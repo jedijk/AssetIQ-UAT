@@ -3,7 +3,6 @@ import { Building2, ClipboardCheck, Activity } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { getBackendUrl } from "../lib/apiConfig";
-import { publicAssetUrl } from "../lib/assetUrl";
 
 const haptic = () => {
   try {
@@ -79,21 +78,10 @@ export default function OperatorLandingPage() {
       className="operator-landing-surface flex flex-col min-h-[calc(100vh-52px)] w-full"
       data-testid="operator-landing"
     >
-      {/* Hero: true vertical center for logo + greeting; buttons live below */}
+      {/* Hero: greeting centered; buttons live below */}
       <div className="flex flex-1 flex-col items-center justify-center px-6 pt-2 pb-4 min-h-0 w-full">
         <div className="flex w-full max-w-sm flex-col items-center text-center">
-          <div className="brand-logo-plate flex w-full max-w-[220px] justify-center rounded-2xl p-5 shadow-sm ring-1 ring-black/10 sm:max-w-[260px] sm:p-6">
-            <img
-              src={publicAssetUrl("/logo.png")}
-              alt=""
-              className="h-40 w-40 max-h-[min(40vw,220px)] max-w-[min(40vw,220px)] select-none object-contain sm:h-48 sm:w-48 sm:max-h-[260px] sm:max-w-[260px]"
-              width={192}
-              height={192}
-              decoding="async"
-              fetchPriority="high"
-            />
-          </div>
-          <h1 className="operator-landing-title mt-8 text-xl font-semibold">
+          <h1 className="operator-landing-title text-xl font-semibold">
             {getGreeting()}
             {user?.name ? `, ${user.name.split(" ")[0]}` : ""}
           </h1>
