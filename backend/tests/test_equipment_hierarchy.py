@@ -12,7 +12,7 @@ if _frontend_env.exists():
             key, val = line.split('=', 1)
             os.environ.setdefault(key.strip(), val.strip())
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://mobile-date-picker-2.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://logo-simple-mode.preview.emergentagent.com').rstrip('/')
 
 
 class TestEquipmentHierarchyLibrary:
