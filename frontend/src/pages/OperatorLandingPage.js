@@ -76,26 +76,32 @@ export default function OperatorLandingPage() {
 
   return (
     <div
-      className="flex flex-col min-h-[calc(100vh-52px)] px-6 pb-8 pt-6 bg-slate-50"
+      className="operator-landing-surface flex flex-col min-h-[calc(100vh-52px)] w-full"
       data-testid="operator-landing"
     >
-      <div className="flex flex-col flex-1 items-center justify-center w-full max-w-lg mx-auto gap-10">
-        <div className="flex flex-col items-center text-center w-full">
-          <img
-            src={publicAssetUrl("/logo.png")}
-            alt=""
-            className="w-36 h-36 sm:w-44 sm:h-44 object-contain mx-auto select-none drop-shadow-sm"
-            width={176}
-            height={176}
-            decoding="async"
-          />
-          <h1 className="text-xl font-semibold text-slate-900 mt-8">
-            {getGreeting()}{user?.name ? `, ${user.name.split(" ")[0]}` : ""}
+      {/* Hero: true vertical center for logo + greeting; buttons live below */}
+      <div className="flex flex-1 flex-col items-center justify-center px-6 pt-2 pb-4 min-h-0 w-full">
+        <div className="flex w-full max-w-sm flex-col items-center text-center">
+          <div className="brand-logo-plate flex w-full max-w-[220px] justify-center rounded-2xl p-5 shadow-sm ring-1 ring-black/10 sm:max-w-[260px] sm:p-6">
+            <img
+              src={publicAssetUrl("/logo.png")}
+              alt=""
+              className="h-40 w-40 max-h-[min(40vw,220px)] max-w-[min(40vw,220px)] select-none object-contain sm:h-48 sm:w-48 sm:max-h-[260px] sm:max-w-[260px]"
+              width={192}
+              height={192}
+              decoding="async"
+              fetchPriority="high"
+            />
+          </div>
+          <h1 className="operator-landing-title mt-8 text-xl font-semibold">
+            {getGreeting()}
+            {user?.name ? `, ${user.name.split(" ")[0]}` : ""}
           </h1>
-          <p className="text-sm text-slate-500 mt-1">What would you like to do?</p>
+          <p className="operator-landing-subtitle mt-1 text-sm">What would you like to do?</p>
         </div>
+      </div>
 
-      <div className="flex flex-col gap-4 w-full max-w-xs shrink-0">
+      <div className="flex shrink-0 flex-col gap-4 px-6 pb-8 pt-2 w-full max-w-xs mx-auto">
         <button
           onClick={handleClick(() => navigate("/my-tasks"))}
           className="relative flex items-center justify-center gap-3 rounded-2xl p-6 bg-orange-400 text-white w-full shadow-lg shadow-orange-400/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
@@ -135,7 +141,6 @@ export default function OperatorLandingPage() {
             <span className="text-sm font-semibold tracking-wide">Production</span>
           </button>
         </div>
-      </div>
       </div>
     </div>
   );

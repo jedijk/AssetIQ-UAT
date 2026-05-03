@@ -790,11 +790,13 @@ const Layout = () => {
               }}
               data-testid="app-logo-link"
             >
-              <img 
-                src={publicAssetUrl("/logo.png")} 
-                alt="AssetIQ" 
-                className="w-8 h-8 rounded-lg"
-              />
+              <span className="brand-logo-plate inline-flex shrink-0 overflow-hidden rounded-lg ring-1 ring-black/10">
+                <img
+                  src={publicAssetUrl("/logo.png")}
+                  alt="AssetIQ"
+                  className="w-8 h-8 block object-contain"
+                />
+              </span>
               <span className="text-base font-semibold text-slate-900 dark:text-white" data-testid="app-logo">
                 <span>Asset</span>
                 <span className="text-blue-600 dark:text-blue-400">IQ</span>
