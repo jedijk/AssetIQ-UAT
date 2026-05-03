@@ -16,6 +16,7 @@ const STATIC_ASSETS = [
   '/index.html',
   '/offline.html',
   '/logo.png',
+  '/logo-operator.png',
   '/logo192.png',
   '/logo512.png',
   '/manifest.json',
