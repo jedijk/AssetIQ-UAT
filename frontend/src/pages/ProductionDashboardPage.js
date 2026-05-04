@@ -1804,7 +1804,7 @@ export default function ProductionDashboardPage() {
                             <button
                               type="button"
                               onClick={openEdit}
-                              className="p-1 rounded-md bg-white border border-slate-200 text-slate-500 active:bg-slate-100"
+                              className="w-8 h-8 flex items-center justify-center rounded-md bg-white border border-slate-200 text-slate-500 active:bg-slate-100"
                               data-testid={`mobile-edit-${timeKey || i}`}
                               aria-label="Edit entry"
                             >
@@ -1817,7 +1817,7 @@ export default function ProductionDashboardPage() {
                                 printingLogSubmissionId &&
                                 printingLogSubmissionId === (isViscOnly ? entry._viscosity_submission_id : entry.submission_id)
                               }
-                              className="p-1 rounded-md bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 active:bg-slate-100 disabled:opacity-60"
+                              className="w-8 h-8 flex items-center justify-center rounded-md bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 active:bg-slate-100 disabled:opacity-60"
                               data-testid={`mobile-reprint-${timeKey || i}`}
                               aria-label="Reprint label"
                               title="Reprint label"
