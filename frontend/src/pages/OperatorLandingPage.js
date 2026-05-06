@@ -76,11 +76,11 @@ export default function OperatorLandingPage() {
 
   return (
     <div
-      className="operator-landing-surface flex flex-col min-h-[calc(100vh-52px)] w-full"
+      className="operator-landing-surface flex flex-col items-center justify-center min-h-[calc(100vh-52px)] w-full"
       data-testid="operator-landing"
     >
       {/* Hero: transparent shield mark + greeting; buttons live below */}
-      <div className="flex flex-1 flex-col items-center justify-center px-6 pt-2 pb-4 min-h-0 w-full">
+      <div className="flex flex-col items-center px-6 pt-2 pb-1 w-full">
         <div className="flex w-full max-w-sm flex-col items-center text-center">
           <img
             src={publicAssetUrl("/logo-operator.png")}
@@ -90,7 +90,7 @@ export default function OperatorLandingPage() {
             height={176}
             decoding="async"
           />
-          <h1 className="operator-landing-title mt-8 text-xl font-semibold">
+          <h1 className="operator-landing-title mt-4 text-xl font-semibold">
             {getGreeting()}
             {user?.name ? `, ${user.name.split(" ")[0]}` : ""}
           </h1>
@@ -98,7 +98,7 @@ export default function OperatorLandingPage() {
         </div>
       </div>
 
-      <div className="flex shrink-0 flex-col gap-4 px-6 pb-8 pt-2 w-full max-w-xs mx-auto">
+      <div className="flex shrink-0 flex-col gap-4 px-6 pb-8 pt-1 w-full max-w-xs mx-auto">
         <button
           onClick={handleClick(() => navigate("/my-tasks"))}
           className="relative flex items-center justify-center gap-3 rounded-2xl p-6 bg-orange-400 text-white w-full shadow-lg shadow-orange-400/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"

@@ -27,7 +27,7 @@
       "description": "Search endpoint /api/failure-modes?search=... only searches the 'keywords' array of each failure mode. It does NOT search the 'equipment' or 'failure_mode' name fields. Searching 'pump' returns 0 results even though 10 pump failure modes exist. The find_matching_failure_modes() function in failure_modes.py only iterates over fm['keywords'].",
       "endpoint_or_component": "GET /api/failure-modes?search=pump | find_matching_failure_modes() in backend/failure_modes.py",
       "surfaces": ["backend"],
-      "reproduction": "GET https://mobile-date-picker-2.preview.emergentagent.com/api/failure-modes?search=pump returns {\"total\": 0, \"failure_modes\": []}. Expected: should return pump-related failure modes (Seal Failure, Bearing Failure, Cavitation, etc.)",
+      "reproduction": "GET https://clock-calibration.preview.emergentagent.com/api/failure-modes?search=pump returns {\"total\": 0, \"failure_modes\": []}. Expected: should return pump-related failure modes (Seal Failure, Bearing Failure, Cavitation, etc.)",
       "affected_test": "backend/tests/test_failure_modes.py::TestFailureModesLibrary::test_search_by_equipment_name"
     },
     {

@@ -101,3 +101,48 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Time in production dashboard not aligned with submission date time - appears 2 hours off (UTC+2 timezone issue)"
+
+backend:
+  - task: "Production dashboard API returns datetime in UTC"
+    implemented: true
+    working: true
+    file: "/app/backend/routes/production.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Backend correctly sends datetime field with full ISO timestamp in UTC. The time field was pre-formatted in UTC which caused the issue."
+
+frontend:
+  - task: "Production dashboard time display in local timezone"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/ProductionDashboardPage.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Fixed getTimeKey and added getLocalTime helper to convert datetime from UTC to user's browser local timezone. Updated combinedSeries, viscosityByTime, filteredLog, and Excel export to use local time."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Production dashboard time display"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Fixed timezone issue in Production Dashboard. The time column now displays times in user's browser local timezone instead of UTC. Changes made to ProductionDashboardPage.js - updated getTimeKey function and added getLocalTime helper to properly convert UTC datetime to local time."

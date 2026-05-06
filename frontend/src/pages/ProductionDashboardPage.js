@@ -433,13 +433,16 @@ export default function ProductionDashboardPage() {
   const caps = useCapabilities();
 
   const getTimeKey = (entry) => {
-    if (entry?.time) return entry.time;
+    // Always use datetime field and convert to user's local timezone
+    // The backend sends datetime in UTC (ISO format), so we parse and format locally
     if (entry?.datetime) {
       const d = new Date(entry.datetime);
       if (!isNaN(d)) {
         return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
       }
     }
+    // Fallback to pre-formatted time only if datetime is missing (legacy data)
+    if (entry?.time) return entry.time;
     return "";
   };
 
@@ -713,7 +716,10 @@ export default function ProductionDashboardPage() {
         const logHeader = ["#", "Date", "Time", "RPM", "Feed", "M%", "Energy", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR", "Viscosity", "Remarks", "By"];
         const logRows = [logHeader];
         const viscMap = {};
-        (data.viscosity_series || []).forEach((v) => { if (v.time) viscMap[v.time] = v.viscosity; });
+        (data.viscosity_series || []).forEach((v) => { 
+          const localTime = getLocalTime(v);
+          if (localTime) viscMap[localTime] = v.viscosity; 
+        });
         (data.production_log || []).forEach((e, i) => {
           const dateStr = e.datetime ? new Date(e.datetime).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}) : '';
           const timeKey = getTimeKey(e);
@@ -733,7 +739,7 @@ export default function ProductionDashboardPage() {
         const viscHeader = ["Time", "Sample No.", "Viscosity (MU)"];
         const viscRows = [viscHeader];
         (data.viscosity_series || []).forEach((v) => {
-          viscRows.push([v.time, v.sample || "", v.viscosity]);
+          viscRows.push([getLocalTime(v), v.sample || "", v.viscosity]);
         });
         const wsVisc = XLSX.utils.aoa_to_sheet(viscRows);
         wsVisc["!cols"] = [{ wch: 10 }, { wch: 20 }, { wch: 14 }];
@@ -844,18 +850,34 @@ export default function ProductionDashboardPage() {
   // Combined time series for Mooney Viscosity chart (merges viscosity + production log data)
   const isMultiDay = period !== "1d";
 
+  // Helper to convert datetime to local HH:MM format
+  const getLocalTime = (item) => {
+    if (item?.datetime) {
+      const d = new Date(item.datetime);
+      if (!isNaN(d)) {
+        return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+      }
+    }
+    // Fallback to pre-formatted time (legacy data in UTC)
+    return item?.time || "";
+  };
+
   // Filtered production log
   const filteredLog = useMemo(() => {
     if (!data?.production_log) return [];
 
     // Merge standalone viscosity entries (no matching extruder time) as separate rows
+    // Use local time keys for matching
     const logKeys = new Set(
       (data.production_log || [])
         .map((e) => (isMultiDay ? e.datetime : getTimeKey(e)))
         .filter(Boolean)
     );
     const standaloneVisc = (data?.viscosity_series || [])
-      .filter((v) => (isMultiDay ? v.datetime : v.time) && !logKeys.has(isMultiDay ? v.datetime : v.time))
+      .filter((v) => {
+        const key = isMultiDay ? v.datetime : getLocalTime(v);
+        return key && !logKeys.has(key);
+      })
       .map((v) => ({
         time: v.time,
         datetime: v.datetime || "",
@@ -890,14 +912,22 @@ export default function ProductionDashboardPage() {
     const log = data?.production_log || [];
     const viscSeries = data?.viscosity_series || [];
     const viscVals = data?.viscosity_values || [];
-    const screenChanges = chartSeries.screenChange ? new Set((data?.screen_changes || []).map(s => s.time)) : new Set();
-    const magnetCleanings = chartSeries.magnetCleaning ? new Set((data?.magnet_cleanings || []).map(s => s.time)) : new Set();
+    // Convert screen_changes and magnet_cleanings to local time keys
+    const screenChanges = chartSeries.screenChange 
+      ? new Set((data?.screen_changes || []).map(s => getLocalTime(s))) 
+      : new Set();
+    const magnetCleanings = chartSeries.magnetCleaning 
+      ? new Set((data?.magnet_cleanings || []).map(s => getLocalTime(s))) 
+      : new Set();
 
     if (!isMultiDay) {
-      // Single day: use time (HH:MM) as key
-      // Build viscosity lookup by time
+      // Single day: use time (HH:MM) in local timezone as key
+      // Build viscosity lookup by local time
       const viscByTime = {};
-      viscSeries.forEach((v) => { if (v.time) viscByTime[v.time] = v.viscosity; });
+      viscSeries.forEach((v) => { 
+        const localTime = getLocalTime(v);
+        if (localTime) viscByTime[localTime] = v.viscosity; 
+      });
 
       const timeMap = {};
       log.forEach((entry) => {
@@ -911,8 +941,9 @@ export default function ProductionDashboardPage() {
         };
       });
       viscSeries.forEach((v) => {
-        if (!timeMap[v.time]) {
-          timeMap[v.time] = { time: v.time, viscosity: v.viscosity, rpm: null, feed: null, mp4: null, t_product_ir: null, screenChange: null, magnetCleaning: null };
+        const localTime = getLocalTime(v);
+        if (!timeMap[localTime]) {
+          timeMap[localTime] = { time: localTime, viscosity: v.viscosity, rpm: null, feed: null, mp4: null, t_product_ir: null, screenChange: null, magnetCleaning: null };
         }
       });
       const addEvent = (timeSet, fieldName) => {
@@ -1020,11 +1051,12 @@ export default function ProductionDashboardPage() {
 
   const kpis = data?.kpis || {};
 
-  // Build time-to-viscosity map for accurate matching
+  // Build time-to-viscosity map for accurate matching (using local timezone)
   const viscosityByTime = useMemo(() => {
     const map = {};
     (data?.viscosity_series || []).forEach((v) => {
-      if (v.time) map[v.time] = { value: v.viscosity, submission_id: v.submission_id };
+      const localTime = getLocalTime(v);
+      if (localTime) map[localTime] = { value: v.viscosity, submission_id: v.submission_id };
     });
     return map;
   }, [data?.viscosity_series]);
@@ -1032,7 +1064,8 @@ export default function ProductionDashboardPage() {
   // Anomaly highlight row
   const isAnomalyRow = (entry) => {
     const avgVisc = kpis.avg_viscosity || 0;
-    const visc = viscosityByTime[entry.time]?.value;
+    const timeKey = getTimeKey(entry);
+    const visc = viscosityByTime[timeKey]?.value;
     if (visc !== undefined) {
       return Math.abs(visc - avgVisc) > 4;
     }
@@ -1804,7 +1837,7 @@ export default function ProductionDashboardPage() {
                             <button
                               type="button"
                               onClick={openEdit}
-                              className="p-1 rounded-md bg-white border border-slate-200 text-slate-500 active:bg-slate-100"
+                              className="w-8 h-8 flex items-center justify-center rounded-md bg-white border border-slate-200 text-slate-500 active:bg-slate-100"
                               data-testid={`mobile-edit-${timeKey || i}`}
                               aria-label="Edit entry"
                             >
@@ -1817,7 +1850,7 @@ export default function ProductionDashboardPage() {
                                 printingLogSubmissionId &&
                                 printingLogSubmissionId === (isViscOnly ? entry._viscosity_submission_id : entry.submission_id)
                               }
-                              className="p-1 rounded-md bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 active:bg-slate-100 disabled:opacity-60"
+                              className="w-8 h-8 flex items-center justify-center rounded-md bg-white border border-slate-200 text-slate-500 hover:text-indigo-600 active:bg-slate-100 disabled:opacity-60"
                               data-testid={`mobile-reprint-${timeKey || i}`}
                               aria-label="Reprint label"
                               title="Reprint label"
