@@ -29,17 +29,53 @@ def _require_owner(user: dict):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
 
 
-def _serialize_datetime(dt):
-    """Serialize datetime to ISO format with UTC timezone suffix."""
+def _serialize_datetime(dt, *, force_utc: bool = False):
+    """
+    Serialize datetime to ISO format.
+
+    - Operator-entered datetimes (from form fields) are treated as local wall-clock times and MUST remain naive.
+    - Server timestamps (created_at/updated_at/submitted_at) should be emitted in UTC so clients can safely render.
+    """
     if dt is None:
         return ""
     if hasattr(dt, 'isoformat'):
-        iso_str = dt.isoformat()
-        # Ensure UTC suffix is present (MongoDB returns naive datetimes)
-        if not iso_str.endswith('Z') and '+' not in iso_str and '-' not in iso_str[-6:]:
-            iso_str += '+00:00'
-        return iso_str
+        if isinstance(dt, datetime):
+            if dt.tzinfo is None:
+                # Keep naive datetimes naive unless explicitly forced to UTC.
+                if not force_utc:
+                    return dt.isoformat()
+                return dt.replace(tzinfo=timezone.utc).isoformat()
+
+            # tz-aware datetime
+            if force_utc:
+                return dt.astimezone(timezone.utc).isoformat()
+            return dt.isoformat()
+        return dt.isoformat()
     return str(dt)
+
+def _sort_key_dt(dt: Optional[datetime]) -> datetime:
+    """
+    Provide a comparable key for sorting mixed naive/aware datetimes.
+    - naive -> returned as-is
+    - aware -> converted to UTC and made naive
+    """
+    if not isinstance(dt, datetime):
+        return datetime.min
+    if dt.tzinfo is None:
+        return dt
+    try:
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    except Exception:
+        return datetime.min
+
+def _in_range(dt: Optional[datetime], start: datetime, end: datetime) -> bool:
+    """Safe date range check for mixed naive/aware datetimes."""
+    if not isinstance(dt, datetime):
+        return False
+    if dt.tzinfo is None:
+        # Compare as local wall-clock time: drop tzinfo from range bounds too.
+        return start.replace(tzinfo=None) <= dt <= end.replace(tzinfo=None)
+    return start <= dt <= end
 
 
 # Form template names that contain production data
@@ -128,8 +164,8 @@ def _parse_sample_datetime(val):
                 continue
     if d is None:
         return None
-    if d.tzinfo is None:
-        d = d.replace(tzinfo=timezone.utc)
+    # IMPORTANT: preserve operator-entered wall-clock time.
+    # If it's naive, keep it naive (do NOT treat it as UTC).
     return d
 
 
@@ -443,8 +479,8 @@ async def get_production_dashboard(
         date_time_val = extract_field(sub, "Date & Time")
         dt_form = _parse_sample_datetime(date_time_val) if date_time_val else None
 
-        in_meta = range_start <= dt_meta <= range_end
-        in_form = dt_form is not None and range_start <= dt_form <= range_end
+        in_meta = _in_range(dt_meta, range_start, range_end)
+        in_form = _in_range(dt_form, range_start, range_end)
         if not in_meta and not in_form:
             continue
 
@@ -504,11 +540,11 @@ async def get_production_dashboard(
 
     extruder_subs = sorted(
         [s for s in submissions if match_template(s, EXTRUDER_FORM)],
-        key=lambda s: s.get("_parsed_time", datetime.min.replace(tzinfo=timezone.utc)),
+        key=lambda s: _sort_key_dt(s.get("_parsed_time")),
     )
     viscosity_subs = sorted(
         [s for s in submissions if match_template(s, VISCOSITY_FORM)],
-        key=lambda s: s.get("_parsed_time", datetime.min.replace(tzinfo=timezone.utc)),
+        key=lambda s: _sort_key_dt(s.get("_parsed_time")),
     )
 
     # Lookup for stable pairing when viscosity submissions were auto-paired to a specific
@@ -524,7 +560,7 @@ async def get_production_dashboard(
     magnet_subs = [s for s in submissions if match_template(s, MAGNET_CLEANING_FORM)]
     end_of_shift_subs = sorted(
         [s for s in submissions if match_template(s, END_OF_SHIFT_FORM)],
-        key=lambda s: s.get("_parsed_time", datetime.min.replace(tzinfo=timezone.utc)),
+        key=lambda s: _sort_key_dt(s.get("_parsed_time")),
         reverse=True,
     )
 
@@ -893,12 +929,13 @@ async def get_production_dashboard(
     def _parse_entry_dt(entry):
         raw = entry.get("datetime") or ""
         if not raw:
-            return datetime.min.replace(tzinfo=timezone.utc)
+            return datetime.min
         try:
             d = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-            return d.replace(tzinfo=timezone.utc) if d.tzinfo is None else d
+            # Keep naive datetimes naive; convert aware → UTC naive for stable sorting.
+            return _sort_key_dt(d)
         except Exception:
-            return datetime.min.replace(tzinfo=timezone.utc)
+            return datetime.min
 
     production_log.sort(key=_parse_entry_dt)
 

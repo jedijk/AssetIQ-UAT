@@ -1355,8 +1355,7 @@ export default function DashboardPage({ initialTab }) {
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-slate-700 truncate">{item.form_template_name || item.template_name || item.form_name || "Form"}</p>
                 <p className="text-[10px] text-slate-400">
-                  {item.submitted_by_name && <span>{item.submitted_by_name} • </span>}
-                  {formatDate(item.submitted_at || item.created_at)}
+                  {formatDateTime(item.submitted_at || item.created_at)}
                 </p>
               </div>
               <span className={`text-[10px] px-1.5 py-0.5 rounded capitalize ${
