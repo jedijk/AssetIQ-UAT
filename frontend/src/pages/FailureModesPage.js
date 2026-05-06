@@ -172,6 +172,7 @@ const FailureModesPage = () => {
   });
   const [keywordInput, setKeywordInput] = useState("");
   const [actionInput, setActionInput] = useState("");
+  const [actionMinutes, setActionMinutes] = useState("");
   const [actionDiscipline, setActionDiscipline] = useState("mechanical");
   const [actionType, setActionType] = useState("PM");
   
@@ -211,6 +212,7 @@ const FailureModesPage = () => {
     });
     setKeywordInput("");
     setActionInput("");
+    setActionMinutes("");
   };
 
   // Fetch categories
@@ -548,13 +550,16 @@ const FailureModesPage = () => {
 
   const addAction = () => {
     if (actionInput.trim()) {
+      const minutes = actionMinutes === "" ? null : parseInt(actionMinutes, 10);
       const newAction = {
         description: actionInput.trim(),
         discipline: actionDiscipline,
-        action_type: actionType
+        action_type: actionType,
+        estimated_minutes: Number.isFinite(minutes) && minutes >= 0 ? minutes : null,
       };
       setNewFm({ ...newFm, recommended_actions: [...newFm.recommended_actions, newAction] });
       setActionInput("");
+      setActionMinutes("");
     }
   };
 
@@ -1289,7 +1294,7 @@ const FailureModesPage = () => {
                 />
                 <Button type="button" variant="outline" onClick={addAction}>{t("common.add")}</Button>
               </div>
-              <div className="flex gap-2 mt-2">
+              <div className="flex gap-2 mt-2 flex-wrap">
                 <Select value={actionDiscipline} onValueChange={setActionDiscipline}>
                   <SelectTrigger className="w-40">
                     <SelectValue placeholder="Discipline" />
@@ -1310,6 +1315,19 @@ const FailureModesPage = () => {
                     ))}
                   </SelectContent>
                 </Select>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-slate-500 whitespace-nowrap">Est. time (min)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={actionMinutes}
+                    onChange={(e) => setActionMinutes(e.target.value)}
+                    className="w-24"
+                    placeholder="—"
+                    data-testid="fm-action-est-minutes"
+                  />
+                </div>
               </div>
               <ul className="space-y-2 mt-3">
                 {newFm.recommended_actions.map((action, i) => {
@@ -1318,6 +1336,7 @@ const FailureModesPage = () => {
                   const description = isObject ? (action.action || action.description) : action;
                   const discipline = isObject ? action.discipline : null;
                   const type = isObject ? action.action_type : null;
+                  const estMin = isObject ? action.estimated_minutes : null;
                   const typeConfig = ACTION_TYPE_OPTIONS.find(t => t.value === type);
                   const actionKey = `${description}-${discipline || 'none'}-${type || 'none'}-${i}`;
                   
@@ -1332,6 +1351,11 @@ const FailureModesPage = () => {
                           )}
                           {discipline && (
                             <span className="text-xs text-slate-500 capitalize">{discipline}</span>
+                          )}
+                          {Number.isFinite(estMin) && estMin !== null && (
+                            <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-slate-100 text-slate-600">
+                              {estMin} min
+                            </span>
                           )}
                         </div>
                         <span className="text-sm">{i + 1}. {description}</span>

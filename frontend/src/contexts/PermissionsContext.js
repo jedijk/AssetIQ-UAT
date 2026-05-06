@@ -5,18 +5,45 @@ import { permissionsAPI } from "../lib/api";
 const PermissionsContext = createContext(null);
 const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
 
-// Feature to nav path mapping
+// Feature to route path mapping (used for route-gating + nav visibility).
+// Keep this aligned with backend FEATURES in `backend/routes/permissions.py`.
 const FEATURE_PATHS = {
   observations: ["/threats", "/observations"],
   investigations: ["/investigations", "/causal-engine"],
   actions: ["/actions"],
-  tasks: ["/my-tasks", "/task-planner", "/tasks"],
-  forms: ["/forms"],
+  // "tasks" is execution / personal work queue
+  tasks: ["/my-tasks"],
+  // "scheduler" is the planner / scheduling UI (route is `/tasks`)
+  scheduler: ["/tasks"],
+  forms: ["/forms", "/form-submissions", "/granulometry"],
   equipment: ["/equipment", "/definitions", "/equipment-manager"],
   library: ["/library"],
+  insights: ["/settings/insights"],
+  // chat is currently a sidebar (no dedicated route), keep mapping empty for now
+  chat: [],
+  statistics: ["/settings/statistics", "/user-statistics"],
   feedback: ["/feedback", "/settings/feedback"],
   users: ["/settings/user-management"],
-  settings: ["/settings/criticality-definitions", "/settings/statistics"],
+  // Treat all settings pages as "settings" gated, except user-management (users) and statistics (statistics)
+  settings: [
+    "/settings",
+    "/settings/preferences",
+    "/settings/general",
+    "/settings/permissions",
+    "/settings/qr",
+    "/settings/labels",
+    "/settings/notifications",
+    "/settings/risk-calculation",
+    "/settings/ai-usage",
+    "/settings/server-performance",
+    "/settings/database",
+    "/settings/audit-log",
+    "/settings/log-ingestion",
+    "/settings/privacy",
+    "/settings/deletion-requests",
+    "/settings/consent-management",
+    "/settings/criticality-definitions",
+  ],
 };
 
 export const PermissionsProvider = ({ children }) => {

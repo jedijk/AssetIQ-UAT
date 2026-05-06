@@ -235,7 +235,11 @@ async def export_failure_modes_excel(
         if isinstance(actions, list):
             if actions and isinstance(actions[0], dict):
                 actions_str = "\n".join([
-                    f"• {a.get('action', a)}" + (f" ({a.get('action_type', '')})" if a.get('action_type') else "")
+                    (
+                        f"• {a.get('action') or a.get('description') or ''}".strip()
+                        + (f" ({a.get('action_type', '')})" if a.get('action_type') else "")
+                        + (f" — {a.get('estimated_minutes')} min" if a.get('estimated_minutes') not in (None, '', 0) else "")
+                    )
                     for a in actions
                 ])
             else:

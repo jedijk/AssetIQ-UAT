@@ -110,6 +110,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
     recommended_actions: [],
   });
   const [newFmAction, setNewFmAction] = useState("");
+  const [newFmActionMinutes, setNewFmActionMinutes] = useState("");
 
   const rpn = fmData.severity * fmData.occurrence * fmData.detection;
   const rpnLevel = rpn >= 300 ? "Critical" : rpn >= 200 ? "High" : rpn >= 100 ? "Medium" : "Low";
@@ -364,11 +365,19 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
 
   const addFmAction = () => {
     if (newFmAction.trim()) {
+      const minutes = newFmActionMinutes === "" ? null : parseInt(newFmActionMinutes, 10);
       setFmData(prev => ({
         ...prev,
-        recommended_actions: [...prev.recommended_actions, newFmAction.trim()]
+        recommended_actions: [
+          ...prev.recommended_actions,
+          {
+            description: newFmAction.trim(),
+            estimated_minutes: Number.isFinite(minutes) && minutes >= 0 ? minutes : null,
+          },
+        ]
       }));
       setNewFmAction("");
+      setNewFmActionMinutes("");
     }
   };
 
@@ -1169,13 +1178,26 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
             {/* Recommended Actions for FM */}
             <div className="space-y-3">
               <Label className="text-sm font-medium">Recommended Actions</Label>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Input
                   value={newFmAction}
                   onChange={(e) => setNewFmAction(e.target.value)}
                   placeholder="Add a recommended action..."
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addFmAction())}
                 />
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs text-slate-500 whitespace-nowrap">Est. time (min)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={newFmActionMinutes}
+                    onChange={(e) => setNewFmActionMinutes(e.target.value)}
+                    className="w-24"
+                    placeholder="—"
+                    data-testid="quick-add-fm-action-est-minutes"
+                  />
+                </div>
                 <Button variant="outline" onClick={addFmAction} disabled={!newFmAction.trim()}>
                   <Plus className="w-4 h-4" />
                 </Button>
@@ -1184,7 +1206,16 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                 <div className="space-y-2">
                   {fmData.recommended_actions.map((action, idx) => (
                     <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg text-sm">
-                      <span>{action}</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="truncate">
+                          {typeof action === "object" ? (action.description || action.action || "") : String(action)}
+                        </span>
+                        {typeof action === "object" && Number.isFinite(action.estimated_minutes) && action.estimated_minutes !== null && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            {action.estimated_minutes} min
+                          </Badge>
+                        )}
+                      </div>
                       <Button
                         variant="ghost"
                         size="sm"

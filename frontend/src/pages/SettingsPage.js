@@ -34,7 +34,7 @@ const SETTINGS_SECTIONS = [
     description: "App preferences and display settings",
     icon: Settings,
     path: "/settings/preferences",
-    roles: ["owner", "admin", "engineer", "technician", "viewer"]
+    roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"]
   },
   {
     id: "privacy",
@@ -42,7 +42,7 @@ const SETTINGS_SECTIONS = [
     description: "GDPR compliance and data export",
     icon: Shield,
     path: "/settings/privacy",
-    roles: ["owner", "admin", "engineer", "technician", "viewer"]
+    roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"]
   },
   {
     id: "users",
@@ -59,7 +59,7 @@ const SETTINGS_SECTIONS = [
     description: "QR codes and scan settings",
     icon: QrCode,
     path: "/settings/qr",
-    roles: ["owner", "admin", "engineer"]
+    roles: ["owner", "admin", "reliability_engineer"]
   },
   {
     id: "risk",
@@ -75,7 +75,7 @@ const SETTINGS_SECTIONS = [
     description: "Email and alert preferences",
     icon: Bell,
     path: "/settings/notifications",
-    roles: ["owner", "admin", "engineer", "technician"]
+    roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations"]
   },
   {
     id: "ai",
@@ -115,7 +115,7 @@ const SETTINGS_SECTIONS = [
     description: "Usage analytics and reports",
     icon: BarChart3,
     path: "/settings/statistics",
-    roles: ["owner", "admin", "engineer", "technician"]
+    roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations"]
   },
   {
     id: "deletion-requests",

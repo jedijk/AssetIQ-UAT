@@ -85,6 +85,7 @@ export function FailureModeViewPanel({
   // Local state for adding keywords/actions in edit mode
   const [keywordInput, setKeywordInput] = useState("");
   const [actionInput, setActionInput] = useState("");
+  const [actionMinutes, setActionMinutes] = useState("");
   
   // Validation dialog state
   const [showValidationDialog, setShowValidationDialog] = useState(false);
@@ -198,14 +199,17 @@ export function FailureModeViewPanel({
   
   const addAction = () => {
     if (actionInput.trim() && formData) {
+      const minutes = actionMinutes === "" ? null : parseInt(actionMinutes, 10);
       const newAction = {
         description: actionInput.trim(),
         discipline: actionDiscipline,
         action_type: actionType,
+        estimated_minutes: Number.isFinite(minutes) && minutes >= 0 ? minutes : null,
         auto_create: false  // Default to false, user can enable it
       };
       setFormData({ ...formData, recommended_actions: [...(formData.recommended_actions || []), newAction] });
       setActionInput("");
+      setActionMinutes("");
     }
   };
   
@@ -230,6 +234,21 @@ export function FailureModeViewPanel({
       });
       setFormData({ ...formData, recommended_actions: updatedActions });
     }
+  };
+
+  const setActionEstimatedMinutes = (idx, raw) => {
+    if (!formData?.recommended_actions) return;
+    const next = formData.recommended_actions.map((action, i) => {
+      if (i !== idx) return action;
+      const isObject = typeof action === "object" && action !== null;
+      const base = isObject ? action : { description: action };
+      const minutes = raw === "" ? null : parseInt(raw, 10);
+      return {
+        ...base,
+        estimated_minutes: Number.isFinite(minutes) && minutes >= 0 ? minutes : null,
+      };
+    });
+    setFormData({ ...formData, recommended_actions: next });
   };
 
   if (!fm) {
@@ -694,6 +713,7 @@ export function FailureModeViewPanel({
               const discipline = isObject ? action.discipline : null;
               const actType = isObject ? action.action_type : null;
               const autoCreate = isObject ? action.auto_create : false;
+              const estMin = isObject ? action.estimated_minutes : null;
               
               const typeColors = {
                 PM: "bg-blue-100 text-blue-700",
@@ -739,12 +759,32 @@ export function FailureModeViewPanel({
                         {discipline && (
                           <span className="text-xs text-slate-500 capitalize">{discipline}</span>
                         )}
+                        {Number.isFinite(estMin) && estMin !== null && (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-slate-100 text-slate-600">
+                            {estMin} min
+                          </span>
+                        )}
                         {autoCreate && (
                           <span className="text-xs text-green-600 font-medium">Auto-create</span>
                         )}
                       </div>
                     )}
                     <span className="text-sm text-slate-700">{description}</span>
+                    {isEditing && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <Label className="text-xs text-slate-500 whitespace-nowrap">Est. time (min)</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={String(isObject && action.estimated_minutes !== undefined && action.estimated_minutes !== null ? action.estimated_minutes : "")}
+                          onChange={(e) => setActionEstimatedMinutes(idx, e.target.value)}
+                          className="w-24 h-8 text-xs"
+                          placeholder="—"
+                          data-testid={`view-panel-action-est-minutes-${idx}`}
+                        />
+                      </div>
+                    )}
                   </div>
                   {isEditing && (
                     <button onClick={() => removeAction(idx)} className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-600">
@@ -792,6 +832,19 @@ export function FailureModeViewPanel({
                       ))}
                     </SelectContent>
                   </Select>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-slate-500 whitespace-nowrap">Est. time (min)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={actionMinutes}
+                      onChange={(e) => setActionMinutes(e.target.value)}
+                      className="w-24 h-9 text-xs"
+                      placeholder="—"
+                      data-testid="view-panel-action-est-minutes"
+                    />
+                  </div>
                 </div>
               </div>
             )}
