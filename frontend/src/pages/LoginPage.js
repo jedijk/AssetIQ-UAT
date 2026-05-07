@@ -185,7 +185,7 @@ const LoginPage = () => {
         loop
         muted
         playsInline
-        poster="/logo.png"
+        poster="/logo-login-desktop.png"
         className="login-mobile-video"
         style={{ backgroundColor: '#1e3a5f' }}
       />
@@ -204,7 +204,7 @@ const LoginPage = () => {
         <div className="login-image-content">
           <div className="login-brand">
             <img 
-              src="/logo.png" 
+              src="/logo-login-desktop.png" 
               alt="AssetIQ" 
               className="w-14 h-14 rounded-xl shadow-lg"
             />
