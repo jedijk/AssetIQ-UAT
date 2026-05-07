@@ -350,9 +350,24 @@ class RBACService:
         def serialize_date(val):
             if val is None:
                 return None
+            # Strings: ensure ISO datetimes include timezone if missing.
+            # This prevents clients from interpreting UTC timestamps as local wall-clock times.
             if isinstance(val, str):
-                return val
-            if hasattr(val, 'isoformat'):
+                s = val.strip()
+                # If it's an ISO-like datetime without timezone suffix, append +00:00
+                # Example problematic shape: "2026-05-07T09:12:34.123456"
+                if "T" in s and not s.endswith("Z"):
+                    tail = s[-6:]
+                    has_offset = ("+" in tail) or ("-" in tail)
+                    if not has_offset:
+                        return s + "+00:00"
+                return s
+            # Datetimes: if naive, assume UTC for server-generated timestamps.
+            if isinstance(val, datetime):
+                if val.tzinfo is None:
+                    return val.replace(tzinfo=timezone.utc).isoformat()
+                return val.isoformat()
+            if hasattr(val, "isoformat"):
                 return val.isoformat()
             return str(val)
         
