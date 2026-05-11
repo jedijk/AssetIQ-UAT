@@ -1252,6 +1252,38 @@ export default function ProductionDashboardPage() {
             </Button>
           </div>
 
+          {/* Day / night shift — mobile only (desktop uses shift selector above) */}
+          {isMobile && (
+            <div className="flex w-full min-w-0" data-testid="mobile-shift-selector">
+              <div className="inline-flex w-full max-w-md items-stretch rounded-lg bg-slate-100 p-0.5 gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => setShift("day")}
+                  className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-md px-2 py-2 min-h-[44px] text-xs font-semibold transition-colors touch-manipulation active:scale-[0.99] ${
+                    shift === "day" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  }`}
+                  title="Day shift (06:00 – 22:00)"
+                  data-testid="mobile-shift-day"
+                >
+                  <span>Day</span>
+                  <span className="font-normal text-[10px] leading-tight text-slate-400">06:00–22:00</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShift("night")}
+                  className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-md px-2 py-2 min-h-[44px] text-xs font-semibold transition-colors touch-manipulation active:scale-[0.99] ${
+                    shift === "night" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  }`}
+                  title="Night shift (22:00 – 06:00)"
+                  data-testid="mobile-shift-night"
+                >
+                  <span>Night</span>
+                  <span className="font-normal text-[10px] leading-tight text-slate-400">22:00–06:00</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Custom date pickers (unfold below) - hidden on mobile */}
           {showCustomDate && !isMobile && (
             <div className="flex items-center gap-3">
