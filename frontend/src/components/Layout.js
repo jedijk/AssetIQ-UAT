@@ -790,11 +790,11 @@ const Layout = () => {
               }}
               data-testid="app-logo-link"
             >
-              <span className="brand-logo-plate inline-flex shrink-0 overflow-hidden rounded-lg ring-1 ring-black/10">
+              <span className="brand-logo-plate inline-flex shrink-0 overflow-hidden rounded-lg ring-1 ring-black/15 dark:ring-white/20">
                 <img
                   src={publicAssetUrl("/logo.png")}
                   alt="AssetIQ"
-                  className="w-8 h-8 block object-contain"
+                  className="w-8 h-8 block object-cover"
                 />
               </span>
               <span className="text-base font-semibold text-slate-900 dark:text-white" data-testid="app-logo">

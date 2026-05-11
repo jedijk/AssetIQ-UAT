@@ -12,8 +12,8 @@ import { publicAssetUrl } from "../lib/assetUrl";
 
 // Static assets from /public (PUBLIC_URL-safe)
 const BACKGROUND_VIDEO = publicAssetUrl("/background.mp4");
-const LOGIN_BRAND_PRIMARY = publicAssetUrl("/logo-login-desktop.png");
-const LOGIN_BRAND_FALLBACK = publicAssetUrl("/logo.png");
+const LOGIN_BRAND_PRIMARY = publicAssetUrl("/logo.png");
+const LOGIN_BRAND_FALLBACK = publicAssetUrl("/logo192.png");
 
 // Max retry attempts for server connection
 const MAX_RETRY_ATTEMPTS = 5;

@@ -79,13 +79,13 @@ export default function OperatorLandingPage() {
       className="operator-landing-surface flex flex-col items-center justify-center min-h-[calc(100vh-52px)] w-full"
       data-testid="operator-landing"
     >
-      {/* Hero: transparent shield mark + greeting; buttons live below */}
+      {/* Hero: app mark + greeting; buttons live below */}
       <div className="flex flex-col items-center px-6 pt-2 pb-1 w-full">
         <div className="flex w-full max-w-sm flex-col items-center text-center">
           <img
-            src={publicAssetUrl("/logo-operator.png")}
+            src={publicAssetUrl("/logo.png")}
             alt=""
-            className="mx-auto h-36 w-36 max-h-[min(42vw,240px)] max-w-[min(42vw,240px)] select-none object-contain drop-shadow-sm sm:h-44 sm:w-44"
+            className="mx-auto h-36 w-36 max-h-[min(42vw,240px)] max-w-[min(42vw,240px)] select-none object-contain drop-shadow-sm sm:h-44 sm:w-44 rounded-2xl"
             width={176}
             height={176}
             decoding="async"

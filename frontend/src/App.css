@@ -967,14 +967,14 @@ a, button, input, select, textarea {
   background-color: var(--bg-tertiary) !important;
 }
 
-/* Raster logos shipped with white backgrounds must stay on true white; AssetIQ theme remaps .bg-white / .bg-slate-50 to navy */
+/* Header mark: full-bleed app icon (navy); no forced white tile — theme remaps .bg-white to navy */
 .brand-logo-plate {
-  background-color: #ffffff !important;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+  background-color: transparent !important;
+  box-shadow: none;
 }
 .theme-assetiq .brand-logo-plate,
 [data-theme="assetiq"] .brand-logo-plate {
-  background-color: #ffffff !important;
+  background-color: transparent !important;
 }
 
 /* Simple-mode landing: light canvas + dark text (theme otherwise paints bg-slate-50 → navy and text-slate-900 → ice blue) */
