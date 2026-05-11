@@ -8,9 +8,12 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Loader2, Shield, Activity, BarChart3, RefreshCw, Server, WifiOff } from "lucide-react";
 import { getBackendUrl } from "../lib/apiConfig";
+import { publicAssetUrl } from "../lib/assetUrl";
 
-// Background video - served from public folder (static asset)
-const BACKGROUND_VIDEO = "/background.mp4";
+// Static assets from /public (PUBLIC_URL-safe)
+const BACKGROUND_VIDEO = publicAssetUrl("/background.mp4");
+const LOGIN_BRAND_PRIMARY = publicAssetUrl("/logo-login-desktop.png");
+const LOGIN_BRAND_FALLBACK = publicAssetUrl("/logo.png");
 
 // Max retry attempts for server connection
 const MAX_RETRY_ATTEMPTS = 5;
@@ -24,6 +27,7 @@ const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loginBrandSrc, setLoginBrandSrc] = useState(LOGIN_BRAND_PRIMARY);
   
   // Server startup state
   const [serverStarting, setServerStarting] = useState(false);
@@ -185,7 +189,7 @@ const LoginPage = () => {
         loop
         muted
         playsInline
-        poster="/logo-login-desktop.png"
+        poster={LOGIN_BRAND_FALLBACK}
         className="login-mobile-video"
         style={{ backgroundColor: '#1e3a5f' }}
       />
@@ -203,10 +207,15 @@ const LoginPage = () => {
         <div className="login-image-overlay" />
         <div className="login-image-content">
           <div className="login-brand">
-            <img 
-              src="/logo-login-desktop.png" 
-              alt="AssetIQ" 
+            <img
+              src={loginBrandSrc}
+              alt="AssetIQ"
               className="w-14 h-14 rounded-xl shadow-lg"
+              onError={() =>
+                setLoginBrandSrc((prev) =>
+                  prev === LOGIN_BRAND_FALLBACK ? prev : LOGIN_BRAND_FALLBACK
+                )
+              }
             />
             <h1 className="login-brand-title">AssetIQ</h1>
           </div>
@@ -236,9 +245,9 @@ const LoginPage = () => {
         <div className="login-form-wrapper animate-fade-in">
           {/* Mobile Logo (hidden on desktop) */}
           <div className="login-mobile-logo">
-            <img 
-              src="/logo.png" 
-              alt="AssetIQ" 
+            <img
+              src={LOGIN_BRAND_FALLBACK}
+              alt="AssetIQ"
               className="w-10 h-10 rounded-lg"
             />
             <span className="text-xl font-bold text-slate-900">AssetIQ</span>
