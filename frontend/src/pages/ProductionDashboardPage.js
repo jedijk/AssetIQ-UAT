@@ -1255,11 +1255,16 @@ export default function ProductionDashboardPage() {
           {/* Day / night shift — mobile only (desktop uses shift selector above) */}
           {isMobile && (
             <div className="flex w-full min-w-0 justify-center px-3" data-testid="mobile-shift-selector">
-              <div className="flex w-[min(100%,22rem)] items-stretch rounded-lg bg-slate-100 p-0.5 gap-0.5">
+              {/* inline-flex + flex-none segments so width is intrinsic — full-width caps looked “off center” vs tab pills */}
+              <div
+                role="group"
+                aria-label="Shift"
+                className="inline-flex max-w-full items-stretch rounded-lg bg-slate-100 p-0.5 gap-0.5"
+              >
                 <button
                   type="button"
                   onClick={() => setShift("day")}
-                  className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-md px-2 py-2 min-h-[44px] text-xs font-semibold transition-colors touch-manipulation active:scale-[0.99] ${
+                  className={`flex min-w-[6.75rem] flex-none flex-col items-center justify-center gap-0.5 rounded-md px-3 py-2 min-h-[44px] text-xs font-semibold transition-colors touch-manipulation active:scale-[0.99] ${
                     shift === "day" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
                   }`}
                   title="Day shift (06:00 – 22:00)"
@@ -1271,7 +1276,7 @@ export default function ProductionDashboardPage() {
                 <button
                   type="button"
                   onClick={() => setShift("night")}
-                  className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-md px-2 py-2 min-h-[44px] text-xs font-semibold transition-colors touch-manipulation active:scale-[0.99] ${
+                  className={`flex min-w-[6.75rem] flex-none flex-col items-center justify-center gap-0.5 rounded-md px-3 py-2 min-h-[44px] text-xs font-semibold transition-colors touch-manipulation active:scale-[0.99] ${
                     shift === "night" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
                   }`}
                   title="Night shift (22:00 – 06:00)"
