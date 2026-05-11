@@ -866,6 +866,30 @@ export default function ProductionDashboardPage() {
   const filteredLog = useMemo(() => {
     if (!data?.production_log) return [];
 
+    /** Chronological sort key: ISO `datetime` parses to ms; never mix string compare with `HH:MM` (e.g. "10:09" sorts before "2026-…"). */
+    const sortMsForEntry = (entry) => {
+      const raw = (entry?.datetime || "").trim();
+      if (raw) {
+        const ms = Date.parse(raw);
+        if (!Number.isNaN(ms)) return ms;
+      }
+      const t = (entry?.time || "").trim();
+      const m = t.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+      if (m) {
+        const d = new Date(
+          fromDate.getFullYear(),
+          fromDate.getMonth(),
+          fromDate.getDate(),
+          parseInt(m[1], 10),
+          parseInt(m[2], 10),
+          m[3] ? parseInt(m[3], 10) : 0,
+          0
+        );
+        return d.getTime();
+      }
+      return Number.POSITIVE_INFINITY;
+    };
+
     // Merge standalone viscosity entries (no matching extruder time) as separate rows
     // Use local time keys for matching
     const logKeys = new Set(
@@ -893,9 +917,14 @@ export default function ProductionDashboardPage() {
         _viscosity_submission_id: v.submission_id,
       }));
 
-    const merged = [...data.production_log, ...standaloneVisc].sort((a, b) =>
-      (a.datetime || a.time || "").localeCompare(b.datetime || b.time || "")
-    );
+    const merged = [...data.production_log, ...standaloneVisc].sort((a, b) => {
+      const da = sortMsForEntry(a);
+      const db = sortMsForEntry(b);
+      if (da !== db) return da - db;
+      const sa = a.submission_id || a._viscosity_submission_id || "";
+      const sb = b.submission_id || b._viscosity_submission_id || "";
+      return String(sa).localeCompare(String(sb));
+    });
 
     if (!logSearch) return merged;
     const s = logSearch.toLowerCase();
@@ -906,7 +935,7 @@ export default function ProductionDashboardPage() {
         String(e.rpm).includes(s) ||
         String(e.feed).includes(s)
     );
-  }, [data?.production_log, data?.viscosity_series, logSearch, isMultiDay]);
+  }, [data?.production_log, data?.viscosity_series, logSearch, isMultiDay, fromDate]);
 
   const combinedSeries = useMemo(() => {
     const log = data?.production_log || [];
