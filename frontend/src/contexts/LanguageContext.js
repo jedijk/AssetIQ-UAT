@@ -178,9 +178,9 @@ const en = {
 
   // Release / product announcements (toasts)
   announcements: {
-    liteModeTitle: "Performance update",
+    liteModeTitle: "AssetIQ 3.6.7 — big fixes",
     liteModeBody:
-      "Lite mode is now included: the app adapts automatically on older or low-memory devices for a smoother experience. New: Lab dashboard (Granulometric analysis). Owners can turn lite mode on or off under Profile → Edit Profile.",
+      "Production dashboard: correct log time order, day/night shift on mobile, centered shift control, and clearer charts. Login and branding assets load more reliably. Deploy caching is tightened to reduce stale-bundle errors after releases. Plus ongoing lite-mode and lab polish.",
   },
   
   // Common
@@ -1427,9 +1427,9 @@ const nl = {
   },
 
   announcements: {
-    liteModeTitle: "Prestatie-update",
+    liteModeTitle: "AssetIQ 3.6.7 — grote fixes",
     liteModeBody:
-      "Lite-modus is toegevoegd: de app past zich automatisch aan op oudere apparaten of met weinig geheugen voor een vlottere ervaring. Nieuw: Lab-dashboard (granulometrische analyse). Eigenaren kunnen lite-modus aan of uit zetten via Profiel → Profiel bewerken.",
+      "Productiedashboard: juiste tijdvolgorde in het logboek, dag-/nachtdienst op mobiel, gecentreerde dienstkeuze en duidelijkere grafieken. Login- en merk-assets laden betrouwbaarder. Deploy-caching is aangescherpt om verouderde bundels na releases te voorkomen. Plus doorlopende lite-modus- en lab-verfijning.",
   },
   
   // Common

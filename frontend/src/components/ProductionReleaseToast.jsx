@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 
-const RELEASE_TOAST_VERSION = process.env.REACT_APP_VERSION || "3.6.6";
+const RELEASE_TOAST_VERSION = process.env.REACT_APP_VERSION || "3.6.7";
 const STORAGE_KEY = `assetiq_announced_lite_mode_${RELEASE_TOAST_VERSION}`;
 
 /**
@@ -30,10 +30,10 @@ export function ProductionReleaseToast() {
         localStorage.setItem(STORAGE_KEY, "1");
       } catch (_e) {}
 
-      toast.success(t("announcements.liteModeTitle"), {
+      toast.info(t("announcements.liteModeTitle"), {
         id: "lite-mode-release-announcement",
         description: t("announcements.liteModeBody"),
-        duration: 14000,
+        duration: 16000,
       });
     }, 700);
 
