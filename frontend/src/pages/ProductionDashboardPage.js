@@ -1254,8 +1254,8 @@ export default function ProductionDashboardPage() {
 
           {/* Day / night shift — mobile only (desktop uses shift selector above) */}
           {isMobile && (
-            <div className="flex w-full min-w-0" data-testid="mobile-shift-selector">
-              <div className="inline-flex w-full max-w-md items-stretch rounded-lg bg-slate-100 p-0.5 gap-0.5">
+            <div className="flex w-full min-w-0 justify-center px-3" data-testid="mobile-shift-selector">
+              <div className="flex w-[min(100%,22rem)] items-stretch rounded-lg bg-slate-100 p-0.5 gap-0.5">
                 <button
                   type="button"
                   onClick={() => setShift("day")}
