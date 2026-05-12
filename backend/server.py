@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 # Single source of truth for the application version.
 # Bump this with each release; the frontend polls /api/health and will force a
 # hard refresh whenever it sees a newer version than the one baked into its bundle.
-APP_VERSION = "3.6.7"
+APP_VERSION = "3.6.8"
 
 # Create FastAPI app IMMEDIATELY - before any potentially failing imports
 app = FastAPI(

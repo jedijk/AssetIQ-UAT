@@ -178,9 +178,9 @@ const en = {
 
   // Release / product announcements (toasts)
   announcements: {
-    liteModeTitle: "AssetIQ 3.6.7 — big fixes",
+    liteModeTitle: "AssetIQ 3.6.8 — AI chat improvements",
     liteModeBody:
-      "Production dashboard: correct log time order, day/night shift on mobile, centered shift control, and clearer charts. Login and branding assets load more reliably. Deploy caching is tightened to reduce stale-bundle errors after releases. Plus ongoing lite-mode and lab polish.",
+      "AI chat: prompts and confirmations follow the language of your message (for example English equipment lists when you describe the issue in English). Reopening the chat no longer resets the context auto-skip timer. Photo extraction anchors dates to capture time and shows a clear low-confidence signal when the date is adjusted. AI vision fail-safe improvements. Production log row #1 is the first line of the day. Plus dashboard polish and tighter deploy caching.",
   },
   
   // Common
@@ -1427,9 +1427,9 @@ const nl = {
   },
 
   announcements: {
-    liteModeTitle: "AssetIQ 3.6.7 — grote fixes",
+    liteModeTitle: "AssetIQ 3.6.8 — verbeterde AI-chat",
     liteModeBody:
-      "Productiedashboard: juiste tijdvolgorde in het logboek, dag-/nachtdienst op mobiel, gecentreerde dienstkeuze en duidelijkere grafieken. Login- en merk-assets laden betrouwbaarder. Deploy-caching is aangescherpt om verouderde bundels na releases te voorkomen. Plus doorlopende lite-modus- en lab-verfijning.",
+      "AI-chat: prompts en bevestigingen volgen de taal van uw bericht (bijv. Engelstalige apparatenlijsten bij een Engelse melding). De automatische overslaan-timer voor context wordt niet meer gereset als u de chat sluit en weer opent. Fototextractie koppelt datums aan het moment van vastleggen en toont een duidelijk signaal bij lage betrouwbaarheid als de datum wordt gecorrigeerd. Verbeteringen aan AI-vision failsafes. Regel #1 in het productielog is de eerste regel van de dag. Plus dashboard-verfijning en strakkere deploy-caching.",
   },
   
   // Common

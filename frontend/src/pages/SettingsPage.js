@@ -24,7 +24,7 @@ import { Button } from "../components/ui/button";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { cn } from "../lib/utils";
 
-const APP_VERSION = process.env.REACT_APP_VERSION || "3.6.7";
+const APP_VERSION = process.env.REACT_APP_VERSION || "3.6.8";
 
 // Settings sections configuration
 const SETTINGS_SECTIONS = [
