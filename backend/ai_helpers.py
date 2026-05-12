@@ -172,6 +172,42 @@ async def classify_user_intent(message: str, session_id: str) -> dict:
         return {"is_data_query": False, "confidence": 0.5}
 
 
+async def summarize_issue_description(text: str, language: str = "en") -> str:
+    """
+    Short summary of the operator's issue text for a confirmation step before
+    equipment mapping + failure mode selection.
+    """
+    t = (text or "").strip()
+    if not t:
+        return ""
+    if len(t) <= 160:
+        return t
+    try:
+        client = get_openai_client()
+        lang_note = "Dutch" if language == "nl" else "English"
+        response = client.chat.completions.create(
+            model=os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        f"In 1–2 short sentences ({lang_note}), summarize the equipment issue below "
+                        "for operator confirmation. Output only the summary, no preamble."
+                    ),
+                },
+                {"role": "user", "content": t[:4000]},
+            ],
+            temperature=0.2,
+            max_tokens=150,
+        )
+        out = (response.choices[0].message.content or "").strip()
+        if out:
+            return out
+    except Exception as e:
+        logger.warning("summarize_issue_description fallback: %s", e)
+    return t[:280] + ("…" if len(t) > 280 else "")
+
+
 async def get_data_context(user_id: str, query_entities: list = None) -> str:
     """Gather relevant data context for answering data queries."""
     context_parts = []

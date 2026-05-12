@@ -20,11 +20,10 @@ from models.api_models import (
 )
 from ai_helpers import (
     classify_user_intent, get_data_context, answer_data_query, transcribe_audio_with_ai,
-    analyze_attachment_image,
+    analyze_attachment_image, summarize_issue_description,
 )
 from chat_handler_v2 import (
-    process_chat_message, ChatState, message_looks_like_equipment,
-    extract_tag_from_message, lookup_equipment_by_tag,
+    process_chat_message, ChatState,
 )
 from failure_modes import FAILURE_MODES_LIBRARY
 from services.threat_score_service import (
@@ -178,6 +177,8 @@ async def _reset_conv(user_id: str):
         failure_mode_suggestions=None,
         original_message=None,
         awaiting_context_for_threat=None,
+        issue_description=None,
+        issue_summary=None,
     )
 
 
@@ -317,6 +318,133 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
     return {"threat": updated, "auto_created_actions": auto_created, "threat_id": threat_id}
 
 
+def _issue_confirm_yes(text: str) -> bool:
+    t = (text or "").strip().lower()
+    if not t:
+        return False
+    if t in {
+        "yes", "y", "yeah", "yep", "correct", "ok", "okay", "sure", "fine",
+        "ja", "klopt", "akkoord", "precies", "continue", "proceed", "next", "go",
+    }:
+        return True
+    return t.startswith("yes") or t.startswith("ja ") or t.startswith("ja,") or t.startswith("ok ")
+
+
+def _issue_confirm_no(text: str) -> bool:
+    t = (text or "").strip().lower()
+    return t in {"no", "nope", "nee", "incorrect", "wrong", "not correct", "klopt niet"}
+
+
+async def _finalize_chat_machine_result(
+    user_id: str,
+    session_id: str,
+    detected_lang: str,
+    image_thumbnail: Optional[str],
+    result: dict,
+) -> ChatResponse:
+    """Persist state + assistant message after `process_chat_message` (observation or in-flow)."""
+    new_state = result["state"]
+    resp_text = result["response_text"]
+
+    if result.get("create_observation") and result.get("observation_data"):
+        obs = await _create_observation(user_id, result["observation_data"],
+                                        session_id, image_thumbnail)
+        threat = obs["threat"]
+        auto_actions = obs["auto_created_actions"]
+        new_threat_id = obs["threat_id"]
+
+        actions_info = ""
+        if auto_actions:
+            actions_info = f"\n\n**{len(auto_actions)} action(s) auto-created:**\n"
+            for a in auto_actions[:3]:
+                actions_info += f"- {a['title'][:50]}{'...' if len(a['title'])>50 else ''}\n"
+            if len(auto_actions) > 3:
+                actions_info += f"- ...and {len(auto_actions)-3} more\n"
+
+        context_prompt = (
+            f"Observation recorded: **{threat['title']}**{actions_info}\n\n"
+            f"Would you like to add any additional context? You can:\n"
+            f"- Add comments about what you observed\n"
+            f"- Provide temperature or measurement readings\n"
+            f"- Describe the conditions (weather, operating state)\n"
+            f"- Upload a photo of the issue\n\n"
+            f"Type your observations or say 'skip' to continue."
+        )
+
+        await _write_conv(
+            user_id,
+            state=ChatState.AWAITING_CONTEXT,
+            pending_data={},
+            equipment_suggestions=None,
+            failure_mode_suggestions=None,
+            original_message=None,
+            awaiting_context_for_threat=new_threat_id,
+            issue_description=None,
+            issue_summary=None,
+        )
+
+        eq_data = result["observation_data"].get("equipment", {})
+        await _store_assistant_msg(
+            user_id, context_prompt,
+            chat_state=ChatState.AWAITING_CONTEXT,
+            threat_id=new_threat_id,
+            threat_title=threat["title"],
+            threat_asset=threat["asset"],
+            threat_equipment_type=threat.get("equipment_type"),
+            threat_equipment_tag=eq_data.get("tag"),
+            threat_failure_mode=threat["failure_mode"],
+            threat_risk_level=threat["risk_level"],
+            threat_risk_score=threat["risk_score"],
+            threat_rank=threat.get("rank"),
+            threat_summary=True,
+            awaiting_context_for_threat=new_threat_id,
+            question_type="context",
+        )
+
+        return ChatResponse(
+            message=context_prompt,
+            threat=ThreatResponse(**threat),
+            follow_up_question=context_prompt,
+            question_type="context",
+            awaiting_context_for_threat=new_threat_id,
+            detected_language=detected_lang,
+        )
+
+    await _write_conv(
+        user_id,
+        state=new_state,
+        pending_data=result.get("pending_data", {}),
+        equipment_suggestions=result.get("equipment_suggestions"),
+        failure_mode_suggestions=result.get("failure_mode_suggestions"),
+        original_message=result.get("original_message"),
+        awaiting_context_for_threat=None,
+    )
+
+    q_type = ("asset" if result.get("equipment_suggestions")
+              else ("failure" if result.get("failure_mode_suggestions") is not None else None))
+
+    await _store_assistant_msg(
+        user_id, resp_text,
+        chat_state=new_state,
+        pending_data=result.get("pending_data", {}),
+        equipment_suggestions=result.get("equipment_suggestions"),
+        failure_mode_suggestions=result.get("failure_mode_suggestions"),
+        show_new_failure_mode_option=result.get("show_new_failure_mode_option"),
+        question_type=q_type,
+        original_message=result.get("original_message"),
+    )
+
+    return ChatResponse(
+        message=resp_text,
+        follow_up_question=resp_text if new_state != ChatState.COMPLETE else None,
+        question_type=q_type,
+        equipment_suggestions=result.get("equipment_suggestions"),
+        failure_mode_suggestions=result.get("failure_mode_suggestions"),
+        show_new_failure_mode_option=result.get("show_new_failure_mode_option"),
+        detected_language=detected_lang,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Core chat processing (shared by text and voice endpoints)
 # ---------------------------------------------------------------------------
@@ -355,7 +483,129 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
     logger.info(f"Chat: db={get_current_db_name()}, user={user_id[:20]}, state={state}, msg='{content[:50]}'")
 
     # ------------------------------------------------------------------
-    # 3. AWAITING_CONTEXT — handle context/skip (highest priority)
+    # 3. Issue description summary / confirm (before equipment & failure modes)
+    # ------------------------------------------------------------------
+    if state == ChatState.AWAITING_ISSUE_CONFIRM:
+        issue_desc = (conv.get("issue_description") or "").strip()
+        if content.strip().lower() == "cancel":
+            await _reset_conv(user_id)
+            reply = "Cancelled. What would you like to report?"
+            await _store_assistant_msg(user_id, reply, chat_state=ChatState.INITIAL)
+            return ChatResponse(message=reply, detected_language=detected_lang)
+
+        if _issue_confirm_yes(content):
+            if not issue_desc:
+                await _reset_conv(user_id)
+                reply = "Please start again with a short description of the issue."
+                await _store_assistant_msg(user_id, reply, chat_state=ChatState.INITIAL)
+                return ChatResponse(message=reply, detected_language=detected_lang)
+            await _write_conv(user_id, issue_description=None, issue_summary=None)
+            fm_library = await get_failure_modes_from_db()
+            pd = {"original_description": issue_desc, "issue_description": issue_desc}
+            result = await process_chat_message(
+                db=db,
+                user_id=user_id,
+                message_content=issue_desc,
+                failure_modes_library=fm_library,
+                current_state=ChatState.INITIAL,
+                pending_data=pd,
+                prev_equipment_suggestions=[],
+                prev_failure_mode_suggestions=[],
+                original_message=issue_desc,
+            )
+            return await _finalize_chat_machine_result(
+                user_id, session_id, detected_lang, image_thumbnail, result
+            )
+
+        if _issue_confirm_no(content):
+            await _write_conv(
+                user_id,
+                state=ChatState.AWAITING_ISSUE_DESCRIPTION,
+                issue_description=None,
+                issue_summary=None,
+            )
+            reply = (
+                "Geef het probleem opnieuw kort met eigen woorden."
+                if detected_lang == "nl"
+                else "Please describe the issue again in your own words."
+            )
+            await _store_assistant_msg(
+                user_id, reply,
+                chat_state=ChatState.AWAITING_ISSUE_DESCRIPTION,
+                question_type="issue_redescribe",
+            )
+            return ChatResponse(
+                message=reply,
+                follow_up_question=reply,
+                question_type="issue_redescribe",
+                detected_language=detected_lang,
+            )
+
+        summary = await summarize_issue_description(content, detected_lang)
+        await _write_conv(
+            user_id,
+            state=ChatState.AWAITING_ISSUE_CONFIRM,
+            issue_description=content,
+            issue_summary=summary,
+        )
+        reply = (
+            f"Dit is wat ik begreep:\n\n**{summary}**\n\n"
+            f"Klopt dit? Antwoord **ja** om door te gaan met equipment en failure mode, of typ een **andere** beschrijving."
+            if detected_lang == "nl"
+            else (
+                f"Here's what I understood:\n\n**{summary}**\n\n"
+                f"Is this correct? Reply **yes** to continue with equipment and failure mode selection, "
+                f"or type a **revised** description."
+            )
+        )
+        await _store_assistant_msg(
+            user_id, reply,
+            chat_state=ChatState.AWAITING_ISSUE_CONFIRM,
+            question_type="issue_confirm",
+        )
+        return ChatResponse(
+            message=reply,
+            follow_up_question=reply,
+            question_type="issue_confirm",
+            detected_language=detected_lang,
+        )
+
+    if state == ChatState.AWAITING_ISSUE_DESCRIPTION:
+        if content.strip().lower() == "cancel":
+            await _reset_conv(user_id)
+            reply = "Cancelled. What would you like to report?"
+            await _store_assistant_msg(user_id, reply, chat_state=ChatState.INITIAL)
+            return ChatResponse(message=reply, detected_language=detected_lang)
+        summary = await summarize_issue_description(content, detected_lang)
+        await _write_conv(
+            user_id,
+            state=ChatState.AWAITING_ISSUE_CONFIRM,
+            issue_description=content,
+            issue_summary=summary,
+        )
+        reply = (
+            f"Dit is wat ik begreep:\n\n**{summary}**\n\n"
+            f"Klopt dit? Antwoord **ja** om door te gaan, of typ een **andere** beschrijving."
+            if detected_lang == "nl"
+            else (
+                f"Here's what I understood:\n\n**{summary}**\n\n"
+                f"Is this correct? Reply **yes** to continue, or type a **revised** description."
+            )
+        )
+        await _store_assistant_msg(
+            user_id, reply,
+            chat_state=ChatState.AWAITING_ISSUE_CONFIRM,
+            question_type="issue_confirm",
+        )
+        return ChatResponse(
+            message=reply,
+            follow_up_question=reply,
+            question_type="issue_confirm",
+            detected_language=detected_lang,
+        )
+
+    # ------------------------------------------------------------------
+    # 4. AWAITING_CONTEXT — handle context/skip (highest priority)
     # ------------------------------------------------------------------
     if state == ChatState.AWAITING_CONTEXT:
         skip_phrases = {"skip", "no", "done", "next", "nee", "klaar", "volgende"}
@@ -469,18 +719,15 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
         )
 
     # ------------------------------------------------------------------
-    # 4. Race-condition guard: message looks like equipment but state is INITIAL
-    # ------------------------------------------------------------------
-    is_equip_format = message_looks_like_equipment(content)
-    if state == ChatState.INITIAL and is_equip_format:
-        logger.info("Equipment format detected with state=INITIAL, forcing AWAITING_EQUIPMENT")
-        state = ChatState.AWAITING_EQUIPMENT
-
-    # ------------------------------------------------------------------
     # 5. Intent classification (only in INITIAL, no image, not in-flow)
     # ------------------------------------------------------------------
-    in_flow = state in {ChatState.AWAITING_EQUIPMENT, ChatState.AWAITING_FAILURE_MODE,
-                        ChatState.AWAITING_NEW_FAILURE_MODE}
+    in_flow = state in {
+        ChatState.AWAITING_ISSUE_CONFIRM,
+        ChatState.AWAITING_ISSUE_DESCRIPTION,
+        ChatState.AWAITING_EQUIPMENT,
+        ChatState.AWAITING_FAILURE_MODE,
+        ChatState.AWAITING_NEW_FAILURE_MODE,
+    }
     if state == ChatState.INITIAL and not in_flow and not image_base64:
         intent = await classify_user_intent(content, session_id)
         if intent.get("is_data_query") and intent.get("confidence", 0) > 0.6:
@@ -490,6 +737,40 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             )
             await _store_assistant_msg(user_id, answer, chat_state=ChatState.INITIAL, is_data_query=True)
             return ChatResponse(message=answer, question_type="data_query", detected_language=detected_lang)
+
+        summary = await summarize_issue_description(content, detected_lang)
+        await _write_conv(
+            user_id,
+            state=ChatState.AWAITING_ISSUE_CONFIRM,
+            pending_data={},
+            equipment_suggestions=None,
+            failure_mode_suggestions=None,
+            original_message=None,
+            awaiting_context_for_threat=None,
+            issue_description=content,
+            issue_summary=summary,
+        )
+        reply = (
+            f"Dit is wat ik begreep:\n\n**{summary}**\n\n"
+            f"Klopt dit? Antwoord **ja** om door te gaan met equipment en failure mode, of typ een **andere** beschrijving."
+            if detected_lang == "nl"
+            else (
+                f"Here's what I understood:\n\n**{summary}**\n\n"
+                f"Is this correct? Reply **yes** to continue with equipment and failure mode selection, "
+                f"or type a **revised** description."
+            )
+        )
+        await _store_assistant_msg(
+            user_id, reply,
+            chat_state=ChatState.AWAITING_ISSUE_CONFIRM,
+            question_type="issue_confirm",
+        )
+        return ChatResponse(
+            message=reply,
+            follow_up_question=reply,
+            question_type="issue_confirm",
+            detected_language=detected_lang,
+        )
 
     # ------------------------------------------------------------------
     # 6. Process with state machine (equipment / failure mode flow)
@@ -508,112 +789,8 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
         original_message=original_message,
     )
 
-    new_state = result["state"]
-    resp_text = result["response_text"]
-
-    # ------------------------------------------------------------------
-    # 7. If COMPLETE → create observation → move to AWAITING_CONTEXT
-    # ------------------------------------------------------------------
-    if result.get("create_observation") and result.get("observation_data"):
-        obs = await _create_observation(user_id, result["observation_data"],
-                                        session_id, image_thumbnail)
-        threat = obs["threat"]
-        auto_actions = obs["auto_created_actions"]
-        new_threat_id = obs["threat_id"]
-
-        # Build context prompt
-        actions_info = ""
-        if auto_actions:
-            actions_info = f"\n\n**{len(auto_actions)} action(s) auto-created:**\n"
-            for a in auto_actions[:3]:
-                actions_info += f"- {a['title'][:50]}{'...' if len(a['title'])>50 else ''}\n"
-            if len(auto_actions) > 3:
-                actions_info += f"- ...and {len(auto_actions)-3} more\n"
-
-        context_prompt = (
-            f"Observation recorded: **{threat['title']}**{actions_info}\n\n"
-            f"Would you like to add any additional context? You can:\n"
-            f"- Add comments about what you observed\n"
-            f"- Provide temperature or measurement readings\n"
-            f"- Describe the conditions (weather, operating state)\n"
-            f"- Upload a photo of the issue\n\n"
-            f"Type your observations or say 'skip' to continue."
-        )
-
-        # Write AWAITING_CONTEXT state
-        await _write_conv(
-            user_id,
-            state=ChatState.AWAITING_CONTEXT,
-            pending_data={},
-            equipment_suggestions=None,
-            failure_mode_suggestions=None,
-            original_message=None,
-            awaiting_context_for_threat=new_threat_id,
-        )
-
-        # Store assistant message with threat summary
-        eq_data = result["observation_data"].get("equipment", {})
-        await _store_assistant_msg(
-            user_id, context_prompt,
-            chat_state=ChatState.AWAITING_CONTEXT,
-            threat_id=new_threat_id,
-            threat_title=threat["title"],
-            threat_asset=threat["asset"],
-            threat_equipment_type=threat.get("equipment_type"),
-            threat_equipment_tag=eq_data.get("tag"),
-            threat_failure_mode=threat["failure_mode"],
-            threat_risk_level=threat["risk_level"],
-            threat_risk_score=threat["risk_score"],
-            threat_rank=threat.get("rank"),
-            threat_summary=True,
-            awaiting_context_for_threat=new_threat_id,
-            question_type="context",
-        )
-
-        return ChatResponse(
-            message=context_prompt,
-            threat=ThreatResponse(**threat),
-            follow_up_question=context_prompt,
-            question_type="context",
-            awaiting_context_for_threat=new_threat_id,
-            detected_language=detected_lang,
-        )
-
-    # ------------------------------------------------------------------
-    # 8. Non-observation result: write new state, store message, return
-    # ------------------------------------------------------------------
-    await _write_conv(
-        user_id,
-        state=new_state,
-        pending_data=result.get("pending_data", {}),
-        equipment_suggestions=result.get("equipment_suggestions"),
-        failure_mode_suggestions=result.get("failure_mode_suggestions"),
-        original_message=result.get("original_message"),
-        awaiting_context_for_threat=None,
-    )
-
-    q_type = ("asset" if result.get("equipment_suggestions")
-              else ("failure" if result.get("failure_mode_suggestions") is not None else None))
-
-    await _store_assistant_msg(
-        user_id, resp_text,
-        chat_state=new_state,
-        pending_data=result.get("pending_data", {}),
-        equipment_suggestions=result.get("equipment_suggestions"),
-        failure_mode_suggestions=result.get("failure_mode_suggestions"),
-        show_new_failure_mode_option=result.get("show_new_failure_mode_option"),
-        question_type=q_type,
-        original_message=result.get("original_message"),
-    )
-
-    return ChatResponse(
-        message=resp_text,
-        follow_up_question=resp_text if new_state != ChatState.COMPLETE else None,
-        question_type=q_type,
-        equipment_suggestions=result.get("equipment_suggestions"),
-        failure_mode_suggestions=result.get("failure_mode_suggestions"),
-        show_new_failure_mode_option=result.get("show_new_failure_mode_option"),
-        detected_language=detected_lang,
+    return await _finalize_chat_machine_result(
+        user_id, session_id, detected_lang, image_thumbnail, result
     )
 
 

@@ -5,7 +5,7 @@ Tests the complete rewrite of the chat system that uses chat_conversations colle
 as the single source of truth for state management.
 
 Key flows tested:
-1. Full chat flow: initial message → equipment suggestions → select equipment → 
+1. Full chat flow: initial message → issue summary + confirm (yes) → equipment suggestions → select equipment → 
    failure mode suggestions → select FM → observation created → AWAITING_CONTEXT → 
    send context → saved to threat
 2. Skip context flow: after observation, send 'skip' → returns to INITIAL state
@@ -27,6 +27,15 @@ BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 class TestChatSystemV2:
     """Chat System V2 - Single Source of Truth State Machine Tests"""
+
+    def _confirm_issue_summary(self):
+        """After the first threat-report message, the API asks for confirmation — reply yes."""
+        r = self.session.post(
+            f"{BASE_URL}/api/chat/send",
+            json={"content": "yes"},
+        )
+        assert r.status_code == 200
+        return r.json()
     
     @pytest.fixture(autouse=True)
     def setup(self):
@@ -157,6 +166,8 @@ class TestChatSystemV2:
         )
         assert response1.status_code == 200, f"Step 1 failed: {response1.text}"
         data1 = response1.json()
+        if data1.get("question_type") == "issue_confirm":
+            data1 = self._confirm_issue_summary()
         
         # Should get equipment suggestions or direct match
         print(f"Step 1 response: {data1.get('message', '')[:100]}...")
@@ -231,6 +242,8 @@ class TestChatSystemV2:
         )
         assert response1.status_code == 200
         data1 = response1.json()
+        if data1.get("question_type") == "issue_confirm":
+            data1 = self._confirm_issue_summary()
         
         eq_suggestions = data1.get("equipment_suggestions", [])
         
@@ -301,6 +314,8 @@ class TestChatSystemV2:
         )
         assert response.status_code == 200, f"Request failed: {response.text}"
         data = response.json()
+        if data.get("question_type") == "issue_confirm":
+            data = self._confirm_issue_summary()
         
         # The system should either:
         # 1. Find the equipment directly and ask for failure mode
@@ -373,6 +388,8 @@ class TestChatSystemV2:
         )
         assert response1.status_code == 200
         data1 = response1.json()
+        if data1.get("question_type") == "issue_confirm":
+            data1 = self._confirm_issue_summary()
         
         eq_suggestions = data1.get("equipment_suggestions", [])
         
@@ -437,6 +454,8 @@ class TestChatSystemV2:
         )
         assert response1.status_code == 200
         data1 = response1.json()
+        if data1.get("question_type") == "issue_confirm":
+            data1 = self._confirm_issue_summary()
         
         # If we got equipment suggestions, we should be in AWAITING_EQUIPMENT state
         if data1.get("equipment_suggestions"):
