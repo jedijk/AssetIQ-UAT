@@ -136,13 +136,44 @@ def parse_submitted_at(sub):
     return None
 
 
+def _unwrap_form_value(val):
+    """
+    Form values are sometimes stored as plain scalars, sometimes as {value: "..."} (mobile / structured UIs).
+    """
+    if val is None:
+        return None
+    if isinstance(val, datetime):
+        return val
+    if isinstance(val, dict):
+        for k in ("value", "isoValue", "iso", "dateTime", "text", "raw"):
+            inner = val.get(k)
+            if inner not in (None, ""):
+                return _unwrap_form_value(inner)
+        return val
+    if isinstance(val, list) and len(val) > 0:
+        return _unwrap_form_value(val[0])
+    return val
+
+
 def _parse_sample_datetime(val):
     """Parse operator-entered sample time from form values (ISO, EU day-first, etc.)."""
     if val is None:
         return None
+    val = _unwrap_form_value(val)
+    if isinstance(val, datetime):
+        # BSON / backend may hydrate datetime; keep naive wall-clock when tz-unset (matches operator picker).
+        if val.tzinfo is not None:
+            try:
+                return val.replace(tzinfo=None)
+            except Exception:
+                return val
+        return val
     s = str(val).strip()
-    if not s:
+    if not s or s in ("{}", "null", "undefined"):
         return None
+    # Normalise space-separated ISO (some clients send "YYYY-MM-DD HH:MM")
+    if " " in s and "T" not in s and re.match(r"^\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}", s):
+        s = s.replace(" ", "T", 1)
     try:
         d = datetime.fromisoformat(s.replace("Z", "+00:00"))
     except ValueError:
@@ -164,35 +195,59 @@ def _parse_sample_datetime(val):
                 continue
     if d is None:
         return None
-    # IMPORTANT: preserve operator-entered wall-clock time.
-    # If it's naive, keep it naive (do NOT treat it as UTC).
+    # Treat parsed clock as operator wall time for dashboard filters (match naive range bounds).
+    if d.tzinfo is not None:
+        try:
+            return d.replace(tzinfo=None)
+        except Exception:
+            return d
     return d
 
 
 def _extract_date_time_field_raw(sub) -> Optional[str]:
     """
     Raw sample datetime string from form values.
-    Uses canonical "Date & Time" first, then datetime-like labels (template variants).
+    Uses canonical "Date & Time" first, then field_type, then label/f_id heuristics
+    (templates vary; mobile may nest value objects).
     """
-    raw = extract_field(sub, "Date & Time")
-    if raw:
+    raw = _unwrap_form_value(extract_field(sub, "Date & Time"))
+    if raw is not None and raw != "":
+        if isinstance(raw, datetime):
+            return raw.isoformat(sep="T", timespec="seconds")
         s = str(raw).strip()
-        if s:
+        if s and s not in ("{}", "null"):
             return s
+
     for v in sub.get("values", []) or []:
+        ft = str(v.get("field_type") or v.get("type") or "").strip().lower()
+        if ft in ("datetime", "datetime-local", "datetime_local", "datetimelocal"):
+            inner = _unwrap_form_value(v.get("value"))
+            if inner is not None and inner != "":
+                if isinstance(inner, datetime):
+                    return inner.isoformat(sep="T", timespec="seconds")
+                s = str(inner).strip()
+                if s:
+                    return s
+
         label = str(v.get("field_label") or "").strip().lower()
         fid = str(v.get("field_id") or "").strip().lower()
         is_dt_like = (
             ("date" in label and "time" in label)
+            or ("datum" in label and "tijd" in label)
             or ("date/time" in label)
             or ("datetime" in label)
             or (fid.replace("_", " ").strip() == "date & time")
             or (fid == "date_&_time")
+            or ("sample" in label and ("time" in label or "date" in label or "datum" in label))
         )
-        if is_dt_like and v.get("value"):
-            s = str(v.get("value")).strip()
-            if s:
-                return s
+        if is_dt_like:
+            inner = _unwrap_form_value(v.get("value"))
+            if inner is not None and inner != "":
+                if isinstance(inner, datetime):
+                    return inner.isoformat(sep="T", timespec="seconds")
+                s = str(inner).strip()
+                if s:
+                    return s
     return None
 
 
