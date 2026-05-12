@@ -78,6 +78,8 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
     fd.append("image", fileToSend);
     fd.append("schema_json", JSON.stringify(schema));
     if (formTemplateId) fd.append("form_template_id", formTemplateId);
+    // Anchor AI date/datetime extraction to when the photo was taken (browser clock, ISO UTC).
+    fd.append("captured_at_iso", new Date().toISOString());
 
     try {
       const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
@@ -136,6 +138,7 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
           confidence: item.confidence,
           raw_text: item.raw_text,
           source: "ai_extraction",
+          date_adjusted: item.date_adjusted === true,
         };
       }
       // Include stored photo path

@@ -10,7 +10,7 @@ import json
 import base64
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date, time
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
@@ -46,6 +46,8 @@ class ExtractedValue(BaseModel):
     value: Any
     confidence: float
     raw_text: Optional[str] = None
+    # True when calendar date was snapped to capture anchor (year/drift mismatch)
+    date_adjusted: bool = False
 
 
 class ExtractionResponse(BaseModel):
@@ -154,11 +156,92 @@ def _normalize_date_value(raw: str, kind: str = "date") -> Optional[str]:
     return None
 
 
-def _build_prompt(schema: ExtractionSchema, hints: List[str] = None) -> str:
+# Max calendar drift from capture date before we treat OCR date as implausible (~1 month).
+_MAX_CAPTURE_DATE_DRIFT_DAYS = 31
+
+
+def _parse_capture_reference_utc(captured_at_iso: Optional[str]) -> datetime:
+    """Client-reported capture instant (ISO); fallback to current UTC."""
+    if not captured_at_iso or not isinstance(captured_at_iso, str):
+        return datetime.now(timezone.utc)
+    s = captured_at_iso.strip()
+    if not s:
+        return datetime.now(timezone.utc)
+    try:
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except ValueError:
+        return datetime.now(timezone.utc)
+
+
+def _calibrate_date_value_to_capture(
+    value: Any,
+    field_type: str,
+    ref_utc: datetime,
+    confidence: float,
+) -> tuple[Any, float, bool]:
+    """
+    If the extracted calendar date is a different year or more than ~1 month from
+    the capture anchor, snap the calendar date to the capture date (keep time for
+    datetime), cap confidence, and mark date_adjusted for UI.
+    """
+    if value is None or field_type not in ("date", "datetime"):
+        return value, confidence, False
+    normalized = _normalize_date_value(str(value).strip(), field_type)
+    if not normalized:
+        return value, confidence, False
+
+    ref_cal: date = ref_utc.date()
+    time_part: time = time(0, 0)
+    try:
+        if field_type == "date":
+            extracted_date = datetime.strptime(normalized[:10], "%Y-%m-%d").date()
+        else:
+            if "T" in normalized:
+                dt_part = datetime.strptime(normalized[:16], "%Y-%m-%dT%H:%M")
+                extracted_date = dt_part.date()
+                time_part = dt_part.time()
+            else:
+                extracted_date = datetime.strptime(normalized[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return normalized, confidence, False
+
+    delta_days = abs((extracted_date - ref_cal).days)
+    year_mismatch = extracted_date.year != ref_cal.year
+    if not year_mismatch and delta_days <= _MAX_CAPTURE_DATE_DRIFT_DAYS:
+        return normalized, confidence, False
+
+    new_conf = min(float(confidence), 0.28)
+    if field_type == "date":
+        return ref_cal.isoformat(), new_conf, True
+    out = datetime.combine(ref_cal, time_part).strftime("%Y-%m-%dT%H:%M")
+    return out, new_conf, True
+
+
+def _schema_has_date_or_datetime(schema: ExtractionSchema) -> bool:
+    return any(f.type in ("date", "datetime") for f in schema.fields)
+
+
+def _build_prompt(
+    schema: ExtractionSchema,
+    hints: List[str] = None,
+    capture_anchor_utc: Optional[datetime] = None,
+) -> str:
     if schema.prompt_template:
         prompt = schema.prompt_template
         if hints:
             prompt += "\n\nLearned corrections from past usage:\n" + "\n".join(hints)
+        if capture_anchor_utc and _schema_has_date_or_datetime(schema):
+            anchor = capture_anchor_utc.strftime("%Y-%m-%d %H:%M UTC")
+            prompt += (
+                "\n\nPHOTO CAPTURE ANCHOR (UTC): approximately "
+                f"{anchor}. For ambiguous reading dates/times, align with this capture window; "
+                "do not guess a year or month far from it unless the image clearly shows a different printed date."
+            )
         return prompt
 
     lines = [
@@ -193,6 +276,20 @@ def _build_prompt(schema: ExtractionSchema, hints: List[str] = None) -> str:
         lines.append("- Month names in Dutch/German/English (e.g. 'juli', 'Juli', 'July') must be converted to numeric format.")
         lines.append("- If the year is written with only 2 digits (e.g. '24'), assume 20XX (2024).")
 
+    if capture_anchor_utc and (has_date_field or has_datetime_field):
+        anchor = capture_anchor_utc.strftime("%Y-%m-%d %H:%M UTC")
+        lines.append("")
+        lines.append("PHOTO CAPTURE ANCHOR (trust this for ambiguous dates):")
+        lines.append(f"- This photo was captured at approximately {anchor}.")
+        lines.append(
+            "- For date/datetime fields that describe when this reading was taken (gauges, forms, labels on equipment): "
+            "the calendar date should match this capture window unless the image clearly shows a different printed date as the main subject."
+        )
+        lines.append(
+            "- Do not output a year or month far from this capture window from noisy or partial digits. "
+            "If the printed date is ambiguous, use the capture calendar date and set confidence lower."
+        )
+
     # Append learned corrections
     if hints:
         lines.append("")
@@ -218,6 +315,7 @@ async def extract_from_image(
     image: UploadFile = File(...),
     schema_json: str = Form(...),
     form_template_id: Optional[str] = Form(None),
+    captured_at_iso: Optional[str] = Form(None),
     current_user: dict = Depends(get_current_user),
 ):
     if not VISION_KEY:
@@ -282,8 +380,12 @@ async def extract_from_image(
     if hints:
         logger.info(f"[AI Extract] Applying {len(hints)} learned correction hints")
 
-    prompt = _build_prompt(schema, hints)
-    logger.info(f"[AI Extract] user={current_user.get('id')} fields={len(schema.fields)} mode={schema.mode} hints={len(hints)}")
+    ref_utc = _parse_capture_reference_utc(captured_at_iso)
+    prompt = _build_prompt(schema, hints, capture_anchor_utc=ref_utc)
+    logger.info(
+        f"[AI Extract] user={current_user.get('id')} fields={len(schema.fields)} mode={schema.mode} "
+        f"hints={len(hints)} capture_anchor={ref_utc.isoformat()}"
+    )
 
     try:
         client = OpenAI(api_key=VISION_KEY)
@@ -339,18 +441,29 @@ async def extract_from_image(
 
             # Normalize date/datetime values as a safety net in case AI returns non-ISO format
             value = item.get("value")
+            conf = float(item.get("confidence", 0))
             matched_schema_field = schema_fields.get(matched_key)
+            date_adjusted = False
             if value and matched_schema_field and matched_schema_field.type in ("date", "datetime"):
                 normalized = _normalize_date_value(str(value), matched_schema_field.type)
                 if normalized and normalized != value:
                     logger.info(f"[AI Extract] Normalized {matched_schema_field.type} value for '{matched_key}': '{value}' → '{normalized}'")
                     value = normalized
+                value, conf, date_adjusted = _calibrate_date_value_to_capture(
+                    value, matched_schema_field.type, ref_utc, conf
+                )
+                if date_adjusted:
+                    logger.info(
+                        f"[AI Extract] Calibrated {matched_schema_field.type} for '{matched_key}' to capture date "
+                        f"(confidence→{conf:.2f})"
+                    )
 
             extracted.append(ExtractedValue(
                 key=matched_key,
                 value=value,
-                confidence=float(item.get("confidence", 0)),
+                confidence=conf,
                 raw_text=item.get("raw_text"),
+                date_adjusted=date_adjusted,
             ))
 
         logger.info(f"[AI Extract] success - {len(extracted)} fields extracted")

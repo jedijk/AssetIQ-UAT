@@ -516,15 +516,23 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
     const AiBadge = () => {
       if (!aiInfo) return null;
       const conf = aiInfo.confidence;
-      const isLow = conf < confThreshold;
+      const dateAdjusted = aiInfo.date_adjusted === true;
+      const isLow = conf < confThreshold || dateAdjusted;
       const wasCorrected = !!corrected;
       return (
         <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ml-1.5 ${
           wasCorrected ? "bg-blue-100 text-blue-700" :
+          dateAdjusted ? "bg-red-100 text-red-800 ring-1 ring-red-200" :
           isLow ? "bg-amber-100 text-amber-700" :
           "bg-green-100 text-green-700"
         }`} data-testid={`ai-badge-${field.id}`}>
-          {wasCorrected ? "Corrected" : isLow ? `AI ${Math.round(conf * 100)}%` : `AI ${Math.round(conf * 100)}%`}
+          {wasCorrected
+            ? "Corrected"
+            : dateAdjusted
+              ? `AI date corrected — low accuracy (${Math.round(conf * 100)}%)`
+              : isLow
+                ? `AI ${Math.round(conf * 100)}%`
+                : `AI ${Math.round(conf * 100)}%`}
         </span>
       );
     };
@@ -818,6 +826,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
           <div key={field.id} className="space-y-1.5">
             <Label className={cn(hasError && "text-red-600", mobileLabelClass)}>
               {field.label} {field.required && <span className="text-red-500">*</span>}
+              <AiBadge />
             </Label>
             <LinkedEquipmentBadge />
             <Input
@@ -833,7 +842,11 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
                 handleFieldChange(field.id, selectedDate);
               }}
               onMouseDown={(e) => e.stopPropagation()}
-              className={cn(mobileInputClass, hasError && "border-red-500")}
+              className={cn(
+                mobileInputClass,
+                hasError && "border-red-500",
+                aiInfo?.date_adjusted && !corrected && "ring-2 ring-red-300 border-red-300 bg-red-50/40"
+              )}
             />
             {hasError && <p className="text-xs text-red-600">{hasError}</p>}
           </div>
@@ -863,7 +876,11 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
                 handleFieldChange(field.id, selectedDateTime);
               }}
               onMouseDown={(e) => e.stopPropagation()}
-              className={cn(mobileInputClass, hasError && "border-red-500")}
+              className={cn(
+                mobileInputClass,
+                hasError && "border-red-500",
+                aiInfo?.date_adjusted && !corrected && "ring-2 ring-red-300 border-red-300 bg-red-50/40"
+              )}
             />
             {hasError && <p className="text-xs text-red-600">{hasError}</p>}
           </div>
