@@ -422,6 +422,30 @@ const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmen
   );
 };
 
+/** Chronological sort key for production log rows (ISO `datetime` or clock time anchored on `fromDate`). */
+function sortMillisecondsForProductionEntry(entry, fromDate) {
+  const raw = (entry?.datetime || "").trim();
+  if (raw) {
+    const ms = Date.parse(raw);
+    if (!Number.isNaN(ms)) return ms;
+  }
+  const t = (entry?.time || "").trim();
+  const m = t.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (m && fromDate) {
+    const d = new Date(
+      fromDate.getFullYear(),
+      fromDate.getMonth(),
+      fromDate.getDate(),
+      parseInt(m[1], 10),
+      parseInt(m[2], 10),
+      m[3] ? parseInt(m[3], 10) : 0,
+      0
+    );
+    return d.getTime();
+  }
+  return Number.POSITIVE_INFINITY;
+}
+
 // ──────────────────────────────────────────
 // Main component
 // ──────────────────────────────────────────
@@ -720,7 +744,15 @@ export default function ProductionDashboardPage() {
           const localTime = getLocalTime(v);
           if (localTime) viscMap[localTime] = v.viscosity; 
         });
-        (data.production_log || []).forEach((e, i) => {
+        const logSorted = [...(data.production_log || [])].sort((a, b) => {
+          const da = sortMillisecondsForProductionEntry(a, fromDate);
+          const db = sortMillisecondsForProductionEntry(b, fromDate);
+          if (da !== db) return da - db;
+          const sa = a.submission_id || "";
+          const sb = b.submission_id || "";
+          return String(sa).localeCompare(String(sb));
+        });
+        logSorted.forEach((e, i) => {
           const dateStr = e.datetime ? new Date(e.datetime).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}) : '';
           const timeKey = getTimeKey(e);
           logRows.push([
@@ -866,30 +898,6 @@ export default function ProductionDashboardPage() {
   const filteredLog = useMemo(() => {
     if (!data?.production_log) return [];
 
-    /** Chronological sort key: ISO `datetime` parses to ms; never mix string compare with `HH:MM` (e.g. "10:09" sorts before "2026-…"). */
-    const sortMsForEntry = (entry) => {
-      const raw = (entry?.datetime || "").trim();
-      if (raw) {
-        const ms = Date.parse(raw);
-        if (!Number.isNaN(ms)) return ms;
-      }
-      const t = (entry?.time || "").trim();
-      const m = t.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
-      if (m) {
-        const d = new Date(
-          fromDate.getFullYear(),
-          fromDate.getMonth(),
-          fromDate.getDate(),
-          parseInt(m[1], 10),
-          parseInt(m[2], 10),
-          m[3] ? parseInt(m[3], 10) : 0,
-          0
-        );
-        return d.getTime();
-      }
-      return Number.POSITIVE_INFINITY;
-    };
-
     // Merge standalone viscosity entries (no matching extruder time) as separate rows
     // Use local time keys for matching
     const logKeys = new Set(
@@ -917,11 +925,11 @@ export default function ProductionDashboardPage() {
         _viscosity_submission_id: v.submission_id,
       }));
 
-    // Newest sample first (operator-facing log); avoids a rare stray older calendar date dominating row #1.
+    // Chronological (first reading of the day/shift at top) so row #1 is the first line item.
     const merged = [...data.production_log, ...standaloneVisc].sort((a, b) => {
-      const da = sortMsForEntry(a);
-      const db = sortMsForEntry(b);
-      if (da !== db) return db - da;
+      const da = sortMillisecondsForProductionEntry(a, fromDate);
+      const db = sortMillisecondsForProductionEntry(b, fromDate);
+      if (da !== db) return da - db;
       const sa = a.submission_id || a._viscosity_submission_id || "";
       const sb = b.submission_id || b._viscosity_submission_id || "";
       return String(sa).localeCompare(String(sb));
