@@ -627,6 +627,28 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               </button>
             ))}
             
+            <button
+              onClick={() => {
+                sendMutation.mutate({ content: "Equipment: I don't know", image: null });
+              }}
+              disabled={isSending}
+              className="w-full text-left p-2.5 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+              data-testid="equipment-unknown-btn"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <HelpCircle className="w-4 h-4 text-slate-500" />
+                  <span className="font-medium text-slate-700 text-sm">I don&apos;t know</span>
+                </div>
+                {isSending ? (
+                  <Loader2 className="w-4 h-4 text-slate-400 animate-spin flex-shrink-0" />
+                ) : (
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors flex-shrink-0" />
+                )}
+              </div>
+              <span className="text-xs text-slate-500 ml-6">Continue without selecting equipment</span>
+            </button>
+            
             {/* Cancel option */}
             <button
               onClick={async () => {
@@ -678,6 +700,28 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
                 </div>
               </button>
             ))}
+            
+            <button
+              onClick={() => {
+                sendMutation.mutate({ content: "Failure mode: I don't know", image: null });
+              }}
+              disabled={isSending}
+              className="w-full text-left p-2.5 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+              data-testid="failure-mode-unknown-btn"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <HelpCircle className="w-4 h-4 text-slate-500" />
+                  <span className="font-medium text-slate-700 text-sm">I don&apos;t know</span>
+                </div>
+                {isSending ? (
+                  <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
+                ) : (
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
+                )}
+              </div>
+              <span className="text-xs text-slate-500 ml-6">Record without a specific failure mode</span>
+            </button>
             
             {/* New Failure Mode option */}
             <button

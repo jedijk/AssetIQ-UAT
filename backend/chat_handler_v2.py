@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 class ChatState:
     INITIAL = "initial"
+    AWAITING_ISSUE_DESCRIPTION = "awaiting_issue_description"
+    AWAITING_ISSUE_CONFIRM = "awaiting_issue_confirm"
     AWAITING_EQUIPMENT = "awaiting_equipment"
     AWAITING_FAILURE_MODE = "awaiting_failure_mode"
     AWAITING_NEW_FAILURE_MODE = "awaiting_new_failure_mode"
@@ -25,6 +27,42 @@ def _equip_label(equipment: dict) -> str:
     name = equipment.get("name", "Unknown")
     tag = equipment.get("tag")
     return f"{name} ({tag})" if tag else name
+
+
+def _unknown_equipment_placeholder(pending_data: dict) -> dict:
+    """Synthetic equipment when the operator cannot identify the asset."""
+    return {
+        "id": None,
+        "name": "Unknown equipment",
+        "tag": None,
+        "equipment_type": None,
+        "criticality": {},
+        "installation_id": pending_data.get("installation_id"),
+    }
+
+
+def _message_indicates_unknown_equipment(message_content: str) -> bool:
+    raw = message_content.strip().lower()
+    if raw.startswith("equipment:"):
+        inner = message_content.split(":", 1)[1].strip().lower()
+    else:
+        inner = raw
+    return inner in (
+        "i don't know", "i dont know", "don't know", "dont know",
+        "unknown", "not sure", "no idea", "unsure",
+    )
+
+
+def _message_indicates_unknown_failure_mode(message_content: str) -> bool:
+    raw = message_content.strip().lower()
+    if raw.startswith("failure mode:"):
+        inner = message_content.split(":", 1)[1].strip().lower()
+    else:
+        inner = raw
+    return inner in (
+        "i don't know", "i dont know", "don't know", "dont know",
+        "unknown", "not sure", "no idea", "unsure",
+    )
 
 
 def normalize_text(text: str) -> str:
@@ -352,6 +390,11 @@ async def process_chat_message(
     # AWAITING_EQUIPMENT
     # ==============================
     if current_state == ChatState.AWAITING_EQUIPMENT:
+        if _message_indicates_unknown_equipment(message_content):
+            unknown_eq = _unknown_equipment_placeholder(pending_data)
+            return _after_equipment_selected(
+                unknown_eq, failure_modes_library, original_message, pending_data)
+
         selected = match_equipment_from_suggestions(message_content, prev_equipment_suggestions)
 
         # Direct tag lookup fallback (handles race condition or tag not in suggestions)
@@ -392,6 +435,16 @@ async def process_chat_message(
     # AWAITING_FAILURE_MODE
     # ==============================
     if current_state == ChatState.AWAITING_FAILURE_MODE:
+        if _message_indicates_unknown_failure_mode(message_content):
+            pending_data["failure_mode_name"] = "Unknown / not specified"
+            pending_data["is_custom_failure_mode"] = True
+            pending_data.pop("failure_mode", None)
+            pending_data.pop("failure_mode_id", None)
+            pending_data.pop("recommended_actions", None)
+            return _result(
+                text=f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
+                state=ChatState.COMPLETE, pending=pending_data, create=True, obs_data=pending_data)
+
         # Custom failure mode
         if message_content.lower().startswith("new failure mode:"):
             custom = message_content.split(":", 1)[1].strip()

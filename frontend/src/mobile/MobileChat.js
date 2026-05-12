@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { chatAPI, voiceAPI } from "../lib/api";
-import { X, Send, Mic, MicOff, Loader2, Trash2 } from "lucide-react";
+import { X, Send, Mic, MicOff, Loader2, Trash2, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 
 const MobileChat = ({ onClose }) => {
@@ -120,6 +120,16 @@ const MobileChat = ({ onClose }) => {
                   )}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => sendMutation.mutate({ content: "Equipment: I don't know" })}
+                disabled={sendMutation.isPending}
+                className="suggestion-btn suggestion-btn-muted"
+                data-testid="equipment-unknown-btn"
+              >
+                <HelpCircle className="w-3.5 h-3.5 inline mr-1 opacity-70" />
+                I don&apos;t know
+              </button>
             </div>
           )}
 
@@ -135,6 +145,16 @@ const MobileChat = ({ onClose }) => {
                   {fm.failure_mode}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => sendMutation.mutate({ content: "Failure mode: I don't know" })}
+                disabled={sendMutation.isPending}
+                className="suggestion-btn suggestion-btn-muted"
+                data-testid="failure-mode-unknown-btn"
+              >
+                <HelpCircle className="w-3.5 h-3.5 inline mr-1 opacity-70" />
+                I don&apos;t know
+              </button>
             </div>
           )}
 
@@ -392,6 +412,18 @@ const MobileChat = ({ onClose }) => {
           background: #e2e8f0;
           border-color: #3b82f6;
           color: #3b82f6;
+        }
+
+        .suggestion-btn-muted {
+          background: #fafafa;
+          border-color: #cbd5e1;
+          color: #475569;
+        }
+
+        .suggestion-btn-muted:hover {
+          border-color: #64748b;
+          color: #334155;
+          background: #f1f5f9;
         }
 
         .threat-card {

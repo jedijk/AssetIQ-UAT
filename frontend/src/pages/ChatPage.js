@@ -278,6 +278,16 @@ const ChatPage = () => {
                   </div>
                 </Button>
               ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSuggestionClick("Equipment: I don't know")}
+                className="text-left justify-start text-slate-600 hover:bg-slate-50 border-slate-200 h-auto py-1.5"
+                data-testid="equipment-unknown-btn"
+              >
+                <HelpCircle className="w-3 h-3 mr-1 flex-shrink-0" />
+                I don&apos;t know
+              </Button>
             </div>
           </div>
         )}
@@ -300,6 +310,16 @@ const ChatPage = () => {
                   {fm.rpn && <span className="ml-1 text-xs text-slate-400">(RPN: {fm.rpn})</span>}
                 </Button>
               ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleSuggestionClick("Failure mode: I don't know")}
+                className="text-left justify-start text-slate-600 hover:bg-slate-50 border-slate-200"
+                data-testid="failure-mode-unknown-btn"
+              >
+                <HelpCircle className="w-3 h-3 mr-1 flex-shrink-0" />
+                I don&apos;t know
+              </Button>
             </div>
           </div>
         )}
