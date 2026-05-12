@@ -918,13 +918,13 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
       {/* Backdrop - Click anywhere outside to close */}
       <div
         onClick={onClose}
-        className="fixed inset-0 top-[52px] bg-black/20 backdrop-blur-sm z-40"
+        className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[210]"
         data-testid="chat-backdrop"
       />
 
       {/* Sidebar */}
       <div
-        className="fixed right-0 top-0 h-full w-full sm:w-[400px] bg-slate-50 shadow-2xl z-50 flex flex-col"
+        className="fixed right-0 top-0 h-full w-full sm:w-[400px] bg-slate-50 shadow-2xl z-[220] flex flex-col"
         data-testid="chat-sidebar"
       >
         {/* Header */}

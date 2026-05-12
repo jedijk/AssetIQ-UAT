@@ -1417,7 +1417,7 @@ const Layout = () => {
       <motion.button
         onClick={() => { setChatPrefillEquipment(null); setChatOpen(true); }}
         className={`fixed bottom-6 h-14 w-14 rounded-full bg-blue-600 text-white flex items-center justify-center z-30 transition-all duration-200 ease-out right-6 ${
-          chatOpen ? "sm:right-[424px]" : ""
+          chatOpen ? "sm:right-[424px] sm:z-[230]" : ""
         }`}
         style={{ boxShadow: '0 8px 24px -4px rgba(37, 99, 235, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.25)' }}
         whileHover={{ scale: 1.08, boxShadow: '0 12px 32px -4px rgba(37, 99, 235, 0.6), 0 6px 16px -2px rgba(0, 0, 0, 0.3)' }}
