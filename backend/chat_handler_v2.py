@@ -7,7 +7,7 @@ No DB state queries — state is passed in by the caller (routes/chat.py).
 
 import re
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +15,36 @@ logger = logging.getLogger(__name__)
 def _chat_ui(locale: str, en: str, nl: str) -> str:
     """Pick Dutch or English assistant string for chat (not for stored threats)."""
     return nl if (locale or "en").lower().startswith("nl") else en
+
+
+def _prompt_lang_from_user_text(text: str) -> Optional[str]:
+    """
+    If the user message clearly reads English or Dutch, return 'en' or 'nl'.
+    Used to avoid Dutch equipment prompts when the issue text is English but
+    chat_ui_language / ui_language still say nl (app default or stale conv).
+    """
+    if not text:
+        return None
+    s = text.strip()
+    if len(s) < 6:
+        return None
+    low = f" {s.lower()} "
+    nl_markers = (
+        " het ", " een ", " niet ", " naar ", " deze ", " wordt ", " graag ",
+        " geen ", " ook ", " alleen ", " kunt ", " kunnen ", " moeten ", " wij ",
+        " uw ", " bijvoorbeeld ", " melding ", " klep ", " pomp ", " storing ",
+        " temperatuur ", " apparatuur ", " lekkage ", " defect ", " werkt niet ",
+    )
+    if any(m in low for m in nl_markers):
+        return "nl"
+    en_markers = (
+        " the ", " and ", " with ", " that ", " this ", " which ", " sensor ",
+        " filter ", " valve ", " high ", " low ", " temperature ", " problem ",
+        " issue ", " broken ", " leak ", " full ", " often ", " very ", " bearing ",
+    )
+    if any(m in low for m in en_markers):
+        return "en"
+    return None
 
 
 class ChatState:
@@ -345,8 +375,11 @@ async def process_chat_message(
     ul = (ui_language or "en").lower()[:2]
     if ul not in ("nl", "en"):
         ul = "en"
-    pending_data.setdefault("chat_ui_language", ul)
-    loc = pending_data["chat_ui_language"]
+    inferred = _prompt_lang_from_user_text(message_content)
+    if inferred == "en" and ul == "nl":
+        ul = "en"
+    pending_data["chat_ui_language"] = ul
+    loc = ul
     prev_equipment_suggestions = prev_equipment_suggestions or []
     prev_failure_mode_suggestions = prev_failure_mode_suggestions or []
     original_message = original_message or message_content
