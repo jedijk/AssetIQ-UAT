@@ -369,6 +369,44 @@ def _issue_confirm_language_code(detected_lang: str) -> str:
     return "nl" if detected_lang == "nl" else "en"
 
 
+def _issue_confirm_ui_lang_from_copy(summary: str, issue_body: str, fallback: str) -> str:
+    """
+    Match issue-confirm chrome (intro + buttons) to the language users actually read
+    in the summary/issue text. Avoids Dutch UI when the summary is English but
+    chat_ui_language / detect_language skew nl (e.g. app set to NL, or 'is'/'in'
+    scoring false positives in detect_language).
+    """
+    blob = f"{summary or ''}\n{issue_body or ''}".strip()
+    if len(blob) < 3:
+        fb = (fallback or "en").lower()[:2]
+        return fb if fb == "nl" else "en"
+
+    low = f" {blob.lower()} "
+
+    # Strong Dutch cues (articles / function words uncommon as false positives in EN)
+    nl_markers = (
+        " het ", " een ", " niet ", " naar ", " deze ", " wordt ", " graag ",
+        " geen ", " ook ", " alleen ", " kunt ", " kunnen ", " moeten ", " wij ",
+        " uw ", " u ", " bijvoorbeeld ", " melding ", " klep ", " pomp ",
+    )
+    if any(m in low for m in nl_markers):
+        return "nl"
+
+    # Strong English cues (typical issue-reporting vocabulary)
+    en_markers = (
+        " the ", " and ", " with ", " that ", " this ", " which ", " sensor ",
+        " filter ", " valve ", " high ", " low ", " temperature ", " problem ",
+        " issue ", " broken ", " leak ", " full ", " often ", " very ",
+    )
+    if any(m in low for m in en_markers):
+        return "en"
+
+    d = detect_language(blob)
+    if d == "nl":
+        return "nl"
+    return "en"
+
+
 async def _finalize_chat_machine_result(
     user_id: str,
     session_id: str,
@@ -644,8 +682,11 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             issue_description=updated_issue,
             issue_summary=summary,
         )
-        reply = _issue_confirm_assistant_text(pending_data.get("chat_ui_language") or detected_lang)
-        ic_lang = _issue_confirm_language_code(pending_data.get("chat_ui_language") or detected_lang)
+        ic_ui_lang = _issue_confirm_ui_lang_from_copy(
+            summary, updated_issue, pending_data.get("chat_ui_language") or detected_lang
+        )
+        reply = _issue_confirm_assistant_text(ic_ui_lang)
+        ic_lang = _issue_confirm_language_code(ic_ui_lang)
         await _store_assistant_msg(
             user_id, reply,
             chat_state=ChatState.AWAITING_ISSUE_CONFIRM,
@@ -679,8 +720,11 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             issue_description=content,
             issue_summary=summary,
         )
-        reply = _issue_confirm_assistant_text(pending_data.get("chat_ui_language") or detected_lang)
-        ic_lang = _issue_confirm_language_code(pending_data.get("chat_ui_language") or detected_lang)
+        ic_ui_lang = _issue_confirm_ui_lang_from_copy(
+            summary, content, pending_data.get("chat_ui_language") or detected_lang
+        )
+        reply = _issue_confirm_assistant_text(ic_ui_lang)
+        ic_lang = _issue_confirm_language_code(ic_ui_lang)
         await _store_assistant_msg(
             user_id, reply,
             chat_state=ChatState.AWAITING_ISSUE_CONFIRM,
@@ -885,8 +929,11 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             issue_description=content,
             issue_summary=summary,
         )
-        reply = _issue_confirm_assistant_text(pending_data.get("chat_ui_language") or detected_lang)
-        ic_lang = _issue_confirm_language_code(pending_data.get("chat_ui_language") or detected_lang)
+        ic_ui_lang = _issue_confirm_ui_lang_from_copy(
+            summary, content, pending_data.get("chat_ui_language") or detected_lang
+        )
+        reply = _issue_confirm_assistant_text(ic_ui_lang)
+        ic_lang = _issue_confirm_language_code(ic_ui_lang)
         await _store_assistant_msg(
             user_id, reply,
             chat_state=ChatState.AWAITING_ISSUE_CONFIRM,
