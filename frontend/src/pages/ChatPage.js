@@ -259,6 +259,13 @@ const ChatPage = () => {
                       </Button>
                     </div>
                   )}
+                  {isLastAssistant && (
+                    <p className="text-xs text-slate-500 mt-2">
+                      {isNl
+                        ? "Of typ hieronder wat er aangepast moet worden — we werken je beschrijving en samenvatting bij."
+                        : "Or type below what to change — we'll update your description and summary."}
+                    </p>
+                  )}
                 </>
               );
             })()}

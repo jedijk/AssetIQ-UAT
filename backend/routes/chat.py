@@ -21,6 +21,7 @@ from models.api_models import (
 from ai_helpers import (
     classify_user_intent, get_data_context, answer_data_query, transcribe_audio_with_ai,
     analyze_attachment_image, summarize_issue_description,
+    merge_issue_description_with_edit,
 )
 from chat_handler_v2 import (
     process_chat_message, ChatState,
@@ -340,9 +341,12 @@ def _issue_confirm_no(text: str) -> bool:
 
 def _issue_confirm_assistant_text(detected_lang: str) -> str:
     return (
-        "Dit is wat ik begreep:\n\nKlopt dit? Kies hieronder een optie."
+        "Dit is wat ik begreep:\n\nKlopt dit? Kies hieronder een optie, of typ wat er aangepast moet worden."
         if detected_lang == "nl"
-        else "Here's what I understood:\n\nIs this correct? Choose an option below."
+        else (
+            "Here's what I understood:\n\n"
+            "Is this correct? Choose an option below, or type what you'd like changed."
+        )
     )
 
 
@@ -556,11 +560,20 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                 detected_language=detected_lang,
             )
 
-        summary = await summarize_issue_description(content, detected_lang)
+        prior_summary = (conv.get("issue_summary") or "").strip()
+        if issue_desc:
+            merged = await merge_issue_description_with_edit(
+                issue_desc, prior_summary, content, detected_lang
+            )
+            updated_issue = (merged or "").strip() or content.strip()
+        else:
+            updated_issue = content.strip()
+
+        summary = await summarize_issue_description(updated_issue, detected_lang)
         await _write_conv(
             user_id,
             state=ChatState.AWAITING_ISSUE_CONFIRM,
-            issue_description=content,
+            issue_description=updated_issue,
             issue_summary=summary,
         )
         reply = _issue_confirm_assistant_text(detected_lang)

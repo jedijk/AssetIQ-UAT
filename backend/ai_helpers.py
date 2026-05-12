@@ -208,6 +208,62 @@ async def summarize_issue_description(text: str, language: str = "en") -> str:
     return t[:280] + ("…" if len(t) > 280 else "")
 
 
+async def merge_issue_description_with_edit(
+    current_issue: str,
+    current_summary: str,
+    edit_instruction: str,
+    language: str = "en",
+) -> str:
+    """
+    Combine the stored operator issue text with a follow-up correction
+    (e.g. 'say motor instead of pump') into one updated issue description
+    before re-summarizing for confirmation.
+    """
+    ci = (current_issue or "").strip()
+    ed = (edit_instruction or "").strip()
+    if not ed:
+        return ci
+    if not ci:
+        return ed
+
+    try:
+        client = get_openai_client()
+        lang = "Dutch" if language == "nl" else "English"
+        response = client.chat.completions.create(
+            model=os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        f"You merge an equipment-issue report with the operator's correction ({lang}). "
+                        "Return exactly one paragraph: the full updated issue report after applying their "
+                        "instruction. Preserve technical details (tags, equipment names) unless the "
+                        "correction says otherwise. If they give a completely new description, use that as "
+                        "the basis. Output only the updated report text, no preamble or quotes."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"ISSUE REPORT:\n{ci[:3500]}\n\n"
+                        f"SHORT SUMMARY (for context):\n{(current_summary or '(none)')[:800]}\n\n"
+                        f"OPERATOR CORRECTION / WHAT TO CHANGE:\n{ed[:2000]}\n\n"
+                        "Updated full issue report:"
+                    ),
+                },
+            ],
+            temperature=0.2,
+            max_tokens=500,
+        )
+        out = (response.choices[0].message.content or "").strip()
+        if out:
+            return out
+    except Exception as e:
+        logger.warning("merge_issue_description_with_edit fallback: %s", e)
+
+    return f"{ci}\n\n(Clarification / correction: {ed})"
+
+
 async def get_data_context(user_id: str, query_entities: list = None) -> str:
     """Gather relevant data context for answering data queries."""
     context_parts = []

@@ -139,6 +139,13 @@ const MobileChat = ({ onClose }) => {
                         </button>
                       </div>
                     )}
+                    {isLastAssistant && (
+                      <p className="issue-confirm-hint">
+                        {isNl
+                          ? "Of typ hieronder wat er aangepast moet worden — we werken je beschrijving en samenvatting bij."
+                          : "Or type below what to change — we'll update your description and summary."}
+                      </p>
+                    )}
                   </>
                 );
               })()}
@@ -494,6 +501,13 @@ const MobileChat = ({ onClose }) => {
         .issue-confirm-revise:disabled {
           opacity: 0.5;
           cursor: not-allowed;
+        }
+
+        .issue-confirm-hint {
+          margin: 10px 0 0;
+          font-size: 12px;
+          color: #64748b;
+          line-height: 1.35;
         }
 
         .suggestions {
