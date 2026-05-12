@@ -97,13 +97,55 @@ const MobileChat = ({ onClose }) => {
     }
   };
 
-  const renderMessage = (msg) => {
+  const renderMessage = (msg, idx, isLastAssistant) => {
     const isUser = msg.role === "user";
-    
+    const issueConfirmStructured =
+      !isUser && msg.question_type === "issue_confirm" && msg.issue_summary;
+
     return (
-      <div key={msg.id} className={`chat-message ${isUser ? "user" : "assistant"}`}>
+      <div key={msg.id || idx} className={`chat-message ${isUser ? "user" : "assistant"}`}>
         <div className="message-bubble">
-          <p>{msg.content}</p>
+          {issueConfirmStructured ? (
+            <div className="issue-confirm-block">
+              {(() => {
+                const chunks = (msg.content || "").split(/\n\n+/);
+                const intro = chunks[0] || "";
+                const promptText = chunks.slice(1).join("\n\n").trim();
+                const isNl = msg.issue_confirm_language === "nl";
+                return (
+                  <>
+                    <p className="issue-confirm-intro">{intro}</p>
+                    <p className="issue-confirm-summary">{msg.issue_summary}</p>
+                    {promptText ? <p className="issue-confirm-prompt">{promptText}</p> : null}
+                    {isLastAssistant && (
+                      <div className="issue-confirm-actions">
+                        <button
+                          type="button"
+                          className="issue-confirm-yes"
+                          onClick={() => sendMutation.mutate({ content: "yes" })}
+                          disabled={sendMutation.isPending}
+                          data-testid="issue-confirm-yes-btn"
+                        >
+                          {isNl ? "Ja" : "Yes"}
+                        </button>
+                        <button
+                          type="button"
+                          className="issue-confirm-revise"
+                          onClick={() => sendMutation.mutate({ content: "revise" })}
+                          disabled={sendMutation.isPending}
+                          data-testid="issue-confirm-revise-btn"
+                        >
+                          {isNl ? "Aanpassen" : "Revise"}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          ) : (
+            <p>{msg.content}</p>
+          )}
           
           {/* Equipment Suggestions */}
           {msg.equipment_suggestions?.length > 0 && (
@@ -212,7 +254,12 @@ const MobileChat = ({ onClose }) => {
             <p className="hint">e.g., "pump is leaking" or "motor overheating"</p>
           </div>
         ) : (
-          messages.map(renderMessage)
+          messages.map((msg, idx) => {
+            const isLastAssistant =
+              msg.role === "assistant" &&
+              !messages.slice(idx + 1).some((m) => m.role === "assistant");
+            return renderMessage(msg, idx, isLastAssistant);
+          })
         )}
         <div ref={messagesEndRef} />
       </div>
@@ -387,6 +434,66 @@ const MobileChat = ({ onClose }) => {
           margin: 0;
           font-size: 15px;
           line-height: 1.4;
+        }
+
+        .issue-confirm-intro {
+          color: #1e293b;
+          white-space: pre-wrap;
+          margin-bottom: 8px;
+        }
+
+        .issue-confirm-summary {
+          color: #16a34a;
+          font-weight: 600;
+          font-size: 15px;
+          line-height: 1.45;
+          margin: 4px 0 8px;
+        }
+
+        .issue-confirm-prompt {
+          color: #475569;
+          font-size: 13px;
+          white-space: pre-wrap;
+          margin-bottom: 10px;
+        }
+
+        .issue-confirm-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 4px;
+        }
+
+        .issue-confirm-yes {
+          padding: 10px 18px;
+          border-radius: 10px;
+          border: none;
+          background: #16a34a;
+          color: #fff;
+          font-weight: 600;
+          font-size: 14px;
+          cursor: pointer;
+        }
+
+        .issue-confirm-yes:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .issue-confirm-revise {
+          padding: 10px 18px;
+          border-radius: 10px;
+          border: 1px solid #cbd5e1;
+          background: #fff;
+          color: #334155;
+          font-weight: 600;
+          font-size: 14px;
+          cursor: pointer;
+        }
+
+        .issue-confirm-revise:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
 
         .suggestions {

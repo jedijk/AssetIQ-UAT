@@ -332,7 +332,22 @@ def _issue_confirm_yes(text: str) -> bool:
 
 def _issue_confirm_no(text: str) -> bool:
     t = (text or "").strip().lower()
-    return t in {"no", "nope", "nee", "incorrect", "wrong", "not correct", "klopt niet"}
+    return t in {
+        "no", "nope", "nee", "incorrect", "wrong", "not correct", "klopt niet",
+        "revise", "revision", "change", "different", "anders", "aanpassen", "wijzig",
+    }
+
+
+def _issue_confirm_assistant_text(detected_lang: str) -> str:
+    return (
+        "Dit is wat ik begreep:\n\nKlopt dit? Kies hieronder een optie."
+        if detected_lang == "nl"
+        else "Here's what I understood:\n\nIs this correct? Choose an option below."
+    )
+
+
+def _issue_confirm_language_code(detected_lang: str) -> str:
+    return "nl" if detected_lang == "nl" else "en"
 
 
 async def _finalize_chat_machine_result(
@@ -548,26 +563,22 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             issue_description=content,
             issue_summary=summary,
         )
-        reply = (
-            f"Dit is wat ik begreep:\n\n**{summary}**\n\n"
-            f"Klopt dit? Antwoord **ja** om door te gaan met equipment en failure mode, of typ een **andere** beschrijving."
-            if detected_lang == "nl"
-            else (
-                f"Here's what I understood:\n\n**{summary}**\n\n"
-                f"Is this correct? Reply **yes** to continue with equipment and failure mode selection, "
-                f"or type a **revised** description."
-            )
-        )
+        reply = _issue_confirm_assistant_text(detected_lang)
+        ic_lang = _issue_confirm_language_code(detected_lang)
         await _store_assistant_msg(
             user_id, reply,
             chat_state=ChatState.AWAITING_ISSUE_CONFIRM,
             question_type="issue_confirm",
+            issue_summary=summary,
+            issue_confirm_language=ic_lang,
         )
         return ChatResponse(
             message=reply,
             follow_up_question=reply,
             question_type="issue_confirm",
             detected_language=detected_lang,
+            issue_summary=summary,
+            issue_confirm_language=ic_lang,
         )
 
     if state == ChatState.AWAITING_ISSUE_DESCRIPTION:
@@ -583,25 +594,22 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             issue_description=content,
             issue_summary=summary,
         )
-        reply = (
-            f"Dit is wat ik begreep:\n\n**{summary}**\n\n"
-            f"Klopt dit? Antwoord **ja** om door te gaan, of typ een **andere** beschrijving."
-            if detected_lang == "nl"
-            else (
-                f"Here's what I understood:\n\n**{summary}**\n\n"
-                f"Is this correct? Reply **yes** to continue, or type a **revised** description."
-            )
-        )
+        reply = _issue_confirm_assistant_text(detected_lang)
+        ic_lang = _issue_confirm_language_code(detected_lang)
         await _store_assistant_msg(
             user_id, reply,
             chat_state=ChatState.AWAITING_ISSUE_CONFIRM,
             question_type="issue_confirm",
+            issue_summary=summary,
+            issue_confirm_language=ic_lang,
         )
         return ChatResponse(
             message=reply,
             follow_up_question=reply,
             question_type="issue_confirm",
             detected_language=detected_lang,
+            issue_summary=summary,
+            issue_confirm_language=ic_lang,
         )
 
     # ------------------------------------------------------------------
@@ -750,26 +758,22 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             issue_description=content,
             issue_summary=summary,
         )
-        reply = (
-            f"Dit is wat ik begreep:\n\n**{summary}**\n\n"
-            f"Klopt dit? Antwoord **ja** om door te gaan met equipment en failure mode, of typ een **andere** beschrijving."
-            if detected_lang == "nl"
-            else (
-                f"Here's what I understood:\n\n**{summary}**\n\n"
-                f"Is this correct? Reply **yes** to continue with equipment and failure mode selection, "
-                f"or type a **revised** description."
-            )
-        )
+        reply = _issue_confirm_assistant_text(detected_lang)
+        ic_lang = _issue_confirm_language_code(detected_lang)
         await _store_assistant_msg(
             user_id, reply,
             chat_state=ChatState.AWAITING_ISSUE_CONFIRM,
             question_type="issue_confirm",
+            issue_summary=summary,
+            issue_confirm_language=ic_lang,
         )
         return ChatResponse(
             message=reply,
             follow_up_question=reply,
             question_type="issue_confirm",
             detected_language=detected_lang,
+            issue_summary=summary,
+            issue_confirm_language=ic_lang,
         )
 
     # ------------------------------------------------------------------
@@ -878,4 +882,6 @@ async def voice_send(
         "failure_mode_suggestions": resp.failure_mode_suggestions,
         "show_new_failure_mode_option": resp.show_new_failure_mode_option,
         "threat": resp.threat,
+        "issue_summary": resp.issue_summary,
+        "issue_confirm_language": resp.issue_confirm_language,
     }

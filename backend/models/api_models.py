@@ -130,6 +130,8 @@ class ChatResponse(BaseModel):
     show_new_failure_mode_option: Optional[bool] = None
     awaiting_context_for_threat: Optional[str] = None
     detected_language: Optional[str] = None  # ISO code: "en", "nl", "de", etc.
+    issue_summary: Optional[str] = None
+    issue_confirm_language: Optional[str] = None  # "en" | "nl" when question_type is issue_confirm
 
 
 class VoiceTranscriptionResponse(BaseModel):

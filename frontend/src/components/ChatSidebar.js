@@ -545,8 +545,52 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
           </div>
         )}
         
+        {/* Issue summary confirm — structured summary + Yes / Revise */}
+        {!msg.threat_id && msg.question_type === "issue_confirm" && msg.issue_summary && (
+          <div className="space-y-2">
+            {(() => {
+              const chunks = (msg.content || "").split(/\n\n+/);
+              const intro = chunks[0] || "";
+              const promptText = chunks.slice(1).join("\n\n").trim();
+              const isNl = msg.issue_confirm_language === "nl";
+              return (
+                <>
+                  <p className="text-slate-800 whitespace-pre-wrap">{intro}</p>
+                  <p className="text-green-600 font-semibold text-[15px] leading-snug">
+                    {msg.issue_summary}
+                  </p>
+                  {promptText ? (
+                    <p className="text-slate-600 text-sm whitespace-pre-wrap">{promptText}</p>
+                  ) : null}
+                  {isInteractive && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <button
+                        type="button"
+                        onClick={() => sendMutation.mutate({ content: "yes", image: null })}
+                        disabled={isSending}
+                        className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
+                        data-testid="issue-confirm-yes-btn"
+                      >
+                        {isNl ? "Ja" : "Yes"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => sendMutation.mutate({ content: "revise", image: null })}
+                        disabled={isSending}
+                        className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                        data-testid="issue-confirm-revise-btn"
+                      >
+                        {isNl ? "Aanpassen" : "Revise"}
+                      </button>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        )}
         {/* Show content for non-threat messages */}
-        {!msg.threat_id && (
+        {!msg.threat_id && !(msg.question_type === "issue_confirm" && msg.issue_summary) && (
           <p className="whitespace-pre-wrap">{msg.content}</p>
         )}
         

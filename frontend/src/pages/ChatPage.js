@@ -195,7 +195,7 @@ const ChatPage = () => {
   };
 
   // Render message content
-  const renderMessageContent = (msg) => {
+  const renderMessageContent = (msg, isLastAssistant = false) => {
     if (msg.role === "user") {
       return (
         <div className="chat-bubble-user">
@@ -217,9 +217,55 @@ const ChatPage = () => {
     const showNewFailureModeOption = msg.failure_mode_suggestions !== undefined || msg.chat_state === "awaiting_failure_mode";
     const isContextPrompt = msg.chat_state === "awaiting_context" || msg.awaiting_context_for_threat;
     
+    const issueConfirmStructured =
+      msg.question_type === "issue_confirm" && msg.issue_summary;
+
     return (
       <div className={`chat-bubble-ai ${isFollowUp ? "border-l-4 border-l-blue-400" : ""} ${isContextPrompt ? "border-l-4 border-l-green-400 bg-green-50/50" : ""}`}>
-        <p className="whitespace-pre-wrap">{msg.content}</p>
+        {issueConfirmStructured ? (
+          <div className="space-y-2">
+            {(() => {
+              const chunks = (msg.content || "").split(/\n\n+/);
+              const intro = chunks[0] || "";
+              const promptText = chunks.slice(1).join("\n\n").trim();
+              const isNl = msg.issue_confirm_language === "nl";
+              return (
+                <>
+                  <p className="text-slate-800 whitespace-pre-wrap">{intro}</p>
+                  <p className="text-green-600 font-semibold leading-snug">{msg.issue_summary}</p>
+                  {promptText ? (
+                    <p className="text-slate-600 text-sm whitespace-pre-wrap">{promptText}</p>
+                  ) : null}
+                  {isLastAssistant && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      <Button
+                        type="button"
+                        variant="default"
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700"
+                        onClick={() => handleSuggestionClick("yes")}
+                        data-testid="issue-confirm-yes-btn"
+                      >
+                        {isNl ? "Ja" : "Yes"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSuggestionClick("revise")}
+                        data-testid="issue-confirm-revise-btn"
+                      >
+                        {isNl ? "Aanpassen" : "Revise"}
+                      </Button>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        ) : (
+          <p className="whitespace-pre-wrap">{msg.content}</p>
+        )}
         
         {/* Context Prompt Quick Actions */}
         {isContextPrompt && (
@@ -424,7 +470,11 @@ const ChatPage = () => {
           </div>
         ) : (
           <AnimatePresence>
-            {messages.map((msg, idx) => (
+            {messages.map((msg, idx) => {
+              const isLastAssistant =
+                msg.role === "assistant" &&
+                !messages.slice(idx + 1).some((m) => m.role === "assistant");
+              return (
               <motion.div
                 key={msg.id || idx}
                 initial={{ opacity: 0, y: 10 }}
@@ -433,9 +483,10 @@ const ChatPage = () => {
                 className={`message-group ${msg.role}`}
                 data-testid={`chat-message-${msg.role}-${idx}`}
               >
-                {renderMessageContent(msg)}
+                {renderMessageContent(msg, isLastAssistant)}
               </motion.div>
-            ))}
+            );
+            })}
           </AnimatePresence>
         )}
         <div ref={messagesEndRef} />
