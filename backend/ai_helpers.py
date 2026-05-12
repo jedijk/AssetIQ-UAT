@@ -564,7 +564,7 @@ def detect_audio_format(audio_data: bytes) -> str:
 
 
 async def transcribe_audio_with_ai(audio_base64: str) -> str:
-    """Transcribe and translate audio to English using OpenAI Whisper."""
+    """Transcribe audio with OpenAI Whisper in the spoken language (no translation)."""
     temp_path = None
     try:
         client = get_openai_client()
@@ -586,11 +586,10 @@ async def transcribe_audio_with_ai(audio_base64: str) -> str:
             temp_path = f.name
 
         with open(temp_path, "rb") as audio_file:
-            # Use translations endpoint to auto-translate any language to English
-            response = client.audio.translations.create(
+            response = client.audio.transcriptions.create(
                 model="whisper-1",
                 file=audio_file,
-                response_format="json"
+                response_format="json",
             )
 
         return response.text
