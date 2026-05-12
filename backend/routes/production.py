@@ -169,6 +169,33 @@ def _parse_sample_datetime(val):
     return d
 
 
+def _extract_date_time_field_raw(sub) -> Optional[str]:
+    """
+    Raw sample datetime string from form values.
+    Uses canonical "Date & Time" first, then datetime-like labels (template variants).
+    """
+    raw = extract_field(sub, "Date & Time")
+    if raw:
+        s = str(raw).strip()
+        if s:
+            return s
+    for v in sub.get("values", []) or []:
+        label = str(v.get("field_label") or "").strip().lower()
+        fid = str(v.get("field_id") or "").strip().lower()
+        is_dt_like = (
+            ("date" in label and "time" in label)
+            or ("date/time" in label)
+            or ("datetime" in label)
+            or (fid.replace("_", " ").strip() == "date & time")
+            or (fid == "date_&_time")
+        )
+        if is_dt_like and v.get("value"):
+            s = str(v.get("value")).strip()
+            if s:
+                return s
+    return None
+
+
 @router.get("/production/dashboard")
 async def get_production_dashboard(
     date: Optional[str] = Query(None, description="Date in YYYY-MM-DD format (single day, used if from_date not set)"),
@@ -466,6 +493,23 @@ async def get_production_dashboard(
 
     all_subs = await db.form_submissions.find(submissions_query, {"_id": 0}).to_list(8000)
 
+    def _prefer_form_sample_time_for_row(sub) -> bool:
+        """Extruder + Mooney: sample clock is the Date & Time field, not submitted_at."""
+        tpl = (sub.get("form_template_name") or "").strip().lower()
+        tid = sub.get("form_template_id")
+        ts = str(tid).strip() if tid is not None else ""
+        if isinstance(tid, ObjectId):
+            ts = str(tid)
+        if ts and ts in extruder_tpl_ids_str:
+            return True
+        if ts and ts in viscosity_tpl_ids_str:
+            return True
+        if ("extruder" in tpl) and ("setting" in tpl):
+            return True
+        if ("mooney" in tpl) and (("viscos" in tpl) or ("sample" in tpl)):
+            return True
+        return False
+
     # Filter by date range: include if submission time OR sample "Date & Time" falls in shift window.
     # (Using only the form field can drop rows when it parses wrong or defaults outside the window.)
     submissions = []
@@ -476,15 +520,20 @@ async def get_production_dashboard(
         if dt_meta.tzinfo is None:
             dt_meta = dt_meta.replace(tzinfo=timezone.utc)
 
-        date_time_val = extract_field(sub, "Date & Time")
-        dt_form = _parse_sample_datetime(date_time_val) if date_time_val else None
+        raw_sample_dt = _extract_date_time_field_raw(sub)
+        dt_form = _parse_sample_datetime(raw_sample_dt) if raw_sample_dt else None
 
         in_meta = _in_range(dt_meta, range_start, range_end)
-        in_form = _in_range(dt_form, range_start, range_end)
+        in_form = _in_range(dt_form, range_start, range_end) if dt_form else False
         if not in_meta and not in_form:
             continue
 
-        sub["_parsed_time"] = dt_form if in_form else dt_meta
+        # Production log / charts must show the operator-entered sample time for extruder + Mooney,
+        # even when that time is outside the currently selected shift filter but submission time is in-range.
+        if _prefer_form_sample_time_for_row(sub) and dt_form is not None:
+            sub["_parsed_time"] = dt_form
+        else:
+            sub["_parsed_time"] = dt_form if in_form else dt_meta
         submissions.append(sub)
 
     # Separate by form type.
@@ -1323,13 +1372,9 @@ async def viscosity_pairing_status(
     subs = await db.form_submissions.find(query, {"_id": 0}).to_list(2000)
 
     def _time_hhmm(sub):
-        dt = parse_submitted_at(sub)
-        date_time_val = extract_field(sub, "Date & Time")
-        if date_time_val:
-            try:
-                dt = datetime.fromisoformat(str(date_time_val).replace("Z", "+00:00"))
-            except Exception:
-                pass
+        raw = _extract_date_time_field_raw(sub)
+        dt_form = _parse_sample_datetime(raw) if raw else None
+        dt = dt_form if dt_form is not None else parse_submitted_at(sub)
         if not dt:
             return None, None
         if dt.tzinfo is None:
@@ -1419,13 +1464,9 @@ async def repair_viscosity_pairing(
     ).to_list(2000)
 
     def _extract_dt_for_filter(sub):
-        dt = parse_submitted_at(sub)
-        date_time_val = extract_field(sub, "Date & Time")
-        if date_time_val:
-            try:
-                dt = datetime.fromisoformat(str(date_time_val).replace("Z", "+00:00"))
-            except Exception:
-                pass
+        raw = _extract_date_time_field_raw(sub)
+        dt_form = _parse_sample_datetime(raw) if raw else None
+        dt = dt_form if dt_form is not None else parse_submitted_at(sub)
         if not dt:
             return None
         if dt.tzinfo is None:
