@@ -583,8 +583,13 @@ async def get_production_dashboard(
         if not in_meta and not in_form:
             continue
 
-        # Production log / charts must show the operator-entered sample time for extruder + Mooney,
-        # even when that time is outside the currently selected shift filter but submission time is in-range.
+        # Extruder / Mooney: form Date & Time is authoritative. If it parses and falls OUTSIDE the
+        # selected date/shift window, do not attach this row via submission time alone — it would
+        # show a historical sample clock (e.g. Nov 2025) on a May 2026 dashboard and sort oddly.
+        if _prefer_form_sample_time_for_row(sub) and dt_form is not None and not in_form:
+            continue
+
+        # Production log / charts use operator-entered sample time for extruder + Mooney when in-window.
         if _prefer_form_sample_time_for_row(sub) and dt_form is not None:
             sub["_parsed_time"] = dt_form
         else:

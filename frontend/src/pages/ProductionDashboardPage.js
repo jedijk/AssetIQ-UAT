@@ -917,10 +917,11 @@ export default function ProductionDashboardPage() {
         _viscosity_submission_id: v.submission_id,
       }));
 
+    // Newest sample first (operator-facing log); avoids a rare stray older calendar date dominating row #1.
     const merged = [...data.production_log, ...standaloneVisc].sort((a, b) => {
       const da = sortMsForEntry(a);
       const db = sortMsForEntry(b);
-      if (da !== db) return da - db;
+      if (da !== db) return db - da;
       const sa = a.submission_id || a._viscosity_submission_id || "";
       const sb = b.submission_id || b._viscosity_submission_id || "";
       return String(sa).localeCompare(String(sb));
