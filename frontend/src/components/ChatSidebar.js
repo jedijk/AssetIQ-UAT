@@ -62,6 +62,10 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
   const recordingTimerRef = useRef(null);
   const newFailureModeInputRef = useRef(null);
   const autoSkipTimerRef = useRef(null);
+  /** Wall-clock deadline (ms) for auto-skip; survives closing/reopening the sidebar for the same prompt. */
+  const contextSkipDeadlineMsRef = useRef(null);
+  const contextSkipTrackedMessageIdRef = useRef(null);
+  const contextSkipInFlightRef = useRef(false);
   const queryClient = useQueryClient();
 
   // Pre-fill message when equipment is provided
@@ -105,51 +109,87 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
   useEffect(() => { manualLanguageRef.current = manualLanguage; }, [manualLanguage]);
 
   useEffect(() => {
-    if (!awaitingContextMessageId || !isOpen) {
-      setAutoSkipCountdown(null);
+    const clearTimer = () => {
       if (autoSkipTimerRef.current) {
         clearInterval(autoSkipTimerRef.current);
         autoSkipTimerRef.current = null;
+      }
+    };
+
+    const remainingSeconds = () => {
+      const d = contextSkipDeadlineMsRef.current;
+      if (!d) return 0;
+      return Math.max(0, Math.ceil((d - Date.now()) / 1000));
+    };
+
+    const fireAutoSkip = () => {
+      if (contextSkipInFlightRef.current) return;
+      contextSkipInFlightRef.current = true;
+      clearTimer();
+      setAutoSkipCountdown(null);
+      setIsSending(true);
+      chatAPI
+        .sendMessage("skip", null, manualLanguageRef.current)
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
+          queryClient.invalidateQueries({ queryKey: ["threats"] });
+          queryClient.invalidateQueries({ queryKey: ["stats"] });
+        })
+        .catch((err) => {
+          const msg = err?.response?.data?.detail || "Auto-skip failed";
+          toast.error(msg);
+        })
+        .finally(() => {
+          setIsSending(false);
+          contextSkipInFlightRef.current = false;
+          contextSkipDeadlineMsRef.current = null;
+          contextSkipTrackedMessageIdRef.current = null;
+        });
+    };
+
+    if (!awaitingContextMessageId) {
+      contextSkipDeadlineMsRef.current = null;
+      contextSkipTrackedMessageIdRef.current = null;
+      contextSkipInFlightRef.current = false;
+      setAutoSkipCountdown(null);
+      clearTimer();
+      return;
+    }
+
+    if (contextSkipInFlightRef.current) {
+      clearTimer();
+      return;
+    }
+
+    // New awaiting-context assistant message → full 60s from first time we see this id
+    if (contextSkipTrackedMessageIdRef.current !== awaitingContextMessageId) {
+      contextSkipTrackedMessageIdRef.current = awaitingContextMessageId;
+      contextSkipDeadlineMsRef.current = Date.now() + 60_000;
+    }
+
+    if (!isOpen) {
+      // Plain open/close: keep the same deadline; only pause the interval (no reset to 60s).
+      clearTimer();
+      const rem = remainingSeconds();
+      setAutoSkipCountdown(rem > 0 ? rem : null);
+      if (rem <= 0) {
+        fireAutoSkip();
       }
       return;
     }
 
-    // Start 60-second countdown (fresh for this awaiting message)
-    setAutoSkipCountdown(60);
-
-    autoSkipTimerRef.current = setInterval(() => {
-      setAutoSkipCountdown(prev => {
-        if (prev == null) return null;
-        if (prev <= 1) {
-          // Time's up - auto-skip by calling API directly
-          clearInterval(autoSkipTimerRef.current);
-          autoSkipTimerRef.current = null;
-          setIsSending(true);
-          chatAPI.sendMessage("skip", null, manualLanguageRef.current)
-            .then(() => {
-              queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
-              queryClient.invalidateQueries({ queryKey: ["threats"] });
-              queryClient.invalidateQueries({ queryKey: ["stats"] });
-            })
-            .catch((err) => {
-              const msg = err?.response?.data?.detail || "Auto-skip failed";
-              toast.error(msg);
-            })
-            .finally(() => {
-              setIsSending(false);
-              setAutoSkipCountdown(null);
-            });
-          return null;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => {
-      if (autoSkipTimerRef.current) {
-        clearInterval(autoSkipTimerRef.current);
-        autoSkipTimerRef.current = null;
+    const tick = () => {
+      const rem = remainingSeconds();
+      setAutoSkipCountdown(rem);
+      if (rem <= 0) {
+        fireAutoSkip();
       }
+    };
+
+    tick();
+    autoSkipTimerRef.current = setInterval(tick, 1000);
+    return () => {
+      clearTimer();
     };
   }, [awaitingContextMessageId, isOpen, queryClient]);
 
@@ -161,7 +201,11 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
       // Clear auto-skip timer when user sends any message
       if (autoSkipTimerRef.current) {
         clearInterval(autoSkipTimerRef.current);
+        autoSkipTimerRef.current = null;
       }
+      contextSkipDeadlineMsRef.current = null;
+      contextSkipTrackedMessageIdRef.current = null;
+      contextSkipInFlightRef.current = false;
       setAutoSkipCountdown(null);
     },
     onSuccess: (data, variables) => {
@@ -509,6 +553,10 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
               <div className="px-3 pb-3 pt-2 border-t border-slate-200 bg-slate-50/50">
                 <p className="text-xs text-slate-600 mb-2">
                   Would you like to add more details? (temperature, conditions, photos) — add your comments in the chat below ↓
+                  {" "}
+                  <span className="text-slate-500">
+                    Closing and reopening the chat does not reset the auto-skip timer.
+                  </span>
                 </p>
                 <div className="flex flex-wrap gap-2 items-center">
                   <button
@@ -604,6 +652,9 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
         {/* Context Prompt for non-threat messages (e.g., after adding context) */}
         {!msg.threat_id && isInteractive && (msg.chat_state === "awaiting_context" || msg.awaiting_context_for_threat) && (
           <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
+            <p className="text-xs text-slate-500 mb-2">
+              Closing and reopening the chat does not reset the auto-continue timer.
+            </p>
             <div className="flex flex-wrap gap-2 items-center">
               <button
                 onClick={() => fileInputRef.current?.click()}
