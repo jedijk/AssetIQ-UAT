@@ -12,6 +12,11 @@ from typing import List, Dict, Any
 logger = logging.getLogger(__name__)
 
 
+def _chat_ui(locale: str, en: str, nl: str) -> str:
+    """Pick Dutch or English assistant string for chat (not for stored threats)."""
+    return nl if (locale or "en").lower().startswith("nl") else en
+
+
 class ChatState:
     INITIAL = "initial"
     AWAITING_ISSUE_DESCRIPTION = "awaiting_issue_description"
@@ -330,12 +335,18 @@ async def process_chat_message(
     prev_equipment_suggestions: List = None,
     prev_failure_mode_suggestions: List = None,
     original_message: str = None,
+    ui_language: str = "en",
 ) -> Dict[str, Any]:
     """
     Pure state-machine logic. Receives state, returns new state + response.
     Caller is responsible for reading/writing state to DB.
     """
     pending_data = dict(pending_data or {})
+    ul = (ui_language or "en").lower()[:2]
+    if ul not in ("nl", "en"):
+        ul = "en"
+    pending_data.setdefault("chat_ui_language", ul)
+    loc = pending_data["chat_ui_language"]
     prev_equipment_suggestions = prev_equipment_suggestions or []
     prev_failure_mode_suggestions = prev_failure_mode_suggestions or []
     original_message = original_message or message_content
@@ -355,8 +366,16 @@ async def process_chat_message(
 
     # --- CANCEL from any state ---
     if message_content.strip().lower() == "cancel":
-        return _result(text="Cancelled. What would you like to report?",
-                       state=ChatState.INITIAL, pending={}, orig=None)
+        return _result(
+            text=_chat_ui(
+                loc,
+                "Cancelled. What would you like to report?",
+                "Geannuleerd. Wat wilt u melden?",
+            ),
+            state=ChatState.INITIAL,
+            pending={"chat_ui_language": loc},
+            orig=None,
+        )
 
     # --- Helper: after equipment is selected, search failure modes ---
     def _after_equipment_selected(equipment, fm_library, orig_msg, pdata):
@@ -366,6 +385,7 @@ async def process_chat_message(
         pdata["equipment_type"] = equipment.get("equipment_type")
         pdata["criticality"] = equipment.get("criticality")
         pdata["installation_id"] = equipment.get("installation_id")
+        pdata.setdefault("chat_ui_language", loc)
 
         fm_matches = search_failure_modes(fm_library, orig_msg, equipment.get("equipment_type"))
 
@@ -375,16 +395,33 @@ async def process_chat_message(
             pdata["failure_mode_id"] = fm.get("id")
             pdata["failure_mode_name"] = fm.get("failure_mode")
             pdata["recommended_actions"] = fm.get("recommended_actions", [])
-            return _result(text=f"Observation recorded for {_equip_label(equipment)}.",
-                           state=ChatState.COMPLETE, pending=pdata, create=True, obs_data=pdata, orig=orig_msg)
+            return _result(
+                text=_chat_ui(
+                    loc,
+                    f"Observation recorded for {_equip_label(equipment)}.",
+                    f"Melding vastgelegd voor {_equip_label(equipment)}.",
+                ),
+                state=ChatState.COMPLETE, pending=pdata, create=True, obs_data=pdata, orig=orig_msg)
         elif len(fm_matches) > 1:
-            return _result(text=f"Equipment: {_equip_label(equipment)}. What type of failure is it? Please select:",
-                           state=ChatState.AWAITING_FAILURE_MODE, fm_sugg=fm_matches,
-                           new_fm_opt=True, pending=pdata, orig=orig_msg)
+            return _result(
+                text=_chat_ui(
+                    loc,
+                    f"Equipment: {_equip_label(equipment)}. What type of failure is it? Please select:",
+                    f"Apparatuur: {_equip_label(equipment)}. Wat voor storing is het? Maak een keuze:",
+                ),
+                state=ChatState.AWAITING_FAILURE_MODE, fm_sugg=fm_matches,
+                new_fm_opt=True, pending=pdata, orig=orig_msg)
         else:
-            return _result(text=f"Equipment: {_equip_label(equipment)}. No matching failure mode found. Would you like to specify the failure mode?",
-                           state=ChatState.AWAITING_FAILURE_MODE, fm_sugg=[],
-                           new_fm_opt=True, pending=pdata, orig=orig_msg)
+            return _result(
+                text=_chat_ui(
+                    loc,
+                    f"Equipment: {_equip_label(equipment)}. No matching failure mode found. "
+                    f"Would you like to specify the failure mode?",
+                    f"Apparatuur: {_equip_label(equipment)}. Geen passende storingsmodus gevonden. "
+                    f"Wilt u de storingsmodus zelf opgeven?",
+                ),
+                state=ChatState.AWAITING_FAILURE_MODE, fm_sugg=[],
+                new_fm_opt=True, pending=pdata, orig=orig_msg)
 
     # ==============================
     # AWAITING_EQUIPMENT
@@ -424,12 +461,22 @@ async def process_chat_message(
             if full:
                 logger.info(f"Auto-selected full equipment match: {full.get('name')} ({full.get('tag')})")
                 return _after_equipment_selected(full, failure_modes_library, original_message, pending_data)
-            return _result(text="Which equipment? Please select:",
-                           state=ChatState.AWAITING_EQUIPMENT, eq_sugg=eq_matches, orig=original_message)
+            return _result(
+                text=_chat_ui(
+                    loc,
+                    "Which equipment? Please select:",
+                    "Welk stuk apparatuur bedoelt u? Maak een keuze:",
+                ),
+                state=ChatState.AWAITING_EQUIPMENT, eq_sugg=eq_matches, orig=original_message)
         else:
-            return _result(text="I couldn't find that equipment. Please specify the equipment name or tag:",
-                           state=ChatState.AWAITING_EQUIPMENT,
-                           eq_sugg=prev_equipment_suggestions, orig=original_message)
+            return _result(
+                text=_chat_ui(
+                    loc,
+                    "I couldn't find that equipment. Please specify the equipment name or tag:",
+                    "Ik heb dat apparaat niet gevonden. Geef de naam of het tag-nummer door:",
+                ),
+                state=ChatState.AWAITING_EQUIPMENT,
+                eq_sugg=prev_equipment_suggestions, orig=original_message)
 
     # ==============================
     # AWAITING_FAILURE_MODE
@@ -442,7 +489,11 @@ async def process_chat_message(
             pending_data.pop("failure_mode_id", None)
             pending_data.pop("recommended_actions", None)
             return _result(
-                text=f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
+                text=_chat_ui(
+                    loc,
+                    f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
+                    f"Melding vastgelegd voor {_equip_label(pending_data.get('equipment', {}))}.",
+                ),
                 state=ChatState.COMPLETE, pending=pending_data, create=True, obs_data=pending_data)
 
         # Custom failure mode
@@ -451,11 +502,21 @@ async def process_chat_message(
             if custom and len(custom) >= 3:
                 pending_data["failure_mode_name"] = custom
                 pending_data["is_custom_failure_mode"] = True
-                return _result(text=f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
-                               state=ChatState.COMPLETE, pending=pending_data, create=True, obs_data=pending_data)
-            return _result(text="Please provide a valid failure mode name (at least 3 characters):",
-                           state=ChatState.AWAITING_FAILURE_MODE, fm_sugg=prev_failure_mode_suggestions,
-                           new_fm_opt=True)
+                return _result(
+                    text=_chat_ui(
+                        loc,
+                        f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
+                        f"Melding vastgelegd voor {_equip_label(pending_data.get('equipment', {}))}.",
+                    ),
+                    state=ChatState.COMPLETE, pending=pending_data, create=True, obs_data=pending_data)
+            return _result(
+                text=_chat_ui(
+                    loc,
+                    "Please provide a valid failure mode name (at least 3 characters):",
+                    "Geef een geldige storingsmodus (minimaal 3 tekens):",
+                ),
+                state=ChatState.AWAITING_FAILURE_MODE, fm_sugg=prev_failure_mode_suggestions,
+                new_fm_opt=True)
 
         selected = match_failure_mode_from_suggestions(message_content, prev_failure_mode_suggestions)
         if selected:
@@ -463,8 +524,13 @@ async def process_chat_message(
             pending_data["failure_mode_id"] = selected.get("id")
             pending_data["failure_mode_name"] = selected.get("failure_mode")
             pending_data["recommended_actions"] = selected.get("recommended_actions", [])
-            return _result(text=f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
-                           state=ChatState.COMPLETE, pending=pending_data, create=True, obs_data=pending_data)
+            return _result(
+                text=_chat_ui(
+                    loc,
+                    f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
+                    f"Melding vastgelegd voor {_equip_label(pending_data.get('equipment', {}))}.",
+                ),
+                state=ChatState.COMPLETE, pending=pending_data, create=True, obs_data=pending_data)
 
         # Re-search
         fm_matches = search_failure_modes(failure_modes_library, message_content,
@@ -474,14 +540,33 @@ async def process_chat_message(
             pending_data["failure_mode"] = fm
             pending_data["failure_mode_id"] = fm.get("id")
             pending_data["failure_mode_name"] = fm.get("failure_mode")
-            return _result(text=f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
-                           state=ChatState.COMPLETE, pending=pending_data, create=True, obs_data=pending_data)
+            return _result(
+                text=_chat_ui(
+                    loc,
+                    f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
+                    f"Melding vastgelegd voor {_equip_label(pending_data.get('equipment', {}))}.",
+                ),
+                state=ChatState.COMPLETE, pending=pending_data, create=True, obs_data=pending_data)
         elif len(fm_matches) > 1:
-            return _result(text=f"Equipment: {_equip_label(pending_data.get('equipment', {}))}. Which failure type? Please select:",
-                           state=ChatState.AWAITING_FAILURE_MODE, fm_sugg=fm_matches, new_fm_opt=True)
+            return _result(
+                text=_chat_ui(
+                    loc,
+                    f"Equipment: {_equip_label(pending_data.get('equipment', {}))}. "
+                    f"Which failure type? Please select:",
+                    f"Apparatuur: {_equip_label(pending_data.get('equipment', {}))}. "
+                    f"Welke storingscategorie? Maak een keuze:",
+                ),
+                state=ChatState.AWAITING_FAILURE_MODE, fm_sugg=fm_matches, new_fm_opt=True)
         else:
-            return _result(text=f"Equipment: {_equip_label(pending_data.get('equipment', {}))}. No matching failure mode found. Would you like to specify the failure mode?",
-                           state=ChatState.AWAITING_FAILURE_MODE, fm_sugg=[], new_fm_opt=True)
+            return _result(
+                text=_chat_ui(
+                    loc,
+                    f"Equipment: {_equip_label(pending_data.get('equipment', {}))}. "
+                    f"No matching failure mode found. Would you like to specify the failure mode?",
+                    f"Apparatuur: {_equip_label(pending_data.get('equipment', {}))}. "
+                    f"Geen passende storingsmodus gevonden. Wilt u de storingsmodus zelf opgeven?",
+                ),
+                state=ChatState.AWAITING_FAILURE_MODE, fm_sugg=[], new_fm_opt=True)
 
     # ==============================
     # AWAITING_NEW_FAILURE_MODE
@@ -493,32 +578,51 @@ async def process_chat_message(
         if custom and len(custom) >= 3:
             pending_data["failure_mode_name"] = custom
             pending_data["is_custom_failure_mode"] = True
-            return _result(text=f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
-                           state=ChatState.COMPLETE, pending=pending_data, create=True, obs_data=pending_data)
-        return _result(text="Please provide a valid failure mode name (at least 3 characters):",
-                       state=ChatState.AWAITING_NEW_FAILURE_MODE)
+            return _result(
+                text=_chat_ui(
+                    loc,
+                    f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
+                    f"Melding vastgelegd voor {_equip_label(pending_data.get('equipment', {}))}.",
+                ),
+                state=ChatState.COMPLETE, pending=pending_data, create=True, obs_data=pending_data)
+        return _result(
+            text=_chat_ui(
+                loc,
+                "Please provide a valid failure mode name (at least 3 characters):",
+                "Geef een geldige storingsmodus (minimaal 3 tekens):",
+            ),
+            state=ChatState.AWAITING_NEW_FAILURE_MODE)
 
     # ==============================
     # INITIAL — fresh message
     # ==============================
     eq_matches = await search_equipment_hierarchy(db, message_content, user_id)
+    pd0 = {**pending_data, "original_description": message_content}
 
     if len(eq_matches) == 0:
-        return _result(text="Which equipment are you reporting an issue for? Please specify the equipment name or tag:",
-                       state=ChatState.AWAITING_EQUIPMENT,
-                       pending={"original_description": message_content}, orig=message_content)
+        return _result(
+            text=_chat_ui(
+                loc,
+                "Which equipment are you reporting an issue for? Please specify the equipment name or tag:",
+                "Voor welk apparaat meldt u een probleem? Geef de naam of het tag-nummer door:",
+            ),
+            state=ChatState.AWAITING_EQUIPMENT,
+            pending=pd0, orig=message_content)
 
     if len(eq_matches) == 1:
-        pd = {"original_description": message_content}
-        return _after_equipment_selected(eq_matches[0], failure_modes_library, message_content, pd)
+        return _after_equipment_selected(eq_matches[0], failure_modes_library, message_content, dict(pd0))
 
     # Multiple equipment matches — auto-select if one is a clear full/exact match
     full = find_full_equipment_match(message_content, eq_matches)
     if full:
         logger.info(f"Auto-selected full equipment match (initial): {full.get('name')} ({full.get('tag')})")
-        pd = {"original_description": message_content}
-        return _after_equipment_selected(full, failure_modes_library, message_content, pd)
+        return _after_equipment_selected(full, failure_modes_library, message_content, dict(pd0))
 
-    return _result(text="Which equipment are you reporting an issue for? Please select:",
-                   state=ChatState.AWAITING_EQUIPMENT, eq_sugg=eq_matches,
-                   pending={"original_description": message_content}, orig=message_content)
+    return _result(
+        text=_chat_ui(
+            loc,
+            "Which equipment are you reporting an issue for? Please select:",
+            "Voor welk apparaat meldt u een probleem? Maak een keuze:",
+        ),
+        state=ChatState.AWAITING_EQUIPMENT, eq_sugg=eq_matches,
+        pending=pd0, orig=message_content)

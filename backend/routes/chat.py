@@ -22,6 +22,7 @@ from ai_helpers import (
     classify_user_intent, get_data_context, answer_data_query, transcribe_audio_with_ai,
     analyze_attachment_image, summarize_issue_description,
     merge_issue_description_with_edit,
+    translate_to_english_for_record,
 )
 from chat_handler_v2 import (
     process_chat_message, ChatState,
@@ -208,6 +209,20 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
     equipment_name = obs_data.get("equipment_name", "Unknown")
     failure_mode_name = obs_data.get("failure_mode_name", "Unknown")
 
+    chat_lang = (obs_data.get("chat_ui_language") or "en").lower()
+    equ_id = obs_data.get("equipment_id")
+    fm_id = obs_data.get("failure_mode_id")
+    is_custom_fm = obs_data.get("is_custom_failure_mode", False)
+    if chat_lang == "nl":
+        if is_custom_fm or not fm_id:
+            failure_mode_name = await translate_to_english_for_record(
+                failure_mode_name, "failure mode label"
+            )
+        if not equ_id and equipment_name:
+            equipment_name = await translate_to_english_for_record(
+                equipment_name, "equipment or asset label"
+            )
+
     fmea_data = obs_data.get("failure_mode", {})
     rpn = fmea_data.get("rpn", 100) if isinstance(fmea_data, dict) else 100
     fmea_score = min(100, int(rpn / 10))
@@ -372,23 +387,44 @@ async def _finalize_chat_machine_result(
         auto_actions = obs["auto_created_actions"]
         new_threat_id = obs["threat_id"]
 
+        obs_data = result.get("observation_data") or {}
+        ctx_nl = obs_data.get("chat_ui_language") == "nl"
+
         actions_info = ""
         if auto_actions:
-            actions_info = f"\n\n**{len(auto_actions)} action(s) auto-created:**\n"
-            for a in auto_actions[:3]:
-                actions_info += f"- {a['title'][:50]}{'...' if len(a['title'])>50 else ''}\n"
-            if len(auto_actions) > 3:
-                actions_info += f"- ...and {len(auto_actions)-3} more\n"
+            if ctx_nl:
+                actions_info = f"\n\n**{len(auto_actions)} actie(s) automatisch aangemaakt:**\n"
+                for a in auto_actions[:3]:
+                    actions_info += f"- {a['title'][:50]}{'...' if len(a['title'])>50 else ''}\n"
+                if len(auto_actions) > 3:
+                    actions_info += f"- ...en nog {len(auto_actions)-3}\n"
+            else:
+                actions_info = f"\n\n**{len(auto_actions)} action(s) auto-created:**\n"
+                for a in auto_actions[:3]:
+                    actions_info += f"- {a['title'][:50]}{'...' if len(a['title'])>50 else ''}\n"
+                if len(auto_actions) > 3:
+                    actions_info += f"- ...and {len(auto_actions)-3} more\n"
 
-        context_prompt = (
-            f"Observation recorded: **{threat['title']}**{actions_info}\n\n"
-            f"Would you like to add any additional context? You can:\n"
-            f"- Add comments about what you observed\n"
-            f"- Provide temperature or measurement readings\n"
-            f"- Describe the conditions (weather, operating state)\n"
-            f"- Upload a photo of the issue\n\n"
-            f"Type your observations or say 'skip' to continue."
-        )
+        if ctx_nl:
+            context_prompt = (
+                f"Melding vastgelegd: **{threat['title']}**{actions_info}\n\n"
+                f"Wilt u aanvullende context toevoegen? Dat kan bijvoorbeeld:\n"
+                f"- Opmerkingen over wat u heeft gezien\n"
+                f"- Temperaturen of metingen\n"
+                f"- Omstandigheden (weer, bedrijfstoestand)\n"
+                f"- Een foto van het probleem\n\n"
+                f"Typ uw opmerkingen of zeg 'skip' om verder te gaan."
+            )
+        else:
+            context_prompt = (
+                f"Observation recorded: **{threat['title']}**{actions_info}\n\n"
+                f"Would you like to add any additional context? You can:\n"
+                f"- Add comments about what you observed\n"
+                f"- Provide temperature or measurement readings\n"
+                f"- Describe the conditions (weather, operating state)\n"
+                f"- Upload a photo of the issue\n\n"
+                f"Type your observations or say 'skip' to continue."
+            )
 
         await _write_conv(
             user_id,
@@ -492,7 +528,26 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
     # 2. Read conversation state (single source of truth)
     conv = await _read_conv(user_id)
     state = conv.get("state", ChatState.INITIAL)
-    pending_data = conv.get("pending_data", {})
+    pending_data = dict(conv.get("pending_data") or {})
+    low = content.strip().lower()
+    short_cmd = (
+        low
+        in {
+            "yes", "y", "yeah", "yep", "ja", "ja,", "skip", "revise", "no", "nee",
+            "cancel", "ok", "okay", "klopt", "akkoord",
+        }
+        or len(content.strip()) < 4
+    )
+    ul = (detected_lang or "en").lower()[:2]
+    if ul not in ("nl", "en"):
+        ul = "en"
+    if short_cmd and conv.get("chat_ui_language"):
+        cul = conv.get("chat_ui_language")
+        if isinstance(cul, str) and cul.lower()[:2] in ("nl", "en"):
+            ul = cul.lower()[:2]
+    pending_data["chat_ui_language"] = ul
+    await _write_conv(user_id, chat_ui_language=ul)
+    ui_is_nl = ul == "nl"
     original_message = conv.get("original_message")
     eq_suggestions = conv.get("equipment_suggestions") or []
     fm_suggestions = conv.get("failure_mode_suggestions") or []
@@ -508,19 +563,31 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
         issue_desc = (conv.get("issue_description") or "").strip()
         if content.strip().lower() == "cancel":
             await _reset_conv(user_id)
-            reply = "Cancelled. What would you like to report?"
+            reply = (
+                "Geannuleerd. Wat wilt u melden?"
+                if ui_is_nl
+                else "Cancelled. What would you like to report?"
+            )
             await _store_assistant_msg(user_id, reply, chat_state=ChatState.INITIAL)
             return ChatResponse(message=reply, detected_language=detected_lang)
 
         if _issue_confirm_yes(content):
             if not issue_desc:
                 await _reset_conv(user_id)
-                reply = "Please start again with a short description of the issue."
+                reply = (
+                    "Begin opnieuw met een korte beschrijving van het probleem."
+                    if ui_is_nl
+                    else "Please start again with a short description of the issue."
+                )
                 await _store_assistant_msg(user_id, reply, chat_state=ChatState.INITIAL)
                 return ChatResponse(message=reply, detected_language=detected_lang)
             await _write_conv(user_id, issue_description=None, issue_summary=None)
             fm_library = await get_failure_modes_from_db()
-            pd = {"original_description": issue_desc, "issue_description": issue_desc}
+            pd = {
+                **pending_data,
+                "original_description": issue_desc,
+                "issue_description": issue_desc,
+            }
             result = await process_chat_message(
                 db=db,
                 user_id=user_id,
@@ -531,6 +598,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                 prev_equipment_suggestions=[],
                 prev_failure_mode_suggestions=[],
                 original_message=issue_desc,
+                ui_language=detected_lang,
             )
             return await _finalize_chat_machine_result(
                 user_id, session_id, detected_lang, image_thumbnail, result
@@ -545,7 +613,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             )
             reply = (
                 "Geef het probleem opnieuw kort met eigen woorden."
-                if detected_lang == "nl"
+                if ui_is_nl
                 else "Please describe the issue again in your own words."
             )
             await _store_assistant_msg(
@@ -576,8 +644,8 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             issue_description=updated_issue,
             issue_summary=summary,
         )
-        reply = _issue_confirm_assistant_text(detected_lang)
-        ic_lang = _issue_confirm_language_code(detected_lang)
+        reply = _issue_confirm_assistant_text(pending_data.get("chat_ui_language") or detected_lang)
+        ic_lang = _issue_confirm_language_code(pending_data.get("chat_ui_language") or detected_lang)
         await _store_assistant_msg(
             user_id, reply,
             chat_state=ChatState.AWAITING_ISSUE_CONFIRM,
@@ -597,7 +665,11 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
     if state == ChatState.AWAITING_ISSUE_DESCRIPTION:
         if content.strip().lower() == "cancel":
             await _reset_conv(user_id)
-            reply = "Cancelled. What would you like to report?"
+            reply = (
+                "Geannuleerd. Wat wilt u melden?"
+                if ui_is_nl
+                else "Cancelled. What would you like to report?"
+            )
             await _store_assistant_msg(user_id, reply, chat_state=ChatState.INITIAL)
             return ChatResponse(message=reply, detected_language=detected_lang)
         summary = await summarize_issue_description(content, detected_lang)
@@ -607,8 +679,8 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             issue_description=content,
             issue_summary=summary,
         )
-        reply = _issue_confirm_assistant_text(detected_lang)
-        ic_lang = _issue_confirm_language_code(detected_lang)
+        reply = _issue_confirm_assistant_text(pending_data.get("chat_ui_language") or detected_lang)
+        ic_lang = _issue_confirm_language_code(pending_data.get("chat_ui_language") or detected_lang)
         await _store_assistant_msg(
             user_id, reply,
             chat_state=ChatState.AWAITING_ISSUE_CONFIRM,
@@ -629,6 +701,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
     # 4. AWAITING_CONTEXT — handle context/skip (highest priority)
     # ------------------------------------------------------------------
     if state == ChatState.AWAITING_CONTEXT:
+        analysis = None
         skip_phrases = {"skip", "no", "done", "next", "nee", "klaar", "volgende"}
         is_skip = content.strip().lower() in skip_phrases
 
@@ -690,33 +763,74 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
         if is_skip:
             # User explicitly skipped - reset and move on
             await _reset_conv(user_id)
-            reply = "Got it! Your observation has been saved. What else would you like to report?"
+            reply = (
+                "Begrepen! Uw melding is opgeslagen. Wat wilt u nog melden?"
+                if ui_is_nl
+                else "Got it! Your observation has been saved. What else would you like to report?"
+            )
             await _store_assistant_msg(user_id, reply, chat_state=ChatState.INITIAL)
             return ChatResponse(message=reply, detected_language=detected_lang)
         
         # User added context - ask for more context (keep skip timer running)
         if image_base64 and analysis:
-            parts = ["Thanks! I've added your photo to the observation."]
-            desc = analysis.get("image_description")
-            if desc:
-                parts.append(f"\n\n**Image analysis:** {desc}")
-            severity = analysis.get("severity")
-            if severity:
-                parts.append(f"\n**Assessed severity:** {severity.capitalize()}")
-            safety = analysis.get("safety_concerns", [])
-            if safety:
-                parts.append("\n**Safety concerns:** " + "; ".join(safety))
-            ai_actions = analysis.get("recommended_actions", [])
-            if ai_actions:
-                parts.append(f"\n\n**{len(ai_actions)} action(s) created from photo analysis:**")
-                for a in ai_actions[:3]:
-                    parts.append(f"- [{a.get('priority','').capitalize()}] {a.get('action','')[:80]}")
-            parts.append("\n\n**Would you like to add more photos or context?** You can skip if you're done.")
+            if ui_is_nl:
+                parts = ["Bedankt! Ik heb uw foto toegevoegd aan de melding."]
+                desc = analysis.get("image_description")
+                if desc:
+                    parts.append(f"\n\n**Beeldanalyse:** {desc}")
+                severity = analysis.get("severity")
+                if severity:
+                    parts.append(f"\n**Ingeschatte ernst:** {severity.capitalize()}")
+                safety = analysis.get("safety_concerns", [])
+                if safety:
+                    parts.append("\n**Veiligheid:** " + "; ".join(safety))
+                ai_actions = analysis.get("recommended_actions", [])
+                if ai_actions:
+                    parts.append(f"\n\n**{len(ai_actions)} actie(s) aangemaakt op basis van de foto:**")
+                    for a in ai_actions[:3]:
+                        parts.append(f"- [{a.get('priority','').capitalize()}] {a.get('action','')[:80]}")
+                parts.append(
+                    "\n\n**Wilt u nog foto's of aanvullende context toevoegen?** "
+                    "U kunt overslaan als u klaar bent."
+                )
+            else:
+                parts = ["Thanks! I've added your photo to the observation."]
+                desc = analysis.get("image_description")
+                if desc:
+                    parts.append(f"\n\n**Image analysis:** {desc}")
+                severity = analysis.get("severity")
+                if severity:
+                    parts.append(f"\n**Assessed severity:** {severity.capitalize()}")
+                safety = analysis.get("safety_concerns", [])
+                if safety:
+                    parts.append("\n**Safety concerns:** " + "; ".join(safety))
+                ai_actions = analysis.get("recommended_actions", [])
+                if ai_actions:
+                    parts.append(f"\n\n**{len(ai_actions)} action(s) created from photo analysis:**")
+                    for a in ai_actions[:3]:
+                        parts.append(f"- [{a.get('priority','').capitalize()}] {a.get('action','')[:80]}")
+                parts.append("\n\n**Would you like to add more photos or context?** You can skip if you're done.")
             reply = "".join(parts)
         elif image_base64:
-            reply = "Thanks! I've added your photo to the observation.\n\n**Would you like to add more photos or context?** You can skip if you're done."
+            reply = (
+                "Bedankt! Ik heb uw foto toegevoegd aan de melding.\n\n"
+                "**Wilt u nog foto's of aanvullende context toevoegen?** U kunt overslaan als u klaar bent."
+                if ui_is_nl
+                else (
+                    "Thanks! I've added your photo to the observation.\n\n"
+                    "**Would you like to add more photos or context?** You can skip if you're done."
+                )
+            )
         else:
-            reply = "Thanks! I've added your context to the observation.\n\n**Would you like to add more photos or context?** You can skip if you're done."
+            reply = (
+                "Bedankt! Ik heb uw aanvullende tekst toegevoegd aan de melding.\n\n"
+                "**Wilt u nog foto's of aanvullende context toevoegen?** U kunt overslaan als u klaar bent."
+                if ui_is_nl
+                else (
+                    "Thanks! I've added your context to the observation.\n\n"
+                    "**Would you like to add more photos or context?** You can skip if you're done."
+                )
+            )
 
         # Keep awaiting_context state so skip timer runs
         await _write_conv(
@@ -771,8 +885,8 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             issue_description=content,
             issue_summary=summary,
         )
-        reply = _issue_confirm_assistant_text(detected_lang)
-        ic_lang = _issue_confirm_language_code(detected_lang)
+        reply = _issue_confirm_assistant_text(pending_data.get("chat_ui_language") or detected_lang)
+        ic_lang = _issue_confirm_language_code(pending_data.get("chat_ui_language") or detected_lang)
         await _store_assistant_msg(
             user_id, reply,
             chat_state=ChatState.AWAITING_ISSUE_CONFIRM,
@@ -804,6 +918,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
         prev_equipment_suggestions=eq_suggestions,
         prev_failure_mode_suggestions=fm_suggestions,
         original_message=original_message,
+        ui_language=detected_lang,
     )
 
     return await _finalize_chat_machine_result(
@@ -846,9 +961,15 @@ async def clear_chat_history(current_user: dict = Depends(get_current_user)):
 @router.post("/chat/cancel")
 async def cancel_chat_flow(current_user: dict = Depends(get_current_user)):
     user_id = current_user["id"]
+    conv = await _read_conv(user_id)
+    ui_nl = conv.get("chat_ui_language") == "nl"
     await _reset_conv(user_id)
-    await _store_assistant_msg(user_id, "Cancelled. What would you like to report?",
-                               chat_state=ChatState.INITIAL)
+    msg = (
+        "Geannuleerd. Wat wilt u melden?"
+        if ui_nl
+        else "Cancelled. What would you like to report?"
+    )
+    await _store_assistant_msg(user_id, msg, chat_state=ChatState.INITIAL)
     return {"success": True, "message": "Cancelled"}
 
 

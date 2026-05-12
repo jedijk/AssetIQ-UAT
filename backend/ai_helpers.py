@@ -264,6 +264,43 @@ async def merge_issue_description_with_edit(
     return f"{ci}\n\n(Clarification / correction: {ed})"
 
 
+async def translate_to_english_for_record(text: str, purpose: str = "threat register") -> str:
+    """
+    Translate operator-facing text to concise English for stored threats / actions.
+    Used when the chat UI was Dutch but the canonical record must be English.
+    """
+    t = (text or "").strip()
+    if not t:
+        return ""
+    low = t.lower()
+    if low in {"unknown / not specified", "unknown", "unknown equipment", "n/a", "—", "-"}:
+        return t
+    try:
+        client = get_openai_client()
+        response = client.chat.completions.create(
+            model=os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Translate the following text to clear, concise English for an industrial "
+                        f"reliability / maintenance {purpose}. Keep equipment tags and model numbers "
+                        "unchanged. Output only the translated text, no quotes or explanation."
+                    ),
+                },
+                {"role": "user", "content": t[:2000]},
+            ],
+            temperature=0.1,
+            max_tokens=200,
+        )
+        out = (response.choices[0].message.content or "").strip()
+        if out:
+            return out
+    except Exception as e:
+        logger.warning("translate_to_english_for_record fallback: %s", e)
+    return t
+
+
 async def get_data_context(user_id: str, query_entities: list = None) -> str:
     """Gather relevant data context for answering data queries."""
     context_parts = []
