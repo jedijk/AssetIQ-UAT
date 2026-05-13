@@ -791,7 +791,6 @@ export default function ProductionDashboardPage() {
             b.submitted_by || "",
           ]);
         });
-        });
         const wsBag = XLSX.utils.aoa_to_sheet(bagRows);
         wsBag["!cols"] = bagHeader.map(() => ({ wch: 16 }));
         XLSX.utils.book_append_sheet(wb, wsBag, "Input Material");
