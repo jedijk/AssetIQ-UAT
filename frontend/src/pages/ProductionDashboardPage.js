@@ -1337,7 +1337,7 @@ export default function ProductionDashboardPage() {
             </span>
 
             {/* Export - hidden on mobile */}
-            <Button variant="outline" size="sm" className="h-8 gap-1 hidden sm:flex" onClick={exportToExcel} disabled={!data?.production_log?.length} data-testid="export-btn">
+            <Button variant="outline" size="sm" className="h-8 gap-1 hidden sm:flex" onClick={exportToExcel} disabled={!data} data-testid="export-btn">
               <Download className="w-3.5 h-3.5" /> <span>Export</span>
             </Button>
           </div>

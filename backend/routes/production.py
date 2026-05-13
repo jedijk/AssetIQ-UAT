@@ -180,10 +180,24 @@ def parse_submitted_at(sub):
         raw = sub.get(key, "")
         if isinstance(raw, datetime):
             return raw
-        if not raw:
+        if raw is None or raw == "":
             continue
+        if isinstance(raw, (int, float)):
+            try:
+                ts = float(raw)
+                if ts > 1e12:
+                    ts = ts / 1000.0
+                return datetime.fromtimestamp(ts, tz=timezone.utc)
+            except Exception:
+                continue
+        s = str(raw).strip()
+        if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
+            try:
+                return datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            except Exception:
+                pass
         try:
-            return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+            return datetime.fromisoformat(s.replace("Z", "+00:00"))
         except Exception:
             continue
     return None
@@ -738,6 +752,13 @@ async def get_production_dashboard(
         tpl = (sub.get("form_template_name") or "").strip().lower()
         return bool(tpl) and ("big" in tpl) and ("bag" in tpl)
 
+    def _is_information_template_sub(sub) -> bool:
+        ts = _tid_str_for_filter(sub)
+        if ts and ts in information_tpl_ids_str:
+            return True
+        tpl = (sub.get("form_template_name") or "").strip().lower()
+        return bool(tpl) and bool(re.search(r"\binformation\b", tpl))
+
     def _prefer_form_sample_time_for_row(sub) -> bool:
         """Extruder + Mooney: sample clock is the Date & Time field, not submitted_at."""
         tpl = (sub.get("form_template_name") or "").strip().lower()
@@ -760,6 +781,7 @@ async def get_production_dashboard(
     submissions = []
     for sub in all_subs:
         is_bb = _is_big_bag_template_sub(sub)
+        is_info = _is_information_template_sub(sub)
 
         raw_sample_dt = _extract_date_time_field_raw(sub)
         dt_form = _parse_sample_datetime(raw_sample_dt) if raw_sample_dt else None
@@ -772,6 +794,9 @@ async def get_production_dashboard(
         dt_meta = parse_submitted_at(sub)
         if dt_meta is None and is_bb and dt_form is not None:
             dt_meta = dt_form
+        # Information forms are often text-only; fall back to any parsed form clock like Big Bag.
+        if dt_meta is None and is_info and dt_form is not None:
+            dt_meta = dt_form
 
         if dt_meta is None:
             continue
@@ -783,6 +808,13 @@ async def get_production_dashboard(
         # Date-only Production Date parses as midnight and misses day/night shift windows;
         # still include the row when the calendar day overlaps the dashboard range.
         if is_bb and dt_form:
+            try:
+                d0 = dt_form.date() if dt_form.tzinfo is None else dt_form.astimezone(timezone.utc).date()
+                if cal_env_start.date() <= d0 <= cal_env_end.date():
+                    in_form = True
+            except Exception:
+                pass
+        if is_info and dt_form:
             try:
                 d0 = dt_form.date() if dt_form.tzinfo is None else dt_form.astimezone(timezone.utc).date()
                 if cal_env_start.date() <= d0 <= cal_env_end.date():
