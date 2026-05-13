@@ -1891,10 +1891,14 @@ export default function ProductionDashboardPage() {
                   isMobile ? (
                     <div className="space-y-2">
                       {data.information_entries.map((row, i) => (
-                        <div key={row.submission_id || i} className="p-2 rounded-lg bg-slate-50 border border-slate-100 text-xs">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="font-medium text-slate-900 flex-1 min-w-0 break-words">{row.text || "—"}</div>
-                            <div className="flex items-center gap-1 shrink-0">
+                        <div key={row.submission_id || i} className="p-3 rounded-lg bg-slate-50 border border-slate-100">
+                          <p className="text-sm sm:text-[15px] text-slate-900 font-medium leading-relaxed break-words">
+                            {row.text || "—"}
+                          </p>
+                          <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-slate-600">
+                            <span className="tabular-nums text-slate-500">{row.time || "—"}</span>
+                            <span className="font-medium text-slate-700">{row.submitted_by || "—"}</span>
+                            <div className="flex items-center gap-1 ml-auto">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -1936,34 +1940,57 @@ export default function ProductionDashboardPage() {
                               </button>
                             </div>
                           </div>
-                          <div className="text-slate-600 mt-1">{row.submitted_by || "—"}</div>
-                          <div className="text-slate-400 mt-0.5 tabular-nums text-[11px]">
+                          <div className="text-[11px] text-slate-500 mt-1 tabular-nums">
                             {formatDateTime(row.submitted_at || row.datetime) || "—"}
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <table className="w-full text-xs">
+                    <table className="w-full table-fixed text-xs">
+                      <colgroup>
+                        <col style={{ width: "50%" }} />
+                        <col style={{ width: "8%" }} />
+                        <col style={{ width: "17%" }} />
+                        <col style={{ width: "15%" }} />
+                        <col style={{ width: "10%" }} />
+                      </colgroup>
                       <thead>
                         <tr className="border-b border-slate-200">
-                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Text</th>
-                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider w-[88px]">Time</th>
-                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Submitted by</th>
-                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">When</th>
-                          <th className="w-14"></th>
+                          <th className="text-left py-2 px-2 font-semibold text-slate-700 uppercase tracking-wider text-[11px]">
+                            Text
+                          </th>
+                          <th className="text-left py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px] whitespace-nowrap">
+                            Time
+                          </th>
+                          <th
+                            className="text-left py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px]"
+                            title="Submitted by"
+                          >
+                            By
+                          </th>
+                          <th className="text-left py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px] whitespace-nowrap">
+                            When
+                          </th>
+                          <th className="w-14 p-0" aria-label="Actions" />
                         </tr>
                       </thead>
                       <tbody>
                         {data.information_entries.map((row, i) => (
                           <tr key={row.submission_id || i} className="border-b border-slate-50 hover:bg-slate-50 group align-top">
-                            <td className="py-1.5 px-1 text-slate-700 max-w-[200px] break-words">{row.text || "—"}</td>
-                            <td className="py-1.5 px-1 text-slate-600 tabular-nums whitespace-nowrap">{row.time || "—"}</td>
-                            <td className="py-1.5 px-1 text-slate-700">{row.submitted_by || "—"}</td>
-                            <td className="py-1.5 px-1 text-slate-600 tabular-nums whitespace-nowrap">
+                            <td className="py-2 px-2 text-sm text-slate-900 leading-relaxed break-words min-w-0">
+                              {row.text || "—"}
+                            </td>
+                            <td className="py-2 px-1 text-slate-500 tabular-nums text-[11px] whitespace-nowrap align-top">
+                              {row.time || "—"}
+                            </td>
+                            <td className="py-2 px-1 text-slate-600 text-[11px] break-words min-w-0 align-top">
+                              {row.submitted_by || "—"}
+                            </td>
+                            <td className="py-2 px-1 text-slate-500 tabular-nums text-[11px] whitespace-nowrap align-top">
                               {formatDateTime(row.submitted_at || row.datetime) || "—"}
                             </td>
-                            <td className="py-1 px-1 align-middle">
+                            <td className="py-1.5 px-1 align-top">
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button
                                   type="button"
