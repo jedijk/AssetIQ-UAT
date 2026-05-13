@@ -234,6 +234,10 @@ function formTemplateFieldTypeKey(field) {
   return typeof raw === "string" ? raw.trim().toLowerCase() : "text";
 }
 
+/** Production Log–style icon buttons for dashboard tables */
+const PRODUCTION_DASH_ACTION_EDIT = "p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors";
+const PRODUCTION_DASH_ACTION_DELETE = "p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors";
+
 const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmentId, equipmentName, equipmentTag, onSuccess, submissionId, initialValues }) => {
   const [fields, setFields] = useState([]);
   const [formData, setFormData] = useState({});
@@ -1693,8 +1697,8 @@ export default function ProductionDashboardPage() {
                                     </td>
                                     <td className="py-1.5 px-1 text-right tabular-nums text-slate-700">{Number(eos.total_input || 0).toLocaleString()}</td>
                                     <td className="py-1.5 px-1 text-right tabular-nums text-red-600 font-medium">{Number(eos.total_waste || 0).toLocaleString()}</td>
-                                    <td className="py-1 px-1">
-                                      <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                    <td className="py-1.5 px-2 align-top">
+                                      <div className="flex items-center gap-0.5">
                                         <button
                                           onClick={(e) => {
                                             e.stopPropagation();
@@ -1712,11 +1716,11 @@ export default function ProductionDashboardPage() {
                                               });
                                             }
                                           }}
-                                          className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                                          className={PRODUCTION_DASH_ACTION_EDIT}
                                           title="Edit"
                                           data-testid={`edit-eos-${i}`}
                                         >
-                                          <Pencil className="w-3 h-3" />
+                                          <Pencil className="w-3.5 h-3.5" />
                                         </button>
                                         <button
                                           onClick={(e) => {
@@ -1725,11 +1729,11 @@ export default function ProductionDashboardPage() {
                                               setDeleteConfirm({ ids: [eos.submission_id], label: `end of shift entry (${displayDT || "item"})` });
                                             }
                                           }}
-                                          className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+                                          className={PRODUCTION_DASH_ACTION_DELETE}
                                           title="Delete"
                                           data-testid={`delete-eos-${i}`}
                                         >
-                                          <Trash2 className="w-3 h-3" />
+                                          <Trash2 className="w-3.5 h-3.5" />
                                         </button>
                                       </div>
                                     </td>
@@ -1840,15 +1844,15 @@ export default function ProductionDashboardPage() {
                             <td className="py-1.5 px-1 text-slate-700">{bag.lot_no}</td>
                             <td className="py-1.5 px-1 text-slate-700 tabular-nums">{bag.production_date || ""}</td>
                             <td className="py-1.5 px-1 text-slate-600 text-[11px]">{bag.equipment_name || "Line-90"}</td>
-                            <td className="py-1 px-1">
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <td className="py-1.5 px-2 align-middle">
+                              <div className="flex items-center gap-0.5">
                                 <button
                                   onClick={() => setEditBigBag({ ...bag, _index: i })}
-                                  className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                                  className={PRODUCTION_DASH_ACTION_EDIT}
                                   title="Edit"
                                   data-testid={`edit-bag-${i}`}
                                 >
-                                  <Pencil className="w-3 h-3" />
+                                  <Pencil className="w-3.5 h-3.5" />
                                 </button>
                                 <button
                                   onClick={() => {
@@ -1856,11 +1860,11 @@ export default function ProductionDashboardPage() {
                                       setDeleteConfirm({ ids: [bag.submission_id], label: `big bag entry (${bag.material || bag.lot_no || "item"})` });
                                     }
                                   }}
-                                  className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+                                  className={PRODUCTION_DASH_ACTION_DELETE}
                                   title="Delete"
                                   data-testid={`delete-bag-${i}`}
                                 >
-                                  <Trash2 className="w-3 h-3" />
+                                  <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </div>
                             </td>
@@ -1926,7 +1930,7 @@ export default function ProductionDashboardPage() {
                           <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-slate-600">
                             <span className="tabular-nums text-slate-500">{row.time || "—"}</span>
                             <span className="font-medium text-slate-700">{row.submitted_by || "—"}</span>
-                            <div className="flex items-center gap-1 ml-auto">
+                            <div className="flex items-center gap-0.5 ml-auto">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -1943,11 +1947,11 @@ export default function ProductionDashboardPage() {
                                     initialValues: row.prefill && typeof row.prefill === "object" ? row.prefill : {},
                                   });
                                 }}
-                                className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                                className={PRODUCTION_DASH_ACTION_EDIT}
                                 title="Edit"
                                 data-testid={`edit-information-${i}`}
                               >
-                                <Pencil className="w-3 h-3" />
+                                <Pencil className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 type="button"
@@ -1960,11 +1964,11 @@ export default function ProductionDashboardPage() {
                                     });
                                   }
                                 }}
-                                className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+                                className={PRODUCTION_DASH_ACTION_DELETE}
                                 title="Delete"
                                 data-testid={`delete-information-${i}`}
                               >
-                                <Trash2 className="w-3 h-3" />
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           </div>
@@ -2011,8 +2015,8 @@ export default function ProductionDashboardPage() {
                             <td className="py-2 px-1 text-slate-600 text-[11px] break-words min-w-0 align-top">
                               {row.submitted_by || "—"}
                             </td>
-                            <td className="py-1.5 px-1 align-top">
-                              <div className="flex items-center justify-end gap-1">
+                            <td className="py-1.5 px-2 align-top">
+                              <div className="flex items-center gap-0.5 justify-end">
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -2029,7 +2033,7 @@ export default function ProductionDashboardPage() {
                                       initialValues: row.prefill && typeof row.prefill === "object" ? row.prefill : {},
                                     });
                                   }}
-                                  className="p-1.5 rounded-md border border-transparent text-slate-400 hover:border-slate-200 hover:bg-slate-100 hover:text-slate-600"
+                                  className={PRODUCTION_DASH_ACTION_EDIT}
                                   title="Edit"
                                   data-testid={`edit-information-${i}`}
                                 >
@@ -2046,7 +2050,7 @@ export default function ProductionDashboardPage() {
                                       });
                                     }
                                   }}
-                                  className="p-1.5 rounded-md border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-red-50 hover:border-red-200 hover:text-red-600"
+                                  className={PRODUCTION_DASH_ACTION_DELETE}
                                   title="Delete"
                                   data-testid={`delete-information-${i}`}
                                 >
@@ -2297,7 +2301,7 @@ export default function ProductionDashboardPage() {
                                   setEditEntry({ ...entry, _index: i, viscosity: viscData?.value ?? "", _viscosity_submission_id: viscData?.submission_id || "" });
                                 }
                               }}
-                              className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                              className={PRODUCTION_DASH_ACTION_EDIT}
                               data-testid={`edit-row-${timeKey || i}`}
                               title="Edit"
                             >
@@ -2330,7 +2334,7 @@ export default function ProductionDashboardPage() {
                                   setDeleteConfirm({ ids, label: `log entry at ${timeLabel}` });
                                 }
                               }}
-                              className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors"
+                              className={PRODUCTION_DASH_ACTION_DELETE}
                               data-testid={`delete-row-${timeKey || i}`}
                               title="Delete"
                             >
