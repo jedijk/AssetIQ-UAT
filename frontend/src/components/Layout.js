@@ -125,11 +125,6 @@ const Layout = () => {
         
         if (data.version === APP_VERSION) {
           localStorage.setItem(STORAGE_KEY, "true");
-
-          toast.success(`AssetIQ updated to v${APP_VERSION}`, {
-            description: "New: Lab dashboard (Granulometric analysis). Plus Label Print — design labels and print directly from form submissions, mobile print support, form field bindings, and bug fixes.",
-            duration: 4500,
-          });
         }
       } catch (error) {
         console.log('Version check failed:', error);
