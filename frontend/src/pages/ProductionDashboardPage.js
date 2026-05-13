@@ -1286,6 +1286,19 @@ export default function ProductionDashboardPage() {
                       data-testid="mobile-date-picker"
                     />
                   )}
+                  {/* Mobile: sync next to date selector */}
+                  {isMobile && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 touch-manipulation ml-1"
+                      onClick={handleManualRefresh}
+                      data-testid="refresh-btn-mobile"
+                      title="Refresh"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
+                    </Button>
+                  )}
                 </div>
               )}
 
@@ -1330,19 +1343,19 @@ export default function ProductionDashboardPage() {
               })}
             </div>
 
-            <div className="order-2 flex w-full min-w-0 flex-wrap items-center gap-2 md:order-none md:contents">
-              {/* Refresh */}
+            {/* Desktop toolbar row: hidden on mobile (refresh lives next to date; pairing/debug omitted on small screens) */}
+            <div className="order-2 hidden w-full min-w-0 md:order-none md:contents">
               <Button
                 variant="outline"
                 size="icon"
                 className="h-8 w-8 shrink-0 touch-manipulation"
                 onClick={handleManualRefresh}
                 data-testid="refresh-btn"
+                title="Refresh"
               >
                 <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
               </Button>
 
-              {/* Mooney ↔ Extruder pairing repair & debug (single-day only); all authenticated users */}
               <Button
                 variant="outline"
                 size="sm"
