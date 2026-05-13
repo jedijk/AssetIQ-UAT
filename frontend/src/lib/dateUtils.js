@@ -232,6 +232,61 @@ export const formatDateTime = (dateInput, options = {}) => {
 };
 
 /**
+ * Short date + time for dense tables (e.g. production dashboard).
+ * Day/month order and separators follow the user's date_format preference; time uses 12h/24h from preferences.
+ */
+export const formatDateTimeCompact = (dateInput) => {
+  if (!dateInput) return '—';
+  try {
+    const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+    if (isNaN(date.getTime())) return '—';
+
+    const prefs = getUserPreferences();
+    const tz = prefs.timezone || DEFAULT_PREFS.timezone;
+    const dateFormat = prefs.date_format || DEFAULT_PREFS.date_format;
+    const timeFormat = prefs.time_format || DEFAULT_PREFS.time_format;
+
+    const day2 = date.toLocaleString('en-GB', { timeZone: tz, day: '2-digit' });
+    const month2 = date.toLocaleString('en-GB', { timeZone: tz, month: '2-digit' });
+    const year2 = date.toLocaleString('en-GB', { timeZone: tz, year: '2-digit' });
+
+    const timeStr = date.toLocaleTimeString(undefined, {
+      timeZone: tz,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: timeFormat === '12h',
+    });
+
+    let datePart;
+    switch (dateFormat) {
+      case 'MM/DD/YYYY':
+        datePart = `${month2}/${day2}`;
+        break;
+      case 'DD-MM-YYYY':
+        datePart = `${day2}-${month2}`;
+        break;
+      case 'DD/MM/YYYY':
+        datePart = `${day2}/${month2}`;
+        break;
+      case 'DD MMM YYYY': {
+        const d1 = date.toLocaleString('en-GB', { timeZone: tz, day: 'numeric' });
+        const mon = date.toLocaleString('en-GB', { timeZone: tz, month: 'short' });
+        datePart = `${d1} ${mon}`;
+        break;
+      }
+      case 'YYYY-MM-DD':
+      default:
+        datePart = `${year2}-${month2}-${day2}`;
+        break;
+    }
+    return `${datePart} ${timeStr}`;
+  } catch (e) {
+    console.warn('formatDateTimeCompact error:', e);
+    return '—';
+  }
+};
+
+/**
  * Format date for display in a compact way (e.g., for lists)
  */
 export const formatDateCompact = (dateInput) => {
@@ -285,6 +340,7 @@ export default {
   formatDate,
   formatTime,
   formatDateTime,
+  formatDateTimeCompact,
   formatDateCompact,
   formatDateRelative,
   getUserTimezone,

@@ -37,6 +37,10 @@ export const productionAPI = {
     const response = await api.patch(`/production/submission/${submissionId}`, { values });
     return response.data;
   },
+  setInformationPin: async (submissionId, pinned) => {
+    const response = await api.patch(`/production/information/${submissionId}/pin`, { pinned });
+    return response.data;
+  },
   createViscositySubmission: async (datetime, measurement) => {
     const response = await api.post("/production/create-viscosity", { datetime, measurement });
     return response.data;

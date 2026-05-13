@@ -495,6 +495,7 @@ class TaskService:
         template = await self.get_template_by_id(plan["task_template_id"])
         
         doc = {
+            "id": str(uuid.uuid4()),
             "task_plan_id": data["task_plan_id"],
             "task_template_id": plan["task_template_id"],
             "task_template_name": plan["task_template_name"],
@@ -570,6 +571,7 @@ class TaskService:
                 logger.warning(f"Failed to fetch form template: {e}")
         
         doc = {
+            "id": str(uuid.uuid4()),
             "task_plan_id": None,  # No plan for ad-hoc tasks
             "task_template_id": data["task_template_id"],
             "task_template_name": template["name"],
@@ -1265,7 +1267,7 @@ class TaskService:
         plans_processed = 0
         
         for plan in plans:
-            plan_id = str(plan["_id"])
+            plan_id = plan.get("id") or str(plan["_id"])
             instances = await self.generate_instances_for_plan(
                 plan_id, horizon_days, created_by
             )
@@ -1375,27 +1377,32 @@ class TaskService:
     def _calculate_next_due(
         self,
         base_date: datetime,
-        interval_value: int,
+        interval_value: Any,
         interval_unit: str
     ) -> datetime:
         """Calculate next due date based on interval."""
         
         if isinstance(base_date, str):
             base_date = datetime.fromisoformat(base_date.replace('Z', '+00:00'))
+        try:
+            iv = int(interval_value) if interval_value is not None else 1
+        except (TypeError, ValueError):
+            iv = 1
+        unit = (interval_unit or "days").lower() if isinstance(interval_unit, str) else "days"
         
-        if interval_unit == "hours":
-            return base_date + timedelta(hours=interval_value)
-        elif interval_unit == "days":
-            return base_date + timedelta(days=interval_value)
-        elif interval_unit == "weeks":
-            return base_date + timedelta(weeks=interval_value)
-        elif interval_unit == "months":
+        if unit == "hours":
+            return base_date + timedelta(hours=iv)
+        elif unit == "days":
+            return base_date + timedelta(days=iv)
+        elif unit == "weeks":
+            return base_date + timedelta(weeks=iv)
+        elif unit == "months":
             # Approximate months as 30 days
-            return base_date + timedelta(days=interval_value * 30)
-        elif interval_unit == "years":
-            return base_date + timedelta(days=interval_value * 365)
+            return base_date + timedelta(days=iv * 30)
+        elif unit == "years":
+            return base_date + timedelta(days=iv * 365)
         else:
-            return base_date + timedelta(days=interval_value)
+            return base_date + timedelta(days=iv)
     
     def _serialize_template(self, doc: Dict) -> Dict[str, Any]:
         """Serialize template document."""

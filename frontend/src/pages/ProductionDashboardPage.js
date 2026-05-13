@@ -5,7 +5,7 @@ import { api } from "../lib/apiClient";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useIsMobile } from "../hooks/useIsMobile";
-import { formatDateTime } from "../lib/dateUtils";
+import { formatDateTime, formatDateTimeCompact } from "../lib/dateUtils";
 import {
   ChevronLeft,
   ChevronRight,
@@ -31,6 +31,8 @@ import {
   MessageCircle,
   Printer,
   Loader2,
+  Pin,
+  PinOff,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -792,6 +794,35 @@ export default function ProductionDashboardPage() {
       }
     },
   });
+
+  const setInformationPinMutation = useMutation({
+    mutationFn: ({ submissionId, pinned }) => productionAPI.setInformationPin(submissionId, pinned),
+    onSuccess: () => {
+      invalidateDashboard();
+    },
+    onError: () => {
+      toast.error("Could not update pin");
+    },
+  });
+
+  const toggleInformationPin = useCallback(
+    (submissionId) => {
+      if (!submissionId || setInformationPinMutation.isPending) return;
+      const row = data?.information_entries?.find((e) => e.submission_id === submissionId);
+      const nextPinned = !row?.pinned;
+      setInformationPinMutation.mutate({ submissionId, pinned: nextPinned });
+    },
+    [data?.information_entries, setInformationPinMutation]
+  );
+
+  const sortedInformationEntries = useMemo(() => {
+    const list = data?.information_entries;
+    if (!list?.length) return [];
+    return list.map((e) => ({
+      ...e,
+      _informationPinned: !!e.pinned,
+    }));
+  }, [data?.information_entries]);
 
   // Edit state for big bag entries
   const [editBigBag, setEditBigBag] = useState(null);
@@ -1897,7 +1928,9 @@ export default function ProductionDashboardPage() {
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <h3 className="text-sm font-semibold text-slate-700">Information</h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Line-90 — information forms</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Line-90 — information forms · Pinned items stay on top for everyone (saved with the entry)
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   {data?.information_entries?.length > 0 && (
@@ -1935,8 +1968,13 @@ export default function ProductionDashboardPage() {
                 {data?.information_entries?.length > 0 ? (
                   isMobile ? (
                     <div className="space-y-2">
-                      {data.information_entries.map((row, i) => (
-                        <div key={row.submission_id || i} className="p-3 rounded-lg bg-slate-50 border border-slate-100">
+                      {sortedInformationEntries.map((row, i) => (
+                        <div
+                          key={row.submission_id || i}
+                          className={`p-3 rounded-lg border ${
+                            row._informationPinned ? "bg-amber-50/50 border-amber-200" : "bg-slate-50 border-slate-100"
+                          }`}
+                        >
                           <p className="text-sm sm:text-[15px] text-slate-900 font-medium leading-relaxed break-words">
                             {row.text || "—"}
                           </p>
@@ -1944,6 +1982,22 @@ export default function ProductionDashboardPage() {
                             <span className="tabular-nums text-slate-500">{row.time || "—"}</span>
                             <span className="font-medium text-slate-700">{row.submitted_by || "—"}</span>
                             <div className="flex items-center gap-0.5 ml-auto">
+                              {row.submission_id && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleInformationPin(row.submission_id)}
+                                  disabled={setInformationPinMutation.isPending}
+                                  className={`p-1 rounded transition-colors ${
+                                    row._informationPinned
+                                      ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                                      : "text-slate-400 hover:bg-slate-100 hover:text-amber-600"
+                                  }`}
+                                  title={row._informationPinned ? "Unpin" : "Pin to top"}
+                                  data-testid={`pin-information-${i}`}
+                                >
+                                  {row._informationPinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => {
@@ -1994,18 +2048,21 @@ export default function ProductionDashboardPage() {
                   ) : (
                     <table className="w-full table-fixed text-xs">
                       <colgroup>
-                        <col style={{ width: "56%" }} />
-                        <col style={{ width: "10%" }} />
-                        <col style={{ width: "22%" }} />
-                        <col style={{ width: "12%" }} />
+                        <col style={{ width: "48%" }} />
+                        <col style={{ width: "14%" }} />
+                        <col style={{ width: "19%" }} />
+                        <col style={{ width: "19%" }} />
                       </colgroup>
                       <thead>
                         <tr className="border-b border-slate-200">
                           <th className="text-left py-2 px-2 font-semibold text-slate-700 tracking-wide text-[11px]">
                             Info
                           </th>
-                          <th className="text-left py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px] whitespace-nowrap">
-                            Time
+                          <th
+                            className="text-left py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px] whitespace-nowrap"
+                            title="Date and time (your timezone)"
+                          >
+                            Date/time
                           </th>
                           <th
                             className="text-left py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px]"
@@ -2013,23 +2070,46 @@ export default function ProductionDashboardPage() {
                           >
                             By
                           </th>
-                          <th className="w-14 p-0" aria-label="Actions" />
+                          <th className="min-w-[5.25rem] p-0" aria-label="Actions" />
                         </tr>
                       </thead>
                       <tbody>
-                        {data.information_entries.map((row, i) => (
-                          <tr key={row.submission_id || i} className="border-b border-slate-50 hover:bg-slate-50 align-top">
+                        {sortedInformationEntries.map((row, i) => (
+                          <tr
+                            key={row.submission_id || i}
+                            className={`border-b border-slate-50 hover:bg-slate-50 align-top ${
+                              row._informationPinned ? "bg-amber-50/40 border-l-2 border-l-amber-400" : ""
+                            }`}
+                          >
                             <td className="py-2 px-2 text-sm text-slate-900 leading-relaxed break-words min-w-0">
                               {row.text || "—"}
                             </td>
-                            <td className="py-2 px-1 text-slate-500 tabular-nums text-[11px] whitespace-nowrap align-top">
-                              {row.time || "—"}
+                            <td className="py-2 px-1 text-slate-500 tabular-nums text-[10px] leading-tight whitespace-nowrap align-top">
+                              {(row.submitted_at || row.datetime)
+                                ? formatDateTimeCompact(row.submitted_at || row.datetime)
+                                : row.time || "—"}
                             </td>
                             <td className="py-2 px-1 text-slate-600 text-[11px] break-words min-w-0 align-top">
                               {row.submitted_by || "—"}
                             </td>
                             <td className="py-1.5 px-2 align-top">
                               <div className="flex items-center gap-0.5 justify-end">
+                                {row.submission_id && (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleInformationPin(row.submission_id)}
+                                    disabled={setInformationPinMutation.isPending}
+                                    className={`p-1 rounded transition-colors ${
+                                      row._informationPinned
+                                        ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                                        : "text-slate-400 hover:bg-slate-100 hover:text-amber-600"
+                                    }`}
+                                    title={row._informationPinned ? "Unpin" : "Pin to top"}
+                                    data-testid={`pin-information-${i}`}
+                                  >
+                                    {row._informationPinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -2703,7 +2783,8 @@ export default function ProductionDashboardPage() {
               data-testid="delete-confirm-btn"
               disabled={deleteSubmissionMutation.isPending}
               onClick={() => {
-                (deleteConfirm?.ids || []).forEach((id) => deleteSubmissionMutation.mutate(id));
+                const ids = deleteConfirm?.ids || [];
+                ids.forEach((id) => deleteSubmissionMutation.mutate(id));
                 setDeleteConfirm(null);
               }}
             >

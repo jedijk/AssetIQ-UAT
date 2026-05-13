@@ -90,6 +90,8 @@ END_OF_SHIFT_FORM = "End of shift"
 INFORMATION_FORM = "Information"
 # Mongo $regex and Python checks must stay aligned (word boundaries; English + Dutch).
 INFORMATION_TEMPLATE_NAME_REGEX = r"\b(information|informatie)\b"
+# Persisted on form_submissions; shared by all users, survives navigation across days.
+INFORMATION_DASHBOARD_PINNED_FIELD = "production_information_pinned"
 
 
 def _information_template_name_matches(name: Optional[Any]) -> bool:
@@ -213,6 +215,43 @@ def parse_submitted_at(sub):
         except Exception:
             continue
     return None
+
+
+def _information_entry_display_time(sub: dict) -> datetime:
+    """Sort/display clock for an information row (including pinned rows outside the visible date window)."""
+    raw_sample_dt = _extract_date_time_field_raw(sub)
+    dt_form = _parse_sample_datetime(raw_sample_dt) if raw_sample_dt else None
+    dt_meta = parse_submitted_at(sub)
+    if dt_meta is None and dt_form is not None:
+        dt_meta = dt_form
+    if dt_meta is None:
+        dt_meta = datetime.now(timezone.utc)
+    elif dt_meta.tzinfo is None:
+        dt_meta = dt_meta.replace(tzinfo=timezone.utc)
+    chosen = dt_form or dt_meta
+    if isinstance(chosen, datetime) and chosen.tzinfo is None:
+        chosen = chosen.replace(tzinfo=timezone.utc)
+    return chosen
+
+
+async def _submission_is_information_form(sub: dict) -> bool:
+    """True if this submission uses an information-style template (name or template lookup)."""
+    if _information_template_name_matches(sub.get("form_template_name")):
+        return True
+    tid = sub.get("form_template_id")
+    if tid is None:
+        return False
+    s = str(tid).strip()
+    if not s:
+        return False
+    ors: List[dict] = [{"id": tid}, {"id": s}]
+    if len(s) == 24:
+        try:
+            ors.append({"_id": ObjectId(s)})
+        except Exception:
+            pass
+    tpl = await db.form_templates.find_one({"$or": ors}, {"name": 1})
+    return _information_template_name_matches((tpl or {}).get("name"))
 
 
 def _production_date_raw_for_big_bag(sub) -> Optional[Any]:
@@ -937,6 +976,31 @@ async def get_production_dashboard(
     big_bag_subs.sort(key=lambda s: _sort_key_dt(s.get("_parsed_time")))
     information_subs = [s for s in submissions if match_template(s, INFORMATION_FORM)]
     information_subs.sort(key=lambda s: _sort_key_dt(s.get("_parsed_time")))
+    # Pinned information rows are stored on the submission and must appear for all users,
+    # including when their timestamps fall outside the selected dashboard range.
+    try:
+        seen_info_ids = {s.get("id") for s in information_subs if s.get("id")}
+        pinned_raw = await db.form_submissions.find(
+            {"$and": [query, {INFORMATION_DASHBOARD_PINNED_FIELD: True}]},
+            {"_id": 0},
+        ).sort([("submitted_at", -1), ("created_at", -1)]).to_list(500)
+        for sub in pinned_raw:
+            if not _is_information_template_sub(sub):
+                continue
+            sid = sub.get("id")
+            if not sid or sid in seen_info_ids:
+                continue
+            sub["_parsed_time"] = _information_entry_display_time(sub)
+            information_subs.append(sub)
+            seen_info_ids.add(sid)
+    except Exception as e:
+        logger.warning("production dashboard: merge pinned information failed: %s", e)
+    information_subs.sort(
+        key=lambda s: (
+            0 if s.get(INFORMATION_DASHBOARD_PINNED_FIELD) else 1,
+            _sort_key_dt(s.get("_parsed_time")),
+        )
+    )
     screen_change_subs = [s for s in submissions if match_template(s, SCREEN_CHANGE_FORM)]
     magnet_subs = [s for s in submissions if match_template(s, MAGNET_CLEANING_FORM)]
     end_of_shift_subs = sorted(
@@ -1082,6 +1146,7 @@ async def get_production_dashboard(
             "form_template_name": tpl_name,
             "form_template_id": str(ftid) if ftid is not None else "",
             "prefill": _submission_prefill_by_field_id(sub),
+            "pinned": bool(sub.get(INFORMATION_DASHBOARD_PINNED_FIELD)),
         })
 
     # End of Shift data
@@ -1517,6 +1582,39 @@ async def delete_production_event(
     if result.deleted_count == 0:
         return {"error": "Event not found"}
     return {"status": "deleted", "id": event_id}
+
+
+@router.patch("/production/information/{submission_id}/pin")
+async def set_production_information_pin(
+    submission_id: str,
+    data: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    """Pin or unpin an information form submission on the production dashboard (shared, persisted)."""
+    raw = data.get("pinned")
+    if raw is None:
+        raise HTTPException(status_code=400, detail="Missing 'pinned' (boolean)")
+    if isinstance(raw, str):
+        pinned = raw.strip().lower() in ("1", "true", "yes", "on")
+    else:
+        pinned = bool(raw)
+
+    sub = await db.form_submissions.find_one({"id": submission_id}, {"_id": 0})
+    if not sub and ObjectId.is_valid(submission_id):
+        sub = await db.form_submissions.find_one({"_id": ObjectId(submission_id)}, {"_id": 0})
+    if not sub:
+        raise HTTPException(status_code=404, detail="Submission not found")
+
+    if not await _submission_is_information_form(sub):
+        raise HTTPException(status_code=400, detail="Only information form submissions can be pinned here")
+
+    fid = sub.get("id") or submission_id
+    now = _serialize_datetime(datetime.now(timezone.utc))
+    await db.form_submissions.update_one(
+        {"id": fid},
+        {"$set": {INFORMATION_DASHBOARD_PINNED_FIELD: pinned, "updated_at": now}},
+    )
+    return {"status": "updated", "id": fid, "pinned": pinned}
 
 
 @router.patch("/production/submission/{submission_id}")
