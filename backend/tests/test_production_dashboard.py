@@ -120,14 +120,25 @@ class TestProductionDashboardAPI:
         assert "viscosity_series" in data, "Response should contain 'viscosity_series'"
     
     def test_dashboard_shift_parameter(self, auth_headers):
-        """Test dashboard accepts morning / afternoon / night (and legacy day) shift parameters."""
+        """Test dashboard accepts single and comma-separated shift parameters."""
         for shift_key in ("morning", "afternoon", "night"):
             resp = requests.get(
                 f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift={shift_key}",
                 headers=auth_headers,
             )
             assert resp.status_code == 200
-            assert resp.json()["shift"] == shift_key
+            data = resp.json()
+            assert data["shift"] == shift_key
+            assert data.get("shifts") == [shift_key]
+
+        multi = requests.get(
+            f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=morning,night",
+            headers=auth_headers,
+        )
+        assert multi.status_code == 200
+        body = multi.json()
+        assert body["shift"] == "morning,night"
+        assert body["shifts"] == ["morning", "night"]
 
         response_day = requests.get(
             f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=day",

@@ -19,7 +19,7 @@ function dashboardParamsFromKey(queryKey) {
  * @param {object} opts
  * @param {object} [opts.capabilities] — stale window only
  */
-export function useProductionDashboardQuery({ period, fromStr, toStr, shift, productionAPI, capabilities }) {
+export function useProductionDashboardQuery({ period, fromStr, toStr, shift, productionAPI, capabilities, filtersReady = true }) {
   const realtime = capabilities?.realtimeUpdates !== false;
   const stale = realtime ? 15_000 : 45_000;
 
@@ -31,6 +31,7 @@ export function useProductionDashboardQuery({ period, fromStr, toStr, shift, pro
       return productionAPI.getDashboard(params);
     },
     enabled:
+      filtersReady &&
       !!period &&
       !!shift &&
       !!fromStr &&

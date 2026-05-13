@@ -4,7 +4,7 @@ Aggregates form submission data for the Daily Production Overview (Line 90).
 """
 from fastapi import APIRouter, Depends, Query, HTTPException
 from datetime import datetime, timezone, timedelta
-from typing import Any, Optional
+from typing import Any, List, Optional, Tuple
 import logging
 import re
 import uuid
@@ -68,6 +68,7 @@ def _sort_key_dt(dt: Optional[datetime]) -> datetime:
     except Exception:
         return datetime.min
 
+
 def _in_range(dt: Optional[datetime], start: datetime, end: datetime) -> bool:
     """Safe date range check for mixed naive/aware datetimes."""
     if not isinstance(dt, datetime):
@@ -97,6 +98,46 @@ SHIFTS = {
     "night": {"label": "Night (22:00 - 06:00)", "start_hour": 22, "end_hour": 6},
     "day": {"label": "Day (06:00 - 22:00)", "start_hour": 6, "end_hour": 22},
 }
+
+
+def _in_any_time_window(dt: Optional[datetime], windows: List[Tuple[datetime, datetime]]) -> bool:
+    """True if dt falls inside any of the half-open-style inclusive windows."""
+    if not isinstance(dt, datetime) or not windows:
+        return False
+    return any(_in_range(dt, ws, we) for ws, we in windows)
+
+
+def _normalize_shift_keys(raw: Optional[str]) -> List[str]:
+    """Parse comma-separated shift keys (morning, afternoon, night, legacy day). Dedupe, preserve order."""
+    parts = [p.strip().lower() for p in (raw or "").split(",") if p.strip()]
+    seen = set()
+    out: List[str] = []
+    for p in parts:
+        if p not in SHIFTS or p in seen:
+            continue
+        seen.add(p)
+        out.append(p)
+    return out or ["morning"]
+
+
+def _shift_windows_for_day(shift_keys: List[str], target_date: datetime) -> List[Tuple[datetime, datetime]]:
+    windows: List[Tuple[datetime, datetime]] = []
+    for k in shift_keys:
+        cfg = SHIFTS[k]
+        if k == "night":
+            ws = target_date.replace(hour=22, minute=0, second=0, microsecond=0)
+            we = (target_date + timedelta(days=1)).replace(hour=6, minute=0, second=0, microsecond=0)
+        else:
+            ws = target_date.replace(hour=cfg["start_hour"], minute=0, second=0, microsecond=0)
+            we = target_date.replace(hour=cfg["end_hour"], minute=0, second=0, microsecond=0)
+        windows.append((ws, we))
+    return windows
+
+
+def _envelope_windows(windows: List[Tuple[datetime, datetime]]) -> Tuple[datetime, datetime]:
+    if not windows:
+        raise ValueError("windows must be non-empty")
+    return min(w[0] for w in windows), max(w[1] for w in windows)
 
 
 def extract_field(submission, field_label):
@@ -283,7 +324,10 @@ async def get_production_dashboard(
     date: Optional[str] = Query(None, description="Date in YYYY-MM-DD format (single day, used if from_date not set)"),
     from_date: Optional[str] = Query(None, description="Range start YYYY-MM-DD"),
     to_date: Optional[str] = Query(None, description="Range end YYYY-MM-DD"),
-    shift: Optional[str] = Query("morning", description="Shift: morning, afternoon, night (legacy: day)"),
+    shift: Optional[str] = Query(
+        "morning",
+        description="Comma-separated shifts for single-day mode: morning, afternoon, night (legacy: day). Example: morning,night",
+    ),
     current_user: dict = Depends(get_current_user),
 ):
     """
@@ -291,9 +335,8 @@ async def get_production_dashboard(
     Supports single-day (date) or range (from_date + to_date).
     """
     now = datetime.now(timezone.utc)
-    shift = (shift or "morning").strip().lower()
-    if shift not in SHIFTS:
-        shift = "morning"
+    shift_keys = _normalize_shift_keys(shift)
+    shift_param = ",".join(shift_keys)
 
     # Determine the effective date range
     if from_date and to_date:
@@ -310,6 +353,7 @@ async def get_production_dashboard(
         range_end = range_end.replace(hour=23, minute=59, second=59, microsecond=999999)
         target_date = range_start
         is_range = True
+        filter_windows = [(range_start, range_end)]
     else:
         # Single day mode (backward compatible)
         if date:
@@ -320,20 +364,15 @@ async def get_production_dashboard(
         else:
             target_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
-        shift_config = SHIFTS.get(shift, SHIFTS["morning"])
-        if shift == "night":
-            range_start = target_date.replace(hour=22, minute=0, second=0, microsecond=0)
-            range_end = (target_date + timedelta(days=1)).replace(hour=6, minute=0, second=0, microsecond=0)
-        else:
-            range_start = target_date.replace(
-                hour=shift_config["start_hour"], minute=0, second=0, microsecond=0
-            )
-            range_end = target_date.replace(
-                hour=shift_config["end_hour"], minute=0, second=0, microsecond=0
-            )
+        filter_windows = _shift_windows_for_day(shift_keys, target_date)
+        range_start, range_end = _envelope_windows(filter_windows)
         is_range = False
 
-    shift_config = SHIFTS.get(shift, SHIFTS["morning"])
+    shift_label = ", ".join(SHIFTS[k]["label"] for k in shift_keys)
+    shift_hours = "; ".join(
+        f"{SHIFTS[k]['start_hour']:02d}:00 - {SHIFTS[k]['end_hour']:02d}:00" for k in shift_keys
+    )
+    cal_env_start, cal_env_end = _envelope_windows(filter_windows)
 
     # Find ALL equipment nodes that look like Line-90 (name/tag). Sites may have duplicates
     # or multiple rows; find_one only expanded one subtree and submissions linked to another
@@ -663,14 +702,14 @@ async def get_production_dashboard(
         if dt_meta.tzinfo is None:
             dt_meta = dt_meta.replace(tzinfo=timezone.utc)
 
-        in_meta = _in_range(dt_meta, range_start, range_end)
-        in_form = _in_range(dt_form, range_start, range_end) if dt_form else False
+        in_meta = _in_any_time_window(dt_meta, filter_windows)
+        in_form = _in_any_time_window(dt_form, filter_windows) if dt_form else False
         # Date-only Production Date parses as midnight and misses day/night shift windows;
         # still include the row when the calendar day overlaps the dashboard range.
         if is_bb and dt_form:
             try:
                 d0 = dt_form.date() if dt_form.tzinfo is None else dt_form.astimezone(timezone.utc).date()
-                if range_start.date() <= d0 <= range_end.date():
+                if cal_env_start.date() <= d0 <= cal_env_end.date():
                     in_form = True
             except Exception:
                 pass
@@ -1023,7 +1062,7 @@ async def get_production_dashboard(
                     ts_dt = None
             if ts_dt is None:
                 continue
-            if not (range_start <= ts_dt <= range_end):
+            if not _in_any_time_window(ts_dt, filter_windows):
                 continue
 
             time_label = ts_dt.strftime("%H:%M")
@@ -1229,8 +1268,9 @@ async def get_production_dashboard(
         "from_date": range_start.strftime("%Y-%m-%d"),
         "to_date": range_end.strftime("%Y-%m-%d"),
         "is_range": is_range,
-        "shift": shift,
-        "shift_label": shift_config["label"],
+        "shift": shift_param,
+        "shifts": shift_keys,
+        "shift_label": shift_label,
         "equipment_name": EQUIPMENT_NAME,
         "kpis": {
             "total_input": round(total_feed, 1),
@@ -1244,7 +1284,7 @@ async def get_production_dashboard(
             "rsd": rsd,
             "rsd_target": 7,
             "runtime_hours": runtime_hours,
-            "shift_hours": f"{shift_config['start_hour']:02d}:00 - {shift_config['end_hour']:02d}:00",
+            "shift_hours": shift_hours,
             "sample_count": len(production_log),
             "viscosity_sample_count": len(viscosity_values),
         },

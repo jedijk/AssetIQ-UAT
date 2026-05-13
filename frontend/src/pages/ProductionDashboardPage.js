@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, lazy, Suspense } from "react";
+import React, { useState, useMemo, useEffect, useLayoutEffect, useCallback, useRef, lazy, Suspense } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { productionAPI } from "../lib/api";
 import { api } from "../lib/apiClient";
@@ -446,6 +446,46 @@ function sortMillisecondsForProductionEntry(entry, fromDate) {
   return Number.POSITIVE_INFINITY;
 }
 
+const PRODUCTION_SHIFT_OPTIONS = [
+  { key: "morning", short: "Morning", sub: "06:00–14:00", title: "Morning (06:00 – 14:00)" },
+  { key: "afternoon", short: "Afternoon", sub: "14:00–22:00", title: "Afternoon (14:00 – 22:00)" },
+  { key: "night", short: "Night", sub: "22:00–06:00", title: "Night (22:00 – 06:00)" },
+];
+
+const PRODUCTION_DASH_FILTERS_KEY = "assetiq.productionDashboard.filters";
+const PRODUCTION_DASH_FILTERS_V = 1;
+const PERIOD_KEY_SET = new Set(PERIOD_OPTIONS.map((o) => o.key));
+
+function loadProductionDashboardFiltersSnapshot() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(PRODUCTION_DASH_FILTERS_KEY);
+    if (!raw) return null;
+    const j = JSON.parse(raw);
+    if (j?.v !== PRODUCTION_DASH_FILTERS_V) return null;
+    return j;
+  } catch {
+    return null;
+  }
+}
+
+function parseSavedShiftsFromSnapshot(saved) {
+  const allowed = new Set(["morning", "afternoon", "night"]);
+  const arr = saved?.shifts;
+  if (!Array.isArray(arr)) return ["morning"];
+  const next = [...new Set(arr.filter((x) => typeof x === "string" && allowed.has(x)))];
+  return next.length ? next : ["morning"];
+}
+
+function saveProductionDashboardFiltersSnapshot(payload) {
+  try {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(PRODUCTION_DASH_FILTERS_KEY, JSON.stringify(payload));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
 // ──────────────────────────────────────────
 // Main component
 // ──────────────────────────────────────────
@@ -484,8 +524,23 @@ export default function ProductionDashboardPage() {
     toStr,
   } = useProductionDateRange();
 
-  // State
-  const [shift, setShift] = useState("morning");
+  const [selectedShifts, setSelectedShifts] = useState(() =>
+    parseSavedShiftsFromSnapshot(loadProductionDashboardFiltersSnapshot())
+  );
+  const [productionFiltersHydrated, setProductionFiltersHydrated] = useState(false);
+  const productionFiltersRestoredRef = useRef(false);
+
+  const shiftQueryKey = useMemo(() => [...selectedShifts].sort().join(","), [selectedShifts]);
+
+  const toggleProductionShift = useCallback((key) => {
+    setSelectedShifts((prev) => {
+      const has = prev.includes(key);
+      if (has && prev.length === 1) return prev;
+      if (has) return prev.filter((k) => k !== key);
+      const order = { morning: 0, afternoon: 1, night: 2 };
+      return [...prev, key].sort((a, b) => (order[a] ?? 9) - (order[b] ?? 9));
+    });
+  }, []);
   const [logSearch, setLogSearch] = useState("");
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", description: "", type: "action", severity: "info" });
@@ -493,6 +548,48 @@ export default function ProductionDashboardPage() {
   const [expandedEosNotes, setExpandedEosNotes] = useState(null); // Track which EOS row has notes expanded (for mobile)
   const [formExec, setFormExec] = useState(null); // { templateId, templateName }
   const [selectedTime, setSelectedTime] = useState(null); // highlighted time from chart click
+
+  useLayoutEffect(() => {
+    const already = productionFiltersRestoredRef.current;
+    productionFiltersRestoredRef.current = true;
+    if (!already) {
+      try {
+        const saved = loadProductionDashboardFiltersSnapshot();
+        if (saved) {
+          const p = saved.period;
+          if (p === "custom" && saved.fromStr && saved.toStr) {
+            const fd = new Date(`${saved.fromStr}T12:00:00`);
+            const td = new Date(`${saved.toStr}T12:00:00`);
+            if (!Number.isNaN(fd.getTime()) && !Number.isNaN(td.getTime())) {
+              setFromDate(fd);
+              setToDate(td);
+              setPeriod("custom");
+              setShowCustomDate(!!saved.showCustomDate);
+            }
+          } else if (p && PERIOD_KEY_SET.has(p)) {
+            handlePeriod(p);
+          }
+        }
+      } catch {
+        /* ignore corrupt snapshot */
+      }
+    }
+    setProductionFiltersHydrated(true);
+    // One-time restore on mount (localStorage); `hydrated` must flip even in React Strict Mode.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally run once
+  }, []);
+
+  useEffect(() => {
+    if (!productionFiltersHydrated) return;
+    saveProductionDashboardFiltersSnapshot({
+      v: PRODUCTION_DASH_FILTERS_V,
+      shifts: selectedShifts,
+      period,
+      fromStr,
+      toStr,
+      showCustomDate,
+    });
+  }, [productionFiltersHydrated, selectedShifts, period, fromStr, toStr, showCustomDate]);
 
   // Force period to "1d" on mobile
   useEffect(() => {
@@ -532,15 +629,16 @@ export default function ProductionDashboardPage() {
   const { data, isLoading, isFetching, refetch } = useProductionDashboardQuery({
     fromStr,
     toStr,
-    shift,
+    shift: shiftQueryKey,
     period,
     productionAPI,
     capabilities: caps,
+    filtersReady: productionFiltersHydrated,
   });
 
   const handleManualRefresh = () => {
     queryClient.invalidateQueries({
-      queryKey: productionKeys.dashboard(period, fromStr, toStr, shift),
+      queryKey: productionKeys.dashboard(period, fromStr, toStr, shiftQueryKey),
       exact: true,
     });
   };
@@ -587,7 +685,7 @@ export default function ProductionDashboardPage() {
   };
 
   const invalidateDashboard = () =>
-    queryClient.invalidateQueries({ queryKey: productionKeys.dashboard(period, fromStr, toStr, shift) });
+    queryClient.invalidateQueries({ queryKey: productionKeys.dashboard(period, fromStr, toStr, shiftQueryKey) });
 
   // Mutation for creating events
   const createEventMutation = useMutation({
@@ -1211,17 +1309,33 @@ export default function ProductionDashboardPage() {
               </div>
             )}
 
-            {/* Shift selector — all breakpoints; mobile also has segmented control below */}
-            <Select value={shift} onValueChange={setShift}>
-              <SelectTrigger className="min-w-[200px] sm:min-w-[240px] w-full sm:w-[min(100%,260px)] max-w-md sm:max-w-none h-8 text-xs sm:text-sm bg-white basis-full sm:basis-auto" data-testid="shift-selector">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="morning">Morning (06:00 - 14:00)</SelectItem>
-                <SelectItem value="afternoon">Afternoon (14:00 - 22:00)</SelectItem>
-                <SelectItem value="night">Night (22:00 - 06:00)</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Production shifts — multi-select (comma-separated in API); at least one active */}
+            <div
+              role="group"
+              aria-label="Production shifts"
+              className="inline-flex w-full max-w-xl flex-wrap items-stretch gap-1 rounded-lg bg-slate-100 p-0.5 basis-full sm:w-auto sm:basis-auto sm:max-w-none"
+              data-testid="shift-multi-selector"
+            >
+              {PRODUCTION_SHIFT_OPTIONS.map((opt) => {
+                const on = selectedShifts.includes(opt.key);
+                return (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => toggleProductionShift(opt.key)}
+                    className={`flex min-h-[44px] flex-1 flex-col items-center justify-center gap-0.5 rounded-md px-2 py-1.5 text-[11px] font-semibold leading-tight transition-colors touch-manipulation sm:min-h-8 sm:flex-none sm:flex-row sm:items-center sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs ${
+                      on ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200" : "text-slate-500 hover:text-slate-700"
+                    }`}
+                    title={`${opt.title}${on ? " — click to deselect" : " — click to include"}`}
+                    data-testid={`shift-multi-${opt.key}`}
+                  >
+                    <span>{opt.short}</span>
+                    <span className="font-normal text-[8px] text-slate-400 whitespace-nowrap sm:text-[10px]">{opt.sub}</span>
+                  </button>
+                );
+              })}
+            </div>
 
             {/* Refresh */}
             <Button
@@ -1269,54 +1383,6 @@ export default function ProductionDashboardPage() {
               <Download className="w-3.5 h-3.5" /> <span>Export</span>
             </Button>
           </div>
-
-          {/* Morning / afternoon / night — mobile (desktop uses shift selector above) */}
-          {isMobile && (
-            <div className="flex w-full min-w-0 justify-center px-2" data-testid="mobile-shift-selector">
-              <div
-                role="group"
-                aria-label="Shift"
-                className="grid w-full max-w-md grid-cols-3 gap-0.5 rounded-lg bg-slate-100 p-0.5"
-              >
-                <button
-                  type="button"
-                  onClick={() => setShift("morning")}
-                  className={`flex flex-col items-center justify-center gap-0.5 rounded-md px-1.5 py-2 min-h-[44px] text-[11px] font-semibold leading-tight transition-colors touch-manipulation active:scale-[0.99] ${
-                    shift === "morning" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                  }`}
-                  title="Morning (06:00 – 14:00)"
-                  data-testid="mobile-shift-morning"
-                >
-                  <span>Morning</span>
-                  <span className="font-normal text-[8px] leading-tight text-slate-400 whitespace-nowrap">06:00–14:00</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShift("afternoon")}
-                  className={`flex flex-col items-center justify-center gap-0.5 rounded-md px-1.5 py-2 min-h-[44px] text-[11px] font-semibold leading-tight transition-colors touch-manipulation active:scale-[0.99] ${
-                    shift === "afternoon" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                  }`}
-                  title="Afternoon (14:00 – 22:00)"
-                  data-testid="mobile-shift-afternoon"
-                >
-                  <span>Afternoon</span>
-                  <span className="font-normal text-[8px] leading-tight text-slate-400 whitespace-nowrap">14:00–22:00</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShift("night")}
-                  className={`flex flex-col items-center justify-center gap-0.5 rounded-md px-1.5 py-2 min-h-[44px] text-[11px] font-semibold leading-tight transition-colors touch-manipulation active:scale-[0.99] ${
-                    shift === "night" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                  }`}
-                  title="Night (22:00 – 06:00)"
-                  data-testid="mobile-shift-night"
-                >
-                  <span>Night</span>
-                  <span className="font-normal text-[8px] leading-tight text-slate-400 whitespace-nowrap">22:00–06:00</span>
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Custom date pickers (unfold below) - hidden on mobile */}
           {showCustomDate && !isMobile && (
