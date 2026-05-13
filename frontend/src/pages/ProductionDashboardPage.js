@@ -1949,11 +1949,10 @@ export default function ProductionDashboardPage() {
                   ) : (
                     <table className="w-full table-fixed text-xs">
                       <colgroup>
-                        <col style={{ width: "50%" }} />
-                        <col style={{ width: "8%" }} />
-                        <col style={{ width: "17%" }} />
-                        <col style={{ width: "15%" }} />
+                        <col style={{ width: "58%" }} />
                         <col style={{ width: "10%" }} />
+                        <col style={{ width: "24%" }} />
+                        <col style={{ width: "8%" }} />
                       </colgroup>
                       <thead>
                         <tr className="border-b border-slate-200">
@@ -1969,9 +1968,6 @@ export default function ProductionDashboardPage() {
                           >
                             By
                           </th>
-                          <th className="text-left py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px] whitespace-nowrap">
-                            When
-                          </th>
                           <th className="w-14 p-0" aria-label="Actions" />
                         </tr>
                       </thead>
@@ -1986,9 +1982,6 @@ export default function ProductionDashboardPage() {
                             </td>
                             <td className="py-2 px-1 text-slate-600 text-[11px] break-words min-w-0 align-top">
                               {row.submitted_by || "—"}
-                            </td>
-                            <td className="py-2 px-1 text-slate-500 tabular-nums text-[11px] whitespace-nowrap align-top">
-                              {formatDateTime(row.submitted_at || row.datetime) || "—"}
                             </td>
                             <td className="py-1.5 px-1 align-top">
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
