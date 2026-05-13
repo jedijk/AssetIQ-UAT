@@ -1981,7 +1981,8 @@ export default function ProductionDashboardPage() {
                           <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-slate-600">
                             <span className="tabular-nums text-slate-500">{row.time || "—"}</span>
                             <span className="font-medium text-slate-700">{row.submitted_by || "—"}</span>
-                            <div className="flex items-center gap-0.5 ml-auto">
+                          </div>
+                          <div className="mt-2 flex w-full flex-wrap items-center justify-center gap-0.5">
                               {row.submission_id && (
                                 <button
                                   type="button"
@@ -2037,7 +2038,6 @@ export default function ProductionDashboardPage() {
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
-                            </div>
                           </div>
                           <div className="text-[11px] text-slate-500 mt-1 tabular-nums">
                             {formatDateTime(row.submitted_at || row.datetime) || "—"}
