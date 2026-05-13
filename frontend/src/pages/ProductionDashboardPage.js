@@ -865,7 +865,7 @@ export default function ProductionDashboardPage() {
         XLSX.utils.book_append_sheet(wb, wsAct, "Actions");
 
         // Sheet 7: Information (form submissions)
-        const infoHeader = ["Shift time", "Submitted at", "Text", "Submitted by", "Form", "Submission ID"];
+        const infoHeader = ["Shift time", "Submitted at", "Info", "Submitted by", "Form", "Submission ID"];
         const infoRows = [infoHeader];
         (data.information_entries || []).forEach((row) => {
           infoRows.push([
@@ -1949,15 +1949,15 @@ export default function ProductionDashboardPage() {
                   ) : (
                     <table className="w-full table-fixed text-xs">
                       <colgroup>
-                        <col style={{ width: "58%" }} />
+                        <col style={{ width: "56%" }} />
                         <col style={{ width: "10%" }} />
-                        <col style={{ width: "24%" }} />
-                        <col style={{ width: "8%" }} />
+                        <col style={{ width: "22%" }} />
+                        <col style={{ width: "12%" }} />
                       </colgroup>
                       <thead>
                         <tr className="border-b border-slate-200">
-                          <th className="text-left py-2 px-2 font-semibold text-slate-700 uppercase tracking-wider text-[11px]">
-                            Text
+                          <th className="text-left py-2 px-2 font-semibold text-slate-700 tracking-wide text-[11px]">
+                            Info
                           </th>
                           <th className="text-left py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px] whitespace-nowrap">
                             Time
@@ -1973,7 +1973,7 @@ export default function ProductionDashboardPage() {
                       </thead>
                       <tbody>
                         {data.information_entries.map((row, i) => (
-                          <tr key={row.submission_id || i} className="border-b border-slate-50 hover:bg-slate-50 group align-top">
+                          <tr key={row.submission_id || i} className="border-b border-slate-50 hover:bg-slate-50 align-top">
                             <td className="py-2 px-2 text-sm text-slate-900 leading-relaxed break-words min-w-0">
                               {row.text || "—"}
                             </td>
@@ -1984,7 +1984,7 @@ export default function ProductionDashboardPage() {
                               {row.submitted_by || "—"}
                             </td>
                             <td className="py-1.5 px-1 align-top">
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="flex items-center justify-end gap-1">
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -2001,11 +2001,11 @@ export default function ProductionDashboardPage() {
                                       initialValues: row.prefill && typeof row.prefill === "object" ? row.prefill : {},
                                     });
                                   }}
-                                  className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                                  className="p-1.5 rounded-md border border-transparent text-slate-400 hover:border-slate-200 hover:bg-slate-100 hover:text-slate-600"
                                   title="Edit"
                                   data-testid={`edit-information-${i}`}
                                 >
-                                  <Pencil className="w-3 h-3" />
+                                  <Pencil className="w-3.5 h-3.5" />
                                 </button>
                                 <button
                                   type="button"
@@ -2018,11 +2018,11 @@ export default function ProductionDashboardPage() {
                                       });
                                     }
                                   }}
-                                  className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+                                  className="p-1.5 rounded-md border border-slate-200 bg-white text-slate-500 shadow-sm hover:bg-red-50 hover:border-red-200 hover:text-red-600"
                                   title="Delete"
                                   data-testid={`delete-information-${i}`}
                                 >
-                                  <Trash2 className="w-3 h-3" />
+                                  <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </div>
                             </td>
