@@ -2048,29 +2048,29 @@ export default function ProductionDashboardPage() {
                   ) : (
                     <table className="w-full table-fixed text-xs">
                       <colgroup>
-                        <col style={{ width: "48%" }} />
+                        <col style={{ width: "36%" }} />
+                        <col style={{ width: "28%" }} />
+                        <col style={{ width: "22%" }} />
                         <col style={{ width: "14%" }} />
-                        <col style={{ width: "19%" }} />
-                        <col style={{ width: "19%" }} />
                       </colgroup>
                       <thead>
                         <tr className="border-b border-slate-200">
-                          <th className="text-left py-2 px-2 font-semibold text-slate-700 tracking-wide text-[11px]">
+                          <th className="text-left py-2 px-2 font-semibold text-slate-700 tracking-wide text-[11px] min-w-0">
                             Info
                           </th>
                           <th
-                            className="text-left py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px] whitespace-nowrap"
+                            className="text-left py-2 px-1 pr-2 font-medium text-slate-500 uppercase tracking-wider text-[10px] whitespace-normal leading-tight min-w-[8.5rem]"
                             title="Date and time (your timezone)"
                           >
                             Date/time
                           </th>
                           <th
-                            className="text-left py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px]"
+                            className="text-left py-2 pl-2 pr-1 font-medium text-slate-500 uppercase tracking-wider text-[10px] min-w-0"
                             title="Submitted by"
                           >
                             By
                           </th>
-                          <th className="min-w-[5.25rem] p-0" aria-label="Actions" />
+                          <th className="min-w-[5.25rem] w-[14%] max-w-[6.5rem] p-0" aria-label="Actions" />
                         </tr>
                       </thead>
                       <tbody>
@@ -2081,18 +2081,18 @@ export default function ProductionDashboardPage() {
                               row._informationPinned ? "bg-amber-50/40 border-l-2 border-l-amber-400" : ""
                             }`}
                           >
-                            <td className="py-2 px-2 text-sm text-slate-900 leading-relaxed break-words min-w-0">
+                            <td className="py-2 px-2 text-sm text-slate-900 leading-relaxed break-words min-w-0 overflow-hidden">
                               {row.text || "—"}
                             </td>
-                            <td className="py-2 px-1 text-slate-500 tabular-nums text-[10px] leading-tight whitespace-nowrap align-top">
+                            <td className="py-2 px-1 pr-2 text-slate-500 tabular-nums text-[10px] leading-tight whitespace-nowrap align-top min-w-[8.5rem] overflow-hidden">
                               {(row.submitted_at || row.datetime)
                                 ? formatDateTimeCompact(row.submitted_at || row.datetime)
                                 : row.time || "—"}
                             </td>
-                            <td className="py-2 px-1 text-slate-600 text-[11px] break-words min-w-0 align-top">
+                            <td className="py-2 pl-2 pr-1 text-slate-600 text-[11px] break-words min-w-0 overflow-hidden">
                               {row.submitted_by || "—"}
                             </td>
-                            <td className="py-1.5 px-2 align-top">
+                            <td className="py-1.5 px-2 align-top min-w-[5.25rem] overflow-hidden">
                               <div className="flex items-center gap-0.5 justify-end">
                                 {row.submission_id && (
                                   <button
