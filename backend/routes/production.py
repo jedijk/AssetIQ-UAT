@@ -4,7 +4,7 @@ Aggregates form submission data for the Daily Production Overview (Line 90).
 """
 from fastapi import APIRouter, Depends, Query, HTTPException
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Any, Optional
 import logging
 import re
 import uuid
