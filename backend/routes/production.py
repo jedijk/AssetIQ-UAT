@@ -86,8 +86,18 @@ BIG_BAG_FORM = "Big Bag Loading"
 SCREEN_CHANGE_FORM = "Screen change"
 MAGNET_CLEANING_FORM = "Magnet cleaning"
 END_OF_SHIFT_FORM = "End of shift"
+# Any form template whose name contains "information" (e.g. "Production Information")
+INFORMATION_FORM = "Information"
 
-PRODUCTION_FORMS = [EXTRUDER_FORM, VISCOSITY_FORM, BIG_BAG_FORM, SCREEN_CHANGE_FORM, MAGNET_CLEANING_FORM, END_OF_SHIFT_FORM]
+PRODUCTION_FORMS = [
+    EXTRUDER_FORM,
+    VISCOSITY_FORM,
+    BIG_BAG_FORM,
+    SCREEN_CHANGE_FORM,
+    MAGNET_CLEANING_FORM,
+    END_OF_SHIFT_FORM,
+    INFORMATION_FORM,
+]
 
 EQUIPMENT_NAME = "Line-90"
 
@@ -221,6 +231,63 @@ def _unwrap_form_value(val):
     if isinstance(val, list) and len(val) > 0:
         return _unwrap_form_value(val[0])
     return val
+
+
+def _submission_prefill_by_field_id(sub) -> dict:
+    """Map field_id -> string for edit dialogs."""
+    out: dict = {}
+    for v in sub.get("values") or []:
+        fid = (v.get("field_id") or "").strip()
+        if not fid:
+            continue
+        raw = _unwrap_form_value(v.get("value"))
+        if raw is None:
+            continue
+        if isinstance(raw, datetime):
+            out[fid] = raw.isoformat(sep="T", timespec="minutes")
+        else:
+            out[fid] = str(raw)
+    return out
+
+
+def _information_text_from_submission(sub) -> str:
+    """Primary text for dashboard: prefer obvious labels, else join non-trivial string fields."""
+    priority_tokens = (
+        "information",
+        "details",
+        "comments",
+        "description",
+        "notes",
+        "message",
+        "remarks",
+        "text",
+    )
+    priority_chunks: List[str] = []
+    other_chunks: List[str] = []
+    for v in sub.get("values") or []:
+        lab = (v.get("field_label") or "").strip().lower()
+        raw = _unwrap_form_value(v.get("value"))
+        if raw is None:
+            continue
+        if isinstance(raw, datetime):
+            s = raw.isoformat(sep=" ", timespec="minutes")
+        else:
+            s = str(raw).strip()
+        if len(s) < 2:
+            continue
+        if any(tok in lab for tok in priority_tokens):
+            priority_chunks.append(s)
+        else:
+            other_chunks.append(s)
+    ordered = priority_chunks + other_chunks
+    seen = set()
+    parts: List[str] = []
+    for c in ordered:
+        if c not in seen:
+            seen.add(c)
+            parts.append(c)
+    out = " — ".join(parts)
+    return out[:4000] if out else ""
 
 
 def _parse_sample_datetime(val):
@@ -498,6 +565,9 @@ async def get_production_dashboard(
                 {"form_template_name": {"$regex": "end", "$options": "i"}},
                 {"form_template_name": {"$regex": "shift", "$options": "i"}},
             ]},
+            {"$and": [
+                {"form_template_name": {"$regex": r"\binformation\b", "$options": "i"}},
+            ]},
         ]
     }
 
@@ -523,6 +593,9 @@ async def get_production_dashboard(
                     {"form_template_name": {"$regex": "big", "$options": "i"}},
                     {"form_template_name": {"$regex": "bag", "$options": "i"}},
                 ]},
+                {"$and": [
+                    {"form_template_name": {"$regex": r"\binformation\b", "$options": "i"}},
+                ]},
             ]},
             {"$or": [
                 {"equipment_id": ""},
@@ -538,6 +611,7 @@ async def get_production_dashboard(
     screen_tpl_ids_str = set()
     magnet_tpl_ids_str = set()
     eos_tpl_ids_str = set()
+    information_tpl_ids_str = set()
 
     prod_tpl_id_values = []
     try:
@@ -585,6 +659,8 @@ async def get_production_dashboard(
                     magnet_tpl_ids_str.add(sid)
                 if ("end" in nm) and ("shift" in nm):
                     eos_tpl_ids_str.add(sid)
+                if re.search(r"\binformation\b", nm):
+                    information_tpl_ids_str.add(sid)
     except Exception as e:
         logger.warning("production dashboard: form_templates lookup failed: %s", e)
 
@@ -762,6 +838,8 @@ async def get_production_dashboard(
                 return True
             if target == END_OF_SHIFT_FORM.lower() and ts in eos_tpl_ids_str:
                 return True
+            if target == INFORMATION_FORM.lower() and ts in information_tpl_ids_str:
+                return True
         tpl = (sub.get("form_template_name") or "").strip().lower()
         if not tpl:
             return False
@@ -779,6 +857,8 @@ async def get_production_dashboard(
             return ("magnet" in tpl) and ("clean" in tpl)
         if target == END_OF_SHIFT_FORM.lower():
             return ("end" in tpl) and ("shift" in tpl)
+        if target == INFORMATION_FORM.lower():
+            return bool(re.search(r"\binformation\b", tpl))
         return False
 
     extruder_subs = sorted(
@@ -800,6 +880,8 @@ async def get_production_dashboard(
             extruder_time_by_id[sid] = dt
     big_bag_subs = [s for s in submissions if match_template(s, BIG_BAG_FORM)]
     big_bag_subs.sort(key=lambda s: _sort_key_dt(s.get("_parsed_time")))
+    information_subs = [s for s in submissions if match_template(s, INFORMATION_FORM)]
+    information_subs.sort(key=lambda s: _sort_key_dt(s.get("_parsed_time")))
     screen_change_subs = [s for s in submissions if match_template(s, SCREEN_CHANGE_FORM)]
     magnet_subs = [s for s in submissions if match_template(s, MAGNET_CLEANING_FORM)]
     end_of_shift_subs = sorted(
@@ -921,6 +1003,32 @@ async def get_production_dashboard(
             "submission_id": sub.get("id", ""),
         })
 
+    information_entries = []
+    for sub in information_subs:
+        dt = sub.get("_parsed_time")
+        time_label = dt.strftime("%H:%M") if dt else ""
+        st = parse_submitted_at(sub)
+        if st:
+            when_iso = _serialize_datetime(st, force_utc=True)
+        elif dt:
+            when_iso = _serialize_datetime(dt)
+        else:
+            when_iso = ""
+        text = _information_text_from_submission(sub)
+        tpl_name = (sub.get("form_template_name") or "").strip()
+        ftid = sub.get("form_template_id")
+        information_entries.append({
+            "time": time_label,
+            "datetime": _serialize_datetime(dt) if dt else "",
+            "submitted_at": when_iso,
+            "text": text,
+            "submitted_by": sub.get("submitted_by_name", ""),
+            "submission_id": sub.get("id", ""),
+            "form_template_name": tpl_name,
+            "form_template_id": str(ftid) if ftid is not None else "",
+            "prefill": _submission_prefill_by_field_id(sub),
+        })
+
     # End of Shift data
     end_of_shift_entries = []
     for sub in end_of_shift_subs:
@@ -974,10 +1082,8 @@ async def get_production_dashboard(
         actions_query, {"_id": 0}
     ).sort("created_at", -1).to_list(50)
 
-    insights_query = {**event_date_query, "type": "insight"}
-    insights = await db.production_events.find(
-        insights_query, {"_id": 0}
-    ).sort("created_at", -1).to_list(50)
+    # Dashboard "Information" panel uses form submissions (information_entries), not production_events insights.
+    insights: List[dict] = []
 
     # Lot info from Big Bag Loading
     lot_info = ""
@@ -1294,6 +1400,7 @@ async def get_production_dashboard(
         "viscosity_series": viscosity_series,
         "viscosity_values": viscosity_values,
         "big_bag_entries": big_bag_entries,
+        "information_entries": information_entries,
         "end_of_shift_entries": end_of_shift_entries,
         "screen_changes": [{"time": s.get("_parsed_time").strftime("%H:%M") if s.get("_parsed_time") else "", "datetime": s.get("_parsed_time").isoformat() if s.get("_parsed_time") else ""} for s in screen_change_subs],
         "magnet_cleanings": [{"time": s.get("_parsed_time").strftime("%H:%M") if s.get("_parsed_time") else "", "datetime": s.get("_parsed_time").isoformat() if s.get("_parsed_time") else ""} for s in magnet_subs],
@@ -1923,7 +2030,7 @@ async def viscosity_pairing_debug_report(
 
     if isinstance(report_payload, dict):
         report_payload_clipped = dict(report_payload)
-        for k in ("production_log", "viscosity_series", "big_bag_entries", "end_of_shift_entries", "actions", "insights"):
+        for k in ("production_log", "viscosity_series", "big_bag_entries", "information_entries", "end_of_shift_entries", "actions", "insights"):
             if k in report_payload_clipped:
                 report_payload_clipped[k] = _clip_list(report_payload_clipped.get(k))
     else:

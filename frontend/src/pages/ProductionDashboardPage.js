@@ -18,8 +18,6 @@ import {
   Sigma,
   Clock,
   AlertTriangle,
-  AlertCircle,
-  CheckCircle2,
   Search,
   X,
   Pencil,
@@ -128,38 +126,6 @@ const KPICard = ({ icon: Icon, iconColor, label, value, unit, detail, detail2, t
         {trendDirection === 'up' ? '+' : ''}{trend}
       </span>
     )}
-  </div>
-);
-
-// ──────────────────────────────────────────
-// Severity icon helper
-// ──────────────────────────────────────────
-const SeverityIcon = ({ severity }) => {
-  switch (severity) {
-    case "critical":
-      return <AlertTriangle className="w-4 h-4 text-red-500" />;
-    case "warning":
-      return <AlertTriangle className="w-4 h-4 text-amber-500" />;
-    case "success":
-      return <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
-    default:
-      return <Clock className="w-4 h-4 text-slate-400" />;
-  }
-};
-
-// ──────────────────────────────────────────
-// Event Card (Actions / Insights)
-// ──────────────────────────────────────────
-const EventCard = ({ event }) => (
-  <div className="flex items-start gap-3 py-2.5 border-b border-slate-100 last:border-0" data-testid={`event-${event.id}`}>
-    <div className="mt-0.5">
-      <SeverityIcon severity={event.severity} />
-    </div>
-    <div className="flex-1 min-w-0">
-      <p className="text-sm font-medium text-slate-800 leading-tight">{event.title}</p>
-      <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{event.description}</p>
-    </div>
-    <span className="text-xs text-slate-400 tabular-nums flex-shrink-0">{event.time}</span>
   </div>
 );
 
@@ -609,7 +575,8 @@ export default function ProductionDashboardPage() {
       const extruder = list.find((t) => t.name === "Extruder settings sample");
       const viscosity = list.find((t) => /mooney viscosity/i.test(t.name));
       const endOfShift = list.find((t) => /end of shift/i.test(t.name));
-      return { bigBag, extruder, viscosity, endOfShift };
+      const informationTemplates = list.filter((t) => /\binformation\b/i.test(String(t.name || "")));
+      return { bigBag, extruder, viscosity, endOfShift, informationTemplates };
     },
     staleTime: 600000,
   });
@@ -797,22 +764,6 @@ export default function ProductionDashboardPage() {
   // Edit state for big bag entries
   const [editBigBag, setEditBigBag] = useState(null);
 
-  // Mutation for AI insights generation
-  const aiInsightsMutation = useMutation({
-    mutationFn: () => productionAPI.generateAiInsights({
-      date: fromStr,
-      production_log: data?.production_log || [],
-      viscosity_values: data?.viscosity_values || [],
-      kpis: data?.kpis || {},
-      actions: data?.actions || [],
-    }),
-    onSuccess: () => {
-      invalidateDashboard();
-      toast.success("AI insights generated");
-    },
-    onError: () => toast.error("Failed to generate insights"),
-  });
-
   // Export to Excel
   const exportToExcel = () => {
     if (!data) return;
@@ -913,15 +864,22 @@ export default function ProductionDashboardPage() {
         wsAct["!cols"] = [{ wch: 8 }, { wch: 10 }, { wch: 30 }, { wch: 50 }];
         XLSX.utils.book_append_sheet(wb, wsAct, "Actions");
 
-        // Sheet 7: Insights
-        const insHeader = ["Time", "Severity", "Title", "Description"];
-        const insRows = [insHeader];
-        (data.insights || []).forEach((ev) => {
-          insRows.push([ev.time, ev.severity, ev.title, ev.description]);
+        // Sheet 7: Information (form submissions)
+        const infoHeader = ["Shift time", "Submitted at", "Text", "Submitted by", "Form", "Submission ID"];
+        const infoRows = [infoHeader];
+        (data.information_entries || []).forEach((row) => {
+          infoRows.push([
+            row.time || "",
+            row.submitted_at || row.datetime || "",
+            row.text || "",
+            row.submitted_by || "",
+            row.form_template_name || "",
+            row.submission_id || "",
+          ]);
         });
-        const wsIns = XLSX.utils.aoa_to_sheet(insRows);
-        wsIns["!cols"] = [{ wch: 8 }, { wch: 10 }, { wch: 30 }, { wch: 50 }];
-        XLSX.utils.book_append_sheet(wb, wsIns, "Insights");
+        const wsInfo = XLSX.utils.aoa_to_sheet(infoRows);
+        wsInfo["!cols"] = [{ wch: 10 }, { wch: 22 }, { wch: 48 }, { wch: 18 }, { wch: 28 }, { wch: 28 }];
+        XLSX.utils.book_append_sheet(wb, wsInfo, "Information");
 
         // Save
         const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
@@ -1884,35 +1842,172 @@ export default function ProductionDashboardPage() {
               </div>
             </div>
 
-            {/* Daily Insights */}
-            <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4" data-testid="insights-panel">
+            {/* Information (submitted forms) */}
+            <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4" data-testid="information-panel">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-slate-700">Insights</h3>
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-700">Information</h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Line-90 — information forms</p>
+                </div>
                 <div className="flex items-center gap-2">
-                  {data?.insights?.length > 0 && (
-                    <Badge variant="secondary" className="text-xs">{data.insights.length}</Badge>
+                  {data?.information_entries?.length > 0 && (
+                    <Badge variant="secondary" className="text-xs">{data.information_entries.length}</Badge>
                   )}
-                  {/* Hide AI Refresh button on mobile (view only) */}
-                  {!isMobile && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 gap-1 text-xs"
-                      disabled={aiInsightsMutation.isPending || !data?.production_log?.length}
-                      onClick={() => aiInsightsMutation.mutate()}
-                      data-testid="ai-insights-btn"
-                    >
-                      <Sparkles className={`w-3 h-3 ${aiInsightsMutation.isPending ? "animate-spin" : ""}`} />
-                      {aiInsightsMutation.isPending ? "Analyzing..." : "AI Refresh"}
-                    </Button>
+                  {!isMobile && (formTemplates?.informationTemplates?.length > 0) && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" data-testid="information-add-btn">
+                          <Plus className="w-3 h-3" /> Add
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {formTemplates.informationTemplates.map((tpl) => (
+                          <DropdownMenuItem
+                            key={tpl.id}
+                            onClick={() => {
+                              setFormExec({
+                                templateId: tpl.id,
+                                templateName: tpl.name || "Information",
+                                equipmentId: line90Equipment?.id,
+                              });
+                            }}
+                            data-testid={`add-information-${tpl.id}`}
+                          >
+                            {tpl.name || "Information"}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </div>
               </div>
               <div className={isMobile ? "" : "max-h-[200px] overflow-y-auto"}>
-                {data?.insights?.length > 0 ? (
-                  data.insights.map((ev) => <EventCard key={ev.id} event={ev} />)
+                {data?.information_entries?.length > 0 ? (
+                  isMobile ? (
+                    <div className="space-y-2">
+                      {data.information_entries.map((row, i) => (
+                        <div key={row.submission_id || i} className="p-2 rounded-lg bg-slate-50 border border-slate-100 text-xs">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="font-medium text-slate-900 flex-1 min-w-0 break-words">{row.text || "—"}</div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const tid = row.form_template_id || formTemplates?.informationTemplates?.[0]?.id;
+                                  if (!tid) {
+                                    toast.error("Information template not found");
+                                    return;
+                                  }
+                                  setFormExec({
+                                    templateId: tid,
+                                    templateName: row.form_template_name || "Information",
+                                    equipmentId: line90Equipment?.id,
+                                    submissionId: row.submission_id,
+                                    initialValues: row.prefill && typeof row.prefill === "object" ? row.prefill : {},
+                                  });
+                                }}
+                                className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                                title="Edit"
+                                data-testid={`edit-information-${i}`}
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (row.submission_id) {
+                                    const snippet = (row.text || "").slice(0, 40);
+                                    setDeleteConfirm({
+                                      ids: [row.submission_id],
+                                      label: `information entry${snippet ? ` (${snippet}${(row.text || "").length > 40 ? "…" : ""})` : ""}`,
+                                    });
+                                  }
+                                }}
+                                className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+                                title="Delete"
+                                data-testid={`delete-information-${i}`}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="text-slate-600 mt-1">{row.submitted_by || "—"}</div>
+                          <div className="text-slate-400 mt-0.5 tabular-nums text-[11px]">
+                            {formatDateTime(row.submitted_at || row.datetime) || "—"}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200">
+                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Text</th>
+                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider w-[88px]">Time</th>
+                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Submitted by</th>
+                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">When</th>
+                          <th className="w-14"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.information_entries.map((row, i) => (
+                          <tr key={row.submission_id || i} className="border-b border-slate-50 hover:bg-slate-50 group align-top">
+                            <td className="py-1.5 px-1 text-slate-700 max-w-[200px] break-words">{row.text || "—"}</td>
+                            <td className="py-1.5 px-1 text-slate-600 tabular-nums whitespace-nowrap">{row.time || "—"}</td>
+                            <td className="py-1.5 px-1 text-slate-700">{row.submitted_by || "—"}</td>
+                            <td className="py-1.5 px-1 text-slate-600 tabular-nums whitespace-nowrap">
+                              {formatDateTime(row.submitted_at || row.datetime) || "—"}
+                            </td>
+                            <td className="py-1 px-1 align-middle">
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const tid = row.form_template_id || formTemplates?.informationTemplates?.[0]?.id;
+                                    if (!tid) {
+                                      toast.error("Information template not found");
+                                      return;
+                                    }
+                                    setFormExec({
+                                      templateId: tid,
+                                      templateName: row.form_template_name || "Information",
+                                      equipmentId: line90Equipment?.id,
+                                      submissionId: row.submission_id,
+                                      initialValues: row.prefill && typeof row.prefill === "object" ? row.prefill : {},
+                                    });
+                                  }}
+                                  className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                                  title="Edit"
+                                  data-testid={`edit-information-${i}`}
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (row.submission_id) {
+                                      const snippet = (row.text || "").slice(0, 40);
+                                      setDeleteConfirm({
+                                        ids: [row.submission_id],
+                                        label: `information entry${snippet ? ` (${snippet}${(row.text || "").length > 40 ? "…" : ""})` : ""}`,
+                                      });
+                                    }
+                                  }}
+                                  className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+                                  title="Delete"
+                                  data-testid={`delete-information-${i}`}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )
                 ) : (
-                  <p className="text-xs text-slate-400 py-4 text-center">No insights recorded</p>
+                  <p className="text-xs text-slate-400 py-4 text-center">No information submitted</p>
                 )}
               </div>
             </div>
