@@ -778,10 +778,19 @@ export default function ProductionDashboardPage() {
         XLSX.utils.book_append_sheet(wb, wsVisc, "Viscosity Samples");
 
         // Sheet 4: Input Material
-        const bagHeader = ["Material", "Supplier", "Bag No.", "Lot No.", "Production Date"];
+        const bagHeader = ["Material", "Supplier", "Bag No.", "Lot No.", "Production Date", "Equipment / line", "By"];
         const bagRows = [bagHeader];
         (data.big_bag_entries || []).forEach((b) => {
-          bagRows.push([b.material, b.supplier, b.bag_no, b.lot_no, b.production_date || ""]);
+          bagRows.push([
+            b.material,
+            b.supplier,
+            b.bag_no,
+            b.lot_no,
+            b.production_date || "",
+            b.equipment_name || "Line-90",
+            b.submitted_by || "",
+          ]);
+        });
         });
         const wsBag = XLSX.utils.aoa_to_sheet(bagRows);
         wsBag["!cols"] = bagHeader.map(() => ({ wch: 16 }));
@@ -1694,7 +1703,10 @@ export default function ProductionDashboardPage() {
             {/* Input Material / Big Bag Loading */}
             <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4" data-testid="big-bag-panel">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-slate-700">Input Material</h3>
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-700">Input Material</h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Line-90 — big bag loading</p>
+                </div>
                 <div className="flex items-center gap-2">
                   {data?.big_bag_entries?.length > 0 && (
                     <Badge variant="secondary" className="text-xs">{data.big_bag_entries.length}</Badge>
@@ -1728,6 +1740,7 @@ export default function ProductionDashboardPage() {
                         <div key={bag.submission_id || i} className="p-2 rounded-lg bg-slate-50 border border-slate-100 text-xs">
                           <div className="font-medium text-slate-900">{bag.material || "—"}</div>
                           <div className="flex flex-wrap gap-x-3 text-slate-600 mt-1">
+                            <span className="text-slate-500">{bag.equipment_name || "Line-90"}</span>
                             <span>Supplier: {bag.supplier || "—"}</span>
                             <span>Bag: {bag.bag_no || "—"}</span>
                             <span>Lot: {bag.lot_no || "—"}</span>
@@ -1746,6 +1759,7 @@ export default function ProductionDashboardPage() {
                           <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Bag No.</th>
                           <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Lot No.</th>
                           <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Prod. Date</th>
+                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Equipment</th>
                           <th className="w-14"></th>
                         </tr>
                       </thead>
@@ -1757,6 +1771,7 @@ export default function ProductionDashboardPage() {
                             <td className="py-1.5 px-1 text-slate-700 tabular-nums">{bag.bag_no}</td>
                             <td className="py-1.5 px-1 text-slate-700">{bag.lot_no}</td>
                             <td className="py-1.5 px-1 text-slate-700 tabular-nums">{bag.production_date || ""}</td>
+                            <td className="py-1.5 px-1 text-slate-600 text-[11px]">{bag.equipment_name || "Line-90"}</td>
                             <td className="py-1 px-1">
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button

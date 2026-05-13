@@ -431,6 +431,11 @@ async def get_production_dashboard(
                     {"form_template_name": {"$regex": "end", "$options": "i"}},
                     {"form_template_name": {"$regex": "shift", "$options": "i"}},
                 ]},
+                # Big Bag Loading is often submitted without a linked equipment row
+                {"$and": [
+                    {"form_template_name": {"$regex": "big", "$options": "i"}},
+                    {"form_template_name": {"$regex": "bag", "$options": "i"}},
+                ]},
             ]},
             {"$or": [
                 {"equipment_id": ""},
@@ -548,6 +553,22 @@ async def get_production_dashboard(
 
     all_subs = await db.form_submissions.find(submissions_query, {"_id": 0}).to_list(8000)
 
+    def _tid_str_for_filter(sub):
+        tid = sub.get("form_template_id")
+        if tid is None:
+            return None
+        if isinstance(tid, ObjectId):
+            return str(tid)
+        s = str(tid).strip()
+        return s or None
+
+    def _is_big_bag_template_sub(sub) -> bool:
+        ts = _tid_str_for_filter(sub)
+        if ts and ts in big_bag_tpl_ids_str:
+            return True
+        tpl = (sub.get("form_template_name") or "").strip().lower()
+        return bool(tpl) and ("big" in tpl) and ("bag" in tpl)
+
     def _prefer_form_sample_time_for_row(sub) -> bool:
         """Extruder + Mooney: sample clock is the Date & Time field, not submitted_at."""
         tpl = (sub.get("form_template_name") or "").strip().lower()
@@ -577,6 +598,11 @@ async def get_production_dashboard(
 
         raw_sample_dt = _extract_date_time_field_raw(sub)
         dt_form = _parse_sample_datetime(raw_sample_dt) if raw_sample_dt else None
+        # Big Bag often has no "Date & Time"; use Production Date for shift/day windowing.
+        if dt_form is None and _is_big_bag_template_sub(sub):
+            raw_pd = extract_field(sub, "Production Date")
+            if raw_pd is not None and str(raw_pd).strip() and str(raw_pd).strip() not in ("{}", "null"):
+                dt_form = _parse_sample_datetime(_unwrap_form_value(raw_pd))
 
         in_meta = _in_range(dt_meta, range_start, range_end)
         in_form = _in_range(dt_form, range_start, range_end) if dt_form else False
@@ -665,6 +691,7 @@ async def get_production_dashboard(
         if sid and dt:
             extruder_time_by_id[sid] = dt
     big_bag_subs = [s for s in submissions if match_template(s, BIG_BAG_FORM)]
+    big_bag_subs.sort(key=lambda s: _sort_key_dt(s.get("_parsed_time")))
     screen_change_subs = [s for s in submissions if match_template(s, SCREEN_CHANGE_FORM)]
     magnet_subs = [s for s in submissions if match_template(s, MAGNET_CLEANING_FORM)]
     end_of_shift_subs = sorted(
@@ -762,13 +789,19 @@ async def get_production_dashboard(
         bag_no = extract_field(sub, "Bag No.") or ""
         lot_no = extract_field(sub, "Lot No.") or ""
         production_date = extract_field(sub, "Production Date") or ""
+        equip_label = (sub.get("equipment_name") or "").strip()
+        if not equip_label:
+            equip_label = EQUIPMENT_NAME
         big_bag_entries.append({
             "time": time_label,
+            "datetime": _serialize_datetime(dt) if dt else "",
             "material": material,
             "supplier": supplier,
             "bag_no": bag_no,
             "lot_no": lot_no,
             "production_date": production_date,
+            "equipment_name": equip_label,
+            "submitted_by": sub.get("submitted_by_name", ""),
             "submission_id": sub.get("id", ""),
         })
 
@@ -1006,11 +1039,14 @@ async def get_production_dashboard(
             if entry.get("input_material"):
                 big_bag_entries.append({
                     "time": time_label,
+                    "datetime": _serialize_datetime(ts_dt),
                     "material": entry.get("input_material", ""),
                     "supplier": entry.get("supplier", ""),
                     "bag_no": entry.get("bag_no", ""),
                     "lot_no": entry.get("lot_no", ""),
                     "production_date": entry.get("production_date", ""),
+                    "equipment_name": entry.get("asset_id") or EQUIPMENT_NAME,
+                    "submitted_by": "Log Ingestion",
                     "submission_id": entry.get("id", ""),
                 })
 
@@ -1047,8 +1083,7 @@ async def get_production_dashboard(
             return datetime.min
 
     production_log.sort(key=_parse_entry_dt)
-
-    avg_viscosity = round(sum(viscosity_values) / len(viscosity_values), 2) if viscosity_values else 0
+    big_bag_entries.sort(key=_parse_entry_dt)
     if len(viscosity_values) > 1 and avg_viscosity > 0:
         mean_v = sum(viscosity_values) / len(viscosity_values)
         variance_v = sum((v - mean_v) ** 2 for v in viscosity_values) / (len(viscosity_values) - 1)
