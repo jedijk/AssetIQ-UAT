@@ -301,40 +301,53 @@ async def get_production_dashboard(
 
     shift_config = SHIFTS.get(shift, SHIFTS["day"])
 
-    # Find Line-90 equipment ID and all ancestor/descendant IDs (name OR tag — many sites tag the line, name the EXU)
+    # Find ALL equipment nodes that look like Line-90 (name/tag). Sites may have duplicates
+    # or multiple rows; find_one only expanded one subtree and submissions linked to another
+    # Line-90 id were dropped from the dashboard query.
     _line90_pat = {"$regex": r"line\s*[-–]?\s*90", "$options": "i"}
-    line90 = await db.equipment_nodes.find_one(
+    line90_roots = await db.equipment_nodes.find(
         {"$or": [
             {"name": _line90_pat},
             {"tag": _line90_pat},
             {"tag_number": _line90_pat},
         ]},
         {"_id": 0, "id": 1, "parent_id": 1},
-    )
+    ).limit(40).to_list(40)
+    line90 = line90_roots[0] if line90_roots else None
+
     equipment_ids = []
-    if line90:
-        equipment_ids.append(line90["id"])
-        # Include ancestors (parent, grandparent) — submissions may be assigned at installation level
-        if line90.get("parent_id"):
-            equipment_ids.append(line90["parent_id"])
+    seen_eq: set = set()
+
+    def _add_eq_id(eid):
+        if not eid or eid in seen_eq:
+            return
+        seen_eq.add(eid)
+        equipment_ids.append(eid)
+
+    for root in line90_roots:
+        rid = root.get("id")
+        _add_eq_id(rid)
+        if root.get("parent_id"):
+            _add_eq_id(root["parent_id"])
             parent = await db.equipment_nodes.find_one(
-                {"id": line90["parent_id"]}, {"_id": 0, "parent_id": 1}
+                {"id": root["parent_id"]}, {"_id": 0, "parent_id": 1}
             )
             if parent and parent.get("parent_id"):
-                equipment_ids.append(parent["parent_id"])
+                _add_eq_id(parent["parent_id"])
 
-        # Include descendants (children, grandchildren) — submissions may be assigned to sub-units
         children = await db.equipment_nodes.find(
-            {"parent_id": line90["id"]}, {"_id": 0, "id": 1}
-        ).to_list(50)
-        child_ids = [c["id"] for c in children]
-        equipment_ids.extend(child_ids)
+            {"parent_id": rid}, {"_id": 0, "id": 1}
+        ).to_list(80)
+        child_ids = [c["id"] for c in children if c.get("id")]
+        for cid in child_ids:
+            _add_eq_id(cid)
 
         if child_ids:
             grandchildren = await db.equipment_nodes.find(
                 {"parent_id": {"$in": child_ids}}, {"_id": 0, "id": 1}
-            ).to_list(200)
-            equipment_ids.extend([gc["id"] for gc in grandchildren])
+            ).to_list(300)
+            for gc in grandchildren:
+                _add_eq_id(gc.get("id"))
 
     # Tags/names under Line-90 (e.g. EXU, 1U-20) for matching form `equipment_name`
     # and ingested `production_logs.asset_id` — CSVs rarely use the literal "Line-90" string.
@@ -361,6 +374,7 @@ async def get_production_dashboard(
     equipment_match = [
         {"equipment_name": {"$regex": "Line.?90", "$options": "i"}},
         {"equipment_name": EQUIPMENT_NAME},
+        {"equipment_tag": {"$regex": r"line\s*[-–]?\s*90", "$options": "i"}},
     ]
     if equipment_ids:
         equipment_match.append({"equipment_id": {"$in": equipment_ids}})
@@ -551,7 +565,10 @@ async def get_production_dashboard(
         ]
     }
 
-    all_subs = await db.form_submissions.find(submissions_query, {"_id": 0}).to_list(8000)
+    all_subs = await db.form_submissions.find(
+        submissions_query,
+        {"_id": 0},
+    ).sort([("submitted_at", -1), ("created_at", -1)]).to_list(15000)
 
     def _tid_str_for_filter(sub):
         tid = sub.get("form_template_id")
