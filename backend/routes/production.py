@@ -122,8 +122,8 @@ def extract_numeric(submission, field_label):
 
 
 def parse_submitted_at(sub):
-    """Parse submitted_at (fallback: created_at) into a datetime object."""
-    for key in ("submitted_at", "created_at"):
+    """Parse submitted_at (fallback: created_at, then updated_at) into a datetime object."""
+    for key in ("submitted_at", "created_at", "updated_at"):
         raw = sub.get(key, "")
         if isinstance(raw, datetime):
             return raw
@@ -133,6 +133,31 @@ def parse_submitted_at(sub):
             return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
         except Exception:
             continue
+    return None
+
+
+def _production_date_raw_for_big_bag(sub) -> Optional[Any]:
+    """Locate Production Date (or equivalent) on Big Bag style submissions."""
+    for label in (
+        "Production Date",
+        "Production date",
+        "Date of production",
+        "Produced on",
+    ):
+        v = extract_field(sub, label)
+        if v is not None and str(v).strip() and str(v).strip() not in ("{}", "null", ""):
+            return v
+    for v in sub.get("values") or []:
+        lab = str(v.get("field_label") or "").lower()
+        fid = str(v.get("field_id") or "").lower()
+        if "production" in lab and "date" in lab:
+            w = _unwrap_form_value(v.get("value"))
+            if w is not None and str(w).strip() and str(w).strip() not in ("{}", "null", ""):
+                return w
+        if "production_date" in fid or fid.endswith("productiondate"):
+            w = _unwrap_form_value(v.get("value"))
+            if w is not None and str(w).strip() and str(w).strip() not in ("{}", "null", ""):
+                return w
     return None
 
 
@@ -545,8 +570,10 @@ async def get_production_dashboard(
     time_window_or = [
         {"submitted_at": {"$gte": broad_start, "$lte": broad_end}},
         {"created_at": {"$gte": broad_start, "$lte": broad_end}},
+        {"updated_at": {"$gte": broad_start, "$lte": broad_end}},
         {"submitted_at": {"$gte": broad_start_iso, "$lte": broad_end_iso}},
         {"created_at": {"$gte": broad_start_iso, "$lte": broad_end_iso}},
+        {"updated_at": {"$gte": broad_start_iso, "$lte": broad_end_iso}},
     ]
     span_days = (range_end.date() - range_start.date()).days + 1
     if span_days <= 120:
@@ -556,6 +583,7 @@ async def get_production_dashboard(
             day_prefix = scan_day.strftime("%Y-%m-%d")
             time_window_or.append({"submitted_at": {"$regex": f"^{day_prefix}"}})
             time_window_or.append({"created_at": {"$regex": f"^{day_prefix}"}})
+            time_window_or.append({"updated_at": {"$regex": f"^{day_prefix}"}})
             scan_day += timedelta(days=1)
 
     submissions_query = {
@@ -607,22 +635,37 @@ async def get_production_dashboard(
     # (Using only the form field can drop rows when it parses wrong or defaults outside the window.)
     submissions = []
     for sub in all_subs:
+        is_bb = _is_big_bag_template_sub(sub)
+
+        raw_sample_dt = _extract_date_time_field_raw(sub)
+        dt_form = _parse_sample_datetime(raw_sample_dt) if raw_sample_dt else None
+        # Big Bag often has no "Date & Time"; use Production Date for shift/day windowing.
+        if dt_form is None and is_bb:
+            raw_pd = _production_date_raw_for_big_bag(sub)
+            if raw_pd is not None and str(raw_pd).strip() and str(raw_pd).strip() not in ("{}", "null"):
+                dt_form = _parse_sample_datetime(_unwrap_form_value(raw_pd))
+
         dt_meta = parse_submitted_at(sub)
+        if dt_meta is None and is_bb and dt_form is not None:
+            dt_meta = dt_form
+
         if dt_meta is None:
             continue
         if dt_meta.tzinfo is None:
             dt_meta = dt_meta.replace(tzinfo=timezone.utc)
 
-        raw_sample_dt = _extract_date_time_field_raw(sub)
-        dt_form = _parse_sample_datetime(raw_sample_dt) if raw_sample_dt else None
-        # Big Bag often has no "Date & Time"; use Production Date for shift/day windowing.
-        if dt_form is None and _is_big_bag_template_sub(sub):
-            raw_pd = extract_field(sub, "Production Date")
-            if raw_pd is not None and str(raw_pd).strip() and str(raw_pd).strip() not in ("{}", "null"):
-                dt_form = _parse_sample_datetime(_unwrap_form_value(raw_pd))
-
         in_meta = _in_range(dt_meta, range_start, range_end)
         in_form = _in_range(dt_form, range_start, range_end) if dt_form else False
+        # Date-only Production Date parses as midnight and misses day/night shift windows;
+        # still include the row when the calendar day overlaps the dashboard range.
+        if is_bb and dt_form:
+            try:
+                d0 = dt_form.date() if dt_form.tzinfo is None else dt_form.astimezone(timezone.utc).date()
+                if range_start.date() <= d0 <= range_end.date():
+                    in_form = True
+            except Exception:
+                pass
+
         if not in_meta and not in_form:
             continue
 
@@ -805,7 +848,15 @@ async def get_production_dashboard(
         supplier = extract_field(sub, "Supplier") or ""
         bag_no = extract_field(sub, "Bag No.") or ""
         lot_no = extract_field(sub, "Lot No.") or ""
-        production_date = extract_field(sub, "Production Date") or ""
+        rpd = _production_date_raw_for_big_bag(sub)
+        if rpd is not None:
+            u = _unwrap_form_value(rpd)
+            if isinstance(u, datetime):
+                production_date = u.isoformat(sep=" ", timespec="minutes")
+            else:
+                production_date = str(u).strip() if u not in (None, "") else ""
+        else:
+            production_date = ""
         equip_label = (sub.get("equipment_name") or "").strip()
         if not equip_label:
             equip_label = EQUIPMENT_NAME
