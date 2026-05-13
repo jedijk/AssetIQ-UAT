@@ -86,8 +86,20 @@ BIG_BAG_FORM = "Big Bag Loading"
 SCREEN_CHANGE_FORM = "Screen change"
 MAGNET_CLEANING_FORM = "Magnet cleaning"
 END_OF_SHIFT_FORM = "End of shift"
-# Any form template whose name contains "information" (e.g. "Production Information")
+# Any form template whose name matches information-style titles (EN/NL), e.g. "Production Information", "Lijninformatie".
 INFORMATION_FORM = "Information"
+# Mongo $regex and Python checks must stay aligned (word boundaries; English + Dutch).
+INFORMATION_TEMPLATE_NAME_REGEX = r"\b(information|informatie)\b"
+
+
+def _information_template_name_matches(name: Optional[Any]) -> bool:
+    if name is None:
+        return False
+    s = str(name).strip()
+    if not s:
+        return False
+    return bool(re.search(INFORMATION_TEMPLATE_NAME_REGEX, s, flags=re.IGNORECASE))
+
 
 PRODUCTION_FORMS = [
     EXTRUDER_FORM,
@@ -377,6 +389,15 @@ def _extract_date_time_field_raw(sub) -> Optional[str]:
                 s = str(inner).strip()
                 if s:
                     return s
+        # Date-only fields (common on short "information" forms) — used for calendar-day / shift windowing.
+        if ft in ("date", "day"):
+            inner = _unwrap_form_value(v.get("value"))
+            if inner is not None and inner != "":
+                if isinstance(inner, datetime):
+                    return inner.isoformat(sep="T", timespec="seconds")
+                s = str(inner).strip()
+                if s:
+                    return s
 
         label = str(v.get("field_label") or "").strip().lower()
         fid = str(v.get("field_id") or "").strip().lower()
@@ -580,7 +601,7 @@ async def get_production_dashboard(
                 {"form_template_name": {"$regex": "shift", "$options": "i"}},
             ]},
             {"$and": [
-                {"form_template_name": {"$regex": r"\binformation\b", "$options": "i"}},
+                {"form_template_name": {"$regex": INFORMATION_TEMPLATE_NAME_REGEX, "$options": "i"}},
             ]},
         ]
     }
@@ -608,7 +629,7 @@ async def get_production_dashboard(
                     {"form_template_name": {"$regex": "bag", "$options": "i"}},
                 ]},
                 {"$and": [
-                    {"form_template_name": {"$regex": r"\binformation\b", "$options": "i"}},
+                    {"form_template_name": {"$regex": INFORMATION_TEMPLATE_NAME_REGEX, "$options": "i"}},
                 ]},
             ]},
             {"$or": [
@@ -673,11 +694,13 @@ async def get_production_dashboard(
                     magnet_tpl_ids_str.add(sid)
                 if ("end" in nm) and ("shift" in nm):
                     eos_tpl_ids_str.add(sid)
-                if re.search(r"\binformation\b", nm):
+                if _information_template_name_matches(nm):
                     information_tpl_ids_str.add(sid)
     except Exception as e:
         logger.warning("production dashboard: form_templates lookup failed: %s", e)
 
+    # Information (and other production) rows still require Line-90 equipment signals in Mongo,
+    # except the explicit `forms_without_equipment` branch (empty equipment_id) mirroring Big Bag.
     query_or = [
         {
             "$and": [
@@ -756,8 +779,8 @@ async def get_production_dashboard(
         ts = _tid_str_for_filter(sub)
         if ts and ts in information_tpl_ids_str:
             return True
-        tpl = (sub.get("form_template_name") or "").strip().lower()
-        return bool(tpl) and bool(re.search(r"\binformation\b", tpl))
+        tpl = (sub.get("form_template_name") or "").strip()
+        return _information_template_name_matches(tpl)
 
     def _prefer_form_sample_time_for_row(sub) -> bool:
         """Extruder + Mooney: sample clock is the Date & Time field, not submitted_at."""
@@ -890,7 +913,7 @@ async def get_production_dashboard(
         if target == END_OF_SHIFT_FORM.lower():
             return ("end" in tpl) and ("shift" in tpl)
         if target == INFORMATION_FORM.lower():
-            return bool(re.search(r"\binformation\b", tpl))
+            return _information_template_name_matches(tpl)
         return False
 
     extruder_subs = sorted(

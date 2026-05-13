@@ -575,7 +575,7 @@ export default function ProductionDashboardPage() {
       const extruder = list.find((t) => t.name === "Extruder settings sample");
       const viscosity = list.find((t) => /mooney viscosity/i.test(t.name));
       const endOfShift = list.find((t) => /end of shift/i.test(t.name));
-      const informationTemplates = list.filter((t) => /\binformation\b/i.test(String(t.name || "")));
+      const informationTemplates = list.filter((t) => /\b(information|informatie)\b/i.test(String(t.name || "")));
       return { bigBag, extruder, viscosity, endOfShift, informationTemplates };
     },
     staleTime: 600000,
