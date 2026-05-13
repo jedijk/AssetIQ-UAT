@@ -215,9 +215,24 @@ const ChartSeriesToggles = ({ active, onToggle }) => (
 // Form Execution Dialog
 // ──────────────────────────────────────────
 const FIELD_TYPE_MAP = {
-  text: "text", numeric: "number", number: "number",
-  date: "date", datetime: "datetime-local", dropdown: "text",
+  text: "text",
+  textarea: "text",
+  string: "text",
+  multiline: "text",
+  paragraph: "text",
+  numeric: "number",
+  number: "number",
+  date: "date",
+  datetime: "datetime-local",
+  dropdown: "text",
+  select: "text",
 };
+
+/** Normalize template field type strings (designer / API casing varies). */
+function formTemplateFieldTypeKey(field) {
+  const raw = field?.type ?? field?.field_type ?? "text";
+  return typeof raw === "string" ? raw.trim().toLowerCase() : "text";
+}
 
 const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmentId, equipmentName, equipmentTag, onSuccess, submissionId, initialValues }) => {
   const [fields, setFields] = useState([]);
@@ -236,21 +251,24 @@ const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmen
       setFields(f);
       // Set defaults (or prefill from initialValues in edit mode)
       const defaults = {};
+      const optsMap = {};
       const now = new Date();
       const localISO = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString();
       f.forEach((field) => {
-        const ft = field.type || field.field_type || "text";
+        const ft = formTemplateFieldTypeKey(field);
         const prefill = initialValues?.[field.id];
         if (prefill !== undefined && prefill !== null && prefill !== "") {
           defaults[field.id] = String(prefill);
         } else if (ft === "datetime") defaults[field.id] = localISO.slice(0, 16);
         else if (ft === "date") defaults[field.id] = localISO.slice(0, 10);
         else defaults[field.id] = "";
-        // Collect dropdown options
-        if (ft === "dropdown" && field.options) {
-          setDropdownOptions((prev) => ({ ...prev, [field.id]: field.options }));
+        const optList = field.options;
+        const hasOptions = Array.isArray(optList) && optList.length > 0;
+        if ((ft === "dropdown" || ft === "select") && hasOptions) {
+          optsMap[field.id] = optList;
         }
       });
+      setDropdownOptions(optsMap);
       setFormData(defaults);
     }).catch(() => toast.error("Failed to load form")).finally(() => setLoading(false));
   }, [open, templateId, submissionId, initialValues]);
@@ -298,7 +316,7 @@ const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmen
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto overflow-x-hidden" data-testid="form-execution-dialog">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto overflow-x-hidden" data-testid="form-execution-dialog">
         <DialogHeader>
           <DialogTitle>{submissionId ? `Edit ${templateName}` : templateName}</DialogTitle>
         </DialogHeader>
@@ -307,11 +325,13 @@ const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmen
         ) : (
           <div className="grid grid-cols-2 gap-3 pt-2">
             {fields.map((field) => {
-              const ft = field.type || field.field_type || "text";
+              const ft = formTemplateFieldTypeKey(field);
               const inputType = FIELD_TYPE_MAP[ft] || "text";
               const opts = dropdownOptions[field.id];
+              const isPlainText = !opts && inputType === "text";
+              const fieldSpan = ft === "datetime" || isPlainText ? "col-span-2" : "";
               return (
-                <div key={field.id} className={ft === "datetime" ? "col-span-2" : ""}>
+                <div key={field.id} className={fieldSpan}>
                   <Label className="text-xs">
                     {field.label}
                     {field.required && <span className="text-red-500 ml-0.5">*</span>}
@@ -329,6 +349,14 @@ const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmen
                         ))}
                       </SelectContent>
                     </Select>
+                  ) : isPlainText ? (
+                    <Textarea
+                      className="mt-1 min-h-[10rem] w-full resize-y text-sm leading-relaxed"
+                      rows={8}
+                      value={formData[field.id] ?? ""}
+                      onChange={(e) => setFormData((p) => ({ ...p, [field.id]: e.target.value }))}
+                      data-testid={`form-field-${field.id}`}
+                    />
                   ) : (
                     <Input
                       type={inputType}
