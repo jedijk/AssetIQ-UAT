@@ -485,7 +485,7 @@ export default function ProductionDashboardPage() {
   } = useProductionDateRange();
 
   // State
-  const [shift, setShift] = useState("day");
+  const [shift, setShift] = useState("morning");
   const [logSearch, setLogSearch] = useState("");
   const [showAddEvent, setShowAddEvent] = useState(false);
   const [newEvent, setNewEvent] = useState({ title: "", description: "", type: "action", severity: "info" });
@@ -1211,13 +1211,14 @@ export default function ProductionDashboardPage() {
               </div>
             )}
 
-            {/* Shift selector - hide on mobile */}
+            {/* Shift selector — all breakpoints; mobile also has segmented control below */}
             <Select value={shift} onValueChange={setShift}>
-              <SelectTrigger className={`w-[140px] sm:w-[180px] h-8 text-xs sm:text-sm bg-white ${isMobile ? "hidden" : ""}`} data-testid="shift-selector">
+              <SelectTrigger className="min-w-[200px] sm:min-w-[240px] w-full sm:w-[min(100%,260px)] max-w-md sm:max-w-none h-8 text-xs sm:text-sm bg-white basis-full sm:basis-auto" data-testid="shift-selector">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="day">Day (06:00 - 22:00)</SelectItem>
+                <SelectItem value="morning">Morning (06:00 - 14:00)</SelectItem>
+                <SelectItem value="afternoon">Afternoon (14:00 - 22:00)</SelectItem>
                 <SelectItem value="night">Night (22:00 - 06:00)</SelectItem>
               </SelectContent>
             </Select>
@@ -1269,38 +1270,49 @@ export default function ProductionDashboardPage() {
             </Button>
           </div>
 
-          {/* Day / night shift — mobile only (desktop uses shift selector above) */}
+          {/* Morning / afternoon / night — mobile (desktop uses shift selector above) */}
           {isMobile && (
-            <div className="flex w-full min-w-0 justify-center px-3" data-testid="mobile-shift-selector">
-              {/* inline-flex + flex-none segments so width is intrinsic — full-width caps looked “off center” vs tab pills */}
+            <div className="flex w-full min-w-0 justify-center px-2" data-testid="mobile-shift-selector">
               <div
                 role="group"
                 aria-label="Shift"
-                className="inline-flex max-w-full items-stretch rounded-lg bg-slate-100 p-0.5 gap-0.5"
+                className="grid w-full max-w-md grid-cols-3 gap-0.5 rounded-lg bg-slate-100 p-0.5"
               >
                 <button
                   type="button"
-                  onClick={() => setShift("day")}
-                  className={`flex min-w-[6.75rem] flex-none flex-col items-center justify-center gap-0.5 rounded-md px-3 py-2 min-h-[44px] text-xs font-semibold transition-colors touch-manipulation active:scale-[0.99] ${
-                    shift === "day" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  onClick={() => setShift("morning")}
+                  className={`flex flex-col items-center justify-center gap-0.5 rounded-md px-1.5 py-2 min-h-[44px] text-[11px] font-semibold leading-tight transition-colors touch-manipulation active:scale-[0.99] ${
+                    shift === "morning" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
                   }`}
-                  title="Day shift (06:00 – 22:00)"
-                  data-testid="mobile-shift-day"
+                  title="Morning (06:00 – 14:00)"
+                  data-testid="mobile-shift-morning"
                 >
-                  <span>Day</span>
-                  <span className="font-normal text-[10px] leading-tight text-slate-400">06:00–22:00</span>
+                  <span>Morning</span>
+                  <span className="font-normal text-[8px] leading-tight text-slate-400 whitespace-nowrap">06:00–14:00</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShift("afternoon")}
+                  className={`flex flex-col items-center justify-center gap-0.5 rounded-md px-1.5 py-2 min-h-[44px] text-[11px] font-semibold leading-tight transition-colors touch-manipulation active:scale-[0.99] ${
+                    shift === "afternoon" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  }`}
+                  title="Afternoon (14:00 – 22:00)"
+                  data-testid="mobile-shift-afternoon"
+                >
+                  <span>Afternoon</span>
+                  <span className="font-normal text-[8px] leading-tight text-slate-400 whitespace-nowrap">14:00–22:00</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setShift("night")}
-                  className={`flex min-w-[6.75rem] flex-none flex-col items-center justify-center gap-0.5 rounded-md px-3 py-2 min-h-[44px] text-xs font-semibold transition-colors touch-manipulation active:scale-[0.99] ${
+                  className={`flex flex-col items-center justify-center gap-0.5 rounded-md px-1.5 py-2 min-h-[44px] text-[11px] font-semibold leading-tight transition-colors touch-manipulation active:scale-[0.99] ${
                     shift === "night" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
                   }`}
-                  title="Night shift (22:00 – 06:00)"
+                  title="Night (22:00 – 06:00)"
                   data-testid="mobile-shift-night"
                 >
                   <span>Night</span>
-                  <span className="font-normal text-[10px] leading-tight text-slate-400">22:00–06:00</span>
+                  <span className="font-normal text-[8px] leading-tight text-slate-400 whitespace-nowrap">22:00–06:00</span>
                 </button>
               </div>
             </div>

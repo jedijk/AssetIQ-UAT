@@ -90,10 +90,12 @@ PRODUCTION_FORMS = [EXTRUDER_FORM, VISCOSITY_FORM, BIG_BAG_FORM, SCREEN_CHANGE_F
 
 EQUIPMENT_NAME = "Line-90"
 
-# Shift definitions
+# Shift definitions (single-day mode). "day" is legacy API/bookmarks: full 06:00–22:00 window.
 SHIFTS = {
-    "day": {"label": "Day (06:00 - 22:00)", "start_hour": 6, "end_hour": 22},
+    "morning": {"label": "Morning (06:00 - 14:00)", "start_hour": 6, "end_hour": 14},
+    "afternoon": {"label": "Afternoon (14:00 - 22:00)", "start_hour": 14, "end_hour": 22},
     "night": {"label": "Night (22:00 - 06:00)", "start_hour": 22, "end_hour": 6},
+    "day": {"label": "Day (06:00 - 22:00)", "start_hour": 6, "end_hour": 22},
 }
 
 
@@ -281,7 +283,7 @@ async def get_production_dashboard(
     date: Optional[str] = Query(None, description="Date in YYYY-MM-DD format (single day, used if from_date not set)"),
     from_date: Optional[str] = Query(None, description="Range start YYYY-MM-DD"),
     to_date: Optional[str] = Query(None, description="Range end YYYY-MM-DD"),
-    shift: Optional[str] = Query("day", description="Shift: day or night"),
+    shift: Optional[str] = Query("morning", description="Shift: morning, afternoon, night (legacy: day)"),
     current_user: dict = Depends(get_current_user),
 ):
     """
@@ -289,6 +291,9 @@ async def get_production_dashboard(
     Supports single-day (date) or range (from_date + to_date).
     """
     now = datetime.now(timezone.utc)
+    shift = (shift or "morning").strip().lower()
+    if shift not in SHIFTS:
+        shift = "morning"
 
     # Determine the effective date range
     if from_date and to_date:
@@ -315,16 +320,20 @@ async def get_production_dashboard(
         else:
             target_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
 
-        shift_config = SHIFTS.get(shift, SHIFTS["day"])
+        shift_config = SHIFTS.get(shift, SHIFTS["morning"])
         if shift == "night":
             range_start = target_date.replace(hour=22, minute=0, second=0, microsecond=0)
             range_end = (target_date + timedelta(days=1)).replace(hour=6, minute=0, second=0, microsecond=0)
         else:
-            range_start = target_date.replace(hour=6, minute=0, second=0, microsecond=0)
-            range_end = target_date.replace(hour=22, minute=0, second=0, microsecond=0)
+            range_start = target_date.replace(
+                hour=shift_config["start_hour"], minute=0, second=0, microsecond=0
+            )
+            range_end = target_date.replace(
+                hour=shift_config["end_hour"], minute=0, second=0, microsecond=0
+            )
         is_range = False
 
-    shift_config = SHIFTS.get(shift, SHIFTS["day"])
+    shift_config = SHIFTS.get(shift, SHIFTS["morning"])
 
     # Find ALL equipment nodes that look like Line-90 (name/tag). Sites may have duplicates
     # or multiple rows; find_one only expanded one subtree and submissions linked to another

@@ -53,7 +53,7 @@ class TestProductionDashboardAPI:
     def test_dashboard_returns_200(self, auth_headers):
         """Test dashboard endpoint returns 200 status."""
         response = requests.get(
-            f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=day",
+            f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=morning",
             headers=auth_headers
         )
         assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
@@ -61,7 +61,7 @@ class TestProductionDashboardAPI:
     def test_dashboard_returns_kpis(self, auth_headers):
         """Test dashboard returns KPIs structure."""
         response = requests.get(
-            f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=day",
+            f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=morning",
             headers=auth_headers
         )
         assert response.status_code == 200
@@ -82,7 +82,7 @@ class TestProductionDashboardAPI:
     def test_dashboard_returns_production_log(self, auth_headers):
         """Test dashboard returns production_log array."""
         response = requests.get(
-            f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=day",
+            f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=morning",
             headers=auth_headers
         )
         assert response.status_code == 200
@@ -94,7 +94,7 @@ class TestProductionDashboardAPI:
     def test_dashboard_returns_actions_and_insights(self, auth_headers):
         """Test dashboard returns actions and insights arrays."""
         response = requests.get(
-            f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=day",
+            f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=morning",
             headers=auth_headers
         )
         assert response.status_code == 200
@@ -108,7 +108,7 @@ class TestProductionDashboardAPI:
     def test_dashboard_returns_chart_data(self, auth_headers):
         """Test dashboard returns chart data arrays."""
         response = requests.get(
-            f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=day",
+            f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=morning",
             headers=auth_headers
         )
         assert response.status_code == 200
@@ -120,29 +120,26 @@ class TestProductionDashboardAPI:
         assert "viscosity_series" in data, "Response should contain 'viscosity_series'"
     
     def test_dashboard_shift_parameter(self, auth_headers):
-        """Test dashboard accepts shift parameter (day/night)."""
-        # Test day shift
+        """Test dashboard accepts morning / afternoon / night (and legacy day) shift parameters."""
+        for shift_key in ("morning", "afternoon", "night"):
+            resp = requests.get(
+                f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift={shift_key}",
+                headers=auth_headers,
+            )
+            assert resp.status_code == 200
+            assert resp.json()["shift"] == shift_key
+
         response_day = requests.get(
             f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=day",
-            headers=auth_headers
+            headers=auth_headers,
         )
         assert response_day.status_code == 200
-        data_day = response_day.json()
-        assert data_day["shift"] == "day"
-        
-        # Test night shift
-        response_night = requests.get(
-            f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=night",
-            headers=auth_headers
-        )
-        assert response_night.status_code == 200
-        data_night = response_night.json()
-        assert data_night["shift"] == "night"
+        assert response_day.json()["shift"] == "day"
     
     def test_dashboard_date_parameter(self, auth_headers):
         """Test dashboard returns correct date in response."""
         response = requests.get(
-            f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=day",
+            f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=morning",
             headers=auth_headers
         )
         assert response.status_code == 200
@@ -152,7 +149,7 @@ class TestProductionDashboardAPI:
     def test_dashboard_requires_auth(self):
         """Test dashboard endpoint requires authentication."""
         response = requests.get(
-            f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=day"
+            f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=morning"
         )
         assert response.status_code == 401, "Should return 401 without auth"
 
@@ -348,7 +345,7 @@ class TestProductionDashboardIntegration:
         
         # Fetch dashboard and check if event appears
         dashboard_response = requests.get(
-            f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=day",
+            f"{BASE_URL}/api/production/dashboard?date={SEEDED_DATE_1}&shift=morning",
             headers=auth_headers
         )
         assert dashboard_response.status_code == 200
