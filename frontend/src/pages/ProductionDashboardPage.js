@@ -1981,8 +1981,8 @@ export default function ProductionDashboardPage() {
                         <p className="text-sm sm:text-[15px] text-slate-900 font-medium leading-relaxed break-words">
                           {row.text || "—"}
                         </p>
-                        <div className="mt-3 border-t border-slate-200/90 pt-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-                          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs text-slate-600">
+                        <div className="mt-3 border-t border-slate-200/90 pt-2.5 flex flex-row flex-wrap items-center justify-between gap-x-2 gap-y-2">
+                          <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs text-slate-600">
                             <span className="shrink-0 tabular-nums text-slate-500">
                               {(row.submitted_at || row.datetime)
                                 ? formatDateTimeCompact(row.submitted_at || row.datetime)
@@ -1993,7 +1993,7 @@ export default function ProductionDashboardPage() {
                             </span>
                             <span className="min-w-0 font-medium text-slate-700">{row.submitted_by || "—"}</span>
                           </div>
-                          <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-0.5 sm:w-auto">
+                          <div className="flex shrink-0 items-center justify-end gap-0.5">
                             {row.submission_id && (
                               <button
                                 type="button"
