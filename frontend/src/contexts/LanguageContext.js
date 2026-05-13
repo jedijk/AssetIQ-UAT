@@ -178,9 +178,9 @@ const en = {
 
   // Release / product announcements (toasts)
   announcements: {
-    liteModeTitle: "AssetIQ 3.6.8 — AI chat improvements",
+    liteModeTitle: "AssetIQ 3.6.9 — What's new",
     liteModeBody:
-      "AI chat: prompts and confirmations follow the language of your message (for example English equipment lists when you describe the issue in English). Reopening the chat no longer resets the context auto-skip timer. Photo extraction anchors dates to capture time and shows a clear low-confidence signal when the date is adjusted. AI vision fail-safe improvements. Production log row #1 is the first line of the day. Plus dashboard polish and tighter deploy caching.",
+      "Production overview: Morning, Afternoon, and Night shift windows; select multiple shifts together; your shifts, period, and custom date range are remembered on this device. Reliability fixes for production dashboard data and API loading.",
   },
   
   // Common
@@ -1427,9 +1427,9 @@ const nl = {
   },
 
   announcements: {
-    liteModeTitle: "AssetIQ 3.6.8 — verbeterde AI-chat",
+    liteModeTitle: "AssetIQ 3.6.9 — Wat is er nieuw",
     liteModeBody:
-      "AI-chat: prompts en bevestigingen volgen de taal van uw bericht (bijv. Engelstalige apparatenlijsten bij een Engelse melding). De automatische overslaan-timer voor context wordt niet meer gereset als u de chat sluit en weer opent. Fototextractie koppelt datums aan het moment van vastleggen en toont een duidelijk signaal bij lage betrouwbaarheid als de datum wordt gecorrigeerd. Verbeteringen aan AI-vision failsafes. Regel #1 in het productielog is de eerste regel van de dag. Plus dashboard-verfijning en strakkere deploy-caching.",
+      "Productieoverzicht: ochtend-, middag- en nachtdienstvensters; meerdere diensten tegelijk selecteren; uw diensten, periode en aangepaste datums worden op dit apparaat onthouden. Betrouwbaarheidsverbeteringen voor productiedashboardgegevens en API-laden.",
   },
   
   // Common

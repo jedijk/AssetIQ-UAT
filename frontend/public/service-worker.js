@@ -7,7 +7,7 @@
 // which in turn triggers the "activate" handler below to delete old caches.
 // The frontend version-check (useVersionCheck in App.js) also force-reloads
 // when the backend reports a newer version, wiping all caches as a safety net.
-const CACHE_NAME = 'assetiq-v3.6.8';
+const CACHE_NAME = 'assetiq-v3.6.9';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to cache on install
