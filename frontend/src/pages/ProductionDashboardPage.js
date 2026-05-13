@@ -1554,8 +1554,8 @@ export default function ProductionDashboardPage() {
                   <table className="w-full text-[11px]">
                     <thead className="sticky top-0 bg-slate-50 text-slate-600 z-[1]">
                       <tr>
-                        <th className="text-left py-2 px-2 font-medium">Time</th>
-                        <th className="text-right py-2 px-2 font-medium">MU</th>
+                        <th className="text-left py-2 px-2 font-semibold text-slate-700 tracking-wide text-[11px]">Time</th>
+                        <th className="text-right py-2 px-2 font-medium text-slate-500 uppercase tracking-wider text-[10px]">MU</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1613,10 +1613,10 @@ export default function ProductionDashboardPage() {
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-slate-200">
-                        <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Date & Time</th>
-                        <th className="text-right py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Input (kg)</th>
-                        <th className="text-right py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Waste (kg)</th>
-                        <th className="w-14"></th>
+                        <th className="text-left py-2 px-2 font-semibold text-slate-700 tracking-wide text-[11px]">Date & Time</th>
+                        <th className="text-right py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px]">Input (kg)</th>
+                        <th className="text-right py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px]">Waste (kg)</th>
+                        <th className="w-14 p-0" aria-label="Actions" />
                       </tr>
                     </thead>
                     <tbody>
@@ -1794,13 +1794,13 @@ export default function ProductionDashboardPage() {
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="border-b border-slate-200">
-                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Material</th>
-                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Supplier</th>
-                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Bag No.</th>
-                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Lot No.</th>
-                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Prod. Date</th>
-                          <th className="text-left py-1.5 px-1 font-semibold text-slate-500 uppercase tracking-wider">Equipment</th>
-                          <th className="w-14"></th>
+                          <th className="text-left py-2 px-2 font-semibold text-slate-700 tracking-wide text-[11px]">Material</th>
+                          <th className="text-left py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px]">Supplier</th>
+                          <th className="text-left py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px]">Bag No.</th>
+                          <th className="text-left py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px]">Lot No.</th>
+                          <th className="text-left py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px]">Prod. Date</th>
+                          <th className="text-left py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px]">Equipment</th>
+                          <th className="w-14 p-0" aria-label="Actions" />
                         </tr>
                       </thead>
                       <tbody>
@@ -2203,11 +2203,19 @@ export default function ProductionDashboardPage() {
                 <table className="w-full text-sm" data-testid="production-log-table">
                   <thead>
                     <tr className="border-b border-slate-200">
-                      {["#", "Date", "Time", "RPM", "Feed", "M%", "Energy", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR", "Viscosity", "Remarks", "By", ""].map((h) => (
-                        <th key={h} className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider py-2 px-2 whitespace-nowrap">
-                          {h}
-                        </th>
-                      ))}
+                      {["#", "Date", "Time", "RPM", "Feed", "M%", "Energy", "MT1", "MT2", "MT3", "MP1", "MP2", "MP3", "MP4", "CO2 Feed/P", "T Product IR", "Viscosity", "Remarks", "By", ""].map((h) => {
+                        const secondary = "text-left text-[10px] font-medium text-slate-500 uppercase tracking-wider py-2 px-2 whitespace-nowrap";
+                        const primary = "text-left text-[11px] font-semibold text-slate-700 tracking-wide py-2 px-2 whitespace-nowrap";
+                        const isPrimary = h === "Remarks";
+                        if (h === "") {
+                          return <th key="actions" className="w-14 p-0" aria-label="Actions" />;
+                        }
+                        return (
+                          <th key={h} className={isPrimary ? primary : secondary}>
+                            {h}
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                 <tbody>
