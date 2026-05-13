@@ -5,7 +5,7 @@ import { api } from "../lib/apiClient";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useIsMobile } from "../hooks/useIsMobile";
-import { formatDateTime, formatDateTimeCompact } from "../lib/dateUtils";
+import { formatDateTimeCompact } from "../lib/dateUtils";
 import {
   ChevronLeft,
   ChevronRight,
@@ -239,6 +239,10 @@ function formTemplateFieldTypeKey(field) {
 /** Production Log–style icon buttons for dashboard tables */
 const PRODUCTION_DASH_ACTION_EDIT = "p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors";
 const PRODUCTION_DASH_ACTION_DELETE = "p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors";
+/** Square touch target + centered glyph for Information (and similar) icon rows */
+const PRODUCTION_DASH_INFO_ACTION_BTN = "inline-flex size-9 shrink-0 items-center justify-center rounded transition-colors";
+const PRODUCTION_DASH_INFO_ACTION_EDIT = `${PRODUCTION_DASH_INFO_ACTION_BTN} text-slate-400 hover:bg-slate-100 hover:text-slate-600`;
+const PRODUCTION_DASH_INFO_ACTION_DELETE = `${PRODUCTION_DASH_INFO_ACTION_BTN} text-slate-300 hover:bg-red-50 hover:text-red-500`;
 
 const FormExecutionDialog = ({ open, onClose, templateId, templateName, equipmentId, equipmentName, equipmentTag, onSuccess, submissionId, initialValues }) => {
   const [fields, setFields] = useState([]);
@@ -1966,196 +1970,90 @@ export default function ProductionDashboardPage() {
               </div>
               <div className={isMobile ? "" : "max-h-[200px] overflow-y-auto"}>
                 {data?.information_entries?.length > 0 ? (
-                  isMobile ? (
-                    <div className="space-y-2">
-                      {sortedInformationEntries.map((row, i) => (
-                        <div
-                          key={row.submission_id || i}
-                          className={`p-3 rounded-lg border ${
-                            row._informationPinned ? "bg-amber-50/50 border-amber-200" : "bg-slate-50 border-slate-100"
-                          }`}
-                        >
-                          <p className="text-sm sm:text-[15px] text-slate-900 font-medium leading-relaxed break-words">
-                            {row.text || "—"}
-                          </p>
-                          <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-slate-600">
-                            <span className="tabular-nums text-slate-500">{row.time || "—"}</span>
-                            <span className="font-medium text-slate-700">{row.submitted_by || "—"}</span>
-                          </div>
-                          <div className="mt-2 flex w-full flex-wrap items-center justify-center gap-0.5">
-                              {row.submission_id && (
-                                <button
-                                  type="button"
-                                  onClick={() => toggleInformationPin(row.submission_id)}
-                                  disabled={setInformationPinMutation.isPending}
-                                  className={`p-1 rounded transition-colors ${
-                                    row._informationPinned
-                                      ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
-                                      : "text-slate-400 hover:bg-slate-100 hover:text-amber-600"
-                                  }`}
-                                  title={row._informationPinned ? "Unpin" : "Pin to top"}
-                                  data-testid={`pin-information-${i}`}
-                                >
-                                  {row._informationPinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const tid = row.form_template_id || formTemplates?.informationTemplates?.[0]?.id;
-                                  if (!tid) {
-                                    toast.error("Information template not found");
-                                    return;
-                                  }
-                                  setFormExec({
-                                    templateId: tid,
-                                    templateName: row.form_template_name || "Information",
-                                    equipmentId: line90Equipment?.id,
-                                    submissionId: row.submission_id,
-                                    initialValues: row.prefill && typeof row.prefill === "object" ? row.prefill : {},
-                                  });
-                                }}
-                                className={PRODUCTION_DASH_ACTION_EDIT}
-                                title="Edit"
-                                data-testid={`edit-information-${i}`}
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (row.submission_id) {
-                                    const snippet = (row.text || "").slice(0, 40);
-                                    setDeleteConfirm({
-                                      ids: [row.submission_id],
-                                      label: `information entry${snippet ? ` (${snippet}${(row.text || "").length > 40 ? "…" : ""})` : ""}`,
-                                    });
-                                  }
-                                }}
-                                className={PRODUCTION_DASH_ACTION_DELETE}
-                                title="Delete"
-                                data-testid={`delete-information-${i}`}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                          </div>
-                          <div className="text-[11px] text-slate-500 mt-1 tabular-nums">
-                            {formatDateTime(row.submitted_at || row.datetime) || "—"}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <table className="w-full table-fixed text-xs">
-                      <colgroup>
-                        <col style={{ width: "36%" }} />
-                        <col style={{ width: "28%" }} />
-                        <col style={{ width: "22%" }} />
-                        <col style={{ width: "14%" }} />
-                      </colgroup>
-                      <thead>
-                        <tr className="border-b border-slate-200">
-                          <th className="text-left py-2 px-2 font-semibold text-slate-700 tracking-wide text-[11px] min-w-0">
-                            Info
-                          </th>
-                          <th
-                            className="text-left py-2 px-1 pr-2 font-medium text-slate-500 uppercase tracking-wider text-[10px] whitespace-normal leading-tight min-w-[8.5rem]"
-                            title="Date and time (your timezone)"
-                          >
-                            Date/time
-                          </th>
-                          <th
-                            className="text-left py-2 pl-2 pr-1 font-medium text-slate-500 uppercase tracking-wider text-[10px] min-w-0"
-                            title="Submitted by"
-                          >
-                            By
-                          </th>
-                          <th className="min-w-[5.25rem] w-[14%] max-w-[6.5rem] p-0" aria-label="Actions" />
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sortedInformationEntries.map((row, i) => (
-                          <tr
-                            key={row.submission_id || i}
-                            className={`border-b border-slate-50 hover:bg-slate-50 align-top ${
-                              row._informationPinned ? "bg-amber-50/40 border-l-2 border-l-amber-400" : ""
-                            }`}
-                          >
-                            <td className="py-2 px-2 text-sm text-slate-900 leading-relaxed break-words min-w-0 overflow-hidden">
-                              {row.text || "—"}
-                            </td>
-                            <td className="py-2 px-1 pr-2 text-slate-500 tabular-nums text-[10px] leading-tight whitespace-nowrap align-top min-w-[8.5rem] overflow-hidden">
+                  <div className="space-y-2">
+                    {sortedInformationEntries.map((row, i) => (
+                      <div
+                        key={row.submission_id || i}
+                        className={`p-3 rounded-lg border ${
+                          row._informationPinned ? "bg-amber-50/50 border-amber-200 border-l-[3px] border-l-amber-400" : "bg-slate-50 border-slate-100"
+                        }`}
+                      >
+                        <p className="text-sm sm:text-[15px] text-slate-900 font-medium leading-relaxed break-words">
+                          {row.text || "—"}
+                        </p>
+                        <div className="mt-3 border-t border-slate-200/90 pt-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                          <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs text-slate-600">
+                            <span className="shrink-0 tabular-nums text-slate-500">
                               {(row.submitted_at || row.datetime)
                                 ? formatDateTimeCompact(row.submitted_at || row.datetime)
                                 : row.time || "—"}
-                            </td>
-                            <td className="py-2 pl-2 pr-1 text-slate-600 text-[11px] break-words min-w-0 overflow-hidden">
-                              {row.submitted_by || "—"}
-                            </td>
-                            <td className="py-1.5 px-2 align-top min-w-[5.25rem] overflow-hidden">
-                              <div className="flex items-center gap-0.5 justify-end">
-                                {row.submission_id && (
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleInformationPin(row.submission_id)}
-                                    disabled={setInformationPinMutation.isPending}
-                                    className={`p-1 rounded transition-colors ${
-                                      row._informationPinned
-                                        ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
-                                        : "text-slate-400 hover:bg-slate-100 hover:text-amber-600"
-                                    }`}
-                                    title={row._informationPinned ? "Unpin" : "Pin to top"}
-                                    data-testid={`pin-information-${i}`}
-                                  >
-                                    {row._informationPinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
-                                  </button>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const tid = row.form_template_id || formTemplates?.informationTemplates?.[0]?.id;
-                                    if (!tid) {
-                                      toast.error("Information template not found");
-                                      return;
-                                    }
-                                    setFormExec({
-                                      templateId: tid,
-                                      templateName: row.form_template_name || "Information",
-                                      equipmentId: line90Equipment?.id,
-                                      submissionId: row.submission_id,
-                                      initialValues: row.prefill && typeof row.prefill === "object" ? row.prefill : {},
-                                    });
-                                  }}
-                                  className={PRODUCTION_DASH_ACTION_EDIT}
-                                  title="Edit"
-                                  data-testid={`edit-information-${i}`}
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (row.submission_id) {
-                                      const snippet = (row.text || "").slice(0, 40);
-                                      setDeleteConfirm({
-                                        ids: [row.submission_id],
-                                        label: `information entry${snippet ? ` (${snippet}${(row.text || "").length > 40 ? "…" : ""})` : ""}`,
-                                      });
-                                    }
-                                  }}
-                                  className={PRODUCTION_DASH_ACTION_DELETE}
-                                  title="Delete"
-                                  data-testid={`delete-information-${i}`}
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )
+                            </span>
+                            <span className="text-slate-300 select-none" aria-hidden>
+                              ·
+                            </span>
+                            <span className="min-w-0 font-medium text-slate-700">{row.submitted_by || "—"}</span>
+                          </div>
+                          <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-0.5 sm:w-auto">
+                            {row.submission_id && (
+                              <button
+                                type="button"
+                                onClick={() => toggleInformationPin(row.submission_id)}
+                                disabled={setInformationPinMutation.isPending}
+                                className={`${PRODUCTION_DASH_INFO_ACTION_BTN} ${
+                                  row._informationPinned
+                                    ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                                    : "text-slate-400 hover:bg-slate-100 hover:text-amber-600"
+                                }`}
+                                title={row._informationPinned ? "Unpin" : "Pin to top"}
+                                data-testid={`pin-information-${i}`}
+                              >
+                                {row._informationPinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const tid = row.form_template_id || formTemplates?.informationTemplates?.[0]?.id;
+                                if (!tid) {
+                                  toast.error("Information template not found");
+                                  return;
+                                }
+                                setFormExec({
+                                  templateId: tid,
+                                  templateName: row.form_template_name || "Information",
+                                  equipmentId: line90Equipment?.id,
+                                  submissionId: row.submission_id,
+                                  initialValues: row.prefill && typeof row.prefill === "object" ? row.prefill : {},
+                                });
+                              }}
+                              className={PRODUCTION_DASH_INFO_ACTION_EDIT}
+                              title="Edit"
+                              data-testid={`edit-information-${i}`}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (row.submission_id) {
+                                  const snippet = (row.text || "").slice(0, 40);
+                                  setDeleteConfirm({
+                                    ids: [row.submission_id],
+                                    label: `information entry${snippet ? ` (${snippet}${(row.text || "").length > 40 ? "…" : ""})` : ""}`,
+                                  });
+                                }
+                              }}
+                              className={PRODUCTION_DASH_INFO_ACTION_DELETE}
+                              title="Delete"
+                              data-testid={`delete-information-${i}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
                   <p className="text-xs text-slate-400 py-4 text-center">No information submitted</p>
                 )}
