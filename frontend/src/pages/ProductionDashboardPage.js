@@ -450,6 +450,16 @@ function sortMillisecondsForProductionEntry(entry, fromDate) {
   return Number.POSITIVE_INFINITY;
 }
 
+/** Chart / series ordering: always use full `datetime` when present so e.g. 23:16 before 01:36 next calendar day (06:00–06:00 shift). */
+function chartPointSortMs(entry, fromDate) {
+  const raw = (entry?.datetime || "").trim();
+  if (raw) {
+    const ms = Date.parse(raw);
+    if (!Number.isNaN(ms)) return ms;
+  }
+  return sortMillisecondsForProductionEntry(entry, fromDate);
+}
+
 const PRODUCTION_SHIFT_OPTIONS = [
   { key: "morning", short: "Morning", sub: "06:00–14:00", title: "Morning (06:00 – 14:00)" },
   { key: "afternoon", short: "Afternoon", sub: "14:00–22:00", title: "Afternoon (14:00 – 22:00)" },
@@ -1104,6 +1114,7 @@ export default function ProductionDashboardPage() {
         if (!timeKey) return;
         timeMap[timeKey] = {
           time: timeKey,
+          _sortMs: chartPointSortMs(entry, fromDate),
           rpm: entry.rpm, feed: entry.feed, mp4: entry.mp4, t_product_ir: entry.t_product_ir,
           viscosity: viscByTime[timeKey] ?? null,
           screenChange: null, magnetCleaning: null,
@@ -1111,19 +1122,47 @@ export default function ProductionDashboardPage() {
       });
       viscSeries.forEach((v) => {
         const localTime = getLocalTime(v);
+        if (!localTime) return;
+        const sm = chartPointSortMs({ datetime: v.datetime, time: v.time }, fromDate);
         if (!timeMap[localTime]) {
-          timeMap[localTime] = { time: localTime, viscosity: v.viscosity, rpm: null, feed: null, mp4: null, t_product_ir: null, screenChange: null, magnetCleaning: null };
+          timeMap[localTime] = { time: localTime, _sortMs: sm, viscosity: v.viscosity, rpm: null, feed: null, mp4: null, t_product_ir: null, screenChange: null, magnetCleaning: null };
+        } else {
+          timeMap[localTime].viscosity = v.viscosity;
+          if (Number.isFinite(sm) && sm < timeMap[localTime]._sortMs) {
+            timeMap[localTime]._sortMs = sm;
+          }
         }
       });
       const addEvent = (timeSet, fieldName) => {
         timeSet.forEach((t) => {
-          if (timeMap[t]) timeMap[t][fieldName] = timeMap[t].viscosity || 0;
-          else timeMap[t] = { time: t, viscosity: null, rpm: null, feed: null, mp4: null, t_product_ir: null, screenChange: null, magnetCleaning: null, [fieldName]: 0 };
+          if (timeMap[t]) {
+            timeMap[t][fieldName] = timeMap[t].viscosity || 0;
+          } else {
+            timeMap[t] = {
+              time: t,
+              _sortMs: chartPointSortMs({ time: t }, fromDate),
+              viscosity: null,
+              rpm: null,
+              feed: null,
+              mp4: null,
+              t_product_ir: null,
+              screenChange: null,
+              magnetCleaning: null,
+              [fieldName]: 0,
+            };
+          }
         });
       };
       addEvent(screenChanges, "screenChange");
       addEvent(magnetCleanings, "magnetCleaning");
-      const sorted = Object.values(timeMap).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+      const sorted = Object.values(timeMap)
+        .sort((a, b) => {
+          const da = a._sortMs ?? Number.POSITIVE_INFINITY;
+          const db = b._sortMs ?? Number.POSITIVE_INFINITY;
+          if (da !== db) return da - db;
+          return String(a.time || "").localeCompare(String(b.time || ""));
+        })
+        .map(({ _sortMs: _ignored, ...row }) => row);
       sorted.forEach((p) => {
         if (p.screenChange !== null) p.screenChange = p.viscosity || p.screenChange;
         if (p.magnetCleaning !== null) p.magnetCleaning = p.viscosity || p.magnetCleaning;
@@ -1216,7 +1255,7 @@ export default function ProductionDashboardPage() {
         };
       });
     return sorted;
-  }, [data?.production_log, data?.viscosity_series, data?.viscosity_values, data?.screen_changes, data?.magnet_cleanings, chartSeries.screenChange, chartSeries.magnetCleaning, isMultiDay, period]);
+  }, [data?.production_log, data?.viscosity_series, data?.viscosity_values, data?.screen_changes, data?.magnet_cleanings, chartSeries.screenChange, chartSeries.magnetCleaning, isMultiDay, period, fromDate]);
 
   const kpis = data?.kpis || {};
 

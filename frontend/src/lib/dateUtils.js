@@ -260,23 +260,23 @@ export const formatDateTimeCompact = (dateInput) => {
     let datePart;
     switch (dateFormat) {
       case 'MM/DD/YYYY':
-        datePart = `${month2}/${day2}`;
+        datePart = `${month2}/${day2}/${year2}`;
         break;
       case 'DD-MM-YYYY':
-        datePart = `${day2}-${month2}`;
+        datePart = `${day2}-${month2}-${year2}`;
         break;
       case 'DD/MM/YYYY':
-        datePart = `${day2}/${month2}`;
+        datePart = `${day2}/${month2}/${year2}`;
         break;
       case 'DD MMM YYYY': {
         const d1 = date.toLocaleString('en-GB', { timeZone: tz, day: 'numeric' });
         const mon = date.toLocaleString('en-GB', { timeZone: tz, month: 'short' });
-        datePart = `${d1} ${mon}`;
+        datePart = `${d1} ${mon} ${year2}`;
         break;
       }
       case 'YYYY-MM-DD':
       default:
-        datePart = `${year2}-${month2}-${day2}`;
+        datePart = `${day2}-${month2}-${year2}`;
         break;
     }
     return `${datePart} ${timeStr}`;
