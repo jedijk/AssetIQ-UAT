@@ -380,7 +380,7 @@ const useIsMobile = () => {
 // Fetch form submissions
 const fetchSubmissions = async (filters) => {
   const params = new URLSearchParams();
-  params.append("limit", "20");  // Optimized limit for fast loading
+  params.append("limit", "200"); // API caps list size; `total` in response is full match count
   if (filters.hasWarnings) params.append("has_warnings", "true");
   if (filters.hasCritical) params.append("has_critical", "true");
   
@@ -584,6 +584,8 @@ export default function FormSubmissionsPage() {
   };
 
   const submissions = submissionsData?.submissions || [];
+  const totalMatching = submissionsData?.total ?? submissions.length;
+  const returnedCount = submissionsData?.returned ?? submissions.length;
 
   // Fetch form templates so we can decide which submissions allow label reprint.
   // We only need the (lightweight) list — every template carries label_print_config.
@@ -673,7 +675,7 @@ export default function FormSubmissionsPage() {
     return true;
   });
 
-  // Calculate stats
+  // Calculate stats (counts refer to the loaded page; see banner when the list is capped)
   const stats = {
     total: submissions.length,
     withWarnings: submissions.filter(s => s.has_warnings).length,
@@ -742,7 +744,10 @@ export default function FormSubmissionsPage() {
               </div>
               <div className="text-center sm:text-left">
                 <p className="text-[10px] sm:text-xs text-slate-500">Total</p>
-                <p className="text-lg sm:text-xl font-bold text-slate-800">{stats.total}</p>
+                <p className="text-lg sm:text-xl font-bold text-slate-800 tabular-nums">{stats.total}</p>
+                {totalMatching > returnedCount && (
+                  <p className="text-[10px] text-slate-400 tabular-nums leading-tight">{totalMatching} match filters</p>
+                )}
               </div>
             </div>
           </div>
@@ -823,6 +828,12 @@ export default function FormSubmissionsPage() {
 
         {/* Submissions List */}
         <div className="bg-white rounded-lg sm:rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          {returnedCount < totalMatching && (
+            <div className="px-3 sm:px-4 py-2 border-b border-amber-100 bg-amber-50/90 text-[11px] sm:text-xs text-amber-950">
+              Showing the <span className="font-semibold tabular-nums">{returnedCount}</span> most recent of{" "}
+              <span className="font-semibold tabular-nums">{totalMatching}</span> matching submissions (newest first). Narrow with filters if needed.
+            </div>
+          )}
           {isLoading ? (
             <div className="p-4 sm:p-6 space-y-3" data-testid="submissions-skeleton">
               {Array.from({ length: 8 }).map((_, i) => (

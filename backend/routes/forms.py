@@ -221,15 +221,15 @@ async def get_form_submissions(
     Returns lightweight submission objects for list view.
     For full submission details, use GET /api/form-submissions/{id}
     
-    Performance target: < 500ms response time
+    Performance target: < 500ms response time; supports skip/limit (max 200) and returns full match count in `total`.
     """
     import time
     import asyncio
     
     start_time = time.time()
     
-    # STRICT limits: default 10, max 50
-    limit = min(max(limit, 1), 50)
+    # Pagination: default 10, max 200 (list view stays lightweight via projection)
+    limit = min(max(limit, 1), 200)
     skip = max(skip, 0)
     
     # MINIMAL projection - lightweight fields only
@@ -265,6 +265,11 @@ async def get_form_submissions(
         query["has_critical"] = has_critical
     
     try:
+        total_matching = await asyncio.wait_for(
+            db.form_submissions.count_documents(query),
+            timeout=2.0,
+        )
+
         # 3 second hard timeout
         async def execute_query():
             # Query with projection, sort by submitted_at DESC, skip/limit
@@ -301,7 +306,7 @@ async def get_form_submissions(
                     users = await db.users.find(
                         {"id": {"$in": user_ids}},
                         {"_id": 0, "id": 1, "avatar_path": 1, "avatar_data": 1}
-                    ).to_list(length=50)
+                    ).to_list(length=200)
                     return {u["id"]: bool(u.get("avatar_path") or u.get("avatar_data")) for u in users}
                 user_avatars = await asyncio.wait_for(fetch_avatars(), timeout=1.0)
             except asyncio.TimeoutError:
@@ -354,10 +359,18 @@ async def get_form_submissions(
             })
         
         duration = time.time() - start_time
-        logger.info(f"GET /api/form-submissions completed in {duration:.3f}s - returned {len(submissions)} items")
+        logger.info(
+            f"GET /api/form-submissions completed in {duration:.3f}s - returned {len(submissions)} of {total_matching} matching (skip={skip}, limit={limit})"
+        )
         
-        # Return format expected by frontend
-        return {"total": len(submissions), "submissions": submissions}
+        # `total` = documents matching query; list may be shorter due to skip/limit
+        return {
+            "total": total_matching,
+            "returned": len(submissions),
+            "skip": skip,
+            "limit": limit,
+            "submissions": submissions,
+        }
         
     except asyncio.TimeoutError:
         logger.error("GET /api/form-submissions TIMEOUT after 3s")

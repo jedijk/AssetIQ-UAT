@@ -161,7 +161,7 @@ const FormsPage = ({ embedded = false }) => {
   // Fetch submissions
   const { data: submissionsData, isLoading: loadingSubmissions, isError: submissionsError } = useQuery({
     queryKey: ["form-submissions"],
-    queryFn: () => formAPI.getSubmissions({}),
+    queryFn: () => formAPI.getSubmissions({ limit: 200 }),
     enabled: activeTab === "submissions",
     retry: 2,
   });
