@@ -1085,6 +1085,13 @@ class TaskService:
         try:
             await self.db.form_submissions.insert_one(submission_doc)
             logger.info(f"Created form submission: {submission_doc['id']}")
+            try:
+                from services.form_service import FormService
+                await FormService(self.db).try_auto_pair_mooney_viscosity(submission_doc)
+            except Exception as pair_err:
+                logger.warning(
+                    f"Mooney viscosity auto-pair failed for task submission {submission_doc.get('id')}: {pair_err}"
+                )
             return submission_doc["id"]
         except Exception as e:
             logger.error(f"Failed to create form submission: {e}")

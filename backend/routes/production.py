@@ -1664,6 +1664,13 @@ async def update_production_submission(
             {"id": submission_id},
             {"$set": {"values": new_values, "updated_at": _serialize_datetime(datetime.now(timezone.utc))}}
         )
+
+        # Re-run Mooney → Extruder pairing after edits (measurement, date/time, etc.)
+        from services.form_service import FormService
+        if FormService.is_mooney_viscosity_submission(sub):
+            updated_sub = {**sub, "values": new_values}
+            await FormService(db).try_auto_pair_mooney_viscosity(updated_sub)
+
         return {"status": "updated", "source": "form_submission", "id": submission_id, "matched_fields": matched_count}
 
     # Fallback: try the ingested production_logs collection
@@ -1800,13 +1807,8 @@ async def create_viscosity_submission(
     await db.form_submissions.insert_one(submission)
     logger.info(f"Created new viscosity submission {submission_id} for datetime {datetime_val}, measurement={measurement}")
     
-    # Trigger auto-pairing
-    try:
-        from services.form_service import FormService
-        svc = FormService(db)
-        await svc._auto_pair_viscosity_to_extruder(submission)
-    except Exception as e:
-        logger.warning(f"Auto-pairing failed for new viscosity submission: {e}")
+    from services.form_service import FormService
+    await FormService(db).try_auto_pair_mooney_viscosity(submission)
     
     return {
         "status": "created",

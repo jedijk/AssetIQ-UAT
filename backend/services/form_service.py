@@ -592,14 +592,7 @@ class FormService:
             {"$inc": {"usage_count": 1}}
         )
         
-        # Auto-pair Mooney Viscosity samples to the latest orphan Extruder sample (same date)
-        try:
-            # Be flexible: production templates are often versioned (e.g. "Mooney viscosity v3").
-            tpl_name_norm = (template.get("name") or "").strip().lower()
-            if "mooney" in tpl_name_norm and ("viscos" in tpl_name_norm or "sample" in tpl_name_norm):
-                await self._auto_pair_viscosity_to_extruder(doc)
-        except Exception as e:
-            logger.warning(f"Viscosity auto-pair failed for submission {doc.get('id')}: {e}")
+        await self.try_auto_pair_mooney_viscosity(doc)
 
         # Auto-create observations for critical breaches
         observations_created = []
@@ -1190,6 +1183,27 @@ class FormService:
             "updated_at": self._serialize_datetime(doc.get("updated_at")),
         }
     
+    @staticmethod
+    def is_mooney_viscosity_submission(sub: Dict[str, Any]) -> bool:
+        """True when submission is a Mooney viscosity sample form (name may include version suffix)."""
+        tpl = (sub.get("form_template_name") or "").strip().lower()
+        return "mooney" in tpl and ("viscos" in tpl or "sample" in tpl)
+
+    async def try_auto_pair_mooney_viscosity(self, visc_doc: Dict[str, Any]) -> None:
+        """Run Mooney → Extruder pairing when applicable; logs and swallows errors (non-blocking)."""
+        if not self.is_mooney_viscosity_submission(visc_doc):
+            return
+        try:
+            await self._auto_pair_viscosity_to_extruder(visc_doc)
+        except Exception as e:
+            logger.warning(f"Viscosity auto-pair failed for submission {visc_doc.get('id')}: {e}")
+
+    async def try_auto_pair_mooney_viscosity_by_id(self, submission_id: str) -> None:
+        """Reload submission by id and run pairing if it is a Mooney viscosity form."""
+        sub = await self.submissions.find_one({"id": submission_id}, {"_id": 0})
+        if sub:
+            await self.try_auto_pair_mooney_viscosity(sub)
+
     async def _auto_pair_viscosity_to_extruder(self, visc_doc: Dict[str, Any], dry_run: bool = False) -> Optional[Dict[str, Any]]:
         """When a Mooney Viscosity sample is submitted, back-date its Date & Time to
         match the latest 'orphan' Extruder sample on the same date that still shows
