@@ -232,6 +232,43 @@ export const formatDateTime = (dateInput, options = {}) => {
 };
 
 /**
+ * Numeric date part for dense tables (production log date column, etc.).
+ * Always uses digits for month/day (no "May" / "Jan" text).
+ */
+export const formatDateOnlyCompact = (dateInput) => {
+  if (!dateInput) return '—';
+  try {
+    const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+    if (isNaN(date.getTime())) return '—';
+
+    const prefs = getUserPreferences();
+    const tz = prefs.timezone || DEFAULT_PREFS.timezone;
+    const dateFormat = prefs.date_format || DEFAULT_PREFS.date_format;
+
+    const day2 = date.toLocaleString('en-GB', { timeZone: tz, day: '2-digit' });
+    const month2 = date.toLocaleString('en-GB', { timeZone: tz, month: '2-digit' });
+    const year2 = date.toLocaleString('en-GB', { timeZone: tz, year: '2-digit' });
+    const year4 = date.toLocaleString('en-GB', { timeZone: tz, year: 'numeric' });
+
+    switch (dateFormat) {
+      case 'MM/DD/YYYY':
+        return `${month2}/${day2}/${year4}`;
+      case 'DD-MM-YYYY':
+        return `${day2}-${month2}-${year4}`;
+      case 'DD/MM/YYYY':
+        return `${day2}/${month2}/${year4}`;
+      case 'YYYY-MM-DD':
+        return `${year4}-${month2}-${day2}`;
+      default:
+        return `${day2}-${month2}-${year2}`;
+    }
+  } catch (e) {
+    console.warn('formatDateOnlyCompact error:', e);
+    return '—';
+  }
+};
+
+/**
  * Short date + time for dense tables (e.g. production dashboard).
  * Day/month order and separators follow the user's date_format preference; time uses 12h/24h from preferences.
  */
@@ -243,12 +280,7 @@ export const formatDateTimeCompact = (dateInput) => {
 
     const prefs = getUserPreferences();
     const tz = prefs.timezone || DEFAULT_PREFS.timezone;
-    const dateFormat = prefs.date_format || DEFAULT_PREFS.date_format;
     const timeFormat = prefs.time_format || DEFAULT_PREFS.time_format;
-
-    const day2 = date.toLocaleString('en-GB', { timeZone: tz, day: '2-digit' });
-    const month2 = date.toLocaleString('en-GB', { timeZone: tz, month: '2-digit' });
-    const year2 = date.toLocaleString('en-GB', { timeZone: tz, year: '2-digit' });
 
     const timeStr = date.toLocaleTimeString(undefined, {
       timeZone: tz,
@@ -257,29 +289,7 @@ export const formatDateTimeCompact = (dateInput) => {
       hour12: timeFormat === '12h',
     });
 
-    let datePart;
-    switch (dateFormat) {
-      case 'MM/DD/YYYY':
-        datePart = `${month2}/${day2}/${year2}`;
-        break;
-      case 'DD-MM-YYYY':
-        datePart = `${day2}-${month2}-${year2}`;
-        break;
-      case 'DD/MM/YYYY':
-        datePart = `${day2}/${month2}/${year2}`;
-        break;
-      case 'DD MMM YYYY': {
-        const d1 = date.toLocaleString('en-GB', { timeZone: tz, day: 'numeric' });
-        const mon = date.toLocaleString('en-GB', { timeZone: tz, month: 'short' });
-        datePart = `${d1} ${mon} ${year2}`;
-        break;
-      }
-      case 'YYYY-MM-DD':
-      default:
-        datePart = `${day2}-${month2}-${year2}`;
-        break;
-    }
-    return `${datePart} ${timeStr}`;
+    return `${formatDateOnlyCompact(date)} ${timeStr}`;
   } catch (e) {
     console.warn('formatDateTimeCompact error:', e);
     return '—';
@@ -341,6 +351,7 @@ export default {
   formatTime,
   formatDateTime,
   formatDateTimeCompact,
+  formatDateOnlyCompact,
   formatDateCompact,
   formatDateRelative,
   getUserTimezone,

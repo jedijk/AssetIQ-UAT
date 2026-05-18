@@ -146,6 +146,17 @@ def _extract_waste_reporting_fields(sub: dict) -> Tuple[str, str, Optional[float
     return date_time_raw, waste_type, weight_kg
 
 
+def _sum_waste_reporting_kg(entries: List[dict]) -> float:
+    """Total kg from Waste reporting form rows shown in the dashboard table."""
+    total = 0.0
+    for e in entries or []:
+        try:
+            total += float(e.get("weight_kg") or 0)
+        except (TypeError, ValueError):
+            continue
+    return round(total, 1)
+
+
 PRODUCTION_FORMS = [
     EXTRUDER_FORM,
     VISCOSITY_FORM,
@@ -1116,7 +1127,6 @@ async def get_production_dashboard(
     # NOTE: total_feed is initialized to 0 and ONLY set from End of Shift entries (see below)
     # Do NOT accumulate from individual FEED values
     total_feed = 0.0
-    total_waste = 0.0
 
     for sub in extruder_subs:
         dt = sub.get("_parsed_time")
@@ -1139,7 +1149,6 @@ async def get_production_dashboard(
         waste = extract_numeric(sub, "Waste") or 0
 
         # Do NOT add feed to total_feed - total_input comes ONLY from End of Shift
-        total_waste += waste
 
         production_log.append({
             "time": time_label,
@@ -1257,14 +1266,12 @@ async def get_production_dashboard(
         dt = sub.get("_parsed_time")
         date_time_raw = extract_field(sub, "Date & Time") or ""
         total_input = extract_numeric(sub, "Total Input")
-        total_wast = extract_numeric(sub, "Total Wast")
         # Extract notes/comments for display on hover
         notes = sub.get("notes") or ""
         end_of_shift_entries.append({
             "datetime": _serialize_datetime(dt),
             "date_time_raw": date_time_raw,
             "total_input": total_input if total_input is not None else 0,
-            "total_waste": total_wast if total_wast is not None else 0,
             "submitted_by": sub.get("submitted_by_name", ""),
             "submission_id": sub.get("id", ""),
             "notes": notes,
@@ -1283,11 +1290,6 @@ async def get_production_dashboard(
             "submission_id": sub.get("id", ""),
             "prefill": _submission_prefill_by_field_id(sub),
         })
-
-    # Waste calculation - only show reported waste; do not fabricate an estimate
-    waste_kg = total_waste
-    waste_pct = round((waste_kg / total_feed * 100), 2) if total_feed > 0 and waste_kg > 0 else 0
-    yield_pct = round(100 - waste_pct, 2) if total_feed > 0 else 0
 
     # Viscosity KPIs filled after form rows and ingested logs are merged (see below).
     rsd = 0
@@ -1507,17 +1509,6 @@ async def get_production_dashboard(
                     "submission_id": entry.get("id", ""),
                 })
 
-        # Recalculate KPIs from ingested data
-        waste_from_entry = 0
-        try:
-            waste_from_entry = float(ingested[0].get("total_waste", 0) or 0)
-        except (ValueError, TypeError):
-            pass
-        total_waste = waste_from_entry if waste_from_entry > 0 else total_waste
-        waste_kg = total_waste
-        waste_pct = round((waste_kg / total_feed * 100), 2) if total_feed > 0 else 0
-        yield_pct = round(100 - waste_pct, 2) if total_feed > 0 else 0
-
         # Update lot_info
         if big_bag_entries and not lot_info:
             lots = [e.get("lot_no", "") for e in big_bag_entries if e.get("lot_no")]
@@ -1583,14 +1574,13 @@ async def get_production_dashboard(
     else:
         runtime_hours = round(len(production_log) * 0.25, 2) if production_log else 0
 
-    # Override Total Input and Total Waste with End of Shift sums when available
-    # (This runs AFTER any ingested-data fallback so End of Shift always wins.)
+    # Total input from End of Shift when available (waste KPI uses Waste reporting table below).
     if end_of_shift_entries:
         total_feed = sum(float(e.get("total_input") or 0) for e in end_of_shift_entries)
-        total_waste = sum(float(e.get("total_waste") or 0) for e in end_of_shift_entries)
-        waste_kg = total_waste
-        waste_pct = round((waste_kg / total_feed * 100), 2) if total_feed > 0 and waste_kg > 0 else 0
-        yield_pct = round(100 - waste_pct, 2) if total_feed > 0 else 0
+
+    waste_kg = _sum_waste_reporting_kg(waste_reporting_entries)
+    waste_pct = round((waste_kg / total_feed * 100), 2) if total_feed > 0 and waste_kg > 0 else 0
+    yield_pct = round(100 - waste_pct, 2) if total_feed > 0 else 0
 
     # Viscosity range string
     visc_range_str = "55-60"
@@ -1632,6 +1622,7 @@ async def get_production_dashboard(
             "shift_hours": shift_hours,
             "sample_count": len(production_log),
             "viscosity_sample_count": len(viscosity_values),
+            "waste_reporting_count": len(waste_reporting_entries),
         },
         "production_log": production_log,
         "waste_downtime_series": waste_downtime_series,

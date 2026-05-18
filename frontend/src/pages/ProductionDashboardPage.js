@@ -5,7 +5,7 @@ import { api } from "../lib/apiClient";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useIsMobile } from "../hooks/useIsMobile";
-import { formatDateTimeCompact } from "../lib/dateUtils";
+import { formatDateOnlyCompact, formatDateTimeCompact } from "../lib/dateUtils";
 import {
   ChevronLeft,
   ChevronRight,
@@ -1007,11 +1007,11 @@ export default function ProductionDashboardPage() {
         const kpiRows = [
           ["KPI", "Value", "Unit", "Detail"],
           ["Total Input", kpis.total_input, "kg", kpis.lot_info || ""],
-          ["Waste", kpis.waste, "kg", `${kpis.waste_pct}% of input`],
+          ["Waste", kpis.waste, "kg", `${kpis.waste_pct || 0}% of input (${kpis.waste_reporting_count ?? 0} reporting entries)`],
           ["Yield", kpis.yield_pct, "%", `Target: ${kpis.yield_target}%`],
-          ["Avg Mooney Viscosity", kpis.avg_viscosity, "MU", `Range: ${kpis.viscosity_range}`],
+          ["Avg Mooney Viscosity", kpis.avg_viscosity, "MU", `Range: ${kpis.viscosity_range} (${kpis.viscosity_sample_count ?? 0} samples)`],
           ["RSD", kpis.rsd, "%", `Target: < ${kpis.rsd_target}`],
-          ["Runtime", kpis.runtime_hours, "hours", ""],
+          ["Runtime", formatHoursMinutes(kpis.runtime_hours), "", ""],
         ];
         const wsKpi = XLSX.utils.aoa_to_sheet(kpiRows);
         wsKpi["!cols"] = [{ wch: 22 }, { wch: 12 }, { wch: 8 }, { wch: 24 }];
@@ -1034,7 +1034,7 @@ export default function ProductionDashboardPage() {
           return String(sa).localeCompare(String(sb));
         });
         logSorted.forEach((e, i) => {
-          const dateStr = e.datetime ? new Date(e.datetime).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}) : '';
+          const dateStr = e.datetime ? formatDateOnlyCompact(e.datetime) : '';
           const timeKey = getTimeKey(e);
           logRows.push([
             i + 1, dateStr, timeKey || "—", e.rpm, e.feed, e.moisture, e.energy,
@@ -1076,17 +1076,40 @@ export default function ProductionDashboardPage() {
         wsBag["!cols"] = bagHeader.map(() => ({ wch: 16 }));
         XLSX.utils.book_append_sheet(wb, wsBag, "Input Material");
 
-        // Sheet 5: Waste & Downtime
-        const wasteHeader = ["Time", "Waste (kg)", "Downtime", "Feed (kg)", "RPM"];
-        const wasteRows = [wasteHeader];
-        (data.waste_downtime_series || []).forEach((w) => {
-          wasteRows.push([w.time, w.waste, w.downtime, w.feed, w.rpm]);
+        // Sheet 5: End of Shift (input only — waste tracked in Waste Reporting)
+        const eosHeader = ["Date & Time", "Input (kg)", "Completion comments", "Submitted by", "Submission ID"];
+        const eosRows = [eosHeader];
+        (data.end_of_shift_entries || []).forEach((eos) => {
+          eosRows.push([
+            formatDateTimeCompact(eos.datetime || eos.date_time_raw),
+            eos.total_input ?? 0,
+            eos.notes || "",
+            eos.submitted_by || "",
+            eos.submission_id || "",
+          ]);
         });
-        const wsWaste = XLSX.utils.aoa_to_sheet(wasteRows);
-        wsWaste["!cols"] = wasteHeader.map(() => ({ wch: 14 }));
-        XLSX.utils.book_append_sheet(wb, wsWaste, "Waste & Downtime");
+        const wsEos = XLSX.utils.aoa_to_sheet(eosRows);
+        wsEos["!cols"] = [{ wch: 18 }, { wch: 12 }, { wch: 36 }, { wch: 18 }, { wch: 28 }];
+        XLSX.utils.book_append_sheet(wb, wsEos, "End of Shift");
 
-        // Sheet 6: Actions
+        // Sheet 6: Waste Reporting (KPI waste total = sum of Weight column)
+        const wasteRepHeader = ["Date & Time", "Waste Type", "Weight (KG)", "Submitted by", "Submission ID"];
+        const wasteRepRows = [wasteRepHeader];
+        (data.waste_reporting_entries || []).forEach((row) => {
+          const typeLabel = formatWasteTypeLabel(row.waste_type);
+          wasteRepRows.push([
+            formatDateTimeCompact(row.datetime || row.date_time_raw),
+            typeLabel === "—" ? "" : typeLabel,
+            row.weight_kg ?? 0,
+            row.submitted_by || "",
+            row.submission_id || "",
+          ]);
+        });
+        const wsWasteRep = XLSX.utils.aoa_to_sheet(wasteRepRows);
+        wsWasteRep["!cols"] = [{ wch: 18 }, { wch: 16 }, { wch: 12 }, { wch: 18 }, { wch: 28 }];
+        XLSX.utils.book_append_sheet(wb, wsWasteRep, "Waste Reporting");
+
+        // Sheet 7: Actions
         const actHeader = ["Time", "Severity", "Title", "Description"];
         const actRows = [actHeader];
         (data.actions || []).forEach((ev) => {
@@ -1096,13 +1119,13 @@ export default function ProductionDashboardPage() {
         wsAct["!cols"] = [{ wch: 8 }, { wch: 10 }, { wch: 30 }, { wch: 50 }];
         XLSX.utils.book_append_sheet(wb, wsAct, "Actions");
 
-        // Sheet 7: Information (form submissions)
+        // Sheet 8: Information (form submissions)
         const infoHeader = ["Shift time", "Submitted at", "Info", "Submitted by", "Form", "Submission ID"];
         const infoRows = [infoHeader];
         (data.information_entries || []).forEach((row) => {
           infoRows.push([
             row.time || "",
-            row.submitted_at || row.datetime || "",
+            formatDateTimeCompact(row.submitted_at || row.datetime || ""),
             row.text || "",
             row.submitted_by || "",
             row.form_template_name || "",
@@ -1116,7 +1139,10 @@ export default function ProductionDashboardPage() {
         // Save
         const buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
         const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-        saveAs(blob, `Production_Log_${fromStr}.xlsx`);
+        const exportName = fromStr === toStr
+          ? `Production_Dashboard_${fromStr}.xlsx`
+          : `Production_Dashboard_${fromStr}_${toStr}.xlsx`;
+        saveAs(blob, exportName);
         toast.success("Excel exported");
       });
     });
@@ -1691,6 +1717,7 @@ export default function ProductionDashboardPage() {
               value={kpis.waste?.toLocaleString() || "0"}
               unit="kg"
               detail={`${kpis.waste_pct || 0}% of input`}
+              detail2={`${kpis.waste_reporting_count ?? 0} entries`}
             />
             <KPICard
               icon={TrendingUp}
@@ -1892,29 +1919,13 @@ export default function ProductionDashboardPage() {
                       <tr className="border-b border-slate-200">
                         <th className="text-left py-2 px-2 font-semibold text-slate-700 tracking-wide text-[11px]">Date & Time</th>
                         <th className="text-right py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px]">Input (kg)</th>
-                        <th className="text-right py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px]">Waste (kg)</th>
                         <th className="w-14 p-0" aria-label="Actions" />
                       </tr>
                     </thead>
                     <tbody>
                       {data.end_of_shift_entries.map((eos, i) => {
-                        let displayDT = "";
                         const raw = eos.date_time_raw || eos.datetime;
-                        if (raw) {
-                          try {
-                            const d = new Date(raw);
-                            if (!isNaN(d.getTime())) {
-                              const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-                              const hh = String(d.getHours()).padStart(2, "0");
-                              const mm = String(d.getMinutes()).padStart(2, "0");
-                              displayDT = `${d.getDate()} ${months[d.getMonth()]} ${hh}:${mm}`;
-                            } else {
-                              displayDT = String(raw);
-                            }
-                          } catch {
-                            displayDT = String(raw);
-                          }
-                        }
+                        const displayDT = raw ? formatDateTimeCompact(raw) : "";
                         const hasNotes = eos.notes && eos.notes.trim().length > 0;
                         const isExpanded = expandedEosNotes === (eos.submission_id || i);
                         return (
@@ -1941,7 +1952,6 @@ export default function ProductionDashboardPage() {
                                       </div>
                                     </td>
                                     <td className="py-1.5 px-1 text-right tabular-nums text-slate-700">{Number(eos.total_input || 0).toLocaleString()}</td>
-                                    <td className="py-1.5 px-1 text-right tabular-nums text-red-600 font-medium">{Number(eos.total_waste || 0).toLocaleString()}</td>
                                     <td className="py-1.5 px-2 align-top">
                                       <div className="flex items-center gap-0.5">
                                         <button
@@ -1956,7 +1966,6 @@ export default function ProductionDashboardPage() {
                                                 initialValues: {
                                                   "date_&_time": eos.date_time_raw || "",
                                                   "total_input": eos.total_input ?? "",
-                                                  "total_wast": eos.total_waste ?? "",
                                                 },
                                               });
                                             }
@@ -1998,7 +2007,7 @@ export default function ProductionDashboardPage() {
                             {/* Mobile expanded notes row */}
                             {hasNotes && isExpanded && (
                               <tr className="bg-amber-50 border-b border-amber-100">
-                                <td colSpan={4} className="px-2 py-2">
+                                <td colSpan={3} className="px-2 py-2">
                                   <div className="text-xs">
                                     <span className="font-semibold text-amber-700">Completion Comments:</span>
                                     <p className="mt-1 text-slate-600 whitespace-pre-wrap">{eos.notes}</p>
@@ -2471,7 +2480,7 @@ export default function ProductionDashboardPage() {
                           ref={isHighlighted ? (el) => el?.scrollIntoView({ behavior: "smooth", block: "center" }) : undefined}
                         >
                           <td className="py-2 px-2 text-slate-400 text-xs tabular-nums">{i + 1}</td>
-                          <td className="py-2 px-2 text-slate-500 text-xs tabular-nums whitespace-nowrap">{entry.datetime ? new Date(entry.datetime).toLocaleDateString('en-GB', {day: '2-digit', month: 'short', year: 'numeric'}) : ''}</td>
+                          <td className="py-2 px-2 text-slate-500 text-xs tabular-nums whitespace-nowrap">{entry.datetime ? formatDateOnlyCompact(entry.datetime) : ''}</td>
                           <td className="py-2 px-2 font-medium text-slate-700 tabular-nums">{timeLabel}</td>
                           <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.rpm}</td>
                           <td className="py-2 px-2 tabular-nums">{isViscOnly ? tbdCell : entry.feed}</td>
