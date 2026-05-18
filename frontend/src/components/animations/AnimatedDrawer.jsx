@@ -5,6 +5,7 @@
  */
 
 import { memo, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import {
@@ -62,13 +63,13 @@ const AnimatedDrawer = memo(({
 
   const variants = side === "left" ? slideFromLeftVariants : slideFromRightVariants;
 
-  return (
+  const drawer = (
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Overlay */}
+          {/* Overlay — above page sticky toolbars (e.g. production dashboard z-60) and app header */}
           <motion.div
-            className={`fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] ${overlayClassName}`}
+            className={`fixed inset-0 bg-black/40 backdrop-blur-sm z-[250] ${overlayClassName}`}
             variants={overlayVariants}
             initial="initial"
             animate="animate"
@@ -83,7 +84,7 @@ const AnimatedDrawer = memo(({
             className={`
               fixed top-0 ${side === "left" ? "left-0" : "right-0"} 
               h-full bg-white dark:bg-slate-900 
-              shadow-2xl z-[60] flex flex-col
+              shadow-2xl z-[250] flex flex-col
               ${className}
             `}
             style={{ 
@@ -135,6 +136,9 @@ const AnimatedDrawer = memo(({
       )}
     </AnimatePresence>
   );
+
+  if (typeof document === "undefined") return drawer;
+  return createPortal(drawer, document.body);
 });
 
 AnimatedDrawer.displayName = "AnimatedDrawer";
