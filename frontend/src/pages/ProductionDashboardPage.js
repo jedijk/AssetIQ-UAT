@@ -239,6 +239,152 @@ function formTemplateFieldTypeKey(field) {
 /** Production Log–style icon buttons for dashboard tables */
 const PRODUCTION_DASH_ACTION_EDIT = "p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors";
 const PRODUCTION_DASH_ACTION_DELETE = "p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors";
+
+/** Waste reporting table — matches End of Shift panel styling. */
+function WasteReportingPanel({
+  entries,
+  thresholdKg,
+  isMobile,
+  formTemplates,
+  line90Equipment,
+  setFormExec,
+  setDeleteConfirm,
+}) {
+  const openAdd = () => {
+    if (formTemplates?.wasteReporting) {
+      setFormExec({
+        templateId: formTemplates.wasteReporting.id,
+        templateName: formTemplates.wasteReporting.name || "Waste reporting",
+        equipmentId: line90Equipment?.id,
+      });
+    } else {
+      toast.error("Waste reporting template not found");
+    }
+  };
+
+  const openEdit = (row) => {
+    if (formTemplates?.wasteReporting && row.submission_id) {
+      setFormExec({
+        templateId: formTemplates.wasteReporting.id,
+        templateName: formTemplates.wasteReporting.name || "Waste reporting",
+        equipmentId: line90Equipment?.id,
+        submissionId: row.submission_id,
+        initialValues: row.prefill || {},
+      });
+    }
+  };
+
+  const renderActions = (row, i, displayDT) => (
+    <div className="flex items-center gap-0.5">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          openEdit(row);
+        }}
+        className={PRODUCTION_DASH_ACTION_EDIT}
+        title="Edit"
+        data-testid={`edit-waste-${i}`}
+      >
+        <Pencil className="w-3.5 h-3.5" />
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (row.submission_id) {
+            setDeleteConfirm({
+              ids: [row.submission_id],
+              label: `waste entry (${row.waste_type || displayDT || "item"})`,
+            });
+          }
+        }}
+        className={PRODUCTION_DASH_ACTION_DELETE}
+        title="Delete"
+        data-testid={`delete-waste-${i}`}
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4" data-testid="waste-reporting-panel">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-slate-700">Waste</h3>
+        <div className="flex items-center gap-2">
+          {entries?.length > 0 && (
+            <Badge variant="secondary" className="text-xs">{entries.length}</Badge>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 gap-1 text-xs"
+            onClick={openAdd}
+            data-testid="waste-reporting-add-btn"
+          >
+            <Plus className="w-3 h-3" /> Add
+          </Button>
+        </div>
+      </div>
+      <div className="max-h-[240px] overflow-y-auto">
+        {entries?.length > 0 ? (
+          isMobile ? (
+            <div className="space-y-2">
+              {entries.map((row, i) => {
+                const weight = Number(row.weight_kg ?? 0);
+                const isHigh = weight >= thresholdKg;
+                const displayDT = formatDateTimeCompact(row.datetime || row.date_time_raw);
+                return (
+                  <div key={row.submission_id || i} className="p-2 rounded-lg bg-slate-50 border border-slate-100 text-xs">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-slate-500 tabular-nums shrink-0">{displayDT}</span>
+                      {renderActions(row, i, displayDT)}
+                    </div>
+                    <div className="mt-1 font-medium text-slate-800">{row.waste_type || "—"}</div>
+                    <div className={`mt-0.5 tabular-nums font-medium ${isHigh ? "text-red-600" : "text-slate-700"}`}>
+                      {weight.toLocaleString()} kg
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="text-left py-2 px-2 font-semibold text-slate-700 tracking-wide text-[11px]">Date & Time</th>
+                  <th className="text-left py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px]">Waste Type</th>
+                  <th className="text-right py-2 px-1 font-medium text-slate-500 uppercase tracking-wider text-[10px]">Weight (KG)</th>
+                  <th className="w-14 p-0" aria-label="Actions" />
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((row, i) => {
+                  const weight = Number(row.weight_kg ?? 0);
+                  const isHigh = weight >= thresholdKg;
+                  const displayDT = formatDateTimeCompact(row.datetime || row.date_time_raw);
+                  return (
+                    <tr key={row.submission_id || i} className="border-b border-slate-50 hover:bg-slate-50 group" data-testid={`waste-row-${i}`}>
+                      <td className="py-1.5 px-1 text-slate-700 whitespace-nowrap tabular-nums">{displayDT}</td>
+                      <td className="py-1.5 px-1 text-slate-700">{row.waste_type || "—"}</td>
+                      <td className={`py-1.5 px-1 text-right tabular-nums font-medium ${isHigh ? "text-red-600" : "text-slate-700"}`}>
+                        {weight.toLocaleString()}
+                      </td>
+                      <td className="py-1.5 px-2 align-top">{renderActions(row, i, displayDT)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )
+        ) : (
+          <p className="text-xs text-slate-400 py-8 text-center">No waste entries recorded yet</p>
+        )}
+      </div>
+    </div>
+  );
+}
 /** Square touch target + centered glyph for Information (and similar) icon rows */
 const PRODUCTION_DASH_INFO_ACTION_BTN = "inline-flex size-9 shrink-0 items-center justify-center rounded transition-colors";
 const PRODUCTION_DASH_INFO_ACTION_EDIT = `${PRODUCTION_DASH_INFO_ACTION_BTN} text-slate-400 hover:bg-slate-100 hover:text-slate-600`;
@@ -623,8 +769,9 @@ export default function ProductionDashboardPage() {
       const extruder = list.find((t) => t.name === "Extruder settings sample");
       const viscosity = list.find((t) => /mooney viscosity/i.test(t.name));
       const endOfShift = list.find((t) => /end of shift/i.test(t.name));
+      const wasteReporting = list.find((t) => /waste/i.test(t.name) && /report/i.test(t.name));
       const informationTemplates = list.filter((t) => /\b(information|informatie)\b/i.test(String(t.name || "")));
-      return { bigBag, extruder, viscosity, endOfShift, informationTemplates };
+      return { bigBag, extruder, viscosity, endOfShift, wasteReporting, informationTemplates };
     },
     staleTime: 600000,
   });
@@ -1258,6 +1405,9 @@ export default function ProductionDashboardPage() {
   }, [data?.production_log, data?.viscosity_series, data?.viscosity_values, data?.screen_changes, data?.magnet_cleanings, chartSeries.screenChange, chartSeries.magnetCleaning, isMultiDay, period, fromDate]);
 
   const kpis = data?.kpis || {};
+  const wasteWeightThresholdKg = Number(data?.waste_weight_threshold_kg) > 0
+    ? Number(data.waste_weight_threshold_kg)
+    : 500;
 
   // Build time-to-viscosity map for accurate matching (using local timezone)
   const viscosityByTime = useMemo(() => {
@@ -1694,8 +1844,8 @@ export default function ProductionDashboardPage() {
             )}
           </div>
 
-          {/* ── End of Shift Details + Input Material + Insights Row ── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          {/* ── End of Shift, Waste, Input Material, Information ── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
             {/* End of Shift Details */}
             <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4" data-testid="end-of-shift-panel">
               <div className="flex items-center justify-between mb-3">
@@ -1858,6 +2008,16 @@ export default function ProductionDashboardPage() {
                 )}
               </div>
             </div>
+
+            <WasteReportingPanel
+              entries={data?.waste_reporting_entries}
+              thresholdKg={wasteWeightThresholdKg}
+              isMobile={isMobile}
+              formTemplates={formTemplates}
+              line90Equipment={line90Equipment}
+              setFormExec={setFormExec}
+              setDeleteConfirm={setDeleteConfirm}
+            />
 
             {/* Input Material / Big Bag Loading */}
             <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4" data-testid="big-bag-panel">

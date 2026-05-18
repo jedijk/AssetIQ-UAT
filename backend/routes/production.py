@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from datetime import datetime, timezone, timedelta
 from typing import Any, List, Optional, Tuple
 import logging
+import os
 import re
 import uuid
 
@@ -86,6 +87,9 @@ BIG_BAG_FORM = "Big Bag Loading"
 SCREEN_CHANGE_FORM = "Screen change"
 MAGNET_CLEANING_FORM = "Magnet cleaning"
 END_OF_SHIFT_FORM = "End of shift"
+WASTE_REPORTING_FORM = "Waste reporting"
+# Highlight weight (kg) in dashboard when a single entry exceeds this value (override via env).
+WASTE_ENTRY_WEIGHT_ALERT_KG = float(os.environ.get("WASTE_ENTRY_WEIGHT_ALERT_KG", "500"))
 # Any form template whose name matches information-style titles (EN/NL), e.g. "Production Information", "Lijninformatie".
 INFORMATION_FORM = "Information"
 # Mongo $regex and Python checks must stay aligned (word boundaries; English + Dutch).
@@ -103,6 +107,30 @@ def _information_template_name_matches(name: Optional[Any]) -> bool:
     return bool(re.search(INFORMATION_TEMPLATE_NAME_REGEX, s, flags=re.IGNORECASE))
 
 
+def _waste_reporting_template_name_matches(name: Optional[Any]) -> bool:
+    if name is None:
+        return False
+    tpl = str(name).strip().lower()
+    return ("waste" in tpl) and ("report" in tpl)
+
+
+def _extract_waste_reporting_fields(sub: dict) -> Tuple[str, str, Optional[float]]:
+    """Extract Date & Time, waste type label, and weight (kg) from a waste reporting submission."""
+    date_time_raw = extract_field(sub, "Date & Time") or ""
+    waste_type = ""
+    for label in ("Waste type", "Waste Type", "Waste category", "Category", "Type"):
+        raw = extract_field(sub, label)
+        if raw not in (None, ""):
+            waste_type = str(_unwrap_form_value(raw)).strip()
+            break
+    weight_kg = None
+    for label in ("Weight", "Weight (KG)", "Weight (kg)", "Weight kg", "Weight KG"):
+        weight_kg = extract_numeric(sub, label)
+        if weight_kg is not None:
+            break
+    return date_time_raw, waste_type, weight_kg
+
+
 PRODUCTION_FORMS = [
     EXTRUDER_FORM,
     VISCOSITY_FORM,
@@ -110,6 +138,7 @@ PRODUCTION_FORMS = [
     SCREEN_CHANGE_FORM,
     MAGNET_CLEANING_FORM,
     END_OF_SHIFT_FORM,
+    WASTE_REPORTING_FORM,
     INFORMATION_FORM,
 ]
 
@@ -669,6 +698,10 @@ async def get_production_dashboard(
                 {"form_template_name": {"$regex": "shift", "$options": "i"}},
             ]},
             {"$and": [
+                {"form_template_name": {"$regex": "waste", "$options": "i"}},
+                {"form_template_name": {"$regex": "report", "$options": "i"}},
+            ]},
+            {"$and": [
                 {"form_template_name": {"$regex": INFORMATION_TEMPLATE_NAME_REGEX, "$options": "i"}},
             ]},
         ]
@@ -690,6 +723,10 @@ async def get_production_dashboard(
                 {"$and": [
                     {"form_template_name": {"$regex": "end", "$options": "i"}},
                     {"form_template_name": {"$regex": "shift", "$options": "i"}},
+                ]},
+                {"$and": [
+                    {"form_template_name": {"$regex": "waste", "$options": "i"}},
+                    {"form_template_name": {"$regex": "report", "$options": "i"}},
                 ]},
                 # Big Bag Loading is often submitted without a linked equipment row
                 {"$and": [
@@ -714,6 +751,7 @@ async def get_production_dashboard(
     screen_tpl_ids_str = set()
     magnet_tpl_ids_str = set()
     eos_tpl_ids_str = set()
+    waste_reporting_tpl_ids_str = set()
     information_tpl_ids_str = set()
 
     prod_tpl_id_values = []
@@ -762,6 +800,8 @@ async def get_production_dashboard(
                     magnet_tpl_ids_str.add(sid)
                 if ("end" in nm) and ("shift" in nm):
                     eos_tpl_ids_str.add(sid)
+                if _waste_reporting_template_name_matches(nm):
+                    waste_reporting_tpl_ids_str.add(sid)
                 if _information_template_name_matches(nm):
                     information_tpl_ids_str.add(sid)
     except Exception as e:
@@ -970,6 +1010,8 @@ async def get_production_dashboard(
                 return True
             if target == END_OF_SHIFT_FORM.lower() and ts in eos_tpl_ids_str:
                 return True
+            if target == WASTE_REPORTING_FORM.lower() and ts in waste_reporting_tpl_ids_str:
+                return True
             if target == INFORMATION_FORM.lower() and ts in information_tpl_ids_str:
                 return True
         tpl = (sub.get("form_template_name") or "").strip().lower()
@@ -989,6 +1031,8 @@ async def get_production_dashboard(
             return ("magnet" in tpl) and ("clean" in tpl)
         if target == END_OF_SHIFT_FORM.lower():
             return ("end" in tpl) and ("shift" in tpl)
+        if target == WASTE_REPORTING_FORM.lower():
+            return _waste_reporting_template_name_matches(tpl)
         if target == INFORMATION_FORM.lower():
             return _information_template_name_matches(tpl)
         return False
@@ -1043,6 +1087,11 @@ async def get_production_dashboard(
     magnet_subs = [s for s in submissions if match_template(s, MAGNET_CLEANING_FORM)]
     end_of_shift_subs = sorted(
         [s for s in submissions if match_template(s, END_OF_SHIFT_FORM)],
+        key=lambda s: _sort_key_dt(s.get("_parsed_time")),
+        reverse=True,
+    )
+    waste_reporting_subs = sorted(
+        [s for s in submissions if match_template(s, WASTE_REPORTING_FORM)],
         key=lambda s: _sort_key_dt(s.get("_parsed_time")),
         reverse=True,
     )
@@ -1204,6 +1253,20 @@ async def get_production_dashboard(
             "submitted_by": sub.get("submitted_by_name", ""),
             "submission_id": sub.get("id", ""),
             "notes": notes,
+        })
+
+    waste_reporting_entries = []
+    for sub in waste_reporting_subs:
+        dt = sub.get("_parsed_time")
+        date_time_raw, waste_type, weight_kg = _extract_waste_reporting_fields(sub)
+        waste_reporting_entries.append({
+            "datetime": _serialize_datetime(dt) if dt else "",
+            "date_time_raw": date_time_raw,
+            "waste_type": waste_type,
+            "weight_kg": weight_kg if weight_kg is not None else 0,
+            "submitted_by": sub.get("submitted_by_name", ""),
+            "submission_id": sub.get("id", ""),
+            "prefill": _submission_prefill_by_field_id(sub),
         })
 
     # Waste calculation - only show reported waste; do not fabricate an estimate
@@ -1563,6 +1626,8 @@ async def get_production_dashboard(
         "big_bag_entries": big_bag_entries,
         "information_entries": information_entries,
         "end_of_shift_entries": end_of_shift_entries,
+        "waste_reporting_entries": waste_reporting_entries,
+        "waste_weight_threshold_kg": WASTE_ENTRY_WEIGHT_ALERT_KG,
         "screen_changes": [{"time": s.get("_parsed_time").strftime("%H:%M") if s.get("_parsed_time") else "", "datetime": s.get("_parsed_time").isoformat() if s.get("_parsed_time") else ""} for s in screen_change_subs],
         "magnet_cleanings": [{"time": s.get("_parsed_time").strftime("%H:%M") if s.get("_parsed_time") else "", "datetime": s.get("_parsed_time").isoformat() if s.get("_parsed_time") else ""} for s in magnet_subs],
         "actions": actions,
