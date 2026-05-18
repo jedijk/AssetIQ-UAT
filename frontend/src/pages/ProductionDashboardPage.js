@@ -1546,7 +1546,7 @@ export default function ProductionDashboardPage() {
               icon={FlaskConical}
               iconColor="bg-purple-50 text-purple-600"
               label="Avg Mooney"
-              value={kpis.avg_viscosity || "0"}
+              value={kpis.avg_viscosity ?? "0"}
               unit="MU"
               detail={`Range: ${kpis.viscosity_range || "55-60"}`}
               detail2={`${kpis.viscosity_sample_count || 0} samples`}

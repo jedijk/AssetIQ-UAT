@@ -164,6 +164,31 @@ def _envelope_windows(windows: List[Tuple[datetime, datetime]]) -> Tuple[datetim
     return min(w[0] for w in windows), max(w[1] for w in windows)
 
 
+def _calendar_day_in_envelope(
+    dt: Optional[datetime],
+    cal_env_start: datetime,
+    cal_env_end: datetime,
+) -> bool:
+    """True when dt's calendar day overlaps the dashboard date envelope (shift-agnostic)."""
+    if not isinstance(dt, datetime):
+        return False
+    try:
+        d0 = dt.date() if dt.tzinfo is None else dt.astimezone(timezone.utc).date()
+        return cal_env_start.date() <= d0 <= cal_env_end.date()
+    except Exception:
+        return False
+
+
+def _naive_shift_windows(windows: List[Tuple[datetime, datetime]]) -> List[Tuple[datetime, datetime]]:
+    """Strip tzinfo so operator wall-clock times match shift bounds stored as naive/UTC clock."""
+    out: List[Tuple[datetime, datetime]] = []
+    for ws, we in windows:
+        nws = ws.replace(tzinfo=None) if isinstance(ws, datetime) and ws.tzinfo else ws
+        nwe = we.replace(tzinfo=None) if isinstance(we, datetime) and we.tzinfo else we
+        out.append((nws, nwe))
+    return out
+
+
 def extract_field(submission, field_label):
     """Extract a value from a submission's values array by field_label or field_id (case-insensitive)."""
     target = field_label.strip().lower()
@@ -380,6 +405,10 @@ def _parse_sample_datetime(val):
         d = None
     if d is None:
         for fmt in (
+            "%Y-%m-%d",
+            "%d/%m/%Y",
+            "%d-%m-%Y",
+            "%d.%m.%Y",
             "%d/%m/%Y %H:%M",
             "%d-%m-%Y %H:%M",
             "%d.%m.%Y %H:%M",
@@ -867,22 +896,24 @@ async def get_production_dashboard(
 
         in_meta = _in_any_time_window(dt_meta, filter_windows)
         in_form = _in_any_time_window(dt_form, filter_windows) if dt_form else False
-        # Date-only Production Date parses as midnight and misses day/night shift windows;
-        # still include the row when the calendar day overlaps the dashboard range.
-        if is_bb and dt_form:
-            try:
-                d0 = dt_form.date() if dt_form.tzinfo is None else dt_form.astimezone(timezone.utc).date()
-                if cal_env_start.date() <= d0 <= cal_env_end.date():
-                    in_form = True
-            except Exception:
-                pass
-        if is_info and dt_form:
-            try:
-                d0 = dt_form.date() if dt_form.tzinfo is None else dt_form.astimezone(timezone.utc).date()
-                if cal_env_start.date() <= d0 <= cal_env_end.date():
-                    in_form = True
-            except Exception:
-                pass
+
+        # Big Bag: often no "Date & Time" — only Production Date and/or submitted_at.
+        # - Production Date may be date-only (midnight) and miss shift windows.
+        # - submitted_at is UTC while shifts are wall-clock; first load of the day (~06:00 local)
+        #   can be 04:00 UTC and fall outside a 06:00–14:00 UTC window unless we also match by day.
+        if is_bb:
+            if dt_form and not in_form and _calendar_day_in_envelope(dt_form, cal_env_start, cal_env_end):
+                in_form = True
+            if dt_meta and not in_meta:
+                dt_wall = dt_meta.replace(tzinfo=None) if dt_meta.tzinfo else dt_meta
+                if _in_any_time_window(dt_wall, _naive_shift_windows(filter_windows)):
+                    in_meta = True
+                elif _calendar_day_in_envelope(dt_meta, cal_env_start, cal_env_end):
+                    in_meta = True
+
+        if is_info and dt_form and not in_form:
+            if _calendar_day_in_envelope(dt_form, cal_env_start, cal_env_end):
+                in_form = True
 
         if not in_meta and not in_form:
             continue
@@ -896,6 +927,13 @@ async def get_production_dashboard(
         # Production log / charts use operator-entered sample time for extruder + Mooney when in-window.
         if _prefer_form_sample_time_for_row(sub) and dt_form is not None:
             sub["_parsed_time"] = dt_form
+        elif is_bb:
+            if dt_form is not None:
+                sub["_parsed_time"] = dt_form
+            elif dt_meta is not None:
+                sub["_parsed_time"] = dt_meta.replace(tzinfo=None) if dt_meta.tzinfo else dt_meta
+            else:
+                sub["_parsed_time"] = dt_meta
         else:
             sub["_parsed_time"] = dt_form if in_form else dt_meta
         submissions.append(sub)
@@ -1173,8 +1211,7 @@ async def get_production_dashboard(
     waste_pct = round((waste_kg / total_feed * 100), 2) if total_feed > 0 and waste_kg > 0 else 0
     yield_pct = round(100 - waste_pct, 2) if total_feed > 0 else 0
 
-    # Viscosity + chart series filled after form rows and ingested logs are merged (see below).
-    avg_viscosity = 0
+    # Viscosity KPIs filled after form rows and ingested logs are merged (see below).
     rsd = 0
     runtime_hours = 0.0
     waste_downtime_series = []
@@ -1426,8 +1463,12 @@ async def get_production_dashboard(
 
     production_log.sort(key=_parse_entry_dt)
     big_bag_entries.sort(key=_parse_entry_dt)
+
+    avg_viscosity = (
+        round(sum(viscosity_values) / len(viscosity_values), 2) if viscosity_values else 0
+    )
     if len(viscosity_values) > 1 and avg_viscosity > 0:
-        mean_v = sum(viscosity_values) / len(viscosity_values)
+        mean_v = avg_viscosity
         variance_v = sum((v - mean_v) ** 2 for v in viscosity_values) / (len(viscosity_values) - 1)
         rsd = round((variance_v ** 0.5 / mean_v) * 100, 2)
     else:
