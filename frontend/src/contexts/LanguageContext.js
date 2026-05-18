@@ -178,9 +178,9 @@ const en = {
 
   // Release / product announcements (toasts)
   announcements: {
-    liteModeTitle: "AssetIQ 3.6.9 — What's new",
+    liteModeTitle: "AssetIQ 3.7.0 — What's new",
     liteModeBody:
-      "Production overview: Morning, Afternoon, and Night shift windows; select multiple shifts together; your shifts, period, and custom date range are remembered on this device. Reliability fixes for production dashboard data and API loading.",
+      "Production dashboard: Waste reporting table and KPI; automatic Mooney pairing after entry; fixes for average Mooney, first big bag of the day, and numeric dates; updated Excel export with End of Shift and Waste sheets.",
   },
   
   // Common
@@ -1427,9 +1427,9 @@ const nl = {
   },
 
   announcements: {
-    liteModeTitle: "AssetIQ 3.6.9 — Wat is er nieuw",
+    liteModeTitle: "AssetIQ 3.7.0 — Wat is er nieuw",
     liteModeBody:
-      "Productieoverzicht: ochtend-, middag- en nachtdienstvensters; meerdere diensten tegelijk selecteren; uw diensten, periode en aangepaste datums worden op dit apparaat onthouden. Betrouwbaarheidsverbeteringen voor productiedashboardgegevens en API-laden.",
+      "Productiedashboard: afvalrapportagetabel en KPI; automatische Mooney-koppeling na invoer; oplossingen voor gemiddelde Mooney, eerste big bag van de dag en numerieke datums; bijgewerkte Excel-export met End of Shift- en Afvalbladen.",
   },
   
   // Common

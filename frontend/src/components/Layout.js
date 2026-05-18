@@ -16,7 +16,7 @@ import { useAutoEnableNotifications } from "../hooks/useAutoEnableNotifications"
 import { publicAssetUrl } from "../lib/assetUrl";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
-const APP_VERSION = process.env.REACT_APP_VERSION || "3.6.9";
+const APP_VERSION = process.env.REACT_APP_VERSION || "3.7.0";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
