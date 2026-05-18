@@ -214,7 +214,14 @@ export const AuthProvider = ({ children }) => {
       if (error.response?.status === 401) {
         throw new Error("Invalid email or password");
       } else if (error.response?.status === 429) {
-        throw new Error("Too many login attempts. Please try again later.");
+        const detail = error.response?.data?.detail;
+        let message = "Too many login attempts. Please try again later.";
+        if (typeof detail === "string") {
+          message = detail;
+        } else if (Array.isArray(detail) && detail.length > 0) {
+          message = detail.map((d) => (d?.msg ? d.msg : String(d))).join(" ");
+        }
+        throw new Error(message);
       } else if (!error.response) {
         // Network error - likely CORS or backend unreachable
         console.error("[Auth] Network error - check if backend is reachable and CORS is configured");

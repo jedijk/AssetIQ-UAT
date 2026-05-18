@@ -100,13 +100,18 @@ const LoginPage = () => {
       pendingLoginRef.current = null;
       
       let message = "Login failed. Please try again.";
-      if (error.response?.data?.detail) {
-        message = error.response.data.detail;
+      const detail = error.response?.data?.detail;
+      if (typeof detail === "string") {
+        message = detail;
+      } else if (Array.isArray(detail) && detail.length > 0) {
+        message = detail.map((d) => (d?.msg ? d.msg : String(d))).join(" ");
+      } else if (error.message) {
+        message = error.message;
       } else if (error.response?.status === 401) {
         message = "Invalid email or password.";
       }
-      
-      console.error("Login error:", error.response?.status, error.message);
+
+      console.error("Login error:", error.response?.status ?? "—", message);
       toast.error(message);
       return true; // Return true to stop retrying
     }
