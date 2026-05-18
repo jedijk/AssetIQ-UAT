@@ -240,6 +240,14 @@ function formTemplateFieldTypeKey(field) {
 const PRODUCTION_DASH_ACTION_EDIT = "p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors";
 const PRODUCTION_DASH_ACTION_DELETE = "p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors";
 
+/** Map form waste type values (e.g. cut_waste) to dashboard labels (Cut). */
+const formatWasteTypeLabel = (raw) => {
+  if (raw == null || raw === "") return "—";
+  const key = String(raw).trim().toLowerCase().replace(/\s+/g, "_");
+  const labels = { cut_waste: "Cut", production_waste: "Production" };
+  return labels[key] ?? String(raw).trim();
+};
+
 /** Waste reporting table — matches End of Shift panel styling. */
 function WasteReportingPanel({
   entries,
@@ -295,7 +303,7 @@ function WasteReportingPanel({
           if (row.submission_id) {
             setDeleteConfirm({
               ids: [row.submission_id],
-              label: `waste entry (${row.waste_type || displayDT || "item"})`,
+              label: `waste entry (${formatWasteTypeLabel(row.waste_type).replace(/^—$/, displayDT || "item")})`,
             });
           }
         }}
@@ -341,7 +349,7 @@ function WasteReportingPanel({
                       <span className="text-slate-500 tabular-nums shrink-0">{displayDT}</span>
                       {renderActions(row, i, displayDT)}
                     </div>
-                    <div className="mt-1 font-medium text-slate-800">{row.waste_type || "—"}</div>
+                    <div className="mt-1 font-medium text-slate-800">{formatWasteTypeLabel(row.waste_type)}</div>
                     <div className={`mt-0.5 tabular-nums font-medium ${isHigh ? "text-red-600" : "text-slate-700"}`}>
                       {weight.toLocaleString()} kg
                     </div>
@@ -367,7 +375,7 @@ function WasteReportingPanel({
                   return (
                     <tr key={row.submission_id || i} className="border-b border-slate-50 hover:bg-slate-50 group" data-testid={`waste-row-${i}`}>
                       <td className="py-1.5 px-1 text-slate-700 whitespace-nowrap tabular-nums">{displayDT}</td>
-                      <td className="py-1.5 px-1 text-slate-700">{row.waste_type || "—"}</td>
+                      <td className="py-1.5 px-1 text-slate-700">{formatWasteTypeLabel(row.waste_type)}</td>
                       <td className={`py-1.5 px-1 text-right tabular-nums font-medium ${isHigh ? "text-red-600" : "text-slate-700"}`}>
                         {weight.toLocaleString()}
                       </td>

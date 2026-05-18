@@ -114,6 +114,21 @@ def _waste_reporting_template_name_matches(name: Optional[Any]) -> bool:
     return ("waste" in tpl) and ("report" in tpl)
 
 
+def _format_waste_type_label(raw: Optional[Any]) -> str:
+    """Map stored waste type values to operator-friendly labels for the dashboard."""
+    if raw is None:
+        return ""
+    s = str(_unwrap_form_value(raw)).strip()
+    if not s:
+        return ""
+    key = re.sub(r"\s+", "_", s.lower())
+    labels = {
+        "cut_waste": "Cut",
+        "production_waste": "Production",
+    }
+    return labels.get(key, s)
+
+
 def _extract_waste_reporting_fields(sub: dict) -> Tuple[str, str, Optional[float]]:
     """Extract Date & Time, waste type label, and weight (kg) from a waste reporting submission."""
     date_time_raw = extract_field(sub, "Date & Time") or ""
@@ -121,7 +136,7 @@ def _extract_waste_reporting_fields(sub: dict) -> Tuple[str, str, Optional[float
     for label in ("Waste type", "Waste Type", "Waste category", "Category", "Type"):
         raw = extract_field(sub, label)
         if raw not in (None, ""):
-            waste_type = str(_unwrap_form_value(raw)).strip()
+            waste_type = _format_waste_type_label(raw)
             break
     weight_kg = None
     for label in ("Weight", "Weight (KG)", "Weight (kg)", "Weight kg", "Weight KG"):
