@@ -2190,15 +2190,15 @@ export default function ProductionDashboardPage() {
                     {sortedInformationEntries.map((row, i) => (
                       <div
                         key={row.submission_id || i}
-                        className={`p-3 rounded-lg border ${
+                        className={`p-2 rounded-lg border text-xs ${
                           row._informationPinned ? "bg-amber-50/50 border-amber-200 border-l-[3px] border-l-amber-400" : "bg-slate-50 border-slate-100"
                         }`}
                       >
-                        <p className="text-sm sm:text-[15px] text-slate-900 font-medium leading-relaxed break-words">
+                        <p className="text-slate-700 break-words leading-normal">
                           {row.text || "—"}
                         </p>
-                        <div className="mt-3 border-t border-slate-200/90 pt-2.5 flex flex-row flex-wrap items-center justify-between gap-x-2 gap-y-2">
-                          <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs text-slate-600">
+                        <div className="mt-1.5 border-t border-slate-200/90 pt-1.5 flex flex-row flex-wrap items-center justify-between gap-x-2 gap-y-2">
+                          <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5">
                             <span className="shrink-0 tabular-nums text-slate-500">
                               {(row.submitted_at || row.datetime)
                                 ? formatDateTimeCompact(row.submitted_at || row.datetime)
@@ -2207,7 +2207,7 @@ export default function ProductionDashboardPage() {
                             <span className="text-slate-300 select-none" aria-hidden>
                               ·
                             </span>
-                            <span className="min-w-0 font-medium text-slate-700">{row.submitted_by || "—"}</span>
+                            <span className="min-w-0 text-slate-700">{row.submitted_by || "—"}</span>
                           </div>
                           <div className="flex shrink-0 items-center justify-end gap-0.5">
                             {row.submission_id && (
