@@ -687,13 +687,14 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               return (
                 <div
                   key={action.id}
-                  className={`group flex items-start gap-3 p-3 rounded-lg border transition-all ${
+                  className={`group flex flex-col gap-2 p-3 rounded-lg border transition-all sm:flex-row sm:items-start sm:gap-3 ${
                     action.is_validated 
                       ? "bg-green-50 border-green-200" 
                       : `${statusCfg.bg} border-slate-200 hover:shadow-sm`
                   }`}
                   data-testid={`action-plan-item-${action.id}`}
                 >
+                  <div className="flex min-w-0 flex-1 items-start gap-3">
                   {/* Action Number & Type Badge */}
                   <div className="flex-shrink-0">
                     {typeStyle ? (
@@ -712,26 +713,40 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
 
                   {/* Content */}
                   <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/actions/${action.id}`)}>
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <div className="mb-1 flex flex-wrap items-center gap-x-1.5 gap-y-1">
                       {/* Action ID */}
                       {action.action_number && (
-                        <span className="text-[10px] font-mono font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                        <span className="shrink-0 text-[10px] font-mono font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                           {action.action_number}
                         </span>
                       )}
                       {/* Status Badge */}
-                      <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${statusCfg.bg} border`}>
+                      <div className={`flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 ${statusCfg.bg}`}>
                         <StatusIcon className={`w-3 h-3 ${statusCfg.color}`} />
                         <span className={`text-[10px] font-medium ${statusCfg.color}`}>{statusCfg.label}</span>
                       </div>
                       {action.discipline && (
-                        <span className="text-[10px] text-slate-400">{action.discipline}</span>
+                        <span className="shrink-0 text-[10px] text-slate-400">{action.discipline}</span>
                       )}
                       {/* Validation Badge */}
                       {action.is_validated && (
-                        <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px] px-1.5">
+                        <Badge className="shrink-0 bg-green-100 text-green-700 border-green-200 text-[10px] px-1.5">
                           <ShieldCheck className="w-3 h-3 mr-0.5" />
                           Validated
+                        </Badge>
+                      )}
+                      {action.priority && (
+                        <Badge
+                          variant="outline"
+                          className={`shrink-0 text-[10px] ${
+                            action.priority === "high"
+                              ? "border-red-300 text-red-600"
+                              : action.priority === "medium"
+                                ? "border-amber-300 text-amber-600"
+                                : "border-slate-300 text-slate-600"
+                          }`}
+                        >
+                          {action.priority}
                         </Badge>
                       )}
                     </div>
@@ -746,29 +761,18 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                       <p className="text-[10px] text-slate-400 mt-1">Owner: {action.owner}</p>
                     )}
                   </div>
+                  </div>
 
                   {/* Actions Column */}
-                  <div className="flex-shrink-0 flex flex-col items-end gap-1">
+                  <div className="flex w-full flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-2 pl-11 sm:w-auto sm:flex-shrink-0 sm:flex-col sm:items-end sm:gap-1 sm:border-t-0 sm:pt-0 sm:pl-0">
                     {action.due_date && (
-                      <p className="text-[10px] text-slate-500">
+                      <p className="shrink-0 text-[10px] text-slate-500">
                         Due: {formatDate(action.due_date)}
                       </p>
                     )}
-                    {action.priority && (
-                      <Badge 
-                        variant="outline" 
-                        className={`text-[10px] ${
-                          action.priority === 'high' ? 'border-red-300 text-red-600' :
-                          action.priority === 'medium' ? 'border-amber-300 text-amber-600' :
-                          'border-slate-300 text-slate-600'
-                        }`}
-                      >
-                        {action.priority}
-                      </Badge>
-                    )}
-                    
+
                     {/* Edit & Delete Buttons */}
-                    <div className="flex items-center gap-1 mt-1">
+                    <div className="flex items-center gap-1">
                       <Button
                         variant="ghost"
                         size="sm"

@@ -54,8 +54,10 @@ export function VirtualList({
 
   const safeData = Array.isArray(data) ? data : [];
 
+  const scrollClassName = className ? `${className} overflow-y-auto` : "overflow-y-auto";
+
   const fallback = (
-    <div className={className}>
+    <div className={scrollClassName}>
       {safeData.map((item, idx) => (
         <React.Fragment key={item?.id ?? item?._id ?? idx}>
           {itemContent(idx, item)}
@@ -81,7 +83,7 @@ export function VirtualList({
 
   return (
     <VirtuosoErrorBoundary fallback={fallback}>
-      <div className={className}>
+      <div className={scrollClassName}>
         <Virtuoso {...virtuosoProps} />
       </div>
     </VirtuosoErrorBoundary>
