@@ -61,6 +61,11 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import { cn } from "../../lib/utils";
+import {
+  getDatePlausibilityIssue,
+  isImplausibleFormDate,
+  snapFormDateToToday,
+} from "../../lib/datePlausibility";
 import { SignaturePad } from "../ui/signature-pad";
 import { VoiceInput } from "../ui/voice-input";
 import { useIsMobile } from "../../hooks/useIsMobile";
@@ -264,12 +269,26 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
   const [aiFilledFields, setAiFilledFields] = useState({});
   const [aiCorrections, setAiCorrections] = useState({});
   const [extractionImageData, setExtractionImageData] = useState(null);
+  const expandTwoDigitYear = (y, month, day, ref = new Date()) => {
+    if (y >= 100) return y;
+    const base = Math.floor(ref.getFullYear() / 100) * 100;
+    const candidates = [base + y, base - 100 + y, base + 100 + y];
+    const dist = (yr) => {
+      const d = new Date(yr, month - 1, day);
+      return isNaN(d.getTime()) ? Infinity : Math.abs(d - ref);
+    };
+    return candidates.reduce((best, cand) => (dist(cand) < dist(best) ? cand : best));
+  };
+
   const handlePhotoAutoFill = (fills, imageBase64) => {
     console.log("[TaskExec] handlePhotoAutoFill called with", Object.keys(fills).length, "fills:", fills);
     const newData = { ...formData };
     const filled = {};
+    const captureRef = new Date();
     for (const [fieldId, info] of Object.entries(fills)) {
       let val = info.value;
+      let dateAdjusted = info.date_adjusted === true;
+      let confidence = info.confidence;
       // Convert datetime strings for datetime form fields
       const formField = formFields.find(f => f.id === fieldId);
       if (formField) {
@@ -307,9 +326,11 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
             // DD-MM-YYYY / DD/MM/YYYY / DD.MM.YYYY
             m = str.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
             if (m) {
-              let y = parseInt(m[3]);
-              if (y < 100) y += 2000;
-              val = `${y}-${pad(parseInt(m[2]))}-${pad(parseInt(m[1]))}`;
+              const mo = parseInt(m[2], 10);
+              const d = parseInt(m[1], 10);
+              let y = parseInt(m[3], 10);
+              if (y < 100) y = expandTwoDigitYear(y, mo, d, captureRef);
+              val = `${y}-${pad(mo)}-${pad(d)}`;
             } else {
               // Fallback to Date parser (handles "July 21 2024" etc.)
               const d = new Date(str);
@@ -323,9 +344,16 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
           const num = parseFloat(String(val).replace(/[^0-9.\-]/g, ""));
           if (!isNaN(num)) val = num;
         }
+        if ((ft === "date" || ft === "datetime") && val != null && isImplausibleFormDate(val, ft, { referenceDate: captureRef })) {
+          const snapped = snapFormDateToToday(val, ft, captureRef);
+          console.warn(`[TaskExec] Implausible AI date for "${fieldId}": ${val} → ${snapped}`);
+          val = snapped;
+          dateAdjusted = true;
+          confidence = Math.min(typeof confidence === "number" ? confidence : 0.5, 0.25);
+        }
       }
       newData[fieldId] = val;
-      filled[fieldId] = { ...info, value: val };
+      filled[fieldId] = { ...info, value: val, date_adjusted: dateAdjusted, confidence };
       console.log(`[TaskExec] Fill field="${fieldId}" formField=${formField?.label || 'NOT FOUND'} val=${val}`);
     }
     setFormData(newData);
@@ -363,8 +391,16 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
   const validateForm = () => {
     const errors = {};
     formFields.forEach(field => {
+      const fieldType = field.type || field.field_type;
       if (field.required && !formData[field.id] && formData[field.id] !== false && formData[field.id] !== 0) {
         errors[field.id] = "This field is required";
+      }
+      if ((fieldType === "date" || fieldType === "datetime") && formData[field.id]) {
+        const issue = getDatePlausibilityIssue(formData[field.id], fieldType);
+        if (issue?.implausible) {
+          errors[field.id] =
+            `This date (${issue.parsedYear}) looks wrong — expected around ${issue.referenceYear}. Please correct it.`;
+        }
       }
     });
     setValidationErrors(errors);
@@ -511,14 +547,34 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
     const aiInfo = aiFilledFields[field.id];
     const corrected = aiCorrections[field.id];
     const confThreshold = photoExtractionConfig?.confidence_threshold ?? 0.7;
+    const datePlausibilityIssue =
+      (fieldType === "date" || fieldType === "datetime") && value
+        ? getDatePlausibilityIssue(value, fieldType)
+        : null;
+    const dateLooksWrong = datePlausibilityIssue?.implausible === true;
+    const dateHighlightClass =
+      (aiInfo?.date_adjusted && !corrected) || dateLooksWrong
+        ? "ring-2 ring-red-400 border-red-400 bg-red-50/60"
+        : "";
 
     // AI confidence badge for fields filled by photo extraction
     const AiBadge = () => {
-      if (!aiInfo) return null;
-      const conf = aiInfo.confidence;
-      const dateAdjusted = aiInfo.date_adjusted === true;
-      const isLow = conf < confThreshold || dateAdjusted;
+      if (!aiInfo && !dateLooksWrong) return null;
+      const conf = aiInfo?.confidence;
+      const dateAdjusted = aiInfo?.date_adjusted === true;
+      const isLow = aiInfo && (conf < confThreshold || dateAdjusted);
       const wasCorrected = !!corrected;
+      if (dateLooksWrong && !wasCorrected) {
+        return (
+          <span
+            className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ml-1.5 bg-red-100 text-red-800 ring-1 ring-red-300"
+            data-testid={`date-warning-badge-${field.id}`}
+          >
+            Wrong year — check date ({datePlausibilityIssue.parsedYear})
+          </span>
+        );
+      }
+      if (!aiInfo) return null;
       return (
         <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full ml-1.5 ${
           wasCorrected ? "bg-blue-100 text-blue-700" :
@@ -529,7 +585,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
           {wasCorrected
             ? "Corrected"
             : dateAdjusted
-              ? `AI date corrected — low accuracy (${Math.round(conf * 100)}%)`
+              ? `AI date corrected — verify (${Math.round(conf * 100)}%)`
               : isLow
                 ? `AI ${Math.round(conf * 100)}%`
                 : `AI ${Math.round(conf * 100)}%`}
@@ -845,10 +901,15 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
               className={cn(
                 mobileInputClass,
                 hasError && "border-red-500",
-                aiInfo?.date_adjusted && !corrected && "ring-2 ring-red-300 border-red-300 bg-red-50/40"
+                dateHighlightClass
               )}
             />
             {hasError && <p className="text-xs text-red-600">{hasError}</p>}
+            {!hasError && dateLooksWrong && (
+              <p className="text-xs text-red-600 font-medium">
+                This date is far from today — it may be an OCR error. Please fix before submitting.
+              </p>
+            )}
           </div>
         );
       
@@ -879,10 +940,15 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
               className={cn(
                 mobileInputClass,
                 hasError && "border-red-500",
-                aiInfo?.date_adjusted && !corrected && "ring-2 ring-red-300 border-red-300 bg-red-50/40"
+                dateHighlightClass
               )}
             />
             {hasError && <p className="text-xs text-red-600">{hasError}</p>}
+            {!hasError && dateLooksWrong && (
+              <p className="text-xs text-red-600 font-medium">
+                This date is far from today — it may be an OCR error. Please fix before submitting.
+              </p>
+            )}
           </div>
         );
       

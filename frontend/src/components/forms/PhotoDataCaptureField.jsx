@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { Camera, Loader2, CheckCircle, AlertTriangle, RotateCcw, X } from "lucide-react";
+import { isImplausibleFormDate } from "../../lib/datePlausibility";
 import { Button } from "../ui/button";
 import { getApiUrl } from "../../lib/apiConfig";
 import { compressImage } from "../../lib/imageCompression";
@@ -222,6 +223,41 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
 
           {preview && (
             <img src={preview} alt="Captured" className="w-full max-h-32 object-contain rounded-lg border" />
+          )}
+
+          {results.some((r) => r.date_adjusted) && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+              <div className="flex items-start gap-2 font-medium">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>One or more dates looked wrong on the photo and were set to today. Please verify before submitting.</span>
+              </div>
+            </div>
+          )}
+
+          {results.length > 0 && (
+            <ul className="space-y-1 text-xs">
+              {results.filter((r) => r.value != null).map((r) => {
+                const cfg = (config.extraction_fields || []).find(
+                  (f) => f.key === r.key || String(f.key).toLowerCase().replace(/[^a-z0-9]/g, "") === String(r.key).toLowerCase().replace(/[^a-z0-9]/g, "")
+                );
+                const ft = cfg?.type || "string";
+                const farOff = (ft === "date" || ft === "datetime") && isImplausibleFormDate(r.value, ft);
+                const warn = r.date_adjusted || farOff;
+                if (!warn) return null;
+                return (
+                  <li
+                    key={r.key}
+                    className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-red-800"
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      <strong>{r.key}:</strong> {String(r.value)}
+                      {r.date_adjusted ? " (adjusted to capture date)" : " (year looks wrong — verify)"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
       )}

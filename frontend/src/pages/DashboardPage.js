@@ -1332,12 +1332,15 @@ export default function DashboardPage({ initialTab }) {
           items={recentSubmissions.sort((a, b) => new Date(b.submitted_at || b.created_at) - new Date(a.submitted_at || a.created_at))}
           emptyMessage={t("dashboard.noFormSubmissions") || "No form submissions yet"}
           clickable={true}
-          onClick={() => navigate("/forms", { state: { ...navState, tab: "submissions" } })}
+          onClick={() => navigate("/form-submissions", { state: navState })}
           renderItem={(item, idx) => (
             <div 
               key={item.id || `submission-${idx}`} 
               className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
-              onClick={(e) => { e.stopPropagation(); handleQuickViewClick(item); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate("/form-submissions", { state: { ...navState, submissionId: item.id } });
+              }}
               data-testid={`form-submission-item-${item.id}`}
             >
               <UserAvatar 

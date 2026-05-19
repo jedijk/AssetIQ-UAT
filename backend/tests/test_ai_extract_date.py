@@ -1,5 +1,11 @@
 """Regression tests for AI photo extraction date normalization."""
-from routes.ai_extract import _normalize_date_value
+from datetime import datetime, timezone
+
+from routes.ai_extract import (
+    _calibrate_date_value_to_capture,
+    _expand_two_digit_year,
+    _normalize_date_value,
+)
 
 
 def test_iso_date_passthrough():
@@ -48,3 +54,25 @@ def test_empty():
 
 def test_invalid():
     assert _normalize_date_value("invalid", "date") is None
+
+
+def test_two_digit_year_near_capture_not_2016():
+    ref = datetime(2026, 5, 19, tzinfo=timezone.utc).date()
+    assert _normalize_date_value("19-05-16", "date", ref) == "2026-05-19"
+    assert _expand_two_digit_year(16, 5, 19, ref) == 2026
+
+
+def test_calibrate_year_mismatch_snaps_to_capture():
+    ref = datetime(2026, 5, 19, 12, 0, tzinfo=timezone.utc)
+    value, conf, adjusted = _calibrate_date_value_to_capture("2016-05-18", "date", ref, 0.9)
+    assert adjusted is True
+    assert value == "2026-05-19"
+    assert conf <= 0.28
+
+
+def test_calibrate_plausible_date_unchanged():
+    ref = datetime(2026, 5, 19, 12, 0, tzinfo=timezone.utc)
+    value, conf, adjusted = _calibrate_date_value_to_capture("2026-05-10", "date", ref, 0.9)
+    assert adjusted is False
+    assert value == "2026-05-10"
+    assert conf == 0.9

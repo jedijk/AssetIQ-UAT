@@ -112,28 +112,49 @@ _DUTCH_MONTHS = {
 }
 
 
-def _normalize_date_value(raw: str, kind: str = "date") -> Optional[str]:
+def _expand_two_digit_year(y: int, month: int, day: int, ref: date) -> int:
+    """Pick 19xx/20xx/21xx so the calendar date is closest to the capture/reference day."""
+    if y >= 100:
+        return y
+    base = (ref.year // 100) * 100
+    candidates = [base + y, base - 100 + y, base + 100 + y]
+
+    def distance(yr: int) -> int:
+        try:
+            return abs((date(yr, month, day) - ref).days)
+        except ValueError:
+            return 10**9
+
+    return min(candidates, key=distance)
+
+
+def _normalize_date_value(
+    raw: str,
+    kind: str = "date",
+    ref_date: Optional[date] = None,
+) -> Optional[str]:
     """Safety-net normalizer for AI-returned date/datetime strings.
     Returns ISO (YYYY-MM-DD or YYYY-MM-DDTHH:MM) or None if unparseable.
     """
     if not raw:
         return None
     s = raw.strip()
+    ref = ref_date or datetime.now(timezone.utc).date()
 
     # Already ISO date
     m = re.match(r"^(\d{4})[-/.](\d{2})[-/.](\d{2})(?:[T ](\d{1,2}):(\d{2}))?", s)
     if m:
-        y, mo, d = m.group(1), m.group(2), m.group(3)
+        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
         if kind == "datetime" and m.group(4):
-            return f"{y}-{mo}-{d}T{int(m.group(4)):02d}:{m.group(5)}"
-        return f"{y}-{mo}-{d}" if kind == "date" else f"{y}-{mo}-{d}T00:00"
+            return f"{y:04d}-{mo:02d}-{d:02d}T{int(m.group(4)):02d}:{m.group(5)}"
+        return f"{y:04d}-{mo:02d}-{d:02d}" if kind == "date" else f"{y:04d}-{mo:02d}-{d:02d}T00:00"
 
     # DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY (optional time)
     m = re.match(r"^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?", s)
     if m:
         d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
         if y < 100:
-            y += 2000
+            y = _expand_two_digit_year(y, mo, d, ref)
         if 1 <= d <= 31 and 1 <= mo <= 12:
             base = f"{y:04d}-{mo:02d}-{d:02d}"
             if kind == "datetime":
@@ -148,9 +169,9 @@ def _normalize_date_value(raw: str, kind: str = "date") -> Optional[str]:
         d = int(m.group(1))
         mo = _DUTCH_MONTHS.get(m.group(2).lower())
         y = int(m.group(3))
-        if y < 100:
-            y += 2000
         if mo and 1 <= d <= 31:
+            if y < 100:
+                y = _expand_two_digit_year(y, mo, d, ref)
             base = f"{y:04d}-{mo:02d}-{d:02d}"
             return base if kind == "date" else f"{base}T00:00"
     return None
@@ -191,11 +212,11 @@ def _calibrate_date_value_to_capture(
     """
     if value is None or field_type not in ("date", "datetime"):
         return value, confidence, False
-    normalized = _normalize_date_value(str(value).strip(), field_type)
-    if not normalized:
-        return value, confidence, False
 
     ref_cal: date = ref_utc.date()
+    normalized = _normalize_date_value(str(value).strip(), field_type, ref_cal)
+    if not normalized:
+        return value, confidence, False
     time_part: time = time(0, 0)
     try:
         if field_type == "date":
@@ -330,6 +351,8 @@ async def extract_from_image(
     # This ensures date/datetime fields get proper formatting hints even when
     # the saved extraction config still has type="string" from older configs.
     form_template_doc = None
+    form_fields_by_id: Dict[str, Any] = {}
+    saved_fields_by_key: Dict[str, Any] = {}
     if form_template_id:
         try:
             form_template_doc = await db.form_templates.find_one(
@@ -444,17 +467,31 @@ async def extract_from_image(
             conf = float(item.get("confidence", 0))
             matched_schema_field = schema_fields.get(matched_key)
             date_adjusted = False
-            if value and matched_schema_field and matched_schema_field.type in ("date", "datetime"):
-                normalized = _normalize_date_value(str(value), matched_schema_field.type)
+            effective_date_type = None
+            if matched_schema_field:
+                effective_date_type = matched_schema_field.type
+                if form_template_doc:
+                    saved = saved_fields_by_key.get(matched_key) if form_template_id else None
+                    target_id = saved.get("target_field_id") if saved else None
+                    form_field = form_fields_by_id.get(target_id) if target_id else None
+                    if form_field:
+                        ft = form_field.get("field_type") or form_field.get("type")
+                        if ft in ("date", "datetime"):
+                            effective_date_type = ft
+            if value and effective_date_type in ("date", "datetime"):
+                normalized = _normalize_date_value(str(value), effective_date_type, ref_utc.date())
                 if normalized and normalized != value:
-                    logger.info(f"[AI Extract] Normalized {matched_schema_field.type} value for '{matched_key}': '{value}' → '{normalized}'")
+                    logger.info(
+                        f"[AI Extract] Normalized {effective_date_type} value for '{matched_key}': "
+                        f"'{value}' → '{normalized}'"
+                    )
                     value = normalized
                 value, conf, date_adjusted = _calibrate_date_value_to_capture(
-                    value, matched_schema_field.type, ref_utc, conf
+                    value, effective_date_type, ref_utc, conf
                 )
                 if date_adjusted:
                     logger.info(
-                        f"[AI Extract] Calibrated {matched_schema_field.type} for '{matched_key}' to capture date "
+                        f"[AI Extract] Calibrated {effective_date_type} for '{matched_key}' to capture date "
                         f"(confidence→{conf:.2f})"
                     )
 

@@ -324,35 +324,45 @@ function WasteReportingPanel({
           {entries?.length > 0 && (
             <Badge variant="secondary" className="text-xs">{entries.length}</Badge>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 gap-1 text-xs"
-            onClick={openAdd}
-            data-testid="waste-reporting-add-btn"
-          >
-            <Plus className="w-3 h-3" /> Add
-          </Button>
+          {!isMobile && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1 text-xs"
+              onClick={openAdd}
+              data-testid="waste-reporting-add-btn"
+            >
+              <Plus className="w-3 h-3" /> Add
+            </Button>
+          )}
         </div>
       </div>
       <div className="max-h-[240px] overflow-y-auto">
         {entries?.length > 0 ? (
           isMobile ? (
-            <div className="space-y-2">
+            <div className="space-y-1">
               {entries.map((row, i) => {
                 const weight = Number(row.weight_kg ?? 0);
                 const isHigh = weight >= thresholdKg;
                 const displayDT = formatDateTimeCompact(row.datetime || row.date_time_raw);
                 return (
-                  <div key={row.submission_id || i} className="p-2 rounded-lg bg-slate-50 border border-slate-100 text-xs">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-slate-500 tabular-nums shrink-0">{displayDT}</span>
-                      {renderActions(row, i, displayDT)}
+                  <div
+                    key={row.submission_id || i}
+                    className="flex items-center gap-1.5 rounded-md border border-slate-100 bg-slate-50 py-1 px-2 text-[11px] leading-tight"
+                    data-testid={`waste-row-${i}`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0">
+                        <span className="shrink-0 tabular-nums text-[10px] text-slate-500">{displayDT}</span>
+                        <span className="font-medium text-slate-800">{formatWasteTypeLabel(row.waste_type)}</span>
+                        <span
+                          className={`shrink-0 tabular-nums font-medium ${isHigh ? "text-red-600" : "text-slate-700"}`}
+                        >
+                          {weight.toLocaleString()} kg
+                        </span>
+                      </div>
                     </div>
-                    <div className="mt-1 font-medium text-slate-800">{formatWasteTypeLabel(row.waste_type)}</div>
-                    <div className={`mt-0.5 tabular-nums font-medium ${isHigh ? "text-red-600" : "text-slate-700"}`}>
-                      {weight.toLocaleString()} kg
-                    </div>
+                    {renderActions(row, i, displayDT)}
                   </div>
                 );
               })}
