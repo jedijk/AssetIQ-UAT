@@ -48,7 +48,6 @@ import {
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Badge } from "../components/ui/badge";
-import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import {
   Select,
   SelectContent,
@@ -485,7 +484,6 @@ export default function FormSubmissionsPage() {
       hasWarnings: statusFilter === "warnings",
       hasCritical: statusFilter === "critical",
     }),
-    enabled: !isMobile, // Don't fetch on mobile
     staleTime: 30000, // Cache for 30 seconds to prevent excessive refetching
     gcTime: 60000, // Keep in cache for 1 minute
   });

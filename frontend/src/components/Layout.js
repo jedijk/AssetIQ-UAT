@@ -677,7 +677,7 @@ const Layout = () => {
     { path: "/actions", label: t("nav.actions"), icon: ClipboardList, feature: "actions" },
     { path: "/my-tasks", label: t("nav.myTasks"), icon: ClipboardCheck, feature: "tasks" },
     { path: "/tasks", label: t("nav.taskScheduler"), icon: Calendar, desktopOnly: true, feature: "tasks" },
-    { path: "/form-submissions", label: t("nav.formSubmissions"), icon: FileText, desktopOnly: true, feature: "forms" },
+    { path: "/form-submissions", label: t("nav.formSubmissions"), icon: FileText, feature: "forms" },
     { path: "/library", label: t("nav.library"), icon: BookOpen, desktopOnly: true, feature: "library" },
   ];
   
