@@ -178,9 +178,9 @@ const en = {
 
   // Release / product announcements (toasts)
   announcements: {
-    liteModeTitle: "AssetIQ 3.7.0 — What's new",
+    liteModeTitle: "AssetIQ 3.7.1 — What's new",
     liteModeBody:
-      "Production dashboard: Waste reporting table and KPI; automatic Mooney pairing after entry; fixes for average Mooney, first big bag of the day, and numeric dates; updated Excel export with End of Shift and Waste sheets.",
+      "AI photo capture warns on wrong dates and blocks far-off years on submit. Ops dashboard submissions open Reports. Mobile: Reports scrolling, compact waste list, waste Add on desktop only. Clearer login message when temporarily locked out.",
   },
   
   // Common
@@ -1427,9 +1427,9 @@ const nl = {
   },
 
   announcements: {
-    liteModeTitle: "AssetIQ 3.7.0 — Wat is er nieuw",
+    liteModeTitle: "AssetIQ 3.7.1 — Wat is er nieuw",
     liteModeBody:
-      "Productiedashboard: afvalrapportagetabel en KPI; automatische Mooney-koppeling na invoer; oplossingen voor gemiddelde Mooney, eerste big bag van de dag en numerieke datums; bijgewerkte Excel-export met End of Shift- en Afvalbladen.",
+      "AI-foto: waarschuwing bij verkeerde datums en blokkade van jaartallen ver van vandaag. Ops-dashboard: inzendingen openen Rapporten. Mobiel: scroll in Rapporten, compacte afvallijst, Afval toevoegen alleen op desktop. Duidelijker loginbericht bij tijdelijke blokkade.",
   },
   
   // Common

@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 
-const RELEASE_TOAST_VERSION = process.env.REACT_APP_VERSION || "3.7.0";
+const RELEASE_TOAST_VERSION = process.env.REACT_APP_VERSION || "3.7.1";
 const STORAGE_KEY = `assetiq_announced_lite_mode_${RELEASE_TOAST_VERSION}`;
 
 /**
