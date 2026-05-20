@@ -176,5 +176,39 @@ export const investigationAPI = {
     const response = await api.get(`/investigations/${investigationId}/ai-summary`);
     return response.data;
   },
+
+  // AI Problem Check - analyze description for defensive/solution reasoning
+  aiProblemCheck: async (investigationId, description) => {
+    const response = await api.post(`/investigations/${investigationId}/ai-problem-check`, {
+      description,
+    });
+    return response.data;
+  },
+
+  // Recurring Issue Management
+  getSimilarIncidents: async (investigationId) => {
+    const response = await api.get(`/investigations/${investigationId}/similar-incidents`);
+    return response.data;
+  },
+
+  getLinkedIncident: async (investigationId) => {
+    const response = await api.get(`/investigations/${investigationId}/linked-incident`);
+    return response.data;
+  },
+
+  updateRecurringQuadrant: async (investigationId, quadrantData) => {
+    const response = await api.patch(`/investigations/${investigationId}/recurring-quadrant`, quadrantData);
+    return response.data;
+  },
+
+  linkIncident: async (investigationId, linkedIncidentId) => {
+    const response = await api.patch(`/investigations/${investigationId}/link-incident?linked_incident_id=${linkedIncidentId}`);
+    return response.data;
+  },
+
+  unlinkIncident: async (investigationId) => {
+    const response = await api.delete(`/investigations/${investigationId}/link-incident`);
+    return response.data;
+  },
 };
 

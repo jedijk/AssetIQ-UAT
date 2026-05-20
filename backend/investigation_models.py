@@ -4,7 +4,7 @@ Based on ISO-style structured investigation methodology
 """
 
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict
 from enum import Enum
 from datetime import datetime
 
@@ -58,6 +58,14 @@ class InvestigationStatus(str, Enum):
 
 # ============= Request/Response Models =============
 
+class RecurringQuadrantData(BaseModel):
+    """Data structure for IS/IS NOT quadrant analysis of recurring issues."""
+    current_is: List[str] = Field(default_factory=list)  # Context true for current incident
+    current_is_not: List[str] = Field(default_factory=list)  # Context NOT true for current incident
+    past_was: List[str] = Field(default_factory=list)  # Context true for past incident
+    past_was_not: List[str] = Field(default_factory=list)  # Context NOT true for past incident
+
+
 class InvestigationCreate(BaseModel):
     title: str
     description: str
@@ -69,6 +77,8 @@ class InvestigationCreate(BaseModel):
     team_members: List[str] = Field(default_factory=list)
     threat_id: Optional[str] = None  # Link to originating threat
     notes: Optional[str] = None  # General investigation notes/comments
+    is_recurring: bool = False  # Flag for recurring issues
+    linked_incident_id: Optional[str] = None  # Link to previous similar incident
 
 
 class InvestigationUpdate(BaseModel):
@@ -82,6 +92,9 @@ class InvestigationUpdate(BaseModel):
     team_members: Optional[List[str]] = None
     status: Optional[InvestigationStatus] = None
     notes: Optional[str] = None  # General investigation notes/comments
+    is_recurring: Optional[bool] = None  # Flag for recurring issues
+    linked_incident_id: Optional[str] = None  # Link to previous similar incident
+    recurring_quadrant: Optional[RecurringQuadrantData] = None  # IS/IS NOT quadrant data
 
 
 class TimelineEventCreate(BaseModel):

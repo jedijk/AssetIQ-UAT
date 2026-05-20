@@ -102,47 +102,133 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Time in production dashboard not aligned with submission date time - appears 2 hours off (UTC+2 timezone issue)"
+user_problem_statement: "Implement 3 features: 1) AI Problem Check for investigation descriptions, 2) Recurring Issue IS/IS NOT Quadrant analysis, 3) Mobile web app flickering debugging instrumentation"
 
 backend:
-  - task: "Production dashboard API returns datetime in UTC"
+  - task: "AI Problem Check API endpoint"
     implemented: true
     working: true
-    file: "/app/backend/routes/production.py"
+    file: "/app/backend/routes/investigations.py"
     stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
-      - working: true
+      - working: "NA"
         agent: "main"
-        comment: "Backend correctly sends datetime field with full ISO timestamp in UTC. The time field was pre-formatted in UTC which caused the issue."
+        comment: "Implemented POST /investigations/{inv_id}/ai-problem-check endpoint. Uses GPT-4o-mini to analyze descriptions for defensive reasoning, solution reasoning, and clarity issues. Returns refined description with analysis."
+      - working: true
+        agent: "testing"
+        comment: "✓ PASSED - All tests successful. Tested: 1) Valid request with defensive reasoning - correctly identifies issues and returns refined description with analysis, has_issues, and changes_made. 2) Empty description validation - correctly returns 400 error. 3) Invalid investigation ID - correctly returns 404. AI analysis working correctly with GPT-4o-mini integration."
+
+  - task: "Recurring Issue Detection and Management"
+    implemented: true
+    working: true
+    file: "/app/backend/routes/investigations.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added is_recurring and linked_incident_id fields to investigation model. Auto-detects similar incidents on creation. Added endpoints: GET similar-incidents, GET linked-incident, PATCH recurring-quadrant, PATCH/DELETE link-incident."
+      - working: true
+        agent: "testing"
+        comment: "✓ PASSED - All endpoints working correctly. Tested: 1) GET similar-incidents - returns found boolean and similar_incidents array. 2) GET linked-incident - returns linked_incident (null when no link exists). 3) PATCH recurring-quadrant - successfully saves quadrant data with current_is, current_is_not, past_was, past_was_not fields and persists correctly. 4) PATCH link-incident - successfully links investigations and sets is_recurring flag. 5) DELETE link-incident - successfully removes link and clears recurring data. All data persistence verified."
+
+  - task: "Investigation Model Updates"
+    implemented: true
+    working: true
+    file: "/app/backend/investigation_models.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added RecurringQuadrantData model, is_recurring bool, linked_incident_id optional str, and recurring_quadrant optional dict to InvestigationCreate/Update models."
+      - working: true
+        agent: "testing"
+        comment: "✓ PASSED - Model updates working correctly. RecurringQuadrantData model properly defined with all required fields. Investigation model correctly accepts and stores is_recurring, linked_incident_id, and recurring_quadrant data. All fields validated through API testing."
 
 frontend:
-  - task: "Production dashboard time display in local timezone"
+  - task: "AI Problem Check Modal Component"
     implemented: true
-    working: true
-    file: "/app/frontend/src/pages/ProductionDashboardPage.js"
+    working: "NA"
+    file: "/app/frontend/src/components/causal-engine/AIProblemCheckModal.jsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
-      - working: true
+      - working: "NA"
         agent: "main"
-        comment: "Fixed getTimeKey and added getLocalTime helper to convert datetime from UTC to user's browser local timezone. Updated combinedSeries, viscosityByTime, filteredLog, and Excel export to use local time."
+        comment: "Created new modal component. Shows AI analysis of description (defensive/solution reasoning, clarity issues). Allows Accept & Inject, Edit First, or Reject actions. Keeps original description until user confirms."
+
+  - task: "Recurring Issue Quadrant Component"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/causal-engine/RecurringIssueQuadrant.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Created collapsible quadrant component with 4 cells (Current IS/IS NOT, Past WAS/WAS NOT). Auto-saves changes. Shows only when is_recurring or linked_incident_id exists. Includes incident linking UI."
+
+  - task: "CausalEnginePage Integration"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/CausalEnginePage.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Integrated AI Problem Check button next to description text. Added RecurringIssueQuadrant below Quick Actions. Added modal state and handler for description update."
+
+  - task: "Investigation API Client Updates"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/lib/apis/investigations.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added aiProblemCheck, getSimilarIncidents, getLinkedIncident, updateRecurringQuadrant, linkIncident, unlinkIncident methods."
+
+  - task: "Mobile Debug Instrumentation"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/lib/debug.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Enhanced debug.js with FPS monitoring, render tracking, timer tracking, state change logging, rapid render detection, long task monitoring. Added captureFlickerSnapshot function. All opt-in via REACT_APP_DEBUG=true."
 
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 1
+  test_sequence: 3
   run_ui: false
 
 test_plan:
   current_focus:
-    - "Production dashboard time display"
+    - "AI Problem Check API endpoint"
+    - "Recurring Issue Detection and Management"
+    - "AI Problem Check Modal Component"
+    - "Recurring Issue Quadrant Component"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
   - agent: "main"
-    message: "Fixed timezone issue in Production Dashboard. The time column now displays times in user's browser local timezone instead of UTC. Changes made to ProductionDashboardPage.js - updated getTimeKey function and added getLocalTime helper to properly convert UTC datetime to local time."
+    message: "Implemented all 3 requested features: 1) AI Problem Check with backend endpoint and frontend modal - analyzes descriptions for defensive/solution reasoning and clarity, 2) Recurring Issue IS/IS NOT Quadrant - auto-detects similar incidents, allows linking, and provides 4-quadrant comparison UI, 3) Mobile debug instrumentation - enhanced debug.js with FPS monitoring, render tracking, timer tracking, and flicker snapshot capture (opt-in via REACT_APP_DEBUG=true). Please test backend endpoints first with curl, then verify frontend components."
+  - agent: "testing"
+    message: "✓ BACKEND TESTING COMPLETE - All 3 backend tasks PASSED (12/12 tests). AI Problem Check API working correctly with GPT-4o-mini integration, properly identifies defensive/solution reasoning and returns refined descriptions. All Recurring Issue Management endpoints working: similar-incidents detection, linked-incident retrieval, recurring-quadrant CRUD operations, and link/unlink incident functionality. All data persistence verified. Investigation model updates validated through API testing. Frontend testing NOT performed as per system prompt instructions."

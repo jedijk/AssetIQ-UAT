@@ -6,6 +6,8 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Header, Response
 from datetime import datetime, timezone
 import uuid
+import json
+import os
 import logging
 from database import db
 from auth import get_current_user
@@ -16,9 +18,112 @@ from investigation_models import (
     FailureIdentificationCreate, FailureIdentificationUpdate,
     CauseNodeCreate, CauseNodeUpdate, CauseCategory,
     ActionItemCreate, ActionItemUpdate, ActionPriority, ActionStatus,
-    EvidenceCreate
+    EvidenceCreate, RecurringQuadrantData
 )
+
 logger = logging.getLogger(__name__)
+
+# AI Problem Check System Prompt
+AI_PROBLEM_CHECK_PROMPT = """You are an expert reliability engineer and root cause analysis specialist. Your task is to analyze problem descriptions for investigations and improve them.
+
+Analyze the given problem description for these issues:
+
+1. **DEFENSIVE REASONING** (Must identify and remove):
+   - Blaming others or external factors
+   - Rationalizing or making excuses  
+   - Protecting assumptions without evidence
+   - Deflecting responsibility
+   - Avoiding the real issue
+
+2. **SOLUTION REASONING** (Must identify and remove):
+   - Jumping too quickly to solutions
+   - Describing actions taken instead of the problem
+   - Prescribing fixes before understanding the problem
+   - Focusing on "what to do" instead of "what happened"
+
+3. **PROBLEM CLARITY** (Must ensure):
+   - Statement is factual and observable
+   - Statement is neutral (no blame, no emotion)
+   - Statement focuses on the actual problem/root issue
+   - Statement describes WHAT happened, not WHY or HOW TO FIX
+
+Your output must be a JSON object with:
+{
+  "analysis": {
+    "defensive_reasoning": ["list of defensive reasoning found, or empty array if none"],
+    "solution_reasoning": ["list of solution-focused statements found, or empty array if none"],
+    "clarity_issues": ["list of clarity issues found, or empty array if none"]
+  },
+  "has_issues": true/false,
+  "refined_description": "The improved, factual, neutral, problem-focused description",
+  "changes_made": ["list of specific changes you made to improve the description"]
+}
+
+IMPORTANT RULES:
+- Keep technical details (equipment tags, measurements, dates)
+- Remove blame language ("operator failed to...", "vendor provided bad...")
+- Remove solution language ("we need to...", "should replace...", "must fix...")
+- Focus on observable facts and symptoms
+- Be concise but complete
+- If the original is already good, return it unchanged with has_issues: false"""
+
+
+async def check_for_similar_incidents(user_id: str, asset_name: str, description: str, exclude_id: str = None) -> dict:
+    """Check for similar past incidents based on equipment and description keywords."""
+    if not asset_name:
+        return {"found": False, "similar_incidents": []}
+    
+    # Find past investigations with same equipment
+    query = {
+        "created_by": user_id,
+        "asset_name": {"$regex": f"^{asset_name}$", "$options": "i"},
+        "status": {"$in": ["completed", "closed"]}
+    }
+    if exclude_id:
+        query["id"] = {"$ne": exclude_id}
+    
+    past_investigations = await db.investigations.find(
+        query,
+        {"_id": 0, "id": 1, "title": 1, "description": 1, "incident_date": 1, "case_number": 1}
+    ).sort("incident_date", -1).to_list(10)
+    
+    if not past_investigations:
+        return {"found": False, "similar_incidents": []}
+    
+    # Simple keyword matching for similarity (can be enhanced with AI later)
+    description_lower = (description or "").lower()
+    similar = []
+    
+    # Extract keywords from current description
+    keywords = set(description_lower.split())
+    stop_words = {"the", "a", "an", "is", "was", "were", "are", "been", "be", "have", "has", "had", "do", "does", "did", "will", "would", "could", "should", "may", "might", "must", "shall", "can", "need", "dare", "ought", "used", "to", "of", "in", "for", "on", "with", "at", "by", "from", "as", "into", "through", "during", "before", "after", "above", "below", "between", "under", "again", "further", "then", "once", "and", "but", "or", "nor", "so", "yet", "both", "either", "neither", "not", "only", "same", "than", "too", "very", "just", "also"}
+    keywords = keywords - stop_words
+    
+    for inv in past_investigations:
+        past_desc_lower = (inv.get("description") or "").lower()
+        past_title_lower = (inv.get("title") or "").lower()
+        past_words = set(past_desc_lower.split()) | set(past_title_lower.split())
+        past_words = past_words - stop_words
+        
+        # Calculate overlap
+        if keywords and past_words:
+            overlap = len(keywords & past_words)
+            if overlap >= 2:  # At least 2 matching keywords
+                similar.append({
+                    "id": inv["id"],
+                    "case_number": inv.get("case_number"),
+                    "title": inv.get("title"),
+                    "incident_date": inv.get("incident_date"),
+                    "match_score": overlap
+                })
+    
+    # Sort by match score
+    similar.sort(key=lambda x: x.get("match_score", 0), reverse=True)
+    
+    return {
+        "found": len(similar) > 0,
+        "similar_incidents": similar[:5]  # Return top 5
+    }
 
 router = APIRouter(tags=["Investigations"])
 
@@ -42,6 +147,23 @@ async def create_investigation(
     inv_id = str(uuid.uuid4())
     case_number = await generate_case_number(current_user["id"])
     
+    # Check for similar past incidents to auto-detect recurring issues
+    similar_check = await check_for_similar_incidents(
+        current_user["id"], 
+        data.asset_name, 
+        data.description
+    )
+    
+    # Auto-detect recurring if similar incidents found and not explicitly set
+    is_recurring = data.is_recurring
+    linked_incident_id = data.linked_incident_id
+    
+    if similar_check["found"] and not is_recurring and not linked_incident_id:
+        # Suggest the most similar incident as potential link
+        is_recurring = True
+        if similar_check["similar_incidents"]:
+            linked_incident_id = similar_check["similar_incidents"][0]["id"]
+    
     inv_doc = {
         "id": inv_id,
         "case_number": case_number,
@@ -54,6 +176,9 @@ async def create_investigation(
         "investigation_leader": data.investigation_leader or current_user["name"],
         "team_members": data.team_members,
         "threat_id": data.threat_id,
+        "is_recurring": is_recurring,
+        "linked_incident_id": linked_incident_id,
+        "recurring_quadrant": None,
         "status": InvestigationStatus.DRAFT.value,
         "created_by": current_user["id"],
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -62,6 +187,10 @@ async def create_investigation(
     
     await db.investigations.insert_one(inv_doc)
     inv_doc.pop("_id", None)
+    
+    # Include similar incidents info in response
+    inv_doc["similar_incidents"] = similar_check.get("similar_incidents", [])
+    
     return inv_doc
 
 
@@ -747,3 +876,248 @@ async def download_file(
         raise HTTPException(status_code=500, detail="File download failed")
 
 
+
+
+# ============= AI PROBLEM CHECK =============
+
+class AIProblemCheckRequest(BaseModel):
+    description: str = Field(..., description="The problem description to analyze")
+
+
+class AIProblemCheckResponse(BaseModel):
+    analysis: Dict[str, Any]
+    has_issues: bool
+    refined_description: str
+    changes_made: List[str]
+
+
+@router.post("/investigations/{inv_id}/ai-problem-check")
+async def ai_problem_check(
+    inv_id: str,
+    request: AIProblemCheckRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Analyze investigation description using AI for:
+    - Defensive reasoning (blaming, rationalizing)
+    - Solution reasoning (jumping to fixes)
+    - Problem clarity (factual, neutral, focused)
+    
+    Returns a refined description and analysis.
+    """
+    # Verify investigation exists and user has access
+    inv = await db.investigations.find_one(
+        {"id": inv_id, "created_by": current_user["id"]}
+    )
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    
+    description = request.description.strip()
+    if not description:
+        raise HTTPException(status_code=400, detail="Description cannot be empty")
+    
+    # Check for OpenAI API key
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="AI service not configured")
+    
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+        
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": AI_PROBLEM_CHECK_PROMPT},
+                {"role": "user", "content": f"Analyze this problem description:\n\n{description}"}
+            ],
+            temperature=0.3,
+            max_tokens=1000
+        )
+        
+        # Parse response
+        content = response.choices[0].message.content.strip()
+        
+        # Clean up JSON if wrapped in markdown code block
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        content = content.strip().rstrip("```")
+        
+        result = json.loads(content)
+        
+        return {
+            "analysis": result.get("analysis", {}),
+            "has_issues": result.get("has_issues", False),
+            "refined_description": result.get("refined_description", description),
+            "changes_made": result.get("changes_made", [])
+        }
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse AI response: {e}")
+        raise HTTPException(status_code=500, detail="Failed to parse AI response")
+    except Exception as e:
+        logger.error(f"AI problem check failed: {e}")
+        raise HTTPException(status_code=500, detail=f"AI analysis failed: {str(e)}")
+
+
+# ============= RECURRING ISSUE MANAGEMENT =============
+
+@router.get("/investigations/{inv_id}/similar-incidents")
+async def get_similar_incidents(
+    inv_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Find similar past incidents for a given investigation.
+    Used to help identify recurring issues.
+    """
+    inv = await db.investigations.find_one(
+        {"id": inv_id, "created_by": current_user["id"]},
+        {"_id": 0}
+    )
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    
+    similar = await check_for_similar_incidents(
+        current_user["id"],
+        inv.get("asset_name"),
+        inv.get("description"),
+        exclude_id=inv_id
+    )
+    
+    return similar
+
+
+@router.get("/investigations/{inv_id}/linked-incident")
+async def get_linked_incident(
+    inv_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get the details of the linked previous incident for recurring analysis.
+    """
+    inv = await db.investigations.find_one(
+        {"id": inv_id, "created_by": current_user["id"]},
+        {"_id": 0}
+    )
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    
+    linked_id = inv.get("linked_incident_id")
+    if not linked_id:
+        return {"linked_incident": None}
+    
+    linked_inv = await db.investigations.find_one(
+        {"id": linked_id, "created_by": current_user["id"]},
+        {"_id": 0, "id": 1, "case_number": 1, "title": 1, "description": 1, 
+         "asset_name": 1, "incident_date": 1, "status": 1, "recurring_quadrant": 1}
+    )
+    
+    return {"linked_incident": linked_inv}
+
+
+@router.patch("/investigations/{inv_id}/recurring-quadrant")
+async def update_recurring_quadrant(
+    inv_id: str,
+    quadrant_data: RecurringQuadrantData,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Update the IS/IS NOT quadrant data for recurring issue analysis.
+    """
+    inv = await db.investigations.find_one(
+        {"id": inv_id, "created_by": current_user["id"]}
+    )
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    
+    # Check if investigation is locked
+    if inv.get("status") in ["completed", "closed"]:
+        raise HTTPException(status_code=400, detail="Cannot modify completed/closed investigation")
+    
+    update_data = {
+        "recurring_quadrant": quadrant_data.model_dump(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.investigations.update_one(
+        {"id": inv_id},
+        {"$set": update_data}
+    )
+    
+    return {"message": "Quadrant data updated", "recurring_quadrant": quadrant_data.model_dump()}
+
+
+@router.patch("/investigations/{inv_id}/link-incident")
+async def link_incident(
+    inv_id: str,
+    linked_incident_id: str = Query(..., description="ID of the previous incident to link"),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Link an investigation to a previous similar incident for recurring analysis.
+    """
+    inv = await db.investigations.find_one(
+        {"id": inv_id, "created_by": current_user["id"]}
+    )
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    
+    # Verify linked incident exists
+    linked_inv = await db.investigations.find_one(
+        {"id": linked_incident_id, "created_by": current_user["id"]}
+    )
+    if not linked_inv:
+        raise HTTPException(status_code=404, detail="Linked incident not found")
+    
+    # Prevent self-linking
+    if inv_id == linked_incident_id:
+        raise HTTPException(status_code=400, detail="Cannot link investigation to itself")
+    
+    update_data = {
+        "linked_incident_id": linked_incident_id,
+        "is_recurring": True,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.investigations.update_one(
+        {"id": inv_id},
+        {"$set": update_data}
+    )
+    
+    return {
+        "message": "Incident linked successfully",
+        "linked_incident_id": linked_incident_id,
+        "is_recurring": True
+    }
+
+
+@router.delete("/investigations/{inv_id}/link-incident")
+async def unlink_incident(
+    inv_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Remove the link to a previous incident.
+    """
+    inv = await db.investigations.find_one(
+        {"id": inv_id, "created_by": current_user["id"]}
+    )
+    if not inv:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+    
+    update_data = {
+        "linked_incident_id": None,
+        "is_recurring": False,
+        "recurring_quadrant": None,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.investigations.update_one(
+        {"id": inv_id},
+        {"$set": update_data}
+    )
+    
+    return {"message": "Incident unlinked successfully"}

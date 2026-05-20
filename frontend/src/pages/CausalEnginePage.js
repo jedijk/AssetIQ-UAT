@@ -13,6 +13,8 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { getBackendUrl } from "../lib/apiConfig";
 import AttachmentsPanel from "../components/attachments/AttachmentsPanel";
+import AIProblemCheckModal from "../components/causal-engine/AIProblemCheckModal";
+import RecurringIssueQuadrant from "../components/causal-engine/RecurringIssueQuadrant";
 import {
   Search, Plus, FileText, Clock, AlertTriangle, GitBranch, CheckSquare,
   ChevronRight, Trash2, Calendar, User, MapPin,
@@ -95,6 +97,7 @@ export default function CausalEnginePage() {
   const [aiSummary, setAISummary] = useState(null);
   const [isGeneratingAISummary, setIsGeneratingAISummary] = useState(false);
   const [closureSuggestion, setClosureSuggestion] = useState(null); // Investigation closure suggestion
+  const [showAIProblemCheck, setShowAIProblemCheck] = useState(false); // AI Problem Check modal
   const fileInputRef = useRef(null);
   const API_BASE_URL = getBackendUrl();
   
@@ -1022,7 +1025,22 @@ export default function CausalEnginePage() {
                           )}
                         </div>
                         <h1 className="text-xl font-bold text-slate-900 mb-1">{investigation.title}</h1>
-                        <p className="text-sm text-slate-600">{investigation.description}</p>
+                        <div className="flex items-start gap-2">
+                          <p className="text-sm text-slate-600 flex-1">{investigation.description}</p>
+                          {!isInvestigationLocked && investigation.description && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setShowAIProblemCheck(true)}
+                              className="text-purple-600 hover:bg-purple-50 h-7 px-2 flex-shrink-0"
+                              title="AI Problem Check - Analyze description for defensive reasoning, premature solutions, and clarity"
+                              data-testid="ai-problem-check-btn"
+                            >
+                              <Sparkles className="w-3.5 h-3.5 mr-1" />
+                              <span className="text-xs">Check</span>
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-1">
                         {/* AI Summary Button */}
@@ -1157,6 +1175,13 @@ export default function CausalEnginePage() {
                   <button onClick={() => setActiveTab("causes")} className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"><GitBranch className="w-5 h-5 text-purple-600" /><div className="text-left"><div className="font-medium text-sm">Causes</div><div className="text-xs text-slate-500">Build causal tree</div></div></button>
                   <button onClick={() => setActiveTab("actions")} className="flex items-center gap-3 p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"><CheckSquare className="w-5 h-5 text-green-600" /><div className="text-left"><div className="font-medium text-sm">Actions</div><div className="text-xs text-slate-500">Track corrections</div></div></button>
                 </div>
+
+                {/* Recurring Issue Quadrant - only shown for recurring issues or when similar incidents exist */}
+                <RecurringIssueQuadrant
+                  investigation={investigation}
+                  investigationAPI={investigationAPI}
+                  disabled={isInvestigationLocked}
+                />
 
                 {/* Investigation Notes */}
                 <div className="bg-white rounded-lg border p-4">
@@ -2224,6 +2249,22 @@ export default function CausalEnginePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AI Problem Check Modal */}
+      <AIProblemCheckModal
+        open={showAIProblemCheck}
+        onOpenChange={setShowAIProblemCheck}
+        investigationId={selectedInvId}
+        currentDescription={investigation?.description || ""}
+        onAccept={(newDescription) => {
+          // Update the investigation description
+          updateInvMutation.mutate({
+            id: selectedInvId,
+            data: { description: newDescription }
+          });
+        }}
+        investigationAPI={investigationAPI}
+      />
       </div>
     </div>
   );
