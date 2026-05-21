@@ -68,13 +68,13 @@ export default function AIProblemCheckModal({
     if (descriptionToUse) {
       onAccept(descriptionToUse);
       onOpenChange(false);
-      toast.success("Description updated with AI suggestion");
+      toast.success("Problem statement updated with AI suggestion");
     }
   };
 
   const handleReject = () => {
     onOpenChange(false);
-    toast.info("Original description kept");
+    toast.info("Original problem statement kept");
   };
 
   const hasIssues = aiResult?.has_issues;
@@ -86,10 +86,10 @@ export default function AIProblemCheckModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-purple-600" />
-            AI Problem Check
+            Defensive Reasoning Check
           </DialogTitle>
           <DialogDescription>
-            Analyzing your description for defensive reasoning, premature solutions, and clarity issues.
+            Analyzing your problem statement for defensive reasoning, premature solutions, and clarity issues.
           </DialogDescription>
         </DialogHeader>
 
@@ -98,16 +98,16 @@ export default function AIProblemCheckModal({
           {analyzeMutation.isPending && (
             <div className="flex flex-col items-center justify-center py-8">
               <Loader2 className="w-8 h-8 animate-spin text-purple-600 mb-4" />
-              <p className="text-sm text-slate-600">Analyzing your description...</p>
+              <p className="text-sm text-slate-600">Analyzing your problem statement...</p>
             </div>
           )}
 
           {/* Results */}
           {aiResult && (
             <>
-              {/* Original Description */}
+              {/* Original Problem Statement */}
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Original Description</label>
+                <label className="text-sm font-medium text-slate-700">Original Problem Statement</label>
                 <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-sm text-slate-600">
                   {currentDescription}
                 </div>

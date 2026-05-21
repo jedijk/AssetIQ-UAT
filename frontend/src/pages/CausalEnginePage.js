@@ -1025,22 +1025,7 @@ export default function CausalEnginePage() {
                           )}
                         </div>
                         <h1 className="text-xl font-bold text-slate-900 mb-1">{investigation.title}</h1>
-                        <div className="flex items-start gap-2">
-                          <p className="text-sm text-slate-600 flex-1">{investigation.description}</p>
-                          {!isInvestigationLocked && investigation.description && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setShowAIProblemCheck(true)}
-                              className="text-purple-600 hover:bg-purple-50 h-7 px-2 flex-shrink-0"
-                              title="AI Problem Check - Analyze description for defensive reasoning, premature solutions, and clarity"
-                              data-testid="ai-problem-check-btn"
-                            >
-                              <Sparkles className="w-3.5 h-3.5 mr-1" />
-                              <span className="text-xs">Check</span>
-                            </Button>
-                          )}
-                        </div>
+                        <p className="text-sm text-slate-600">{investigation.description}</p>
                       </div>
                       <div className="flex items-center gap-1">
                         {/* AI Summary Button */}
@@ -1183,16 +1168,31 @@ export default function CausalEnginePage() {
                   disabled={isInvestigationLocked}
                 />
 
-                {/* Investigation Notes */}
+                {/* Problem Statement */}
                 <div className="bg-white rounded-lg border p-4">
-                  <div className="flex items-center gap-2 text-slate-700 mb-3">
-                    <FileText className="w-4 h-4" />
-                    <span className="font-medium text-sm">{t("causal.investigationNotes") || "Investigation Notes"}</span>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2 text-slate-700">
+                      <FileText className="w-4 h-4" />
+                      <span className="font-medium text-sm">Problem Statement</span>
+                    </div>
+                    {!isInvestigationLocked && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowAIProblemCheck(true)}
+                        className="text-purple-600 hover:bg-purple-50 h-7 px-2"
+                        title="Defensive Reasoning Check - Analyze for defensive reasoning, premature solutions, and clarity"
+                        data-testid="ai-problem-check-btn"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 mr-1" />
+                        <span className="text-xs">Defensive Reasoning Check</span>
+                      </Button>
+                    )}
                   </div>
                   <Textarea
                     value={localNotes}
                     onChange={(e) => setLocalNotes(e.target.value)}
-                    placeholder={t("causal.notesPlaceholder") || "Add notes, observations, or important details about this investigation..."}
+                    placeholder="Describe the problem statement - what is the observable issue that needs to be investigated..."
                     className="min-h-[120px] resize-y text-sm"
                     data-testid="investigation-notes"
                   />
@@ -2250,18 +2250,17 @@ export default function CausalEnginePage() {
         </DialogContent>
       </Dialog>
 
-      {/* AI Problem Check Modal */}
+      {/* Defensive Reasoning Check Modal */}
       <AIProblemCheckModal
         open={showAIProblemCheck}
         onOpenChange={setShowAIProblemCheck}
         investigationId={selectedInvId}
-        currentDescription={investigation?.description || ""}
-        onAccept={(newDescription) => {
-          // Update the investigation description
-          updateInvMutation.mutate({
-            id: selectedInvId,
-            data: { description: newDescription }
-          });
+        currentDescription={localNotes || ""}
+        onAccept={(newText) => {
+          // Update the local notes (Problem Statement)
+          setLocalNotes(newText);
+          // Auto-save to backend
+          saveNotesMutation.mutate({ id: selectedInvId, notes: newText });
         }}
         investigationAPI={investigationAPI}
       />

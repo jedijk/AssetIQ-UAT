@@ -61,7 +61,8 @@ export default function RecurringIssueQuadrant({
 
   const isRecurring = investigation?.is_recurring;
   const linkedIncidentId = investigation?.linked_incident_id;
-  const showQuadrant = isRecurring || linkedIncidentId;
+  const showQuadrant = true; // Always show the recurring issue analysis section
+  const hasRecurringData = isRecurring || linkedIncidentId;
 
   // Fetch linked incident details
   const { data: linkedData } = useQuery({
@@ -159,11 +160,6 @@ export default function RecurringIssueQuadrant({
     saveQuadrantMutation.mutate(updated);
   }, [quadrantData, saveQuadrantMutation]);
 
-  // If not a recurring issue, don't render anything
-  if (!showQuadrant && !similarIncidents?.length) {
-    return null;
-  }
-
   // Quadrant cell component
   const QuadrantCell = ({ title, subtitle, quadrantKey, bgColor, borderColor }) => (
     <div className={`p-3 ${bgColor} ${borderColor} rounded-lg`}>
@@ -240,7 +236,7 @@ export default function RecurringIssueQuadrant({
               <div className="text-left">
                 <div className="font-medium text-slate-900 flex items-center gap-2">
                   Recurring Issue Analysis
-                  {isRecurring && (
+                  {hasRecurringData && (
                     <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs">
                       Recurring
                     </Badge>
