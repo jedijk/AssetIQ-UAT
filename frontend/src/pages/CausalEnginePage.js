@@ -265,25 +265,54 @@ export default function CausalEnginePage() {
   };
 
   // Sync localNotes with investigation data when investigation changes
+  // Use a ref to track if user is actively editing to prevent overwrites
+  const isUserEditingNotes = useRef(false);
+  const notesInitialized = useRef(false);
+  
   useEffect(() => {
-    if (investigationData) {
-      setLocalNotes(investigationData.notes || "");
+    // Only sync from server when:
+    // 1. Investigation data loads for the first time (or changes to different investigation)
+    // 2. User is not actively editing
+    if (investigationData && !isUserEditingNotes.current) {
+      const serverNotes = investigationData.notes || "";
+      // Only update if this is initial load or investigation changed
+      if (!notesInitialized.current || localNotes === "") {
+        setLocalNotes(serverNotes);
+        notesInitialized.current = true;
+      }
     }
-  }, [investigationData]);
+  }, [investigationData?.id]); // Only trigger on investigation ID change, not every data refresh
+
+  // Reset initialization flag when switching investigations
+  useEffect(() => {
+    notesInitialized.current = false;
+    isUserEditingNotes.current = false;
+  }, [selectedInvId]);
 
   const updateInvestigation = useCallback(
     (payload) => updateInvMutation.mutate(payload),
     [updateInvMutation]
   );
 
+  // Handle notes change with user editing flag
+  const handleNotesChange = useCallback((e) => {
+    isUserEditingNotes.current = true;
+    setLocalNotes(e.target.value);
+    
+    // Reset editing flag after a delay (user stopped typing)
+    setTimeout(() => {
+      isUserEditingNotes.current = false;
+    }, 2000);
+  }, []);
+
   // Debounced save for notes
   useEffect(() => {
     if (!selectedInvId || localNotes === (investigationData?.notes || "")) return;
     const timer = setTimeout(() => {
       updateInvestigation({ id: selectedInvId, data: { notes: localNotes } });
-    }, 1000);
+    }, 1500); // Increased delay to 1.5s
     return () => clearTimeout(timer);
-  }, [localNotes, selectedInvId, investigationData, updateInvestigation]);
+  }, [localNotes, selectedInvId, investigationData?.notes, updateInvestigation]);
 
   // File upload handler
   const handleFileUpload = async (event) => {
@@ -1191,7 +1220,7 @@ export default function CausalEnginePage() {
                   </div>
                   <Textarea
                     value={localNotes}
-                    onChange={(e) => setLocalNotes(e.target.value)}
+                    onChange={handleNotesChange}
                     placeholder="Describe the problem statement - what is the observable issue that needs to be investigated..."
                     className="min-h-[120px] resize-y text-sm"
                     data-testid="investigation-notes"
@@ -2258,9 +2287,14 @@ export default function CausalEnginePage() {
         currentDescription={localNotes || ""}
         onAccept={(newText) => {
           // Update the local notes (Problem Statement)
+          isUserEditingNotes.current = true; // Prevent server sync from overwriting
           setLocalNotes(newText);
-          // Auto-save to backend
-          saveNotesMutation.mutate({ id: selectedInvId, notes: newText });
+          // Auto-save to backend using the existing update mutation
+          updateInvMutation.mutate({ id: selectedInvId, data: { notes: newText } });
+          // Reset editing flag after save completes
+          setTimeout(() => {
+            isUserEditingNotes.current = false;
+          }, 2000);
         }}
         investigationAPI={investigationAPI}
       />
