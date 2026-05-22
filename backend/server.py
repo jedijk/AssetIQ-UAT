@@ -278,6 +278,7 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             or "/avatar" in request.url.path
             or "/ai/" in request.url.path
             or "/import" in request.url.path
+            or "/pm-import" in request.url.path
             or "/ai-insights" in request.url.path
             or "/auth/" in request.url.path
         ):

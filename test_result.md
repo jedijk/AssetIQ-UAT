@@ -102,133 +102,108 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Implement 3 features: 1) AI Problem Check for investigation descriptions, 2) Recurring Issue IS/IS NOT Quadrant analysis, 3) Mobile web app flickering debugging instrumentation"
+user_problem_statement: "Implement PM Intelligence Import feature - Upload maintenance plans and convert to failure mode intelligence"
 
 backend:
-  - task: "AI Problem Check API endpoint"
+  - task: "PM Import Upload Endpoint"
     implemented: true
     working: true
-    file: "/app/backend/routes/investigations.py"
+    file: "/app/backend/routes/pm_import.py"
     stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Implemented POST /investigations/{inv_id}/ai-problem-check endpoint. Uses GPT-4o-mini to analyze descriptions for defensive reasoning, solution reasoning, and clarity issues. Returns refined description with analysis."
+        comment: "Implemented POST /pm-import/upload endpoint. Accepts Excel, PDF, and image files. Creates session and processes with AI."
       - working: true
         agent: "testing"
-        comment: "✓ PASSED - All tests successful. Tested: 1) Valid request with defensive reasoning - correctly identifies issues and returns refined description with analysis, has_issues, and changes_made. 2) Empty description validation - correctly returns 400 error. 3) Invalid investigation ID - correctly returns 404. AI analysis working correctly with GPT-4o-mini integration."
+        comment: "TESTED: POST /pm-import/upload successfully uploads Excel file, creates session, processes with AI (GPT-4o-mini), extracts 5 maintenance tasks with components, task types, failure modes, and confidence scores. Returns session_id and status. Fixed timeout issue by adding /pm-import to long timeout paths in server.py middleware. All upload tests passing."
 
-  - task: "Recurring Issue Detection and Management"
+  - task: "PM Import Session Management"
     implemented: true
     working: true
-    file: "/app/backend/routes/investigations.py"
+    file: "/app/backend/routes/pm_import.py"
     stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Added is_recurring and linked_incident_id fields to investigation model. Auto-detects similar incidents on creation. Added endpoints: GET similar-incidents, GET linked-incident, PATCH recurring-quadrant, PATCH/DELETE link-incident."
+        comment: "Implemented session CRUD: GET /pm-import/session/{id}, PATCH task updates, accept/reject tasks, bulk actions, import to library."
       - working: true
         agent: "testing"
-        comment: "✓ PASSED - All endpoints working correctly. Tested: 1) GET similar-incidents - returns found boolean and similar_incidents array. 2) GET linked-incident - returns linked_incident (null when no link exists). 3) PATCH recurring-quadrant - successfully saves quadrant data with current_is, current_is_not, past_was, past_was_not fields and persists correctly. 4) PATCH link-incident - successfully links investigations and sets is_recurring flag. 5) DELETE link-incident - successfully removes link and clears recurring data. All data persistence verified."
+        comment: "TESTED: All session management endpoints working correctly. GET /pm-import/session/{id} returns complete session with tasks and stats. POST accept/reject task endpoints update review_status correctly (fixed bug where status was being overwritten to 'edited'). POST bulk-action with 'accept_high_confidence' accepts tasks with confidence >= 70%. POST import endpoint successfully imports accepted tasks to failure mode library (linked 4 to existing, skipped 1 rejected). GET /pm-import/sessions lists all user sessions. All 13 test cases passing."
 
-  - task: "Investigation Model Updates"
+  - task: "PM Import AI Processing Service"
     implemented: true
     working: true
-    file: "/app/backend/investigation_models.py"
+    file: "/app/backend/services/pm_import_service.py"
     stuck_count: 0
-    priority: "medium"
+    priority: "high"
     needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Added RecurringQuadrantData model, is_recurring bool, linked_incident_id optional str, and recurring_quadrant optional dict to InvestigationCreate/Update models."
+        comment: "Implemented PMImportService with Excel/PDF parsing, GPT-4o Vision OCR, rule-based task classification, AI analysis with GPT-4o-mini, library matching, and confidence scoring."
       - working: true
         agent: "testing"
-        comment: "✓ PASSED - Model updates working correctly. RecurringQuadrantData model properly defined with all required fields. Investigation model correctly accepts and stores is_recurring, linked_incident_id, and recurring_quadrant data. All fields validated through API testing."
+        comment: "TESTED: AI processing service working correctly. Successfully parsed Excel file with 5 maintenance tasks. AI analysis extracted components (Gearbox GB-101, Motor M-201, etc.), classified task types (Inspection, Lubrication, Calibration, Replacement, Cleaning), identified 8 unique failure modes, matched 5 tasks to existing library entries, calculated confidence scores (81% average). Processing completed in ~30 seconds with multiple GPT-4o-mini API calls. All AI features functioning as expected."
 
 frontend:
-  - task: "AI Problem Check Modal Component"
+  - task: "PM Import Wizard Component"
     implemented: true
     working: "NA"
-    file: "/app/frontend/src/components/causal-engine/AIProblemCheckModal.jsx"
+    file: "/app/frontend/src/components/library/PMImportWizard.jsx"
     stuck_count: 0
     priority: "high"
     needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Created new modal component. Shows AI analysis of description (defensive/solution reasoning, clarity issues). Allows Accept & Inject, Edit First, or Reject actions. Keeps original description until user confirms."
+        comment: "Created 4-step wizard: Upload (drag/drop), Processing (animated progress), Review (KPI cards, task list with accept/reject), Import Summary."
 
-  - task: "Recurring Issue Quadrant Component"
+  - task: "PM Import Button on Failure Modes Page"
     implemented: true
     working: "NA"
-    file: "/app/frontend/src/components/causal-engine/RecurringIssueQuadrant.jsx"
+    file: "/app/frontend/src/pages/FailureModesPage.js"
     stuck_count: 0
     priority: "high"
     needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Created collapsible quadrant component with 4 cells (Current IS/IS NOT, Past WAS/WAS NOT). Auto-saves changes. Shows only when is_recurring or linked_incident_id exists. Includes incident linking UI."
+        comment: "Added 'Import PM Plan' button next to Export Excel on Failure Modes tab. Opens PMImportWizard modal."
 
-  - task: "CausalEnginePage Integration"
+  - task: "PM Import API Client"
     implemented: true
     working: "NA"
-    file: "/app/frontend/src/pages/CausalEnginePage.js"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: true
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Integrated AI Problem Check button next to description text. Added RecurringIssueQuadrant below Quick Actions. Added modal state and handler for description update."
-
-  - task: "Investigation API Client Updates"
-    implemented: true
-    working: "NA"
-    file: "/app/frontend/src/lib/apis/investigations.js"
+    file: "/app/frontend/src/lib/apis/pmImport.js"
     stuck_count: 0
     priority: "medium"
     needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "Added aiProblemCheck, getSimilarIncidents, getLinkedIncident, updateRecurringQuadrant, linkIncident, unlinkIncident methods."
-
-  - task: "Mobile Debug Instrumentation"
-    implemented: true
-    working: "NA"
-    file: "/app/frontend/src/lib/debug.js"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: true
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "Enhanced debug.js with FPS monitoring, render tracking, timer tracking, state change logging, rapid render detection, long task monitoring. Added captureFlickerSnapshot function. All opt-in via REACT_APP_DEBUG=true."
+        comment: "Created pmImportAPI with upload, getSession, updateTask, acceptTask, rejectTask, bulkAction, importToLibrary, exportReview methods."
 
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 3
+  test_sequence: 5
   run_ui: false
 
 test_plan:
   current_focus:
-    - "AI Problem Check API endpoint"
-    - "Recurring Issue Detection and Management"
-    - "AI Problem Check Modal Component"
-    - "Recurring Issue Quadrant Component"
+    - "PM Import Upload Endpoint"
+    - "PM Import Session Management"
+    - "PM Import AI Processing Service"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
   - agent: "main"
-    message: "Implemented all 3 requested features: 1) AI Problem Check with backend endpoint and frontend modal - analyzes descriptions for defensive/solution reasoning and clarity, 2) Recurring Issue IS/IS NOT Quadrant - auto-detects similar incidents, allows linking, and provides 4-quadrant comparison UI, 3) Mobile debug instrumentation - enhanced debug.js with FPS monitoring, render tracking, timer tracking, and flicker snapshot capture (opt-in via REACT_APP_DEBUG=true). Please test backend endpoints first with curl, then verify frontend components."
+    message: "Implemented PM Intelligence Import feature. Backend: POST /pm-import/upload endpoint that accepts Excel/PDF/images, creates session, processes with AI (GPT-4o Vision for OCR, GPT-4o-mini for analysis), extracts maintenance tasks, classifies task types, identifies failure modes, and matches with existing library. Frontend: PMImportWizard with 4-step flow (Upload, Processing animation, Review with KPI cards and task list, Import Summary). Added 'Import PM Plan' button on Failure Modes page. Please test backend endpoints first."
   - agent: "testing"
-    message: "✓ BACKEND TESTING COMPLETE - All 3 backend tasks PASSED (12/12 tests). AI Problem Check API working correctly with GPT-4o-mini integration, properly identifies defensive/solution reasoning and returns refined descriptions. All Recurring Issue Management endpoints working: similar-incidents detection, linked-incident retrieval, recurring-quadrant CRUD operations, and link/unlink incident functionality. All data persistence verified. Investigation model updates validated through API testing. Frontend testing NOT performed as per system prompt instructions."
+    message: "BACKEND TESTING COMPLETE - ALL TESTS PASSING (13/13). Tested all PM Import endpoints: upload, get session, accept/reject tasks, bulk actions, import to library, list sessions. Fixed 2 minor issues: (1) Added /pm-import to timeout middleware for 120s timeout, (2) Fixed bug in update_task where review_status was being overwritten to 'edited'. All backend APIs working correctly with AI processing, library matching, and data persistence. Ready for frontend integration testing."

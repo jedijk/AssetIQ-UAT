@@ -39,6 +39,7 @@ from routes.labels import router as labels_router
 from routes.audit_log import router as audit_log_router
 from routes.config_performance import router as config_performance_router
 from routes.granulometry import router as granulometry_router
+from routes.pm_import import router as pm_import_router
 
 all_routers = [
     auth_router,
@@ -79,4 +80,5 @@ all_routers = [
     audit_log_router,
     config_performance_router,
     granulometry_router,
+    pm_import_router,
 ]

@@ -69,6 +69,8 @@ import BackButton from "../components/BackButton";
 // Extracted components
 import { EquipmentTypeItem, EQUIPMENT_ICONS, ICON_OPTIONS, DISCIPLINES, EQUIPMENT_CATEGORIES, DISCIPLINE_COLORS } from "../components/library";
 import { FailureModeViewPanel } from "../components/library";
+import PMImportWizard from "../components/library/PMImportWizard";
+import { Upload } from "lucide-react";
 
 const categoryIcons = {
   Rotating: Cog,
@@ -153,6 +155,9 @@ const FailureModesPage = () => {
   
   // Delete confirmation state
   const [deleteConfirmFm, setDeleteConfirmFm] = useState(null);
+  
+  // PM Import Wizard state
+  const [isPMImportOpen, setIsPMImportOpen] = useState(false);
   
   const [newFm, setNewFm] = useState({
     category: "Rotating",
@@ -744,6 +749,15 @@ const FailureModesPage = () => {
             >
               <Download className="w-4 h-4 mr-1" /> 
               {isExporting ? (t("common.exporting") || "Exporting...") : (t("library.exportExcel") || "Export Excel")}
+            </Button>
+            <Button 
+              onClick={() => setIsPMImportOpen(true)} 
+              variant="outline" 
+              className="h-11 border-blue-200 text-blue-700 hover:bg-blue-50"
+              data-testid="import-pm-plan-btn"
+            >
+              <Upload className="w-4 h-4 mr-1" /> 
+              Import PM Plan
             </Button>
             <Button onClick={() => { setEditingFm(null); resetFmForm(); setIsFmDialogOpen(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-failure-mode-btn">
               <Plus className="w-4 h-4 mr-1" /> {t("library.addFailureMode")}
@@ -1742,6 +1756,16 @@ const FailureModesPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* PM Import Wizard */}
+      <PMImportWizard
+        isOpen={isPMImportOpen}
+        onClose={() => setIsPMImportOpen(false)}
+        onImportComplete={() => {
+          queryClient.invalidateQueries({ queryKey: ["failureModes"] });
+          setIsPMImportOpen(false);
+        }}
+      />
     </div>
   );
 };

@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-Backend API Testing Script for Investigation Features
-Tests the new investigation-related API endpoints
+Backend API Testing Script for PM Import Feature
+Tests the PM Intelligence Import API endpoints
 """
 
 import requests
 import json
 import sys
+import io
 from typing import Optional, Dict, Any
+from openpyxl import Workbook
 
 # Configuration
 BASE_URL = "https://pm-plan-converter.preview.emergentagent.com/api"
@@ -85,47 +87,285 @@ def get_headers(token: str) -> Dict[str, str]:
         "Content-Type": "application/json"
     }
 
-def get_existing_investigation(token: str) -> Optional[str]:
-    """Get an existing investigation ID for testing"""
+def create_test_excel_file() -> bytes:
+    """Create a test Excel file with maintenance tasks"""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Maintenance Plan"
+    
+    # Headers
+    ws.append(["Task Description", "Equipment", "Frequency", "Notes"])
+    
+    # Sample maintenance tasks
+    ws.append([
+        "Inspect gearbox for oil leaks and abnormal noise",
+        "Gearbox GB-101",
+        "Weekly",
+        "Check oil level and listen for unusual sounds"
+    ])
+    ws.append([
+        "Grease bearings on main motor",
+        "Motor M-201",
+        "Monthly",
+        "Use high-temperature grease"
+    ])
+    ws.append([
+        "Calibrate pressure sensor",
+        "Pressure Sensor PS-301",
+        "Quarterly",
+        "Verify against reference gauge"
+    ])
+    ws.append([
+        "Replace hydraulic oil filter",
+        "Hydraulic System HS-401",
+        "Every 6 months",
+        "Use OEM filter only"
+    ])
+    ws.append([
+        "Clean cooling system and check for blockages",
+        "Cooling System CS-501",
+        "Monthly",
+        "Flush with clean water"
+    ])
+    
+    # Save to bytes
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+def test_pm_import_upload(token: str, results: TestResult) -> Optional[str]:
+    """Test PM Import Upload endpoint"""
+    print(f"\n{Colors.BLUE}=== Testing PM Import Upload ==={Colors.END}")
+    
+    # Create test Excel file
+    excel_content = create_test_excel_file()
+    
+    # Test 1: Upload Excel file
+    try:
+        files = {
+            'file': ('test_maintenance_plan.xlsx', excel_content, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        }
+        headers = {"Authorization": f"Bearer {token}"}
+        
+        response = requests.post(
+            f"{BASE_URL}/pm-import/upload",
+            headers=headers,
+            files=files,
+            timeout=60
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Validate response structure
+            if "session_id" in data and "status" in data:
+                session_id = data["session_id"]
+                results.add_pass("PM Import Upload - Excel file upload")
+                print(f"  Session ID: {session_id}")
+                print(f"  Status: {data['status']}")
+                print(f"  Tasks count: {data.get('tasks_count', 0)}")
+                return session_id
+            else:
+                results.add_fail("PM Import Upload - Excel file upload", f"Missing required fields: {list(data.keys())}")
+                return None
+        else:
+            results.add_fail("PM Import Upload - Excel file upload", f"Status {response.status_code}: {response.text}")
+            return None
+    except Exception as e:
+        results.add_fail("PM Import Upload - Excel file upload", str(e))
+        return None
+    
+    # Test 2: Upload without file (should return 422)
+    try:
+        headers = {"Authorization": f"Bearer {token}"}
+        response = requests.post(
+            f"{BASE_URL}/pm-import/upload",
+            headers=headers,
+            timeout=10
+        )
+        
+        if response.status_code == 422:
+            results.add_pass("PM Import Upload - No file returns 422")
+        else:
+            results.add_fail("PM Import Upload - No file validation", f"Expected 422, got {response.status_code}")
+    except Exception as e:
+        results.add_fail("PM Import Upload - No file validation", str(e))
+
+def test_pm_import_get_session(token: str, session_id: str, results: TestResult):
+    """Test PM Import Get Session endpoint"""
+    print(f"\n{Colors.BLUE}=== Testing PM Import Get Session ==={Colors.END}")
+    
+    # Test 1: Get valid session
     try:
         response = requests.get(
-            f"{BASE_URL}/investigations",
+            f"{BASE_URL}/pm-import/session/{session_id}",
             headers=get_headers(token),
             timeout=10
         )
         
         if response.status_code == 200:
             data = response.json()
-            investigations = data.get("investigations", [])
-            if investigations:
-                inv_id = investigations[0]["id"]
-                print(f"{Colors.GREEN}✓{Colors.END} Found existing investigation: {inv_id}")
-                return inv_id
+            
+            # Validate response structure
+            required_fields = ["session_id", "status", "tasks_extracted", "stats"]
+            missing_fields = [f for f in required_fields if f not in data]
+            
+            if not missing_fields:
+                results.add_pass("PM Import Get Session - Valid session")
+                print(f"  Status: {data['status']}")
+                print(f"  Tasks extracted: {len(data['tasks_extracted'])}")
+                print(f"  Stats: {json.dumps(data['stats'], indent=2)}")
+                
+                # Validate task structure
+                if data['tasks_extracted']:
+                    task = data['tasks_extracted'][0]
+                    task_fields = ["task_id", "original_task", "component", "task_type", 
+                                   "suggested_failure_modes", "confidence_score", "review_status"]
+                    missing_task_fields = [f for f in task_fields if f not in task]
+                    
+                    if not missing_task_fields:
+                        results.add_pass("PM Import Get Session - Task structure valid")
+                        print(f"  Sample task: {task['original_task'][:50]}...")
+                        print(f"  Component: {task['component']}")
+                        print(f"  Task type: {task['task_type']}")
+                        print(f"  Confidence: {task['confidence_score']}")
+                    else:
+                        results.add_fail("PM Import Get Session - Task structure", f"Missing task fields: {missing_task_fields}")
             else:
-                print(f"{Colors.YELLOW}⚠{Colors.END} No existing investigations found, creating one...")
-                return create_test_investigation(token)
+                results.add_fail("PM Import Get Session - Valid session", f"Missing fields: {missing_fields}")
         else:
-            print(f"{Colors.RED}✗{Colors.END} Failed to get investigations: {response.status_code}")
-            return None
+            results.add_fail("PM Import Get Session - Valid session", f"Status {response.status_code}: {response.text}")
     except Exception as e:
-        print(f"{Colors.RED}✗{Colors.END} Error getting investigations: {str(e)}")
-        return None
+        results.add_fail("PM Import Get Session - Valid session", str(e))
+    
+    # Test 2: Get invalid session (should return 404)
+    try:
+        response = requests.get(
+            f"{BASE_URL}/pm-import/session/invalid-session-id-12345",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code == 404:
+            results.add_pass("PM Import Get Session - Invalid session returns 404")
+        else:
+            results.add_fail("PM Import Get Session - Invalid session", f"Expected 404, got {response.status_code}")
+    except Exception as e:
+        results.add_fail("PM Import Get Session - Invalid session", str(e))
 
-def create_test_investigation(token: str) -> Optional[str]:
-    """Create a test investigation for testing"""
+def test_pm_import_accept_reject_task(token: str, session_id: str, results: TestResult):
+    """Test PM Import Accept/Reject Task endpoints"""
+    print(f"\n{Colors.BLUE}=== Testing PM Import Accept/Reject Task ==={Colors.END}")
+    
+    # First, get the session to get task IDs
+    try:
+        response = requests.get(
+            f"{BASE_URL}/pm-import/session/{session_id}",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            results.add_fail("PM Import Accept/Reject - Setup", "Failed to get session")
+            return
+        
+        data = response.json()
+        tasks = data.get("tasks_extracted", [])
+        
+        if len(tasks) < 2:
+            results.add_fail("PM Import Accept/Reject - Setup", "Not enough tasks to test")
+            return
+        
+        task_id_1 = tasks[0]["task_id"]
+        task_id_2 = tasks[1]["task_id"]
+        
+        # Test 1: Accept a task
+        try:
+            response = requests.post(
+                f"{BASE_URL}/pm-import/session/{session_id}/task/{task_id_1}/accept",
+                headers=get_headers(token),
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data.get("success") and "stats" in data:
+                    results.add_pass("PM Import Accept Task - Accept task")
+                    print(f"  Stats: {json.dumps(data['stats'], indent=2)}")
+                else:
+                    results.add_fail("PM Import Accept Task - Accept task", f"Unexpected response: {data}")
+            else:
+                results.add_fail("PM Import Accept Task - Accept task", f"Status {response.status_code}: {response.text}")
+        except Exception as e:
+            results.add_fail("PM Import Accept Task - Accept task", str(e))
+        
+        # Test 2: Reject a task
+        try:
+            response = requests.post(
+                f"{BASE_URL}/pm-import/session/{session_id}/task/{task_id_2}/reject",
+                headers=get_headers(token),
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data.get("success") and "stats" in data:
+                    results.add_pass("PM Import Reject Task - Reject task")
+                    print(f"  Stats: {json.dumps(data['stats'], indent=2)}")
+                else:
+                    results.add_fail("PM Import Reject Task - Reject task", f"Unexpected response: {data}")
+            else:
+                results.add_fail("PM Import Reject Task - Reject task", f"Status {response.status_code}: {response.text}")
+        except Exception as e:
+            results.add_fail("PM Import Reject Task - Reject task", str(e))
+        
+        # Test 3: Verify task status changed
+        try:
+            response = requests.get(
+                f"{BASE_URL}/pm-import/session/{session_id}",
+                headers=get_headers(token),
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                tasks = data.get("tasks_extracted", [])
+                
+                task_1 = next((t for t in tasks if t["task_id"] == task_id_1), None)
+                task_2 = next((t for t in tasks if t["task_id"] == task_id_2), None)
+                
+                if task_1 and task_1.get("review_status") == "accepted":
+                    results.add_pass("PM Import Accept Task - Status persisted")
+                else:
+                    results.add_fail("PM Import Accept Task - Status persistence", f"Expected 'accepted', got {task_1.get('review_status') if task_1 else 'task not found'}")
+                
+                if task_2 and task_2.get("review_status") == "rejected":
+                    results.add_pass("PM Import Reject Task - Status persisted")
+                else:
+                    results.add_fail("PM Import Reject Task - Status persistence", f"Expected 'rejected', got {task_2.get('review_status') if task_2 else 'task not found'}")
+            else:
+                results.add_fail("PM Import Accept/Reject - Status verification", f"Failed to get session: {response.status_code}")
+        except Exception as e:
+            results.add_fail("PM Import Accept/Reject - Status verification", str(e))
+        
+    except Exception as e:
+        results.add_fail("PM Import Accept/Reject - Setup", str(e))
+
+def test_pm_import_bulk_action(token: str, session_id: str, results: TestResult):
+    """Test PM Import Bulk Action endpoint"""
+    print(f"\n{Colors.BLUE}=== Testing PM Import Bulk Action ==={Colors.END}")
+    
+    # Test: Accept high confidence tasks
     try:
         payload = {
-            "title": "Test Investigation for API Testing",
-            "description": "The operator failed to follow procedure and this caused the pump to fail due to high temperature",
-            "asset_name": "Pump-101",
-            "location": "Plant A",
-            "incident_date": "2024-01-15T10:30:00Z",
-            "investigation_leader": "Test User",
-            "team_members": []
+            "action": "accept_high_confidence"
         }
         
         response = requests.post(
-            f"{BASE_URL}/investigations",
+            f"{BASE_URL}/pm-import/session/{session_id}/bulk-action",
             headers=get_headers(token),
             json=payload,
             timeout=10
@@ -133,29 +373,50 @@ def create_test_investigation(token: str) -> Optional[str]:
         
         if response.status_code == 200:
             data = response.json()
-            inv_id = data.get("id")
-            print(f"{Colors.GREEN}✓{Colors.END} Created test investigation: {inv_id}")
-            return inv_id
+            
+            if data.get("success") and "accepted_count" in data and "stats" in data:
+                results.add_pass("PM Import Bulk Action - Accept high confidence")
+                print(f"  Accepted count: {data['accepted_count']}")
+                print(f"  Stats: {json.dumps(data['stats'], indent=2)}")
+            else:
+                results.add_fail("PM Import Bulk Action - Accept high confidence", f"Unexpected response: {data}")
         else:
-            print(f"{Colors.RED}✗{Colors.END} Failed to create investigation: {response.status_code}")
-            print(f"Response: {response.text}")
-            return None
+            results.add_fail("PM Import Bulk Action - Accept high confidence", f"Status {response.status_code}: {response.text}")
     except Exception as e:
-        print(f"{Colors.RED}✗{Colors.END} Error creating investigation: {str(e)}")
-        return None
-
-def test_ai_problem_check(token: str, inv_id: str, results: TestResult):
-    """Test AI Problem Check API"""
-    print(f"\n{Colors.BLUE}=== Testing AI Problem Check API ==={Colors.END}")
+        results.add_fail("PM Import Bulk Action - Accept high confidence", str(e))
     
-    # Test 1: Valid request with defensive reasoning
+    # Test: Invalid action (should return 400)
     try:
         payload = {
-            "description": "The operator failed to follow procedure and this caused the pump to fail"
+            "action": "invalid_action"
         }
         
         response = requests.post(
-            f"{BASE_URL}/investigations/{inv_id}/ai-problem-check",
+            f"{BASE_URL}/pm-import/session/{session_id}/bulk-action",
+            headers=get_headers(token),
+            json=payload,
+            timeout=10
+        )
+        
+        if response.status_code == 400:
+            results.add_pass("PM Import Bulk Action - Invalid action returns 400")
+        else:
+            results.add_fail("PM Import Bulk Action - Invalid action", f"Expected 400, got {response.status_code}")
+    except Exception as e:
+        results.add_fail("PM Import Bulk Action - Invalid action", str(e))
+
+def test_pm_import_to_library(token: str, session_id: str, results: TestResult):
+    """Test PM Import to Library endpoint"""
+    print(f"\n{Colors.BLUE}=== Testing PM Import to Library ==={Colors.END}")
+    
+    # Test: Import accepted tasks to library
+    try:
+        payload = {
+            "include_low_confidence": True
+        }
+        
+        response = requests.post(
+            f"{BASE_URL}/pm-import/session/{session_id}/import",
             headers=get_headers(token),
             json=payload,
             timeout=30
@@ -164,282 +425,76 @@ def test_ai_problem_check(token: str, inv_id: str, results: TestResult):
         if response.status_code == 200:
             data = response.json()
             
-            # Validate response structure
-            if "analysis" in data and "has_issues" in data and "refined_description" in data and "changes_made" in data:
-                results.add_pass("AI Problem Check - Valid request with defensive reasoning")
+            required_fields = ["success", "total_imported", "linked_to_existing", "new_created", "skipped"]
+            missing_fields = [f for f in required_fields if f not in data]
+            
+            if not missing_fields:
+                results.add_pass("PM Import to Library - Import accepted tasks")
+                print(f"  Total imported: {data['total_imported']}")
+                print(f"  Linked to existing: {data['linked_to_existing']}")
+                print(f"  New created: {data['new_created']}")
+                print(f"  Skipped: {data['skipped']}")
+            else:
+                results.add_fail("PM Import to Library - Import accepted tasks", f"Missing fields: {missing_fields}")
+        else:
+            results.add_fail("PM Import to Library - Import accepted tasks", f"Status {response.status_code}: {response.text}")
+    except Exception as e:
+        results.add_fail("PM Import to Library - Import accepted tasks", str(e))
+    
+    # Test: Verify session status changed to 'imported'
+    try:
+        response = requests.get(
+            f"{BASE_URL}/pm-import/session/{session_id}",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            if data.get("status") == "imported":
+                results.add_pass("PM Import to Library - Session status updated to 'imported'")
+            else:
+                results.add_fail("PM Import to Library - Session status", f"Expected 'imported', got {data.get('status')}")
+        else:
+            results.add_fail("PM Import to Library - Session status verification", f"Failed to get session: {response.status_code}")
+    except Exception as e:
+        results.add_fail("PM Import to Library - Session status verification", str(e))
+
+def test_pm_import_list_sessions(token: str, results: TestResult):
+    """Test PM Import List Sessions endpoint"""
+    print(f"\n{Colors.BLUE}=== Testing PM Import List Sessions ==={Colors.END}")
+    
+    # Test: List sessions
+    try:
+        response = requests.get(
+            f"{BASE_URL}/pm-import/sessions",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            if "sessions" in data and "total" in data:
+                results.add_pass("PM Import List Sessions - List sessions")
+                print(f"  Total sessions: {data['total']}")
+                print(f"  Sessions returned: {len(data['sessions'])}")
                 
-                # Print analysis details
-                print(f"  Analysis: {json.dumps(data['analysis'], indent=2)}")
-                print(f"  Has Issues: {data['has_issues']}")
-                print(f"  Refined: {data['refined_description'][:100]}...")
+                if data['sessions']:
+                    session = data['sessions'][0]
+                    print(f"  Sample session: {session.get('file_name')} - Status: {session.get('status')}")
             else:
-                results.add_fail("AI Problem Check - Valid request", f"Missing required fields in response: {list(data.keys())}")
+                results.add_fail("PM Import List Sessions - List sessions", f"Missing required fields: {list(data.keys())}")
         else:
-            results.add_fail("AI Problem Check - Valid request", f"Status {response.status_code}: {response.text}")
+            results.add_fail("PM Import List Sessions - List sessions", f"Status {response.status_code}: {response.text}")
     except Exception as e:
-        results.add_fail("AI Problem Check - Valid request", str(e))
-    
-    # Test 2: Empty description (should return 400)
-    try:
-        payload = {"description": ""}
-        
-        response = requests.post(
-            f"{BASE_URL}/investigations/{inv_id}/ai-problem-check",
-            headers=get_headers(token),
-            json=payload,
-            timeout=10
-        )
-        
-        if response.status_code == 400:
-            results.add_pass("AI Problem Check - Empty description returns 400")
-        else:
-            results.add_fail("AI Problem Check - Empty description", f"Expected 400, got {response.status_code}")
-    except Exception as e:
-        results.add_fail("AI Problem Check - Empty description", str(e))
-    
-    # Test 3: Invalid investigation ID (should return 404)
-    try:
-        payload = {"description": "Test description"}
-        
-        response = requests.post(
-            f"{BASE_URL}/investigations/invalid-id-12345/ai-problem-check",
-            headers=get_headers(token),
-            json=payload,
-            timeout=10
-        )
-        
-        if response.status_code == 404:
-            results.add_pass("AI Problem Check - Invalid investigation ID returns 404")
-        else:
-            results.add_fail("AI Problem Check - Invalid investigation ID", f"Expected 404, got {response.status_code}")
-    except Exception as e:
-        results.add_fail("AI Problem Check - Invalid investigation ID", str(e))
-
-def test_similar_incidents(token: str, inv_id: str, results: TestResult):
-    """Test Similar Incidents API"""
-    print(f"\n{Colors.BLUE}=== Testing Similar Incidents API ==={Colors.END}")
-    
-    try:
-        response = requests.get(
-            f"{BASE_URL}/investigations/{inv_id}/similar-incidents",
-            headers=get_headers(token),
-            timeout=10
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Validate response structure
-            if "found" in data and "similar_incidents" in data:
-                results.add_pass("Similar Incidents - Valid request")
-                print(f"  Found: {data['found']}")
-                print(f"  Similar incidents count: {len(data['similar_incidents'])}")
-                
-                if data['similar_incidents']:
-                    print(f"  Sample incident: {data['similar_incidents'][0]}")
-            else:
-                results.add_fail("Similar Incidents - Valid request", f"Missing required fields: {list(data.keys())}")
-        else:
-            results.add_fail("Similar Incidents - Valid request", f"Status {response.status_code}: {response.text}")
-    except Exception as e:
-        results.add_fail("Similar Incidents - Valid request", str(e))
-    
-    # Test invalid investigation ID
-    try:
-        response = requests.get(
-            f"{BASE_URL}/investigations/invalid-id-12345/similar-incidents",
-            headers=get_headers(token),
-            timeout=10
-        )
-        
-        if response.status_code == 404:
-            results.add_pass("Similar Incidents - Invalid investigation ID returns 404")
-        else:
-            results.add_fail("Similar Incidents - Invalid investigation ID", f"Expected 404, got {response.status_code}")
-    except Exception as e:
-        results.add_fail("Similar Incidents - Invalid investigation ID", str(e))
-
-def test_linked_incident(token: str, inv_id: str, results: TestResult):
-    """Test Linked Incident API"""
-    print(f"\n{Colors.BLUE}=== Testing Linked Incident API ==={Colors.END}")
-    
-    try:
-        response = requests.get(
-            f"{BASE_URL}/investigations/{inv_id}/linked-incident",
-            headers=get_headers(token),
-            timeout=10
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Validate response structure
-            if "linked_incident" in data:
-                results.add_pass("Linked Incident - Valid request")
-                print(f"  Linked incident: {data['linked_incident']}")
-            else:
-                results.add_fail("Linked Incident - Valid request", f"Missing 'linked_incident' field")
-        else:
-            results.add_fail("Linked Incident - Valid request", f"Status {response.status_code}: {response.text}")
-    except Exception as e:
-        results.add_fail("Linked Incident - Valid request", str(e))
-
-def test_recurring_quadrant(token: str, inv_id: str, results: TestResult):
-    """Test Recurring Quadrant API"""
-    print(f"\n{Colors.BLUE}=== Testing Recurring Quadrant API ==={Colors.END}")
-    
-    try:
-        payload = {
-            "current_is": ["High temperature", "Vibration detected"],
-            "current_is_not": ["Low pressure", "Normal flow rate"],
-            "past_was": ["High temperature", "Abnormal noise"],
-            "past_was_not": ["Low pressure", "Vibration detected"]
-        }
-        
-        response = requests.patch(
-            f"{BASE_URL}/investigations/{inv_id}/recurring-quadrant",
-            headers=get_headers(token),
-            json=payload,
-            timeout=10
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            # Validate response
-            if "message" in data and "recurring_quadrant" in data:
-                results.add_pass("Recurring Quadrant - Save quadrant data")
-                print(f"  Message: {data['message']}")
-                print(f"  Quadrant data saved: {json.dumps(data['recurring_quadrant'], indent=2)}")
-            else:
-                results.add_fail("Recurring Quadrant - Save quadrant data", f"Unexpected response structure: {list(data.keys())}")
-        else:
-            results.add_fail("Recurring Quadrant - Save quadrant data", f"Status {response.status_code}: {response.text}")
-    except Exception as e:
-        results.add_fail("Recurring Quadrant - Save quadrant data", str(e))
-    
-    # Verify data was saved by getting the investigation
-    try:
-        response = requests.get(
-            f"{BASE_URL}/investigations/{inv_id}",
-            headers=get_headers(token),
-            timeout=10
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            investigation = data.get("investigation", {})
-            
-            if investigation.get("recurring_quadrant"):
-                results.add_pass("Recurring Quadrant - Data persisted correctly")
-                print(f"  Verified quadrant data in investigation")
-            else:
-                results.add_fail("Recurring Quadrant - Data persistence", "Quadrant data not found in investigation")
-        else:
-            results.add_fail("Recurring Quadrant - Data verification", f"Failed to get investigation: {response.status_code}")
-    except Exception as e:
-        results.add_fail("Recurring Quadrant - Data verification", str(e))
-
-def test_link_unlink_incident(token: str, inv_id: str, results: TestResult):
-    """Test Link and Unlink Incident APIs"""
-    print(f"\n{Colors.BLUE}=== Testing Link/Unlink Incident APIs ==={Colors.END}")
-    
-    # First, create a second investigation to link to
-    second_inv_id = create_test_investigation(token)
-    
-    if not second_inv_id:
-        results.add_fail("Link Incident - Setup", "Failed to create second investigation")
-        return
-    
-    # Test linking
-    try:
-        response = requests.patch(
-            f"{BASE_URL}/investigations/{inv_id}/link-incident",
-            headers=get_headers(token),
-            params={"linked_incident_id": second_inv_id},
-            timeout=10
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            if data.get("linked_incident_id") == second_inv_id and data.get("is_recurring") == True:
-                results.add_pass("Link Incident - Link to another incident")
-                print(f"  Linked to: {second_inv_id}")
-            else:
-                results.add_fail("Link Incident - Link to another incident", f"Unexpected response: {data}")
-        else:
-            results.add_fail("Link Incident - Link to another incident", f"Status {response.status_code}: {response.text}")
-    except Exception as e:
-        results.add_fail("Link Incident - Link to another incident", str(e))
-    
-    # Verify link was created
-    try:
-        response = requests.get(
-            f"{BASE_URL}/investigations/{inv_id}",
-            headers=get_headers(token),
-            timeout=10
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            investigation = data.get("investigation", {})
-            
-            if investigation.get("linked_incident_id") == second_inv_id:
-                results.add_pass("Link Incident - Link persisted correctly")
-            else:
-                results.add_fail("Link Incident - Link persistence", f"Expected linked_incident_id={second_inv_id}, got {investigation.get('linked_incident_id')}")
-        else:
-            results.add_fail("Link Incident - Link verification", f"Failed to get investigation: {response.status_code}")
-    except Exception as e:
-        results.add_fail("Link Incident - Link verification", str(e))
-    
-    # Test unlinking
-    try:
-        response = requests.delete(
-            f"{BASE_URL}/investigations/{inv_id}/link-incident",
-            headers=get_headers(token),
-            timeout=10
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            
-            if "message" in data:
-                results.add_pass("Unlink Incident - Remove link")
-                print(f"  Message: {data['message']}")
-            else:
-                results.add_fail("Unlink Incident - Remove link", f"Unexpected response: {data}")
-        else:
-            results.add_fail("Unlink Incident - Remove link", f"Status {response.status_code}: {response.text}")
-    except Exception as e:
-        results.add_fail("Unlink Incident - Remove link", str(e))
-    
-    # Verify link was removed
-    try:
-        response = requests.get(
-            f"{BASE_URL}/investigations/{inv_id}",
-            headers=get_headers(token),
-            timeout=10
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            investigation = data.get("investigation", {})
-            
-            if investigation.get("linked_incident_id") is None:
-                results.add_pass("Unlink Incident - Link removed correctly")
-            else:
-                results.add_fail("Unlink Incident - Link removal", f"Link still exists: {investigation.get('linked_incident_id')}")
-        else:
-            results.add_fail("Unlink Incident - Unlink verification", f"Failed to get investigation: {response.status_code}")
-    except Exception as e:
-        results.add_fail("Unlink Incident - Unlink verification", str(e))
+        results.add_fail("PM Import List Sessions - List sessions", str(e))
 
 def main():
     """Main test execution"""
     print(f"\n{Colors.BLUE}{'='*60}{Colors.END}")
-    print(f"{Colors.BLUE}Investigation API Testing{Colors.END}")
+    print(f"{Colors.BLUE}PM Intelligence Import API Testing{Colors.END}")
     print(f"{Colors.BLUE}{'='*60}{Colors.END}")
     
     results = TestResult()
@@ -450,19 +505,24 @@ def main():
         print(f"\n{Colors.RED}Failed to authenticate. Cannot proceed with tests.{Colors.END}")
         sys.exit(1)
     
-    # Get or create investigation
-    print(f"\n{Colors.BLUE}=== Setup ==={Colors.END}")
-    inv_id = get_existing_investigation(token)
-    if not inv_id:
-        print(f"\n{Colors.RED}Failed to get investigation ID. Cannot proceed with tests.{Colors.END}")
+    # Test PM Import Upload
+    session_id = test_pm_import_upload(token, results)
+    if not session_id:
+        print(f"\n{Colors.RED}Failed to upload file. Cannot proceed with remaining tests.{Colors.END}")
+        results.summary()
         sys.exit(1)
     
-    # Run all tests
-    test_ai_problem_check(token, inv_id, results)
-    test_similar_incidents(token, inv_id, results)
-    test_linked_incident(token, inv_id, results)
-    test_recurring_quadrant(token, inv_id, results)
-    test_link_unlink_incident(token, inv_id, results)
+    # Wait a moment for processing to complete
+    import time
+    print(f"\n{Colors.YELLOW}Waiting 5 seconds for processing to complete...{Colors.END}")
+    time.sleep(5)
+    
+    # Run remaining tests
+    test_pm_import_get_session(token, session_id, results)
+    test_pm_import_accept_reject_task(token, session_id, results)
+    test_pm_import_bulk_action(token, session_id, results)
+    test_pm_import_to_library(token, session_id, results)
+    test_pm_import_list_sessions(token, results)
     
     # Print summary
     success = results.summary()
