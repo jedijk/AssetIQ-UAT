@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 
-const PAGE_URL = process.env.REACT_APP_BACKEND_URL || 'https://assetiq-mobile-debug.preview.emergentagent.com';
+const PAGE_URL = process.env.REACT_APP_BACKEND_URL || 'https://pm-plan-converter.preview.emergentagent.com';
 
 test.describe('Causal Engine - Investigation Management', () => {
   // Store investigation IDs for cleanup
