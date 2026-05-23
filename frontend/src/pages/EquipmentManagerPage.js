@@ -10,11 +10,10 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
-import {
-  ChevronRight, ChevronDown, ChevronUp, Building2, Factory, Cog, Settings, Wrench, Plus, Trash2, Edit,
+import { ChevronRight, ChevronDown, ChevronUp, Building2, Factory, Cog, Settings, Wrench, Plus, Trash2, Edit,
   GripVertical, ShieldCheck, Gauge, Zap, Droplets, Wind, Thermometer, Box, CircleDot, 
   Pipette, Flame, Cpu, Search, Check, Upload, FileText, X, Package, Move, ArrowRight, ArrowUp, ArrowDown,
-  Download, MoreVertical, Copy, Scissors, RefreshCw,
+  Download, MoreVertical, Copy, Scissors, RefreshCw, TreePine,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -34,6 +33,7 @@ import {
 } from "../components/ui/context-menu";
 import BackButton from "../components/BackButton";
 import { PropertiesPanel } from "../components/equipment/PropertiesPanel";
+import ProcessImportWizard from "../components/equipment/ProcessImportWizard";
 
 const EQUIPMENT_ICONS = { droplets: Droplets, wind: Wind, cog: Cog, thermometer: Thermometer, box: Box, "circle-dot": CircleDot, zap: Zap, gauge: Gauge, cpu: Cpu, pipette: Pipette, flame: Flame };
 const ICON_OPTIONS = ["droplets", "wind", "cog", "thermometer", "box", "circle-dot", "zap", "gauge", "cpu", "pipette", "flame"];
@@ -570,6 +570,8 @@ export default function EquipmentManagerPage() {
   const [excelImportFile, setExcelImportFile] = useState(null);
   const [excelImportInstallation, setExcelImportInstallation] = useState("");
   const [isImportingExcel, setIsImportingExcel] = useState(false);
+  // State for Process Diagram Import
+  const [isProcessImportOpen, setIsProcessImportOpen] = useState(false);
   // State for assigning unstructured items with level selection
   const [assignDialog, setAssignDialog] = useState({ open: false, item: null, parentNode: null, selectedLevel: "" });
   // State for move mode (legacy - kept for compatibility but not actively used with drag-drop)
@@ -1166,6 +1168,11 @@ export default function EquipmentManagerPage() {
               <FileText className="w-4 h-4 mr-1" />{t("equipment.importExcel") || "Import Excel"}
             </Button>
           )}
+          {(isOwner || user?.role === "admin") && (
+            <Button onClick={() => setIsProcessImportOpen(true)} size="sm" variant="outline" className="border-green-200 text-green-700 hover:bg-green-50" data-testid="import-process-btn">
+              <TreePine className="w-4 h-4 mr-1" />Import Process Diagram
+            </Button>
+          )}
           <Button onClick={handleExportExcel} size="sm" variant="outline" disabled={isExporting || nodes.length === 0} data-testid="export-excel-btn">
             <Download className="w-4 h-4 mr-1" />{isExporting ? (t("common.exporting") || "Exporting...") : (t("equipment.exportExcel") || "Export Excel")}
           </Button>
@@ -1565,6 +1572,16 @@ export default function EquipmentManagerPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Process Diagram Import Wizard */}
+      <ProcessImportWizard
+        isOpen={isProcessImportOpen}
+        onClose={() => setIsProcessImportOpen(false)}
+        onImportComplete={() => {
+          queryClient.invalidateQueries({ queryKey: ["equipment-hierarchy"] });
+        }}
+        installations={installations}
+      />
       </div>
     </div>
   );
