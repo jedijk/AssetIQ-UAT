@@ -356,6 +356,11 @@ class PMImportService:
         skipped_count = 0
         low_confidence_imported = 0
         
+        # Track detailed results for UI display
+        linked_details = []  # Tasks linked to existing failure modes
+        created_details = []  # New failure modes created
+        skipped_details = []  # Skipped tasks
+        
         from services.failure_modes_service import FailureModesService
         fm_service = FailureModesService(self.db)
         
@@ -363,6 +368,10 @@ class PMImportService:
             if task.get("review_status") not in ["accepted", "edited"]:
                 if task.get("review_status") == "rejected":
                     skipped_count += 1
+                    skipped_details.append({
+                        "task": task.get("original_task", "")[:100],
+                        "reason": "Rejected by user"
+                    })
                 continue
             
             confidence = task.get("confidence_score", 0)
@@ -406,8 +415,23 @@ class PMImportService:
                     
                     linked_count += 1
                     imported_count += 1
+                    
+                    # Track linked detail
+                    linked_details.append({
+                        "task": task.get("original_task", "")[:100],
+                        "task_type": task.get("task_type", ""),
+                        "component": task.get("component", ""),
+                        "frequency": task.get("frequency", ""),
+                        "failure_mode_id": matched_id,
+                        "failure_mode_name": existing_fm.get("failure_mode", library_match.get("matched_name", "")),
+                        "equipment": existing_fm.get("equipment", ""),
+                        "category": existing_fm.get("category", ""),
+                        "action_added": new_action["description"][:80] if not action_exists else None,
+                        "already_existed": action_exists
+                    })
             else:
                 # Create new failure mode entries
+                task_created_fms = []
                 for fm in task.get("suggested_failure_modes", []):
                     fm_name = fm if isinstance(fm, str) else fm.get("name", str(fm))
                     
@@ -444,23 +468,43 @@ class PMImportService:
                         await fm_service.create(new_fm_data, created_by=created_by)
                         new_count += 1
                         imported_count += 1
+                        task_created_fms.append({
+                            "failure_mode_name": fm_name,
+                            "equipment": new_fm_data["equipment"],
+                            "category": new_fm_data["category"]
+                        })
                     except Exception as e:
                         logger.error(f"Failed to create failure mode: {e}")
+                
+                if task_created_fms:
+                    created_details.append({
+                        "task": task.get("original_task", "")[:100],
+                        "task_type": task.get("task_type", ""),
+                        "component": task.get("component", ""),
+                        "frequency": task.get("frequency", ""),
+                        "failure_modes_created": task_created_fms
+                    })
+        
+        # Build import result with details
+        import_result = {
+            "total_imported": imported_count,
+            "linked_to_existing": linked_count,
+            "new_created": new_count,
+            "skipped": skipped_count,
+            "low_confidence_imported": low_confidence_imported,
+            "imported_at": now.isoformat(),
+            "imported_by": created_by,
+            "linked_details": linked_details,
+            "created_details": created_details,
+            "skipped_details": skipped_details
+        }
         
         # Update session status
         await self.sessions_collection.update_one(
             {"session_id": session_id},
             {"$set": {
                 "status": "imported",
-                "import_result": {
-                    "total_imported": imported_count,
-                    "linked_to_existing": linked_count,
-                    "new_created": new_count,
-                    "skipped": skipped_count,
-                    "low_confidence_imported": low_confidence_imported,
-                    "imported_at": now.isoformat(),
-                    "imported_by": created_by
-                },
+                "import_result": import_result,
                 "updated_at": now
             }}
         )
@@ -471,7 +515,10 @@ class PMImportService:
             "linked_to_existing": linked_count,
             "new_created": new_count,
             "skipped": skipped_count,
-            "low_confidence_imported": low_confidence_imported
+            "low_confidence_imported": low_confidence_imported,
+            "linked_details": linked_details,
+            "created_details": created_details,
+            "skipped_details": skipped_details
         }
     
     # ==================== FILE PROCESSING ====================

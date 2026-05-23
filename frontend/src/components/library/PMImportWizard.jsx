@@ -813,50 +813,158 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
           
           {/* Step 4: Import Summary */}
           {step === 4 && importResult && (
-            <div className="p-12 text-center">
-              <div className="w-20 h-20 mx-auto mb-6 bg-green-100 rounded-full flex items-center justify-center">
-                <CheckCircle className="w-10 h-10 text-green-600" />
-              </div>
-              
-              <h3 className="text-2xl font-semibold text-slate-900 mb-2">
-                Import Complete!
-              </h3>
-              <p className="text-slate-500 mb-8 max-w-md mx-auto">
-                Your maintenance plan has been converted to failure mode intelligence.
-              </p>
-              
-              {/* Summary stats */}
-              <div className="max-w-lg mx-auto bg-slate-50 rounded-xl p-6 mb-8">
-                <div className="grid grid-cols-2 gap-4 text-left">
-                  <div className="p-4 bg-white rounded-lg">
-                    <p className="text-3xl font-bold text-blue-600">{importResult.total_imported}</p>
-                    <p className="text-sm text-slate-500">Total Imported</p>
-                  </div>
-                  <div className="p-4 bg-white rounded-lg">
-                    <p className="text-3xl font-bold text-green-600">{importResult.linked_to_existing}</p>
-                    <p className="text-sm text-slate-500">Linked to Existing</p>
-                  </div>
-                  <div className="p-4 bg-white rounded-lg">
-                    <p className="text-3xl font-bold text-purple-600">{importResult.new_created}</p>
-                    <p className="text-sm text-slate-500">New Created</p>
-                  </div>
-                  <div className="p-4 bg-white rounded-lg">
-                    <p className="text-3xl font-bold text-slate-400">{importResult.skipped}</p>
-                    <p className="text-sm text-slate-500">Skipped</p>
-                  </div>
+            <div className="p-6 max-h-[70vh] overflow-y-auto">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-8 h-8 text-green-600" />
                 </div>
                 
-                {importResult.low_confidence_imported > 0 && (
-                  <div className="mt-4 p-3 bg-amber-50 rounded-lg border border-amber-200 text-sm text-amber-700">
-                    <AlertTriangle className="w-4 h-4 inline mr-1" />
-                    {importResult.low_confidence_imported} low confidence items were imported with warnings
-                  </div>
-                )}
+                <h3 className="text-xl font-semibold text-slate-900 mb-1">
+                  Import Complete!
+                </h3>
+                <p className="text-slate-500 text-sm">
+                  Your maintenance plan has been converted to failure mode intelligence.
+                </p>
               </div>
               
-              <Button onClick={handleClose} className="bg-blue-600 hover:bg-blue-700">
-                Done
-              </Button>
+              {/* Summary stats */}
+              <div className="grid grid-cols-4 gap-3 mb-6">
+                <div className="p-3 bg-blue-50 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-blue-600">{importResult.total_imported}</p>
+                  <p className="text-xs text-slate-500">Total Imported</p>
+                </div>
+                <div className="p-3 bg-green-50 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-green-600">{importResult.linked_to_existing}</p>
+                  <p className="text-xs text-slate-500">Linked to Existing</p>
+                </div>
+                <div className="p-3 bg-purple-50 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-purple-600">{importResult.new_created}</p>
+                  <p className="text-xs text-slate-500">New Created</p>
+                </div>
+                <div className="p-3 bg-slate-100 rounded-lg text-center">
+                  <p className="text-2xl font-bold text-slate-400">{importResult.skipped}</p>
+                  <p className="text-xs text-slate-500">Skipped</p>
+                </div>
+              </div>
+              
+              {importResult.low_confidence_imported > 0 && (
+                <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200 text-sm text-amber-700">
+                  <AlertTriangle className="w-4 h-4 inline mr-1" />
+                  {importResult.low_confidence_imported} low confidence items were imported with warnings
+                </div>
+              )}
+              
+              {/* Linked to Existing Failure Modes */}
+              {importResult.linked_details && importResult.linked_details.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                    <Library className="w-4 h-4 text-green-600" />
+                    Tasks Linked to Existing Failure Modes ({importResult.linked_details.length})
+                  </h4>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {importResult.linked_details.map((item, idx) => (
+                      <div key={idx} className="bg-green-50 border border-green-100 rounded-lg p-3">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-slate-700 mb-1">{item.task}</p>
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {item.task_type && (
+                                <Badge className="text-xs bg-slate-100 text-slate-600">{item.task_type}</Badge>
+                              )}
+                              {item.component && (
+                                <Badge variant="outline" className="text-xs">{item.component}</Badge>
+                              )}
+                              {item.frequency && (
+                                <Badge variant="outline" className="text-xs bg-white">{item.frequency}</Badge>
+                              )}
+                            </div>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-green-500 flex-shrink-0 mt-1" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1 mb-1">
+                              <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                              <p className="text-sm font-medium text-green-800">{item.failure_mode_name}</p>
+                            </div>
+                            <p className="text-xs text-slate-500">{item.equipment} • {item.category}</p>
+                            {item.action_added && (
+                              <p className="text-xs text-green-600 mt-1">
+                                + Added action: "{item.action_added}..."
+                              </p>
+                            )}
+                            {item.already_existed && (
+                              <p className="text-xs text-slate-400 mt-1">
+                                (Action already existed)
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* New Failure Modes Created */}
+              {importResult.created_details && importResult.created_details.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-purple-600" />
+                    New Failure Modes Created ({importResult.created_details.length} tasks → {importResult.new_created} failure modes)
+                  </h4>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {importResult.created_details.map((item, idx) => (
+                      <div key={idx} className="bg-purple-50 border border-purple-100 rounded-lg p-3">
+                        <div className="mb-2">
+                          <p className="text-sm text-slate-700 mb-1">{item.task}</p>
+                          <div className="flex flex-wrap gap-1">
+                            {item.task_type && (
+                              <Badge className="text-xs bg-slate-100 text-slate-600">{item.task_type}</Badge>
+                            )}
+                            {item.component && (
+                              <Badge variant="outline" className="text-xs">{item.component}</Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 mb-1">
+                          <Sparkles className="w-3 h-3 text-purple-600" />
+                          <span className="text-xs font-medium text-purple-700">Created:</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {item.failure_modes_created.map((fm, fmIdx) => (
+                            <Badge key={fmIdx} className="text-xs bg-purple-100 text-purple-700">
+                              {fm.failure_mode_name}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Skipped Tasks */}
+              {importResult.skipped_details && importResult.skipped_details.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                    <XCircle className="w-4 h-4 text-slate-400" />
+                    Skipped Tasks ({importResult.skipped_details.length})
+                  </h4>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {importResult.skipped_details.map((item, idx) => (
+                      <div key={idx} className="bg-slate-50 rounded p-2 text-sm text-slate-500">
+                        <span className="line-through">{item.task}</span>
+                        <span className="text-xs ml-2">({item.reason})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex justify-center pt-4 border-t">
+                <Button onClick={handleClose} className="bg-blue-600 hover:bg-blue-700">
+                  Done
+                </Button>
+              </div>
             </div>
           )}
         </div>
