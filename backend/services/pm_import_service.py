@@ -105,6 +105,83 @@ class PMImportService:
         self.sessions_collection = db["pm_import_sessions"]
         self.failure_modes_collection = db["failure_modes"]
     
+    async def create_session_placeholder(
+        self,
+        file_name: str,
+        file_type: str,
+        created_by: str
+    ) -> str:
+        """Create a session placeholder for background processing. Returns session_id."""
+        
+        session_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc)
+        
+        session = {
+            "session_id": session_id,
+            "file_name": file_name,
+            "file_type": file_type,
+            "status": "processing",
+            "progress": 0,
+            "progress_message": "Initializing...",
+            "tasks_extracted": [],
+            "stats": {
+                "total_tasks": 0,
+                "failure_modes_identified": 0,
+                "existing_matches": 0,
+                "new_proposed": 0,
+                "low_confidence_items": 0,
+                "manual_review_required": 0
+            },
+            "created_by": created_by,
+            "created_at": now,
+            "updated_at": now
+        }
+        
+        await self.sessions_collection.insert_one(session)
+        return session_id
+    
+    async def process_session(
+        self,
+        session_id: str,
+        file_name: str,
+        file_type: str,
+        file_content: bytes
+    ) -> None:
+        """Process a PM import session (called as background task)."""
+        
+        try:
+            tasks = await self._process_file(
+                session_id, file_name, file_type, file_content
+            )
+            
+            # Update session with results
+            stats = self._calculate_stats(tasks)
+            
+            await self.sessions_collection.update_one(
+                {"session_id": session_id},
+                {"$set": {
+                    "status": "ready_for_review",
+                    "progress": 100,
+                    "progress_message": "Processing complete",
+                    "tasks_extracted": tasks,
+                    "stats": stats,
+                    "updated_at": datetime.now(timezone.utc)
+                }}
+            )
+            logger.info(f"PM Import session {session_id} completed with {len(tasks)} tasks")
+            
+        except Exception as e:
+            logger.error(f"Error processing session {session_id}: {e}", exc_info=True)
+            await self.sessions_collection.update_one(
+                {"session_id": session_id},
+                {"$set": {
+                    "status": "error",
+                    "error_message": str(e),
+                    "progress_message": f"Error: {str(e)[:200]}",
+                    "updated_at": datetime.now(timezone.utc)
+                }}
+            )
+    
     async def create_session(
         self,
         file_name: str,
@@ -112,7 +189,7 @@ class PMImportService:
         file_content: bytes,
         created_by: str
     ) -> Dict[str, Any]:
-        """Create a new PM import session and start processing."""
+        """Create a new PM import session and start processing (legacy sync method)."""
         
         session_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc)

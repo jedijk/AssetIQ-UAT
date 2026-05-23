@@ -5,6 +5,7 @@ Converts preventive maintenance plans (Excel, PDF, images) into structured
 failure mode intelligence for the AssetIQ Failure Mode Library.
 """
 
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -46,6 +47,37 @@ class BulkActionRequest(BaseModel):
     """Request model for bulk actions."""
     task_ids: Optional[List[str]] = None
     action: str  # "accept", "reject", "accept_high_confidence"
+
+
+# Background task for processing
+async def process_pm_file_background(
+    session_id: str,
+    file_name: str,
+    file_type: str,
+    file_content: bytes,
+    created_by: str
+):
+    """Process PM file in background."""
+    pm_service = PMImportService(db)
+    try:
+        await pm_service.process_session(
+            session_id=session_id,
+            file_name=file_name,
+            file_type=file_type,
+            file_content=file_content
+        )
+    except Exception as e:
+        logger.error(f"Background processing error for session {session_id}: {e}", exc_info=True)
+        # Update session with error
+        await db.pm_import_sessions.update_one(
+            {"session_id": session_id},
+            {"$set": {
+                "status": "error",
+                "error_message": str(e),
+                "progress_message": f"Error: {str(e)[:200]}",
+                "updated_at": datetime.now(timezone.utc)
+            }}
+        )
 
 
 # ============== ROUTES ==============
@@ -102,26 +134,35 @@ async def upload_pm_plan(
     
     # Create PM Import service
     pm_service = PMImportService(db)
+    user_id = current_user.get("id", current_user.get("email", "unknown"))
     
-    # Create session and process (async)
+    # Create session first (quick - just DB insert)
     try:
-        session = await pm_service.create_session(
+        session_id = await pm_service.create_session_placeholder(
+            file_name=file.filename,
+            file_type=file_type,
+            created_by=user_id
+        )
+        
+        # Process file in background to avoid timeout
+        asyncio.create_task(process_pm_file_background(
+            session_id=session_id,
             file_name=file.filename,
             file_type=file_type,
             file_content=content,
-            created_by=current_user.get("id", current_user.get("email", "unknown"))
-        )
+            created_by=user_id
+        ))
         
         return {
-            "session_id": session["session_id"],
-            "status": session["status"],
-            "message": "File uploaded and processing started" if session["status"] == "processing" else "Processing complete",
-            "stats": session.get("stats"),
-            "tasks_count": len(session.get("tasks_extracted", []))
+            "session_id": session_id,
+            "status": "processing",
+            "message": "File uploaded. Processing started in background. Poll session for status.",
+            "stats": None,
+            "tasks_count": 0
         }
         
     except Exception as e:
-        logger.error(f"Upload processing error: {e}", exc_info=True)
+        logger.error(f"Upload error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

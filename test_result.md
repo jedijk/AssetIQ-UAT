@@ -165,6 +165,9 @@ frontend:
       - working: true
         agent: "testing"
         comment: "TESTED: PM Import Wizard modal opens correctly when Import PM Plan button is clicked. Modal displays correct title 'Import Maintenance Plan' with Sparkles icon, descriptive text about AI-powered extraction, professional drag-drop upload zone with border-dashed styling, supported file types (Excel .xlsx/.xls, PDF, Images .png/.jpg), Browse Files button, Continue button (disabled until file selected), and Cancel button. All UI elements render correctly. Screenshots captured."
+      - working: true
+        agent: "testing"
+        comment: "FULL FLOW TESTED: Complete PM Import flow working correctly. (1) Upload: Excel file upload successful via file input, file name displayed correctly. (2) Processing: Animated progress displayed with Brain icon, progress bar, 5 processing steps (Reading, Extracting, Identifying, Mapping, Matching), processing completed in ~18-21 seconds. (3) Review: All 6 KPI cards displayed (5 Tasks Extracted, 15 Failure Modes, 5 Existing Matches, 0 New Proposed, 0 Low Confidence, 0 Manual Review), 5 task rows with confidence scores (81%-96%), library match badges (all Existing Match), accept/reject buttons, task expansion working. (4) Bulk Accept: 'Accept All High Confidence' button successfully accepted all 5 tasks, success toast displayed 'Accepted 5 high confidence tasks', all tasks show green 'Accepted' badge and green left border, counter updated to '5 of 5 tasks accepted'. (5) Import: 'Import to Library' button enabled after acceptance, import completed successfully, success toast 'Import complete!' displayed, modal closed and returned to Library page. Backend logs confirm: POST /pm-import/upload (200), polling GET /pm-import/session (200), POST /pm-import/session/bulk-action (200), POST /pm-import/session/import (200). Minor: Import summary step (Step 4) not displayed - modal closes immediately after import with success toast instead of showing detailed stats screen. Core functionality 100% working."
 
   - task: "PM Import Button on Failure Modes Page"
     implemented: true
@@ -199,7 +202,7 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 6
+  test_sequence: 7
   run_ui: false
 
 test_plan:
@@ -218,3 +221,5 @@ agent_communication:
     message: "BACKEND TESTING COMPLETE - ALL TESTS PASSING (13/13). Tested all PM Import endpoints: upload, get session, accept/reject tasks, bulk actions, import to library, list sessions. Fixed 2 minor issues: (1) Added /pm-import to timeout middleware for 120s timeout, (2) Fixed bug in update_task where review_status was being overwritten to 'edited'. All backend APIs working correctly with AI processing, library matching, and data persistence. Ready for frontend integration testing."
   - agent: "testing"
     message: "FRONTEND UI TESTING COMPLETE - ALL TESTS PASSING. Tested PM Import feature on Failure Modes Library page. Import PM Plan button exists with correct styling (blue outlined, Upload icon), positioned next to Export Excel and Add Failure Mode buttons. Button click opens PMImportWizard modal with correct title 'Import Maintenance Plan', Sparkles icon, descriptive text, professional drag-drop upload zone, supported file types (Excel, PDF, Images), Browse Files button, Continue button (disabled until file selected), and Cancel button. All UI elements render correctly. Screenshots captured. PM Intelligence Import feature is fully functional."
+  - agent: "testing"
+    message: "FULL END-TO-END FLOW TESTING COMPLETE - ALL TESTS PASSING. Tested complete PM Import workflow from upload to library import: (1) Login and navigation to Library/Failure Modes page working. (2) Import PM Plan button opens wizard modal correctly. (3) File upload: Successfully uploaded test Excel file with 5 PM tasks (inspect gearbox, grease bearings, calibrate sensor, replace filter, clean fan). (4) Processing: AI processing completed in ~18-21 seconds with animated progress bar and 5 processing steps displayed. (5) Review step: All 6 KPI cards displayed correctly (5 tasks, 15 failure modes, 5 existing matches), all 5 task rows showing with confidence scores 81%-96%, library match badges, component/task type/frequency badges, accept/reject buttons. (6) Bulk accept: 'Accept All High Confidence' successfully accepted all 5 high-confidence tasks, success toast displayed, all tasks show green 'Accepted' status. (7) Import: 'Import to Library' button enabled, import completed successfully, success toast displayed, modal closed. Backend logs confirm all API calls successful (upload 200, polling 200, bulk-action 200, import 200). Minor UI note: Import summary step (Step 4 with detailed stats) not displayed - modal closes immediately with success toast instead. Core functionality 100% working. PM Intelligence Import feature is production-ready."
