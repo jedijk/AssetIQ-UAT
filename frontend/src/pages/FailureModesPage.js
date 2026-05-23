@@ -133,6 +133,25 @@ const FailureModesPage = () => {
     }
   }, [searchParams, setSearchParams]);
   
+  // Handle ?fm_id=... param — open the failure mode in the view panel
+  const pendingFmId = searchParams.get("fm_id");
+  useEffect(() => {
+    if (!pendingFmId) return;
+    if (!failureModes || failureModes.length === 0) return;
+    const match = failureModes.find(
+      (fm) => fm.id === pendingFmId || String(fm.legacy_id) === pendingFmId
+    );
+    if (match) {
+      setSelectedFm(match);
+      setIsViewPanelEditing(false);
+      setViewPanelForm(null);
+      // Clear param so it doesn't re-trigger
+      const next = new URLSearchParams(searchParams);
+      next.delete("fm_id");
+      setSearchParams(next, { replace: true });
+    }
+  }, [pendingFmId, failureModes, searchParams, setSearchParams]);
+  
   // Equipment type dialog state
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState(null);

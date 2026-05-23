@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { pmImportAPI } from "../../lib/apis/pmImport";
 import { toast } from "sonner";
@@ -27,6 +28,9 @@ import {
   Info,
   AlertCircle,
   HelpCircle,
+  Clock,
+  Wrench,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -44,6 +48,62 @@ const TASK_TYPE_COLORS = {
   Adjustment: "bg-indigo-100 text-indigo-700",
   Monitoring: "bg-green-100 text-green-700",
   Unknown: "bg-slate-100 text-slate-600",
+};
+
+// Action type colors (PM/PDM/CM)
+const ACTION_TYPE_COLORS = {
+  PM: "bg-blue-100 text-blue-700 border-blue-200",
+  PDM: "bg-purple-100 text-purple-700 border-purple-200",
+  CM: "bg-amber-100 text-amber-700 border-amber-200",
+};
+
+// Discipline colors
+const DISCIPLINE_COLORS = {
+  Mechanical: "bg-slate-100 text-slate-700",
+  Electrical: "bg-yellow-100 text-yellow-700",
+  Instrumentation: "bg-purple-100 text-purple-700",
+  Process: "bg-cyan-100 text-cyan-700",
+  Inspection: "bg-blue-100 text-blue-700",
+  Operations: "bg-emerald-100 text-emerald-700",
+  Maintenance: "bg-orange-100 text-orange-700",
+  Reliability: "bg-pink-100 text-pink-700",
+  "Multi-discipline": "bg-pink-100 text-pink-700",
+  "Rotating Equipment": "bg-indigo-100 text-indigo-700",
+  "Static Equipment": "bg-stone-100 text-stone-700",
+};
+
+// Small badge for action type
+const ActionTypeBadge = ({ value }) => {
+  if (!value) return null;
+  const cls = ACTION_TYPE_COLORS[value] || "bg-slate-100 text-slate-700 border-slate-200";
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold border ${cls}`}>
+      {value}
+    </span>
+  );
+};
+
+// Small badge for discipline
+const DisciplineBadge = ({ value }) => {
+  if (!value) return null;
+  const cls = DISCIPLINE_COLORS[value] || "bg-slate-100 text-slate-700";
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${cls}`}>
+      <Wrench className="w-2.5 h-2.5" />
+      {value}
+    </span>
+  );
+};
+
+// Small badge for estimated time
+const EstimatedTimeBadge = ({ value }) => {
+  if (!value) return null;
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-50 text-slate-600 border border-slate-200">
+      <Clock className="w-2.5 h-2.5" />
+      {value}
+    </span>
+  );
 };
 
 // Confidence badge
@@ -198,11 +258,14 @@ const TaskRow = ({ task, onAccept, onReject, onSelectMatch, onApproveNewFM, onSe
               <Badge className={`text-xs ${TASK_TYPE_COLORS[task.task_type] || TASK_TYPE_COLORS.Unknown}`}>
                 {task.task_type}
               </Badge>
+              <ActionTypeBadge value={task.action_type} />
+              <DisciplineBadge value={task.discipline} />
               {task.frequency && (
                 <Badge variant="outline" className="text-xs bg-slate-50">
                   {task.frequency}
                 </Badge>
               )}
+              <EstimatedTimeBadge value={task.estimated_time} />
             </div>
           </div>
           
@@ -477,6 +540,7 @@ const TaskRow = ({ task, onAccept, onReject, onSelectMatch, onApproveNewFM, onSe
 // Main PM Import Wizard Component
 export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [step, setStep] = useState(1); // 1: Upload, 2: Processing, 3: Review, 4: Import Summary
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -712,6 +776,13 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
     } finally {
       setImporting(false);
     }
+  };
+  
+  // Navigate to a failure mode detail in the Library page
+  const handleViewFailureMode = (fmId) => {
+    if (!fmId) return;
+    handleClose();
+    navigate(`/library?fm_id=${fmId}`);
   };
   
   // Export review
@@ -1087,7 +1158,7 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
                     <Library className="w-4 h-4 text-green-600" />
                     Tasks Linked to Existing Failure Modes ({importResult.linked_details.length})
                   </h4>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                  <div className="space-y-2 max-h-72 overflow-y-auto">
                     {importResult.linked_details.map((item, idx) => (
                       <div key={idx} className="bg-green-50 border border-green-100 rounded-lg p-3">
                         <div className="flex items-start gap-3">
@@ -1097,21 +1168,39 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
                               {item.task_type && (
                                 <Badge className="text-xs bg-slate-100 text-slate-600">{item.task_type}</Badge>
                               )}
+                              <ActionTypeBadge value={item.action_type} />
+                              <DisciplineBadge value={item.discipline} />
                               {item.component && (
                                 <Badge variant="outline" className="text-xs">{item.component}</Badge>
                               )}
                               {item.frequency && (
                                 <Badge variant="outline" className="text-xs bg-white">{item.frequency}</Badge>
                               )}
+                              <EstimatedTimeBadge value={item.estimated_time} />
                             </div>
                           </div>
                           <ChevronRight className="w-4 h-4 text-green-500 flex-shrink-0 mt-1" />
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1 mb-1">
+                            <div className="flex items-center gap-1 mb-1 flex-wrap">
                               <CheckCircle className="w-3.5 h-3.5 text-green-600" />
-                              <p className="text-sm font-medium text-green-800">{item.failure_mode_name}</p>
+                              <button
+                                type="button"
+                                onClick={() => handleViewFailureMode(item.failure_mode_id)}
+                                className="text-sm font-medium text-green-800 hover:text-green-600 underline-offset-2 hover:underline inline-flex items-center gap-1"
+                                data-testid={`view-failure-mode-${item.failure_mode_id}`}
+                                title="Open this failure mode in the Library"
+                              >
+                                {item.failure_mode_name}
+                                <ExternalLink className="w-3 h-3" />
+                              </button>
                             </div>
                             <p className="text-xs text-slate-500">{item.equipment} • {item.category}</p>
+                            {item.marked_customer_specific && (
+                              <p className="text-xs text-purple-600 mt-1">
+                                <Sparkles className="w-3 h-3 inline mr-0.5" />
+                                Marked as Customer Specific
+                              </p>
+                            )}
                             {item.action_added && (
                               <p className="text-xs text-green-600 mt-1">
                                 + Added action: "{item.action_added}..."
@@ -1137,7 +1226,7 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
                     <Sparkles className="w-4 h-4 text-purple-600" />
                     New Failure Modes Created ({importResult.created_details.length} tasks → {importResult.new_created} failure modes)
                   </h4>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                  <div className="space-y-2 max-h-72 overflow-y-auto">
                     {importResult.created_details.map((item, idx) => (
                       <div key={idx} className="bg-purple-50 border border-purple-100 rounded-lg p-3">
                         <div className="mb-2">
@@ -1146,9 +1235,15 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
                             {item.task_type && (
                               <Badge className="text-xs bg-slate-100 text-slate-600">{item.task_type}</Badge>
                             )}
+                            <ActionTypeBadge value={item.action_type} />
+                            <DisciplineBadge value={item.discipline} />
                             {item.component && (
                               <Badge variant="outline" className="text-xs">{item.component}</Badge>
                             )}
+                            {item.frequency && (
+                              <Badge variant="outline" className="text-xs bg-white">{item.frequency}</Badge>
+                            )}
+                            <EstimatedTimeBadge value={item.estimated_time} />
                           </div>
                         </div>
                         <div className="flex items-center gap-1 mb-1">
@@ -1157,9 +1252,23 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
                         </div>
                         <div className="flex flex-wrap gap-1">
                           {item.failure_modes_created.map((fm, fmIdx) => (
-                            <Badge key={fmIdx} className="text-xs bg-purple-100 text-purple-700">
-                              {fm.failure_mode_name}
-                            </Badge>
+                            fm.failure_mode_id ? (
+                              <button
+                                key={fmIdx}
+                                type="button"
+                                onClick={() => handleViewFailureMode(fm.failure_mode_id)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"
+                                data-testid={`view-failure-mode-${fm.failure_mode_id}`}
+                                title="Open this failure mode in the Library"
+                              >
+                                {fm.failure_mode_name}
+                                <ExternalLink className="w-3 h-3" />
+                              </button>
+                            ) : (
+                              <Badge key={fmIdx} className="text-xs bg-purple-100 text-purple-700">
+                                {fm.failure_mode_name}
+                              </Badge>
+                            )
                           ))}
                         </div>
                       </div>

@@ -33,6 +33,61 @@ TASK_TYPES = [
     "Unknown"
 ]
 
+# Maintenance action type (CM / PM / PDM)
+ACTION_TYPES = ["PM", "PDM", "CM"]
+
+# Map task type → default action_type and discipline
+# PM = Preventive (time-based), PDM = Predictive (condition-based), CM = Corrective
+TASK_TYPE_DEFAULTS = {
+    "Inspection":   {"action_type": "PM",  "discipline": "Inspection"},
+    "Lubrication":  {"action_type": "PM",  "discipline": "Mechanical"},
+    "Calibration":  {"action_type": "PM",  "discipline": "Instrumentation"},
+    "Replacement":  {"action_type": "PM",  "discipline": "Mechanical"},
+    "Cleaning":     {"action_type": "PM",  "discipline": "Process"},
+    "Adjustment":   {"action_type": "PM",  "discipline": "Mechanical"},
+    "Monitoring":   {"action_type": "PDM", "discipline": "Reliability"},
+    "Unknown":      {"action_type": "PM",  "discipline": "Maintenance"},
+}
+
+# Discipline detection via component keywords (overrides task-type defaults)
+DISCIPLINE_KEYWORDS = {
+    "Electrical": [
+        "cable", "wire", "switchgear", "transformer", "breaker", "fuse",
+        "relay", "circuit", "panel", "motor winding", "vfd", "drive",
+        "schakelaar", "kabel"
+    ],
+    "Instrumentation": [
+        "sensor", "transmitter", "controller", "plc", "gauge", "indicator",
+        "level switch", "flow meter", "pressure transmitter", "temperature transmitter",
+        "calibrate", "calibration", "kalibreer", "control valve", "positioner"
+    ],
+    "Process": [
+        "tank", "vessel", "column", "reactor", "exchanger", "heat exchanger",
+        "filter", "strainer", "separator", "scrubber", "drum",
+        "process line", "piping", "line", "leiding"
+    ],
+    "Mechanical": [
+        "pump", "compressor", "motor", "fan", "blower", "turbine",
+        "bearing", "seal", "gear", "gearbox", "coupling", "shaft",
+        "belt", "chain", "roller", "conveyor", "valve body",
+        "pomp", "lager", "tandwiel", "ventilator"
+    ],
+}
+
+# Action type detection via task text keywords (overrides task-type defaults)
+ACTION_TYPE_KEYWORDS = {
+    "PDM": [
+        "vibration analysis", "vibration monitoring", "thermography",
+        "thermal imaging", "oil analysis", "trillingsanalyse",
+        "ultrasonic", "condition monitor", "trend", "predictive",
+        "motor current signature", "infrared", "acoustic emission"
+    ],
+    "CM": [
+        "repair", "fix", "rebuild", "restore after failure", "corrective",
+        "herstel", "repareer"
+    ],
+}
+
 # Keyword-based pre-classification rules
 TASK_CLASSIFICATION_RULES = {
     "lubrication": {
@@ -94,6 +149,14 @@ FREQUENCY_PATTERNS = [
     (r'\bevery\s+(\d+)\s*months?\b', 'Every {0} months'),
     (r'\b(\d+)\s*hours?\b', 'Every {0} hours'),
     (r'\b(\d+)\s*h\b', 'Every {0} hours'),
+]
+
+# Estimated duration pattern matching (time required to execute the task)
+# Captures "30 min", "2 hours", "1.5 hrs", "45 minutes", Dutch "minuten", "uur"
+DURATION_PATTERNS = [
+    (r'\b(\d+(?:[.,]\d+)?)\s*(?:hours?|hrs?|uur|uren|hr)\b', 'hours'),
+    (r'\b(\d+)\s*(?:minutes?|mins?|min|minuten)\b', 'minutes'),
+    (r'\b(\d+)\s*m\b(?!o)', 'minutes'),  # "30m" but not "month"
 ]
 
 
@@ -444,6 +507,10 @@ class PMImportService:
                     continue
                 
                 # Create the approved new failure mode
+                action_type = task.get("action_type") or "PM"
+                discipline = task.get("discipline") or "Maintenance"
+                estimated_time = task.get("estimated_time") or ""
+                
                 new_fm_data = {
                     "category": approved_fm.get("category") or self._determine_category(task),
                     "equipment": approved_fm.get("equipment") or task.get("component") or "General Equipment",
@@ -454,10 +521,11 @@ class PMImportService:
                     "detectability": approved_fm.get("detectability", 5),
                     "recommended_actions": [{
                         "description": task.get("existing_control") or task.get("original_task"),
-                        "action_type": "PM",
-                        "discipline": "mechanical",
+                        "action_type": action_type,
+                        "discipline": discipline,
                         "source": "PM Import",
                         "frequency": task.get("frequency"),
+                        "estimated_time": estimated_time,
                         "imported_from": session.get("file_name"),
                         "imported_at": now.isoformat()
                     }],
@@ -468,15 +536,19 @@ class PMImportService:
                 }
                 
                 try:
-                    await fm_service.create(new_fm_data, created_by=created_by)
+                    created_fm = await fm_service.create(new_fm_data, created_by=created_by)
                     new_count += 1
                     imported_count += 1
                     created_details.append({
                         "task": task.get("original_task", "")[:100],
                         "task_type": task.get("task_type", ""),
+                        "action_type": action_type,
+                        "discipline": discipline,
+                        "estimated_time": estimated_time,
                         "component": task.get("component", ""),
                         "frequency": task.get("frequency", ""),
                         "failure_modes_created": [{
+                            "failure_mode_id": created_fm.get("id"),
                             "failure_mode_name": fm_name,
                             "equipment": new_fm_data["equipment"],
                             "category": new_fm_data["category"]
@@ -549,20 +621,30 @@ class PMImportService:
         file_name: str,
         now
     ) -> Optional[Dict[str, Any]]:
-        """Link a PM task to an existing failure mode as a preventive control."""
+        """Link a PM task to an existing failure mode as a preventive control.
+        
+        Updates the failure mode with:
+        - The PM/CM/PDM action (with discipline)
+        - failure_mode_type → "customer_specific" (customized with user's PM)
+        """
         
         existing_fm = await fm_service.get_by_id(failure_mode_id)
         if not existing_fm:
             return None
         
+        action_type = task.get("action_type") or "PM"
+        discipline = task.get("discipline") or "Maintenance"
+        estimated_time = task.get("estimated_time") or ""
+        
         # Add the PM task as a recommended action if not already present
         actions = existing_fm.get("recommended_actions", [])
         new_action = {
             "description": task.get("existing_control") or task.get("original_task"),
-            "action_type": "PM",
-            "discipline": "mechanical",
+            "action_type": action_type,
+            "discipline": discipline,
             "source": "PM Import",
             "frequency": task.get("frequency"),
+            "estimated_time": estimated_time,
             "imported_from": file_name,
             "imported_at": now.isoformat()
         }
@@ -575,15 +657,25 @@ class PMImportService:
         
         if not action_exists:
             actions.append(new_action)
-            await fm_service.update(
-                failure_mode_id,
-                {"recommended_actions": actions},
-                updated_by="PM Import"
-            )
+        
+        # Mark failure mode as customer_specific since user has customized it with their PM
+        update_payload = {
+            "recommended_actions": actions,
+            "failure_mode_type": "customer_specific",
+        }
+        await fm_service.update(
+            failure_mode_id,
+            update_payload,
+            updated_by="PM Import",
+            change_reason=f"PM Import: linked task '{(task.get('original_task') or '')[:80]}'"
+        )
         
         return {
             "task": task.get("original_task", "")[:100],
             "task_type": task.get("task_type", ""),
+            "action_type": action_type,
+            "discipline": discipline,
+            "estimated_time": estimated_time,
             "component": task.get("component", ""),
             "frequency": task.get("frequency", ""),
             "failure_mode_id": failure_mode_id,
@@ -591,7 +683,8 @@ class PMImportService:
             "equipment": existing_fm.get("equipment", ""),
             "category": existing_fm.get("category", ""),
             "action_added": new_action["description"][:80] if not action_exists else None,
-            "already_existed": action_exists
+            "already_existed": action_exists,
+            "marked_customer_specific": existing_fm.get("failure_mode_type") != "customer_specific",
         }
     
     # ==================== FILE PROCESSING ====================
@@ -656,6 +749,7 @@ class PMImportService:
         task_column_keywords = ["task", "description", "activity", "action", "work", "maintenance", "taak", "beschrijving", "activiteit"]
         equipment_column_keywords = ["equipment", "component", "asset", "machine", "apparaat", "onderdeel"]
         frequency_column_keywords = ["frequency", "interval", "schedule", "frequentie", "periode"]
+        duration_column_keywords = ["duration", "estimated time", "estimated_time", "time", "duur", "tijd", "minutes", "hours"]
         
         for sheet in wb.worksheets:
             # Try to find header row
@@ -664,6 +758,7 @@ class PMImportService:
             task_col_idx = None
             equipment_col_idx = None
             frequency_col_idx = None
+            duration_col_idx = None
             
             for row_idx, row in enumerate(sheet.iter_rows(max_row=10, values_only=True), 1):
                 if row and any(cell for cell in row if cell):
@@ -682,6 +777,8 @@ class PMImportService:
                                 equipment_col_idx = i
                             if any(kw in h_lower for kw in frequency_column_keywords) and frequency_col_idx is None:
                                 frequency_col_idx = i
+                            if any(kw in h_lower for kw in duration_column_keywords) and duration_col_idx is None:
+                                duration_col_idx = i
                         break
             
             if not header_row:
@@ -724,6 +821,10 @@ class PMImportService:
                 # Extract frequency if available
                 if frequency_col_idx is not None and frequency_col_idx < len(row) and row[frequency_col_idx]:
                     row_data["_frequency"] = str(row[frequency_col_idx]).strip()
+                
+                # Extract duration / estimated time if available
+                if duration_col_idx is not None and duration_col_idx < len(row) and row[duration_col_idx]:
+                    row_data["duration"] = str(row[duration_col_idx]).strip()
                 
                 # Store all column data for reference
                 for idx, cell in enumerate(row):
@@ -930,6 +1031,18 @@ Only return the JSON array, no other text."""
         if not frequency:
             frequency = self._extract_frequency(task_text)
         
+        # Step 2b: Extract estimated duration (task execution time)
+        duration_field_text = ""
+        # Check common duration column names from parsed data
+        for key in ("duration", "estimated_time", "estimated time", "time", "estimated_duration", "tijd", "duur"):
+            if row.get(key):
+                duration_field_text = str(row.get(key))
+                break
+        ocr_duration = row.get("_ocr_data", {}).get("duration") or row.get("_ocr_data", {}).get("estimated_time")
+        estimated_time = self._extract_duration(duration_field_text) \
+            or (str(ocr_duration) if ocr_duration else "") \
+            or self._extract_duration(task_text)
+        
         # Step 3: Extract component (from parsed data, OCR data, or text)
         component = row.get("_equipment") or row.get("_ocr_data", {}).get("equipment", "")
         if not component:
@@ -956,11 +1069,23 @@ Only return the JSON array, no other text."""
             "component": component or ai_analysis.get("component", ""),
             "asset": ai_analysis.get("asset", ""),
             "task_type": ai_analysis.get("task_type", task_type),
+            "action_type": self._infer_action_type(
+                task_text,
+                ai_analysis.get("task_type", task_type),
+                ai_analysis.get("action_type"),
+            ),
+            "discipline": self._infer_discipline(
+                task_text,
+                component or ai_analysis.get("component", ""),
+                ai_analysis.get("task_type", task_type),
+                ai_analysis.get("discipline"),
+            ),
             "suggested_failure_modes": ai_analysis.get("failure_modes", rule_based_data.get("failure_modes", [])),
             "failure_mechanisms": ai_analysis.get("mechanisms", rule_based_data.get("failure_mechanisms", [])),
             "detection_methods": ai_analysis.get("detection_methods", rule_based_data.get("detection_methods", [])),
             "existing_control": task_text,
             "frequency": frequency or ai_analysis.get("frequency", ""),
+            "estimated_time": estimated_time or ai_analysis.get("estimated_time", ""),
             "confidence_score": confidence,
             "ai_reasoning": ai_analysis.get("reasoning", ""),
             "library_match": {"status": "pending"},
@@ -990,6 +1115,61 @@ Only return the JSON array, no other text."""
         
         return ("Unknown", {})
     
+    def _infer_action_type(
+        self,
+        task_text: str,
+        task_type: str,
+        ai_hint: Optional[str] = None,
+    ) -> str:
+        """Infer maintenance action type: PM (preventive), PDM (predictive), CM (corrective)."""
+        text_lower = (task_text or "").lower()
+        
+        # 1) Honor explicit AI hint if it's a valid action type
+        if ai_hint and ai_hint.upper() in ACTION_TYPES:
+            return ai_hint.upper()
+        
+        # 2) Keyword override (predictive/corrective signals beat the default)
+        for action_type, keywords in ACTION_TYPE_KEYWORDS.items():
+            if any(kw in text_lower for kw in keywords):
+                return action_type
+        
+        # 3) Fall back to task-type default
+        default = TASK_TYPE_DEFAULTS.get(task_type, TASK_TYPE_DEFAULTS["Unknown"])
+        return default["action_type"]
+    
+    def _infer_discipline(
+        self,
+        task_text: str,
+        component: str,
+        task_type: str,
+        ai_hint: Optional[str] = None,
+    ) -> str:
+        """Infer execution discipline from task text, component, and task type."""
+        from models.disciplines import normalize_discipline, DISCIPLINE_LIST
+        
+        # 1) Honor explicit AI hint if it normalizes to a known discipline
+        if ai_hint:
+            normalized = normalize_discipline(ai_hint)
+            if normalized in DISCIPLINE_LIST:
+                return normalized
+        
+        haystack = f"{task_text or ''} {component or ''}".lower()
+        
+        # 2) Keyword scoring across haystack — pick the discipline with most matches
+        scores = {discipline: 0 for discipline in DISCIPLINE_KEYWORDS}
+        for discipline, keywords in DISCIPLINE_KEYWORDS.items():
+            for kw in keywords:
+                if kw in haystack:
+                    scores[discipline] += 1
+        
+        best = max(scores.items(), key=lambda kv: kv[1])
+        if best[1] > 0:
+            return best[0]
+        
+        # 3) Fall back to task-type default
+        default = TASK_TYPE_DEFAULTS.get(task_type, TASK_TYPE_DEFAULTS["Unknown"])
+        return default["discipline"]
+    
     def _extract_frequency(self, text: str) -> str:
         """Extract frequency information from text."""
         text_lower = text.lower()
@@ -1000,6 +1180,37 @@ Only return the JSON array, no other text."""
                 if '{0}' in template:
                     return template.format(match.group(1))
                 return template
+        
+        return ""
+    
+    def _extract_duration(self, text: str) -> str:
+        """Extract estimated task duration from text (e.g., '30 min', '2 hours').
+        
+        Returns a clean, normalized duration string or empty if none found.
+        """
+        text_lower = (text or "").lower()
+        
+        for pattern, unit in DURATION_PATTERNS:
+            match = re.search(pattern, text_lower)
+            if not match:
+                continue
+            value = match.group(1).replace(",", ".")
+            try:
+                num = float(value)
+            except ValueError:
+                continue
+            # Filter out values that are obviously frequency intervals, not durations
+            if unit == "hours" and num > 24:
+                continue
+            if unit == "minutes" and num > 480:  # >8h likely not a duration
+                continue
+            # Normalize formatting
+            if num.is_integer():
+                num_str = str(int(num))
+            else:
+                num_str = f"{num:g}"
+            label = "hour" if (unit == "hours" and num == 1) else unit
+            return f"{num_str} {label}"
         
         return ""
     
@@ -1068,22 +1279,31 @@ Pre-identified failure modes: {rule_based_data.get('failure_modes', [])}
 Please analyze and provide:
 1. Component: What equipment/component is this task for?
 2. Task Type: One of [Inspection, Lubrication, Calibration, Replacement, Cleaning, Adjustment, Monitoring, Unknown]
-3. Failure Modes: What failures is this task preventing? (list 2-4 specific failure modes)
-4. Mechanisms: What failure mechanisms are being addressed? (list 1-3)
-5. Detection Methods: How would failures be detected? (list 1-3)
-6. Frequency: If mentioned, what is the task frequency?
-7. Confidence: How confident are you in this analysis? (0-100)
-8. Reasoning: Brief explanation of your analysis
+3. Action Type: Maintenance strategy — one of:
+   - "PM"  (Preventive — time/usage-based scheduled work)
+   - "PDM" (Predictive — condition-based monitoring like vibration, oil, thermography)
+   - "CM"  (Corrective — repair on failure)
+4. Discipline: Execution discipline — one of [Mechanical, Electrical, Instrumentation, Process, Inspection, Operations, Maintenance, Reliability]
+5. Failure Modes: What failures is this task preventing? (list 2-4 specific failure modes)
+6. Mechanisms: What failure mechanisms are being addressed? (list 1-3)
+7. Detection Methods: How would failures be detected? (list 1-3)
+8. Frequency: If mentioned, what is the task frequency?
+9. Estimated Time: If mentioned, estimated duration to execute this task (e.g., "30 min", "2 hours"). Empty if not stated.
+10. Confidence: How confident are you in this analysis? (0-100)
+11. Reasoning: Brief explanation of your analysis
 
 Respond in JSON format:
 {{
   "component": "string",
   "asset": "broader asset category if identifiable",
   "task_type": "string",
+  "action_type": "PM | PDM | CM",
+  "discipline": "string",
   "failure_modes": ["string", "string"],
   "mechanisms": ["string"],
   "detection_methods": ["string"],
   "frequency": "string or empty",
+  "estimated_time": "string or empty",
   "confidence": number,
   "reasoning": "string"
 }}"""
