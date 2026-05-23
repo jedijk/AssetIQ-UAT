@@ -26,11 +26,13 @@ import {
   Edit2,
   Info,
   AlertCircle,
+  HelpCircle,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
+import { PMImportHelpModal } from "./PMImportHelpModal";
 
 // Task type colors
 const TASK_TYPE_COLORS = {
@@ -306,6 +308,7 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [sessionId, setSessionId] = useState(null);
   const [session, setSession] = useState(null);
+  const [showHelp, setShowHelp] = useState(false);
   const [processingStep, setProcessingStep] = useState(1);
   const [selectedTask, setSelectedTask] = useState(null);
   const [importing, setImporting] = useState(false);
@@ -335,6 +338,7 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
     setProcessingStep(1);
     setSelectedTask(null);
     setImportResult(null);
+    setShowHelp(false);
     if (pollingRef.current) {
       clearInterval(pollingRef.current);
     }
@@ -540,14 +544,26 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-blue-600" />
-            Import Maintenance Plan
-          </DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-blue-600" />
+              Import Maintenance Plan
+            </DialogTitle>
+            <button
+              onClick={() => setShowHelp(true)}
+              className="flex items-center gap-1 text-sm text-slate-500 hover:text-blue-600 transition-colors mr-8"
+            >
+              <HelpCircle className="w-4 h-4" />
+              <span>How does this work?</span>
+            </button>
+          </div>
           <DialogDescription>
             Upload an existing preventive maintenance plan and AssetIQ will extract failure mode intelligence automatically.
           </DialogDescription>
         </DialogHeader>
+        
+        {/* Help Modal */}
+        <PMImportHelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
         
         <div className="flex-1 overflow-hidden">
           {/* Step 1: Upload */}
