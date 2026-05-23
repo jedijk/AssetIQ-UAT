@@ -652,22 +652,46 @@ class PMImportService:
         wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
         rows = []
         
+        # Keywords to identify the main task/description column
+        task_column_keywords = ["task", "description", "activity", "action", "work", "maintenance", "taak", "beschrijving", "activiteit"]
+        equipment_column_keywords = ["equipment", "component", "asset", "machine", "apparaat", "onderdeel"]
+        frequency_column_keywords = ["frequency", "interval", "schedule", "frequentie", "periode"]
+        
         for sheet in wb.worksheets:
             # Try to find header row
             header_row = None
+            headers = []
+            task_col_idx = None
+            equipment_col_idx = None
+            frequency_col_idx = None
+            
             for row_idx, row in enumerate(sheet.iter_rows(max_row=10, values_only=True), 1):
                 if row and any(cell for cell in row if cell):
                     # Check if this looks like a header
                     row_text = " ".join(str(c).lower() for c in row if c)
                     if any(kw in row_text for kw in ["task", "maintenance", "description", "activity", "action", "equipment", "component"]):
                         header_row = row_idx
-                        headers = [str(c).strip() if c else f"col_{i}" for i, c in enumerate(row)]
+                        headers = [str(c).strip().lower() if c else f"col_{i}" for i, c in enumerate(row)]
+                        
+                        # Find key columns
+                        for i, h in enumerate(headers):
+                            h_lower = h.lower()
+                            if any(kw in h_lower for kw in task_column_keywords) and task_col_idx is None:
+                                task_col_idx = i
+                            if any(kw in h_lower for kw in equipment_column_keywords) and equipment_col_idx is None:
+                                equipment_col_idx = i
+                            if any(kw in h_lower for kw in frequency_column_keywords) and frequency_col_idx is None:
+                                frequency_col_idx = i
                         break
             
             if not header_row:
                 header_row = 1
                 first_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True), None)
-                headers = [str(c).strip() if c else f"col_{i}" for i, c in enumerate(first_row)] if first_row else []
+                headers = [str(c).strip().lower() if c else f"col_{i}" for i, c in enumerate(first_row)] if first_row else []
+            
+            # If no task column found, use first column with substantial text
+            if task_col_idx is None:
+                task_col_idx = 0
             
             # Extract data rows
             for row in sheet.iter_rows(min_row=header_row + 1, values_only=True):
@@ -675,17 +699,39 @@ class PMImportService:
                     continue
                 
                 row_data = {}
-                row_text_parts = []
                 
+                # Get the main task text (clean, without delimiters)
+                task_text = ""
+                if task_col_idx is not None and task_col_idx < len(row) and row[task_col_idx]:
+                    task_text = str(row[task_col_idx]).strip()
+                
+                # If task text is empty, try to find the longest text cell
+                if not task_text:
+                    for cell in row:
+                        if cell and len(str(cell).strip()) > len(task_text):
+                            task_text = str(cell).strip()
+                
+                if not task_text or len(task_text) < 5:
+                    continue
+                
+                row_data["_task_text"] = task_text
+                row_data["_raw_text"] = task_text  # Use clean task text as raw_text
+                
+                # Extract equipment if available
+                if equipment_col_idx is not None and equipment_col_idx < len(row) and row[equipment_col_idx]:
+                    row_data["_equipment"] = str(row[equipment_col_idx]).strip()
+                
+                # Extract frequency if available
+                if frequency_col_idx is not None and frequency_col_idx < len(row) and row[frequency_col_idx]:
+                    row_data["_frequency"] = str(row[frequency_col_idx]).strip()
+                
+                # Store all column data for reference
                 for idx, cell in enumerate(row):
                     if cell is not None:
                         header = headers[idx] if idx < len(headers) else f"col_{idx}"
                         row_data[header] = str(cell).strip()
-                        row_text_parts.append(str(cell).strip())
                 
-                if row_text_parts:
-                    row_data["_raw_text"] = " | ".join(row_text_parts)
-                    rows.append(row_data)
+                rows.append(row_data)
         
         return rows
     
@@ -705,9 +751,14 @@ class PMImportService:
                         for table in tables:
                             for row in table:
                                 if row and any(cell for cell in row if cell):
-                                    row_text = " | ".join(str(c).strip() for c in row if c)
-                                    rows.append({"_raw_text": row_text})
-                                    has_text = True
+                                    # Get the first non-empty cell with substantial text as the task
+                                    task_text = ""
+                                    for cell in row:
+                                        if cell and len(str(cell).strip()) > len(task_text):
+                                            task_text = str(cell).strip()
+                                    if task_text and len(task_text) > 5:
+                                        rows.append({"_raw_text": task_text, "_task_text": task_text})
+                                        has_text = True
                     
                     # If no tables, extract text
                     if not tables:
@@ -718,7 +769,7 @@ class PMImportService:
                             for line in text.split("\n"):
                                 line = line.strip()
                                 if len(line) > 10:  # Skip very short lines
-                                    rows.append({"_raw_text": line})
+                                    rows.append({"_raw_text": line, "_task_text": line})
         except Exception as e:
             logger.warning(f"PDF text extraction failed: {e}")
         
@@ -866,23 +917,26 @@ Only return the JSON array, no other text."""
     ) -> Optional[Dict[str, Any]]:
         """Analyze a single maintenance task and extract failure mode intelligence."""
         
-        raw_text = row.get("_raw_text", "")
-        if not raw_text or len(raw_text) < 5:
+        # Use clean task text if available, otherwise use raw_text
+        task_text = row.get("_task_text") or row.get("_raw_text", "")
+        if not task_text or len(task_text) < 5:
             return None
         
         # Step 1: Rule-based pre-classification
-        task_type, rule_based_data = self._classify_by_rules(raw_text)
+        task_type, rule_based_data = self._classify_by_rules(task_text)
         
-        # Step 2: Extract frequency
-        frequency = self._extract_frequency(raw_text)
+        # Step 2: Extract frequency (from parsed data or text)
+        frequency = row.get("_frequency") or row.get("_ocr_data", {}).get("frequency", "")
+        if not frequency:
+            frequency = self._extract_frequency(task_text)
         
-        # Step 3: Extract component (from OCR data or text)
-        component = row.get("_ocr_data", {}).get("equipment", "")
+        # Step 3: Extract component (from parsed data, OCR data, or text)
+        component = row.get("_equipment") or row.get("_ocr_data", {}).get("equipment", "")
         if not component:
-            component = self._extract_component(raw_text)
+            component = self._extract_component(task_text)
         
         # Step 4: AI enhancement
-        ai_analysis = await self._ai_analyze_task(raw_text, task_type, rule_based_data)
+        ai_analysis = await self._ai_analyze_task(task_text, task_type, rule_based_data)
         
         # Build task object
         task_id = str(uuid.uuid4())
@@ -898,14 +952,14 @@ Only return the JSON array, no other text."""
         
         return {
             "task_id": task_id,
-            "original_task": raw_text,
+            "original_task": task_text,  # Clean task text without delimiters
             "component": component or ai_analysis.get("component", ""),
             "asset": ai_analysis.get("asset", ""),
             "task_type": ai_analysis.get("task_type", task_type),
             "suggested_failure_modes": ai_analysis.get("failure_modes", rule_based_data.get("failure_modes", [])),
             "failure_mechanisms": ai_analysis.get("mechanisms", rule_based_data.get("failure_mechanisms", [])),
             "detection_methods": ai_analysis.get("detection_methods", rule_based_data.get("detection_methods", [])),
-            "existing_control": raw_text,
+            "existing_control": task_text,
             "frequency": frequency or ai_analysis.get("frequency", ""),
             "confidence_score": confidence,
             "ai_reasoning": ai_analysis.get("reasoning", ""),
