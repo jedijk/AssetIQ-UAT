@@ -456,9 +456,9 @@ class PMImportService:
             library_match = task.get("library_match", {})
             match_status = library_match.get("status", "")
             
-            # SCENARIO A: Existing high-confidence match - auto link
-            if match_status == "existing_match" and library_match.get("matched_id"):
-                matched_id = library_match["matched_id"]
+            # SCENARIO B (priority): User selected/overrode a match — always wins
+            if task.get("selected_match_id"):
+                matched_id = task["selected_match_id"]
                 result = await self._link_task_to_failure_mode(
                     task, matched_id, fm_service, session.get("file_name"), now
                 )
@@ -468,9 +468,9 @@ class PMImportService:
                     linked_details.append(result)
                 continue
             
-            # SCENARIO B: User selected from multiple matches
-            if task.get("selected_match_id"):
-                matched_id = task["selected_match_id"]
+            # SCENARIO A: Existing high-confidence match - auto link
+            if match_status == "existing_match" and library_match.get("matched_id"):
+                matched_id = library_match["matched_id"]
                 result = await self._link_task_to_failure_mode(
                     task, matched_id, fm_service, session.get("file_name"), now
                 )

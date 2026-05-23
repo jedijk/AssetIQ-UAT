@@ -31,12 +31,15 @@ import {
   Clock,
   Wrench,
   ExternalLink,
+  Search,
+  Repeat,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
 import { PMImportHelpModal } from "./PMImportHelpModal";
+import { failureModesAPI } from "../../lib/apis/failureModes";
 
 // Task type colors
 const TASK_TYPE_COLORS = {
@@ -197,11 +200,146 @@ const KPICard = ({ label, value, icon: Icon, color = "blue" }) => {
   );
 };
 
+// Picker dialog: search & select any existing failure mode
+const ChangeFailureModePicker = ({ isOpen, onClose, onSelect, currentFmId }) => {
+  const [query, setQuery] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  // Debounce the query
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(query.trim()), 250);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  // Reset when reopened
+  useEffect(() => {
+    if (isOpen) {
+      setQuery("");
+      setDebounced("");
+    }
+  }, [isOpen]);
+
+  // Fetch failure modes
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    setLoading(true);
+    failureModesAPI
+      .getAll(debounced ? { search: debounced } : {})
+      .then((data) => {
+        if (cancelled) return;
+        setResults((data?.failure_modes || []).slice(0, 50));
+      })
+      .catch(() => !cancelled && setResults([]))
+      .finally(() => !cancelled && setLoading(false));
+    return () => { cancelled = true; };
+  }, [isOpen, debounced]);
+
+  if (!isOpen) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Repeat className="w-5 h-5 text-blue-600" />
+            Change Assigned Failure Mode
+          </DialogTitle>
+          <DialogDescription>
+            Search the Failure Mode Library and pick the one this PM task should be linked to.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Search input */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Input
+            autoFocus
+            placeholder="Search by name, equipment, keyword…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="pl-9"
+            data-testid="change-fm-search-input"
+          />
+        </div>
+
+        {/* Results */}
+        <div className="flex-1 overflow-y-auto -mx-2 px-2">
+          {loading && (
+            <div className="flex items-center justify-center py-8 text-slate-500 text-sm gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+            </div>
+          )}
+          {!loading && results.length === 0 && (
+            <div className="text-center py-8 text-slate-500 text-sm">
+              No failure modes found.
+            </div>
+          )}
+          {!loading && results.length > 0 && (
+            <ul className="divide-y divide-slate-100">
+              {results.map((fm) => {
+                const isCurrent = fm.id === currentFmId;
+                return (
+                  <li key={fm.id}>
+                    <button
+                      type="button"
+                      onClick={() => onSelect(fm)}
+                      disabled={isCurrent}
+                      className={`w-full text-left p-3 rounded transition-colors ${
+                        isCurrent
+                          ? "bg-blue-50 cursor-default"
+                          : "hover:bg-slate-50"
+                      }`}
+                      data-testid={`pick-fm-${fm.id}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-slate-900 truncate">
+                            {fm.failure_mode}
+                          </p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {fm.equipment} • {fm.category}
+                            {fm.failure_mode_type === "customer_specific" && (
+                              <span className="ml-2 inline-flex items-center gap-1 text-purple-600">
+                                <Sparkles className="w-3 h-3" /> Customer Specific
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        {isCurrent ? (
+                          <Badge className="bg-blue-100 text-blue-700 text-[10px] flex-shrink-0">
+                            Current
+                          </Badge>
+                        ) : (
+                          <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0 mt-1" />
+                        )}
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        <div className="flex justify-end pt-3 border-t">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+
 // Task row component with scenario handling
 const TaskRow = ({ task, onAccept, onReject, onSelectMatch, onApproveNewFM, onSelect, isSelected, sessionId }) => {
   const [expanded, setExpanded] = useState(false);
   const [selectedMatchId, setSelectedMatchId] = useState(task.selected_match_id || "");
   const [showApproveForm, setShowApproveForm] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const [overrideFm, setOverrideFm] = useState(null); // {id, name} when user manually changes
   const [newFMData, setNewFMData] = useState({
     failure_mode: task.suggested_failure_modes?.[0] || "",
     equipment: task.component || "",
@@ -222,9 +360,25 @@ const TaskRow = ({ task, onAccept, onReject, onSelectMatch, onApproveNewFM, onSe
   const isScenarioB = matchStatus === "multiple_possible" || matchStatus === "weak_match"; // User selects
   const isScenarioC = matchStatus === "new_proposed"; // User approves new
   
+  // Compute the currently-assigned failure mode id and name (if any)
+  const assignedFmId = task.selected_match_id || (isScenarioA ? task.library_match?.matched_id : null);
+  const assignedFmName = overrideFm?.name
+    || (task.selected_match_id && task.library_match?.all_matches?.find(m => m.id === task.selected_match_id)?.name)
+    || (task.selected_match_id && task.library_match?.matches?.find(m => m.id === task.selected_match_id)?.name)
+    || (isScenarioA ? task.library_match?.matched_name : null);
+  
   const handleSelectMatch = async () => {
     if (selectedMatchId && onSelectMatch) {
       await onSelectMatch(task.task_id, selectedMatchId);
+    }
+  };
+  
+  const handlePickerSelect = async (fm) => {
+    setShowPicker(false);
+    setOverrideFm({ id: fm.id, name: fm.failure_mode });
+    setSelectedMatchId(fm.id);
+    if (onSelectMatch) {
+      await onSelectMatch(task.task_id, fm.id, fm.failure_mode);
     }
   };
   
@@ -362,17 +516,31 @@ const TaskRow = ({ task, onAccept, onReject, onSelectMatch, onApproveNewFM, onSe
                 </div>
               )}
               
-              {/* SCENARIO A: Existing Match */}
+              {/* SCENARIO A: Existing Match (with override support) */}
               {isScenarioA && task.library_match?.matched_name && (
                 <div className="p-3 bg-green-50 rounded-lg border border-green-100">
-                  <div className="flex items-center gap-2 mb-1">
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                    <p className="text-sm font-medium text-green-800">
-                      Will link to: {task.library_match.matched_name}
-                    </p>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                      <p className="text-sm font-medium text-green-800 truncate">
+                        Will link to: {overrideFm?.name || task.library_match.matched_name}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => { e.stopPropagation(); setShowPicker(true); }}
+                      className="text-xs h-7 flex-shrink-0 border-green-300 text-green-700 hover:bg-green-100"
+                      data-testid={`change-fm-btn-${task.task_id}`}
+                    >
+                      <Repeat className="w-3 h-3 mr-1" />
+                      Change
+                    </Button>
                   </div>
                   <p className="text-xs text-green-600 ml-6">
-                    Match Score: {task.library_match.match_score}% • Click Accept to confirm
+                    {overrideFm
+                      ? "Manually overridden • Click Accept to confirm"
+                      : `Match Score: ${task.library_match.match_score}% • Click Accept to confirm`}
                   </p>
                 </div>
               )}
@@ -380,10 +548,22 @@ const TaskRow = ({ task, onAccept, onReject, onSelectMatch, onApproveNewFM, onSe
               {/* SCENARIO B: Multiple Matches - User Selects */}
               {isScenarioB && task.review_status === "pending" && (
                 <div className="p-3 bg-amber-50 rounded-lg border border-amber-100">
-                  <p className="text-sm font-medium text-amber-800 mb-2">
-                    <AlertTriangle className="w-4 h-4 inline mr-1" />
-                    Multiple possible matches - please select one:
-                  </p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium text-amber-800">
+                      <AlertTriangle className="w-4 h-4 inline mr-1" />
+                      Multiple possible matches - please select one:
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => { e.stopPropagation(); setShowPicker(true); }}
+                      className="text-xs h-7 border-amber-300 text-amber-700 hover:bg-amber-100"
+                      data-testid={`pick-other-fm-btn-${task.task_id}`}
+                    >
+                      <Search className="w-3 h-3 mr-1" />
+                      Pick Other…
+                    </Button>
+                  </div>
                   <div className="space-y-2">
                     {(task.library_match?.matches || task.library_match?.all_matches || []).map((match) => (
                       <label key={match.id} className="flex items-center gap-2 cursor-pointer p-2 bg-white rounded border hover:border-amber-300">
@@ -434,13 +614,23 @@ const TaskRow = ({ task, onAccept, onReject, onSelectMatch, onApproveNewFM, onSe
                         <p className="text-xs text-slate-500">Proposed Failure Mode:</p>
                         <p className="font-medium">{task.suggested_failure_modes?.[0] || "N/A"}</p>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); setShowApproveForm(true); }}
                           className="bg-purple-600 hover:bg-purple-700"
                         >
                           Review & Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => { e.stopPropagation(); setShowPicker(true); }}
+                          className="border-purple-300 text-purple-700 hover:bg-purple-100"
+                          data-testid={`link-existing-fm-btn-${task.task_id}`}
+                        >
+                          <Search className="w-3 h-3 mr-1" />
+                          Link to Existing Instead
                         </Button>
                         <Button
                           size="sm"
@@ -514,25 +704,57 @@ const TaskRow = ({ task, onAccept, onReject, onSelectMatch, onApproveNewFM, onSe
               {/* Show confirmed match/approval for accepted tasks */}
               {task.review_status === "accepted" && task.selected_match_id && (
                 <div className="p-3 bg-green-50 rounded-lg border border-green-100">
-                  <p className="text-sm text-green-800">
-                    <CheckCircle className="w-4 h-4 inline mr-1" />
-                    Will link to selected failure mode
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm text-green-800 min-w-0 truncate">
+                      <CheckCircle className="w-4 h-4 inline mr-1" />
+                      Will link to: {assignedFmName || "selected failure mode"}
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => { e.stopPropagation(); setShowPicker(true); }}
+                      className="text-xs h-7 flex-shrink-0 border-green-300 text-green-700 hover:bg-green-100"
+                      data-testid={`change-accepted-fm-btn-${task.task_id}`}
+                    >
+                      <Repeat className="w-3 h-3 mr-1" />
+                      Change
+                    </Button>
+                  </div>
                 </div>
               )}
               
               {task.review_status === "accepted" && task.approved_new_fm && (
                 <div className="p-3 bg-purple-50 rounded-lg border border-purple-100">
-                  <p className="text-sm text-purple-800">
-                    <Sparkles className="w-4 h-4 inline mr-1" />
-                    Will create: <strong>{task.approved_new_fm.failure_mode}</strong>
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm text-purple-800 min-w-0 truncate">
+                      <Sparkles className="w-4 h-4 inline mr-1" />
+                      Will create: <strong>{task.approved_new_fm.failure_mode}</strong>
+                    </p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => { e.stopPropagation(); setShowPicker(true); }}
+                      className="text-xs h-7 flex-shrink-0 border-purple-300 text-purple-700 hover:bg-purple-100"
+                      data-testid={`change-approved-fm-btn-${task.task_id}`}
+                    >
+                      <Repeat className="w-3 h-3 mr-1" />
+                      Link Existing Instead
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+      
+      {/* Failure Mode picker (search any existing FM and assign) */}
+      <ChangeFailureModePicker
+        isOpen={showPicker}
+        onClose={() => setShowPicker(false)}
+        onSelect={handlePickerSelect}
+        currentFmId={assignedFmId}
+      />
     </div>
   );
 };
@@ -723,18 +945,34 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
     }
   };
   
-  // Scenario B: User selects from multiple matches
-  const handleSelectMatch = async (taskId, matchId) => {
+  // Scenario B / manual override: User picks a specific failure mode
+  const handleSelectMatch = async (taskId, matchId, matchName) => {
     try {
       const result = await pmImportAPI.selectMatch(sessionId, taskId, matchId);
       setSession(prev => ({
         ...prev,
-        tasks_extracted: prev.tasks_extracted.map(t => 
-          t.task_id === taskId ? { ...t, review_status: "accepted", selected_match_id: matchId } : t
-        ),
+        tasks_extracted: prev.tasks_extracted.map(t => {
+          if (t.task_id !== taskId) return t;
+          // Inject the selected match into all_matches so name shows in UI
+          const all = t.library_match?.all_matches || t.library_match?.matches || [];
+          const existsInList = all.some(m => m.id === matchId);
+          const updatedMatches = existsInList || !matchName
+            ? all
+            : [...all, { id: matchId, name: matchName, score: 100, match_type: "manual" }];
+          return {
+            ...t,
+            review_status: "accepted",
+            selected_match_id: matchId,
+            approved_new_fm: null, // clear any prior approval since user re-assigned
+            library_match: {
+              ...(t.library_match || {}),
+              all_matches: updatedMatches,
+            },
+          };
+        }),
         stats: result.stats,
       }));
-      toast.success("Match selected");
+      toast.success(matchName ? `Linked to "${matchName}"` : "Match selected");
     } catch (error) {
       toast.error("Failed to select match");
     }
