@@ -83,6 +83,36 @@ export const pmImportAPI = {
   },
 
   /**
+   * Select a failure mode match for a task (Scenario B)
+   * When multiple matches exist, user selects one
+   * @param {string} sessionId
+   * @param {string} taskId
+   * @param {string} matchId - ID of the selected failure mode
+   */
+  selectMatch: async (sessionId, taskId, matchId) => {
+    const response = await api.post(
+      `/pm-import/session/${sessionId}/task/${taskId}/select-match`,
+      { match_id: matchId }
+    );
+    return response.data;
+  },
+
+  /**
+   * Approve creation of a new failure mode (Scenario C)
+   * When no match found, user approves the proposed new failure mode
+   * @param {string} sessionId
+   * @param {string} taskId
+   * @param {object} failureModeData - { failure_mode, equipment, category, severity, occurrence, detectability }
+   */
+  approveNewFailureMode: async (sessionId, taskId, failureModeData) => {
+    const response = await api.post(
+      `/pm-import/session/${sessionId}/task/${taskId}/approve-new-fm`,
+      failureModeData
+    );
+    return response.data;
+  },
+
+  /**
    * Import accepted tasks to the Failure Mode Library
    */
   importToLibrary: async (sessionId, includeLowConfidence = true) => {

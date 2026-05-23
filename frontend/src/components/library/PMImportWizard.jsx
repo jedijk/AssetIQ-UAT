@@ -137,15 +137,42 @@ const KPICard = ({ label, value, icon: Icon, color = "blue" }) => {
   );
 };
 
-// Task row component
-const TaskRow = ({ task, onAccept, onReject, onEdit, onSelect, isSelected }) => {
+// Task row component with scenario handling
+const TaskRow = ({ task, onAccept, onReject, onSelectMatch, onApproveNewFM, onSelect, isSelected, sessionId }) => {
   const [expanded, setExpanded] = useState(false);
+  const [selectedMatchId, setSelectedMatchId] = useState(task.selected_match_id || "");
+  const [showApproveForm, setShowApproveForm] = useState(false);
+  const [newFMData, setNewFMData] = useState({
+    failure_mode: task.suggested_failure_modes?.[0] || "",
+    equipment: task.component || "",
+    category: "",
+  });
   
   const statusColors = {
     pending: "border-l-slate-300",
     accepted: "border-l-green-500",
     rejected: "border-l-red-400",
     edited: "border-l-blue-500",
+  };
+  
+  const matchStatus = task.library_match?.status || "pending";
+  
+  // Determine scenario
+  const isScenarioA = matchStatus === "existing_match"; // Auto-link
+  const isScenarioB = matchStatus === "multiple_possible" || matchStatus === "weak_match"; // User selects
+  const isScenarioC = matchStatus === "new_proposed"; // User approves new
+  
+  const handleSelectMatch = async () => {
+    if (selectedMatchId && onSelectMatch) {
+      await onSelectMatch(task.task_id, selectedMatchId);
+    }
+  };
+  
+  const handleApproveNew = async () => {
+    if (newFMData.failure_mode && onApproveNewFM) {
+      await onApproveNewFM(task.task_id, newFMData);
+      setShowApproveForm(false);
+    }
   };
   
   return (
@@ -187,13 +214,14 @@ const TaskRow = ({ task, onAccept, onReject, onEdit, onSelect, isSelected }) => 
           
           {/* Actions */}
           <div className="flex items-center gap-1 flex-shrink-0">
-            {task.review_status === "pending" && (
+            {task.review_status === "pending" && isScenarioA && (
               <>
                 <Button
                   size="sm"
                   variant="ghost"
                   className="text-green-600 hover:bg-green-50"
                   onClick={(e) => { e.stopPropagation(); onAccept(task.task_id); }}
+                  title="Accept - Link to existing failure mode"
                 >
                   <Check className="w-4 h-4" />
                 </Button>
@@ -207,10 +235,16 @@ const TaskRow = ({ task, onAccept, onReject, onEdit, onSelect, isSelected }) => 
                 </Button>
               </>
             )}
+            {task.review_status === "pending" && (isScenarioB || isScenarioC) && (
+              <Badge className="bg-amber-100 text-amber-700 text-xs">
+                <AlertTriangle className="w-3 h-3 mr-1" />
+                Action Required
+              </Badge>
+            )}
             {task.review_status === "accepted" && (
               <Badge className="bg-green-100 text-green-700">
                 <Check className="w-3 h-3 mr-1" />
-                Accepted
+                {task.selected_match_id ? "Match Selected" : task.approved_new_fm ? "New Approved" : "Accepted"}
               </Badge>
             )}
             {task.review_status === "rejected" && (
@@ -240,7 +274,7 @@ const TaskRow = ({ task, onAccept, onReject, onEdit, onSelect, isSelected }) => 
             className="overflow-hidden border-t border-slate-100"
           >
             <div className="p-4 bg-slate-50 space-y-3">
-              {/* Failure Modes */}
+              {/* Suggested Failure Modes */}
               <div>
                 <p className="text-xs font-medium text-slate-500 mb-1">Suggested Failure Modes</p>
                 <div className="flex flex-wrap gap-1">
@@ -251,22 +285,6 @@ const TaskRow = ({ task, onAccept, onReject, onEdit, onSelect, isSelected }) => 
                   ))}
                 </div>
               </div>
-              
-              {/* Mechanisms */}
-              {task.failure_mechanisms?.length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-slate-500 mb-1">Failure Mechanisms</p>
-                  <p className="text-sm text-slate-600">{task.failure_mechanisms.join(", ")}</p>
-                </div>
-              )}
-              
-              {/* Detection Methods */}
-              {task.detection_methods?.length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-slate-500 mb-1">Detection Methods</p>
-                  <p className="text-sm text-slate-600">{task.detection_methods.join(", ")}</p>
-                </div>
-              )}
               
               {/* AI Reasoning */}
               {task.ai_reasoning && (
@@ -281,14 +299,170 @@ const TaskRow = ({ task, onAccept, onReject, onEdit, onSelect, isSelected }) => 
                 </div>
               )}
               
-              {/* Library Match Info */}
-              {task.library_match?.matched_name && (
+              {/* SCENARIO A: Existing Match */}
+              {isScenarioA && task.library_match?.matched_name && (
                 <div className="p-3 bg-green-50 rounded-lg border border-green-100">
-                  <p className="text-xs font-medium text-green-700 mb-1">
-                    Matched to Existing: {task.library_match.matched_name}
+                  <div className="flex items-center gap-2 mb-1">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <p className="text-sm font-medium text-green-800">
+                      Will link to: {task.library_match.matched_name}
+                    </p>
+                  </div>
+                  <p className="text-xs text-green-600 ml-6">
+                    Match Score: {task.library_match.match_score}% • Click Accept to confirm
                   </p>
-                  <p className="text-xs text-green-600">
-                    Match Score: {task.library_match.match_score}%
+                </div>
+              )}
+              
+              {/* SCENARIO B: Multiple Matches - User Selects */}
+              {isScenarioB && task.review_status === "pending" && (
+                <div className="p-3 bg-amber-50 rounded-lg border border-amber-100">
+                  <p className="text-sm font-medium text-amber-800 mb-2">
+                    <AlertTriangle className="w-4 h-4 inline mr-1" />
+                    Multiple possible matches - please select one:
+                  </p>
+                  <div className="space-y-2">
+                    {(task.library_match?.matches || task.library_match?.all_matches || []).map((match) => (
+                      <label key={match.id} className="flex items-center gap-2 cursor-pointer p-2 bg-white rounded border hover:border-amber-300">
+                        <input
+                          type="radio"
+                          name={`match-${task.task_id}`}
+                          value={match.id}
+                          checked={selectedMatchId === match.id}
+                          onChange={() => setSelectedMatchId(match.id)}
+                          className="text-amber-600"
+                        />
+                        <span className="text-sm flex-1">{match.name}</span>
+                        <Badge variant="outline" className="text-xs">{match.score || match.match_score}%</Badge>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex gap-2 mt-3">
+                    <Button
+                      size="sm"
+                      disabled={!selectedMatchId}
+                      onClick={(e) => { e.stopPropagation(); handleSelectMatch(); }}
+                      className="bg-amber-600 hover:bg-amber-700"
+                    >
+                      Confirm Selection
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => { e.stopPropagation(); onReject(task.task_id); }}
+                    >
+                      Skip Task
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
+              {/* SCENARIO C: New Proposed - User Approves */}
+              {isScenarioC && task.review_status === "pending" && (
+                <div className="p-3 bg-purple-50 rounded-lg border border-purple-100">
+                  <p className="text-sm font-medium text-purple-800 mb-2">
+                    <Sparkles className="w-4 h-4 inline mr-1" />
+                    No existing match found. Review and approve new failure mode:
+                  </p>
+                  
+                  {!showApproveForm ? (
+                    <div className="space-y-2">
+                      <div className="bg-white rounded p-2 border">
+                        <p className="text-xs text-slate-500">Proposed Failure Mode:</p>
+                        <p className="font-medium">{task.suggested_failure_modes?.[0] || "N/A"}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); setShowApproveForm(true); }}
+                          className="bg-purple-600 hover:bg-purple-700"
+                        >
+                          Review & Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => { e.stopPropagation(); onReject(task.task_id); }}
+                        >
+                          Skip Task
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 bg-white rounded p-3 border">
+                      <div>
+                        <label className="text-xs font-medium text-slate-600">Failure Mode Name *</label>
+                        <input
+                          type="text"
+                          value={newFMData.failure_mode}
+                          onChange={(e) => setNewFMData({...newFMData, failure_mode: e.target.value})}
+                          className="w-full mt-1 px-2 py-1 border rounded text-sm"
+                          placeholder="e.g., Bearing Lubrication Starvation"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-slate-600">Equipment / Component</label>
+                        <input
+                          type="text"
+                          value={newFMData.equipment}
+                          onChange={(e) => setNewFMData({...newFMData, equipment: e.target.value})}
+                          className="w-full mt-1 px-2 py-1 border rounded text-sm"
+                          placeholder="e.g., Feed Roller Bearing"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-slate-600">Category</label>
+                        <select
+                          value={newFMData.category}
+                          onChange={(e) => setNewFMData({...newFMData, category: e.target.value})}
+                          className="w-full mt-1 px-2 py-1 border rounded text-sm"
+                        >
+                          <option value="">Select category...</option>
+                          <option value="Rotating">Rotating</option>
+                          <option value="Static">Static</option>
+                          <option value="Instrumentation">Instrumentation</option>
+                          <option value="Electrical">Electrical</option>
+                          <option value="Process">Process</option>
+                          <option value="Piping">Piping</option>
+                        </select>
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          size="sm"
+                          disabled={!newFMData.failure_mode}
+                          onClick={(e) => { e.stopPropagation(); handleApproveNew(); }}
+                          className="bg-purple-600 hover:bg-purple-700"
+                        >
+                          Create & Link
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => { e.stopPropagation(); setShowApproveForm(false); }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Show confirmed match/approval for accepted tasks */}
+              {task.review_status === "accepted" && task.selected_match_id && (
+                <div className="p-3 bg-green-50 rounded-lg border border-green-100">
+                  <p className="text-sm text-green-800">
+                    <CheckCircle className="w-4 h-4 inline mr-1" />
+                    Will link to selected failure mode
+                  </p>
+                </div>
+              )}
+              
+              {task.review_status === "accepted" && task.approved_new_fm && (
+                <div className="p-3 bg-purple-50 rounded-lg border border-purple-100">
+                  <p className="text-sm text-purple-800">
+                    <Sparkles className="w-4 h-4 inline mr-1" />
+                    Will create: <strong>{task.approved_new_fm.failure_mode}</strong>
                   </p>
                 </div>
               )}
@@ -482,6 +656,40 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
       setSession(sess);
     } catch (error) {
       toast.error("Failed to accept tasks");
+    }
+  };
+  
+  // Scenario B: User selects from multiple matches
+  const handleSelectMatch = async (taskId, matchId) => {
+    try {
+      const result = await pmImportAPI.selectMatch(sessionId, taskId, matchId);
+      setSession(prev => ({
+        ...prev,
+        tasks_extracted: prev.tasks_extracted.map(t => 
+          t.task_id === taskId ? { ...t, review_status: "accepted", selected_match_id: matchId } : t
+        ),
+        stats: result.stats,
+      }));
+      toast.success("Match selected");
+    } catch (error) {
+      toast.error("Failed to select match");
+    }
+  };
+  
+  // Scenario C: User approves new failure mode
+  const handleApproveNewFM = async (taskId, fmData) => {
+    try {
+      const result = await pmImportAPI.approveNewFailureMode(sessionId, taskId, fmData);
+      setSession(prev => ({
+        ...prev,
+        tasks_extracted: prev.tasks_extracted.map(t => 
+          t.task_id === taskId ? { ...t, review_status: "accepted", approved_new_fm: fmData } : t
+        ),
+        stats: result.stats,
+      }));
+      toast.success("New failure mode approved");
+    } catch (error) {
+      toast.error("Failed to approve new failure mode");
     }
   };
   
@@ -787,9 +995,11 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
                   <TaskRow
                     key={task.task_id}
                     task={task}
+                    sessionId={sessionId}
                     onAccept={handleAcceptTask}
                     onReject={handleRejectTask}
-                    onEdit={() => {}}
+                    onSelectMatch={handleSelectMatch}
+                    onApproveNewFM={handleApproveNewFM}
                     onSelect={setSelectedTask}
                     isSelected={selectedTask?.task_id === task.task_id}
                   />

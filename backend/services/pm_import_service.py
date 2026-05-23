@@ -341,7 +341,15 @@ class PMImportService:
         session_id: str,
         created_by: str
     ) -> Dict[str, Any]:
-        """Import accepted tasks to the Failure Mode Library."""
+        """Import accepted tasks to the Failure Mode Library.
+        
+        Three scenarios:
+        A) existing_match: Auto-link as preventive control to existing failure mode
+        B) selected_match_id set: User selected from multiple matches - link to selected
+        C) approved_new_fm set: User approved new failure mode - create it
+        
+        Tasks without proper mapping (no existing match, no user selection, no approval) are skipped.
+        """
         
         session = await self.sessions_collection.find_one({"session_id": session_id})
         if not session:
@@ -365,31 +373,86 @@ class PMImportService:
         fm_service = FailureModesService(self.db)
         
         for task in tasks:
+            # Skip rejected tasks
+            if task.get("review_status") == "rejected":
+                skipped_count += 1
+                skipped_details.append({
+                    "task": task.get("original_task", "")[:100],
+                    "reason": "Rejected by user"
+                })
+                continue
+            
+            # Skip tasks not accepted/edited
             if task.get("review_status") not in ["accepted", "edited"]:
-                if task.get("review_status") == "rejected":
-                    skipped_count += 1
-                    skipped_details.append({
-                        "task": task.get("original_task", "")[:100],
-                        "reason": "Rejected by user"
-                    })
                 continue
             
             confidence = task.get("confidence_score", 0)
             if confidence < 70:
                 low_confidence_imported += 1
             
-            # Check for existing match
             library_match = task.get("library_match", {})
+            match_status = library_match.get("status", "")
             
-            if library_match.get("status") == "existing_match" and library_match.get("matched_id"):
-                # Link as preventive control to existing failure mode
+            # SCENARIO A: Existing high-confidence match - auto link
+            if match_status == "existing_match" and library_match.get("matched_id"):
                 matched_id = library_match["matched_id"]
-                existing_fm = await fm_service.get_by_id(matched_id)
+                result = await self._link_task_to_failure_mode(
+                    task, matched_id, fm_service, session.get("file_name"), now
+                )
+                if result:
+                    linked_count += 1
+                    imported_count += 1
+                    linked_details.append(result)
+                continue
+            
+            # SCENARIO B: User selected from multiple matches
+            if task.get("selected_match_id"):
+                matched_id = task["selected_match_id"]
+                result = await self._link_task_to_failure_mode(
+                    task, matched_id, fm_service, session.get("file_name"), now
+                )
+                if result:
+                    linked_count += 1
+                    imported_count += 1
+                    linked_details.append(result)
+                continue
+            
+            # SCENARIO C: User approved new failure mode creation
+            if task.get("approved_new_fm"):
+                approved_fm = task["approved_new_fm"]
+                fm_name = approved_fm.get("failure_mode") or approved_fm.get("name")
                 
-                if existing_fm:
-                    # Add the PM task as a recommended action if not already present
-                    actions = existing_fm.get("recommended_actions", [])
-                    new_action = {
+                if not fm_name:
+                    skipped_count += 1
+                    skipped_details.append({
+                        "task": task.get("original_task", "")[:100],
+                        "reason": "No failure mode name in approval"
+                    })
+                    continue
+                
+                # Check if already exists
+                existing = await fm_service.find_by_name(fm_name)
+                if existing:
+                    # Link to existing instead
+                    result = await self._link_task_to_failure_mode(
+                        task, str(existing.get("_id")), fm_service, session.get("file_name"), now
+                    )
+                    if result:
+                        linked_count += 1
+                        imported_count += 1
+                        linked_details.append(result)
+                    continue
+                
+                # Create the approved new failure mode
+                new_fm_data = {
+                    "category": approved_fm.get("category") or self._determine_category(task),
+                    "equipment": approved_fm.get("equipment") or task.get("component") or "General Equipment",
+                    "failure_mode": fm_name,
+                    "keywords": self._extract_keywords(task),
+                    "severity": approved_fm.get("severity", 5),
+                    "occurrence": approved_fm.get("occurrence", 5),
+                    "detectability": approved_fm.get("detectability", 5),
+                    "recommended_actions": [{
                         "description": task.get("existing_control") or task.get("original_task"),
                         "action_type": "PM",
                         "discipline": "mechanical",
@@ -397,93 +460,50 @@ class PMImportService:
                         "frequency": task.get("frequency"),
                         "imported_from": session.get("file_name"),
                         "imported_at": now.isoformat()
-                    }
-                    
-                    # Check if similar action exists
-                    action_exists = any(
-                        a.get("description", "").lower() == new_action["description"].lower()
-                        for a in actions if isinstance(a, dict)
-                    )
-                    
-                    if not action_exists:
-                        actions.append(new_action)
-                        await fm_service.update(
-                            matched_id,
-                            {"recommended_actions": actions},
-                            updated_by="PM Import"
-                        )
-                    
-                    linked_count += 1
-                    imported_count += 1
-                    
-                    # Track linked detail
-                    linked_details.append({
-                        "task": task.get("original_task", "")[:100],
-                        "task_type": task.get("task_type", ""),
-                        "component": task.get("component", ""),
-                        "frequency": task.get("frequency", ""),
-                        "failure_mode_id": matched_id,
-                        "failure_mode_name": existing_fm.get("failure_mode", library_match.get("matched_name", "")),
-                        "equipment": existing_fm.get("equipment", ""),
-                        "category": existing_fm.get("category", ""),
-                        "action_added": new_action["description"][:80] if not action_exists else None,
-                        "already_existed": action_exists
-                    })
-            else:
-                # Create new failure mode entries
-                task_created_fms = []
-                for fm in task.get("suggested_failure_modes", []):
-                    fm_name = fm if isinstance(fm, str) else fm.get("name", str(fm))
-                    
-                    # Check if already exists
-                    existing = await fm_service.find_by_name(fm_name)
-                    if existing:
-                        continue
-                    
-                    # Create new failure mode
-                    new_fm_data = {
-                        "category": self._determine_category(task),
-                        "equipment": task.get("component") or task.get("asset") or "General Equipment",
-                        "failure_mode": fm_name,
-                        "keywords": self._extract_keywords(task),
-                        "severity": 5,  # Default medium
-                        "occurrence": 5,
-                        "detectability": 5,
-                        "recommended_actions": [{
-                            "description": task.get("existing_control") or task.get("original_task"),
-                            "action_type": "PM",
-                            "discipline": "mechanical",
-                            "source": "PM Import",
-                            "frequency": task.get("frequency"),
-                            "imported_from": session.get("file_name"),
-                            "imported_at": now.isoformat()
-                        }],
-                        "failure_mode_type": "customer_specific",
-                        "source": "pm_import",
-                        "potential_causes": task.get("failure_mechanisms", []),
-                        "process": task.get("task_type")
-                    }
-                    
-                    try:
-                        await fm_service.create(new_fm_data, created_by=created_by)
-                        new_count += 1
-                        imported_count += 1
-                        task_created_fms.append({
-                            "failure_mode_name": fm_name,
-                            "equipment": new_fm_data["equipment"],
-                            "category": new_fm_data["category"]
-                        })
-                    except Exception as e:
-                        logger.error(f"Failed to create failure mode: {e}")
+                    }],
+                    "failure_mode_type": "customer_specific",
+                    "source": "pm_import",
+                    "potential_causes": task.get("failure_mechanisms", []),
+                    "process": task.get("task_type")
+                }
                 
-                if task_created_fms:
+                try:
+                    await fm_service.create(new_fm_data, created_by=created_by)
+                    new_count += 1
+                    imported_count += 1
                     created_details.append({
                         "task": task.get("original_task", "")[:100],
                         "task_type": task.get("task_type", ""),
                         "component": task.get("component", ""),
                         "frequency": task.get("frequency", ""),
-                        "failure_modes_created": task_created_fms
+                        "failure_modes_created": [{
+                            "failure_mode_name": fm_name,
+                            "equipment": new_fm_data["equipment"],
+                            "category": new_fm_data["category"]
+                        }]
                     })
+                except Exception as e:
+                    logger.error(f"Failed to create failure mode: {e}")
+                    skipped_details.append({
+                        "task": task.get("original_task", "")[:100],
+                        "reason": f"Failed to create: {str(e)[:50]}"
+                    })
+                continue
+            
+            # No valid mapping - skip the task
+            skipped_count += 1
+            reason = "No failure mode mapping confirmed"
+            if match_status == "multiple_possible":
+                reason = "Multiple matches - user did not select one"
+            elif match_status == "new_proposed":
+                reason = "New failure mode proposed - user did not approve"
+            elif match_status == "weak_match":
+                reason = "Weak match - user did not confirm"
+            
+            skipped_details.append({
+                "task": task.get("original_task", "")[:100],
+                "reason": reason
+            })
         
         # Build import result with details
         import_result = {
@@ -519,6 +539,59 @@ class PMImportService:
             "linked_details": linked_details,
             "created_details": created_details,
             "skipped_details": skipped_details
+        }
+    
+    async def _link_task_to_failure_mode(
+        self,
+        task: Dict[str, Any],
+        failure_mode_id: str,
+        fm_service,
+        file_name: str,
+        now
+    ) -> Optional[Dict[str, Any]]:
+        """Link a PM task to an existing failure mode as a preventive control."""
+        
+        existing_fm = await fm_service.get_by_id(failure_mode_id)
+        if not existing_fm:
+            return None
+        
+        # Add the PM task as a recommended action if not already present
+        actions = existing_fm.get("recommended_actions", [])
+        new_action = {
+            "description": task.get("existing_control") or task.get("original_task"),
+            "action_type": "PM",
+            "discipline": "mechanical",
+            "source": "PM Import",
+            "frequency": task.get("frequency"),
+            "imported_from": file_name,
+            "imported_at": now.isoformat()
+        }
+        
+        # Check if similar action exists
+        action_exists = any(
+            a.get("description", "").lower() == new_action["description"].lower()
+            for a in actions if isinstance(a, dict)
+        )
+        
+        if not action_exists:
+            actions.append(new_action)
+            await fm_service.update(
+                failure_mode_id,
+                {"recommended_actions": actions},
+                updated_by="PM Import"
+            )
+        
+        return {
+            "task": task.get("original_task", "")[:100],
+            "task_type": task.get("task_type", ""),
+            "component": task.get("component", ""),
+            "frequency": task.get("frequency", ""),
+            "failure_mode_id": failure_mode_id,
+            "failure_mode_name": existing_fm.get("failure_mode", ""),
+            "equipment": existing_fm.get("equipment", ""),
+            "category": existing_fm.get("category", ""),
+            "action_added": new_action["description"][:80] if not action_exists else None,
+            "already_existed": action_exists
         }
     
     # ==================== FILE PROCESSING ====================
@@ -838,6 +911,9 @@ Only return the JSON array, no other text."""
             "ai_reasoning": ai_analysis.get("reasoning", ""),
             "library_match": {"status": "pending"},
             "review_status": "pending",
+            # User selections - populated during review
+            "selected_match_id": None,  # When user selects from multiple matches
+            "approved_new_fm": None,    # When user approves a new failure mode to be created
             "source_document": file_name,
             "source_row": row
         }

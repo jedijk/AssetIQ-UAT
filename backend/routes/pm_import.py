@@ -49,6 +49,21 @@ class BulkActionRequest(BaseModel):
     action: str  # "accept", "reject", "accept_high_confidence"
 
 
+class SelectMatchRequest(BaseModel):
+    """Request model for selecting a failure mode match."""
+    match_id: str
+
+
+class ApproveNewFMRequest(BaseModel):
+    """Request model for approving a new failure mode creation."""
+    failure_mode: str
+    equipment: Optional[str] = None
+    category: Optional[str] = None
+    severity: Optional[int] = 5
+    occurrence: Optional[int] = 5
+    detectability: Optional[int] = 5
+
+
 # Background task for processing
 async def process_pm_file_background(
     session_id: str,
@@ -257,6 +272,75 @@ async def reject_task(
     
     pm_service = PMImportService(db)
     result = await pm_service.reject_task(session_id, task_id)
+    
+    if not result:
+        raise HTTPException(status_code=404, detail="Session or task not found")
+    
+    return {"success": True, "stats": result["stats"]}
+
+
+@router.post("/session/{session_id}/task/{task_id}/select-match")
+async def select_match(
+    session_id: str,
+    task_id: str,
+    request: SelectMatchRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Select a failure mode match for a task (Scenario B).
+    
+    When a task has multiple possible matches, user selects one.
+    The task will be linked to the selected failure mode during import.
+    """
+    
+    pm_service = PMImportService(db)
+    
+    result = await pm_service.update_task(
+        session_id, 
+        task_id, 
+        {
+            "selected_match_id": request.match_id,
+            "review_status": "accepted"
+        }
+    )
+    
+    if not result:
+        raise HTTPException(status_code=404, detail="Session or task not found")
+    
+    return {"success": True, "stats": result["stats"]}
+
+
+@router.post("/session/{session_id}/task/{task_id}/approve-new-fm")
+async def approve_new_failure_mode(
+    session_id: str,
+    task_id: str,
+    request: ApproveNewFMRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Approve creation of a new failure mode for a task (Scenario C).
+    
+    When no reliable match is found, AI proposes a new failure mode.
+    User reviews and approves the details before it gets created.
+    """
+    
+    pm_service = PMImportService(db)
+    
+    result = await pm_service.update_task(
+        session_id, 
+        task_id, 
+        {
+            "approved_new_fm": {
+                "failure_mode": request.failure_mode,
+                "equipment": request.equipment,
+                "category": request.category,
+                "severity": request.severity,
+                "occurrence": request.occurrence,
+                "detectability": request.detectability
+            },
+            "review_status": "accepted"
+        }
+    )
     
     if not result:
         raise HTTPException(status_code=404, detail="Session or task not found")
