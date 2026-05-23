@@ -200,12 +200,19 @@ const KPICard = ({ label, value, icon: Icon, color = "blue" }) => {
   );
 };
 
-// Picker dialog: search & select any existing failure mode
-const ChangeFailureModePicker = ({ isOpen, onClose, onSelect, currentFmId }) => {
+// Picker dialog: search & select any existing failure mode, OR create a new one
+const ChangeFailureModePicker = ({ isOpen, onClose, onSelect, onCreateNew, currentFmId, defaultNewFM }) => {
+  const [mode, setMode] = useState("pick"); // "pick" | "create"
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [newFM, setNewFM] = useState({
+    failure_mode: "",
+    equipment: "",
+    category: "",
+  });
+  const [creating, setCreating] = useState(false);
 
   // Debounce the query
   useEffect(() => {
@@ -216,14 +223,20 @@ const ChangeFailureModePicker = ({ isOpen, onClose, onSelect, currentFmId }) => 
   // Reset when reopened
   useEffect(() => {
     if (isOpen) {
+      setMode("pick");
       setQuery("");
       setDebounced("");
+      setNewFM({
+        failure_mode: defaultNewFM?.failure_mode || "",
+        equipment: defaultNewFM?.equipment || "",
+        category: defaultNewFM?.category || "",
+      });
     }
-  }, [isOpen]);
+  }, [isOpen, defaultNewFM]);
 
   // Fetch failure modes
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || mode !== "pick") return;
     let cancelled = false;
     setLoading(true);
     failureModesAPI
@@ -235,7 +248,17 @@ const ChangeFailureModePicker = ({ isOpen, onClose, onSelect, currentFmId }) => 
       .catch(() => !cancelled && setResults([]))
       .finally(() => !cancelled && setLoading(false));
     return () => { cancelled = true; };
-  }, [isOpen, debounced]);
+  }, [isOpen, debounced, mode]);
+
+  const handleCreate = async () => {
+    if (!newFM.failure_mode.trim() || !onCreateNew) return;
+    setCreating(true);
+    try {
+      await onCreateNew(newFM);
+    } finally {
+      setCreating(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -245,87 +268,198 @@ const ChangeFailureModePicker = ({ isOpen, onClose, onSelect, currentFmId }) => 
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Repeat className="w-5 h-5 text-blue-600" />
-            Change Assigned Failure Mode
+            Assign Failure Mode
           </DialogTitle>
           <DialogDescription>
-            Search the Failure Mode Library and pick the one this PM task should be linked to.
+            Pick an existing failure mode from the library, or create a brand-new one for this PM task.
           </DialogDescription>
         </DialogHeader>
 
-        {/* Search input */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input
-            autoFocus
-            placeholder="Search by name, equipment, keyword…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="pl-9"
-            data-testid="change-fm-search-input"
-          />
+        {/* Mode tabs */}
+        <div className="flex gap-2 border-b border-slate-200">
+          <button
+            type="button"
+            onClick={() => setMode("pick")}
+            className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+              mode === "pick"
+                ? "border-blue-600 text-blue-700"
+                : "border-transparent text-slate-500 hover:text-slate-700"
+            }`}
+            data-testid="picker-tab-pick"
+          >
+            <Search className="w-4 h-4 inline mr-1" />
+            Pick Existing
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("create")}
+            className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+              mode === "create"
+                ? "border-purple-600 text-purple-700"
+                : "border-transparent text-slate-500 hover:text-slate-700"
+            }`}
+            data-testid="picker-tab-create"
+          >
+            <Sparkles className="w-4 h-4 inline mr-1" />
+            Create New
+          </button>
         </div>
 
-        {/* Results */}
-        <div className="flex-1 overflow-y-auto -mx-2 px-2">
-          {loading && (
-            <div className="flex items-center justify-center py-8 text-slate-500 text-sm gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+        {mode === "pick" && (
+          <>
+            {/* Search input */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                autoFocus
+                placeholder="Search by name, equipment, keyword…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="pl-9"
+                data-testid="change-fm-search-input"
+              />
             </div>
-          )}
-          {!loading && results.length === 0 && (
-            <div className="text-center py-8 text-slate-500 text-sm">
-              No failure modes found.
-            </div>
-          )}
-          {!loading && results.length > 0 && (
-            <ul className="divide-y divide-slate-100">
-              {results.map((fm) => {
-                const isCurrent = fm.id === currentFmId;
-                return (
-                  <li key={fm.id}>
-                    <button
-                      type="button"
-                      onClick={() => onSelect(fm)}
-                      disabled={isCurrent}
-                      className={`w-full text-left p-3 rounded transition-colors ${
-                        isCurrent
-                          ? "bg-blue-50 cursor-default"
-                          : "hover:bg-slate-50"
-                      }`}
-                      data-testid={`pick-fm-${fm.id}`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-slate-900 truncate">
-                            {fm.failure_mode}
-                          </p>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            {fm.equipment} • {fm.category}
-                            {fm.failure_mode_type === "customer_specific" && (
-                              <span className="ml-2 inline-flex items-center gap-1 text-purple-600">
-                                <Sparkles className="w-3 h-3" /> Customer Specific
-                              </span>
+
+            {/* Results */}
+            <div className="flex-1 overflow-y-auto -mx-2 px-2">
+              {loading && (
+                <div className="flex items-center justify-center py-8 text-slate-500 text-sm gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+                </div>
+              )}
+              {!loading && results.length === 0 && (
+                <div className="text-center py-8 text-slate-500 text-sm">
+                  <p>No failure modes found{query ? ` for "${query}"` : ""}.</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setMode("create");
+                      if (query) setNewFM(prev => ({ ...prev, failure_mode: query }));
+                    }}
+                    className="mt-3 border-purple-300 text-purple-700 hover:bg-purple-50"
+                    data-testid="picker-empty-create-btn"
+                  >
+                    <Sparkles className="w-3 h-3 mr-1" />
+                    Create "{query || "new failure mode"}" instead
+                  </Button>
+                </div>
+              )}
+              {!loading && results.length > 0 && (
+                <ul className="divide-y divide-slate-100">
+                  {results.map((fm) => {
+                    const isCurrent = fm.id === currentFmId;
+                    return (
+                      <li key={fm.id}>
+                        <button
+                          type="button"
+                          onClick={() => onSelect(fm)}
+                          disabled={isCurrent}
+                          className={`w-full text-left p-3 rounded transition-colors ${
+                            isCurrent
+                              ? "bg-blue-50 cursor-default"
+                              : "hover:bg-slate-50"
+                          }`}
+                          data-testid={`pick-fm-${fm.id}`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-slate-900 truncate">
+                                {fm.failure_mode}
+                              </p>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                {fm.equipment} • {fm.category}
+                                {fm.failure_mode_type === "customer_specific" && (
+                                  <span className="ml-2 inline-flex items-center gap-1 text-purple-600">
+                                    <Sparkles className="w-3 h-3" /> Customer Specific
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                            {isCurrent ? (
+                              <Badge className="bg-blue-100 text-blue-700 text-[10px] flex-shrink-0">
+                                Current
+                              </Badge>
+                            ) : (
+                              <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0 mt-1" />
                             )}
-                          </p>
-                        </div>
-                        {isCurrent ? (
-                          <Badge className="bg-blue-100 text-blue-700 text-[10px] flex-shrink-0">
-                            Current
-                          </Badge>
-                        ) : (
-                          <ChevronRight className="w-4 h-4 text-slate-400 flex-shrink-0 mt-1" />
-                        )}
-                      </div>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
+                          </div>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          </>
+        )}
 
-        <div className="flex justify-end pt-3 border-t">
+        {mode === "create" && (
+          <div className="flex-1 overflow-y-auto space-y-3">
+            <div className="p-3 bg-purple-50 border border-purple-100 rounded text-xs text-purple-700">
+              <Sparkles className="w-3 h-3 inline mr-1" />
+              A new failure mode will be created and linked to this PM task. It will be marked as <strong>Customer Specific</strong>.
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-slate-600">Failure Mode Name *</label>
+              <input
+                autoFocus
+                type="text"
+                value={newFM.failure_mode}
+                onChange={(e) => setNewFM({ ...newFM, failure_mode: e.target.value })}
+                className="w-full mt-1 px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-200"
+                placeholder="e.g., Bearing Lubrication Starvation"
+                data-testid="picker-new-fm-name"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600">Equipment / Component</label>
+              <input
+                type="text"
+                value={newFM.equipment}
+                onChange={(e) => setNewFM({ ...newFM, equipment: e.target.value })}
+                className="w-full mt-1 px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-200"
+                placeholder="e.g., Feed Roller Bearing"
+                data-testid="picker-new-fm-equipment"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-600">Category</label>
+              <select
+                value={newFM.category}
+                onChange={(e) => setNewFM({ ...newFM, category: e.target.value })}
+                className="w-full mt-1 px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-200"
+                data-testid="picker-new-fm-category"
+              >
+                <option value="">Select category…</option>
+                <option value="Rotating">Rotating</option>
+                <option value="Static">Static</option>
+                <option value="Instrumentation">Instrumentation</option>
+                <option value="Electrical">Electrical</option>
+                <option value="Process">Process</option>
+                <option value="Piping">Piping</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2 pt-3 border-t">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
+          {mode === "create" && (
+            <Button
+              disabled={!newFM.failure_mode.trim() || creating}
+              onClick={handleCreate}
+              className="bg-purple-600 hover:bg-purple-700"
+              data-testid="picker-create-confirm-btn"
+            >
+              {creating ? (
+                <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Creating…</>
+              ) : (
+                <><Sparkles className="w-4 h-4 mr-1" /> Create & Link</>
+              )}
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>
@@ -380,6 +514,13 @@ const TaskRow = ({ task, onAccept, onReject, onSelectMatch, onApproveNewFM, onSe
     if (onSelectMatch) {
       await onSelectMatch(task.task_id, fm.id, fm.failure_mode);
     }
+  };
+  
+  const handlePickerCreateNew = async (fmData) => {
+    if (!onApproveNewFM) return;
+    await onApproveNewFM(task.task_id, fmData);
+    setShowPicker(false);
+    setOverrideFm(null); // creation flow uses approved_new_fm path
   };
   
   const handleApproveNew = async () => {
@@ -748,12 +889,18 @@ const TaskRow = ({ task, onAccept, onReject, onSelectMatch, onApproveNewFM, onSe
         )}
       </AnimatePresence>
       
-      {/* Failure Mode picker (search any existing FM and assign) */}
+      {/* Failure Mode picker (search any existing FM and assign, or create new) */}
       <ChangeFailureModePicker
         isOpen={showPicker}
         onClose={() => setShowPicker(false)}
         onSelect={handlePickerSelect}
+        onCreateNew={handlePickerCreateNew}
         currentFmId={assignedFmId}
+        defaultNewFM={{
+          failure_mode: task.suggested_failure_modes?.[0] || "",
+          equipment: task.component || "",
+          category: "",
+        }}
       />
     </div>
   );
@@ -978,18 +1125,20 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
     }
   };
   
-  // Scenario C: User approves new failure mode
+  // Scenario C / manual override: User approves new failure mode
   const handleApproveNewFM = async (taskId, fmData) => {
     try {
       const result = await pmImportAPI.approveNewFailureMode(sessionId, taskId, fmData);
       setSession(prev => ({
         ...prev,
         tasks_extracted: prev.tasks_extracted.map(t => 
-          t.task_id === taskId ? { ...t, review_status: "accepted", approved_new_fm: fmData } : t
+          t.task_id === taskId
+            ? { ...t, review_status: "accepted", approved_new_fm: fmData, selected_match_id: null }
+            : t
         ),
         stats: result.stats,
       }));
-      toast.success("New failure mode approved");
+      toast.success(`New failure mode "${fmData.failure_mode}" approved`);
     } catch (error) {
       toast.error("Failed to approve new failure mode");
     }

@@ -300,6 +300,7 @@ async def select_match(
         task_id, 
         {
             "selected_match_id": request.match_id,
+            "approved_new_fm": None,  # Clear prior new-FM approval since user is linking existing
             "review_status": "accepted"
         }
     )
@@ -338,6 +339,7 @@ async def approve_new_failure_mode(
                 "occurrence": request.occurrence,
                 "detectability": request.detectability
             },
+            "selected_match_id": None,  # Clear prior existing-match selection since user is creating new
             "review_status": "accepted"
         }
     )
