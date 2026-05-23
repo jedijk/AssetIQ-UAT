@@ -1763,7 +1763,7 @@ const FailureModesPage = () => {
         onClose={() => setIsPMImportOpen(false)}
         onImportComplete={() => {
           queryClient.invalidateQueries({ queryKey: ["failureModes"] });
-          setIsPMImportOpen(false);
+          // Don't close immediately - let user see summary, they will click Done
         }}
       />
     </div>
