@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams, useLocation } from "react-router-dom";
@@ -114,6 +114,7 @@ const FailureModesPage = () => {
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get("search") || "");
   const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all"); // generic, customer_specific, all
+  const [highSeverityOnly, setHighSeverityOnly] = useState(false); // filter to severity >= 8
   const [mainTab, setMainTab] = useState(() => searchParams.get("tab") || "failure-modes");
   const [libraryTab, setLibraryTab] = useState("equipment");
   
@@ -283,6 +284,23 @@ const FailureModesPage = () => {
   // counter is always accurate even if the page was capped.
   const totalModes = modesData?.total ?? failureModes.length;
   const totalCategories = DISCIPLINES.length;
+
+  // Client-side "High severity only" filter (severity >= 8 on SAE J1739 scale).
+  // Sort by severity desc, then RPN desc, so the most critical FMs surface first.
+  const displayedFailureModes = useMemo(() => {
+    let list = failureModes;
+    if (highSeverityOnly) {
+      list = list.filter((fm) => (fm.severity ?? 0) >= 8);
+      list = [...list].sort((a, b) => {
+        if ((b.severity ?? 0) !== (a.severity ?? 0)) return (b.severity ?? 0) - (a.severity ?? 0);
+        const aRpn = (a.severity ?? 0) * (a.occurrence ?? 0) * (a.detectability ?? 0);
+        const bRpn = (b.severity ?? 0) * (b.occurrence ?? 0) * (b.detectability ?? 0);
+        return bRpn - aRpn;
+      });
+    }
+    return list;
+  }, [failureModes, highSeverityOnly]);
+  const displayedTotal = highSeverityOnly ? displayedFailureModes.length : totalModes;
   
   // Calculate connected failure modes count for each equipment type
   const getConnectedFmCount = (equipmentTypeId) => {
@@ -755,8 +773,10 @@ const FailureModesPage = () => {
                 <AlertTriangle className="w-4 h-4 text-slate-600" />
               </div>
               <div>
-                <span className="text-lg font-bold text-slate-900">{totalModes}</span>
-                <span className="text-xs text-slate-500 ml-1">{t("library.failureModes")}</span>
+                <span className="text-lg font-bold text-slate-900">{displayedTotal}</span>
+                <span className="text-xs text-slate-500 ml-1">
+                  {highSeverityOnly ? "High Severity FMs" : t("library.failureModes")}
+                </span>
               </div>
             </div>
             <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
@@ -822,6 +842,27 @@ const FailureModesPage = () => {
                 </SelectItem>
               </SelectContent>
             </Select>
+            <Button
+              type="button"
+              onClick={() => setHighSeverityOnly((v) => !v)}
+              variant="outline"
+              className={`h-11 ${
+                highSeverityOnly
+                  ? "border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
+                  : "border-slate-200 text-slate-700 hover:bg-slate-50"
+              }`}
+              data-testid="high-severity-toggle"
+              title="Show only failure modes with severity ≥ 8 (high), sorted by severity then RPN"
+              aria-pressed={highSeverityOnly}
+            >
+              <AlertTriangle className="w-4 h-4 mr-1" />
+              High Severity
+              {highSeverityOnly && (
+                <span className="ml-1 text-xs font-semibold bg-red-100 text-red-700 px-1.5 rounded">
+                  {displayedFailureModes.length}
+                </span>
+              )}
+            </Button>
             <Button 
               onClick={handleExportExcel} 
               variant="outline" 
@@ -869,17 +910,21 @@ const FailureModesPage = () => {
                     <span></span>
                   </div>
                 </div>
-              ) : failureModes.length === 0 ? (
+              ) : displayedFailureModes.length === 0 ? (
                 <div className="empty-state py-16">
                   <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
                     <Info className="w-8 h-8 text-slate-400" />
                   </div>
                   <h3 className="text-xl font-semibold text-slate-700 mb-2">{t("library.noMatches")}</h3>
-                  <p className="text-slate-500">{t("library.tryAdjusting")}</p>
+                  <p className="text-slate-500">
+                    {highSeverityOnly
+                      ? "No failure modes with severity ≥ 8. Toggle off to see all."
+                      : t("library.tryAdjusting")}
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-2 overflow-y-auto h-full pr-2" data-testid="failure-modes-list">
-                  {failureModes.map((fm, idx) => {
+                  {displayedFailureModes.map((fm, idx) => {
                     const Icon = disciplineIcons[fm.discipline] || AlertTriangle;
                     const colors = disciplineColors[fm.discipline] || "bg-slate-100 text-slate-700";
                     const isSelected = selectedFm?.id === fm.id;
