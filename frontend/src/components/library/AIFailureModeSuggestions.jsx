@@ -283,7 +283,7 @@ export function AIFailureModeSuggestions({
             AI Failure Mode Suggestions
           </DialogTitle>
           <DialogDescription>
-            Use AI to intelligently suggest new failure mode mappings for equipment types. Works for all equipment types - suggests only unmapped failure modes.
+            Use AI to intelligently suggest new failure mode mappings for equipment types.
           </DialogDescription>
         </DialogHeader>
         
