@@ -233,7 +233,7 @@ export function AIFailureModeSuggestions({
     setAccepting(true);
     
     try {
-      // Apply mappings by updating each failure mode
+      // Apply mappings by updating each failure mode using PATCH
       for (const mapping of mappingsToApply) {
         for (const fmId of mapping.failure_mode_ids) {
           const fm = failureModes.find(f => f.id === fmId);
@@ -241,7 +241,7 @@ export function AIFailureModeSuggestions({
             const currentIds = fm.equipment_type_ids || [];
             if (!currentIds.includes(mapping.equipment_type_id)) {
               const newIds = [...currentIds, mapping.equipment_type_id];
-              await api.put(`/failure-modes/${fmId}`, {
+              await api.patch(`/failure-modes/${fmId}`, {
                 equipment_type_ids: newIds
               });
             }
