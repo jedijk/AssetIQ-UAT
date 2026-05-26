@@ -272,8 +272,8 @@ export function AIFailureModeSuggestions({
   
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Brain className="w-5 h-5 text-purple-600" />
             AI Failure Mode Suggestions
@@ -283,7 +283,7 @@ export function AIFailureModeSuggestions({
           </DialogDescription>
         </DialogHeader>
         
-        <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
           {/* Mode Selection */}
           <div className="flex items-center gap-2 mb-4 p-3 bg-slate-50 rounded-lg">
             <span className="text-sm font-medium text-slate-700">Analyze:</span>
@@ -441,8 +441,8 @@ export function AIFailureModeSuggestions({
           
           {/* Suggestions list */}
           {!loading && suggestions.length > 0 && (
-            <ScrollArea className="flex-1">
-              <div className="space-y-4 pr-4">
+            <div className="flex-1 overflow-auto min-h-0">
+              <div className="space-y-4 pr-2 pb-4">
                 {suggestions.map(suggestion => {
                   const isExpanded = expandedTypes[suggestion.equipment_type_id];
                   const selected = selectedMappings[suggestion.equipment_type_id] || new Set();
@@ -552,11 +552,11 @@ export function AIFailureModeSuggestions({
                   );
                 })}
               </div>
-            </ScrollArea>
+            </div>
           )}
         </div>
         
-        <DialogFooter className="border-t pt-4">
+        <DialogFooter className="border-t pt-4 flex-shrink-0">
           <div className="flex items-center justify-between w-full">
             <p className="text-sm text-slate-500">
               {totalSelected > 0 && (
