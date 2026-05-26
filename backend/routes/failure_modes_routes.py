@@ -393,6 +393,8 @@ class FailureModeUpdate(BaseModel):
     iso14224_mechanism: Optional[str] = None
     failure_mode_type: Optional[str] = None
     change_reason: Optional[str] = None
+    # AI provenance — set when "Improve with AI" is applied.
+    ai_improved_at: Optional[str] = None
 
     model_config = {"extra": "ignore"}
 
@@ -574,6 +576,8 @@ async def update_failure_mode(
             update_data["iso14224_mechanism"] = data.iso14224_mechanism
         if data.failure_mode_type is not None:
             update_data["failure_mode_type"] = data.failure_mode_type
+        if data.ai_improved_at is not None:
+            update_data["ai_improved_at"] = data.ai_improved_at
         
         result = await failure_modes_service.update(
             mode_id, 

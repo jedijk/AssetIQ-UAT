@@ -199,7 +199,12 @@ export function BulkImproveFailureModes({
       iso14224_mechanism: fm.iso14224_mechanism || "",
       category: fm.category || "",
     };
-    const merged = { ...baseData, ...patch };
+    const merged = {
+      ...baseData,
+      ...patch,
+      ai_improved_at: new Date().toISOString(),
+      change_reason: "ai_reliability_engineer_bulk",
+    };
     await api.patch(`/failure-modes/${fm.id}`, merged);
     return { action: "updated", changedCount };
   };

@@ -317,7 +317,9 @@ class FailureModesService:
             "recommended_actions", "equipment_type_ids", "mechanism",
             "failure_mode_type",
             # New fields for failure mode enhancements
-            "process", "potential_effects", "potential_causes", "iso14224_mechanism"
+            "process", "potential_effects", "potential_causes", "iso14224_mechanism",
+            # AI provenance
+            "ai_improved_at",
         ]
         
         for field in allowed_fields:
@@ -644,6 +646,7 @@ class FailureModesService:
             "failure_mode_type": doc.get("failure_mode_type", "generic"),
             "version": doc.get("version", 1),
             "rolled_back_from_version": doc.get("rolled_back_from_version"),
+            "ai_improved_at": safe_isoformat(doc.get("ai_improved_at")) if not isinstance(doc.get("ai_improved_at"), str) else doc.get("ai_improved_at"),
             "created_at": safe_isoformat(doc.get("created_at")),
             "updated_at": safe_isoformat(doc.get("updated_at")),
         }

@@ -116,6 +116,7 @@ const FailureModesPage = () => {
   const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all"); // generic, customer_specific, all
   const [highSeverityOnly, setHighSeverityOnly] = useState(false); // filter to severity >= 8
+  const [hideAIImproved, setHideAIImproved] = useState(false); // filter out FMs already improved by AI
   const [mainTab, setMainTab] = useState(() => searchParams.get("tab") || "failure-modes");
   const [libraryTab, setLibraryTab] = useState("equipment");
   
@@ -291,6 +292,9 @@ const FailureModesPage = () => {
   // Sort by severity desc, then RPN desc, so the most critical FMs surface first.
   const displayedFailureModes = useMemo(() => {
     let list = failureModes;
+    if (hideAIImproved) {
+      list = list.filter((fm) => !fm.ai_improved_at);
+    }
     if (highSeverityOnly) {
       list = list.filter((fm) => (fm.severity ?? 0) >= 8);
       list = [...list].sort((a, b) => {
@@ -301,8 +305,12 @@ const FailureModesPage = () => {
       });
     }
     return list;
-  }, [failureModes, highSeverityOnly]);
-  const displayedTotal = highSeverityOnly ? displayedFailureModes.length : totalModes;
+  }, [failureModes, highSeverityOnly, hideAIImproved]);
+  const displayedTotal = highSeverityOnly || hideAIImproved ? displayedFailureModes.length : totalModes;
+  const aiImprovedCount = useMemo(
+    () => failureModes.filter((fm) => fm.ai_improved_at).length,
+    [failureModes],
+  );
   
   // Calculate connected failure modes count for each equipment type
   const getConnectedFmCount = (equipmentTypeId) => {
@@ -644,7 +652,12 @@ const FailureModesPage = () => {
       iso14224_mechanism: selectedFm.iso14224_mechanism || "",
       category: selectedFm.category || "",
     };
-    const merged = { ...baseData, ...patch };
+    const merged = {
+      ...baseData,
+      ...patch,
+      ai_improved_at: new Date().toISOString(),
+      change_reason: "ai_reliability_engineer",
+    };
     updateFmMutation.mutate({ id: selectedFm.id, data: merged, oldData: selectedFm });
   };
 
@@ -865,6 +878,33 @@ const FailureModesPage = () => {
                 </span>
               )}
             </Button>
+            <Button
+              type="button"
+              onClick={() => setHideAIImproved((v) => !v)}
+              variant="outline"
+              className={`h-11 ${
+                hideAIImproved
+                  ? "border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100"
+                  : "border-slate-200 text-slate-700 hover:bg-slate-50"
+              }`}
+              data-testid="hide-ai-improved-toggle"
+              title={`Hide failure modes already improved by AI (${aiImprovedCount} marked)`}
+              aria-pressed={hideAIImproved}
+            >
+              <Sparkles className="w-4 h-4 mr-1" />
+              Not improved yet
+              {aiImprovedCount > 0 && (
+                <span
+                  className={`ml-1 text-xs font-semibold px-1.5 rounded ${
+                    hideAIImproved
+                      ? "bg-purple-100 text-purple-700"
+                      : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {aiImprovedCount} done
+                </span>
+              )}
+            </Button>
             <Button 
               onClick={handleExportExcel} 
               variant="outline" 
@@ -930,7 +970,9 @@ const FailureModesPage = () => {
                   </div>
                   <h3 className="text-xl font-semibold text-slate-700 mb-2">{t("library.noMatches")}</h3>
                   <p className="text-slate-500">
-                    {highSeverityOnly
+                    {hideAIImproved && failureModes.some((fm) => fm.ai_improved_at)
+                      ? "All visible failure modes have already been improved by AI. Toggle off to see them again."
+                      : highSeverityOnly
                       ? "No failure modes with severity ≥ 8. Toggle off to see all."
                       : t("library.tryAdjusting")}
                   </p>
