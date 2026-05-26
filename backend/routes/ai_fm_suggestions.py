@@ -1114,3 +1114,282 @@ async def suggest_new_failure_modes(request: SuggestNewFailureModesRequest):
         suggestions=suggestions,
         total=len(suggestions),
     )
+
+
+# =============================================================================
+# Improve a single Failure Mode (Reliability Engineer)
+# =============================================================================
+
+class ExistingFailureModeFull(BaseModel):
+    id: Optional[str] = None
+    failure_mode: str
+    category: Optional[str] = None
+    mechanism: Optional[str] = None
+    severity: Optional[int] = None
+    occurrence: Optional[int] = None
+    detectability: Optional[int] = None
+    keywords: List[str] = []
+    potential_effects: List[str] = []
+    potential_causes: List[str] = []
+    recommended_actions: List[str] = []
+    equipment_type_ids: List[str] = []
+
+
+class ImproveFailureModeRequest(BaseModel):
+    failure_mode: ExistingFailureModeFull
+    equipment_types: List[EquipmentTypeOption] = []
+
+
+class ImprovedFailureMode(BaseModel):
+    failure_mode: str
+    category: str
+    mechanism: str
+    severity: int
+    occurrence: int
+    detectability: int
+    rpn: int
+    keywords: List[str] = []
+    potential_effects: List[str] = []
+    potential_causes: List[str] = []
+    recommended_actions: List[str] = []
+    equipment_type_ids: List[str] = []
+    equipment_type_names: List[str] = []
+    improvements_summary: List[str] = []
+    rationale: str = ""
+
+
+IMPROVE_FAILURE_MODE_SYSTEM_PROMPT = """You are a senior reliability engineer (CMRP-level, ISO 14224 fluent) refining a SINGLE failure-mode record so it can serve as a high-quality reference in a production FMEA library.
+
+You are given:
+1. The current failure mode record (with its existing fields).
+2. The user's equipment type catalog (so equipment_type_ids stay valid).
+
+Your job: produce an IMPROVED version of every field. Keep what is already good, fix what is weak, expand what is missing.
+
+IMPROVEMENT RULES:
+
+1. failure_mode (name):
+   - Keep it concise, specific and action-oriented (e.g. "Mechanical Seal Face Wear", not "Pump Failure").
+   - If the existing name is already perfect, return it verbatim.
+
+2. category & mechanism:
+   - category: one of Rotating, Static, Piping, Electrical, Instrumentation, Civil, Operations, Laboratory (or the existing one if more specific).
+   - mechanism: short ISO 14224 code (BRD, LKG, COR, ERO, FAT, FRA, WEA, CON, INS, CAL, VIB, ELU, OVH, CAV, UNK). Pick the closest fit.
+
+3. severity / occurrence / detectability (SAE J1739 scale, 1-10):
+   - severity: 1 (negligible) → 10 (catastrophic safety / environmental).
+   - occurrence: 1 (very rare) → 10 (very high).
+   - detectability: 1 (almost certain to detect early) → 10 (no detection possible).
+   - Be REALISTIC and CONSERVATIVE. Most production failures sit S 5-8, O 3-6, D 4-7.
+   - If the existing values are clearly off (e.g. all 10s or all 1s), correct them.
+
+4. keywords (3-6, lowercase, search-friendly):
+   - Include the failure mechanism and equipment context. Avoid redundancy.
+
+5. potential_effects (3-5 short bullets):
+   - Process / safety / environmental / economic consequences. Each bullet should be a noun phrase (e.g. "Process leak", "Unplanned shutdown").
+
+6. potential_causes (3-5 short bullets):
+   - Root causes spanning design, operating, maintenance and environmental factors.
+
+7. recommended_actions (3-6 concrete maintenance actions):
+   - Mix of inspection, monitoring (PDM), preventive (PM) and corrective (CM) tasks.
+   - Be specific: "Vibration trend monitoring (PDM, monthly)" not "monitor regularly".
+
+8. equipment_type_ids:
+   - Keep the existing IDs if they are valid. Add up to 2 more EXACT IDs from the user's catalog if the failure mode clearly applies. NEVER invent IDs.
+   - If the existing list is empty, propose 1-3 IDs from the catalog where this failure mode is most relevant.
+
+9. improvements_summary (2-5 short bullets):
+   - Explain what you changed and why. Each bullet should reference a field name (e.g. "Tightened name to 'Mechanical Seal Face Wear'", "Lowered occurrence from 8 → 5 — typical for centrifugal pumps").
+   - If a field was already strong and you kept it, do NOT mention it.
+
+10. rationale: one sentence summarising the overall improvement direction.
+
+Return ONLY valid JSON. No prose outside JSON."""
+
+
+def _improve_cache_key(fm: ExistingFailureModeFull, et_ids: List[str]) -> str:
+    fingerprint = json.dumps({
+        "name": fm.failure_mode,
+        "category": fm.category or "",
+        "mechanism": fm.mechanism or "",
+        "sod": [fm.severity, fm.occurrence, fm.detectability],
+        "kw": sorted(fm.keywords or []),
+        "eff": sorted(fm.potential_effects or []),
+        "cau": sorted(fm.potential_causes or []),
+        "act": sorted(fm.recommended_actions or []),
+        "eq": sorted(fm.equipment_type_ids or []),
+        "catalog": sorted(et_ids),
+    }, sort_keys=True)
+    return hashlib.md5(f"IMPROVEFM:{fingerprint}".encode()).hexdigest()
+
+
+async def improve_failure_mode_with_ai(
+    fm: ExistingFailureModeFull,
+    equipment_types: List[EquipmentTypeOption],
+) -> ImprovedFailureMode:
+    """Use OpenAI to produce an improved version of a single failure mode."""
+    et_ids = [et.id for et in equipment_types]
+    cache_key = _improve_cache_key(fm, et_ids)
+
+    if cache_key in _suggestion_cache:
+        logger.info(f"Returning in-memory cached improved FM: {cache_key[:8]}")
+        return _suggestion_cache[cache_key]
+
+    try:
+        cached_doc = await db[_CACHE_COLLECTION].find_one({"_id": cache_key})
+        if cached_doc and "improved_fm" in cached_doc:
+            improved = ImprovedFailureMode(**cached_doc["improved_fm"])
+            _suggestion_cache[cache_key] = improved
+            logger.info(f"Returning Mongo-cached improved FM: {cache_key[:8]}")
+            return improved
+    except Exception as e:
+        logger.warning(f"Improve-FM cache lookup failed (non-fatal): {e}")
+
+    client = get_openai_client()
+
+    et_list = [{"id": et.id, "name": et.name, "discipline": et.discipline or ""} for et in equipment_types]
+    fm_payload = {
+        "failure_mode": fm.failure_mode,
+        "category": fm.category or "",
+        "mechanism": fm.mechanism or "",
+        "severity": fm.severity,
+        "occurrence": fm.occurrence,
+        "detectability": fm.detectability,
+        "keywords": fm.keywords or [],
+        "potential_effects": fm.potential_effects or [],
+        "potential_causes": fm.potential_causes or [],
+        "recommended_actions": fm.recommended_actions or [],
+        "equipment_type_ids": fm.equipment_type_ids or [],
+    }
+
+    user_prompt = f"""CURRENT FAILURE MODE:
+{json.dumps(fm_payload, indent=2)}
+
+EQUIPMENT TYPE CATALOG (use exact IDs only):
+{json.dumps(et_list, indent=2)}
+
+Return JSON:
+{{
+  "failure_mode": "string",
+  "category": "string",
+  "mechanism": "string",
+  "severity": 7,
+  "occurrence": 4,
+  "detectability": 6,
+  "keywords": ["..."],
+  "potential_effects": ["..."],
+  "potential_causes": ["..."],
+  "recommended_actions": ["..."],
+  "equipment_type_ids": ["..."],
+  "equipment_type_names": ["..."],
+  "improvements_summary": ["..."],
+  "rationale": "1 short sentence"
+}}"""
+
+    try:
+        response = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": IMPROVE_FAILURE_MODE_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0,
+            max_tokens=2500,
+            seed=42,
+            response_format={"type": "json_object"},
+        )
+
+        result = json.loads(response.choices[0].message.content.strip())
+
+        valid_et_ids = {et.id for et in equipment_types}
+        et_name_by_id = {et.id: et.name for et in equipment_types}
+
+        def _clip(v, lo, hi, default):
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                v = default
+            return max(lo, min(hi, v))
+
+        def _str_list(v, cap):
+            if isinstance(v, str):
+                parts = [p.strip() for p in v.split(",") if p.strip()]
+            elif isinstance(v, list):
+                parts = [str(p).strip() for p in v if str(p).strip()]
+            else:
+                parts = []
+            seen = set()
+            out = []
+            for p in parts:
+                key = p.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(p)
+            return out[:cap]
+
+        sev = _clip(result.get("severity"), 1, 10, fm.severity or 5)
+        occ = _clip(result.get("occurrence"), 1, 10, fm.occurrence or 5)
+        det = _clip(result.get("detectability"), 1, 10, fm.detectability or 5)
+
+        raw_ids = result.get("equipment_type_ids") or []
+        et_ids_out = [i for i in raw_ids if i in valid_et_ids]
+        # Always preserve existing valid IDs even if AI dropped them
+        for eid in (fm.equipment_type_ids or []):
+            if eid in valid_et_ids and eid not in et_ids_out:
+                et_ids_out.append(eid)
+        et_ids_out = et_ids_out[:8]
+        et_names_out = [et_name_by_id[i] for i in et_ids_out]
+
+        improved = ImprovedFailureMode(
+            failure_mode=(result.get("failure_mode") or fm.failure_mode).strip(),
+            category=(result.get("category") or fm.category or "General").strip(),
+            mechanism=(result.get("mechanism") or fm.mechanism or "UNK").strip().upper(),
+            severity=sev,
+            occurrence=occ,
+            detectability=det,
+            rpn=sev * occ * det,
+            keywords=_str_list(result.get("keywords"), 8),
+            potential_effects=_str_list(result.get("potential_effects"), 6),
+            potential_causes=_str_list(result.get("potential_causes"), 6),
+            recommended_actions=_str_list(result.get("recommended_actions"), 8),
+            equipment_type_ids=et_ids_out,
+            equipment_type_names=et_names_out,
+            improvements_summary=_str_list(result.get("improvements_summary"), 6),
+            rationale=(result.get("rationale") or "").strip(),
+        )
+
+        _suggestion_cache[cache_key] = improved
+        try:
+            await db[_CACHE_COLLECTION].update_one(
+                {"_id": cache_key},
+                {"$set": {
+                    "improved_fm": improved.model_dump(),
+                    "kind": "improve_failure_mode",
+                    "fm_id": fm.id,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }},
+                upsert=True,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to persist improved-FM cache (non-fatal): {e}")
+
+        return improved
+
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse AI improve-FM response: {e}")
+        raise HTTPException(status_code=500, detail="Failed to parse AI response")
+    except Exception as e:
+        logger.error(f"AI improve-FM error: {e}")
+        raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")
+
+
+@router.post("/improve-failure-mode", response_model=ImprovedFailureMode)
+async def improve_failure_mode_endpoint(request: ImproveFailureModeRequest):
+    """Have an AI reliability engineer improve a single failure mode record."""
+    if not request.failure_mode or not request.failure_mode.failure_mode:
+        raise HTTPException(status_code=400, detail="No failure mode provided")
+    eq_types = request.equipment_types[:200]
+    return await improve_failure_mode_with_ai(request.failure_mode, eq_types)

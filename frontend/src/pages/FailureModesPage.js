@@ -73,6 +73,7 @@ import PMImportWizard from "../components/library/PMImportWizard";
 import AIFailureModeSuggestions from "../components/library/AIFailureModeSuggestions";
 import AINewEquipmentTypeSuggestions from "../components/library/AINewEquipmentTypeSuggestions";
 import AINewFailureModeSuggestions from "../components/library/AINewFailureModeSuggestions";
+import AIImproveFailureMode from "../components/library/AIImproveFailureMode";
 import { Upload, Sparkles } from "lucide-react";
 
 const disciplineIcons = {
@@ -146,6 +147,7 @@ const FailureModesPage = () => {
   const [isAISuggestionsOpen, setIsAISuggestionsOpen] = useState(false); // AI suggestions dialog
   const [isAINewTypesOpen, setIsAINewTypesOpen] = useState(false); // AI suggest NEW equipment types
   const [isAINewFmOpen, setIsAINewFmOpen] = useState(false); // AI suggest NEW failure modes
+  const [isAIImproveOpen, setIsAIImproveOpen] = useState(false); // AI improve a single failure mode
   
   // Failure mode dialog state
   const [isFmDialogOpen, setIsFmDialogOpen] = useState(false);
@@ -597,6 +599,30 @@ const FailureModesPage = () => {
     setViewPanelForm(null);
   };
 
+  // Apply AI-improved fields directly to the selected failure mode
+  const handleApplyAIImprovement = (patch) => {
+    if (!selectedFm || !patch) return;
+    // Merge patch onto the existing FM. Falls back to existing values for fields
+    // the user didn't pick.
+    const baseData = {
+      discipline: selectedFm.discipline,
+      failure_mode: selectedFm.failure_mode,
+      keywords: selectedFm.keywords || [],
+      severity: selectedFm.severity,
+      occurrence: selectedFm.occurrence,
+      detectability: selectedFm.detectability,
+      recommended_actions: selectedFm.recommended_actions || [],
+      equipment_type_ids: selectedFm.equipment_type_ids || [],
+      process: selectedFm.process || "",
+      potential_effects: selectedFm.potential_effects || [],
+      potential_causes: selectedFm.potential_causes || [],
+      iso14224_mechanism: selectedFm.iso14224_mechanism || "",
+      category: selectedFm.category || "",
+    };
+    const merged = { ...baseData, ...patch };
+    updateFmMutation.mutate({ id: selectedFm.id, data: merged, oldData: selectedFm });
+  };
+
   const handleSaveFm = () => {
     if (editingFm) {
       updateFmMutation.mutate({ id: editingFm.id, data: newFm, oldData: editingFm });
@@ -938,6 +964,7 @@ const FailureModesPage = () => {
                   onValidate={handleValidateFm}
                   onUnvalidate={handleUnvalidateFm}
                   onShowVersionHistory={handleShowVersionHistory}
+                  onImproveWithAI={() => setIsAIImproveOpen(true)}
                   equipmentTypes={equipmentTypes}
                   categories={categories}
                   currentUser={user}
@@ -968,6 +995,7 @@ const FailureModesPage = () => {
                 onValidate={handleValidateFm}
                 onUnvalidate={handleUnvalidateFm}
                 onShowVersionHistory={handleShowVersionHistory}
+                onImproveWithAI={() => setIsAIImproveOpen(true)}
                 equipmentTypes={equipmentTypes}
                 categories={categories}
                 currentUser={user}
@@ -1928,6 +1956,15 @@ const FailureModesPage = () => {
           queryClient.invalidateQueries({ queryKey: ["failureModes"] });
         }}
         t={t}
+      />
+
+      {/* AI Improve Failure Mode (Reliability Engineer) */}
+      <AIImproveFailureMode
+        isOpen={isAIImproveOpen}
+        onClose={() => setIsAIImproveOpen(false)}
+        failureMode={selectedFm}
+        equipmentTypes={equipmentTypes}
+        onApply={handleApplyAIImprovement}
       />
     </div>
   );

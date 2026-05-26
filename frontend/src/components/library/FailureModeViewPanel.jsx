@@ -4,7 +4,8 @@ import { formatDate } from "../../lib/dateUtils";
 import { 
   AlertTriangle, Edit, Trash2, X, Plus, Link, CheckCircle, 
   User, Briefcase, Calendar, History, RotateCcw, Clock, ShieldCheck,
-  Cog, Thermometer, Activity, Zap, Shield, Leaf, Maximize2, Minimize2, Image, Search
+  Cog, Thermometer, Activity, Zap, Shield, Leaf, Maximize2, Minimize2, Image, Search,
+  Wand2
 } from "lucide-react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -72,6 +73,7 @@ export function FailureModeViewPanel({
   onValidate,
   onUnvalidate,
   onShowVersionHistory,
+  onImproveWithAI,
   equipmentTypes,
   categories,
   currentUser,
@@ -337,6 +339,18 @@ export function FailureModeViewPanel({
               <Button size="sm" variant="outline" onClick={onStartEdit} data-testid="view-panel-edit-btn">
                 <Edit className="w-4 h-4 mr-1" /> {t("common.edit")}
               </Button>
+              {onImproveWithAI && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onImproveWithAI}
+                  className="border-purple-200 text-purple-700 hover:bg-purple-50"
+                  data-testid="view-panel-improve-ai-btn"
+                  title="Improve this failure mode with AI (reliability engineer)"
+                >
+                  <Wand2 className="w-4 h-4 mr-1" /> Improve with AI
+                </Button>
+              )}
               <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => onDelete(fm.id)} data-testid="view-panel-delete-btn">
                 <Trash2 className="w-4 h-4" />
               </Button>
