@@ -236,23 +236,42 @@ Return JSON:
 @router.post("/failure-modes", response_model=SuggestFailureModesResponse)
 async def suggest_failure_modes(request: SuggestFailureModesRequest):
     """Get deterministic AI-powered suggestions for mapping failure modes to equipment types."""
-    
+
     # Process ALL equipment types at once (no batching)
     equipment_type_ids = request.equipment_type_ids
-    
+
+    # 1) Resolve from built-in catalog
     equipment_types = []
+    resolved_ids = set()
     for eq_id in equipment_type_ids:
         eq_type = next((t for t in EQUIPMENT_TYPES if t["id"] == eq_id), None)
         if eq_type:
             equipment_types.append(eq_type)
-    
+            resolved_ids.add(eq_id)
+
+    # 2) Resolve any remaining IDs from user-custom equipment types in Mongo
+    missing_ids = [i for i in equipment_type_ids if i not in resolved_ids]
+    if missing_ids:
+        try:
+            custom_cursor = db.custom_equipment_types.find(
+                {"id": {"$in": missing_ids}}, {"_id": 0}
+            )
+            async for ct in custom_cursor:
+                equipment_types.append({
+                    "id": ct.get("id"),
+                    "name": ct.get("name"),
+                    "discipline": ct.get("discipline", ""),
+                })
+        except Exception as e:
+            logger.warning(f"Failed to resolve custom equipment types (non-fatal): {e}")
+
     if not equipment_types:
         raise HTTPException(status_code=400, detail="No valid equipment types provided")
-    
+
     failure_modes = request.existing_failure_modes[:150]  # Increased limit
     suggestions = await get_ai_suggestions(equipment_types, failure_modes)
     total = sum(len(s.suggested_failure_modes) for s in suggestions)
-    
+
     return SuggestFailureModesResponse(
         suggestions=suggestions,
         total_suggestions=total
