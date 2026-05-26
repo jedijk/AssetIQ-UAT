@@ -253,6 +253,9 @@ const FailureModesPage = () => {
       if (typeFilter && typeFilter !== "all") {
         params.append("failure_mode_type", typeFilter);
       }
+      // Load the full library so the counter and lists reflect ALL failure modes,
+      // not just the first 500. Backend cache only kicks in at exactly limit=500.
+      params.append("limit", "10000");
       const response = await api.get(`/failure-modes?${params.toString()}`);
       return response.data;
     },
@@ -276,7 +279,9 @@ const FailureModesPage = () => {
   const hierarchyNodes = nodesData?.nodes || [];
   
   // Calculate dynamic stats
-  const totalModes = failureModes.length;
+  // Prefer the server's total (real Mongo count) over the page length so the
+  // counter is always accurate even if the page was capped.
+  const totalModes = modesData?.total ?? failureModes.length;
   const totalCategories = categories.length;
   
   // Calculate connected failure modes count for each equipment type

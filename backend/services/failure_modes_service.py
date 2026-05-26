@@ -57,11 +57,13 @@ class FailureModesService:
         from datetime import timedelta
         
         # Check if this is a default query (no filters, first page, default limit)
+        # NOTE: limit must equal the default exactly — a larger limit must bypass the
+        # cache so users with > 500 failure modes can actually load all of them.
         is_default_query = (
             not category or category.lower() == "all"
         ) and not equipment and not search and not min_rpn and not equipment_type_id and not mechanism and is_validated is None and (
             not failure_mode_type or failure_mode_type.lower() == "all"
-        ) and not recently_added_days and skip == 0 and limit >= 500
+        ) and not recently_added_days and skip == 0 and limit == 500
         
         # Use cache for default unfiltered query
         if is_default_query:
