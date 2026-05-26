@@ -833,3 +833,284 @@ async def suggest_new_equipment_types(request: SuggestNewEquipmentTypesRequest):
         suggestions=suggestions,
         total=len(suggestions),
     )
+
+
+# =============================================================================
+# New Failure Mode Suggestions (Reliability Engineer persona)
+# =============================================================================
+
+class ExistingFailureModeBrief(BaseModel):
+    failure_mode: str
+    category: Optional[str] = None
+    equipment_type_ids: List[str] = []
+
+
+class NewFailureModeSuggestion(BaseModel):
+    failure_mode: str
+    category: str
+    mechanism: Optional[str] = None   # ISO 14224 short code, e.g. "BRD", "LKG"
+    severity: int
+    occurrence: int
+    detectability: int
+    rpn: int
+    equipment_type_ids: List[str] = []
+    equipment_type_names: List[str] = []
+    keywords: List[str] = []
+    potential_effects: List[str] = []
+    potential_causes: List[str] = []
+    recommended_actions: List[str] = []
+    rationale: str
+
+
+class SuggestNewFailureModesRequest(BaseModel):
+    equipment_types: List[EquipmentTypeOption]
+    existing_failure_modes: List[ExistingFailureModeBrief]
+
+
+class SuggestNewFailureModesResponse(BaseModel):
+    suggestions: List[NewFailureModeSuggestion]
+    total: int
+
+
+NEW_FAILURE_MODE_SYSTEM_PROMPT = """You are a senior reliability engineer (CMRP-level, ISO 14224 fluent) auditing a failure mode catalog.
+
+The user gives you:
+1. A list of EXISTING failure modes already in the library (with the equipment_type_ids they cover).
+2. A list of equipment types from their catalog.
+
+Your task: propose NEW failure modes that should be added — failure modes that are clearly relevant for the given equipment types but are NOT yet represented in the existing library (or are missing for specific equipment types they should cover).
+
+STRICT RULES:
+
+1. CATEGORY DISCIPLINE:
+   - Rotating equipment failures: bearings, seals, vibration, imbalance, misalignment, lubrication, shaft, impeller, motor windings, cavitation.
+   - Static equipment failures: corrosion, erosion, fatigue, cracking, fouling, leakage, blockage, embrittlement.
+   - Piping/Valves: leakage, blockage, erosion, stuck actuator, packing failure, seat damage.
+   - Electrical: insulation breakdown, overheating, short circuit, open circuit, contact pitting.
+   - Instrumentation: calibration drift, signal loss, sensor fouling, communication failure.
+
+2. AVOID DUPLICATION:
+   - Do NOT propose any failure mode whose name is already in the existing list (case-insensitive). Read carefully.
+   - If a failure mode already exists for SOME equipment types but is clearly missing for OTHERS, you may propose extending it — but only if the gap is meaningful (e.g. "Bearing Failure" exists for centrifugal pumps but is missing for gas turbines).
+
+3. SCORING (use ISO 14224 / SAE J1739 conventions, 1-10 scale):
+   - severity: 1 (negligible) → 10 (catastrophic, safety/environmental).
+   - occurrence: 1 (very rare, < 1 in 10⁶) → 10 (very high, > 1 in 2).
+   - detectability: 1 (almost certain to detect early) → 10 (no detection possible).
+   - Be REALISTIC. Most production failures sit S 5-8, O 3-6, D 4-7.
+
+4. ISO 14224 MECHANISM CODE (`mechanism` field): use a short ISO code such as:
+   BRD (breakdown), LKG (leakage), COR (corrosion), ERO (erosion), FAT (fatigue), FRA (fracture),
+   WEA (wear), CON (contamination), INS (insulation failure), CAL (calibration), VIB (vibration),
+   ELU (electrical), UNK (unknown). Pick the closest fit.
+
+5. EQUIPMENT MAPPING:
+   - `equipment_type_ids` MUST contain at least one ID from the user's catalog. Use EXACT IDs only.
+   - Each suggestion should target the most relevant equipment types (typically 1-4 IDs).
+   - Always also fill `equipment_type_names` matching those IDs.
+
+6. CONTENT QUALITY:
+   - `failure_mode`: short, specific, action-oriented (e.g. "Mechanical Seal Face Wear", not "Pump Failure").
+   - `potential_effects`: 2-4 short bullets describing consequences (e.g. "Process leak", "Pump shutdown").
+   - `potential_causes`: 2-4 short bullets describing root causes.
+   - `recommended_actions`: 2-4 concrete maintenance actions (e.g. "Vibration trend monitoring (PDM)", "Replace seal during planned shutdown (PM)").
+   - `keywords`: 3-6 lowercase search terms.
+   - `rationale`: 1 short sentence explaining WHY this failure mode is missing and where it applies.
+
+7. QUANTITY:
+   - Return at MOST 15 suggestions, sorted by RPN descending.
+   - Prefer fewer, higher-quality, high-RPN gaps over many marginal ones.
+
+Return ONLY valid JSON. No prose outside JSON."""
+
+
+def get_new_fms_cache_key(eq_types: List[EquipmentTypeOption], existing: List[ExistingFailureModeBrief]) -> str:
+    et_keys = sorted([f"{et.id}|{et.discipline or ''}" for et in eq_types])
+    fm_keys = sorted([f"{(fm.failure_mode or '').lower()}|{(fm.category or '').lower()}" for fm in existing])
+    return hashlib.md5(f"NEWFMS:{et_keys}:{fm_keys}".encode()).hexdigest()
+
+
+async def get_new_failure_mode_suggestions(
+    equipment_types: List[EquipmentTypeOption],
+    existing_failure_modes: List[ExistingFailureModeBrief],
+) -> List[NewFailureModeSuggestion]:
+    """Propose NEW failure modes that should be added to the library."""
+    cache_key = get_new_fms_cache_key(equipment_types, existing_failure_modes)
+
+    if cache_key in _suggestion_cache:
+        logger.info(f"Returning in-memory cached new-FM suggestions: {cache_key[:8]}")
+        return _suggestion_cache[cache_key]
+
+    try:
+        cached_doc = await db[_CACHE_COLLECTION].find_one({"_id": cache_key})
+        if cached_doc and "new_fm_suggestions" in cached_doc:
+            suggestions = [NewFailureModeSuggestion(**s) for s in cached_doc["new_fm_suggestions"]]
+            _suggestion_cache[cache_key] = suggestions
+            logger.info(f"Returning Mongo-cached new-FM suggestions: {cache_key[:8]}")
+            return suggestions
+    except Exception as e:
+        logger.warning(f"New-FM cache lookup failed (non-fatal): {e}")
+
+    client = get_openai_client()
+
+    et_list = [
+        {"id": et.id, "name": et.name, "discipline": et.discipline or ""}
+        for et in equipment_types
+    ]
+    existing_list = [
+        {
+            "failure_mode": fm.failure_mode,
+            "category": fm.category or "",
+            "equipment_type_ids": fm.equipment_type_ids or [],
+        }
+        for fm in existing_failure_modes
+    ]
+
+    user_prompt = f"""EQUIPMENT TYPE CATALOG (use exact IDs in your output):
+{json.dumps(et_list, indent=2)}
+
+EXISTING FAILURE MODES (do NOT re-propose these):
+{json.dumps(existing_list, indent=2)}
+
+Return JSON:
+{{
+  "suggestions": [
+    {{
+      "failure_mode": "Mechanical Seal Face Wear",
+      "category": "Rotating",
+      "mechanism": "WEA",
+      "severity": 7,
+      "occurrence": 5,
+      "detectability": 6,
+      "rpn": 210,
+      "equipment_type_ids": ["pump_centrifugal"],
+      "equipment_type_names": ["Centrifugal Pump"],
+      "keywords": ["seal wear", "mechanical seal", "face wear"],
+      "potential_effects": ["Process leak", "Loss of containment"],
+      "potential_causes": ["Abrasive particles", "Dry running"],
+      "recommended_actions": ["Vibration trend monitoring (PDM)", "Replace seal at planned shutdown (PM)"],
+      "rationale": "Mechanical seal wear is a top-cause pump failure not present in the library."
+    }}
+  ]
+}}"""
+
+    try:
+        response = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": NEW_FAILURE_MODE_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0,
+            max_tokens=4500,
+            seed=42,
+            response_format={"type": "json_object"},
+        )
+
+        result = json.loads(response.choices[0].message.content.strip())
+
+        existing_names = {(fm.failure_mode or "").strip().lower() for fm in existing_failure_modes}
+        valid_et_ids = {et.id for et in equipment_types}
+        et_name_by_id = {et.id: et.name for et in equipment_types}
+
+        suggestions: List[NewFailureModeSuggestion] = []
+        seen_names = set()
+
+        def _clip(v, lo, hi, default):
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                v = default
+            return max(lo, min(hi, v))
+
+        for item in result.get("suggestions", []):
+            name = (item.get("failure_mode") or "").strip()
+            if not name:
+                continue
+            low = name.lower()
+            if low in existing_names or low in seen_names:
+                continue
+
+            sev = _clip(item.get("severity"), 1, 10, 5)
+            occ = _clip(item.get("occurrence"), 1, 10, 5)
+            det = _clip(item.get("detectability"), 1, 10, 5)
+            rpn = sev * occ * det
+
+            raw_ids = item.get("equipment_type_ids") or []
+            et_ids = [i for i in raw_ids if i in valid_et_ids][:5]
+            if not et_ids:
+                # Without a valid equipment_type mapping, the suggestion is not actionable.
+                continue
+            et_names = [et_name_by_id[i] for i in et_ids]
+
+            def _str_list(v, cap):
+                if isinstance(v, str):
+                    parts = [p.strip() for p in v.split(",") if p.strip()]
+                elif isinstance(v, list):
+                    parts = [str(p).strip() for p in v if str(p).strip()]
+                else:
+                    parts = []
+                return parts[:cap]
+
+            seen_names.add(low)
+            suggestions.append(NewFailureModeSuggestion(
+                failure_mode=name,
+                category=(item.get("category") or "").strip() or "General",
+                mechanism=(item.get("mechanism") or "").strip() or "UNK",
+                severity=sev,
+                occurrence=occ,
+                detectability=det,
+                rpn=rpn,
+                equipment_type_ids=et_ids,
+                equipment_type_names=et_names,
+                keywords=_str_list(item.get("keywords"), 6),
+                potential_effects=_str_list(item.get("potential_effects"), 6),
+                potential_causes=_str_list(item.get("potential_causes"), 6),
+                recommended_actions=_str_list(item.get("recommended_actions"), 6),
+                rationale=(item.get("rationale") or "").strip(),
+            ))
+
+        # Sort by RPN desc, cap at 15
+        suggestions.sort(key=lambda s: s.rpn, reverse=True)
+        suggestions = suggestions[:15]
+
+        _suggestion_cache[cache_key] = suggestions
+        try:
+            await db[_CACHE_COLLECTION].update_one(
+                {"_id": cache_key},
+                {"$set": {
+                    "new_fm_suggestions": [s.model_dump() for s in suggestions],
+                    "kind": "new_failure_modes",
+                    "equipment_type_ids": sorted([et.id for et in equipment_types]),
+                    "existing_fm_count": len(existing_failure_modes),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }},
+                upsert=True,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to persist new-FM cache (non-fatal): {e}")
+
+        return suggestions
+
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse AI new-FM response: {e}")
+        raise HTTPException(status_code=500, detail="Failed to parse AI response")
+    except Exception as e:
+        logger.error(f"AI new-FM error: {e}")
+        raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")
+
+
+@router.post("/new-failure-modes", response_model=SuggestNewFailureModesResponse)
+async def suggest_new_failure_modes(request: SuggestNewFailureModesRequest):
+    """Get AI-suggested NEW failure modes based on the user's equipment type catalog."""
+    if not request.equipment_types:
+        raise HTTPException(status_code=400, detail="No equipment types provided")
+
+    eq_types = request.equipment_types[:120]
+    existing = request.existing_failure_modes[:500]
+
+    suggestions = await get_new_failure_mode_suggestions(eq_types, existing)
+    return SuggestNewFailureModesResponse(
+        suggestions=suggestions,
+        total=len(suggestions),
+    )

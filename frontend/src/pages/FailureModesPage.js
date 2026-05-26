@@ -72,6 +72,7 @@ import { FailureModeViewPanel } from "../components/library";
 import PMImportWizard from "../components/library/PMImportWizard";
 import AIFailureModeSuggestions from "../components/library/AIFailureModeSuggestions";
 import AINewEquipmentTypeSuggestions from "../components/library/AINewEquipmentTypeSuggestions";
+import AINewFailureModeSuggestions from "../components/library/AINewFailureModeSuggestions";
 import { Upload, Sparkles } from "lucide-react";
 
 const disciplineIcons = {
@@ -144,6 +145,7 @@ const FailureModesPage = () => {
   const [selectedEquipmentType, setSelectedEquipmentType] = useState(null); // For viewing connected failure modes
   const [isAISuggestionsOpen, setIsAISuggestionsOpen] = useState(false); // AI suggestions dialog
   const [isAINewTypesOpen, setIsAINewTypesOpen] = useState(false); // AI suggest NEW equipment types
+  const [isAINewFmOpen, setIsAINewFmOpen] = useState(false); // AI suggest NEW failure modes
   
   // Failure mode dialog state
   const [isFmDialogOpen, setIsFmDialogOpen] = useState(false);
@@ -807,6 +809,17 @@ const FailureModesPage = () => {
             >
               <Upload className="w-4 h-4 mr-1" /> 
               Import PM Plan
+            </Button>
+            <Button
+              onClick={() => setIsAINewFmOpen(true)}
+              variant="outline"
+              className="h-11 border-purple-200 text-purple-700 hover:bg-purple-50"
+              data-testid="ai-suggest-new-failure-modes-btn"
+              disabled={equipmentTypes.length === 0}
+              title="Let AI act as a reliability engineer and suggest failure modes missing from your library"
+            >
+              <Sparkles className="w-4 h-4 mr-1" />
+              Suggest Failure Modes
             </Button>
             <Button onClick={() => { setEditingFm(null); resetFmForm(); setIsFmDialogOpen(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-failure-mode-btn">
               <Plus className="w-4 h-4 mr-1" /> {t("library.addFailureMode")}
@@ -1903,6 +1916,18 @@ const FailureModesPage = () => {
         onCreated={() => {
           queryClient.invalidateQueries({ queryKey: ["equipment-types"] });
         }}
+      />
+
+      {/* AI Suggest NEW Failure Modes Dialog (Reliability Engineer) */}
+      <AINewFailureModeSuggestions
+        isOpen={isAINewFmOpen}
+        onClose={() => setIsAINewFmOpen(false)}
+        equipmentTypes={equipmentTypes}
+        failureModes={failureModes}
+        onCreated={() => {
+          queryClient.invalidateQueries({ queryKey: ["failureModes"] });
+        }}
+        t={t}
       />
     </div>
   );
