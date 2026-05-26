@@ -75,7 +75,7 @@ export function EquipmentTypeItem({ item, onEdit, onDelete, onSelect, isSelected
   
   return (
     <div 
-      className={`flex items-center gap-3 p-3 bg-white rounded-lg border transition-all group cursor-pointer ${
+      className={`flex items-start gap-3 p-3 bg-white rounded-lg border transition-all group cursor-pointer ${
         isSelected 
           ? `${colors.border} ring-2 ring-blue-300 shadow-md` 
           : `${colors.border} hover:shadow-sm`
@@ -83,34 +83,34 @@ export function EquipmentTypeItem({ item, onEdit, onDelete, onSelect, isSelected
       data-testid={`equipment-type-${item.id}`}
       onClick={() => onSelect && onSelect(item)}
     >
-      <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${colors.bg}`}>
+      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${colors.bg}`}>
         <Icon className={`w-5 h-5 ${colors.icon}`} />
       </div>
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 overflow-hidden">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-slate-700 truncate">{item.name}</span>
           {item.is_system_level && (
-            <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-600 rounded font-medium">SYS</span>
+            <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-600 rounded font-medium flex-shrink-0">SYS</span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <span className={`text-xs ${colors.text}`}>{item.discipline}</span>
+        <div className="flex items-center gap-1 flex-wrap">
+          <span className={`text-xs ${colors.text} truncate`}>{item.discipline}</span>
           {item.category && (
-            <span className="text-xs text-slate-400 capitalize">• {item.category}</span>
+            <span className="text-xs text-slate-400 capitalize truncate">• {item.category}</span>
           )}
         </div>
         {/* Show connected failure modes count */}
         {connectedFmCount > 0 && (
           <div className="flex items-center gap-1 mt-1">
-            <Link className="w-3 h-3 text-blue-500" />
-            <span className="text-xs text-blue-600 font-medium">{connectedFmCount} failure modes</span>
+            <Link className="w-3 h-3 text-blue-500 flex-shrink-0" />
+            <span className="text-xs text-blue-600 font-medium truncate">{connectedFmCount} failure modes</span>
           </div>
         )}
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 flex-shrink-0 ml-1">
         {/* Show chevron if selectable */}
         {onSelect && (
-          <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${isSelected ? 'rotate-90' : ''}`} />
+          <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${isSelected ? 'rotate-90' : ''}`} />
         )}
         <div className="opacity-0 group-hover:opacity-100 flex gap-1" onClick={e => e.stopPropagation()}>
           <button onClick={() => onEdit(item)} className="p-1.5 hover:bg-blue-50 rounded">
