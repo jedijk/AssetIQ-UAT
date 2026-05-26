@@ -283,3 +283,266 @@ async def get_equipment_types_without_failure_modes():
             for t in EQUIPMENT_TYPES
         ]
     }
+
+
+# =============================================================================
+# Equipment Type Mapping Suggestions (for Equipment Manager)
+# =============================================================================
+
+class EquipmentNodeInput(BaseModel):
+    id: str
+    name: str
+    level: Optional[str] = None
+    description: Optional[str] = None
+    tag: Optional[str] = None
+    parent_name: Optional[str] = None
+
+
+class EquipmentTypeOption(BaseModel):
+    id: str
+    name: str
+    discipline: Optional[str] = None
+
+
+class EquipmentTypeMatch(BaseModel):
+    equipment_type_id: str
+    equipment_type_name: str
+    discipline: Optional[str] = None
+    confidence: float
+    reasoning: str
+
+
+class NodeMappingSuggestion(BaseModel):
+    node_id: str
+    node_name: str
+    node_level: Optional[str] = None
+    best_match: Optional[EquipmentTypeMatch] = None
+    alternatives: List[EquipmentTypeMatch] = []
+
+
+class SuggestEquipmentTypeMappingsRequest(BaseModel):
+    nodes: List[EquipmentNodeInput]
+    equipment_types: List[EquipmentTypeOption]
+
+
+class SuggestEquipmentTypeMappingsResponse(BaseModel):
+    suggestions: List[NodeMappingSuggestion]
+    total_matched: int
+
+
+EQUIPMENT_TYPE_MAPPING_SYSTEM_PROMPT = """You are an industrial reliability engineer. Your task is to map equipment instances (nodes from a plant hierarchy) to the correct equipment type from an ISO 14224-aligned catalog.
+
+STRICT RULES:
+
+1. NAME MATCHING (primary):
+   - Use the node's name, tag and description to infer the equipment kind.
+   - Examples: "P-101 Feed Pump" → Centrifugal Pump. "V-201 Knock-Out Drum" → Pressure Vessel. "E-301 Heat Exchanger" → Heat Exchanger.
+   - Ignore plant codes, numbering, or unit prefixes (P-101, V-201, etc.) and focus on the descriptive words.
+
+2. DISCIPLINE COHERENCE:
+   - Rotating: pumps, compressors, fans, blowers, gearboxes, motors, turbines.
+   - Static: vessels, columns/towers, drums, heat exchangers, reactors, boilers, tanks.
+   - Piping: valves, piping, strainers, filters.
+   - Electrical: transformers, switchgear, cables, motors (electrical view), UPS.
+   - Instrumentation: transmitters, gauges, analyzers, sensors.
+
+3. CONFIDENCE SCORING (be conservative):
+   - 0.90-0.95: Exact match (the node's name unambiguously names this equipment type).
+   - 0.80-0.89: Strong match (clear keywords + correct discipline).
+   - 0.70-0.79: Reasonable match (related family).
+   - Below 0.70: Do not return a best_match; set it to null.
+
+4. OUTPUT REQUIREMENTS:
+   - For each node: pick at most ONE best_match. Optionally include up to 2 alternatives, each with their own confidence and reasoning.
+   - Use EXACT equipment_type IDs from the catalog. Never invent IDs.
+   - If nothing reasonable matches (confidence < 0.70 for all), return best_match: null and alternatives: [].
+
+Return ONLY valid JSON. No prose outside JSON."""
+
+
+def get_mapping_cache_key(nodes: List[EquipmentNodeInput], et_ids: List[str]) -> str:
+    """Cache key includes node descriptors so renames bust the cache."""
+    node_keys = sorted([f"{n.id}|{n.name}|{n.level or ''}|{n.tag or ''}" for n in nodes])
+    type_keys = sorted(et_ids)
+    return hashlib.md5(f"ETMAP:{node_keys}:{type_keys}".encode()).hexdigest()
+
+
+async def get_equipment_type_mapping_suggestions(
+    nodes: List[EquipmentNodeInput],
+    equipment_types: List[EquipmentTypeOption],
+) -> List[NodeMappingSuggestion]:
+    """Use OpenAI to suggest equipment_type_id per equipment node, with persistent cache."""
+    et_ids = [et.id for et in equipment_types]
+    cache_key = get_mapping_cache_key(nodes, et_ids)
+
+    if cache_key in _suggestion_cache:
+        logger.info(f"Returning in-memory cached equipment-type mappings: {cache_key[:8]}")
+        return _suggestion_cache[cache_key]
+
+    try:
+        cached_doc = await db[_CACHE_COLLECTION].find_one({"_id": cache_key})
+        if cached_doc and "mapping_suggestions" in cached_doc:
+            suggestions = [NodeMappingSuggestion(**s) for s in cached_doc["mapping_suggestions"]]
+            _suggestion_cache[cache_key] = suggestions
+            logger.info(f"Returning Mongo-cached equipment-type mappings: {cache_key[:8]}")
+            return suggestions
+    except Exception as e:
+        logger.warning(f"Mapping cache lookup failed (non-fatal): {e}")
+
+    client = get_openai_client()
+
+    et_list = [{"id": et.id, "name": et.name, "discipline": et.discipline or ""} for et in equipment_types]
+    node_list = [
+        {
+            "id": n.id,
+            "name": n.name,
+            "level": n.level or "",
+            "tag": n.tag or "",
+            "description": (n.description or "")[:200],
+            "parent": n.parent_name or "",
+        }
+        for n in nodes
+    ]
+
+    user_prompt = f"""Map each equipment node to the correct equipment type from the catalog.
+
+EQUIPMENT TYPE CATALOG (use exact IDs):
+{json.dumps(et_list, indent=2)}
+
+EQUIPMENT NODES TO CLASSIFY:
+{json.dumps(node_list, indent=2)}
+
+Return JSON:
+{{
+  "suggestions": [
+    {{
+      "node_id": "<exact node id>",
+      "node_name": "<name>",
+      "node_level": "<level>",
+      "best_match": {{
+        "equipment_type_id": "<id from catalog>",
+        "equipment_type_name": "<name>",
+        "discipline": "<discipline>",
+        "confidence": 0.92,
+        "reasoning": "<1 short sentence>"
+      }},
+      "alternatives": [
+        {{"equipment_type_id": "<id>", "equipment_type_name": "<name>", "discipline": "<disc>", "confidence": 0.78, "reasoning": "<why>"}}
+      ]
+    }}
+  ]
+}}
+
+If no equipment_type fits a node with confidence >= 0.70, set its best_match to null and alternatives to []."""
+
+    try:
+        response = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": EQUIPMENT_TYPE_MAPPING_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0,
+            max_tokens=4000,
+            seed=42,
+            response_format={"type": "json_object"},
+        )
+
+        result = json.loads(response.choices[0].message.content.strip())
+
+        valid_ids = {et.id for et in equipment_types}
+        valid_node_ids = {n.id for n in nodes}
+        node_lookup = {n.id: n for n in nodes}
+
+        suggestions: List[NodeMappingSuggestion] = []
+        for item in result.get("suggestions", []):
+            node_id = item.get("node_id")
+            if not node_id or node_id not in valid_node_ids:
+                continue
+
+            def _coerce_match(m: Dict[str, Any]) -> Optional[EquipmentTypeMatch]:
+                if not m:
+                    return None
+                et_id = m.get("equipment_type_id")
+                if not et_id or et_id not in valid_ids:
+                    return None
+                conf = m.get("confidence", 0.0)
+                try:
+                    conf = float(conf)
+                except (TypeError, ValueError):
+                    conf = 0.0
+                if conf < 0.70:
+                    return None
+                return EquipmentTypeMatch(
+                    equipment_type_id=et_id,
+                    equipment_type_name=m.get("equipment_type_name", ""),
+                    discipline=m.get("discipline", ""),
+                    confidence=min(0.95, max(0.70, conf)),
+                    reasoning=m.get("reasoning", ""),
+                )
+
+            best = _coerce_match(item.get("best_match"))
+            alts: List[EquipmentTypeMatch] = []
+            seen = {best.equipment_type_id} if best else set()
+            for a in item.get("alternatives", []) or []:
+                coerced = _coerce_match(a)
+                if coerced and coerced.equipment_type_id not in seen:
+                    seen.add(coerced.equipment_type_id)
+                    alts.append(coerced)
+                if len(alts) >= 2:
+                    break
+
+            node = node_lookup[node_id]
+            suggestions.append(NodeMappingSuggestion(
+                node_id=node_id,
+                node_name=item.get("node_name") or node.name,
+                node_level=item.get("node_level") or node.level,
+                best_match=best,
+                alternatives=alts,
+            ))
+
+        _suggestion_cache[cache_key] = suggestions
+        try:
+            await db[_CACHE_COLLECTION].update_one(
+                {"_id": cache_key},
+                {"$set": {
+                    "mapping_suggestions": [s.model_dump() for s in suggestions],
+                    "kind": "equipment_type_mapping",
+                    "node_ids": sorted([n.id for n in nodes]),
+                    "equipment_type_ids": sorted(et_ids),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }},
+                upsert=True,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to persist mapping cache (non-fatal): {e}")
+
+        return suggestions
+
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse AI mapping response: {e}")
+        raise HTTPException(status_code=500, detail="Failed to parse AI response")
+    except Exception as e:
+        logger.error(f"AI mapping error: {e}")
+        raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")
+
+
+@router.post("/equipment-type-mappings", response_model=SuggestEquipmentTypeMappingsResponse)
+async def suggest_equipment_type_mappings(request: SuggestEquipmentTypeMappingsRequest):
+    """Get deterministic AI-powered equipment_type suggestions for equipment nodes."""
+    if not request.nodes:
+        raise HTTPException(status_code=400, detail="No equipment nodes provided")
+    if not request.equipment_types:
+        raise HTTPException(status_code=400, detail="No equipment types provided")
+
+    # Cap to avoid runaway prompts. The frontend should batch if needed.
+    nodes = request.nodes[:80]
+    types = request.equipment_types[:300]
+
+    suggestions = await get_equipment_type_mapping_suggestions(nodes, types)
+    total_matched = sum(1 for s in suggestions if s.best_match is not None)
+
+    return SuggestEquipmentTypeMappingsResponse(
+        suggestions=suggestions,
+        total_matched=total_matched,
+    )

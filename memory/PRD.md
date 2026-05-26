@@ -7,6 +7,13 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [May 26, 2026] **AI Equipment Type Mapping** in Equipment Manager (VERIFIED):
+  - New "AI Map Types" button in the Equipment Manager toolbar (owners/admins)
+  - Backend endpoint `POST /api/ai-suggestions/equipment-type-mappings` suggests an equipment type for each equipment node (equipment_unit / subunit / maintainable_item) using OpenAI GPT-4o
+  - Conservative confidence scoring (≥0.70 only), best_match + up to 2 alternatives per node, deduplicated
+  - Reuses the same Mongo-backed deterministic cache as the failure-mode AI feature → identical inputs always return identical results
+  - Frontend dialog `AIEquipmentTypeMappingSuggestions.jsx` with Without Type / All / Selected modes, search, pre-selected best matches, and bulk Accept that PATCHes `equipment_type_id` (+ discipline) on each node
+  - Verified: backend returned 92% match for "Motor" → Electric Motor, 88% for "Strainer" → Filter/Separator, "No match" for ambiguous items. Cache hit reduced latency from 11.2s → 0.4s.
 - [May 26, 2026] **AI Failure Mode Suggestions — Deterministic Output (VERIFIED)**:
   - Persistent Mongo-backed cache (`ai_fm_suggestion_cache`) layered on top of in-memory cache in `/app/backend/routes/ai_fm_suggestions.py`
   - Identical inputs now return identical AI suggestions across server restarts (OpenAI's `seed` alone is best-effort and was not bit-exact in practice)
