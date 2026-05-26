@@ -163,12 +163,12 @@ export function AINewFailureModeSuggestions({
 
     setCreating(true);
     let ok = 0;
+    let dup = 0;
     let failed = 0;
     try {
       for (const { original, draft } of toCreate) {
         if (existingNames.has((draft.failureMode || "").toLowerCase())) {
-          toast.warning(`Skipped duplicate: "${draft.failureMode}"`);
-          failed += 1;
+          dup += 1;
           continue;
         }
         try {
@@ -195,12 +195,25 @@ export function AINewFailureModeSuggestions({
           await api.post("/failure-modes", payload);
           ok += 1;
         } catch (e) {
-          console.error(`Failed to create FM "${draft.failureMode}"`, e);
-          failed += 1;
+          const detail = e.response?.data?.detail || "";
+          if (
+            e.response?.status === 400 &&
+            /already exists/i.test(detail)
+          ) {
+            // Library has more FMs than the page showed — treat as a duplicate, not a failure.
+            dup += 1;
+          } else {
+            console.error(`Failed to create FM "${draft.failureMode}"`, e);
+            failed += 1;
+          }
         }
       }
       if (ok > 0)
         toast.success(`Created ${ok} new failure mode${ok === 1 ? "" : "s"}`);
+      if (dup > 0)
+        toast.info(
+          `Skipped ${dup} suggestion${dup === 1 ? "" : "s"} already in your library`,
+        );
       if (failed > 0)
         toast.error(`${failed} suggestion${failed === 1 ? "" : "s"} failed`);
       onCreated?.();

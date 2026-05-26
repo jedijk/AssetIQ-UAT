@@ -1107,9 +1107,45 @@ async def suggest_new_failure_modes(request: SuggestNewFailureModesRequest):
         raise HTTPException(status_code=400, detail="No equipment types provided")
 
     eq_types = request.equipment_types[:120]
-    existing = request.existing_failure_modes[:500]
 
-    suggestions = await get_new_failure_mode_suggestions(eq_types, existing)
+    # Build a complete dedup set by pulling ALL failure mode names directly from Mongo.
+    # The client-side list may be paginated/truncated; we must guarantee no duplicates.
+    full_existing_names = set()
+    full_existing_briefs: List[ExistingFailureModeBrief] = []
+    try:
+        cursor = db.failure_modes.find(
+            {},
+            {"_id": 0, "failure_mode": 1, "category": 1, "equipment_type_ids": 1},
+        )
+        async for fm in cursor:
+            name = (fm.get("failure_mode") or "").strip()
+            if not name:
+                continue
+            full_existing_names.add(name.lower())
+            full_existing_briefs.append(ExistingFailureModeBrief(
+                failure_mode=name,
+                category=fm.get("category") or "",
+                equipment_type_ids=fm.get("equipment_type_ids") or [],
+            ))
+    except Exception as e:
+        logger.warning(f"Failed to load full FM library for dedup (falling back to request payload): {e}")
+        full_existing_briefs = list(request.existing_failure_modes)
+        for fm in full_existing_briefs:
+            full_existing_names.add((fm.failure_mode or "").lower())
+
+    # Cap prompt size: most recent / most representative. We send up to 600 names so
+    # the AI has solid context, but dedup runs against the FULL set below.
+    prompt_existing = full_existing_briefs[:600]
+
+    raw_suggestions = await get_new_failure_mode_suggestions(eq_types, prompt_existing)
+
+    # Hard dedup against the full Mongo library — drop any name that already exists
+    # even if it slipped past the AI prompt (e.g. user lib > 600 FMs).
+    suggestions = [
+        s for s in raw_suggestions
+        if (s.failure_mode or "").strip().lower() not in full_existing_names
+    ]
+
     return SuggestNewFailureModesResponse(
         suggestions=suggestions,
         total=len(suggestions),
