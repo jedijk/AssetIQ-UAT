@@ -1191,6 +1191,9 @@ class ImprovedFailureMode(BaseModel):
     equipment_type_ids: List[str] = []
     equipment_type_names: List[str] = []
     improvements_summary: List[str] = []
+    # Per-field explanations: key = field name, value = 1-sentence reason.
+    # Only populated for fields that were actually changed. Untouched fields are omitted.
+    field_explanations: Dict[str, str] = {}
     rationale: str = ""
 
 
@@ -1200,47 +1203,51 @@ You are given:
 1. The current failure mode record (with its existing fields).
 2. The user's equipment type catalog (so equipment_type_ids stay valid).
 
-Your job: produce an IMPROVED version of every field. Keep what is already good, fix what is weak, expand what is missing.
+Your job: produce an IMPROVED version of every field. **Critically: if a field is already strong, you MUST return it VERBATIM (identical bytes — same wording, same order, same casing).** Do NOT rewrite for style alone. Only change a field when you can clearly defend the change in one sentence to a reviewer.
 
-IMPROVEMENT RULES:
+DECIDE-TO-CHANGE RULES (apply per field):
 
-1. failure_mode (name):
-   - Keep it concise, specific and action-oriented (e.g. "Mechanical Seal Face Wear", not "Pump Failure").
-   - If the existing name is already perfect, return it verbatim.
+A. failure_mode (name):
+   - Keep verbatim if it is already short, specific and action-oriented.
+   - Change ONLY if the existing name is generic ("Pump Failure"), redundant, or hides the mechanism.
 
-2. category & mechanism:
-   - category: one of Rotating, Static, Piping, Electrical, Instrumentation, Civil, Operations, Laboratory (or the existing one if more specific).
-   - mechanism: short ISO 14224 code (BRD, LKG, COR, ERO, FAT, FRA, WEA, CON, INS, CAL, VIB, ELU, OVH, CAV, UNK). Pick the closest fit.
+B. category / mechanism:
+   - Keep verbatim if the existing value is in the allowed set and matches the equipment family.
+   - category must be one of: Rotating, Static, Piping, Electrical, Instrumentation, Civil, Operations, Laboratory.
+   - mechanism must be a short ISO 14224 code: BRD, LKG, COR, ERO, FAT, FRA, WEA, CON, INS, CAL, VIB, ELU, OVH, CAV, UNK.
 
-3. severity / occurrence / detectability (SAE J1739 scale, 1-10):
-   - severity: 1 (negligible) → 10 (catastrophic safety / environmental).
-   - occurrence: 1 (very rare) → 10 (very high).
-   - detectability: 1 (almost certain to detect early) → 10 (no detection possible).
-   - Be REALISTIC and CONSERVATIVE. Most production failures sit S 5-8, O 3-6, D 4-7.
-   - If the existing values are clearly off (e.g. all 10s or all 1s), correct them.
+C. severity / occurrence / detectability (SAE J1739 scale, 1-10):
+   - Keep verbatim if the existing value is realistic for the equipment family.
+   - Change ONLY when the existing value is implausible (e.g. severity=10 for a minor wear mode, all values = 1, missing/None, or the cluster of S/O/D is wildly out of line).
+   - Be REALISTIC and CONSERVATIVE: most production failures sit S 5-8, O 3-6, D 4-7. Never inflate by more than 2 points.
 
-4. keywords (3-6, lowercase, search-friendly):
-   - Include the failure mechanism and equipment context. Avoid redundancy.
+D. keywords (3-6, lowercase):
+   - Keep the existing list verbatim if it has 3+ relevant entries and no redundancy.
+   - Change ONLY to: add 1-2 missing high-value terms, remove duplicates, or fix typos.
 
-5. potential_effects (3-5 short bullets):
-   - Process / safety / environmental / economic consequences. Each bullet should be a noun phrase (e.g. "Process leak", "Unplanned shutdown").
+E. potential_effects / potential_causes / recommended_actions (lists):
+   - Keep verbatim if the existing list has 3+ specific, well-written entries.
+   - Change ONLY when there is a real gap: missing common cause, missing critical effect, vague actions like "check regularly". When changing, preserve good existing entries and add (don't replace).
 
-6. potential_causes (3-5 short bullets):
-   - Root causes spanning design, operating, maintenance and environmental factors.
+F. equipment_type_ids:
+   - Keep existing valid IDs verbatim. Add up to 2 more EXACT IDs from the user's catalog ONLY if the failure mode clearly applies and was previously missing.
+   - NEVER invent IDs. NEVER drop a valid existing ID.
+   - If the existing list is empty, propose 1-3 IDs.
 
-7. recommended_actions (3-6 concrete maintenance actions):
-   - Mix of inspection, monitoring (PDM), preventive (PM) and corrective (CM) tasks.
-   - Be specific: "Vibration trend monitoring (PDM, monthly)" not "monitor regularly".
+OUTPUT REQUIREMENTS:
 
-8. equipment_type_ids:
-   - Keep the existing IDs if they are valid. Add up to 2 more EXACT IDs from the user's catalog if the failure mode clearly applies. NEVER invent IDs.
-   - If the existing list is empty, propose 1-3 IDs from the catalog where this failure mode is most relevant.
+1. `improvements_summary` (0-5 short bullets):
+   - One bullet per field you actually CHANGED, referencing the field name.
+   - If you changed nothing, return an empty list.
+   - NEVER include a bullet for a field you kept verbatim.
 
-9. improvements_summary (2-5 short bullets):
-   - Explain what you changed and why. Each bullet should reference a field name (e.g. "Tightened name to 'Mechanical Seal Face Wear'", "Lowered occurrence from 8 → 5 — typical for centrifugal pumps").
-   - If a field was already strong and you kept it, do NOT mention it.
+2. `field_explanations` (object, keyed by field name):
+   - For EACH field you changed, include a 1-sentence explanation of WHY you changed it.
+   - Allowed keys: "failure_mode", "category", "mechanism", "severity", "occurrence", "detectability", "keywords", "potential_effects", "potential_causes", "recommended_actions", "equipment_type_ids".
+   - Do NOT include a key for any field you kept verbatim.
+   - Example: `"severity": "Lowered from 9 to 7 — typical for non-safety bearing wear on centrifugal pumps."`
 
-10. rationale: one sentence summarising the overall improvement direction.
+3. `rationale`: one short sentence summarising the overall direction. If nothing changed, say so plainly (e.g. "Record is already strong; no changes needed.").
 
 Return ONLY valid JSON. No prose outside JSON."""
 
@@ -1321,7 +1328,11 @@ Return JSON:
   "equipment_type_ids": ["..."],
   "equipment_type_names": ["..."],
   "improvements_summary": ["..."],
-  "rationale": "1 short sentence"
+  "field_explanations": {{
+    "severity": "Lowered from 9 to 7 — typical for non-safety bearing wear.",
+    "keywords": "Added 'mechanical seal' to improve search recall."
+  }},
+  "rationale": "1 short sentence — if nothing changed, say 'Record is already strong; no changes needed.'"
 }}"""
 
     try:
@@ -1379,6 +1390,20 @@ Return JSON:
         et_ids_out = et_ids_out[:8]
         et_names_out = [et_name_by_id[i] for i in et_ids_out]
 
+        # Whitelist of allowed explanation keys (must match the diff fields)
+        ALLOWED_EXPL_KEYS = {
+            "failure_mode", "category", "mechanism",
+            "severity", "occurrence", "detectability",
+            "keywords", "potential_effects", "potential_causes",
+            "recommended_actions", "equipment_type_ids",
+        }
+        raw_expls = result.get("field_explanations") or {}
+        field_explanations: Dict[str, str] = {}
+        if isinstance(raw_expls, dict):
+            for k, v in raw_expls.items():
+                if k in ALLOWED_EXPL_KEYS and isinstance(v, str) and v.strip():
+                    field_explanations[k] = v.strip()
+
         improved = ImprovedFailureMode(
             failure_mode=(result.get("failure_mode") or fm.failure_mode).strip(),
             category=(result.get("category") or fm.category or "General").strip(),
@@ -1394,6 +1419,7 @@ Return JSON:
             equipment_type_ids=et_ids_out,
             equipment_type_names=et_names_out,
             improvements_summary=_str_list(result.get("improvements_summary"), 6),
+            field_explanations=field_explanations,
             rationale=(result.get("rationale") or "").strip(),
         )
 

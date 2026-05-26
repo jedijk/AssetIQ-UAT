@@ -151,7 +151,7 @@ export function AIImproveFailureMode({
 
       const changedCount = Object.keys(preselect).length;
       if (changedCount === 0) {
-        toast.info("No improvements suggested — this failure mode is already in great shape.");
+        toast.success("Already in great shape — no changes needed");
       } else {
         toast.success(
           `AI suggests ${changedCount} improvement${changedCount === 1 ? "" : "s"}`,
@@ -389,10 +389,29 @@ export function AIImproveFailureMode({
                 </div>
               )}
 
+              {improved.improvements_summary?.length === 0 && (
+                <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-emerald-900">
+                      This failure mode is already in great shape
+                    </p>
+                    <p className="text-xs text-emerald-800 mt-0.5">
+                      {improved.rationale ||
+                        "The AI reliability engineer reviewed every field and saw no meaningful improvements."}
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2 pr-2 pb-4" data-testid="ai-improve-fm-results">
                 {FIELDS.map((f) => {
                   const changed = !valEqual(current?.[f.key], improved[f.key]);
                   const isSelected = !!selectedFields[f.key];
+                  const explanation =
+                    changed && improved.field_explanations?.[f.key]
+                      ? improved.field_explanations[f.key]
+                      : null;
                   return (
                     <div
                       key={f.key}
@@ -424,24 +443,36 @@ export function AIImproveFailureMode({
                             {isSelected && <CheckCircle className="w-4 h-4 text-white" />}
                           </button>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 flex-1 divide-y md:divide-y-0 md:divide-x divide-slate-200">
-                          <div className="p-3">
-                            <p className="text-xs font-medium text-slate-500 mb-1">
-                              Current — {f.label}
-                            </p>
-                            {renderCurrentValue(f.key, f.isList)}
-                          </div>
-                          <div className="p-3 bg-white/50">
-                            <div className="flex items-center justify-between mb-1">
-                              <p className="text-xs font-medium text-purple-700">
-                                AI improved — {f.label}
+                        <div className="flex-1 min-w-0">
+                          <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200">
+                            <div className="p-3">
+                              <p className="text-xs font-medium text-slate-500 mb-1">
+                                Current — {f.label}
                               </p>
-                              {!changed && (
-                                <span className="text-[10px] text-slate-400">no change</span>
-                              )}
+                              {renderCurrentValue(f.key, f.isList)}
                             </div>
-                            {renderImprovedValue(f.key, f.isList)}
+                            <div className="p-3 bg-white/50">
+                              <div className="flex items-center justify-between mb-1">
+                                <p className="text-xs font-medium text-purple-700">
+                                  AI improved — {f.label}
+                                </p>
+                                {!changed && (
+                                  <span className="text-[10px] text-emerald-600 font-medium">
+                                    ✓ already good
+                                  </span>
+                                )}
+                              </div>
+                              {renderImprovedValue(f.key, f.isList)}
+                            </div>
                           </div>
+                          {explanation && (
+                            <div className="px-3 pb-3 pt-1 border-t border-amber-100 bg-amber-50/40">
+                              <p className="text-xs text-amber-900">
+                                <span className="font-semibold">Why: </span>
+                                {explanation}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
