@@ -125,29 +125,33 @@ export function AIFailureModeSuggestions({
         timeout: 60000 // 60 second timeout for AI requests
       });
       
-      // Filter out failure modes that are already connected to each equipment type
-      const filteredSuggestions = (response.data.suggestions || []).map(suggestion => {
+      // Mark failure modes that are already connected to THIS equipment type
+      // but keep all suggestions (including those mapped to other equipment types)
+      const processedSuggestions = (response.data.suggestions || []).map(suggestion => {
         const existingFmIds = failureModes
           .filter(fm => fm.equipment_type_ids?.includes(suggestion.equipment_type_id))
           .map(fm => fm.id);
         
         return {
           ...suggestion,
-          suggested_failure_modes: suggestion.suggested_failure_modes.filter(
-            fm => !existingFmIds.includes(fm.failure_mode_id)
-          )
+          suggested_failure_modes: suggestion.suggested_failure_modes.map(fm => ({
+            ...fm,
+            already_mapped: existingFmIds.includes(fm.failure_mode_id)
+          }))
         };
-      }).filter(s => s.suggested_failure_modes.length > 0);
+      });
       
-      allSuggestions.push(...filteredSuggestions);
+      allSuggestions.push(...processedSuggestions);
       
       setSuggestions(allSuggestions);
       
-      // Initialize selected mappings with all suggested failure modes
+      // Initialize selected mappings - only select those NOT already mapped to this equipment type
       const initialMappings = {};
       for (const suggestion of allSuggestions) {
         initialMappings[suggestion.equipment_type_id] = new Set(
-          suggestion.suggested_failure_modes.map(fm => fm.failure_mode_id)
+          suggestion.suggested_failure_modes
+            .filter(fm => !fm.already_mapped)
+            .map(fm => fm.failure_mode_id)
         );
       }
       setSelectedMappings(initialMappings);
@@ -503,27 +507,34 @@ export function AIFailureModeSuggestions({
                         <div className="p-4 space-y-2 border-t">
                           {suggestion.suggested_failure_modes.map(fm => {
                             const isSelected = selected.has(fm.failure_mode_id);
+                            const isAlreadyMapped = fm.already_mapped;
                             
                             return (
                               <div
                                 key={fm.failure_mode_id}
                                 className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                                  isSelected 
-                                    ? 'bg-green-50 border-green-200' 
-                                    : 'bg-white border-slate-200 hover:bg-slate-50'
+                                  isAlreadyMapped
+                                    ? 'bg-slate-50 border-slate-200 opacity-60'
+                                    : isSelected 
+                                      ? 'bg-green-50 border-green-200' 
+                                      : 'bg-white border-slate-200 hover:bg-slate-50'
                                 }`}
-                                onClick={() => toggleSelection(suggestion.equipment_type_id, fm.failure_mode_id)}
+                                onClick={() => !isAlreadyMapped && toggleSelection(suggestion.equipment_type_id, fm.failure_mode_id)}
                               >
                                 {/* Checkbox indicator */}
                                 <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                                  isSelected ? 'bg-green-500' : 'bg-slate-100 border border-slate-300'
+                                  isAlreadyMapped
+                                    ? 'bg-slate-300'
+                                    : isSelected 
+                                      ? 'bg-green-500' 
+                                      : 'bg-slate-100 border border-slate-300'
                                 }`}>
-                                  {isSelected && <CheckCircle className="w-4 h-4 text-white" />}
+                                  {(isSelected || isAlreadyMapped) && <CheckCircle className="w-4 h-4 text-white" />}
                                 </div>
                                 
                                 {/* Content */}
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1">
+                                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                                     <Badge variant="outline" className="text-xs">
                                       {fm.category}
                                     </Badge>
@@ -533,6 +544,11 @@ export function AIFailureModeSuggestions({
                                     {fm.rpn && (
                                       <Badge className={`text-xs ${getRpnColor(fm.rpn)}`}>
                                         RPN: {fm.rpn}
+                                      </Badge>
+                                    )}
+                                    {isAlreadyMapped && (
+                                      <Badge className="text-xs bg-slate-200 text-slate-600">
+                                        Already Mapped
                                       </Badge>
                                     )}
                                   </div>
