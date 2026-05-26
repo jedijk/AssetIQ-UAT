@@ -985,8 +985,9 @@ const FailureModesPage = () => {
                           variant="outline"
                           onClick={() => setIsAISuggestionsOpen(true)} 
                           className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
+                          data-testid="ai-map-failure-modes-btn"
                         >
-                          <Sparkles className="w-4 h-4 mr-1" /> AI Suggest
+                          <Sparkles className="w-4 h-4 mr-1" /> Map Failure Modes
                         </Button>
                         <Button
                           size="sm"
