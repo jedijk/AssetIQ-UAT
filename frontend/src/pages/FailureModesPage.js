@@ -498,10 +498,23 @@ const FailureModesPage = () => {
   };
   
   const handleSaveType = () => { 
+    // Check for duplicate name
+    const nameExists = equipmentTypes.some(
+      et => et.name.toLowerCase() === newType.name.trim().toLowerCase() && 
+            (!editingType || et.id !== editingType.id)
+    );
+    
+    if (nameExists) {
+      toast.error("An equipment type with this name already exists");
+      return;
+    }
+    
     if (editingType) { 
       updateTypeMutation.mutate({ typeId: editingType.id, data: { name: newType.name, discipline: newType.discipline, icon: newType.icon } }); 
     } else { 
-      createTypeMutation.mutate(newType); 
+      // Auto-generate ID from name
+      const generatedId = newType.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+      createTypeMutation.mutate({ ...newType, id: generatedId }); 
     } 
   };
 
@@ -1067,17 +1080,6 @@ const FailureModesPage = () => {
             <DialogTitle>{editingType ? t("library.editEquipmentType") : t("library.addEquipmentType")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            {!editingType && (
-              <div>
-                <Label>{t("library.typeId")}</Label>
-                <Input 
-                  value={newType.id} 
-                  onChange={e => setNewType({ ...newType, id: e.target.value.toLowerCase().replace(/\s+/g, '_') })} 
-                  placeholder="pump_custom" 
-                  data-testid="type-id-input" 
-                />
-              </div>
-            )}
             <div>
               <Label>{t("common.name")}</Label>
               <Input 
@@ -1086,6 +1088,13 @@ const FailureModesPage = () => {
                 placeholder="Custom Pump" 
                 data-testid="type-name-input" 
               />
+              {/* Show duplicate warning */}
+              {newType.name.trim() && equipmentTypes.some(
+                et => et.name.toLowerCase() === newType.name.trim().toLowerCase() && 
+                      (!editingType || et.id !== editingType.id)
+              ) && (
+                <p className="text-sm text-red-500 mt-1">An equipment type with this name already exists</p>
+              )}
             </div>
             <div>
               <Label>{t("library.discipline")}</Label>
@@ -1120,7 +1129,10 @@ const FailureModesPage = () => {
             </Button>
             <Button 
               onClick={handleSaveType} 
-              disabled={(!editingType && !newType.id.trim()) || !newType.name.trim()} 
+              disabled={!newType.name.trim() || equipmentTypes.some(
+                et => et.name.toLowerCase() === newType.name.trim().toLowerCase() && 
+                      (!editingType || et.id !== editingType.id)
+              )} 
               data-testid="save-type-btn"
             >
               {editingType ? t("common.save") : t("common.create")}
