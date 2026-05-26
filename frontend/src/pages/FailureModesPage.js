@@ -138,6 +138,7 @@ const FailureModesPage = () => {
   const [editingType, setEditingType] = useState(null);
   const [newType, setNewType] = useState({ id: "", name: "", discipline: "Mechanical", icon: "cog", iso_class: "", category: "rotating" });
   const [typeFilterDiscipline, setTypeFilterDiscipline] = useState("all"); // Filter for Equipment Types tab
+  const [typeFilterNoFailureModes, setTypeFilterNoFailureModes] = useState(false); // Filter to show only types without failure modes
   const [selectedEquipmentType, setSelectedEquipmentType] = useState(null); // For viewing connected failure modes
   
   // Failure mode dialog state
@@ -953,6 +954,21 @@ const FailureModesPage = () => {
                     <p className="text-xs text-slate-500 mt-1">{equipmentTypes.length} {t("library.typesDefined")} • Click to view connected failure modes</p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {/* Filter: No Failure Modes */}
+                    <label className="flex items-center gap-2 text-sm cursor-pointer bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={typeFilterNoFailureModes}
+                        onChange={(e) => setTypeFilterNoFailureModes(e.target.checked)}
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-slate-600 whitespace-nowrap">No failure modes</span>
+                      {typeFilterNoFailureModes && (
+                        <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
+                          {equipmentTypes.filter(t => getConnectedFmCount(t.id) === 0).length}
+                        </span>
+                      )}
+                    </label>
                     {/* Discipline Filter */}
                     <Select value={typeFilterDiscipline} onValueChange={setTypeFilterDiscipline}>
                       <SelectTrigger className="w-[160px] h-9">
@@ -973,7 +989,11 @@ const FailureModesPage = () => {
                 <div className="flex-1 p-4 overflow-y-auto">
                   {/* Group equipment types by discipline */}
                   {DISCIPLINES.filter(d => typeFilterDiscipline === "all" || d === typeFilterDiscipline).map(discipline => {
-                    const disciplineTypes = equipmentTypes.filter(t => t.discipline === discipline);
+                    let disciplineTypes = equipmentTypes.filter(t => t.discipline === discipline);
+                    // Apply "no failure modes" filter
+                    if (typeFilterNoFailureModes) {
+                      disciplineTypes = disciplineTypes.filter(t => getConnectedFmCount(t.id) === 0);
+                    }
                     if (disciplineTypes.length === 0) return null;
                     const colors = DISCIPLINE_COLORS[discipline] || DISCIPLINE_COLORS["Mechanical"];
                     
