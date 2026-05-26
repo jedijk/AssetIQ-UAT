@@ -137,7 +137,7 @@ const FailureModesPage = () => {
   // Equipment type dialog state
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState(null);
-  const [newType, setNewType] = useState({ id: "", name: "", discipline: "Mechanical", icon: "cog", iso_class: "", category: "rotating" });
+  const [newType, setNewType] = useState({ id: "", name: "", discipline: "Rotating", icon: "cog" });
   const [typeFilterDiscipline, setTypeFilterDiscipline] = useState("all"); // Filter for Equipment Types tab
   const [typeFilterNoFailureModes, setTypeFilterNoFailureModes] = useState(false); // Filter to show only types without failure modes
   const [selectedEquipmentType, setSelectedEquipmentType] = useState(null); // For viewing connected failure modes
@@ -201,7 +201,7 @@ const FailureModesPage = () => {
     { value: "PDM", label: "PDM (Predictive)", color: "bg-purple-100 text-purple-700" },
   ];
   
-  const resetTypeForm = () => setNewType({ id: "", name: "", discipline: "Mechanical", icon: "cog", iso_class: "", category: "rotating" });
+  const resetTypeForm = () => setNewType({ id: "", name: "", discipline: "Rotating", icon: "cog" });
   const resetFmForm = () => {
     setNewFm({
       category: "Rotating",
@@ -493,13 +493,13 @@ const FailureModesPage = () => {
 
   const handleEditType = (type) => { 
     setEditingType(type); 
-    setNewType({ id: type.id, name: type.name, discipline: type.discipline || "Mechanical", icon: type.icon || "cog", iso_class: type.iso_class || "", category: type.category || "rotating" }); 
+    setNewType({ id: type.id, name: type.name, discipline: type.discipline || "Rotating", icon: type.icon || "cog" }); 
     setIsTypeDialogOpen(true); 
   };
   
   const handleSaveType = () => { 
     if (editingType) { 
-      updateTypeMutation.mutate({ typeId: editingType.id, data: { name: newType.name, discipline: newType.discipline, icon: newType.icon, iso_class: newType.iso_class, category: newType.category } }); 
+      updateTypeMutation.mutate({ typeId: editingType.id, data: { name: newType.name, discipline: newType.discipline, icon: newType.icon } }); 
     } else { 
       createTypeMutation.mutate(newType); 
     } 
@@ -1088,28 +1088,11 @@ const FailureModesPage = () => {
               />
             </div>
             <div>
-              <Label>{t("library.isoClass")}</Label>
-              <Input 
-                value={newType.iso_class} 
-                onChange={e => setNewType({ ...newType, iso_class: e.target.value })} 
-                placeholder="1.1.99" 
-              />
-            </div>
-            <div>
               <Label>{t("library.discipline")}</Label>
               <Select value={newType.discipline} onValueChange={v => setNewType({ ...newType, discipline: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {DISCIPLINES.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Category</Label>
-              <Select value={newType.category} onValueChange={v => setNewType({ ...newType, category: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {EQUIPMENT_CATEGORIES.map(c => <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
