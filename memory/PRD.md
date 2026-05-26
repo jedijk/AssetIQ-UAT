@@ -7,6 +7,12 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [May 26, 2026] **AI Suggest New Equipment Types** in Library → Equipment Types (VERIFIED):
+  - New "Suggest New Types" button in the Equipment Types tab (Library)
+  - Backend endpoint `POST /api/ai-suggestions/new-equipment-types` scans the user's plant hierarchy nodes, compares against the existing catalog, and proposes NEW equipment types that should be added (with id, name, discipline, rationale, example nodes, node_count). Conservative — at most 15 high-quality suggestions.
+  - Mongo-backed deterministic cache (temp=0, seed=42) so identical inputs always produce identical results.
+  - Frontend dialog `AINewEquipmentTypeSuggestions.jsx` lets the user review, edit name/id/discipline inline, deselect noisy items, and bulk-create the selected types via the existing `POST /equipment-hierarchy/types` endpoint.
+  - Verified live: returned 5 high-quality suggestions (Motor Reductor, Screw Motor Reductor, Brabender, Wet Scrubber, Water Bath) with sensible rationale + example node names. Cache hit reduced latency from 9.3s → 0.5s.
 - [May 26, 2026] **AI Equipment Type Mapping** in Equipment Manager (VERIFIED):
   - New "AI Map Types" button in the Equipment Manager toolbar (owners/admins)
   - Backend endpoint `POST /api/ai-suggestions/equipment-type-mappings` suggests an equipment type for each equipment node (equipment_unit / subunit / maintainable_item) using OpenAI GPT-4o

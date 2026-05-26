@@ -546,3 +546,235 @@ async def suggest_equipment_type_mappings(request: SuggestEquipmentTypeMappingsR
         suggestions=suggestions,
         total_matched=total_matched,
     )
+
+
+# =============================================================================
+# New Equipment Type Suggestions (from Equipment Hierarchy)
+# =============================================================================
+
+VALID_DISCIPLINES = [
+    "Rotating", "Static", "Piping", "Electrical",
+    "Instrumentation", "Civil", "Operations", "Laboratory",
+]
+
+
+class NewEquipmentTypeSuggestion(BaseModel):
+    suggested_id: str
+    suggested_name: str
+    discipline: str
+    rationale: str
+    example_node_ids: List[str] = []
+    example_node_names: List[str] = []
+    node_count: int = 0
+
+
+class SuggestNewEquipmentTypesRequest(BaseModel):
+    nodes: List[EquipmentNodeInput]
+    existing_equipment_types: List[EquipmentTypeOption]
+
+
+class SuggestNewEquipmentTypesResponse(BaseModel):
+    suggestions: List[NewEquipmentTypeSuggestion]
+    total: int
+
+
+NEW_EQUIPMENT_TYPE_SYSTEM_PROMPT = """You are an industrial reliability engineer building an ISO 14224-aligned equipment type catalog.
+
+The user has provided:
+1. A list of EXISTING equipment types already in the catalog.
+2. A list of equipment instances (nodes) from their plant hierarchy.
+
+Your task: identify recurring equipment KINDS in the node list that are NOT well-represented by the existing catalog, and propose NEW equipment types to add.
+
+STRICT RULES:
+
+1. DO NOT propose anything that is already covered by an existing type. Read the existing list carefully.
+2. Group node instances by their underlying equipment kind. Ignore plant codes, tag numbers and unit prefixes (e.g. P-101, V-201, 1F-3001).
+3. Only propose a new equipment type when at least 2 nodes (or 1 clearly distinct unfamiliar item) point to the same kind.
+4. Each suggestion must have:
+   - `suggested_id`: lowercase snake_case identifier, max 40 chars, unique, not present in existing IDs (e.g. "screw_motor_reductor").
+   - `suggested_name`: human-readable Title Case name (e.g. "Screw Motor Reductor").
+   - `discipline`: ONE of exactly: Rotating, Static, Piping, Electrical, Instrumentation, Civil, Operations, Laboratory.
+   - `rationale`: 1 short sentence explaining what the equipment is and why it is missing.
+   - `example_node_ids`: up to 5 node IDs that motivated this suggestion (use exact IDs from input).
+   - `example_node_names`: matching names for those IDs.
+   - `node_count`: total number of nodes you found that map to this new type.
+5. Be CONSERVATIVE. Better to return fewer high-quality suggestions than many noisy ones. Return at most 15 suggestions, sorted by node_count descending.
+6. Skip nodes whose names are too generic to classify ("Unit", "System", "Component", numeric-only).
+
+Return ONLY valid JSON. No prose outside JSON."""
+
+
+def get_new_types_cache_key(nodes: List[EquipmentNodeInput], et_ids: List[str]) -> str:
+    """Cache key based on node descriptors + existing type IDs."""
+    node_keys = sorted([f"{n.id}|{n.name}|{n.level or ''}" for n in nodes])
+    type_keys = sorted(et_ids)
+    return hashlib.md5(f"NEWTYPES:{node_keys}:{type_keys}".encode()).hexdigest()
+
+
+async def get_new_equipment_type_suggestions(
+    nodes: List[EquipmentNodeInput],
+    existing_types: List[EquipmentTypeOption],
+) -> List[NewEquipmentTypeSuggestion]:
+    """Use OpenAI to propose new equipment types based on hierarchy nodes."""
+    et_ids = [et.id for et in existing_types]
+    cache_key = get_new_types_cache_key(nodes, et_ids)
+
+    if cache_key in _suggestion_cache:
+        logger.info(f"Returning in-memory cached new-type suggestions: {cache_key[:8]}")
+        return _suggestion_cache[cache_key]
+
+    try:
+        cached_doc = await db[_CACHE_COLLECTION].find_one({"_id": cache_key})
+        if cached_doc and "new_type_suggestions" in cached_doc:
+            suggestions = [NewEquipmentTypeSuggestion(**s) for s in cached_doc["new_type_suggestions"]]
+            _suggestion_cache[cache_key] = suggestions
+            logger.info(f"Returning Mongo-cached new-type suggestions: {cache_key[:8]}")
+            return suggestions
+    except Exception as e:
+        logger.warning(f"New-types cache lookup failed (non-fatal): {e}")
+
+    client = get_openai_client()
+
+    existing_list = [
+        {"id": et.id, "name": et.name, "discipline": et.discipline or ""}
+        for et in existing_types
+    ]
+    node_list = [
+        {
+            "id": n.id,
+            "name": n.name,
+            "level": n.level or "",
+            "tag": n.tag or "",
+        }
+        for n in nodes
+    ]
+
+    user_prompt = f"""EXISTING EQUIPMENT TYPES (do NOT re-propose these):
+{json.dumps(existing_list, indent=2)}
+
+EQUIPMENT NODES FROM PLANT HIERARCHY:
+{json.dumps(node_list, indent=2)}
+
+Return JSON:
+{{
+  "suggestions": [
+    {{
+      "suggested_id": "snake_case_id",
+      "suggested_name": "Title Case Name",
+      "discipline": "Rotating",
+      "rationale": "1 short sentence",
+      "example_node_ids": ["<id>", "<id>"],
+      "example_node_names": ["<name>", "<name>"],
+      "node_count": 3
+    }}
+  ]
+}}"""
+
+    try:
+        response = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": NEW_EQUIPMENT_TYPE_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0,
+            max_tokens=4000,
+            seed=42,
+            response_format={"type": "json_object"},
+        )
+
+        result = json.loads(response.choices[0].message.content.strip())
+
+        existing_ids_lower = {et.id.lower() for et in existing_types}
+        existing_names_lower = {et.name.lower() for et in existing_types}
+        valid_node_ids = {n.id for n in nodes}
+        node_name_by_id = {n.id: n.name for n in nodes}
+
+        suggestions: List[NewEquipmentTypeSuggestion] = []
+        seen_ids = set()
+        seen_names = set()
+        for item in result.get("suggestions", []):
+            sid = (item.get("suggested_id") or "").strip().lower()
+            sname = (item.get("suggested_name") or "").strip()
+            if not sid or not sname:
+                continue
+            # Skip if duplicate of existing or already seen in this batch
+            if sid in existing_ids_lower or sid in seen_ids:
+                continue
+            if sname.lower() in existing_names_lower or sname.lower() in seen_names:
+                continue
+
+            discipline = (item.get("discipline") or "").strip()
+            if discipline not in VALID_DISCIPLINES:
+                # Try case-insensitive match
+                match = next((d for d in VALID_DISCIPLINES if d.lower() == discipline.lower()), None)
+                discipline = match or "Operations"
+
+            example_ids = [eid for eid in (item.get("example_node_ids") or []) if eid in valid_node_ids][:5]
+            example_names = item.get("example_node_names") or []
+            # Backfill names from input data when missing/mismatched
+            if not example_names or len(example_names) != len(example_ids):
+                example_names = [node_name_by_id.get(eid, "") for eid in example_ids]
+
+            try:
+                node_count = int(item.get("node_count") or len(example_ids))
+            except (TypeError, ValueError):
+                node_count = len(example_ids)
+
+            seen_ids.add(sid)
+            seen_names.add(sname.lower())
+            suggestions.append(NewEquipmentTypeSuggestion(
+                suggested_id=sid,
+                suggested_name=sname,
+                discipline=discipline,
+                rationale=(item.get("rationale") or "").strip(),
+                example_node_ids=example_ids,
+                example_node_names=example_names[:5],
+                node_count=max(node_count, len(example_ids)),
+            ))
+
+        # Sort by node_count desc and cap at 15
+        suggestions.sort(key=lambda s: s.node_count, reverse=True)
+        suggestions = suggestions[:15]
+
+        _suggestion_cache[cache_key] = suggestions
+        try:
+            await db[_CACHE_COLLECTION].update_one(
+                {"_id": cache_key},
+                {"$set": {
+                    "new_type_suggestions": [s.model_dump() for s in suggestions],
+                    "kind": "new_equipment_types",
+                    "node_ids": sorted([n.id for n in nodes]),
+                    "existing_type_ids": sorted(et_ids),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }},
+                upsert=True,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to persist new-types cache (non-fatal): {e}")
+
+        return suggestions
+
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse AI new-types response: {e}")
+        raise HTTPException(status_code=500, detail="Failed to parse AI response")
+    except Exception as e:
+        logger.error(f"AI new-types error: {e}")
+        raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")
+
+
+@router.post("/new-equipment-types", response_model=SuggestNewEquipmentTypesResponse)
+async def suggest_new_equipment_types(request: SuggestNewEquipmentTypesRequest):
+    """Get AI-suggested NEW equipment types based on the user's plant hierarchy."""
+    if not request.nodes:
+        raise HTTPException(status_code=400, detail="No equipment nodes provided")
+
+    nodes = request.nodes[:200]  # accept more nodes since this is a discovery task
+    existing = request.existing_equipment_types[:400]
+
+    suggestions = await get_new_equipment_type_suggestions(nodes, existing)
+    return SuggestNewEquipmentTypesResponse(
+        suggestions=suggestions,
+        total=len(suggestions),
+    )

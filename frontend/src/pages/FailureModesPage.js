@@ -71,6 +71,7 @@ import { EquipmentTypeItem, EquipmentTypeFailureModesPanel, EQUIPMENT_ICONS, ICO
 import { FailureModeViewPanel } from "../components/library";
 import PMImportWizard from "../components/library/PMImportWizard";
 import AIFailureModeSuggestions from "../components/library/AIFailureModeSuggestions";
+import AINewEquipmentTypeSuggestions from "../components/library/AINewEquipmentTypeSuggestions";
 import { Upload, Sparkles } from "lucide-react";
 
 const disciplineIcons = {
@@ -142,6 +143,7 @@ const FailureModesPage = () => {
   const [typeFilterNoFailureModes, setTypeFilterNoFailureModes] = useState(false); // Filter to show only types without failure modes
   const [selectedEquipmentType, setSelectedEquipmentType] = useState(null); // For viewing connected failure modes
   const [isAISuggestionsOpen, setIsAISuggestionsOpen] = useState(false); // AI suggestions dialog
+  const [isAINewTypesOpen, setIsAINewTypesOpen] = useState(false); // AI suggest NEW equipment types
   
   // Failure mode dialog state
   const [isFmDialogOpen, setIsFmDialogOpen] = useState(false);
@@ -258,9 +260,16 @@ const FailureModesPage = () => {
     queryFn: equipmentHierarchyAPI.getEquipmentTypes 
   });
 
+  // Fetch equipment hierarchy nodes (for AI "Suggest New Types" feature)
+  const { data: nodesData } = useQuery({
+    queryKey: ["equipment-nodes"],
+    queryFn: equipmentHierarchyAPI.getNodes,
+  });
+
   const categories = categoriesData?.categories || [];
   const failureModes = modesData?.failure_modes || [];
   const equipmentTypes = typesData?.equipment_types || [];
+  const hierarchyNodes = nodesData?.nodes || [];
   
   // Calculate dynamic stats
   const totalModes = failureModes.length;
@@ -978,6 +987,17 @@ const FailureModesPage = () => {
                           className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
                         >
                           <Sparkles className="w-4 h-4 mr-1" /> AI Suggest
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setIsAINewTypesOpen(true)}
+                          className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
+                          data-testid="ai-suggest-new-types-btn"
+                          disabled={hierarchyNodes.length === 0}
+                          title="Suggest new equipment types based on your hierarchy"
+                        >
+                          <Sparkles className="w-4 h-4 mr-1" /> Suggest New Types
                         </Button>
                         <Button size="sm" onClick={() => { setEditingType(null); resetTypeForm(); setIsTypeDialogOpen(true); }} data-testid="add-equipment-type-btn">
                           <Plus className="w-4 h-4 mr-1" /> Add Type
@@ -1871,6 +1891,17 @@ const FailureModesPage = () => {
           queryClient.invalidateQueries({ queryKey: ["equipmentTypes"] });
         }}
         t={t}
+      />
+
+      {/* AI Suggest NEW Equipment Types Dialog */}
+      <AINewEquipmentTypeSuggestions
+        isOpen={isAINewTypesOpen}
+        onClose={() => setIsAINewTypesOpen(false)}
+        nodes={hierarchyNodes}
+        equipmentTypes={equipmentTypes}
+        onCreated={() => {
+          queryClient.invalidateQueries({ queryKey: ["equipment-types"] });
+        }}
       />
     </div>
   );
