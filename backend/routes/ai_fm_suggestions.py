@@ -535,8 +535,9 @@ async def suggest_equipment_type_mappings(request: SuggestEquipmentTypeMappingsR
     if not request.equipment_types:
         raise HTTPException(status_code=400, detail="No equipment types provided")
 
-    # Cap to avoid runaway prompts. The frontend should batch if needed.
-    nodes = request.nodes[:80]
+    # Cap to avoid runaway prompts. The frontend batches in chunks of 25.
+    # Keep this small so the per-request latency stays well under proxy timeouts.
+    nodes = request.nodes[:30]
     types = request.equipment_types[:300]
 
     suggestions = await get_equipment_type_mapping_suggestions(nodes, types)

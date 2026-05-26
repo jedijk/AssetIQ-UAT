@@ -115,73 +115,75 @@ export function AIEquipmentTypeMappingSuggestions({
       );
       return;
     }
-    if (toAnalyze.length > 80) {
-      toast.warning(
-        `Analyzing the first 80 of ${toAnalyze.length} nodes. Use "Selected" mode for finer batching.`,
-      );
-    }
 
     setLoading(true);
     setSuggestions([]);
-    setLoadingStatus(`Analyzing ${Math.min(toAnalyze.length, 80)} equipment nodes...`);
+    setChosenType({});
 
-    const progressInterval = setInterval(() => {
-      const messages = [
-        `Reading equipment names and tags...`,
-        `Matching against ${equipmentTypes.length} equipment types...`,
-        `Aligning disciplines...`,
-        `Scoring confidence...`,
-        `Preparing recommendations...`,
-      ];
-      setLoadingStatus(messages[Math.floor(Math.random() * messages.length)]);
-    }, 3000);
+    const BATCH_SIZE = 25;
+    const batches = [];
+    for (let i = 0; i < toAnalyze.length; i += BATCH_SIZE) {
+      batches.push(toAnalyze.slice(i, i + BATCH_SIZE));
+    }
+
+    const payloadTypes = equipmentTypes.slice(0, 300).map((et) => ({
+      id: et.id,
+      name: et.name,
+      discipline: et.discipline || "",
+    }));
+
+    const accumulated = [];
+    const chosen = {};
 
     try {
-      const payloadNodes = toAnalyze.slice(0, 80).map((n) => ({
-        id: n.id,
-        name: n.name,
-        level: n.level,
-        tag: n.tag || "",
-        description: (n.description || "").slice(0, 200),
-        parent_name: n.parent_id ? nodeById[n.parent_id]?.name || "" : "",
-      }));
+      for (let b = 0; b < batches.length; b += 1) {
+        setLoadingStatus(
+          `Batch ${b + 1} of ${batches.length} — analyzing ${batches[b].length} nodes...`,
+        );
 
-      const payloadTypes = equipmentTypes.slice(0, 300).map((et) => ({
-        id: et.id,
-        name: et.name,
-        discipline: et.discipline || "",
-      }));
+        const payloadNodes = batches[b].map((n) => ({
+          id: n.id,
+          name: n.name,
+          level: n.level,
+          tag: n.tag || "",
+          description: (n.description || "").slice(0, 200),
+          parent_name: n.parent_id ? nodeById[n.parent_id]?.name || "" : "",
+        }));
 
-      const response = await api.post(
-        "/ai-suggestions/equipment-type-mappings",
-        {
-          nodes: payloadNodes,
-          equipment_types: payloadTypes,
-        },
-        { timeout: 120000 },
-      );
+        const response = await api.post(
+          "/ai-suggestions/equipment-type-mappings",
+          { nodes: payloadNodes, equipment_types: payloadTypes },
+          { timeout: 90000 },
+        );
 
-      const ss = response.data.suggestions || [];
-      setSuggestions(ss);
-
-      // Pre-select best matches
-      const initial = {};
-      for (const s of ss) {
-        if (s.best_match) initial[s.node_id] = s.best_match.equipment_type_id;
+        const batchSuggestions = response.data.suggestions || [];
+        for (const s of batchSuggestions) {
+          accumulated.push(s);
+          if (s.best_match) chosen[s.node_id] = s.best_match.equipment_type_id;
+        }
+        // Stream results into the UI between batches
+        setSuggestions([...accumulated]);
+        setChosenType({ ...chosen });
       }
-      setChosenType(initial);
 
+      const totalMatched = accumulated.filter((s) => s.best_match).length;
       toast.success(
-        `Found matches for ${response.data.total_matched}/${ss.length} equipment nodes`,
+        `Found matches for ${totalMatched}/${accumulated.length} equipment nodes`,
       );
     } catch (error) {
       console.error("Error fetching equipment type mapping suggestions:", error);
-      toast.error(
+      const msg =
         error.response?.data?.detail ||
-          "Failed to get AI suggestions. Please try again.",
-      );
+        (error.code === "ECONNABORTED"
+          ? "Request timed out. Try fewer nodes or use Selected mode."
+          : "Failed to get AI suggestions. Please try again.");
+      toast.error(msg);
+      // Keep whatever we accumulated so far visible.
+      if (accumulated.length > 0) {
+        setSuggestions([...accumulated]);
+        setChosenType({ ...chosen });
+      }
     } finally {
-      clearInterval(progressInterval);
       setLoading(false);
       setLoadingStatus("");
     }
