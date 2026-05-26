@@ -19,7 +19,7 @@ import {
 } from "../ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../ui/dialog";
 
-const categoryIcons = {
+const disciplineIcons = {
   Rotating: Cog,
   Static: Thermometer,
   Piping: Activity,
@@ -31,7 +31,7 @@ const categoryIcons = {
   Extruder: Cog,
 };
 
-const categoryColors = {
+const disciplineColors = {
   Rotating: "bg-blue-100 text-blue-700 border-blue-200",
   Static: "bg-purple-100 text-purple-700 border-purple-200",
   Piping: "bg-orange-100 text-orange-700 border-orange-200",
@@ -79,8 +79,8 @@ export function FailureModeViewPanel({
   isFullscreen = false,
   onToggleFullscreen
 }) {
-  const Icon = categoryIcons[fm?.category] || AlertTriangle;
-  const colors = categoryColors[fm?.category] || "bg-slate-100 text-slate-700 border-slate-200";
+  const Icon = disciplineIcons[fm?.discipline] || AlertTriangle;
+  const colors = disciplineColors[fm?.discipline] || "bg-slate-100 text-slate-700 border-slate-200";
   
   // Local state for adding keywords/actions in edit mode
   const [keywordInput, setKeywordInput] = useState("");
@@ -300,7 +300,7 @@ export function FailureModeViewPanel({
             <>
               <h2 className="font-semibold text-slate-900 text-lg truncate">{fm.failure_mode}</h2>
               <div className="flex items-center gap-2 text-sm text-slate-500">
-                <span>{fm.category}</span>
+                <span>{fm.discipline}</span>
                 {fm.version && (
                   <Badge variant="outline" className="text-xs py-0 px-1.5">
                     v{fm.version}

@@ -73,7 +73,7 @@ import PMImportWizard from "../components/library/PMImportWizard";
 import AIFailureModeSuggestions from "../components/library/AIFailureModeSuggestions";
 import { Upload, Sparkles } from "lucide-react";
 
-const categoryIcons = {
+const disciplineIcons = {
   Rotating: Cog,
   Static: Thermometer,
   Piping: Activity,
@@ -85,7 +85,7 @@ const categoryIcons = {
   Extruder: Cog,
 };
 
-const categoryColors = {
+const disciplineColors = {
   Rotating: "bg-blue-100 text-blue-700 border-blue-200",
   Static: "bg-purple-100 text-purple-700 border-purple-200",
   Piping: "bg-orange-100 text-orange-700 border-orange-200",
@@ -109,7 +109,7 @@ const FailureModesPage = () => {
   
   // Initialize state from URL params (for FMEA linkage from Maintenance Strategies)
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get("search") || "");
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all"); // generic, customer_specific, all
   const [mainTab, setMainTab] = useState(() => searchParams.get("tab") || "failure-modes");
   const [libraryTab, setLibraryTab] = useState("equipment");
@@ -164,7 +164,7 @@ const FailureModesPage = () => {
   const [isPMImportOpen, setIsPMImportOpen] = useState(false);
   
   const [newFm, setNewFm] = useState({
-    category: "Rotating",
+    discipline: "Rotating",
     failure_mode: "",
     keywords: [],
     severity: 5,
@@ -204,7 +204,7 @@ const FailureModesPage = () => {
   const resetTypeForm = () => setNewType({ id: "", name: "", discipline: "Rotating", icon: "cog" });
   const resetFmForm = () => {
     setNewFm({
-      category: "Rotating",
+      discipline: "Rotating",
       failure_mode: "",
       keywords: [],
       severity: 5,
@@ -235,11 +235,11 @@ const FailureModesPage = () => {
 
   // Fetch failure modes
   const { data: modesData, isLoading } = useQuery({
-    queryKey: ["failureModes", categoryFilter, searchQuery, typeFilter],
+    queryKey: ["failureModes", disciplineFilter, searchQuery, typeFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (categoryFilter && categoryFilter !== "all") {
-        params.append("category", categoryFilter);
+      if (disciplineFilter && disciplineFilter !== "all") {
+        params.append("category", disciplineFilter);
       }
       if (searchQuery) {
         params.append("search", searchQuery);
@@ -357,7 +357,7 @@ const FailureModesPage = () => {
           data: { oldData, newData: data },
           undo: async () => {
             await failureModesAPI.update(id, {
-              category: oldData.category,
+              discipline: oldData.discipline,
               equipment: oldData.equipment,
               failure_mode: oldData.failure_mode,
               keywords: oldData.keywords || [],
@@ -399,7 +399,7 @@ const FailureModesPage = () => {
           data: deletedFm,
           undo: async () => {
             await failureModesAPI.create({
-              category: deletedFm.category,
+              discipline: deletedFm.discipline,
               equipment: deletedFm.equipment,
               failure_mode: deletedFm.failure_mode,
               keywords: deletedFm.keywords || [],
@@ -521,7 +521,7 @@ const FailureModesPage = () => {
   const handleEditFm = (fm) => {
     setEditingFm(fm);
     setNewFm({
-      category: fm.category,
+      discipline: fm.discipline,
       failure_mode: fm.failure_mode,
       keywords: fm.keywords || [],
       severity: fm.severity,
@@ -549,7 +549,7 @@ const FailureModesPage = () => {
   const handleStartViewPanelEdit = () => {
     if (selectedFm) {
       setViewPanelForm({
-        category: selectedFm.category,
+        discipline: selectedFm.discipline,
         failure_mode: selectedFm.failure_mode,
         keywords: selectedFm.keywords || [],
         severity: selectedFm.severity,
@@ -740,15 +740,15 @@ const FailureModesPage = () => {
                 data-testid="search-input"
               />
             </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
               <SelectTrigger className="w-full sm:w-48 h-11" data-testid="category-filter">
                 <Filter className="w-4 h-4 mr-2 text-slate-400" />
                 <SelectValue placeholder={t("library.allCategories")} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t("library.allCategories")}</SelectItem>
-                {categories.map((cat) => (
-                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                {DISCIPLINES.map((d) => (
+                  <SelectItem key={d} value={d}>{d}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -827,8 +827,8 @@ const FailureModesPage = () => {
               ) : (
                 <div className="space-y-2 overflow-y-auto h-full pr-2" data-testid="failure-modes-list">
                   {failureModes.map((fm, idx) => {
-                    const Icon = categoryIcons[fm.category] || AlertTriangle;
-                    const colors = categoryColors[fm.category] || "bg-slate-100 text-slate-700";
+                    const Icon = disciplineIcons[fm.discipline] || AlertTriangle;
+                    const colors = disciplineColors[fm.discipline] || "bg-slate-100 text-slate-700";
                     const isSelected = selectedFm?.id === fm.id;
                     
                     return (
@@ -853,7 +853,7 @@ const FailureModesPage = () => {
                         {/* Content */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
-                            <Badge className={`${colors} text-xs px-1.5 py-0`}>{fm.category}</Badge>
+                            <Badge className={`${colors} text-xs px-1.5 py-0`}>{fm.discipline}</Badge>
                             {fm.failure_mode_type === "customer_specific" && (
                               <Badge className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0">
                                 Customer
@@ -1159,11 +1159,11 @@ const FailureModesPage = () => {
           <div className="space-y-4 py-4">
             {/* Category */}
             <div>
-              <Label>{t("library.category")} *</Label>
-              <Select value={newFm.category} onValueChange={v => setNewFm({ ...newFm, category: v })}>
+              <Label>{t("library.discipline")} *</Label>
+              <Select value={newFm.discipline} onValueChange={v => setNewFm({ ...newFm, discipline: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {DISCIPLINES.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -1530,8 +1530,8 @@ const FailureModesPage = () => {
                       if (curr.failure_mode !== prev.failure_mode) {
                         changes.push({ field: 'Name', from: prev.failure_mode, to: curr.failure_mode });
                       }
-                      if (curr.category !== prev.category) {
-                        changes.push({ field: 'Category', from: prev.category, to: curr.category });
+                      if (curr.discipline !== prev.discipline) {
+                        changes.push({ field: 'Discipline', from: prev.discipline, to: curr.discipline });
                       }
                       if ((curr.failure_mode_type || 'generic') !== (prev.failure_mode_type || 'generic')) {
                         changes.push({ field: 'Type', from: prev.failure_mode_type || 'generic', to: curr.failure_mode_type || 'generic' });
@@ -1630,8 +1630,8 @@ const FailureModesPage = () => {
                     if (thisVersion.failure_mode !== newer.failure_mode) {
                       changes.push({ field: 'Name', from: thisVersion.failure_mode, to: newer.failure_mode });
                     }
-                    if (thisVersion.category !== newer.category) {
-                      changes.push({ field: 'Category', from: thisVersion.category, to: newer.category });
+                    if (thisVersion.discipline !== newer.discipline) {
+                      changes.push({ field: 'Discipline', from: thisVersion.discipline, to: newer.discipline });
                     }
                     if ((thisVersion.failure_mode_type || 'generic') !== (newer.failure_mode_type || 'generic')) {
                       changes.push({ field: 'Type', from: thisVersion.failure_mode_type || 'generic', to: newer.failure_mode_type || 'generic' });
@@ -1806,8 +1806,8 @@ const FailureModesPage = () => {
             <div className="py-4">
               <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
                 <div className="flex items-center gap-3 mb-2">
-                  <Badge className={categoryColors[deleteConfirmFm.category] || "bg-slate-100"}>
-                    {deleteConfirmFm.category}
+                  <Badge className={disciplineColors[deleteConfirmFm.discipline] || "bg-slate-100"}>
+                    {deleteConfirmFm.discipline}
                   </Badge>
                   <span className={`font-bold ${
                     deleteConfirmFm.severity * deleteConfirmFm.occurrence * deleteConfirmFm.detectability >= 200 
