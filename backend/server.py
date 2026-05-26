@@ -225,7 +225,7 @@ BASE_ORIGINS = [
     "https://asset-iq-uat.vercel.app",
     "https://assetiq-uat.vercel.app",
     # Preview/Development
-    "https://pm-plan-converter.preview.emergentagent.com",
+    "https://failure-mode-editor.preview.emergentagent.com",
     "http://localhost:3000",
     "http://localhost:5000",
 ]

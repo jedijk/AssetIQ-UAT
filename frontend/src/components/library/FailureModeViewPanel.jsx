@@ -1,10 +1,10 @@
 import { getBackendUrl } from '../../lib/apiConfig';
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { formatDate } from "../../lib/dateUtils";
 import { 
   AlertTriangle, Edit, Trash2, X, Plus, Link, CheckCircle, 
   User, Briefcase, Calendar, History, RotateCcw, Clock, ShieldCheck,
-  Cog, Thermometer, Activity, Zap, Shield, Leaf, Maximize2, Minimize2, Image
+  Cog, Thermometer, Activity, Zap, Shield, Leaf, Maximize2, Minimize2, Image, Search
 } from "lucide-react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -87,6 +87,9 @@ export function FailureModeViewPanel({
   const [actionInput, setActionInput] = useState("");
   const [actionMinutes, setActionMinutes] = useState("");
   
+  // Equipment type search state
+  const [equipmentTypeSearch, setEquipmentTypeSearch] = useState("");
+  
   // Validation dialog state
   const [showValidationDialog, setShowValidationDialog] = useState(false);
   const [validatorName, setValidatorName] = useState("");
@@ -100,6 +103,15 @@ export function FailureModeViewPanel({
   const [validatorAvatarUrl, setValidatorAvatarUrl] = useState(null);
   // Current user avatar for validation dialog
   const [currentUserAvatarUrl, setCurrentUserAvatarUrl] = useState(null);
+  
+  // Filter equipment types based on search
+  const filteredEquipmentTypes = useMemo(() => {
+    return equipmentTypes.filter(et => 
+      !equipmentTypeSearch || 
+      et.name.toLowerCase().includes(equipmentTypeSearch.toLowerCase()) ||
+      (et.discipline && et.discipline.toLowerCase().includes(equipmentTypeSearch.toLowerCase()))
+    );
+  }, [equipmentTypes, equipmentTypeSearch]);
 
   // Auto-fill validator info from current user when dialog opens
   useEffect(() => {
@@ -517,42 +529,21 @@ export function FailureModeViewPanel({
           </div>
         )}
 
-        {/* Category & Equipment */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label className="text-xs text-slate-500 mb-2 block">{t("library.category")}</Label>
-            {isEditing ? (
-              <Select value={formData?.category || ""} onValueChange={(v) => setFormData({ ...formData, category: v })}>
-                <SelectTrigger><SelectValue placeholder={t("library.selectCategory")} /></SelectTrigger>
-                <SelectContent>
-                  {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            ) : (
-              <Badge variant="outline" className={`${colors} px-3 py-1`}>
-                <Icon className="w-4 h-4 mr-1.5" />{fm.category}
-              </Badge>
-            )}
-          </div>
-          <div>
-            <Label className="text-xs text-slate-500 mb-2 block">{t("library.equipment")}</Label>
-            {isEditing ? (
-              <Select 
-                value={formData?.equipment || ""} 
-                onValueChange={(v) => setFormData({ ...formData, equipment: v })}
-              >
-                <SelectTrigger><SelectValue placeholder={t("library.equipmentPlaceholder")} /></SelectTrigger>
-                <SelectContent>
-                  {/* Show unique equipment values from existing failure modes or use equipment types */}
-                  {equipmentTypes.map(et => (
-                    <SelectItem key={et.id} value={et.name}>{et.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <span className="text-sm text-slate-700">{fm.equipment || "—"}</span>
-            )}
-          </div>
+        {/* Category */}
+        <div>
+          <Label className="text-xs text-slate-500 mb-2 block">{t("library.category")}</Label>
+          {isEditing ? (
+            <Select value={formData?.category || ""} onValueChange={(v) => setFormData({ ...formData, category: v })}>
+              <SelectTrigger><SelectValue placeholder={t("library.selectCategory")} /></SelectTrigger>
+              <SelectContent>
+                {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Badge variant="outline" className={`${colors} px-3 py-1`}>
+              <Icon className="w-4 h-4 mr-1.5" />{fm.category}
+            </Badge>
+          )}
         </div>
 
         {/* Process */}
@@ -653,29 +644,66 @@ export function FailureModeViewPanel({
         <div>
           <Label className="text-xs text-slate-500 mb-2 block">{t("library.linkedEquipmentTypes")}</Label>
           {isEditing ? (
-            <div className="flex flex-wrap gap-2">
-              {equipmentTypes.map(et => {
-                const isSelected = formData?.equipment_type_ids?.includes(et.id);
-                return (
+            <div className="space-y-2">
+              {/* Search input for equipment types */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  placeholder="Search equipment types..."
+                  value={equipmentTypeSearch}
+                  onChange={(e) => setEquipmentTypeSearch(e.target.value)}
+                  className="pl-9 h-9"
+                />
+              </div>
+              {/* Selected equipment types shown at top */}
+              {(formData?.equipment_type_ids || []).length > 0 && (
+                <div className="flex flex-wrap gap-2 p-2 bg-blue-50 rounded-lg border border-blue-100">
+                  {(formData?.equipment_type_ids || []).map(id => {
+                    const et = equipmentTypes.find(e => e.id === id);
+                    return et ? (
+                      <Badge
+                        key={et.id}
+                        variant="default"
+                        className="cursor-pointer bg-blue-600 flex items-center gap-1"
+                        onClick={() => {
+                          const current = formData?.equipment_type_ids || [];
+                          setFormData({
+                            ...formData,
+                            equipment_type_ids: current.filter(eid => eid !== et.id)
+                          });
+                        }}
+                      >
+                        {et.name}
+                        <X className="w-3 h-3" />
+                      </Badge>
+                    ) : null;
+                  })}
+                </div>
+              )}
+              {/* Available equipment types */}
+              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                {filteredEquipmentTypes.filter(et => !(formData?.equipment_type_ids || []).includes(et.id)).map(et => (
                   <Badge
                     key={et.id}
-                    variant={isSelected ? "default" : "outline"}
-                    className={`cursor-pointer transition-colors ${isSelected ? 'bg-blue-600' : 'hover:bg-blue-50'}`}
+                    variant="outline"
+                    className="cursor-pointer transition-colors hover:bg-blue-50"
                     onClick={() => {
                       const current = formData?.equipment_type_ids || [];
                       setFormData({
                         ...formData,
-                        equipment_type_ids: isSelected 
-                          ? current.filter(id => id !== et.id)
-                          : [...current, et.id]
+                        equipment_type_ids: [...current, et.id]
                       });
                     }}
                   >
-                    {isSelected && <CheckCircle className="w-3 h-3 mr-1" />}
                     {et.name}
                   </Badge>
-                );
-              })}
+                ))}
+                {filteredEquipmentTypes.filter(et => !(formData?.equipment_type_ids || []).includes(et.id)).length === 0 && (
+                  <span className="text-sm text-slate-400 py-1">
+                    {equipmentTypeSearch ? "No matching equipment types" : "All equipment types selected"}
+                  </span>
+                )}
+              </div>
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">

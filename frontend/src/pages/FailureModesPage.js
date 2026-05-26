@@ -161,7 +161,6 @@ const FailureModesPage = () => {
   
   const [newFm, setNewFm] = useState({
     category: "Rotating",
-    equipment: "",
     failure_mode: "",
     keywords: [],
     severity: 5,
@@ -175,6 +174,7 @@ const FailureModesPage = () => {
     iso14224_mechanism: "",
     failure_mode_type: "generic"  // "generic" or "customer_specific"
   });
+  const [equipmentTypeSearch, setEquipmentTypeSearch] = useState(""); // For filtering equipment types
   const [keywordInput, setKeywordInput] = useState("");
   const [actionInput, setActionInput] = useState("");
   const [actionMinutes, setActionMinutes] = useState("");
@@ -201,7 +201,6 @@ const FailureModesPage = () => {
   const resetFmForm = () => {
     setNewFm({
       category: "Rotating",
-      equipment: "",
       failure_mode: "",
       keywords: [],
       severity: 5,
@@ -218,6 +217,7 @@ const FailureModesPage = () => {
     setKeywordInput("");
     setActionInput("");
     setActionMinutes("");
+    setEquipmentTypeSearch("");
   };
 
   // Fetch categories
@@ -488,7 +488,6 @@ const FailureModesPage = () => {
     setEditingFm(fm);
     setNewFm({
       category: fm.category,
-      equipment: fm.equipment,
       failure_mode: fm.failure_mode,
       keywords: fm.keywords || [],
       severity: fm.severity,
@@ -501,6 +500,7 @@ const FailureModesPage = () => {
       potential_causes: fm.potential_causes || "",
       iso14224_mechanism: fm.iso14224_mechanism || ""
     });
+    setEquipmentTypeSearch("");
     setIsFmDialogOpen(true);
   };
 
@@ -516,7 +516,6 @@ const FailureModesPage = () => {
     if (selectedFm) {
       setViewPanelForm({
         category: selectedFm.category,
-        equipment: selectedFm.equipment,
         failure_mode: selectedFm.failure_mode,
         keywords: selectedFm.keywords || [],
         severity: selectedFm.severity,
@@ -602,24 +601,12 @@ const FailureModesPage = () => {
     });
   };
 
-  // Auto-link equipment types when equipment name changes
-  const handleEquipmentChange = (value) => {
-    setNewFm(prev => {
-      const updated = { ...prev, equipment: value };
-      // Auto-detect equipment types if not already set
-      if (!prev.equipment_type_ids || prev.equipment_type_ids.length === 0) {
-        const equipLower = value.toLowerCase();
-        const autoTypes = equipmentTypes.filter(t => 
-          equipLower.includes(t.name.toLowerCase()) || 
-          t.name.toLowerCase().includes(equipLower)
-        ).map(t => t.id);
-        if (autoTypes.length > 0) {
-          updated.equipment_type_ids = autoTypes;
-        }
-      }
-      return updated;
-    });
-  };
+  // Filter equipment types based on search
+  const filteredEquipmentTypes = equipmentTypes.filter(et => 
+    !equipmentTypeSearch || 
+    et.name.toLowerCase().includes(equipmentTypeSearch.toLowerCase()) ||
+    (et.discipline && et.discipline.toLowerCase().includes(equipmentTypeSearch.toLowerCase()))
+  );
 
   // Export failure modes to Excel
   const [isExporting, setIsExporting] = useState(false);
@@ -1096,33 +1083,15 @@ const FailureModesPage = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            {/* Row 1: Category & Equipment */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>{t("library.category")} *</Label>
-                <Select value={newFm.category} onValueChange={v => setNewFm({ ...newFm, category: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>{t("library.equipment")} *</Label>
-                <Select 
-                  value={newFm.equipment} 
-                  onValueChange={v => handleEquipmentChange(v)}
-                >
-                  <SelectTrigger data-testid="fm-equipment-input">
-                    <SelectValue placeholder={t("library.equipmentPlaceholder")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {equipmentTypes.map(et => (
-                      <SelectItem key={et.id} value={et.name}>{et.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            {/* Category */}
+            <div>
+              <Label>{t("library.category")} *</Label>
+              <Select value={newFm.category} onValueChange={v => setNewFm({ ...newFm, category: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Failure Mode Type Selection */}
@@ -1226,28 +1195,59 @@ const FailureModesPage = () => {
               />
             </div>
 
-            {/* Linked Equipment Types - Multi-select */}
+            {/* Linked Equipment Types - Multi-select with Search */}
             <div>
               <Label className="flex items-center gap-2">
                 <Link className="w-4 h-4 text-blue-500" />
                 {t("library.linkedEquipmentTypes")}
               </Label>
               <p className="text-xs text-slate-500 mb-2">{t("library.clickToSelect")}</p>
+              {/* Search input for equipment types */}
+              <div className="relative mb-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  placeholder="Search equipment types..."
+                  value={equipmentTypeSearch}
+                  onChange={(e) => setEquipmentTypeSearch(e.target.value)}
+                  className="pl-9 h-9"
+                />
+              </div>
+              {/* Selected equipment types shown at top */}
+              {(newFm.equipment_type_ids || []).length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2 p-2 bg-blue-50 rounded-lg border border-blue-100">
+                  {(newFm.equipment_type_ids || []).map(id => {
+                    const eqt = equipmentTypes.find(e => e.id === id);
+                    return eqt ? (
+                      <button
+                        key={eqt.id}
+                        type="button"
+                        onClick={() => toggleEquipmentType(eqt.id)}
+                        className="px-3 py-1.5 rounded-full text-sm font-medium bg-blue-500 text-white flex items-center gap-1"
+                      >
+                        {eqt.name}
+                        <X className="w-3 h-3" />
+                      </button>
+                    ) : null;
+                  })}
+                </div>
+              )}
+              {/* Available equipment types */}
               <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-lg max-h-40 overflow-y-auto">
-                {equipmentTypes.map(eqt => (
+                {filteredEquipmentTypes.filter(eqt => !(newFm.equipment_type_ids || []).includes(eqt.id)).map(eqt => (
                   <button
                     key={eqt.id}
                     type="button"
                     onClick={() => toggleEquipmentType(eqt.id)}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
-                      (newFm.equipment_type_ids || []).includes(eqt.id)
-                        ? "bg-blue-500 text-white"
-                        : "bg-white border border-slate-200 text-slate-600 hover:border-blue-300"
-                    }`}
+                    className="px-3 py-1.5 rounded-full text-sm font-medium transition-all bg-white border border-slate-200 text-slate-600 hover:border-blue-300"
                   >
                     {eqt.name}
                   </button>
                 ))}
+                {filteredEquipmentTypes.filter(eqt => !(newFm.equipment_type_ids || []).includes(eqt.id)).length === 0 && (
+                  <span className="text-sm text-slate-400 py-2">
+                    {equipmentTypeSearch ? "No matching equipment types" : "All equipment types selected"}
+                  </span>
+                )}
               </div>
               {(newFm.equipment_type_ids || []).length > 0 && (
                 <p className="text-xs text-blue-600 mt-1">
@@ -1406,7 +1406,7 @@ const FailureModesPage = () => {
             </Button>
             <Button 
               onClick={handleSaveFm} 
-              disabled={!newFm.failure_mode.trim() || !newFm.equipment.trim()} 
+              disabled={!newFm.failure_mode.trim()} 
               data-testid="save-fm-btn"
             >
               {editingFm ? t("common.save") : t("common.create")}
