@@ -1,6 +1,6 @@
 """
 AI-powered failure mode suggestions for equipment types.
-Uses LLM to intelligently map failure modes to equipment types.
+Uses OpenAI GPT-4o to intelligently map failure modes to equipment types.
 """
 
 import os
@@ -9,18 +9,30 @@ import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from openai import AsyncOpenAI
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage
 from iso14224_models import EQUIPMENT_TYPES
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ai-suggestions", tags=["AI Suggestions"])
+
+# Initialize OpenAI client
+openai_client = None
+
+def get_openai_client():
+    global openai_client
+    if openai_client is None:
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
+        openai_client = AsyncOpenAI(api_key=api_key)
+    return openai_client
 
 # ============= Models =============
 
@@ -47,9 +59,6 @@ class SuggestFailureModesResponse(BaseModel):
     suggestions: List[EquipmentTypeSuggestions]
     total_suggestions: int
 
-class AcceptSuggestionsRequest(BaseModel):
-    mappings: List[Dict[str, Any]]  # [{equipment_type_id, failure_mode_ids: [...]}]
-
 # ============= AI Service =============
 
 SYSTEM_PROMPT = """You are an expert industrial reliability engineer specializing in FMEA (Failure Mode and Effects Analysis) and ISO 14224 standards for the oil & gas, petrochemical, and process industries.
@@ -73,11 +82,9 @@ async def get_ai_suggestions(
     equipment_types: List[Dict[str, Any]],
     failure_modes: List[Dict[str, Any]]
 ) -> List[EquipmentTypeSuggestions]:
-    """Use AI to suggest failure mode mappings for equipment types."""
+    """Use OpenAI GPT-4o to suggest failure mode mappings for equipment types."""
     
-    api_key = os.environ.get("EMERGENT_LLM_KEY") or os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="No AI API key configured")
+    client = get_openai_client()
     
     # Prepare failure modes summary for the prompt
     fm_summary = []
@@ -137,17 +144,19 @@ Respond with JSON in this exact format:
 Only include failure modes with confidence >= 0.6. Order by confidence descending."""
 
     try:
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"fm-suggestions-{datetime.now(timezone.utc).isoformat()}",
-            system_message=SYSTEM_PROMPT
-        ).with_model("openai", "gpt-4o")
+        response = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.3,
+            max_tokens=4000
+        )
         
-        response = await chat.send_message(UserMessage(text=user_prompt))
+        response_text = response.choices[0].message.content.strip()
         
-        # Parse the response
         # Clean the response - remove markdown code blocks if present
-        response_text = response.strip()
         if response_text.startswith("```"):
             response_text = response_text.split("```")[1]
             if response_text.startswith("json"):
@@ -232,8 +241,6 @@ async def get_equipment_types_without_failure_modes():
     Get list of equipment types that have no failure modes mapped.
     This helps identify equipment types that need AI suggestions.
     """
-    # This would typically check the database, but for now returns from static list
-    # The frontend will filter based on actual failure mode mappings
     return {
         "equipment_types": [
             {

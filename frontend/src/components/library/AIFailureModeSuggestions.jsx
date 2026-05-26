@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { 
   Sparkles, Loader2, CheckCircle, X, ChevronDown, ChevronRight, 
-  AlertTriangle, Brain, Link, RefreshCw
+  AlertTriangle, Brain, Link, RefreshCw, Search, Cog
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { ScrollArea } from "../ui/scroll-area";
+import { Input } from "../ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../ui/dialog";
 import { toast } from "sonner";
 import api from "../../lib/api";
@@ -39,6 +40,9 @@ export function AIFailureModeSuggestions({
   const [expandedTypes, setExpandedTypes] = useState({});
   const [selectedMappings, setSelectedMappings] = useState({}); // {equipmentTypeId: Set of fmIds}
   const [accepting, setAccepting] = useState(false);
+  const [analyzeMode, setAnalyzeMode] = useState("without_fm"); // "without_fm" | "all" | "selected"
+  const [selectedTypesForAnalysis, setSelectedTypesForAnalysis] = useState(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
   
   // Equipment types without failure modes
   const equipmentTypesWithoutFm = equipmentTypes.filter(et => {
@@ -48,10 +52,48 @@ export function AIFailureModeSuggestions({
     return connectedCount === 0;
   });
   
+  // Get equipment types to analyze based on mode
+  const getTypesToAnalyze = () => {
+    switch (analyzeMode) {
+      case "without_fm":
+        return equipmentTypesWithoutFm;
+      case "all":
+        return equipmentTypes;
+      case "selected":
+        return equipmentTypes.filter(et => selectedTypesForAnalysis.has(et.id));
+      default:
+        return equipmentTypesWithoutFm;
+    }
+  };
+  
+  // Filter equipment types for selection based on search
+  const filteredEquipmentTypes = equipmentTypes.filter(et =>
+    !searchQuery || 
+    et.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    et.discipline?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  
+  // Toggle equipment type selection for analysis
+  const toggleTypeSelection = (typeId) => {
+    setSelectedTypesForAnalysis(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(typeId)) {
+        newSet.delete(typeId);
+      } else {
+        newSet.add(typeId);
+      }
+      return newSet;
+    });
+  };
+  
   // Fetch AI suggestions - processes in batches of 5
   const fetchSuggestions = async () => {
-    if (equipmentTypesWithoutFm.length === 0) {
-      toast.info("All equipment types already have failure modes connected");
+    const typesToAnalyze = getTypesToAnalyze();
+    
+    if (typesToAnalyze.length === 0) {
+      toast.info(analyzeMode === "selected" 
+        ? "Please select at least one equipment type to analyze"
+        : "No equipment types to analyze");
       return;
     }
     
@@ -62,7 +104,7 @@ export function AIFailureModeSuggestions({
       // Process in batches of 5 for performance
       const batchSize = 5;
       const allSuggestions = [];
-      const typeIds = equipmentTypesWithoutFm.map(et => et.id);
+      const typeIds = typesToAnalyze.map(et => et.id);
       
       // Only process first batch for now (max 5 types)
       const batch = typeIds.slice(0, batchSize);
@@ -83,7 +125,21 @@ export function AIFailureModeSuggestions({
         timeout: 60000 // 60 second timeout for AI requests
       });
       
-      allSuggestions.push(...(response.data.suggestions || []));
+      // Filter out failure modes that are already connected to each equipment type
+      const filteredSuggestions = (response.data.suggestions || []).map(suggestion => {
+        const existingFmIds = failureModes
+          .filter(fm => fm.equipment_type_ids?.includes(suggestion.equipment_type_id))
+          .map(fm => fm.id);
+        
+        return {
+          ...suggestion,
+          suggested_failure_modes: suggestion.suggested_failure_modes.filter(
+            fm => !existingFmIds.includes(fm.failure_mode_id)
+          )
+        };
+      }).filter(s => s.suggested_failure_modes.length > 0);
+      
+      allSuggestions.push(...filteredSuggestions);
       
       setSuggestions(allSuggestions);
       
@@ -223,31 +279,113 @@ export function AIFailureModeSuggestions({
             AI Failure Mode Suggestions
           </DialogTitle>
           <DialogDescription>
-            Use AI to intelligently suggest failure mode mappings for equipment types that don't have any connected.
+            Use AI to intelligently suggest new failure mode mappings for equipment types. Works for all equipment types - suggests only unmapped failure modes.
           </DialogDescription>
         </DialogHeader>
         
         <div className="flex-1 overflow-hidden flex flex-col">
+          {/* Mode Selection */}
+          <div className="flex items-center gap-2 mb-4 p-3 bg-slate-50 rounded-lg">
+            <span className="text-sm font-medium text-slate-700">Analyze:</span>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setAnalyzeMode("without_fm")}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  analyzeMode === "without_fm" 
+                    ? "bg-purple-600 text-white" 
+                    : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Without FM ({equipmentTypesWithoutFm.length})
+              </button>
+              <button
+                onClick={() => setAnalyzeMode("all")}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  analyzeMode === "all" 
+                    ? "bg-purple-600 text-white" 
+                    : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                All Types ({equipmentTypes.length})
+              </button>
+              <button
+                onClick={() => setAnalyzeMode("selected")}
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  analyzeMode === "selected" 
+                    ? "bg-purple-600 text-white" 
+                    : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Selected ({selectedTypesForAnalysis.size})
+              </button>
+            </div>
+          </div>
+          
+          {/* Equipment Type Selection (when mode is "selected") */}
+          {analyzeMode === "selected" && (
+            <div className="mb-4 border rounded-lg p-3 bg-white">
+              <div className="flex items-center gap-2 mb-2">
+                <Search className="w-4 h-4 text-slate-400" />
+                <Input
+                  placeholder="Search equipment types..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <ScrollArea className="h-40">
+                <div className="space-y-1">
+                  {filteredEquipmentTypes.map(et => {
+                    const connectedCount = failureModes.filter(fm => 
+                      fm.equipment_type_ids?.includes(et.id)
+                    ).length;
+                    const isSelected = selectedTypesForAnalysis.has(et.id);
+                    
+                    return (
+                      <div
+                        key={et.id}
+                        onClick={() => toggleTypeSelection(et.id)}
+                        className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+                          isSelected ? "bg-purple-50 border border-purple-200" : "hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${
+                          isSelected ? "bg-purple-500" : "bg-slate-100 border border-slate-300"
+                        }`}>
+                          {isSelected && <CheckCircle className="w-3 h-3 text-white" />}
+                        </div>
+                        <Cog className="w-4 h-4 text-slate-400" />
+                        <span className="text-sm font-medium flex-1">{et.name}</span>
+                        <Badge variant="outline" className="text-xs">{et.discipline}</Badge>
+                        <span className="text-xs text-slate-400">{connectedCount} FM</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+          
           {/* Header stats */}
           <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg mb-4">
             <div className="flex items-center gap-6">
               <div>
-                <p className="text-2xl font-bold text-slate-900">{equipmentTypesWithoutFm.length}</p>
-                <p className="text-xs text-slate-500">Equipment types without failure modes</p>
+                <p className="text-2xl font-bold text-slate-900">{getTypesToAnalyze().length}</p>
+                <p className="text-xs text-slate-500">Equipment types to analyze</p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-purple-600">{suggestions.length}</p>
-                <p className="text-xs text-slate-500">Types analyzed</p>
+                <p className="text-xs text-slate-500">Types with suggestions</p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-green-600">{totalSelected}</p>
-                <p className="text-xs text-slate-500">Suggestions selected</p>
+                <p className="text-xs text-slate-500">Mappings selected</p>
               </div>
             </div>
             
             <Button
               onClick={fetchSuggestions}
-              disabled={loading || equipmentTypesWithoutFm.length === 0}
+              disabled={loading || getTypesToAnalyze().length === 0}
               className="bg-purple-600 hover:bg-purple-700"
             >
               {loading ? (
