@@ -282,7 +282,7 @@ const FailureModesPage = () => {
   // Prefer the server's total (real Mongo count) over the page length so the
   // counter is always accurate even if the page was capped.
   const totalModes = modesData?.total ?? failureModes.length;
-  const totalCategories = categories.length;
+  const totalCategories = DISCIPLINES.length;
   
   // Calculate connected failure modes count for each equipment type
   const getConnectedFmCount = (equipmentTypeId) => {
