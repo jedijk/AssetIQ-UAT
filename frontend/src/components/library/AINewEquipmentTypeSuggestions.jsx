@@ -69,22 +69,34 @@ export function AINewEquipmentTypeSuggestions({
   // Each row: { selected: bool, name: string, id: string, discipline: string }
   const [drafts, setDrafts] = useState({});
   const [creating, setCreating] = useState(false);
+  const [onlyUnmapped, setOnlyUnmapped] = useState(true);
 
   const mappableNodes = useMemo(
     () => nodes.filter((n) => MAPPABLE_LEVELS.has(n.level)),
     [nodes],
   );
 
+  const unmappedNodes = useMemo(
+    () => mappableNodes.filter((n) => !n.equipment_type_id),
+    [mappableNodes],
+  );
+
+  const nodesToScan = onlyUnmapped ? unmappedNodes : mappableNodes;
+
   const fetchSuggestions = async () => {
-    if (mappableNodes.length === 0) {
-      toast.info("No equipment nodes available in the hierarchy to analyze");
+    if (nodesToScan.length === 0) {
+      toast.info(
+        onlyUnmapped
+          ? "No unmapped equipment nodes to analyze. Uncheck the filter to include mapped nodes."
+          : "No equipment nodes available in the hierarchy to analyze",
+      );
       return;
     }
 
     setLoading(true);
     setSuggestions([]);
     setDrafts({});
-    setLoadingStatus(`Scanning ${Math.min(mappableNodes.length, 200)} equipment nodes...`);
+    setLoadingStatus(`Scanning ${Math.min(nodesToScan.length, 200)} equipment nodes...`);
 
     const progressInterval = setInterval(() => {
       const messages = [
@@ -99,7 +111,7 @@ export function AINewEquipmentTypeSuggestions({
 
     try {
       const payload = {
-        nodes: mappableNodes.slice(0, 200).map((n) => ({
+        nodes: nodesToScan.slice(0, 200).map((n) => ({
           id: n.id,
           name: n.name,
           level: n.level,
@@ -248,13 +260,37 @@ export function AINewEquipmentTypeSuggestions({
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+          {/* Filter row */}
+          <div className="flex items-center gap-3 mb-3 px-1">
+            <label className="flex items-center gap-2 text-sm cursor-pointer bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
+              <input
+                type="checkbox"
+                checked={onlyUnmapped}
+                onChange={(e) => setOnlyUnmapped(e.target.checked)}
+                className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                data-testid="ai-new-types-only-unmapped-toggle"
+              />
+              <span className="text-slate-700 font-medium">Only unmapped nodes</span>
+              <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">
+                {unmappedNodes.length}
+              </span>
+            </label>
+            <span className="text-xs text-slate-500">
+              {onlyUnmapped
+                ? `Scanning ${unmappedNodes.length} nodes without an equipment type`
+                : `Scanning all ${mappableNodes.length} eligible nodes (mapped + unmapped)`}
+            </span>
+          </div>
+
           <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg mb-4">
             <div className="flex items-center gap-6">
               <div>
                 <p className="text-2xl font-bold text-slate-900">
-                  {mappableNodes.length}
+                  {nodesToScan.length}
                 </p>
-                <p className="text-xs text-slate-500">Equipment nodes scanned</p>
+                <p className="text-xs text-slate-500">
+                  {onlyUnmapped ? "Unmapped nodes to scan" : "Nodes to scan"}
+                </p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-purple-600">
@@ -270,7 +306,7 @@ export function AINewEquipmentTypeSuggestions({
 
             <Button
               onClick={fetchSuggestions}
-              disabled={loading || mappableNodes.length === 0}
+              disabled={loading || nodesToScan.length === 0}
               className="bg-purple-600 hover:bg-purple-700"
               data-testid="ai-new-types-run-btn"
             >
@@ -306,7 +342,7 @@ export function AINewEquipmentTypeSuggestions({
                 {loadingStatus || "Discovering new equipment kinds..."}
               </p>
               <p className="text-sm text-slate-400 mt-1">
-                Analyzing {Math.min(mappableNodes.length, 200)} nodes
+                Analyzing {Math.min(nodesToScan.length, 200)} nodes
               </p>
             </div>
           )}
@@ -320,9 +356,11 @@ export function AINewEquipmentTypeSuggestions({
                 Ready to Discover
               </h3>
               <p className="text-sm text-slate-500 max-w-md">
-                {mappableNodes.length > 0
-                  ? `Click "Get AI Suggestions" to scan ${mappableNodes.length} equipment nodes and propose new types missing from your catalog.`
-                  : "Add equipment to your hierarchy first, then come back here to discover missing types."}
+                {nodesToScan.length > 0
+                  ? `Click "Get AI Suggestions" to scan ${nodesToScan.length} ${onlyUnmapped ? "unmapped" : "eligible"} equipment node${nodesToScan.length === 1 ? "" : "s"} and propose new types missing from your catalog.`
+                  : onlyUnmapped && mappableNodes.length > 0
+                    ? "All eligible equipment nodes already have a type. Uncheck the filter above to scan all nodes anyway."
+                    : "Add equipment to your hierarchy first, then come back here to discover missing types."}
               </p>
             </div>
           )}
