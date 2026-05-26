@@ -70,7 +70,8 @@ import BackButton from "../components/BackButton";
 import { EquipmentTypeItem, EquipmentTypeFailureModesPanel, EQUIPMENT_ICONS, ICON_OPTIONS, DISCIPLINES, EQUIPMENT_CATEGORIES, DISCIPLINE_COLORS } from "../components/library";
 import { FailureModeViewPanel } from "../components/library";
 import PMImportWizard from "../components/library/PMImportWizard";
-import { Upload } from "lucide-react";
+import AIFailureModeSuggestions from "../components/library/AIFailureModeSuggestions";
+import { Upload, Sparkles } from "lucide-react";
 
 const categoryIcons = {
   Rotating: Cog,
@@ -140,6 +141,7 @@ const FailureModesPage = () => {
   const [typeFilterDiscipline, setTypeFilterDiscipline] = useState("all"); // Filter for Equipment Types tab
   const [typeFilterNoFailureModes, setTypeFilterNoFailureModes] = useState(false); // Filter to show only types without failure modes
   const [selectedEquipmentType, setSelectedEquipmentType] = useState(null); // For viewing connected failure modes
+  const [isAISuggestionsOpen, setIsAISuggestionsOpen] = useState(false); // AI suggestions dialog
   
   // Failure mode dialog state
   const [isFmDialogOpen, setIsFmDialogOpen] = useState(false);
@@ -981,6 +983,14 @@ const FailureModesPage = () => {
                         ))}
                       </SelectContent>
                     </Select>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => setIsAISuggestionsOpen(true)} 
+                      className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
+                    >
+                      <Sparkles className="w-4 h-4 mr-1" /> AI Suggest
+                    </Button>
                     <Button size="sm" onClick={() => { setEditingType(null); resetTypeForm(); setIsTypeDialogOpen(true); }} data-testid="add-equipment-type-btn">
                       <Plus className="w-4 h-4 mr-1" /> {t("library.addEquipmentType")}
                     </Button>
@@ -1847,6 +1857,19 @@ const FailureModesPage = () => {
           queryClient.invalidateQueries({ queryKey: ["failureModes"] });
           // Don't close immediately - let user see summary, they will click Done
         }}
+      />
+      
+      {/* AI Failure Mode Suggestions Dialog */}
+      <AIFailureModeSuggestions
+        isOpen={isAISuggestionsOpen}
+        onClose={() => setIsAISuggestionsOpen(false)}
+        equipmentTypes={equipmentTypes}
+        failureModes={failureModes}
+        onAcceptSuggestions={() => {
+          queryClient.invalidateQueries({ queryKey: ["failureModes"] });
+          queryClient.invalidateQueries({ queryKey: ["equipmentTypes"] });
+        }}
+        t={t}
       />
     </div>
   );

@@ -277,6 +277,7 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             "/storage/" in request.url.path
             or "/avatar" in request.url.path
             or "/ai/" in request.url.path
+            or "/ai-suggestions" in request.url.path
             or "/import" in request.url.path
             or "/pm-import" in request.url.path
             or "/ai-insights" in request.url.path
