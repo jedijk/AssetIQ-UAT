@@ -67,7 +67,7 @@ import MaintenanceStrategiesPanel from "../components/MaintenanceStrategiesPanel
 import BackButton from "../components/BackButton";
 
 // Extracted components
-import { EquipmentTypeItem, EQUIPMENT_ICONS, ICON_OPTIONS, DISCIPLINES, EQUIPMENT_CATEGORIES, DISCIPLINE_COLORS } from "../components/library";
+import { EquipmentTypeItem, EquipmentTypeFailureModesPanel, EQUIPMENT_ICONS, ICON_OPTIONS, DISCIPLINES, EQUIPMENT_CATEGORIES, DISCIPLINE_COLORS } from "../components/library";
 import { FailureModeViewPanel } from "../components/library";
 import PMImportWizard from "../components/library/PMImportWizard";
 import { Upload } from "lucide-react";
@@ -138,6 +138,7 @@ const FailureModesPage = () => {
   const [editingType, setEditingType] = useState(null);
   const [newType, setNewType] = useState({ id: "", name: "", discipline: "Mechanical", icon: "cog", iso_class: "", category: "rotating" });
   const [typeFilterDiscipline, setTypeFilterDiscipline] = useState("all"); // Filter for Equipment Types tab
+  const [selectedEquipmentType, setSelectedEquipmentType] = useState(null); // For viewing connected failure modes
   
   // Failure mode dialog state
   const [isFmDialogOpen, setIsFmDialogOpen] = useState(false);
@@ -261,6 +262,23 @@ const FailureModesPage = () => {
   // Calculate dynamic stats
   const totalModes = failureModes.length;
   const totalCategories = categories.length;
+  
+  // Calculate connected failure modes count for each equipment type
+  const getConnectedFmCount = (equipmentTypeId) => {
+    return failureModes.filter(fm => 
+      fm.equipment_type_ids?.includes(equipmentTypeId)
+    ).length;
+  };
+  
+  // Handle updating failure mode equipment_type_ids from the equipment type panel
+  const handleUpdateFailureModeConnection = async (fmId, updates) => {
+    try {
+      await failureModesAPI.update(fmId, updates);
+      queryClient.invalidateQueries({ queryKey: ["failureModes"] });
+    } catch (error) {
+      toast.error("Failed to update failure mode connection");
+    }
+  };
   
   // Handle ?fm_id=... param — open the failure mode in the view panel
   // Placed here so `failureModes` and the `setSelectedFm` setter are already declared.
@@ -925,57 +943,82 @@ const FailureModesPage = () => {
 
         {/* Equipment Types Tab */}
         <TabsContent value="libraries" className="space-y-6">
-          <div className="card">
-            <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="font-semibold text-slate-800">{t("library.equipmentTypes")}</h3>
-                <p className="text-xs text-slate-500 mt-1">{equipmentTypes.length} {t("library.typesDefined")}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {/* Discipline Filter */}
-                <Select value={typeFilterDiscipline} onValueChange={setTypeFilterDiscipline}>
-                  <SelectTrigger className="w-[160px] h-9">
-                    <SelectValue placeholder="All Disciplines" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Disciplines</SelectItem>
-                    {DISCIPLINES.map(d => (
-                      <SelectItem key={d} value={d}>{d}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button size="sm" onClick={() => { setEditingType(null); resetTypeForm(); setIsTypeDialogOpen(true); }} data-testid="add-equipment-type-btn">
-                  <Plus className="w-4 h-4 mr-1" /> {t("library.addEquipmentType")}
-                </Button>
-              </div>
-            </div>
-            <div className="p-4 max-h-[calc(100vh-320px)] overflow-y-auto">
-              {/* Group equipment types by discipline */}
-              {DISCIPLINES.filter(d => typeFilterDiscipline === "all" || d === typeFilterDiscipline).map(discipline => {
-                const disciplineTypes = equipmentTypes.filter(t => t.discipline === discipline);
-                if (disciplineTypes.length === 0) return null;
-                const colors = DISCIPLINE_COLORS[discipline] || DISCIPLINE_COLORS["Mechanical"];
-                
-                return (
-                  <div key={discipline} className="mb-6 last:mb-0">
-                    <div className={`flex items-center gap-2 mb-3 px-2 py-1.5 rounded-lg ${colors.bg}`}>
-                      <span className={`text-sm font-semibold ${colors.text}`}>{discipline}</span>
-                      <span className="text-xs text-slate-400">({disciplineTypes.length})</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                      {disciplineTypes.map(t => (
-                        <EquipmentTypeItem 
-                          key={t.id} 
-                          item={t} 
-                          onEdit={handleEditType} 
-                          onDelete={(id) => deleteTypeMutation.mutate(id)} 
-                        />
-                      ))}
-                    </div>
+          <div className="flex gap-4 h-[calc(100vh-280px)]">
+            {/* Left Panel: Equipment Types List */}
+            <div className={`${selectedEquipmentType ? 'w-1/2 lg:w-2/5' : 'w-full'} transition-all duration-300`}>
+              <div className="card h-full flex flex-col">
+                <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold text-slate-800">{t("library.equipmentTypes")}</h3>
+                    <p className="text-xs text-slate-500 mt-1">{equipmentTypes.length} {t("library.typesDefined")} • Click to view connected failure modes</p>
                   </div>
-                );
-              })}
+                  <div className="flex items-center gap-2">
+                    {/* Discipline Filter */}
+                    <Select value={typeFilterDiscipline} onValueChange={setTypeFilterDiscipline}>
+                      <SelectTrigger className="w-[160px] h-9">
+                        <SelectValue placeholder="All Disciplines" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Disciplines</SelectItem>
+                        {DISCIPLINES.map(d => (
+                          <SelectItem key={d} value={d}>{d}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" onClick={() => { setEditingType(null); resetTypeForm(); setIsTypeDialogOpen(true); }} data-testid="add-equipment-type-btn">
+                      <Plus className="w-4 h-4 mr-1" /> {t("library.addEquipmentType")}
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex-1 p-4 overflow-y-auto">
+                  {/* Group equipment types by discipline */}
+                  {DISCIPLINES.filter(d => typeFilterDiscipline === "all" || d === typeFilterDiscipline).map(discipline => {
+                    const disciplineTypes = equipmentTypes.filter(t => t.discipline === discipline);
+                    if (disciplineTypes.length === 0) return null;
+                    const colors = DISCIPLINE_COLORS[discipline] || DISCIPLINE_COLORS["Mechanical"];
+                    
+                    return (
+                      <div key={discipline} className="mb-6 last:mb-0">
+                        <div className={`flex items-center gap-2 mb-3 px-2 py-1.5 rounded-lg ${colors.bg}`}>
+                          <span className={`text-sm font-semibold ${colors.text}`}>{discipline}</span>
+                          <span className="text-xs text-slate-400">({disciplineTypes.length})</span>
+                        </div>
+                        <div className={`grid gap-3 ${selectedEquipmentType ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
+                          {disciplineTypes.map(t => (
+                            <EquipmentTypeItem 
+                              key={t.id} 
+                              item={t} 
+                              onEdit={handleEditType} 
+                              onDelete={(id) => deleteTypeMutation.mutate(id)}
+                              onSelect={setSelectedEquipmentType}
+                              isSelected={selectedEquipmentType?.id === t.id}
+                              connectedFmCount={getConnectedFmCount(t.id)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
+            
+            {/* Right Panel: Connected Failure Modes */}
+            {selectedEquipmentType && (
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="w-1/2 lg:w-3/5 h-full"
+              >
+                <EquipmentTypeFailureModesPanel
+                  equipmentType={selectedEquipmentType}
+                  allFailureModes={failureModes}
+                  onUpdateFailureMode={handleUpdateFailureModeConnection}
+                  onClose={() => setSelectedEquipmentType(null)}
+                  t={t}
+                />
+              </motion.div>
+            )}
           </div>
         </TabsContent>
         
