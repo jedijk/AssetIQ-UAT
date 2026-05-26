@@ -383,7 +383,7 @@ export function AINewFailureModeSuggestions({
                             </div>
                             <div className="md:col-span-3">
                               <label className="text-xs font-medium text-slate-500">
-                                Category
+                                Discipline
                               </label>
                               <Input
                                 value={draft.category || ""}

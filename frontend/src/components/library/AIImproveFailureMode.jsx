@@ -22,7 +22,7 @@ import api from "../../lib/api";
 
 const FIELDS = [
   { key: "failure_mode", label: "Name" },
-  { key: "category", label: "Category" },
+  { key: "category", label: "Discipline" },
   { key: "mechanism", label: "ISO Mechanism" },
   { key: "severity", label: "Severity (S)" },
   { key: "occurrence", label: "Occurrence (O)" },
@@ -181,10 +181,24 @@ export function AIImproveFailureMode({
       return;
     }
     const patch = {};
+    // Parse out the leading PM/CM/PDM marker from an action string.
+    // Accepts: "Vibration trend monitoring (PDM, monthly)" -> {type: "PDM", action: "Vibration trend monitoring"}.
+    // Falls back to PM when no marker is present.
+    const parseActionType = (txt) => {
+      const m = String(txt || "").match(/\s*\((PDM|PM|CM)(?:[,)][^)]*)?\)\s*$/i);
+      if (m) {
+        return {
+          actionType: m[1].toUpperCase(),
+          cleaned: String(txt).slice(0, m.index).trim(),
+        };
+      }
+      return { actionType: "PM", cleaned: String(txt || "").trim() };
+    };
     for (const k of keys) {
       if (k === "recommended_actions") {
-        // Preserve existing per-action metadata when the textual content is preserved;
-        // otherwise emit fresh PM/Mechanical defaults so the field is at least usable.
+        // Preserve existing per-action metadata (discipline, frequency, etc.) when
+        // the textual content matches an existing entry; otherwise build a fresh
+        // entry honouring the (PM|CM|PDM) marker the AI embedded in the text.
         const existingByAction = {};
         for (const a of current.recommended_actions_full || []) {
           if (typeof a === "object") {
@@ -193,11 +207,12 @@ export function AIImproveFailureMode({
           }
         }
         patch[k] = (improved.recommended_actions || []).map((txt) => {
-          const existing = existingByAction[txt.toLowerCase()];
+          const existing = existingByAction[String(txt).toLowerCase()];
           if (existing) return existing;
+          const { actionType, cleaned } = parseActionType(txt);
           return {
-            action: txt,
-            action_type: "PM",
+            action: cleaned || String(txt).trim(),
+            action_type: actionType,
             discipline: "mechanical",
           };
         });
@@ -213,6 +228,23 @@ export function AIImproveFailureMode({
     onClose();
   };
 
+  const parseTypeFromAction = (txt) => {
+    const m = String(txt || "").match(/\s*\((PDM|PM|CM)(?:[,)][^)]*)?\)\s*$/i);
+    if (m) {
+      return {
+        type: m[1].toUpperCase(),
+        label: String(txt).slice(0, m.index).trim(),
+      };
+    }
+    return { type: null, label: String(txt || "").trim() };
+  };
+
+  const ACTION_TYPE_COLORS = {
+    PM: "bg-blue-100 text-blue-700 border-blue-200",
+    CM: "bg-amber-100 text-amber-700 border-amber-200",
+    PDM: "bg-purple-100 text-purple-700 border-purple-200",
+  };
+
   const renderValue = (val, isList, key) => {
     if (isList) {
       const items = Array.isArray(val) ? val : [];
@@ -225,6 +257,46 @@ export function AIImproveFailureMode({
           ? improved.equipment_type_names
           : items
       );
+      // Render recommended_actions with a colored PM/CM/PDM pill
+      if (key === "recommended_actions") {
+        return (
+          <ul className="text-xs text-slate-700 space-y-1">
+            {display.slice(0, 8).map((raw, i) => {
+              let label = raw;
+              let type = null;
+              if (typeof raw === "string") {
+                const parsed = parseTypeFromAction(raw);
+                label = parsed.label || raw;
+                type = parsed.type;
+              } else if (raw && typeof raw === "object") {
+                label = raw.action || raw.description || JSON.stringify(raw);
+                type = (raw.action_type || "").toUpperCase() || null;
+              }
+              return (
+                <li
+                  key={`${key}-${i}`}
+                  className="flex items-start gap-2"
+                >
+                  {type && (
+                    <span
+                      className={`inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded border flex-shrink-0 mt-0.5 ${
+                        ACTION_TYPE_COLORS[type] ||
+                        "bg-slate-100 text-slate-700 border-slate-200"
+                      }`}
+                    >
+                      {type}
+                    </span>
+                  )}
+                  <span className="flex-1">{label}</span>
+                </li>
+              );
+            })}
+            {display.length > 8 && (
+              <li className="text-slate-400">+{display.length - 8} more</li>
+            )}
+          </ul>
+        );
+      }
       return (
         <ul className="list-disc list-inside text-xs text-slate-700 space-y-0.5">
           {display.slice(0, 8).map((x, i) => (
@@ -248,6 +320,10 @@ export function AIImproveFailureMode({
       const names = (current.equipment_type_ids || [])
         .map((id) => equipmentTypeNameById[id] || id);
       return renderValue(names, true, key);
+    }
+    if (isList && key === "recommended_actions") {
+      // Use the structured form so existing action_type pills render correctly
+      return renderValue(current.recommended_actions_full || current.recommended_actions, true, key);
     }
     return renderValue(current[key], isList, key);
   };
@@ -408,10 +484,7 @@ export function AIImproveFailureMode({
                 {FIELDS.map((f) => {
                   const changed = !valEqual(current?.[f.key], improved[f.key]);
                   const isSelected = !!selectedFields[f.key];
-                  const explanation =
-                    changed && improved.field_explanations?.[f.key]
-                      ? improved.field_explanations[f.key]
-                      : null;
+                  const explanation = improved.field_explanations?.[f.key] || null;
                   return (
                     <div
                       key={f.key}
@@ -420,7 +493,7 @@ export function AIImproveFailureMode({
                           ? isSelected
                             ? "border-green-300 bg-green-50/30"
                             : "border-amber-200 bg-amber-50/30"
-                          : "border-slate-200 bg-white opacity-70"
+                          : "border-slate-200 bg-white"
                       }`}
                       data-testid={`ai-improve-fm-row-${f.key}`}
                     >
@@ -466,9 +539,22 @@ export function AIImproveFailureMode({
                             </div>
                           </div>
                           {explanation && (
-                            <div className="px-3 pb-3 pt-1 border-t border-amber-100 bg-amber-50/40">
-                              <p className="text-xs text-amber-900">
-                                <span className="font-semibold">Why: </span>
+                            <div
+                              className={`px-3 pb-3 pt-2 border-t ${
+                                changed
+                                  ? "border-amber-100 bg-amber-50/40"
+                                  : "border-emerald-100 bg-emerald-50/40"
+                              }`}
+                              data-testid={`ai-improve-fm-explanation-${f.key}`}
+                            >
+                              <p
+                                className={`text-xs ${
+                                  changed ? "text-amber-900" : "text-emerald-900"
+                                }`}
+                              >
+                                <span className="font-semibold">
+                                  {changed ? "Why changed: " : "Why kept: "}
+                                </span>
                                 {explanation}
                               </p>
                             </div>

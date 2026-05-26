@@ -1228,6 +1228,16 @@ D. keywords (3-6, lowercase):
 E. potential_effects / potential_causes / recommended_actions (lists):
    - Keep verbatim if the existing list has 3+ specific, well-written entries.
    - Change ONLY when there is a real gap: missing common cause, missing critical effect, vague actions like "check regularly". When changing, preserve good existing entries and add (don't replace).
+   - For `recommended_actions` SPECIFICALLY: aim for a **balanced mix of PM (preventive), CM (corrective) and PDM (predictive)** task types whenever the failure mode supports it.
+     * Always end each action with the type marker in parentheses: "(PM)", "(CM)" or "(PDM)". You may add a frequency hint after, e.g. "(PDM, monthly)" or "(PM, every 6 months)".
+     * Examples of good output:
+         - "Vibration trend monitoring (PDM, monthly)"
+         - "Lubrication analysis (PDM, quarterly)"
+         - "Replace mechanical seal at planned shutdown (PM)"
+         - "Replace bearing on failure (CM)"
+         - "Restart pump with manual reset (CM)"
+     * If the existing list already covers the mix well, keep it verbatim.
+     * If the existing list is heavy on one type (e.g. only PM), ADD complementary PDM / CM actions instead of replacing.
 
 F. equipment_type_ids:
    - Keep existing valid IDs verbatim. Add up to 2 more EXACT IDs from the user's catalog ONLY if the failure mode clearly applies and was previously missing.
@@ -1241,11 +1251,15 @@ OUTPUT REQUIREMENTS:
    - If you changed nothing, return an empty list.
    - NEVER include a bullet for a field you kept verbatim.
 
-2. `field_explanations` (object, keyed by field name):
-   - For EACH field you changed, include a 1-sentence explanation of WHY you changed it.
-   - Allowed keys: "failure_mode", "category", "mechanism", "severity", "occurrence", "detectability", "keywords", "potential_effects", "potential_causes", "recommended_actions", "equipment_type_ids".
-   - Do NOT include a key for any field you kept verbatim.
-   - Example: `"severity": "Lowered from 9 to 7 — typical for non-safety bearing wear on centrifugal pumps."`
+2. `field_explanations` (object, keyed by field name) — REQUIRED FOR EVERY FIELD:
+   - Include a 1-sentence explanation for **every** field in this list:
+     "failure_mode", "category", "mechanism", "severity", "occurrence", "detectability", "keywords", "potential_effects", "potential_causes", "recommended_actions", "equipment_type_ids".
+   - For CHANGED fields: explain WHY you changed it (what was wrong, what is now better).
+     Example: `"severity": "Lowered from 9 to 7 — typical for non-safety bearing wear on centrifugal pumps."`
+   - For UNCHANGED fields: state WHY the current value is already strong with concrete reasoning — reference the specific value, scale, scope or ISO context. Avoid generic phrases like "looks good".
+     Example: `"keywords": "Already covers mechanism (vibration), location (bearing) and equipment context — 4 lowercase terms aligned with ISO 14224 search vocabulary."`
+     Example: `"severity": "S=7 correctly reflects loss-of-containment risk without crossing into catastrophic safety/environmental territory (≥9)."`
+   - Never leave a field out. Never write empty strings.
 
 3. `rationale`: one short sentence summarising the overall direction. If nothing changed, say so plainly (e.g. "Record is already strong; no changes needed.").
 
@@ -1265,7 +1279,8 @@ def _improve_cache_key(fm: ExistingFailureModeFull, et_ids: List[str]) -> str:
         "eq": sorted(fm.equipment_type_ids or []),
         "catalog": sorted(et_ids),
     }, sort_keys=True)
-    return hashlib.md5(f"IMPROVEFM:{fingerprint}".encode()).hexdigest()
+    # Bump version when prompt schema changes so stale cached responses are not reused.
+    return hashlib.md5(f"IMPROVEFM_V2:{fingerprint}".encode()).hexdigest()
 
 
 async def improve_failure_mode_with_ai(
@@ -1343,7 +1358,7 @@ Return JSON:
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0,
-            max_tokens=2500,
+            max_tokens=3500,
             seed=42,
             response_format={"type": "json_object"},
         )

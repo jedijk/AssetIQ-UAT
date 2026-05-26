@@ -543,12 +543,12 @@ export function FailureModeViewPanel({
           </div>
         )}
 
-        {/* Category */}
+        {/* Discipline */}
         <div>
-          <Label className="text-xs text-slate-500 mb-2 block">{t("library.category")}</Label>
+          <Label className="text-xs text-slate-500 mb-2 block">Discipline</Label>
           {isEditing ? (
             <Select value={formData?.category || ""} onValueChange={(v) => setFormData({ ...formData, category: v })}>
-              <SelectTrigger><SelectValue placeholder={t("library.selectCategory")} /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Select discipline" /></SelectTrigger>
               <SelectContent>
                 {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>

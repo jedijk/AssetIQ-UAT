@@ -765,7 +765,7 @@ const FailureModesPage = () => {
               </div>
               <div>
                 <span className="text-lg font-bold text-blue-600">{totalCategories}</span>
-                <span className="text-xs text-slate-500 ml-1">{t("library.categories")}</span>
+                <span className="text-xs text-slate-500 ml-1">Disciplines</span>
               </div>
             </div>
           </div>
@@ -785,10 +785,10 @@ const FailureModesPage = () => {
             <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
               <SelectTrigger className="w-full sm:w-48 h-11" data-testid="category-filter">
                 <Filter className="w-4 h-4 mr-2 text-slate-400" />
-                <SelectValue placeholder={t("library.allCategories")} />
+                <SelectValue placeholder="All Disciplines" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t("library.allCategories")}</SelectItem>
+                <SelectItem value="all">All Disciplines</SelectItem>
                 {DISCIPLINES.map((d) => (
                   <SelectItem key={d} value={d}>{d}</SelectItem>
                 ))}
