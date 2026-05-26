@@ -10,7 +10,6 @@ import {
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { ScrollArea } from "../ui/scroll-area";
 import { Input } from "../ui/input";
 import {
   Dialog,
@@ -321,8 +320,8 @@ export function AINewFailureModeSuggestions({
           )}
 
           {!loading && suggestions.length > 0 && (
-            <ScrollArea className="flex-1 min-h-0">
-              <div className="space-y-3 pr-2 pb-4" data-testid="ai-new-fm-results">
+            <div className="flex-1 overflow-auto min-h-0" data-testid="ai-new-fm-results">
+              <div className="space-y-3 pr-2 pb-4">
                 {suggestions.map((s, idx) => {
                   const draft = drafts[idx] || {};
                   const rpnLive =
@@ -505,7 +504,7 @@ export function AINewFailureModeSuggestions({
                   );
                 })}
               </div>
-            </ScrollArea>
+            </div>
           )}
         </div>
 
