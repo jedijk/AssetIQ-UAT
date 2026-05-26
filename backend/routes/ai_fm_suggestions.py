@@ -6,6 +6,7 @@ Uses OpenAI GPT-4o with deterministic settings for consistent output.
 import os
 import re
 import json
+import asyncio
 import hashlib
 import logging
 from datetime import datetime, timezone
@@ -13,7 +14,7 @@ from typing import List, Dict, Any, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, RateLimitError
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -40,6 +41,40 @@ def get_openai_client():
             raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
         openai_client = AsyncOpenAI(api_key=api_key)
     return openai_client
+
+
+# Retry-after parser: OpenAI 429 error messages include a "Please try again in 9.348s." hint.
+_RETRY_AFTER_RE = re.compile(r"try again in ([\d.]+)s", re.IGNORECASE)
+
+
+async def call_openai_with_retry(client: AsyncOpenAI, *, max_retries: int = 4, **kwargs):
+    """Wrap an OpenAI chat completion call with retry on 429 (TPM rate limit).
+    Honours the wait hint in the error message; falls back to exponential backoff.
+    """
+    delay = 2.0
+    for attempt in range(max_retries):
+        try:
+            return await client.chat.completions.create(**kwargs)
+        except RateLimitError as e:
+            wait = None
+            msg = str(e)
+            m = _RETRY_AFTER_RE.search(msg)
+            if m:
+                try:
+                    wait = float(m.group(1)) + 0.5  # small buffer
+                except ValueError:
+                    wait = None
+            if wait is None:
+                wait = delay
+                delay = min(delay * 2, 30.0)
+            if attempt == max_retries - 1:
+                raise
+            logger.warning(
+                f"OpenAI 429 (attempt {attempt + 1}/{max_retries}); sleeping {wait:.1f}s"
+            )
+            await asyncio.sleep(wait)
+    # Unreachable but keeps type checkers happy
+    raise HTTPException(status_code=503, detail="OpenAI rate-limit retries exhausted")
 
 # ============= Models =============
 
@@ -1307,7 +1342,25 @@ async def improve_failure_mode_with_ai(
 
     client = get_openai_client()
 
-    et_list = [{"id": et.id, "name": et.name, "discipline": et.discipline or ""} for et in equipment_types]
+    # Shrink the catalog so each request stays under ~3k prompt tokens (vs ~5k before).
+    # Priority: 1) existing ET ids already on the FM, 2) ETs sharing the FM's discipline.
+    fm_discipline = (fm.category or "").strip().lower()
+    existing_ids = set(fm.equipment_type_ids or [])
+    primary = [et for et in equipment_types if et.id in existing_ids]
+    secondary = [
+        et for et in equipment_types
+        if et.id not in existing_ids and (et.discipline or "").strip().lower() == fm_discipline
+    ]
+    fallback = [
+        et for et in equipment_types
+        if et.id not in existing_ids and (et.discipline or "").strip().lower() != fm_discipline
+    ]
+    trimmed_types = (primary + secondary + fallback)[:40]
+
+    et_list = [
+        {"id": et.id, "name": et.name, "discipline": et.discipline or ""}
+        for et in trimmed_types
+    ]
     fm_payload = {
         "failure_mode": fm.failure_mode,
         "category": fm.category or "",
@@ -1351,7 +1404,8 @@ Return JSON:
 }}"""
 
     try:
-        response = await client.chat.completions.create(
+        response = await call_openai_with_retry(
+            client,
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": IMPROVE_FAILURE_MODE_SYSTEM_PROMPT},
@@ -1458,6 +1512,12 @@ Return JSON:
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse AI improve-FM response: {e}")
         raise HTTPException(status_code=500, detail="Failed to parse AI response")
+    except RateLimitError as e:
+        logger.error(f"AI improve-FM rate limit exhausted: {e}")
+        raise HTTPException(
+            status_code=429,
+            detail="OpenAI rate limit. Please slow the bulk run or try again in a minute.",
+        )
     except Exception as e:
         logger.error(f"AI improve-FM error: {e}")
         raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")

@@ -21,7 +21,9 @@ import {
 import { toast } from "sonner";
 import api from "../../lib/api";
 
-const CONCURRENCY = 4;
+const CONCURRENCY = 2;
+// Light backoff between worker iterations to stay under TPM rate limits.
+const INTER_CALL_DELAY_MS = 300;
 const FIELD_KEYS = [
   "failure_mode",
   "category",
@@ -235,22 +237,45 @@ export function BulkImproveFailureModes({
         const fm = failureModes[idx];
         stats.current = fm.failure_mode;
         flush();
-        try {
-          const res = await processOne(fm, etPayload);
-          if (res.action === "updated") stats.updated += 1;
-          else stats.skipped += 1;
-        } catch (e) {
-          stats.failed += 1;
-          stats.errors.push({
-            name: fm.failure_mode,
-            detail:
-              e.response?.data?.detail ||
-              e.message ||
-              "unknown error",
-          });
-        } finally {
-          stats.processed += 1;
-          flush();
+        // Per-FM retry on 429 (TPM rate limit) — the backend already retries
+        // internally but a hard exhaustion bubbles up as 429 and we want to
+        // pause+retry on the client side too.
+        let attempt = 0;
+        const maxAttempts = 3;
+        while (attempt < maxAttempts && !cancelRef.current) {
+          try {
+            const res = await processOne(fm, etPayload);
+            if (res.action === "updated") stats.updated += 1;
+            else stats.skipped += 1;
+            break;
+          } catch (e) {
+            const status = e.response?.status;
+            const isRateLimited =
+              status === 429 ||
+              /rate.?limit|429/i.test(e.response?.data?.detail || e.message || "");
+            attempt += 1;
+            if (isRateLimited && attempt < maxAttempts) {
+              const wait = 10 + attempt * 5; // 10s, 15s, 20s
+              stats.current = `Rate limited, waiting ${wait}s...`;
+              flush();
+              await new Promise((r) => setTimeout(r, wait * 1000));
+              continue;
+            }
+            stats.failed += 1;
+            stats.errors.push({
+              name: fm.failure_mode,
+              detail:
+                e.response?.data?.detail ||
+                e.message ||
+                "unknown error",
+            });
+            break;
+          }
+        }
+        stats.processed += 1;
+        flush();
+        if (INTER_CALL_DELAY_MS > 0 && !cancelRef.current) {
+          await new Promise((r) => setTimeout(r, INTER_CALL_DELAY_MS));
         }
       }
     };
