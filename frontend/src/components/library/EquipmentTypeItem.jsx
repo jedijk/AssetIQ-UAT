@@ -42,31 +42,43 @@ export const ICON_OPTIONS = [
   "move", "move-horizontal", "arrow-up-down", "filter", "circle"
 ];
 
-// Standardized disciplines aligned with ISO 14224
+// Standardized disciplines - MUST match /app/frontend/src/constants/disciplines.js
+// To customize disciplines, update both this file and the constants file
 export const DISCIPLINES = [
-  "Mechanical",
+  "Rotating",
+  "Static",
+  "Piping",
   "Electrical", 
   "Instrumentation",
-  "Static Equipment",
-  "Safety"
+  "Civil",
+  "Operations",
+  "Laboratory"
 ];
 
-// Equipment categories
+// Equipment categories for ISO 14224 classification
 export const EQUIPMENT_CATEGORIES = [
   "rotating",
   "static", 
-  "control",
-  "safety",
-  "electrical"
+  "piping",
+  "electrical",
+  "instrumentation",
+  "civil"
 ];
 
-// Discipline colors for visual grouping
+// Discipline colors for visual grouping - matches the disciplines above
 export const DISCIPLINE_COLORS = {
-  "Mechanical": { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", icon: "text-blue-600" },
+  "Rotating": { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", icon: "text-blue-600" },
+  "Static": { bg: "bg-slate-50", text: "text-slate-700", border: "border-slate-200", icon: "text-slate-600" },
+  "Piping": { bg: "bg-teal-50", text: "text-teal-700", border: "border-teal-200", icon: "text-teal-600" },
   "Electrical": { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200", icon: "text-amber-600" },
   "Instrumentation": { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-200", icon: "text-purple-600" },
+  "Civil": { bg: "bg-orange-50", text: "text-orange-700", border: "border-orange-200", icon: "text-orange-600" },
+  "Operations": { bg: "bg-green-50", text: "text-green-700", border: "border-green-200", icon: "text-green-600" },
+  "Laboratory": { bg: "bg-cyan-50", text: "text-cyan-700", border: "border-cyan-200", icon: "text-cyan-600" },
+  // Legacy support - map old names to new colors
+  "Mechanical": { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200", icon: "text-blue-600" },
   "Static Equipment": { bg: "bg-slate-50", text: "text-slate-700", border: "border-slate-200", icon: "text-slate-600" },
-  "Safety": { bg: "bg-red-50", text: "text-red-700", border: "border-red-200", icon: "text-red-600" }
+  "Safety": { bg: "bg-red-50", text: "text-red-700", border: "border-red-200", icon: "text-red-600" },
 };
 
 export function EquipmentTypeItem({ item, onEdit, onDelete, onSelect, isSelected, connectedFmCount = 0 }) {

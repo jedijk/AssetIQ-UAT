@@ -98,19 +98,17 @@ def is_valid_parent_child(parent_level: ISOLevel, child_level: ISOLevel) -> bool
     return valid_parent == norm_parent
 
 # Discipline categories - Unified across the application
+# These are the standardized disciplines used for equipment types, actions, and tasks
+# To customize: Update this enum and the DISCIPLINE_COLORS in frontend
 class Discipline(str, Enum):
-    MECHANICAL = "Mechanical"
+    ROTATING = "Rotating"
+    STATIC = "Static"
+    PIPING = "Piping"
     ELECTRICAL = "Electrical"
     INSTRUMENTATION = "Instrumentation"
-    PROCESS = "Process"
+    CIVIL = "Civil"
     OPERATIONS = "Operations"
-    MAINTENANCE = "Maintenance"
-    SAFETY = "Safety"
-    INSPECTION = "Inspection"
-    RELIABILITY = "Reliability"
-    ROTATING_EQUIPMENT = "Rotating Equipment"
-    STATIC_EQUIPMENT = "Static Equipment"
-    MULTI_DISCIPLINE = "Multi-discipline"
+    LABORATORY = "Laboratory"
 
 # Criticality levels
 class CriticalityLevel(str, Enum):
