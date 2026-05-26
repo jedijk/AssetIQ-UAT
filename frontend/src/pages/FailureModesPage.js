@@ -74,6 +74,7 @@ import AIFailureModeSuggestions from "../components/library/AIFailureModeSuggest
 import AINewEquipmentTypeSuggestions from "../components/library/AINewEquipmentTypeSuggestions";
 import AINewFailureModeSuggestions from "../components/library/AINewFailureModeSuggestions";
 import AIImproveFailureMode from "../components/library/AIImproveFailureMode";
+import BulkImproveFailureModes from "../components/library/BulkImproveFailureModes";
 import { Upload, Sparkles } from "lucide-react";
 
 const disciplineIcons = {
@@ -149,6 +150,7 @@ const FailureModesPage = () => {
   const [isAINewTypesOpen, setIsAINewTypesOpen] = useState(false); // AI suggest NEW equipment types
   const [isAINewFmOpen, setIsAINewFmOpen] = useState(false); // AI suggest NEW failure modes
   const [isAIImproveOpen, setIsAIImproveOpen] = useState(false); // AI improve a single failure mode
+  const [isBulkImproveOpen, setIsBulkImproveOpen] = useState(false); // Bulk improve all visible
   
   // Failure mode dialog state
   const [isFmDialogOpen, setIsFmDialogOpen] = useState(false);
@@ -892,6 +894,17 @@ const FailureModesPage = () => {
             >
               <Sparkles className="w-4 h-4 mr-1" />
               Suggest Failure Modes
+            </Button>
+            <Button
+              onClick={() => setIsBulkImproveOpen(true)}
+              variant="outline"
+              className="h-11 border-purple-200 text-purple-700 hover:bg-purple-50"
+              data-testid="bulk-improve-fm-btn"
+              disabled={displayedFailureModes.length === 0}
+              title={`Run AI improvement and auto-apply changes for the ${displayedFailureModes.length} visible failure mode(s)`}
+            >
+              <Sparkles className="w-4 h-4 mr-1" />
+              Bulk Improve ({displayedFailureModes.length})
             </Button>
             <Button onClick={() => { setEditingFm(null); resetFmForm(); setIsFmDialogOpen(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-failure-mode-btn">
               <Plus className="w-4 h-4 mr-1" /> {t("library.addFailureMode")}
@@ -2015,6 +2028,17 @@ const FailureModesPage = () => {
         failureMode={selectedFm}
         equipmentTypes={equipmentTypes}
         onApply={handleApplyAIImprovement}
+      />
+
+      {/* Bulk Improve Failure Modes with AI */}
+      <BulkImproveFailureModes
+        isOpen={isBulkImproveOpen}
+        onClose={() => setIsBulkImproveOpen(false)}
+        failureModes={displayedFailureModes}
+        equipmentTypes={equipmentTypes}
+        onCompleted={() => {
+          queryClient.invalidateQueries({ queryKey: ["failureModes"] });
+        }}
       />
     </div>
   );
