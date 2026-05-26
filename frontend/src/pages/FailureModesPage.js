@@ -963,50 +963,56 @@ const FailureModesPage = () => {
             {/* Left Panel: Equipment Types List */}
             <div className={`${selectedEquipmentType ? 'w-1/2 lg:w-2/5' : 'w-full'} transition-all duration-300`}>
               <div className="card h-full flex flex-col">
-                <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h3 className="font-semibold text-slate-800">{t("library.equipmentTypes")}</h3>
-                    <p className="text-xs text-slate-500 mt-1">{equipmentTypes.length} {t("library.typesDefined")} • Click to view connected failure modes</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {/* Filter: No Failure Modes */}
-                    <label className="flex items-center gap-2 text-sm cursor-pointer bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={typeFilterNoFailureModes}
-                        onChange={(e) => setTypeFilterNoFailureModes(e.target.checked)}
-                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-slate-600 whitespace-nowrap">No failure modes</span>
-                      {typeFilterNoFailureModes && (
-                        <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
-                          {equipmentTypes.filter(t => getConnectedFmCount(t.id) === 0).length}
-                        </span>
-                      )}
-                    </label>
-                    {/* Discipline Filter */}
-                    <Select value={typeFilterDiscipline} onValueChange={setTypeFilterDiscipline}>
-                      <SelectTrigger className="w-[160px] h-9">
-                        <SelectValue placeholder="All Disciplines" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Disciplines</SelectItem>
-                        {DISCIPLINES.map(d => (
-                          <SelectItem key={d} value={d}>{d}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => setIsAISuggestionsOpen(true)} 
-                      className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
-                    >
-                      <Sparkles className="w-4 h-4 mr-1" /> AI Suggest
-                    </Button>
-                    <Button size="sm" onClick={() => { setEditingType(null); resetTypeForm(); setIsTypeDialogOpen(true); }} data-testid="add-equipment-type-btn">
-                      <Plus className="w-4 h-4 mr-1" /> {t("library.addEquipmentType")}
-                    </Button>
+                <div className="p-4 border-b border-slate-200">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold text-slate-800">{t("library.equipmentTypes")}</h3>
+                        <p className="text-xs text-slate-500 mt-1">{equipmentTypes.length} {t("library.typesDefined")} • Click to view connected failure modes</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => setIsAISuggestionsOpen(true)} 
+                          className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
+                        >
+                          <Sparkles className="w-4 h-4 mr-1" /> AI Suggest
+                        </Button>
+                        <Button size="sm" onClick={() => { setEditingType(null); resetTypeForm(); setIsTypeDialogOpen(true); }} data-testid="add-equipment-type-btn">
+                          <Plus className="w-4 h-4 mr-1" /> Add Type
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Filter: No Failure Modes */}
+                      <label className="flex items-center gap-2 text-sm cursor-pointer bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={typeFilterNoFailureModes}
+                          onChange={(e) => setTypeFilterNoFailureModes(e.target.checked)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-slate-600 whitespace-nowrap">No failure modes</span>
+                        {typeFilterNoFailureModes && (
+                          <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
+                            {equipmentTypes.filter(t => getConnectedFmCount(t.id) === 0).length}
+                          </span>
+                        )}
+                      </label>
+                      {/* Discipline Filter */}
+                      <Select value={typeFilterDiscipline} onValueChange={setTypeFilterDiscipline}>
+                        <SelectTrigger className="w-[150px] h-9">
+                          <SelectValue placeholder="All Disciplines" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Disciplines</SelectItem>
+                          {DISCIPLINES.map(d => (
+                            <SelectItem key={d} value={d}>{d}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
                 <div className="flex-1 p-4 overflow-y-auto">
