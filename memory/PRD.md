@@ -4,9 +4,15 @@
 Create a robust full-stack platform optimized for multi-environment execution with dynamic database switching, advanced form capabilities, seamless AI integrations, GDPR compliance, version-controlled PWAs, comprehensive log ingestion, and automated data processing.
 
 ## Current Version
-**v3.6.0** (Updated: April 2026)
+**v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [May 26, 2026] **AI Failure Mode Suggestions — Deterministic Output (VERIFIED)**:
+  - Persistent Mongo-backed cache (`ai_fm_suggestion_cache`) layered on top of in-memory cache in `/app/backend/routes/ai_fm_suggestions.py`
+  - Identical inputs now return identical AI suggestions across server restarts (OpenAI's `seed` alone is best-effort and was not bit-exact in practice)
+  - Deduplicated `failure_mode_id` within each equipment type's suggestions list (no more duplicate "Bearing Failure" entries)
+  - `POST /api/ai-suggestions/clear-cache` now also purges the persisted Mongo collection
+  - Verified: 4 calls (incl. backend restart) all returned identical MD5 hashes; first call 14.8s, cached calls 0.4s
 - [Apr 25, 2026] **Reprint Label from Form Submissions** (VERIFIED):
   - Each submission row in `/form-submissions` and `/tasks?tab=forms` now shows a printer icon when (and only when) the source form template has `label_print_config.enabled` and a `label_template_id`
   - Clicking the icon reprints the label for that submission via the existing `printLabel` flow (PDF on desktop, HTML on iOS/mobile)

@@ -7,6 +7,7 @@ import os
 import json
 import hashlib
 import logging
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
 from fastapi import APIRouter, HTTPException
@@ -17,13 +18,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from iso14224_models import EQUIPMENT_TYPES
+from database import db
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ai-suggestions", tags=["AI Suggestions"])
 
-# Simple cache for deterministic results
+# In-memory cache (per-process). Backed by Mongo for cross-restart persistence.
 _suggestion_cache: Dict[str, Any] = {}
+_CACHE_COLLECTION = "ai_fm_suggestion_cache"
 
 # Initialize OpenAI client
 openai_client = None
@@ -99,17 +102,29 @@ async def get_ai_suggestions(
     equipment_types: List[Dict[str, Any]],
     failure_modes: List[Dict[str, Any]]
 ) -> List[EquipmentTypeSuggestions]:
-    """Use OpenAI GPT-4o with deterministic settings."""
-    
-    # Check cache first
+    """Use OpenAI GPT-4o with deterministic settings and persistent cache."""
+
+    # Build cache key from equipment + failure mode IDs (order-independent).
     eq_ids = [eq.get("id") for eq in equipment_types]
     fm_ids = [fm.get("id") for fm in failure_modes]
     cache_key = get_cache_key(eq_ids, fm_ids)
-    
+
+    # 1) In-memory cache (fastest)
     if cache_key in _suggestion_cache:
-        logger.info(f"Returning cached suggestions for key: {cache_key[:8]}")
+        logger.info(f"Returning in-memory cached suggestions for key: {cache_key[:8]}")
         return _suggestion_cache[cache_key]
-    
+
+    # 2) MongoDB-persisted cache (survives restarts -> consistent results forever)
+    try:
+        cached_doc = await db[_CACHE_COLLECTION].find_one({"_id": cache_key})
+        if cached_doc and "suggestions" in cached_doc:
+            suggestions = [EquipmentTypeSuggestions(**s) for s in cached_doc["suggestions"]]
+            _suggestion_cache[cache_key] = suggestions
+            logger.info(f"Returning Mongo-cached suggestions for key: {cache_key[:8]}")
+            return suggestions
+    except Exception as e:
+        logger.warning(f"Cache lookup failed (non-fatal): {e}")
+
     client = get_openai_client()
     
     # Prepare data in minimal format
@@ -164,10 +179,14 @@ Return JSON:
         suggestions = []
         for item in result.get("suggestions", []):
             fm_suggestions = []
+            seen_fm_ids = set()  # deduplicate within a single equipment type
             for fm in item.get("suggested_failure_modes", []):
                 fm_id = fm.get("failure_mode_id")
-                # Validate ID exists
+                if not fm_id or fm_id in seen_fm_ids:
+                    continue
+                # Validate ID exists in input
                 if any(f["id"] == fm_id for f in fm_list):
+                    seen_fm_ids.add(fm_id)
                     fm_suggestions.append(FailureModeSuggestion(
                         failure_mode_id=fm_id,
                         failure_mode_name=fm.get("failure_mode_name", ""),
@@ -186,9 +205,22 @@ Return JSON:
                     ai_reasoning=item.get("ai_reasoning", "")
                 ))
         
-        # Cache the result
+        # Cache the result (in-memory + Mongo)
         _suggestion_cache[cache_key] = suggestions
-        
+        try:
+            await db[_CACHE_COLLECTION].update_one(
+                {"_id": cache_key},
+                {"$set": {
+                    "suggestions": [s.model_dump() for s in suggestions],
+                    "equipment_type_ids": sorted(eq_ids),
+                    "failure_mode_ids": sorted(fm_ids),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }},
+                upsert=True,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to persist suggestions to Mongo cache (non-fatal): {e}")
+
         return suggestions
         
     except json.JSONDecodeError as e:
@@ -229,11 +261,17 @@ async def suggest_failure_modes(request: SuggestFailureModesRequest):
 
 @router.post("/clear-cache")
 async def clear_suggestion_cache():
-    """Clear the suggestion cache to force fresh AI results."""
+    """Clear both in-memory and Mongo-persisted suggestion cache."""
     global _suggestion_cache
-    count = len(_suggestion_cache)
+    mem_count = len(_suggestion_cache)
     _suggestion_cache = {}
-    return {"message": f"Cleared {count} cached suggestions"}
+    try:
+        result = await db[_CACHE_COLLECTION].delete_many({})
+        mongo_count = result.deleted_count
+    except Exception as e:
+        logger.warning(f"Failed to clear Mongo cache (non-fatal): {e}")
+        mongo_count = 0
+    return {"message": f"Cleared {mem_count} in-memory and {mongo_count} persisted suggestions"}
 
 
 @router.get("/equipment-types-without-fm")
