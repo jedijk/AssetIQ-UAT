@@ -4,6 +4,7 @@ Uses OpenAI GPT-4o with deterministic settings for consistent output.
 """
 
 import os
+import re
 import json
 import hashlib
 import logging
@@ -354,9 +355,13 @@ EQUIPMENT_TYPE_MAPPING_SYSTEM_PROMPT = """You are an industrial reliability engi
 STRICT RULES:
 
 1. NAME MATCHING (primary):
-   - Use the node's name, tag and description to infer the equipment kind.
-   - Examples: "P-101 Feed Pump" → Centrifugal Pump. "V-201 Knock-Out Drum" → Pressure Vessel. "E-301 Heat Exchanger" → Heat Exchanger.
-   - Ignore plant codes, numbering, or unit prefixes (P-101, V-201, etc.) and focus on the descriptive words.
+   - Use ONLY the node's `name` and `description` to infer the equipment kind. DO NOT use, infer from, or reason about any numeric or alphanumeric plant tag/identifier.
+   - Plant tags such as "P-101", "V-201", "1C-1005-0031", "1E-4001" carry NO classification value. If anything in the name still looks like a tag (e.g. a leading code like "1C-1005-0031 Pump"), ignore that portion entirely and reason only on the descriptive words that follow ("Pump").
+   - Examples of correct reasoning:
+       * "1C-1005-0031 Screw Motor Reductor" → reason on "Screw Motor Reductor" only → Gearbox.
+       * "P-101 Feed Pump" → reason on "Feed Pump" only → Centrifugal Pump.
+       * "V-201 Knock-Out Drum" → reason on "Knock-Out Drum" only → Pressure Vessel.
+   - NEVER let the tag or numbering influence the discipline, confidence, or reasoning.
 
 2. DISCIPLINE COHERENCE:
    - Rotating: pumps, compressors, fans, blowers, gearboxes, motors, turbines.
@@ -375,15 +380,44 @@ STRICT RULES:
    - For each node: pick at most ONE best_match. Optionally include up to 2 alternatives, each with their own confidence and reasoning.
    - Use EXACT equipment_type IDs from the catalog. Never invent IDs.
    - If nothing reasonable matches (confidence < 0.70 for all), return best_match: null and alternatives: [].
+   - The `reasoning` text MUST NOT quote or reference the plant tag.
 
 Return ONLY valid JSON. No prose outside JSON."""
 
 
+# Strips a leading plant-tag-like prefix from an equipment node name so the AI
+# never sees codes such as "1C-1005-0031" in the descriptive name.
+# Matches:
+#   - Tokens whose first char is a digit and contains at least one '-', '.' or '/'
+#   - Short uppercase-letter+digit codes joined by '-' or '.' (e.g. "P-101", "V-201")
+_TAG_PREFIX_RE = re.compile(
+    r"^\s*(?:"
+    r"[0-9][A-Za-z0-9]*(?:[-./][A-Za-z0-9]+)+"      # 1C-1005-0031, 12.5-PR-001
+    r"|[A-Za-z]{1,3}[-.][0-9][A-Za-z0-9-./]*"        # P-101, V-201, E-301, TI-1234A
+    r")\s+"
+)
+
+
+def strip_tag_prefix(name: str) -> str:
+    """Remove any leading plant-tag-like prefix from a node name."""
+    if not name:
+        return name
+    cleaned = _TAG_PREFIX_RE.sub("", name, count=1).strip()
+    # Safety: never return an empty string — if stripping consumed the whole name,
+    # fall back to the original.
+    return cleaned or name.strip()
+
+
 def get_mapping_cache_key(nodes: List[EquipmentNodeInput], et_ids: List[str]) -> str:
-    """Cache key includes node descriptors so renames bust the cache."""
-    node_keys = sorted([f"{n.id}|{n.name}|{n.level or ''}|{n.tag or ''}" for n in nodes])
+    """Cache key includes the *cleaned* node descriptors so renames bust the cache,
+    but plant-tag changes alone (which are ignored by the AI) do NOT."""
+    node_keys = sorted([
+        f"{n.id}|{strip_tag_prefix(n.name)}|{n.level or ''}"
+        for n in nodes
+    ])
     type_keys = sorted(et_ids)
-    return hashlib.md5(f"ETMAP:{node_keys}:{type_keys}".encode()).hexdigest()
+    # Bump the namespace prefix to invalidate caches built with the old tag-aware key.
+    return hashlib.md5(f"ETMAP_V2:{node_keys}:{type_keys}".encode()).hexdigest()
 
 
 async def get_equipment_type_mapping_suggestions(
@@ -414,11 +448,12 @@ async def get_equipment_type_mapping_suggestions(
     node_list = [
         {
             "id": n.id,
-            "name": n.name,
+            # Strip leading plant-tag prefixes so the AI cannot be confused
+            # by codes like "1C-1005-0031 Pump" → seen as "Pump".
+            "name": strip_tag_prefix(n.name),
             "level": n.level or "",
-            "tag": n.tag or "",
-            "description": (n.description or "")[:200],
-            "parent": n.parent_name or "",
+            "description": strip_tag_prefix(n.description or "")[:200],
+            "parent": strip_tag_prefix(n.parent_name or ""),
         }
         for n in nodes
     ]
