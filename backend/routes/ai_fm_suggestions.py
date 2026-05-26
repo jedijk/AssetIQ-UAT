@@ -1,13 +1,13 @@
 """
 AI-powered failure mode suggestions for equipment types.
-Uses OpenAI GPT-4o to intelligently map failure modes to equipment types.
+Uses OpenAI GPT-4o with deterministic settings for consistent output.
 """
 
 import os
 import json
+import hashlib
 import logging
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -21,6 +21,9 @@ from iso14224_models import EQUIPMENT_TYPES
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ai-suggestions", tags=["AI Suggestions"])
+
+# Simple cache for deterministic results
+_suggestion_cache: Dict[str, Any] = {}
 
 # Initialize OpenAI client
 openai_client = None
@@ -40,7 +43,7 @@ class FailureModeSuggestion(BaseModel):
     failure_mode_id: str
     failure_mode_name: str
     category: str
-    confidence: float  # 0.0 - 1.0
+    confidence: float
     reasoning: str
     rpn: Optional[int] = None
 
@@ -61,98 +64,87 @@ class SuggestFailureModesResponse(BaseModel):
 
 # ============= AI Service =============
 
-SYSTEM_PROMPT = """You are an expert industrial reliability engineer with 20+ years of experience in FMEA (Failure Mode and Effects Analysis) and ISO 14224 standards for oil & gas, petrochemical, and process industries.
+SYSTEM_PROMPT = """You are an industrial reliability engineer. Your task is to map failure modes to equipment types.
 
-Your task: Map failure modes to equipment types based on technical relevance.
+STRICT RULES - Follow exactly:
 
-SCORING CRITERIA FOR CONFIDENCE:
-- 0.95-1.0: Direct, well-known failure mode for this exact equipment type (e.g., "Bearing Failure" for "Centrifugal Pump")
-- 0.85-0.94: Highly relevant failure mode common in this equipment category (e.g., "Seal Leakage" for pumps)
-- 0.75-0.84: Relevant failure mode that can occur in this equipment type
-- 0.65-0.74: Possible failure mode with some technical relevance
-- Below 0.65: Do not include
+1. DISCIPLINE MATCHING (primary criteria):
+   - Rotating equipment → ONLY failures related to: bearings, seals, vibration, imbalance, lubrication, shaft, impeller, motor
+   - Static equipment → ONLY failures related to: corrosion, erosion, fatigue, cracking, fouling, leakage, blockage
+   - Piping/Valves → ONLY failures related to: leakage, blockage, erosion, corrosion, valve stuck, actuator
+   - Electrical → ONLY failures related to: insulation, overheating, short circuit, open circuit, contact failure
+   - Instrumentation → ONLY failures related to: calibration, drift, signal loss, sensor failure, communication
 
-DISCIPLINE MATCHING RULES:
-- Rotating equipment: bearing failures, vibration, imbalance, seal issues, lubrication
-- Static equipment: corrosion, erosion, fatigue, cracking, fouling
-- Piping/Valves: leakage, blockage, erosion, corrosion, actuator failures
-- Electrical: insulation breakdown, overheating, contact failures, motor issues
-- Instrumentation: calibration drift, signal loss, sensor failures, communication errors
+2. CONFIDENCE SCORING (be conservative):
+   - 0.90-0.95: Exact match (e.g., "Bearing Failure" for "Centrifugal Pump")
+   - 0.80-0.89: Strong match (same equipment category)
+   - 0.70-0.79: Good match (related equipment type)
+   - Below 0.70: Do not include
 
-IMPORTANT:
-- Use ONLY the failure_mode_id values provided in the input
-- Match by technical relevance, not just keyword matching
-- Each equipment type should have 3-8 relevant failure modes
-- Provide specific technical reasoning for each suggestion
+3. OUTPUT REQUIREMENTS:
+   - Return 4-6 failure modes per equipment type (no more, no less)
+   - Sort by confidence descending
+   - Use EXACT IDs from the input lists
 
-OUTPUT FORMAT: Return ONLY valid JSON, no markdown code blocks."""
+Return ONLY valid JSON. No explanations outside JSON."""
+
+
+def get_cache_key(equipment_ids: List[str], fm_ids: List[str]) -> str:
+    """Generate a deterministic cache key."""
+    key_str = f"{sorted(equipment_ids)}:{sorted(fm_ids)}"
+    return hashlib.md5(key_str.encode()).hexdigest()
 
 
 async def get_ai_suggestions(
     equipment_types: List[Dict[str, Any]],
     failure_modes: List[Dict[str, Any]]
 ) -> List[EquipmentTypeSuggestions]:
-    """Use OpenAI GPT-4o to suggest failure mode mappings for equipment types."""
+    """Use OpenAI GPT-4o with deterministic settings."""
+    
+    # Check cache first
+    eq_ids = [eq.get("id") for eq in equipment_types]
+    fm_ids = [fm.get("id") for fm in failure_modes]
+    cache_key = get_cache_key(eq_ids, fm_ids)
+    
+    if cache_key in _suggestion_cache:
+        logger.info(f"Returning cached suggestions for key: {cache_key[:8]}")
+        return _suggestion_cache[cache_key]
     
     client = get_openai_client()
     
-    # Prepare failure modes in a cleaner format
-    fm_list = []
-    for fm in failure_modes:
-        fm_list.append({
-            "id": fm.get("id"),
-            "name": fm.get("failure_mode"),
-            "category": fm.get("category"),
-            "keywords": fm.get("keywords", [])[:3],
-            "rpn": fm.get("severity", 5) * fm.get("occurrence", 5) * fm.get("detectability", 5)
-        })
+    # Prepare data in minimal format
+    fm_list = [
+        {"id": fm.get("id"), "name": fm.get("failure_mode"), "category": fm.get("category")}
+        for fm in failure_modes
+    ]
     
-    # Prepare equipment types
-    eq_list = []
-    for eq in equipment_types:
-        eq_list.append({
-            "id": eq.get("id"),
-            "name": eq.get("name"),
-            "discipline": eq.get("discipline"),
-            "category": eq.get("category")
-        })
+    eq_list = [
+        {"id": eq.get("id"), "name": eq.get("name"), "discipline": eq.get("discipline")}
+        for eq in equipment_types
+    ]
     
-    # Build a structured prompt
-    user_prompt = f"""TASK: For each equipment type below, select the most technically relevant failure modes from the provided list.
+    user_prompt = f"""Map failure modes to equipment types.
 
-EQUIPMENT TYPES TO ANALYZE:
+EQUIPMENT TYPES:
 {json.dumps(eq_list, indent=2)}
 
-AVAILABLE FAILURE MODES (use these exact IDs):
+FAILURE MODES (use exact IDs):
 {json.dumps(fm_list, indent=2)}
 
-Return JSON in this exact structure:
+Return JSON:
 {{
   "suggestions": [
     {{
-      "equipment_type_id": "<exact id from equipment list>",
+      "equipment_type_id": "<id>",
       "equipment_type_name": "<name>",
       "discipline": "<discipline>",
-      "ai_reasoning": "<1-2 sentence explanation of mapping strategy>",
+      "ai_reasoning": "<1 sentence>",
       "suggested_failure_modes": [
-        {{
-          "failure_mode_id": "<exact id from failure modes list>",
-          "failure_mode_name": "<name>",
-          "category": "<category>",
-          "confidence": <0.65-1.0>,
-          "reasoning": "<specific technical reason why this failure applies>",
-          "rpn": <rpn value>
-        }}
+        {{"failure_mode_id": "<id>", "failure_mode_name": "<name>", "category": "<cat>", "confidence": 0.85, "reasoning": "<why>"}}
       ]
     }}
   ]
-}}
-
-Rules:
-1. Use EXACT IDs from the provided lists
-2. Include 3-8 failure modes per equipment type
-3. Only include if confidence >= 0.65
-4. Sort by confidence descending"""
+}}"""
 
     try:
         response = await client.chat.completions.create(
@@ -161,40 +153,41 @@ Rules:
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.1,  # Very low temperature for consistent output
+            temperature=0,  # Completely deterministic
             max_tokens=4000,
-            response_format={"type": "json_object"}  # Force JSON output
+            seed=42,  # Fixed seed for reproducibility
+            response_format={"type": "json_object"}
         )
         
-        response_text = response.choices[0].message.content.strip()
-        
-        # Parse JSON response
-        result = json.loads(response_text)
+        result = json.loads(response.choices[0].message.content.strip())
         
         suggestions = []
         for item in result.get("suggestions", []):
             fm_suggestions = []
             for fm in item.get("suggested_failure_modes", []):
-                # Validate that the failure_mode_id exists in our list
                 fm_id = fm.get("failure_mode_id")
+                # Validate ID exists
                 if any(f["id"] == fm_id for f in fm_list):
                     fm_suggestions.append(FailureModeSuggestion(
                         failure_mode_id=fm_id,
                         failure_mode_name=fm.get("failure_mode_name", ""),
                         category=fm.get("category", ""),
-                        confidence=min(1.0, max(0.0, fm.get("confidence", 0.7))),
+                        confidence=min(0.95, max(0.70, fm.get("confidence", 0.8))),
                         reasoning=fm.get("reasoning", ""),
                         rpn=fm.get("rpn")
                     ))
             
-            if fm_suggestions:  # Only add if there are valid suggestions
+            if fm_suggestions:
                 suggestions.append(EquipmentTypeSuggestions(
                     equipment_type_id=item.get("equipment_type_id"),
                     equipment_type_name=item.get("equipment_type_name", ""),
                     discipline=item.get("discipline", ""),
-                    suggested_failure_modes=fm_suggestions,
+                    suggested_failure_modes=fm_suggestions[:6],  # Limit to 6
                     ai_reasoning=item.get("ai_reasoning", "")
                 ))
+        
+        # Cache the result
+        _suggestion_cache[cache_key] = suggestions
         
         return suggestions
         
@@ -210,14 +203,10 @@ Rules:
 
 @router.post("/failure-modes", response_model=SuggestFailureModesResponse)
 async def suggest_failure_modes(request: SuggestFailureModesRequest):
-    """
-    Get AI-powered suggestions for mapping failure modes to equipment types.
-    """
+    """Get deterministic AI-powered suggestions for mapping failure modes to equipment types."""
     
-    # Limit to 5 equipment types at a time for performance
     equipment_type_ids = request.equipment_type_ids[:5]
     
-    # Get equipment type details from the master list
     equipment_types = []
     for eq_id in equipment_type_ids:
         eq_type = next((t for t in EQUIPMENT_TYPES if t["id"] == eq_id), None)
@@ -227,12 +216,8 @@ async def suggest_failure_modes(request: SuggestFailureModesRequest):
     if not equipment_types:
         raise HTTPException(status_code=400, detail="No valid equipment types provided")
     
-    # Limit failure modes (max 100 for context)
     failure_modes = request.existing_failure_modes[:100]
-    
-    # Get AI suggestions
     suggestions = await get_ai_suggestions(equipment_types, failure_modes)
-    
     total = sum(len(s.suggested_failure_modes) for s in suggestions)
     
     return SuggestFailureModesResponse(
@@ -241,17 +226,21 @@ async def suggest_failure_modes(request: SuggestFailureModesRequest):
     )
 
 
+@router.post("/clear-cache")
+async def clear_suggestion_cache():
+    """Clear the suggestion cache to force fresh AI results."""
+    global _suggestion_cache
+    count = len(_suggestion_cache)
+    _suggestion_cache = {}
+    return {"message": f"Cleared {count} cached suggestions"}
+
+
 @router.get("/equipment-types-without-fm")
 async def get_equipment_types_without_failure_modes():
     """Get list of all equipment types."""
     return {
         "equipment_types": [
-            {
-                "id": t["id"],
-                "name": t["name"],
-                "discipline": t.get("discipline", ""),
-                "category": t.get("category", "")
-            }
+            {"id": t["id"], "name": t["name"], "discipline": t.get("discipline", "")}
             for t in EQUIPMENT_TYPES
         ]
     }
