@@ -36,6 +36,7 @@ export function AIFailureModeSuggestions({
   t
 }) {
   const [loading, setLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState(""); // Progress status message
   const [suggestions, setSuggestions] = useState([]);
   const [expandedTypes, setExpandedTypes] = useState({});
   const [selectedMappings, setSelectedMappings] = useState({}); // {equipmentTypeId: Set of fmIds}
@@ -101,17 +102,28 @@ export function AIFailureModeSuggestions({
     setSuggestions([]);
     
     try {
-      // Process in batches of 5 for performance
-      const batchSize = 5;
-      const allSuggestions = [];
+      // Process ALL equipment types at once
       const typeIds = typesToAnalyze.map(et => et.id);
+      const typeNames = typesToAnalyze.map(et => et.name);
       
-      // Only process first batch for now (max 5 types)
-      const batch = typeIds.slice(0, batchSize);
+      // Show progress status
+      setLoadingStatus(`Analyzing ${typeIds.length} equipment types...`);
+      
+      // Simulate progress updates
+      const progressInterval = setInterval(() => {
+        const messages = [
+          `Analyzing ${typeIds.length} equipment types...`,
+          `Matching failure modes to equipment...`,
+          `Evaluating technical relevance...`,
+          `Calculating confidence scores...`,
+          `Preparing recommendations...`
+        ];
+        setLoadingStatus(messages[Math.floor(Math.random() * messages.length)]);
+      }, 3000);
       
       const response = await api.post("/ai-suggestions/failure-modes", {
-        equipment_type_ids: batch,
-        existing_failure_modes: failureModes.slice(0, 100).map(fm => ({
+        equipment_type_ids: typeIds,
+        existing_failure_modes: failureModes.slice(0, 150).map(fm => ({
           id: fm.id,
           failure_mode: fm.failure_mode,
           category: fm.category,
@@ -122,8 +134,11 @@ export function AIFailureModeSuggestions({
           equipment_type_ids: fm.equipment_type_ids
         }))
       }, {
-        timeout: 60000 // 60 second timeout for AI requests
+        timeout: 120000 // 2 minute timeout for larger requests
       });
+      
+      clearInterval(progressInterval);
+      setLoadingStatus("Processing results...");
       
       // Mark failure modes that are already connected to THIS equipment type
       // but keep all suggestions (including those mapped to other equipment types)
@@ -141,13 +156,11 @@ export function AIFailureModeSuggestions({
         };
       });
       
-      allSuggestions.push(...processedSuggestions);
-      
-      setSuggestions(allSuggestions);
+      setSuggestions(processedSuggestions);
       
       // Initialize selected mappings - only select those NOT already mapped to this equipment type
       const initialMappings = {};
-      for (const suggestion of allSuggestions) {
+      for (const suggestion of processedSuggestions) {
         initialMappings[suggestion.equipment_type_id] = new Set(
           suggestion.suggested_failure_modes
             .filter(fm => !fm.already_mapped)
@@ -158,18 +171,13 @@ export function AIFailureModeSuggestions({
       
       // Expand all by default
       const expanded = {};
-      for (const suggestion of allSuggestions) {
+      for (const suggestion of processedSuggestions) {
         expanded[suggestion.equipment_type_id] = true;
       }
       setExpandedTypes(expanded);
       
-      const total = allSuggestions.reduce((sum, s) => sum + s.suggested_failure_modes.length, 0);
-      
-      if (typeIds.length > batchSize) {
-        toast.success(`Found ${total} suggestions for ${allSuggestions.length} equipment types. (${typeIds.length - batchSize} more types available for next batch)`);
-      } else {
-        toast.success(`Found ${total} suggestions for ${allSuggestions.length} equipment types`);
-      }
+      const total = processedSuggestions.reduce((sum, s) => sum + s.suggested_failure_modes.length, 0);
+      toast.success(`Found ${total} suggestions for ${processedSuggestions.length} equipment types`);
     } catch (error) {
       console.error("Error fetching AI suggestions:", error);
       toast.error(error.response?.data?.detail || "Failed to get AI suggestions. Please try again.");
@@ -421,8 +429,20 @@ export function AIFailureModeSuggestions({
                   <Brain className="w-8 h-8 text-purple-600" />
                 </div>
               </div>
-              <p className="text-slate-600 font-medium">Analyzing equipment types...</p>
-              <p className="text-sm text-slate-400 mt-1">This may take a moment</p>
+              <p className="text-slate-600 font-medium">{loadingStatus || "Analyzing equipment types..."}</p>
+              <p className="text-sm text-slate-400 mt-1">Processing {getTypesToAnalyze().length} equipment types</p>
+              <div className="mt-4 flex flex-wrap gap-2 justify-center max-w-md">
+                {getTypesToAnalyze().slice(0, 8).map(et => (
+                  <span key={et.id} className="px-2 py-1 bg-purple-50 text-purple-600 text-xs rounded-full">
+                    {et.name}
+                  </span>
+                ))}
+                {getTypesToAnalyze().length > 8 && (
+                  <span className="px-2 py-1 bg-slate-100 text-slate-500 text-xs rounded-full">
+                    +{getTypesToAnalyze().length - 8} more
+                  </span>
+                )}
+              </div>
             </div>
           )}
           

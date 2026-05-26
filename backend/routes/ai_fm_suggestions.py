@@ -205,7 +205,8 @@ Return JSON:
 async def suggest_failure_modes(request: SuggestFailureModesRequest):
     """Get deterministic AI-powered suggestions for mapping failure modes to equipment types."""
     
-    equipment_type_ids = request.equipment_type_ids[:5]
+    # Process ALL equipment types at once (no batching)
+    equipment_type_ids = request.equipment_type_ids
     
     equipment_types = []
     for eq_id in equipment_type_ids:
@@ -216,7 +217,7 @@ async def suggest_failure_modes(request: SuggestFailureModesRequest):
     if not equipment_types:
         raise HTTPException(status_code=400, detail="No valid equipment types provided")
     
-    failure_modes = request.existing_failure_modes[:100]
+    failure_modes = request.existing_failure_modes[:150]  # Increased limit
     suggestions = await get_ai_suggestions(equipment_types, failure_modes)
     total = sum(len(s.suggested_failure_modes) for s in suggestions)
     
