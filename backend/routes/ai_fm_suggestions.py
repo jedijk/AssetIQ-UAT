@@ -61,22 +61,32 @@ class SuggestFailureModesResponse(BaseModel):
 
 # ============= AI Service =============
 
-SYSTEM_PROMPT = """You are an expert industrial reliability engineer specializing in FMEA (Failure Mode and Effects Analysis) and ISO 14224 standards for the oil & gas, petrochemical, and process industries.
+SYSTEM_PROMPT = """You are an expert industrial reliability engineer with 20+ years of experience in FMEA (Failure Mode and Effects Analysis) and ISO 14224 standards for oil & gas, petrochemical, and process industries.
 
-Your task is to analyze equipment types and suggest which failure modes should be associated with them based on:
-1. Technical knowledge of how equipment fails
-2. Industry standards (ISO 14224, API standards)
-3. Common failure mechanisms for each equipment category
-4. The equipment's function, operating conditions, and criticality
+Your task: Map failure modes to equipment types based on technical relevance.
 
-IMPORTANT RULES:
-- Only suggest failure modes that are technically relevant to the equipment type
-- Consider the equipment's discipline (Rotating, Static, Piping, Electrical, Instrumentation, etc.)
-- Provide confidence scores based on how certain the mapping is
-- Give clear technical reasoning for each suggestion
-- Be thorough but avoid false positives - quality over quantity
+SCORING CRITERIA FOR CONFIDENCE:
+- 0.95-1.0: Direct, well-known failure mode for this exact equipment type (e.g., "Bearing Failure" for "Centrifugal Pump")
+- 0.85-0.94: Highly relevant failure mode common in this equipment category (e.g., "Seal Leakage" for pumps)
+- 0.75-0.84: Relevant failure mode that can occur in this equipment type
+- 0.65-0.74: Possible failure mode with some technical relevance
+- Below 0.65: Do not include
 
-You must respond ONLY with valid JSON in the exact format specified. No markdown, no explanations outside JSON."""
+DISCIPLINE MATCHING RULES:
+- Rotating equipment: bearing failures, vibration, imbalance, seal issues, lubrication
+- Static equipment: corrosion, erosion, fatigue, cracking, fouling
+- Piping/Valves: leakage, blockage, erosion, corrosion, actuator failures
+- Electrical: insulation breakdown, overheating, contact failures, motor issues
+- Instrumentation: calibration drift, signal loss, sensor failures, communication errors
+
+IMPORTANT:
+- Use ONLY the failure_mode_id values provided in the input
+- Match by technical relevance, not just keyword matching
+- Each equipment type should have 3-8 relevant failure modes
+- Provide specific technical reasoning for each suggestion
+
+OUTPUT FORMAT: Return ONLY valid JSON, no markdown code blocks."""
+
 
 async def get_ai_suggestions(
     equipment_types: List[Dict[str, Any]],
@@ -86,62 +96,63 @@ async def get_ai_suggestions(
     
     client = get_openai_client()
     
-    # Prepare failure modes summary for the prompt
-    fm_summary = []
+    # Prepare failure modes in a cleaner format
+    fm_list = []
     for fm in failure_modes:
-        fm_summary.append({
+        fm_list.append({
             "id": fm.get("id"),
             "name": fm.get("failure_mode"),
             "category": fm.get("category"),
-            "keywords": fm.get("keywords", [])[:5],  # Limit keywords
-            "rpn": fm.get("severity", 5) * fm.get("occurrence", 5) * fm.get("detectability", 5),
-            "existing_equipment_types": fm.get("equipment_type_ids", [])
+            "keywords": fm.get("keywords", [])[:3],
+            "rpn": fm.get("severity", 5) * fm.get("occurrence", 5) * fm.get("detectability", 5)
         })
     
-    # Prepare equipment types for the prompt
-    eq_summary = []
+    # Prepare equipment types
+    eq_list = []
     for eq in equipment_types:
-        eq_summary.append({
+        eq_list.append({
             "id": eq.get("id"),
             "name": eq.get("name"),
             "discipline": eq.get("discipline"),
-            "category": eq.get("category"),
-            "description": eq.get("description", "")[:200]  # Limit description
+            "category": eq.get("category")
         })
     
-    user_prompt = f"""Analyze the following equipment types and suggest which failure modes should be mapped to each.
+    # Build a structured prompt
+    user_prompt = f"""TASK: For each equipment type below, select the most technically relevant failure modes from the provided list.
 
 EQUIPMENT TYPES TO ANALYZE:
-{json.dumps(eq_summary, indent=2)}
+{json.dumps(eq_list, indent=2)}
 
-AVAILABLE FAILURE MODES:
-{json.dumps(fm_summary, indent=2)}
+AVAILABLE FAILURE MODES (use these exact IDs):
+{json.dumps(fm_list, indent=2)}
 
-For each equipment type, suggest the most relevant failure modes from the available list.
-
-Respond with JSON in this exact format:
+Return JSON in this exact structure:
 {{
-    "suggestions": [
+  "suggestions": [
+    {{
+      "equipment_type_id": "<exact id from equipment list>",
+      "equipment_type_name": "<name>",
+      "discipline": "<discipline>",
+      "ai_reasoning": "<1-2 sentence explanation of mapping strategy>",
+      "suggested_failure_modes": [
         {{
-            "equipment_type_id": "equipment_id",
-            "equipment_type_name": "Equipment Name",
-            "discipline": "Discipline",
-            "ai_reasoning": "Brief explanation of the overall mapping strategy for this equipment",
-            "suggested_failure_modes": [
-                {{
-                    "failure_mode_id": "fm_id",
-                    "failure_mode_name": "Failure Mode Name",
-                    "category": "Category",
-                    "confidence": 0.95,
-                    "reasoning": "Technical explanation why this failure mode applies to this equipment",
-                    "rpn": 125
-                }}
-            ]
+          "failure_mode_id": "<exact id from failure modes list>",
+          "failure_mode_name": "<name>",
+          "category": "<category>",
+          "confidence": <0.65-1.0>,
+          "reasoning": "<specific technical reason why this failure applies>",
+          "rpn": <rpn value>
         }}
-    ]
+      ]
+    }}
+  ]
 }}
 
-Only include failure modes with confidence >= 0.6. Order by confidence descending."""
+Rules:
+1. Use EXACT IDs from the provided lists
+2. Include 3-8 failure modes per equipment type
+3. Only include if confidence >= 0.65
+4. Sort by confidence descending"""
 
     try:
         response = await client.chat.completions.create(
@@ -150,41 +161,40 @@ Only include failure modes with confidence >= 0.6. Order by confidence descendin
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt}
             ],
-            temperature=0.3,
-            max_tokens=4000
+            temperature=0.1,  # Very low temperature for consistent output
+            max_tokens=4000,
+            response_format={"type": "json_object"}  # Force JSON output
         )
         
         response_text = response.choices[0].message.content.strip()
         
-        # Clean the response - remove markdown code blocks if present
-        if response_text.startswith("```"):
-            response_text = response_text.split("```")[1]
-            if response_text.startswith("json"):
-                response_text = response_text[4:]
-        response_text = response_text.strip()
-        
+        # Parse JSON response
         result = json.loads(response_text)
         
         suggestions = []
         for item in result.get("suggestions", []):
             fm_suggestions = []
             for fm in item.get("suggested_failure_modes", []):
-                fm_suggestions.append(FailureModeSuggestion(
-                    failure_mode_id=fm.get("failure_mode_id"),
-                    failure_mode_name=fm.get("failure_mode_name"),
-                    category=fm.get("category", ""),
-                    confidence=fm.get("confidence", 0.7),
-                    reasoning=fm.get("reasoning", ""),
-                    rpn=fm.get("rpn")
-                ))
+                # Validate that the failure_mode_id exists in our list
+                fm_id = fm.get("failure_mode_id")
+                if any(f["id"] == fm_id for f in fm_list):
+                    fm_suggestions.append(FailureModeSuggestion(
+                        failure_mode_id=fm_id,
+                        failure_mode_name=fm.get("failure_mode_name", ""),
+                        category=fm.get("category", ""),
+                        confidence=min(1.0, max(0.0, fm.get("confidence", 0.7))),
+                        reasoning=fm.get("reasoning", ""),
+                        rpn=fm.get("rpn")
+                    ))
             
-            suggestions.append(EquipmentTypeSuggestions(
-                equipment_type_id=item.get("equipment_type_id"),
-                equipment_type_name=item.get("equipment_type_name"),
-                discipline=item.get("discipline", ""),
-                suggested_failure_modes=fm_suggestions,
-                ai_reasoning=item.get("ai_reasoning", "")
-            ))
+            if fm_suggestions:  # Only add if there are valid suggestions
+                suggestions.append(EquipmentTypeSuggestions(
+                    equipment_type_id=item.get("equipment_type_id"),
+                    equipment_type_name=item.get("equipment_type_name", ""),
+                    discipline=item.get("discipline", ""),
+                    suggested_failure_modes=fm_suggestions,
+                    ai_reasoning=item.get("ai_reasoning", "")
+                ))
         
         return suggestions
         
@@ -202,10 +212,6 @@ Only include failure modes with confidence >= 0.6. Order by confidence descendin
 async def suggest_failure_modes(request: SuggestFailureModesRequest):
     """
     Get AI-powered suggestions for mapping failure modes to equipment types.
-    
-    - Takes a list of equipment type IDs to analyze (max 5 at a time for performance)
-    - Takes the full list of available failure modes
-    - Returns suggested mappings with confidence scores and reasoning
     """
     
     # Limit to 5 equipment types at a time for performance
@@ -221,7 +227,7 @@ async def suggest_failure_modes(request: SuggestFailureModesRequest):
     if not equipment_types:
         raise HTTPException(status_code=400, detail="No valid equipment types provided")
     
-    # Limit failure modes to most relevant ones (max 100 for context)
+    # Limit failure modes (max 100 for context)
     failure_modes = request.existing_failure_modes[:100]
     
     # Get AI suggestions
@@ -237,10 +243,7 @@ async def suggest_failure_modes(request: SuggestFailureModesRequest):
 
 @router.get("/equipment-types-without-fm")
 async def get_equipment_types_without_failure_modes():
-    """
-    Get list of equipment types that have no failure modes mapped.
-    This helps identify equipment types that need AI suggestions.
-    """
+    """Get list of all equipment types."""
     return {
         "equipment_types": [
             {
