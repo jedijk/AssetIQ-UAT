@@ -1145,16 +1145,16 @@ const FailureModesPage = () => {
         <TabsContent value="libraries" className="space-y-6">
           <div className="flex gap-4 h-[calc(100vh-280px)]">
             {/* Left Panel: Equipment Types List */}
-            <div className={`${selectedEquipmentType ? 'w-1/2 lg:w-2/5' : 'w-full'} transition-all duration-300`}>
-              <div className="card h-full flex flex-col">
+            <div className={`${selectedEquipmentType ? 'w-1/2 lg:w-2/5' : 'w-full'} transition-all duration-300 min-w-0`}>
+              <div className="card h-full flex flex-col overflow-hidden">
                 <div className="p-4 border-b border-slate-200">
                   <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <div>
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
                         <h3 className="font-semibold text-slate-800">{t("library.equipmentTypes")}</h3>
                         <p className="text-xs text-slate-500 mt-1">{equipmentTypes.length} {t("library.typesDefined")} • Click to view connected failure modes</p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Button 
                           size="sm" 
                           variant="outline"
