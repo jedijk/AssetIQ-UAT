@@ -1533,3 +1533,183 @@ async def improve_failure_mode_endpoint(request: ImproveFailureModeRequest):
         raise HTTPException(status_code=400, detail="No failure mode provided")
     eq_types = request.equipment_types[:200]
     return await improve_failure_mode_with_ai(request.failure_mode, eq_types)
+
+
+# ============= Action Discipline Review =============
+#
+# Classifies the maintenance discipline for each recommended action attached to
+# a failure mode. The library was bulk-seeded with "mechanical" so this tool
+# lets the user re-allocate them based on the action text + action_type.
+
+ACTION_DISCIPLINES = [
+    "mechanical",
+    "electrical",
+    "instrumentation",
+    "process",
+    "civil",
+    "operations",
+    "laboratory",
+]
+
+REVIEW_ACTION_DISCIPLINE_SYSTEM_PROMPT = """You are an industrial reliability engineer responsible for routing maintenance work orders to the right discipline crew.
+
+Given a list of recommended maintenance actions, classify EACH one into exactly ONE of these disciplines:
+- mechanical: rotating/static equipment work — bearings, seals, alignment, lubrication, vibration, gaskets, mechanical seals, couplings, hand-tools, mechanical inspection, replace/repair mechanical parts
+- electrical: motors (windings/insulation), cabling, switchgear, transformers, MCCs, grounding, megger tests, electrical isolation, short-circuit work
+- instrumentation: sensors, transmitters, control loops, calibration, signal/communication faults, PLCs, level/pressure/temperature instruments, valve positioners, loop checks
+- process: process conditions — flow rates, pressure setpoints, NPSH, temperature setpoints, chemical dosing, fluid quality, operating-window adjustments, P&ID review
+- civil: foundations, baseplates, grouting, structural steel, concrete, anchor bolts, building/containment
+- operations: operator rounds, procedure changes, training, manual operations, shift logbook, housekeeping, watchkeeping
+- laboratory: oil analysis, vibration analysis (lab-based), metallurgical testing, sampling for lab, fluid testing, NDE/UT/RT in lab
+
+Rules:
+1. Use lowercase exact discipline keys above.
+2. Use the action text first, then `action_type` (PM/CM/PDM) as a tiebreaker.
+3. If ambiguous, prefer the discipline that does the *physical* work.
+4. Output STRICT JSON only — an array entry per input, in the SAME order.
+"""
+
+
+class ActionDisciplineInput(BaseModel):
+    fm_id: str
+    action_index: int
+    description: str
+    action_type: Optional[str] = None
+    current_discipline: Optional[str] = None
+    # Optional context to improve classification quality
+    failure_mode: Optional[str] = None
+    fm_discipline: Optional[str] = None  # asset discipline (Rotating, Static, ...)
+
+
+class ActionDisciplineResult(BaseModel):
+    fm_id: str
+    action_index: int
+    current_discipline: Optional[str] = None
+    suggested_discipline: str
+    reason: str
+    changed: bool
+
+
+class ReviewActionDisciplinesRequest(BaseModel):
+    actions: List[ActionDisciplineInput]
+
+
+class ReviewActionDisciplinesResponse(BaseModel):
+    results: List[ActionDisciplineResult]
+
+
+def _normalize_discipline(value: Optional[str]) -> str:
+    if not value:
+        return ""
+    v = value.strip().lower()
+    # Map common variants to canonical keys.
+    aliases = {
+        "mech": "mechanical", "mechanic": "mechanical",
+        "elec": "electrical", "i&c": "instrumentation", "ic": "instrumentation",
+        "instrumentation & control": "instrumentation", "instrument": "instrumentation",
+        "ops": "operations", "operator": "operations",
+        "lab": "laboratory",
+        "civil/structural": "civil", "structural": "civil",
+    }
+    if v in aliases:
+        return aliases[v]
+    if v in ACTION_DISCIPLINES:
+        return v
+    return v
+
+
+@router.post("/review-action-disciplines", response_model=ReviewActionDisciplinesResponse)
+async def review_action_disciplines(request: ReviewActionDisciplinesRequest):
+    """Classify a batch of recommended-action items into the correct discipline.
+
+    The caller is expected to chunk the full library into batches (~25 actions
+    per call). The endpoint returns one classification per input action,
+    preserving fm_id + action_index so the frontend can apply changes back to
+    the right slot.
+    """
+    if not request.actions:
+        return ReviewActionDisciplinesResponse(results=[])
+    if len(request.actions) > 60:
+        raise HTTPException(status_code=400, detail="Send at most 60 actions per batch.")
+
+    client = get_openai_client()
+
+    payload = [
+        {
+            "i": idx,
+            "description": a.description[:280],
+            "action_type": a.action_type or "",
+            "current_discipline": _normalize_discipline(a.current_discipline),
+            "failure_mode": (a.failure_mode or "")[:120],
+            "fm_discipline": a.fm_discipline or "",
+        }
+        for idx, a in enumerate(request.actions)
+    ]
+
+    user_prompt = f"""Allowed disciplines: {", ".join(ACTION_DISCIPLINES)}
+
+For each action below, return:
+- "i": same index you received
+- "discipline": one of the allowed values
+- "reason": <= 14 words, why this discipline fits
+
+Actions:
+{json.dumps(payload, indent=2)}
+
+Return JSON: {{"results": [{{"i": 0, "discipline": "mechanical", "reason": "..."}}]}}"""
+
+    try:
+        response = await call_openai_with_retry(
+            client,
+            model="gpt-4o-mini",  # cheaper/faster model is plenty for classification
+            messages=[
+                {"role": "system", "content": REVIEW_ACTION_DISCIPLINE_SYSTEM_PROMPT},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0,
+            max_tokens=1800,
+            seed=42,
+            response_format={"type": "json_object"},
+        )
+        data = json.loads(response.choices[0].message.content.strip())
+        raw_results = data.get("results") or []
+    except json.JSONDecodeError as e:
+        logger.error(f"Action-discipline classifier JSON parse failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to parse AI response")
+    except RateLimitError as e:
+        logger.error(f"Action-discipline classifier rate limit: {e}")
+        raise HTTPException(status_code=429, detail="OpenAI rate limit — try again in a moment.")
+    except Exception as e:
+        logger.error(f"Action-discipline classifier error: {e}")
+        raise HTTPException(status_code=500, detail=f"AI service error: {e}")
+
+    by_index: Dict[int, Dict[str, Any]] = {}
+    for r in raw_results:
+        if not isinstance(r, dict):
+            continue
+        try:
+            i = int(r.get("i"))
+        except (TypeError, ValueError):
+            continue
+        by_index[i] = r
+
+    results: List[ActionDisciplineResult] = []
+    for idx, a in enumerate(request.actions):
+        r = by_index.get(idx, {})
+        suggested = _normalize_discipline(r.get("discipline"))
+        if suggested not in ACTION_DISCIPLINES:
+            # Fallback: keep the current one so we never produce garbage.
+            suggested = _normalize_discipline(a.current_discipline) or "mechanical"
+        current = _normalize_discipline(a.current_discipline)
+        results.append(
+            ActionDisciplineResult(
+                fm_id=a.fm_id,
+                action_index=a.action_index,
+                current_discipline=current or None,
+                suggested_discipline=suggested,
+                reason=(r.get("reason") or "").strip()[:200] or "Classified by AI reliability engineer.",
+                changed=(suggested != current),
+            )
+        )
+
+    return ReviewActionDisciplinesResponse(results=results)

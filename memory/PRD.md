@@ -177,6 +177,23 @@ Create a robust full-stack platform optimized for multi-environment execution wi
   mutation from raw `fetch()` + localStorage token to the shared `actionsAPI.delete()`
   (axios) so it works under both bearer and cookie auth modes.
 
+## 2026-05-27 — AI Review Action Disciplines
+- **New AI tool (`Review Disciplines` button on FM toolbar):** Lets the user
+  bulk re-classify the maintenance discipline (mechanical / electrical /
+  instrumentation / process / civil / operations / laboratory) of every
+  `recommended_actions[*].discipline` in the FMEA library, based on the
+  action's text + action_type.
+- **Backend (`ai_fm_suggestions.py::review_action_disciplines`):** New
+  `POST /api/ai-suggestions/review-action-disciplines` endpoint. Accepts up
+  to 60 actions per batch, returns suggested discipline + short reason for
+  each. Uses `gpt-4o-mini` (cheaper for classification) + the existing 429
+  retry helper. Falls back to current discipline on any parsing error.
+- **Frontend (`AIReviewActionDisciplines.jsx`):** Dialog that streams all
+  ~2700 library actions in batches of 25 with a progress bar, then shows a
+  diff table (current → suggested + AI reason). User can toggle individual
+  rows, override the suggested discipline via dropdown, and apply changes —
+  patches are grouped per FM so each FM gets a single update.
+
 
 ## Testing
 - Backend: Pytest suite at `/app/backend/tests/`

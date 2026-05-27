@@ -75,6 +75,7 @@ import AINewEquipmentTypeSuggestions from "../components/library/AINewEquipmentT
 import AINewFailureModeSuggestions from "../components/library/AINewFailureModeSuggestions";
 import AIImproveFailureMode from "../components/library/AIImproveFailureMode";
 import BulkImproveFailureModes from "../components/library/BulkImproveFailureModes";
+import AIReviewActionDisciplines from "../components/library/AIReviewActionDisciplines";
 import { Upload, Sparkles } from "lucide-react";
 
 const disciplineIcons = {
@@ -152,6 +153,7 @@ const FailureModesPage = () => {
   const [isAINewFmOpen, setIsAINewFmOpen] = useState(false); // AI suggest NEW failure modes
   const [isAIImproveOpen, setIsAIImproveOpen] = useState(false); // AI improve a single failure mode
   const [isBulkImproveOpen, setIsBulkImproveOpen] = useState(false); // Bulk improve all visible
+  const [isReviewDisciplinesOpen, setIsReviewDisciplinesOpen] = useState(false); // AI review action disciplines
   
   // Failure mode dialog state
   const [isFmDialogOpen, setIsFmDialogOpen] = useState(false);
@@ -956,6 +958,17 @@ const FailureModesPage = () => {
               >
                 <Sparkles className="w-4 h-4 mr-1" />
                 Bulk Improve ({displayedFailureModes.length})
+              </Button>
+              <Button
+                onClick={() => setIsReviewDisciplinesOpen(true)}
+                variant="outline"
+                className="h-11 border-purple-200 text-purple-700 hover:bg-purple-50"
+                data-testid="review-action-disciplines-btn"
+                disabled={failureModes.length === 0}
+                title="Have AI re-classify the maintenance discipline of every recommended action in the library"
+              >
+                <Sparkles className="w-4 h-4 mr-1" />
+                Review Disciplines
               </Button>
               <Button
                 onClick={() => { setEditingFm(null); resetFmForm(); setIsFmDialogOpen(true); }}
@@ -2095,6 +2108,16 @@ const FailureModesPage = () => {
         failureModes={displayedFailureModes}
         equipmentTypes={equipmentTypes}
         onCompleted={() => {
+          queryClient.invalidateQueries({ queryKey: ["failureModes"] });
+        }}
+      />
+
+      {/* AI Review Action Disciplines — re-classify recommended_actions disciplines */}
+      <AIReviewActionDisciplines
+        open={isReviewDisciplinesOpen}
+        onClose={() => setIsReviewDisciplinesOpen(false)}
+        failureModes={failureModes}
+        onApplied={() => {
           queryClient.invalidateQueries({ queryKey: ["failureModes"] });
         }}
       />
