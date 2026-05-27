@@ -283,24 +283,15 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
   });
 
   // Delete action plan item mutation
+  // Uses shared actionsAPI (axios) so the request travels with the active auth
+  // mode (bearer OR cookie). Previously we used raw fetch + localStorage which
+  // silently failed under cookie auth — the action stayed and the user thought
+  // delete was broken.
   const deleteActionMutation = useMutation({
-    mutationFn: async (actionId) => {
-      const token = localStorage.getItem("token");
-      const response = await fetch(`${getBackendUrl()}/api/actions/${actionId}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error("Failed to delete action");
-      }
-      return response.json();
-    },
+    mutationFn: (actionId) => actionsAPI.delete(actionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
       queryClient.invalidateQueries({ queryKey: ["threats"] });
-      queryClient.invalidateQueries({ queryKey: ["linked-actions", threatId] });
       queryClient.invalidateQueries({ queryKey: ["actions"] });
       toast.success("Action deleted!");
     },

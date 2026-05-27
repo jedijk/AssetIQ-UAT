@@ -312,9 +312,26 @@ async def create_central_action(
     """Create a new centralized action (promote from threat or investigation)."""
     action_id = str(uuid.uuid4())
     
-    # Generate action number
-    count = await db.central_actions.count_documents({"created_by": current_user["id"]})
-    action_number = f"ACT-{count + 1:04d}"
+    # Generate action number atomically using a single global counter.
+    # Previously we used count_documents() per user which is (a) racy and
+    # (b) produces duplicate numbers (e.g. two `ACT-0001`s) when actions live
+    # in a shared workspace and are authored by different users.
+    # First-call seeding: if no counter doc exists yet, initialise its seq
+    # from the total existing action count so legacy numbers don't get reused.
+    counter_id = "central_actions"
+    existing_count = await db.central_actions.count_documents({})
+    await db.action_counters.update_one(
+        {"_id": counter_id},
+        {"$setOnInsert": {"seq": existing_count}},
+        upsert=True,
+    )
+    counter = await db.action_counters.find_one_and_update(
+        {"_id": counter_id},
+        {"$inc": {"seq": 1}},
+        return_document=True,
+    )
+    seq = (counter or {}).get("seq", existing_count + 1)
+    action_number = f"ACT-{seq:04d}"
     
     # Initialize RPN and risk values from input or defaults
     rpn = data.rpn

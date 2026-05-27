@@ -805,153 +805,166 @@ const FailureModesPage = () => {
             </div>
           </div>
 
-          {/* Filters - wraps to multiple rows when the toolbar gets crowded */}
-          <div
-            className="flex flex-wrap items-center gap-2 mb-6"
-            data-testid="filters"
-          >
-            <div className="relative flex-1 min-w-[220px] sm:min-w-[260px] basis-full sm:basis-auto sm:max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-              <Input
-                placeholder={t("library.searchPlaceholder")}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 h-11 w-full"
-                data-testid="search-input"
-              />
+          {/* Toolbar - stacked into two rows:
+                Row 1: Search + filters (always visible on screen)
+                Row 2: AI / Action buttons (Export, Import, Suggest, Bulk Improve, Add) */}
+          <div className="mb-6 space-y-3" data-testid="filters">
+            {/* Row 1: Search + Filters */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[220px] sm:min-w-[260px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Input
+                  placeholder={t("library.searchPlaceholder")}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 h-11 w-full"
+                  data-testid="search-input"
+                />
+              </div>
+              <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
+                <SelectTrigger className="w-44 h-11" data-testid="category-filter">
+                  <Filter className="w-4 h-4 mr-2 text-slate-400" />
+                  <SelectValue placeholder="All Disciplines" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Disciplines</SelectItem>
+                  {DISCIPLINES.map((d) => (
+                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-44 h-11" data-testid="type-filter">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    <span className="flex items-center gap-2">All Types</span>
+                  </SelectItem>
+                  <SelectItem value="generic">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                      Generic (Industry)
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="customer_specific">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                      Customer Specific
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="recently_added">
+                    <span className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                      Recently Added (30 days)
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                onClick={() => setHighSeverityOnly((v) => !v)}
+                variant="outline"
+                className={`h-11 ${
+                  highSeverityOnly
+                    ? "border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
+                    : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                }`}
+                data-testid="high-severity-toggle"
+                title="Show only failure modes with severity ≥ 8 (high), sorted by severity then RPN"
+                aria-pressed={highSeverityOnly}
+              >
+                <AlertTriangle className="w-4 h-4 mr-1" />
+                High Severity
+                {highSeverityOnly && (
+                  <span className="ml-1 text-xs font-semibold bg-red-100 text-red-700 px-1.5 rounded">
+                    {displayedFailureModes.length}
+                  </span>
+                )}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => setHideAIImproved((v) => !v)}
+                variant="outline"
+                className={`h-11 ${
+                  hideAIImproved
+                    ? "border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100"
+                    : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                }`}
+                data-testid="hide-ai-improved-toggle"
+                title={`Hide failure modes already improved by AI (${aiImprovedCount} marked)`}
+                aria-pressed={hideAIImproved}
+              >
+                <Sparkles className="w-4 h-4 mr-1" />
+                Not improved yet
+                {aiImprovedCount > 0 && (
+                  <span
+                    className={`ml-1 text-xs font-semibold px-1.5 rounded ${
+                      hideAIImproved
+                        ? "bg-purple-100 text-purple-700"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {aiImprovedCount} done
+                  </span>
+                )}
+              </Button>
             </div>
-            <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
-              <SelectTrigger className="w-44 h-11" data-testid="category-filter">
-                <Filter className="w-4 h-4 mr-2 text-slate-400" />
-                <SelectValue placeholder="All Disciplines" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Disciplines</SelectItem>
-                {DISCIPLINES.map((d) => (
-                  <SelectItem key={d} value={d}>{d}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-44 h-11" data-testid="type-filter">
-                <SelectValue placeholder="All Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">
-                  <span className="flex items-center gap-2">All Types</span>
-                </SelectItem>
-                <SelectItem value="generic">
-                  <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                    Generic (Industry)
-                  </span>
-                </SelectItem>
-                <SelectItem value="customer_specific">
-                  <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-purple-500"></span>
-                    Customer Specific
-                  </span>
-                </SelectItem>
-                <SelectItem value="recently_added">
-                  <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                    Recently Added (30 days)
-                  </span>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              type="button"
-              onClick={() => setHighSeverityOnly((v) => !v)}
-              variant="outline"
-              className={`h-11 ${
-                highSeverityOnly
-                  ? "border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
-                  : "border-slate-200 text-slate-700 hover:bg-slate-50"
-              }`}
-              data-testid="high-severity-toggle"
-              title="Show only failure modes with severity ≥ 8 (high), sorted by severity then RPN"
-              aria-pressed={highSeverityOnly}
+
+            {/* Row 2: Action buttons */}
+            <div
+              className="flex flex-wrap items-center gap-2"
+              data-testid="action-bar"
             >
-              <AlertTriangle className="w-4 h-4 mr-1" />
-              High Severity
-              {highSeverityOnly && (
-                <span className="ml-1 text-xs font-semibold bg-red-100 text-red-700 px-1.5 rounded">
-                  {displayedFailureModes.length}
-                </span>
-              )}
-            </Button>
-            <Button
-              type="button"
-              onClick={() => setHideAIImproved((v) => !v)}
-              variant="outline"
-              className={`h-11 ${
-                hideAIImproved
-                  ? "border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100"
-                  : "border-slate-200 text-slate-700 hover:bg-slate-50"
-              }`}
-              data-testid="hide-ai-improved-toggle"
-              title={`Hide failure modes already improved by AI (${aiImprovedCount} marked)`}
-              aria-pressed={hideAIImproved}
-            >
-              <Sparkles className="w-4 h-4 mr-1" />
-              Not improved yet
-              {aiImprovedCount > 0 && (
-                <span
-                  className={`ml-1 text-xs font-semibold px-1.5 rounded ${
-                    hideAIImproved
-                      ? "bg-purple-100 text-purple-700"
-                      : "bg-slate-100 text-slate-600"
-                  }`}
-                >
-                  {aiImprovedCount} done
-                </span>
-              )}
-            </Button>
-            <Button 
-              onClick={handleExportExcel} 
-              variant="outline" 
-              className="h-11" 
-              disabled={isExporting}
-              data-testid="export-excel-btn"
-            >
-              <Download className="w-4 h-4 mr-1" /> 
-              {isExporting ? (t("common.exporting") || "Exporting...") : (t("library.exportExcel") || "Export Excel")}
-            </Button>
-            <Button 
-              onClick={() => setIsPMImportOpen(true)} 
-              variant="outline" 
-              className="h-11 border-blue-200 text-blue-700 hover:bg-blue-50"
-              data-testid="import-pm-plan-btn"
-            >
-              <Upload className="w-4 h-4 mr-1" /> 
-              Import PM Plan
-            </Button>
-            <Button
-              onClick={() => setIsAINewFmOpen(true)}
-              variant="outline"
-              className="h-11 border-purple-200 text-purple-700 hover:bg-purple-50"
-              data-testid="ai-suggest-new-failure-modes-btn"
-              disabled={equipmentTypes.length === 0}
-              title="Let AI act as a reliability engineer and suggest failure modes missing from your library"
-            >
-              <Sparkles className="w-4 h-4 mr-1" />
-              Suggest Failure Modes
-            </Button>
-            <Button
-              onClick={() => setIsBulkImproveOpen(true)}
-              variant="outline"
-              className="h-11 border-purple-200 text-purple-700 hover:bg-purple-50"
-              data-testid="bulk-improve-fm-btn"
-              disabled={displayedFailureModes.length === 0}
-              title={`Run AI improvement and auto-apply changes for the ${displayedFailureModes.length} visible failure mode(s)`}
-            >
-              <Sparkles className="w-4 h-4 mr-1" />
-              Bulk Improve ({displayedFailureModes.length})
-            </Button>
-            <Button onClick={() => { setEditingFm(null); resetFmForm(); setIsFmDialogOpen(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-failure-mode-btn">
-              <Plus className="w-4 h-4 mr-1" /> {t("library.addFailureMode")}
-            </Button>
+              <Button
+                onClick={handleExportExcel}
+                variant="outline"
+                className="h-11"
+                disabled={isExporting}
+                data-testid="export-excel-btn"
+              >
+                <Download className="w-4 h-4 mr-1" />
+                {isExporting ? (t("common.exporting") || "Exporting...") : (t("library.exportExcel") || "Export Excel")}
+              </Button>
+              <Button
+                onClick={() => setIsPMImportOpen(true)}
+                variant="outline"
+                className="h-11 border-blue-200 text-blue-700 hover:bg-blue-50"
+                data-testid="import-pm-plan-btn"
+              >
+                <Upload className="w-4 h-4 mr-1" />
+                Import PM Plan
+              </Button>
+              <Button
+                onClick={() => setIsAINewFmOpen(true)}
+                variant="outline"
+                className="h-11 border-purple-200 text-purple-700 hover:bg-purple-50"
+                data-testid="ai-suggest-new-failure-modes-btn"
+                disabled={equipmentTypes.length === 0}
+                title="Let AI act as a reliability engineer and suggest failure modes missing from your library"
+              >
+                <Sparkles className="w-4 h-4 mr-1" />
+                Suggest Failure Modes
+              </Button>
+              <Button
+                onClick={() => setIsBulkImproveOpen(true)}
+                variant="outline"
+                className="h-11 border-purple-200 text-purple-700 hover:bg-purple-50"
+                data-testid="bulk-improve-fm-btn"
+                disabled={displayedFailureModes.length === 0}
+                title={`Run AI improvement and auto-apply changes for the ${displayedFailureModes.length} visible failure mode(s)`}
+              >
+                <Sparkles className="w-4 h-4 mr-1" />
+                Bulk Improve ({displayedFailureModes.length})
+              </Button>
+              <Button
+                onClick={() => { setEditingFm(null); resetFmForm(); setIsFmDialogOpen(true); }}
+                className="h-11 bg-blue-600 hover:bg-blue-700 ml-auto"
+                data-testid="add-failure-mode-btn"
+              >
+                <Plus className="w-4 h-4 mr-1" /> {t("library.addFailureMode")}
+              </Button>
+            </div>
           </div>
 
           {/* Two-Panel Layout: List + View Panel */}

@@ -162,6 +162,22 @@ Create a robust full-stack platform optimized for multi-environment execution wi
   - `SettingsUserManagementPage.js`
 - Advanced event detection rule engine for log ingestion
 
+## 2026-05-27 — UI & Action Plan fixes
+- **Failure Modes toolbar (FailureModesPage.js):** Split into two rows so the
+  search bar stays visible and AI action buttons no longer push off-screen on
+  smaller laptops. Row 1 = Search + Discipline + Type + High Severity +
+  Not-improved toggle. Row 2 = Export, Import PM Plan, Suggest Failure Modes,
+  Bulk Improve, Add Failure Mode (right-aligned).
+- **Action numbering (backend `routes/actions.py`):** Replaced racy
+  `count_documents()` with an atomic global counter stored in
+  `action_counters` (single doc `_id: "central_actions"` with `$inc seq`).
+  Existing actions renumbered globally via `/tmp/renumber_actions_global.py`
+  (one-shot migration). Duplicate `ACT-0001` across users is gone.
+- **Action delete (RecommendedActionsSection.jsx):** Switched the delete
+  mutation from raw `fetch()` + localStorage token to the shared `actionsAPI.delete()`
+  (axios) so it works under both bearer and cookie auth modes.
+
+
 ## Testing
 - Backend: Pytest suite at `/app/backend/tests/`
 - Test files: `test_chat_full_match.py`, `test_production_patch.py`, `test_viscosity_pairing.py`
