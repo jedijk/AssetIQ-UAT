@@ -215,6 +215,27 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 - **Backup:** Full snapshot of the 29 deleted docs at
   `/app/memory/fm_dedupe_backup_2026-05-27.json` (and `/tmp/fm_dedupe_backup.json`).
 
+## 2026-05-27 — AI Find Similar Failure Modes (interactive)
+- **New backend endpoint:** `POST /api/ai-suggestions/find-similar-failure-modes`
+  — accepts ONE equipment_type at a time + its FM list. Uses local
+  token-overlap (Jaccard ≥0.5) + Levenshtein (≥0.8) to build candidate
+  clusters, then asks GPT-4o-mini to confirm which clusters are genuine
+  semantic duplicates while keeping ISO-14224 distinct mechanisms separate
+  (Bearing Wear ≠ Bearing Seizure ≠ Bearing Fatigue).
+- **New backend endpoint:** `POST /api/failure-modes/merge` — accepts
+  `{winner_id, loser_ids, canonical_name?}`. Merges loser fields (union of
+  equipment_type_ids, keywords, recommended_actions, potential_effects,
+  potential_causes) into the winner, backs up loser docs to the new
+  `fm_merge_log` collection, then deletes them. Invalidates the FM service
+  cache.
+- **New frontend dialog (`AIFindSimilarFailureModes.jsx`):** Opened by a
+  new "Find Similar" button on the FM toolbar. Iterates per-equipment-type
+  with a progress bar, then displays grouped results with editable canonical
+  name + AI reason per group. User ticks the groups to merge, clicks Apply,
+  and the dialog calls `/failure-modes/merge` once per selected group.
+- Verified end-to-end via curl: "Belt Slippage" successfully merged into
+  "Belt Slip" with equipment_type_ids union and audit-log row created.
+
 
 ## Testing
 - Backend: Pytest suite at `/app/backend/tests/`

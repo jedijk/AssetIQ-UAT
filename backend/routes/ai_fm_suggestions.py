@@ -1746,3 +1746,187 @@ Return JSON: {{"results": [{{"i": 0, "discipline": "mechanical", "reason": "..."
         )
 
     return ReviewActionDisciplinesResponse(results=results)
+
+
+# ============= Find Similar Failure Modes (semantic dedupe) =============
+#
+# For ONE equipment type at a time, accepts the list of failure modes attached
+# to it, runs token-overlap + Levenshtein clustering locally to shortlist
+# candidates, then asks GPT-4o-mini to confirm which clusters are genuine
+# semantic duplicates. Returns the confirmed groups for the frontend to show
+# to the user for review-then-merge.
+
+from difflib import SequenceMatcher  # noqa: E402
+
+_SIM_STOPWORDS = {
+    "the", "a", "an", "of", "in", "on", "and", "or", "by", "to", "for",
+    "from", "with", "without", "due", "failure", "fault", "issue", "problem",
+}
+
+
+def _sim_tokens(s: str) -> set:
+    raw = [t for t in "".join(ch if ch.isalnum() else " " for ch in (s or "").lower()).split() if t]
+    return {t for t in raw if t not in _SIM_STOPWORDS and len(t) > 2}
+
+
+def _sim_jaccard(a: set, b: set) -> float:
+    if not a or not b:
+        return 0.0
+    return len(a & b) / len(a | b)
+
+
+def _sim_ratio(a: str, b: str) -> float:
+    return SequenceMatcher(None, (a or "").lower(), (b or "").lower()).ratio()
+
+
+class SimilarFmItem(BaseModel):
+    id: str  # Mongo id as string (str(ObjectId)) or legacy_id stringified — frontend sends what it already has
+    failure_mode: str
+
+
+class FindSimilarFailureModesRequest(BaseModel):
+    equipment_type_id: str
+    equipment_type_name: Optional[str] = None
+    failure_modes: List[SimilarFmItem]
+
+
+class SimilarGroup(BaseModel):
+    member_ids: List[str]
+    canonical_name: str
+    reason: str
+
+
+class FindSimilarFailureModesResponse(BaseModel):
+    equipment_type_id: str
+    groups: List[SimilarGroup]
+    skipped_reason: Optional[str] = None  # e.g. "no candidate clusters"
+
+
+@router.post("/find-similar-failure-modes", response_model=FindSimilarFailureModesResponse)
+async def find_similar_failure_modes(request: FindSimilarFailureModesRequest):
+    """Identify groups of near-duplicate failure modes within ONE equipment type.
+
+    Pipeline:
+    1. Build single-link clusters via Jaccard ≥0.5 OR Levenshtein ≥0.8 on names.
+    2. For each cluster ≥2 members, ask GPT to confirm which sub-groups are
+       genuine duplicates (NOT mechanism differences like wear vs seizure).
+    3. Return the confirmed groups.
+    """
+    fms = request.failure_modes or []
+    if len(fms) < 2:
+        return FindSimilarFailureModesResponse(
+            equipment_type_id=request.equipment_type_id,
+            groups=[],
+            skipped_reason="less than 2 failure modes",
+        )
+
+    n = len(fms)
+    parent = list(range(n))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    tokens_cache = [_sim_tokens(fm.failure_mode) for fm in fms]
+    for i in range(n):
+        for j in range(i + 1, n):
+            a_name = (fms[i].failure_mode or "").strip().lower()
+            b_name = (fms[j].failure_mode or "").strip().lower()
+            if a_name == b_name:
+                continue  # exact dups handled elsewhere
+            jacc = _sim_jaccard(tokens_cache[i], tokens_cache[j])
+            ratio = _sim_ratio(fms[i].failure_mode, fms[j].failure_mode)
+            if jacc >= 0.5 or ratio >= 0.8:
+                union(i, j)
+
+    cluster_map: Dict[int, List[SimilarFmItem]] = {}
+    for i, fm in enumerate(fms):
+        cluster_map.setdefault(find(i), []).append(fm)
+    candidate_clusters = [c for c in cluster_map.values() if len(c) >= 2]
+
+    if not candidate_clusters:
+        return FindSimilarFailureModesResponse(
+            equipment_type_id=request.equipment_type_id,
+            groups=[],
+            skipped_reason="no candidate clusters",
+        )
+
+    client = get_openai_client()
+    et_label = request.equipment_type_name or request.equipment_type_id
+
+    all_groups: List[SimilarGroup] = []
+    valid_ids_overall = {fm.id for fm in fms}
+    used_ids: set = set()  # Prevent overlapping groups across clusters
+
+    sys_prompt = (
+        "You are a reliability engineer reviewing a failure-modes library. "
+        "Group together failure modes that describe THE SAME underlying failure "
+        "but happen to be worded differently (e.g. 'Bearing Failure', 'Bearing "
+        "Damage' are usually the same). Do NOT merge failures that differ in "
+        "mechanism per ISO 14224 (e.g. 'Bearing Wear' ≠ 'Bearing Seizure' ≠ "
+        "'Bearing Fatigue'; 'Tube Leak' ≠ 'Tube Rupture'; 'Seal Leak' ≠ "
+        "'Seal Wear'). When in doubt, keep them SEPARATE. Output STRICT JSON."
+    )
+
+    for cluster in candidate_clusters:
+        items = [{"id": fm.id, "name": fm.failure_mode} for fm in cluster]
+        user_msg = (
+            f"Equipment type: {et_label}\n\n"
+            f"Candidate failure modes:\n{json.dumps(items, indent=2)}\n\n"
+            "Return JSON: {\"groups\": [{\"member_ids\": [\"...\", \"...\"], "
+            "\"canonical_name\": \"...\", \"reason\": \"<= 12 words\"}]}. "
+            "Only include groups with 2+ members that are truly duplicates "
+            "(same mechanism, different wording). Use the cleanest / most "
+            "ISO-14224-aligned name as canonical. A failure mode may appear "
+            "in at most ONE group — never overlap."
+        )
+        try:
+            resp = await call_openai_with_retry(
+                client,
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_msg},
+                ],
+                temperature=0,
+                max_tokens=600,
+                seed=42,
+                response_format={"type": "json_object"},
+            )
+            data = json.loads(resp.choices[0].message.content.strip())
+            groups = data.get("groups") or []
+        except RateLimitError:
+            raise HTTPException(status_code=429, detail="OpenAI rate limit — try again in a moment.")
+        except json.JSONDecodeError:
+            continue
+        except Exception as e:
+            logger.warning(f"find-similar GPT call failed on ET {et_label}: {e}")
+            continue
+
+        for g in groups:
+            if not isinstance(g, dict):
+                continue
+            members = [
+                m for m in (g.get("member_ids") or [])
+                if isinstance(m, str) and m in valid_ids_overall and m not in used_ids
+            ]
+            if len(members) < 2:
+                continue
+            used_ids.update(members)
+            all_groups.append(SimilarGroup(
+                member_ids=members,
+                canonical_name=(g.get("canonical_name") or "").strip()[:200] or "",
+                reason=(g.get("reason") or "").strip()[:240],
+            ))
+
+    return FindSimilarFailureModesResponse(
+        equipment_type_id=request.equipment_type_id,
+        groups=all_groups,
+    )

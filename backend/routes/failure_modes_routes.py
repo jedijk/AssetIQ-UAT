@@ -769,6 +769,149 @@ async def unvalidate_failure_mode(
         raise HTTPException(status_code=404, detail="Failure mode not found")
 
 
+@router.post("/failure-modes/merge")
+async def merge_failure_modes(
+    payload: dict = Body(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Merge N "loser" failure modes into a single "winner" failure mode.
+
+    Used by the AI similarity-review tool to consolidate near-duplicate
+    failure modes (e.g. "Bearing Failure" + "Bearing Damage" on a pump).
+    Always backs up loser docs to `fm_merge_log` before deleting.
+
+    Body: {"winner_id": "...", "loser_ids": ["...", "..."], "canonical_name": "..."}
+    """
+    from bson import ObjectId
+
+    winner_id = (payload.get("winner_id") or "").strip()
+    loser_ids = [str(x).strip() for x in (payload.get("loser_ids") or []) if str(x).strip()]
+    canonical_name = (payload.get("canonical_name") or "").strip()
+
+    if not winner_id or not loser_ids:
+        raise HTTPException(status_code=400, detail="winner_id and loser_ids are required")
+    if winner_id in loser_ids:
+        raise HTTPException(status_code=400, detail="winner_id cannot also be a loser")
+
+    def _id_query(mid: str):
+        if ObjectId.is_valid(mid):
+            return {"_id": ObjectId(mid)}
+        try:
+            return {"legacy_id": int(mid)}
+        except ValueError:
+            return None
+
+    win_q = _id_query(winner_id)
+    if not win_q:
+        raise HTTPException(status_code=400, detail=f"Invalid winner_id: {winner_id}")
+
+    winner = await db.failure_modes.find_one(win_q)
+    if not winner:
+        raise HTTPException(status_code=404, detail="Winner failure mode not found")
+
+    loser_docs = []
+    for lid in loser_ids:
+        q = _id_query(lid)
+        if not q:
+            continue
+        doc = await db.failure_modes.find_one(q)
+        if doc and doc["_id"] != winner["_id"]:
+            loser_docs.append(doc)
+
+    if not loser_docs:
+        raise HTTPException(status_code=404, detail="No valid loser failure modes found")
+
+    # Helper: dedupe-preserving union
+    def _dedup(items, key=lambda x: x):
+        seen, out = set(), []
+        for it in items or []:
+            k = key(it)
+            if k in seen:
+                continue
+            seen.add(k)
+            out.append(it)
+        return out
+
+    def _action_key(a):
+        if isinstance(a, str):
+            return a.strip().lower()
+        if isinstance(a, dict):
+            return (a.get("action") or a.get("description") or "").strip().lower()
+        return str(a)
+
+    def _str_key(v):
+        return (v or "").strip().lower() if isinstance(v, str) else str(v)
+
+    merged_ets = _dedup(
+        list(winner.get("equipment_type_ids") or [])
+        + [eid for ld in loser_docs for eid in (ld.get("equipment_type_ids") or [])]
+    )
+    merged_kw = _dedup(
+        list(winner.get("keywords") or [])
+        + [k for ld in loser_docs for k in (ld.get("keywords") or [])],
+        key=_str_key,
+    )
+    merged_actions = _dedup(
+        list(winner.get("recommended_actions") or [])
+        + [a for ld in loser_docs for a in (ld.get("recommended_actions") or [])],
+        key=_action_key,
+    )
+    merged_effects = _dedup(
+        list(winner.get("potential_effects") or [])
+        + [e for ld in loser_docs for e in (ld.get("potential_effects") or [])],
+        key=_str_key,
+    )
+    merged_causes = _dedup(
+        list(winner.get("potential_causes") or [])
+        + [c for ld in loser_docs for c in (ld.get("potential_causes") or [])],
+        key=_str_key,
+    )
+
+    update_fields = {
+        "equipment_type_ids": merged_ets,
+        "keywords": merged_kw,
+        "recommended_actions": merged_actions,
+        "potential_effects": merged_effects,
+        "potential_causes": merged_causes,
+        "updated_at": datetime.now(timezone.utc),
+        "version": (winner.get("version") or 1) + 1,
+    }
+    if canonical_name:
+        update_fields["failure_mode"] = canonical_name
+
+    # Backup losers first — small audit collection so the merge can be undone manually.
+    await db.fm_merge_log.insert_one({
+        "merged_at": datetime.now(timezone.utc),
+        "merged_by": current_user.get("id") or current_user.get("user_id"),
+        "winner_id": str(winner["_id"]),
+        "winner_failure_mode": canonical_name or winner.get("failure_mode"),
+        "previous_winner_name": winner.get("failure_mode"),
+        "losers": [
+            {**{k: v for k, v in ld.items() if k != "_id"}, "_mongo_id": str(ld["_id"])}
+            for ld in loser_docs
+        ],
+    })
+
+    await db.failure_modes.update_one({"_id": winner["_id"]}, {"$set": update_fields})
+    deleted = 0
+    for ld in loser_docs:
+        res = await db.failure_modes.delete_one({"_id": ld["_id"]})
+        deleted += res.deleted_count
+
+    # Invalidate FM list cache so the next GET refetches.
+    try:
+        from services.failure_modes_service import _invalidate_cache
+        _invalidate_cache()
+    except Exception:
+        pass
+
+    return {
+        "winner_id": str(winner["_id"]),
+        "deleted_count": deleted,
+        "canonical_name": canonical_name or winner.get("failure_mode"),
+    }
+
+
 @router.delete("/failure-modes/{mode_id}")
 async def delete_failure_mode(
     mode_id: str,

@@ -76,6 +76,7 @@ import AINewFailureModeSuggestions from "../components/library/AINewFailureModeS
 import AIImproveFailureMode from "../components/library/AIImproveFailureMode";
 import BulkImproveFailureModes from "../components/library/BulkImproveFailureModes";
 import AIReviewActionDisciplines from "../components/library/AIReviewActionDisciplines";
+import AIFindSimilarFailureModes from "../components/library/AIFindSimilarFailureModes";
 import { Upload, Sparkles } from "lucide-react";
 
 const disciplineIcons = {
@@ -154,6 +155,7 @@ const FailureModesPage = () => {
   const [isAIImproveOpen, setIsAIImproveOpen] = useState(false); // AI improve a single failure mode
   const [isBulkImproveOpen, setIsBulkImproveOpen] = useState(false); // Bulk improve all visible
   const [isReviewDisciplinesOpen, setIsReviewDisciplinesOpen] = useState(false); // AI review action disciplines
+  const [isFindSimilarOpen, setIsFindSimilarOpen] = useState(false); // AI find similar failure modes
   
   // Failure mode dialog state
   const [isFmDialogOpen, setIsFmDialogOpen] = useState(false);
@@ -969,6 +971,17 @@ const FailureModesPage = () => {
               >
                 <Sparkles className="w-4 h-4 mr-1" />
                 Review Disciplines
+              </Button>
+              <Button
+                onClick={() => setIsFindSimilarOpen(true)}
+                variant="outline"
+                className="h-11 border-purple-200 text-purple-700 hover:bg-purple-50"
+                data-testid="find-similar-fm-btn"
+                disabled={failureModes.length === 0}
+                title="Find similar failure modes per equipment type and merge them"
+              >
+                <Sparkles className="w-4 h-4 mr-1" />
+                Find Similar
               </Button>
               <Button
                 onClick={() => { setEditingFm(null); resetFmForm(); setIsFmDialogOpen(true); }}
@@ -2117,6 +2130,17 @@ const FailureModesPage = () => {
         open={isReviewDisciplinesOpen}
         onClose={() => setIsReviewDisciplinesOpen(false)}
         failureModes={failureModes}
+        onApplied={() => {
+          queryClient.invalidateQueries({ queryKey: ["failureModes"] });
+        }}
+      />
+
+      {/* AI Find Similar Failure Modes — semantic dedupe per equipment type */}
+      <AIFindSimilarFailureModes
+        open={isFindSimilarOpen}
+        onClose={() => setIsFindSimilarOpen(false)}
+        failureModes={failureModes}
+        equipmentTypes={equipmentTypes}
         onApplied={() => {
           queryClient.invalidateQueries({ queryKey: ["failureModes"] });
         }}
