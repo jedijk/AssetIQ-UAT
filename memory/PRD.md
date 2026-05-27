@@ -193,6 +193,27 @@ Create a robust full-stack platform optimized for multi-environment execution wi
   diff table (current → suggested + AI reason). User can toggle individual
   rows, override the suggested discipline via dropdown, and apply changes —
   patches are grouped per FM so each FM gets a single update.
+- **2026-05-27 update — discipline taxonomy aligned with the rest of the app:**
+  Backend `ACTION_DISCIPLINES` and frontend dropdowns now use the 8 canonical
+  disciplines from `/app/frontend/src/constants/disciplines.js` — Rotating,
+  Static, Piping, Electrical, Instrumentation, Civil, Operations, Laboratory.
+  Legacy values like `mechanical`, `process`, `lab` are mapped server-side so
+  existing records get flagged for re-tagging.
+
+## 2026-05-27 — Failure-Mode Dedupe (one-off)
+- **Issue:** 35 (equipment_type, failure_mode) pairs had duplicate records
+  attached to the same equipment_type (e.g. two "Bearing Failure" linked to
+  `pump_centrifugal`, three "Communication Failure" linked to `plc`).
+- **One-off script (`/tmp/fm_dedupe.py`):** Grouped FMs by normalised name
+  AND any shared equipment_type_id, picked the most complete representative
+  per group (highest score on keywords + actions + effects + causes +
+  validated flag + RPN), merged all loser fields (union of
+  equipment_type_ids, keywords, actions, effects, causes) into the winner,
+  then deleted the losers.
+- **Result:** 25 winners updated, 29 duplicates deleted. Library is now
+  649 → 620 FMs. 0 remaining (ET, name) duplicates.
+- **Backup:** Full snapshot of the 29 deleted docs at
+  `/app/memory/fm_dedupe_backup_2026-05-27.json` (and `/tmp/fm_dedupe_backup.json`).
 
 
 ## Testing

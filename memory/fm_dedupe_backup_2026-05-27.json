@@ -1,0 +1,2014 @@
+[
+  {
+    "legacy_id": 2,
+    "category": "Rotating",
+    "equipment": "Pump",
+    "failure_mode": "Bearing Failure",
+    "keywords": [
+      "bearing",
+      "noise",
+      "vibration",
+      "heat"
+    ],
+    "severity": 7,
+    "occurrence": 4,
+    "detectability": 4,
+    "rpn": 112,
+    "recommended_actions": [
+      {
+        "action": "Improve lubrication",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Monitor vibration",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace bearings on failure",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "pump_centrifugal",
+      "pump_reciprocating"
+    ],
+    "mechanism": "WEA",
+    "mechanism_description": "Wear - General",
+    "potential_effects": [
+      "Increased vibration",
+      "Excessive noise",
+      "Shaft damage",
+      "Catastrophic failure",
+      "Unplanned shutdown",
+      "Secondary damage to seals"
+    ],
+    "potential_causes": [
+      "Inadequate lubrication",
+      "Contaminated lubricant",
+      "Misalignment",
+      "Overloading",
+      "Fatigue",
+      "Improper installation"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-27 05:52:50.863000",
+    "ai_improved_at": "2026-05-27T05:52:50.747Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb2f4c"
+  },
+  {
+    "legacy_id": 233,
+    "category": "Rotating",
+    "equipment": "Gearbox",
+    "failure_mode": "Bearing Failure",
+    "keywords": [
+      "gearbox bearing",
+      "roller bearing",
+      "bearing damage",
+      "bearing noise"
+    ],
+    "severity": 8,
+    "occurrence": 4,
+    "detectability": 5,
+    "rpn": 160,
+    "recommended_actions": [
+      {
+        "action": "Monitor vibration spectrum",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Check bearing temperatures",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Ensure proper lubrication",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace bearing on failure",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "gearbox",
+      "pump_centrifugal",
+      "screw_motor_reductor",
+      "pneumatic_cylinder",
+      "motorized_pallet_lifter"
+    ],
+    "mechanism": "WEA",
+    "mechanism_description": "Wear - General",
+    "potential_effects": [
+      "Increased vibration",
+      "Excessive noise",
+      "Shaft damage",
+      "Catastrophic failure",
+      "Unplanned shutdown",
+      "Secondary damage to seals"
+    ],
+    "potential_causes": [
+      "Inadequate lubrication",
+      "Contaminated lubricant",
+      "Misalignment",
+      "Overloading",
+      "Fatigue",
+      "Improper installation"
+    ],
+    "version": 10,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-26 20:50:06.849000",
+    "ai_improved_at": "2026-05-26T20:50:06.456Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb3033"
+  },
+  {
+    "legacy_id": 242,
+    "category": "Rotating",
+    "equipment": "Blower Fan",
+    "failure_mode": "Bearing Failure",
+    "keywords": [
+      "fan bearing",
+      "bearing noise",
+      "bearing heat",
+      "pillow block"
+    ],
+    "severity": 7,
+    "occurrence": 4,
+    "detectability": 5,
+    "rpn": 140,
+    "recommended_actions": [
+      {
+        "action": "Lubricate bearings",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Monitor bearing temperature",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace worn bearings",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Conduct vibration analysis",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "blower_fan",
+      "bearing_radial",
+      "bearing_thrust"
+    ],
+    "mechanism": "WEA",
+    "mechanism_description": "Wear - General",
+    "potential_effects": [
+      "Increased vibration",
+      "Excessive noise",
+      "Shaft damage",
+      "Catastrophic failure",
+      "Unplanned shutdown",
+      "Secondary damage to seals"
+    ],
+    "potential_causes": [
+      "Inadequate lubrication",
+      "Contaminated lubricant",
+      "Misalignment",
+      "Overloading",
+      "Fatigue",
+      "Improper installation"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-26 21:14:34.670000",
+    "ai_improved_at": "2026-05-26T21:14:34.222Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb303c"
+  },
+  {
+    "legacy_id": 449,
+    "category": "Static",
+    "equipment": "Flange Fitting",
+    "failure_mode": "External Corrosion",
+    "keywords": [
+      "flange corrosion",
+      "external corrosion",
+      "CUI",
+      "rust"
+    ],
+    "severity": 5,
+    "occurrence": 5,
+    "detectability": 4,
+    "rpn": 100,
+    "recommended_actions": [
+      {
+        "action": "Inspect under insulation",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Apply protective coating",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace corroded components",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Conduct ultrasonic thickness testing",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "flange_fitting",
+      "pipe",
+      "vessel_pressure"
+    ],
+    "mechanism": "COR",
+    "mechanism_description": "Corrosion",
+    "potential_effects": [
+      "Wall thinning",
+      "Support degradation",
+      "Leak",
+      "Structural failure",
+      "Insulation damage"
+    ],
+    "potential_causes": [
+      "Coating failure",
+      "CUI",
+      "Marine environment",
+      "Chemical exposure",
+      "Inadequate maintenance",
+      "Condensation"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-27 05:56:18.920000",
+    "ai_improved_at": "2026-05-27T05:56:18.811Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb310b"
+  },
+  {
+    "legacy_id": 412,
+    "category": "Static",
+    "equipment": "Air Cooler",
+    "failure_mode": "Tube Leak",
+    "keywords": [
+      "tube leak",
+      "fin tube",
+      "header leak",
+      "tube failure"
+    ],
+    "severity": 7,
+    "occurrence": 5,
+    "detectability": 5,
+    "rpn": 175,
+    "recommended_actions": [
+      {
+        "action": "Pressure test bundles",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Plug leaking tubes",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace tube bundle",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Conduct regular ultrasonic thickness measurements",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "air_cooler",
+      "heat_exchanger"
+    ],
+    "mechanism": "LKG",
+    "mechanism_description": "Leakage",
+    "potential_effects": [
+      "Cross-contamination",
+      "Product quality issues",
+      "Reduced efficiency",
+      "Environmental release",
+      "Process upset"
+    ],
+    "potential_causes": [
+      "Corrosion",
+      "Erosion",
+      "Vibration fatigue",
+      "Thermal stress",
+      "Tube-to-tubesheet joint failure",
+      "Manufacturing defect"
+    ],
+    "version": 3,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-26 20:39:22.619000",
+    "iso14224_mechanism": "",
+    "process": "",
+    "ai_improved_at": "2026-05-26T20:39:22.212Z",
+    "_mongo_id": "69d560c3e06b93d83beb30e6"
+  },
+  {
+    "legacy_id": 25,
+    "category": "Piping",
+    "equipment": "Pipe",
+    "failure_mode": "Gasket Failure",
+    "keywords": [
+      "gasket",
+      "flange leak",
+      "piping"
+    ],
+    "severity": 7,
+    "occurrence": 5,
+    "detectability": 5,
+    "rpn": 175,
+    "recommended_actions": [
+      {
+        "action": "Replace gasket",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Torque correctly",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Inspect gasket condition",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Monitor for leaks using ultrasonic testing",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "pipe",
+      "flange_fitting"
+    ],
+    "mechanism": "LKG",
+    "mechanism_description": "Leakage",
+    "potential_effects": [
+      "Flange leak",
+      "Product loss",
+      "Fire/explosion hazard",
+      "Environmental release",
+      "Process shutdown"
+    ],
+    "potential_causes": [
+      "Improper bolt torque",
+      "Gasket creep",
+      "Thermal cycling",
+      "Chemical attack",
+      "Wrong gasket type",
+      "Flange misalignment"
+    ],
+    "version": 3,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-26 20:46:35.985000",
+    "iso14224_mechanism": "",
+    "process": "",
+    "ai_improved_at": "2026-05-26T20:46:35.580Z",
+    "_mongo_id": "69d560c3e06b93d83beb2f63"
+  },
+  {
+    "legacy_id": 32,
+    "category": "Instrumentation",
+    "equipment": "Valve",
+    "failure_mode": "Actuator Failure",
+    "keywords": [
+      "actuator",
+      "fail",
+      "control"
+    ],
+    "severity": 7,
+    "occurrence": 5,
+    "detectability": 5,
+    "rpn": 175,
+    "recommended_actions": [
+      {
+        "action": "Service actuator",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace actuator on failure",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Test actuator functionality",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "valve_control",
+      "valve_positioner"
+    ],
+    "mechanism": "BRD",
+    "mechanism_description": "Breakdown (Mechanical)",
+    "potential_effects": [
+      "Loss of valve control",
+      "Fail position operation",
+      "Process upset",
+      "Safety impact",
+      "Manual operation required"
+    ],
+    "potential_causes": [
+      "Air supply failure",
+      "Diaphragm rupture",
+      "Spring failure",
+      "Motor burnout",
+      "Gear damage",
+      "Corrosion"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-26 20:46:23.366000",
+    "ai_improved_at": "2026-05-26T20:46:22.966Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb2f6a"
+  },
+  {
+    "legacy_id": 41,
+    "category": "Instrumentation",
+    "equipment": "Sensor",
+    "failure_mode": "Sensor Drift",
+    "keywords": [
+      "drift",
+      "calibration",
+      "sensor"
+    ],
+    "severity": 5,
+    "occurrence": 7,
+    "detectability": 4,
+    "rpn": 140,
+    "recommended_actions": [
+      {
+        "action": "Calibrate sensor regularly",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace sensor if drift exceeds threshold",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Implement sensor drift monitoring",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "sensor_pressure",
+      "sensor_temperature",
+      "sensor_flow",
+      "sensor_level"
+    ],
+    "mechanism": "DRF",
+    "mechanism_description": "Instrument drift",
+    "potential_effects": [
+      "Measurement error",
+      "Control issues",
+      "Quality problems"
+    ],
+    "potential_causes": [
+      "Age",
+      "Environmental exposure",
+      "Contamination"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-26 21:16:40.226000",
+    "ai_improved_at": "2026-05-26T21:16:39.781Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb2f73"
+  },
+  {
+    "legacy_id": 49,
+    "category": "Instrumentation",
+    "equipment": "Communication",
+    "failure_mode": "Communication Failure",
+    "keywords": [
+      "communication",
+      "instrumentation",
+      "network"
+    ],
+    "severity": 6,
+    "occurrence": 5,
+    "detectability": 5,
+    "rpn": 150,
+    "recommended_actions": [
+      {
+        "action": "Improve network infrastructure",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Implement system redundancy",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Monitor communication signals",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace faulty components on failure",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "plc",
+      "communication_module",
+      "dcs"
+    ],
+    "mechanism": "BRD",
+    "mechanism_description": "Breakdown (Mechanical)",
+    "potential_effects": [
+      "Loss of function",
+      "Process upset",
+      "Safety impact"
+    ],
+    "potential_causes": [
+      "Component failure",
+      "Age",
+      "Environmental factors"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-26 20:58:05.884000",
+    "ai_improved_at": "2026-05-26T20:58:05.417Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb2f7b"
+  },
+  {
+    "legacy_id": 80,
+    "category": "Instrumentation",
+    "equipment": "System",
+    "failure_mode": "Communication Failure",
+    "keywords": [
+      "communication",
+      "instrumentation",
+      "failure"
+    ],
+    "severity": 7,
+    "occurrence": 5,
+    "detectability": 5,
+    "rpn": 175,
+    "recommended_actions": [
+      {
+        "action": "Implement redundancy in communication paths",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Conduct regular communication system audits",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace faulty communication modules",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "hmi_panel",
+      "communication_module",
+      "safety_light_curtain"
+    ],
+    "mechanism": "BRD",
+    "mechanism_description": "Breakdown (Mechanical)",
+    "potential_effects": [
+      "Loss of function",
+      "Process upset",
+      "Safety impact"
+    ],
+    "potential_causes": [
+      "Component failure",
+      "Age",
+      "Environmental factors"
+    ],
+    "version": 9,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-26 20:44:28.427000",
+    "iso14224_mechanism": "",
+    "process": "",
+    "ai_improved_at": "2026-05-26T20:44:28.015Z",
+    "_mongo_id": "69d560c3e06b93d83beb2f9a"
+  },
+  {
+    "legacy_id": 498,
+    "category": "Instrumentation",
+    "equipment": "Fire Gas",
+    "failure_mode": "Communication Failure",
+    "keywords": [
+      "loop failure",
+      "network fault",
+      "communication loss",
+      "field bus"
+    ],
+    "severity": 7,
+    "occurrence": 4,
+    "detectability": 6,
+    "rpn": 168,
+    "recommended_actions": [
+      {
+        "action": "Monitor loop health",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Check cable integrity",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Test redundant paths",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace faulty components on failure",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "fire_gas",
+      "dcs",
+      "plc"
+    ],
+    "mechanism": "BRD",
+    "mechanism_description": "Breakdown (Mechanical)",
+    "potential_effects": [
+      "Loss of function",
+      "Process upset",
+      "Safety impact"
+    ],
+    "potential_causes": [
+      "Component failure",
+      "Age",
+      "Environmental factors"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-27 05:52:06.812000",
+    "ai_improved_at": "2026-05-27T05:52:06.700Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb313c"
+  },
+  {
+    "legacy_id": 646,
+    "category": "Electrical",
+    "equipment": "Transformer",
+    "failure_mode": "Insulation Breakdown",
+    "keywords": [
+      "insulation",
+      "breakdown",
+      "electrical"
+    ],
+    "severity": 8,
+    "occurrence": 4,
+    "detectability": 5,
+    "rpn": 160,
+    "recommended_actions": [
+      {
+        "action": "Insulation testing",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Moisture control",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace damaged insulation on failure",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "transformer",
+      "generator",
+      "motor_electric"
+    ],
+    "mechanism": "UNK - Unknown",
+    "failure_mode_type": "generic",
+    "process": "",
+    "potential_effects": [
+      "Short circuit",
+      "Equipment damage",
+      "Fire hazard"
+    ],
+    "potential_causes": [
+      "Aging",
+      "Moisture ingress",
+      "Overvoltage"
+    ],
+    "iso14224_mechanism": "INS",
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_at": null,
+    "is_custom": true,
+    "is_builtin": false,
+    "created_by": "7cc2cfbf-3b3c-449f-9e76-9401b92276a5",
+    "created_at": "2026-05-26 15:35:27.652000",
+    "updated_at": "2026-05-26 20:49:12.211000",
+    "ai_improved_at": "2026-05-26T20:49:11.797Z",
+    "version": 2,
+    "_mongo_id": "6a15bdbf1e6cb9b6e803c328"
+  },
+  {
+    "legacy_id": 57,
+    "category": "Electrical",
+    "equipment": "System",
+    "failure_mode": "Ground Fault",
+    "keywords": [
+      "ground fault",
+      "electrical",
+      "short circuit"
+    ],
+    "severity": 5,
+    "occurrence": 5,
+    "detectability": 5,
+    "rpn": 125,
+    "recommended_actions": [
+      {
+        "action": "Improve grounding",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Inspect electrical connections",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Monitor insulation resistance",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Repair or replace faulty components",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "switchgear",
+      "motor_electric",
+      "transformer"
+    ],
+    "mechanism": "BRD",
+    "mechanism_description": "Breakdown (Mechanical)",
+    "potential_effects": [
+      "Loss of function",
+      "Process upset",
+      "Safety impact"
+    ],
+    "potential_causes": [
+      "Component failure",
+      "Age",
+      "Environmental factors"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-27 05:36:42.554000",
+    "ai_improved_at": "2026-05-27T05:36:42.436Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb2f83"
+  },
+  {
+    "legacy_id": 581,
+    "category": "Rotating",
+    "equipment": "Screw Element",
+    "failure_mode": "Screw Breakage",
+    "keywords": [
+      "breakage",
+      "fatigue",
+      "overload",
+      "element failure"
+    ],
+    "severity": 8,
+    "occurrence": 3,
+    "detectability": 5,
+    "rpn": 120,
+    "recommended_actions": [
+      {
+        "action": "Monitor torque limits",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Inspect for cracks",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace cracked elements",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Perform regular lubrication",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "screw_element",
+      "extruder"
+    ],
+    "mechanism": "FRA",
+    "mechanism_description": "Fracture",
+    "potential_effects": [
+      "Production stop",
+      "Barrel damage",
+      "Extended downtime"
+    ],
+    "potential_causes": [
+      "Overload",
+      "Fatigue",
+      "Foreign object",
+      "Material defect"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-27 05:38:20.564000",
+    "ai_improved_at": "2026-05-27T05:38:20.479Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb318f"
+  },
+  {
+    "legacy_id": 559,
+    "category": "Rotating",
+    "equipment": "Gear Set",
+    "failure_mode": "Gear Tooth Wear",
+    "keywords": [
+      "tooth wear",
+      "gear wear",
+      "pitch line",
+      "addendum"
+    ],
+    "severity": 6,
+    "occurrence": 5,
+    "detectability": 5,
+    "rpn": 150,
+    "recommended_actions": [
+      {
+        "action": "Oil analysis",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Inspect gear mesh",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace worn gears",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Vibration trend monitoring",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "gear_set",
+      "gearbox"
+    ],
+    "mechanism": "WEA",
+    "mechanism_description": "Wear - General",
+    "potential_effects": [
+      "Backlash increase",
+      "Noise",
+      "Vibration",
+      "Efficiency loss"
+    ],
+    "potential_causes": [
+      "Normal wear",
+      "Inadequate lubrication",
+      "Misalignment",
+      "Overload"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-26 20:52:09.742000",
+    "ai_improved_at": "2026-05-26T20:52:09.340Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb3179"
+  },
+  {
+    "legacy_id": 236,
+    "category": "Rotating",
+    "equipment": "Gearbox",
+    "failure_mode": "Low Oil Level",
+    "keywords": [
+      "low oil",
+      "oil starvation",
+      "lubrication loss",
+      "oil level"
+    ],
+    "severity": 8,
+    "occurrence": 4,
+    "detectability": 4,
+    "rpn": 128,
+    "recommended_actions": [
+      {
+        "action": "Check oil level regularly",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Install level switch",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Investigate oil consumption",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "gearbox",
+      "lubrication_system"
+    ],
+    "mechanism": "LKG",
+    "mechanism_description": "Leakage",
+    "potential_effects": [
+      "Inadequate lubrication",
+      "Bearing damage risk",
+      "Overheating"
+    ],
+    "potential_causes": [
+      "Leak",
+      "Consumption",
+      "Inadequate makeup",
+      "Seal failure"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-26 21:17:33.838000",
+    "ai_improved_at": "2026-05-26T21:17:33.381Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb3036"
+  },
+  {
+    "legacy_id": 613,
+    "category": "Rotating",
+    "equipment": "Lubrication System",
+    "failure_mode": "Oil Contamination",
+    "keywords": [
+      "contamination",
+      "water in oil",
+      "particles",
+      "dirty oil"
+    ],
+    "severity": 6,
+    "occurrence": 5,
+    "detectability": 4,
+    "rpn": 120,
+    "recommended_actions": [
+      {
+        "action": "Oil analysis",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Change oil filters",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Flush system if needed",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Vibration trend monitoring",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "lubrication_system",
+      "gearbox"
+    ],
+    "mechanism": "CON",
+    "mechanism_description": "Contamination",
+    "potential_effects": [
+      "Accelerated wear",
+      "Filter blockage",
+      "Bearing damage"
+    ],
+    "potential_causes": [
+      "Water ingress",
+      "Particle ingress",
+      "Degradation products",
+      "Wrong oil"
+    ],
+    "version": 3,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-27 05:37:56.555000",
+    "ai_improved_at": "2026-05-27T05:37:56.371Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb31af"
+  },
+  {
+    "legacy_id": 238,
+    "category": "Rotating",
+    "equipment": "Gearbox",
+    "failure_mode": "Gear Tooth Breakage",
+    "keywords": [
+      "tooth breakage",
+      "gear fracture",
+      "tooth crack",
+      "catastrophic failure"
+    ],
+    "severity": 8,
+    "occurrence": 4,
+    "detectability": 6,
+    "rpn": 192,
+    "recommended_actions": [
+      {
+        "action": "Vibration trend analysis",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Avoid shock loads",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Overhaul inspections",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace damaged gears on failure",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "gearbox"
+    ],
+    "mechanism": "FRA",
+    "mechanism_description": "Fracture",
+    "potential_effects": [
+      "Sudden failure",
+      "Secondary damage",
+      "Extended downtime"
+    ],
+    "potential_causes": [
+      "Overload",
+      "Fatigue",
+      "Material defect",
+      "Foreign object",
+      "Misalignment"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-26 21:14:48.739000",
+    "ai_improved_at": "2026-05-26T21:14:48.294Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb3038"
+  },
+  {
+    "legacy_id": 553,
+    "category": "Rotating",
+    "equipment": "Impeller",
+    "failure_mode": "Impeller Imbalance",
+    "keywords": [
+      "imbalance",
+      "unbalance",
+      "vibration",
+      "mass loss"
+    ],
+    "severity": 6,
+    "occurrence": 4,
+    "detectability": 4,
+    "rpn": 96,
+    "recommended_actions": [
+      {
+        "action": "Vibration analysis",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Balance impeller",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Clean deposits",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "impeller",
+      "pump_centrifugal"
+    ],
+    "mechanism": "VIB",
+    "mechanism_description": "Vibration",
+    "potential_effects": [
+      "High vibration",
+      "Bearing wear",
+      "Seal damage",
+      "Fatigue"
+    ],
+    "potential_causes": [
+      "Erosion",
+      "Deposit buildup",
+      "Damage",
+      "Manufacturing defect"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-27 06:01:36.153000",
+    "ai_improved_at": "2026-05-27T06:01:36.051Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb3173"
+  },
+  {
+    "legacy_id": 269,
+    "category": "Rotating",
+    "equipment": "Crane Hoist",
+    "failure_mode": "Gear Damage",
+    "keywords": [
+      "hoist gearbox",
+      "gear damage",
+      "reducer failure",
+      "transmission"
+    ],
+    "severity": 8,
+    "occurrence": 3,
+    "detectability": 5,
+    "rpn": 120,
+    "recommended_actions": [
+      {
+        "action": "Monitor gearbox oil",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Vibration analysis",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Overhaul periodically",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace damaged gears on failure",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "crane_hoist",
+      "gearbox"
+    ],
+    "mechanism": "BRD",
+    "mechanism_description": "Breakdown (Mechanical)",
+    "potential_effects": [
+      "Loss of function",
+      "Process upset",
+      "Safety impact"
+    ],
+    "potential_causes": [
+      "Component failure",
+      "Age",
+      "Environmental factors"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-27 05:46:35.142000",
+    "ai_improved_at": "2026-05-27T05:46:35.038Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb3057"
+  },
+  {
+    "legacy_id": 252,
+    "category": "Rotating",
+    "equipment": "Mixer Agitator",
+    "failure_mode": "Bearing Wear",
+    "keywords": [
+      "bearing wear",
+      "support bearing",
+      "steady bearing",
+      "bearing failure"
+    ],
+    "severity": 7,
+    "occurrence": 4,
+    "detectability": 5,
+    "rpn": 140,
+    "recommended_actions": [
+      {
+        "action": "Monitor bearing condition",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Proper lubrication",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace bearings proactively",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Vibration analysis",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace bearing on failure",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "mixer_agitator",
+      "bearing_radial",
+      "bearing_thrust"
+    ],
+    "mechanism": "WEA",
+    "mechanism_description": "Wear - General",
+    "potential_effects": [
+      "Increased vibration",
+      "Noise",
+      "Temperature rise",
+      "Clearance increase",
+      "Eventual failure"
+    ],
+    "potential_causes": [
+      "Normal wear progression",
+      "Inadequate lubrication",
+      "Contamination",
+      "Misalignment",
+      "Overloading"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-26 21:14:38.666000",
+    "ai_improved_at": "2026-05-26T21:14:38.216Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb3046"
+  },
+  {
+    "legacy_id": 551,
+    "category": "Rotating",
+    "equipment": "Coupling",
+    "failure_mode": "Coupling Failure",
+    "keywords": [
+      "coupling failure",
+      "breakage",
+      "shear",
+      "hub crack"
+    ],
+    "severity": 8,
+    "occurrence": 3,
+    "detectability": 6,
+    "rpn": 144,
+    "recommended_actions": [
+      {
+        "action": "Inspect coupling hubs",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Check torque rating",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace damaged parts",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Vibration trend monitoring",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "coupling",
+      "pump_centrifugal",
+      "compressor_centrifugal"
+    ],
+    "mechanism": "FRA",
+    "mechanism_description": "Fracture",
+    "potential_effects": [
+      "Complete separation",
+      "Equipment damage",
+      "Personnel risk",
+      "Extended downtime"
+    ],
+    "potential_causes": [
+      "Fatigue",
+      "Overload",
+      "Corrosion",
+      "Manufacturing defect",
+      "Improper selection"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-26 21:09:54.652000",
+    "ai_improved_at": "2026-05-26T21:09:54.206Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb3171"
+  },
+  {
+    "legacy_id": 588,
+    "category": "Electrical",
+    "equipment": "Brush Commutator",
+    "failure_mode": "Brush Wear",
+    "keywords": [
+      "brush wear",
+      "carbon brush",
+      "commutator",
+      "electrical"
+    ],
+    "severity": 5,
+    "occurrence": 4,
+    "detectability": 5,
+    "rpn": 100,
+    "recommended_actions": [
+      {
+        "action": "Check brush length",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace worn brushes",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Verify spring tension",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Conduct thermal imaging",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "brush_commutator",
+      "motor_dc"
+    ],
+    "mechanism": "WEA",
+    "mechanism_description": "Wear - General",
+    "potential_effects": [
+      "Poor commutation",
+      "Sparking",
+      "Commutator damage"
+    ],
+    "potential_causes": [
+      "Normal wear",
+      "Contamination",
+      "Wrong grade",
+      "Vibration",
+      "Overload"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-27 06:11:15.966000",
+    "ai_improved_at": "2026-05-27T06:11:15.861Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb3196"
+  },
+  {
+    "legacy_id": 314,
+    "category": "Electrical",
+    "equipment": "MCC",
+    "failure_mode": "Insulation Degradation",
+    "keywords": [
+      "insulation failure",
+      "insulation breakdown",
+      "tracking",
+      "flashover"
+    ],
+    "severity": 8,
+    "occurrence": 3,
+    "detectability": 6,
+    "rpn": 144,
+    "recommended_actions": [
+      {
+        "action": "Insulation resistance test",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Visual inspection",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace degraded insulation",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "mcc",
+      "transformer",
+      "cable_termination"
+    ],
+    "mechanism": "INS",
+    "mechanism_description": "Insulation failure",
+    "potential_effects": [
+      "Electrical failure",
+      "Fire risk",
+      "Equipment damage"
+    ],
+    "potential_causes": [
+      "Insulation breakdown",
+      "Moisture",
+      "Contamination"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-26 21:10:17.806000",
+    "ai_improved_at": "2026-05-26T21:10:17.357Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb3084"
+  },
+  {
+    "legacy_id": 365,
+    "category": "Instrumentation",
+    "equipment": "Valve Positioner",
+    "failure_mode": "Air Supply Failure",
+    "keywords": [
+      "air supply",
+      "instrument air",
+      "supply pressure",
+      "air leak"
+    ],
+    "severity": 6,
+    "occurrence": 4,
+    "detectability": 4,
+    "rpn": 96,
+    "recommended_actions": [
+      {
+        "action": "Check supply pressure",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Inspect air tubing",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Fix air leaks",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "valve_positioner",
+      "actuator_pneumatic"
+    ],
+    "mechanism": "BRD",
+    "mechanism_description": "Breakdown (Mechanical)",
+    "potential_effects": [
+      "Loss of function",
+      "Process upset",
+      "Safety impact"
+    ],
+    "potential_causes": [
+      "Component failure",
+      "Age",
+      "Environmental factors"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-27 06:03:29.341000",
+    "ai_improved_at": "2026-05-27T06:03:29.225Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb30b7"
+  },
+  {
+    "legacy_id": 372,
+    "category": "Instrumentation",
+    "equipment": "DCS",
+    "failure_mode": "Controller Failure",
+    "keywords": [
+      "DCS controller",
+      "processor failure",
+      "CPU failure",
+      "controller crash"
+    ],
+    "severity": 8,
+    "occurrence": 3,
+    "detectability": 4,
+    "rpn": 96,
+    "recommended_actions": [
+      {
+        "action": "Redundancy check",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Monitor CPU health",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace failed controller",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "dcs",
+      "plc"
+    ],
+    "mechanism": "BRD",
+    "mechanism_description": "Breakdown (Mechanical)",
+    "potential_effects": [
+      "Loss of function",
+      "Process upset",
+      "Safety impact"
+    ],
+    "potential_causes": [
+      "Component failure",
+      "Age",
+      "Environmental factors"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-27 06:03:15.791000",
+    "ai_improved_at": "2026-05-27T06:03:15.683Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb30be"
+  },
+  {
+    "legacy_id": 622,
+    "category": "Static",
+    "equipment": "Tray Packing",
+    "failure_mode": "Tray Damage",
+    "keywords": [
+      "tray damage",
+      "collapsed",
+      "bent",
+      "corrosion"
+    ],
+    "severity": 6,
+    "occurrence": 4,
+    "detectability": 5,
+    "rpn": 120,
+    "recommended_actions": [
+      {
+        "action": "Internal inspection",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Check levelness",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace damaged trays",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Conduct corrosion analysis",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "tray_packing"
+    ],
+    "mechanism": "DEF",
+    "mechanism_description": "Deformation",
+    "potential_effects": [
+      "Separation efficiency loss",
+      "Flooding",
+      "Weeping"
+    ],
+    "potential_causes": [
+      "Corrosion",
+      "Mechanical damage",
+      "Thermal stress",
+      "Improper installation"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-27 05:37:48.782000",
+    "ai_improved_at": "2026-05-27T05:37:48.691Z",
+    "iso14224_mechanism": "COR",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb31b8"
+  },
+  {
+    "legacy_id": 623,
+    "category": "Static",
+    "equipment": "Tray Packing",
+    "failure_mode": "Packing Degradation",
+    "keywords": [
+      "packing",
+      "degraded",
+      "crushed",
+      "channeling"
+    ],
+    "severity": 5,
+    "occurrence": 5,
+    "detectability": 5,
+    "rpn": 125,
+    "recommended_actions": [
+      {
+        "action": "Monitor separation efficiency",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Inspect packing condition",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Replace packing",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Conduct thermal imaging to detect hotspots",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "tray_packing"
+    ],
+    "mechanism": "MAT",
+    "mechanism_description": "Material degradation",
+    "potential_effects": [
+      "Channeling",
+      "Separation efficiency loss",
+      "Pressure drop increase"
+    ],
+    "potential_causes": [
+      "Age",
+      "Fouling",
+      "Thermal damage",
+      "Mechanical damage"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-26 21:18:56.364000",
+    "ai_improved_at": "2026-05-26T21:18:55.558Z",
+    "iso14224_mechanism": "FAT",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb31b9"
+  },
+  {
+    "legacy_id": 463,
+    "category": "Static",
+    "equipment": "Furnace Heater",
+    "failure_mode": "Refractory Failure",
+    "keywords": [
+      "refractory failure",
+      "lining damage",
+      "hot spots",
+      "casing hot"
+    ],
+    "severity": 6,
+    "occurrence": 4,
+    "detectability": 4,
+    "rpn": 96,
+    "recommended_actions": [
+      {
+        "action": "Thermal imaging",
+        "action_type": "PDM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Visual inspection",
+        "action_type": "PM",
+        "discipline": "mechanical"
+      },
+      {
+        "action": "Repair/patch refractory",
+        "action_type": "CM",
+        "discipline": "mechanical"
+      }
+    ],
+    "equipment_type_ids": [
+      "furnace_heater"
+    ],
+    "mechanism": "BRD",
+    "mechanism_description": "Breakdown (Mechanical)",
+    "potential_effects": [
+      "Loss of function",
+      "Process upset",
+      "Safety impact"
+    ],
+    "potential_causes": [
+      "Component failure",
+      "Age",
+      "Environmental factors"
+    ],
+    "version": 2,
+    "is_validated": false,
+    "validated_by_name": null,
+    "validated_by_position": null,
+    "validated_by_id": null,
+    "validated_at": null,
+    "is_custom": false,
+    "is_builtin": true,
+    "created_by": "system",
+    "created_at": "2026-04-07 19:53:39.954000",
+    "updated_at": "2026-05-27 06:02:15.278000",
+    "ai_improved_at": "2026-05-27T06:02:15.170Z",
+    "iso14224_mechanism": "",
+    "process": "",
+    "_mongo_id": "69d560c3e06b93d83beb3119"
+  }
+]
