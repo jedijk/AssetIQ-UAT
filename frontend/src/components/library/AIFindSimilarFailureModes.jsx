@@ -141,7 +141,12 @@ export default function AIFindSimilarFailureModes({
 
   // Apply selected merges. For each selected group, pick the "winner" = the
   // failure mode whose name best matches the canonical (case-insensitive
-  // exact match preferred, otherwise the longest one), then call /merge.
+  // exact match preferred, otherwise the most "complete" record), then call
+  // /merge. The same FM can appear in multiple groups across equipment types
+  // (it's linked to several ETs), so after each merge we track:
+  //   - `deletedIds`: losers from previous merges (now gone)
+  //   - `renamedIds`: winners whose name was renamed by a previous merge
+  // and re-derive each group's member list before calling /merge.
   const applyMerges = async () => {
     const selected = groups.filter((g) => g.selected);
     if (!selected.length) {
@@ -150,26 +155,33 @@ export default function AIFindSimilarFailureModes({
     }
     setApplying(true);
 
+    const deletedIds = new Set();
+    const renamedTo = new Map(); // fm_id -> canonical name applied
     let okCount = 0;
+    let skippedCount = 0;
     let failCount = 0;
-    const usedIds = new Set();
+    const errorSamples = []; // first few real error messages for user feedback
 
     for (const g of selected) {
-      // Skip if any member was already merged in a previous group (server would 404)
-      if (g.member_ids.some((id) => usedIds.has(id))) {
-        failCount += g.member_ids.length;
+      // Drop any members that were deleted by a previous merge.
+      const liveIds = g.member_ids.filter((id) => !deletedIds.has(id));
+      if (liveIds.length < 2) {
+        skippedCount += 1;
         continue;
       }
-      const memberFms = g.member_ids.map((id) => fmById.get(id)).filter(Boolean);
+      const memberFms = liveIds.map((id) => fmById.get(id)).filter(Boolean);
       if (memberFms.length < 2) {
-        failCount += memberFms.length;
+        skippedCount += 1;
         continue;
       }
-      // Pick winner: name closest to canonical, else most "complete"
+      // Pick winner: name closest to canonical (after renames), else most "complete"
       const canonical = (g.canonical_name || "").trim().toLowerCase();
-      let winner = memberFms.find(
-        (fm) => (fm.failure_mode || "").trim().toLowerCase() === canonical,
-      );
+      let winner = memberFms.find((fm) => {
+        const currentName = (renamedTo.get(fm.id) || fm.failure_mode || "")
+          .trim()
+          .toLowerCase();
+        return currentName === canonical;
+      });
       if (!winner) {
         winner = memberFms.reduce((best, fm) => {
           const score = (fm.recommended_actions?.length || 0) * 3
@@ -189,18 +201,42 @@ export default function AIFindSimilarFailureModes({
           canonical_name: g.canonical_name || winner.failure_mode,
         });
         okCount += 1;
-        g.member_ids.forEach((id) => usedIds.add(id));
+        losers.forEach((l) => deletedIds.add(l.id));
+        if (g.canonical_name) renamedTo.set(winner.id, g.canonical_name);
       } catch (err) {
         console.error("Merge failed for group", g, err);
-        failCount += 1;
+        const status = err?.response?.status;
+        const detail = err?.response?.data?.detail || err?.message || "";
+        // 404 means a referenced FM was already deleted (race / overlap) —
+        // treat as a benign skip, not a hard failure.
+        if (status === 404 || /not found/i.test(detail)) {
+          skippedCount += 1;
+        } else {
+          failCount += 1;
+          if (errorSamples.length < 3) {
+            errorSamples.push(`"${g.canonical_name}" (${g.et_name}): ${detail || status || "unknown"}`);
+          }
+        }
       }
     }
 
     setApplying(false);
     if (okCount) toast.success(`Merged ${okCount} group(s).`);
-    if (failCount) toast.error(`${failCount} group(s) failed to merge.`);
+    if (skippedCount) {
+      toast.info(
+        `${skippedCount} group(s) skipped — members were already part of an earlier merge.`,
+      );
+    }
+    if (failCount) {
+      toast.error(
+        `${failCount} group(s) failed to merge. ${errorSamples.length ? `e.g. ${errorSamples[0]}` : ""}`,
+        { duration: 8000 },
+      );
+      // Also log all samples to console for easier debugging
+      errorSamples.forEach((s) => console.warn("merge-fail sample:", s));
+    }
     onApplied?.();
-    if (failCount === 0) onClose?.();
+    if (failCount === 0 && okCount > 0) onClose?.();
   };
 
   const progressPct = totalEts > 0 ? Math.min(100, Math.round((scanned / totalEts) * 100)) : 0;
