@@ -1542,10 +1542,11 @@ async def improve_failure_mode_endpoint(request: ImproveFailureModeRequest):
 # lets the user re-allocate them based on the action text + action_type.
 
 ACTION_DISCIPLINES = [
-    "mechanical",
+    "rotating",
+    "static",
+    "piping",
     "electrical",
     "instrumentation",
-    "process",
     "civil",
     "operations",
     "laboratory",
@@ -1553,20 +1554,34 @@ ACTION_DISCIPLINES = [
 
 REVIEW_ACTION_DISCIPLINE_SYSTEM_PROMPT = """You are an industrial reliability engineer responsible for routing maintenance work orders to the right discipline crew.
 
-Given a list of recommended maintenance actions, classify EACH one into exactly ONE of these disciplines:
-- mechanical: rotating/static equipment work — bearings, seals, alignment, lubrication, vibration, gaskets, mechanical seals, couplings, hand-tools, mechanical inspection, replace/repair mechanical parts
-- electrical: motors (windings/insulation), cabling, switchgear, transformers, MCCs, grounding, megger tests, electrical isolation, short-circuit work
-- instrumentation: sensors, transmitters, control loops, calibration, signal/communication faults, PLCs, level/pressure/temperature instruments, valve positioners, loop checks
-- process: process conditions — flow rates, pressure setpoints, NPSH, temperature setpoints, chemical dosing, fluid quality, operating-window adjustments, P&ID review
-- civil: foundations, baseplates, grouting, structural steel, concrete, anchor bolts, building/containment
-- operations: operator rounds, procedure changes, training, manual operations, shift logbook, housekeeping, watchkeeping
-- laboratory: oil analysis, vibration analysis (lab-based), metallurgical testing, sampling for lab, fluid testing, NDE/UT/RT in lab
+Given a list of recommended maintenance actions, classify EACH one into exactly ONE of these disciplines (return the lowercase key in the JSON; the human label is shown for context only):
+
+- rotating (Rotating): work on rotating equipment — pumps, compressors, turbines, motors (mechanical side), fans, gearboxes, bearings, mechanical seals, alignment, vibration, lubrication, couplings, shafts, impellers
+- static (Static): work on static equipment — pressure vessels, heat exchangers, tanks, columns, reactors, filters, strainers, gaskets, manways, fouling, corrosion, fatigue cracking on static metal
+- piping (Piping): piping and valves — leak repair on pipe/flange/valve, valve overhaul, line blockages, gasket replacement on flanged joints, pipe support, line walks
+- electrical (Electrical): motors (windings/insulation), cabling, switchgear, transformers, MCCs, grounding, megger tests, electrical isolation, short-circuit work, breakers
+- instrumentation (Instrumentation): sensors, transmitters, control loops, calibration, signal/communication faults, PLCs, level/pressure/temperature/flow instruments, valve positioners, loop checks, DCS work
+- civil (Civil): foundations, baseplates, grouting, structural steel, concrete, anchor bolts, building/containment, insulation/cladding (civil scope)
+- operations (Operations): operator rounds, procedure changes, training, manual operations, shift logbook, housekeeping, watchkeeping, setpoint changes, process-condition adjustments (NPSH, flow, temperature, dosing), permits
+- laboratory (Laboratory): oil analysis, vibration analysis (lab-based), metallurgical testing, sampling for lab, fluid testing, NDE/UT/RT/PT/MT inspection
+
+Tie-breakers when ambiguous:
+- "Inspect/replace bearings, seals, shaft, impeller" → rotating
+- "Inspect/replace gasket on flange, isolate valve" → piping
+- "Inspect tank/vessel/heat-exchanger for corrosion/fouling/cracks" → static
+- "Adjust NPSH / setpoint / flow / chemical dosing / operating window" → operations
+- "Calibrate / loop check / replace transmitter" → instrumentation
+- "Megger motor / check insulation / electrical isolation" → electrical
+- "Re-grout baseplate / repair foundation / anchor bolts" → civil
+- "Send oil sample to lab / spectroscopy / metallurgical test / NDT" → laboratory
 
 Rules:
-1. Use lowercase exact discipline keys above.
-2. Use the action text first, then `action_type` (PM/CM/PDM) as a tiebreaker.
-3. If ambiguous, prefer the discipline that does the *physical* work.
-4. Output STRICT JSON only — an array entry per input, in the SAME order.
+1. JSON output: use the lowercase key (e.g. "rotating", not "Rotating").
+2. Human reasoning text: refer to the discipline using its human label (e.g. "Rotating work").
+3. Use the action text first, then `action_type` (PM/CM/PDM) as a tiebreaker.
+4. If ambiguous, prefer the discipline that does the *physical* work.
+5. Never invent a discipline outside the 8 listed above.
+6. Output STRICT JSON only — an array entry per input, in the SAME order.
 """
 
 
@@ -1602,14 +1617,29 @@ def _normalize_discipline(value: Optional[str]) -> str:
     if not value:
         return ""
     v = value.strip().lower()
-    # Map common variants to canonical keys.
+    # Map common variants to the 8 canonical discipline keys used in the app
+    # (see /app/frontend/src/constants/disciplines.js).
     aliases = {
-        "mech": "mechanical", "mechanic": "mechanical",
-        "elec": "electrical", "i&c": "instrumentation", "ic": "instrumentation",
+        "mech": "rotating",  # legacy: most "mechanical" actions are rotating-equipment work
+        "mechanic": "rotating",
+        "mechanical": "rotating",
+        "rotating equipment": "rotating",
+        "static equipment": "static",
+        "pipe": "piping",
+        "piping/valves": "piping",
+        "valves": "piping",
+        "elec": "electrical",
+        "i&c": "instrumentation", "ic": "instrumentation",
         "instrumentation & control": "instrumentation", "instrument": "instrumentation",
         "ops": "operations", "operator": "operations",
-        "lab": "laboratory",
+        "process": "operations",  # process-condition tweaks → operations crew
+        "maintenance": "operations",
+        "safety": "operations",
+        "reliability": "operations",
+        "engineering": "operations",
         "civil/structural": "civil", "structural": "civil",
+        "lab": "laboratory",
+        "inspection": "laboratory",
     }
     if v in aliases:
         return aliases[v]
@@ -1699,16 +1729,19 @@ Return JSON: {{"results": [{{"i": 0, "discipline": "mechanical", "reason": "..."
         suggested = _normalize_discipline(r.get("discipline"))
         if suggested not in ACTION_DISCIPLINES:
             # Fallback: keep the current one so we never produce garbage.
-            suggested = _normalize_discipline(a.current_discipline) or "mechanical"
-        current = _normalize_discipline(a.current_discipline)
+            suggested = _normalize_discipline(a.current_discipline) or "rotating"
+        # Return the RAW current discipline (lowercased) — not the normalized
+        # form — so the diff catches legacy values like "mechanical" that
+        # should be re-tagged to one of the 8 canonical keys.
+        raw_current = (a.current_discipline or "").strip().lower()
         results.append(
             ActionDisciplineResult(
                 fm_id=a.fm_id,
                 action_index=a.action_index,
-                current_discipline=current or None,
+                current_discipline=raw_current or None,
                 suggested_discipline=suggested,
                 reason=(r.get("reason") or "").strip()[:200] or "Classified by AI reliability engineer.",
-                changed=(suggested != current),
+                changed=(suggested != raw_current),
             )
         )
 

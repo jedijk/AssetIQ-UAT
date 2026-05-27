@@ -20,34 +20,27 @@ import {
 } from "../ui/select";
 import { toast } from "sonner";
 import api from "../../lib/api";
+import { DISCIPLINES, getDisciplineLabel } from "../../constants/disciplines";
 
 const BATCH_SIZE = 25; // Actions per OpenAI call
-const ALLOWED_DISCIPLINES = [
-  "mechanical",
-  "electrical",
-  "instrumentation",
-  "process",
-  "civil",
-  "operations",
-  "laboratory",
-];
 
-const DISCIPLINE_COLOR = {
-  mechanical: "bg-blue-100 text-blue-700 border-blue-200",
-  electrical: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  instrumentation: "bg-cyan-100 text-cyan-700 border-cyan-200",
-  process: "bg-slate-100 text-slate-700 border-slate-200",
-  civil: "bg-stone-100 text-stone-700 border-stone-200",
-  operations: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  laboratory: "bg-purple-100 text-purple-700 border-purple-200",
-};
+// Use the SAME 8 disciplines as the rest of the app (Rotating / Static /
+// Piping / Electrical / Instrumentation / Civil / Operations / Laboratory).
+// Single source of truth: /app/frontend/src/constants/disciplines.js
+const DISCIPLINE_OPTIONS = DISCIPLINES.map((d) => ({ value: d.value, label: d.label }));
+const ALLOWED_DISCIPLINES = DISCIPLINES.map((d) => d.value);
+
+const DISCIPLINE_COLOR = Object.fromEntries(
+  DISCIPLINES.map((d) => [d.value, `${d.color} border-slate-200`]),
+);
 
 const DisciplineBadge = ({ value }) => {
   const v = (value || "").toLowerCase();
   const cls = DISCIPLINE_COLOR[v] || "bg-slate-100 text-slate-600 border-slate-200";
+  const label = getDisciplineLabel(v) || value || "—";
   return (
-    <Badge variant="outline" className={`${cls} text-[11px] capitalize font-medium`}>
-      {value || "-"}
+    <Badge variant="outline" className={`${cls} text-[11px] font-medium`}>
+      {label}
     </Badge>
   );
 };
@@ -433,13 +426,13 @@ export default function AIReviewActionDisciplines({ open, onClose, failureModes 
                               value={row.override || r.suggested_discipline}
                               onValueChange={(v) => setRow(key, { override: v, selected: true })}
                             >
-                              <SelectTrigger className="h-7 text-xs capitalize">
+                              <SelectTrigger className="h-7 text-xs">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {ALLOWED_DISCIPLINES.map((d) => (
-                                  <SelectItem key={d} value={d} className="capitalize">
-                                    {d}
+                                {DISCIPLINE_OPTIONS.map((d) => (
+                                  <SelectItem key={d.value} value={d.value}>
+                                    {d.label}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
