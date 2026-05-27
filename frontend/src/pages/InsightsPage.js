@@ -1,11 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLanguage } from "../contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Progress } from "../components/ui/progress";
 import { Badge } from "../components/ui/badge";
 import { Skeleton } from "../components/ui/skeleton";
-import { getBackendUrl } from "../lib/apiConfig";
 import { formatDateTime } from "../lib/dateUtils";
 import { 
   Activity, 
@@ -31,14 +30,6 @@ import {
 import api from "../lib/api";
 import { toast } from "sonner";
 
-const API_URL = getBackendUrl();
-
-// Helper to get auth headers
-const getAuthHeaders = () => {
-  const token = localStorage.getItem("token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};
-
 const InsightsPage = ({ embedded = false }) => {
   const { t } = useLanguage();
   
@@ -53,18 +44,24 @@ const InsightsPage = ({ embedded = false }) => {
   const [gaps, setGaps] = useState(null);
   const [recommendations, setRecommendations] = useState(null);
   const [generatingRecommendations, setGeneratingRecommendations] = useState(false);
+  
+  // Ref to track if error toast was already shown (prevents flickering)
+  const errorToastShownRef = useRef(false);
+  // Ref to track if data fetch is in progress (prevents duplicate calls)
+  const fetchInProgressRef = useRef(false);
 
-  // Fetch all data on mount
-  useEffect(() => {
-    fetchAllData();
-  }, []);
-
-  const fetchAllData = async () => {
+  const fetchAllData = useCallback(async (showToastOnError = true) => {
+    // Prevent duplicate fetch calls
+    if (fetchInProgressRef.current) {
+      return;
+    }
+    
+    fetchInProgressRef.current = true;
     setLoading(true);
     setError(null);
     
     try {
-      const headers = getAuthHeaders();
+      // API client already handles auth headers via interceptor
       const [
         summaryRes,
         actionsRes,
@@ -73,12 +70,12 @@ const InsightsPage = ({ embedded = false }) => {
         qualityRes,
         gapsRes
       ] = await Promise.all([
-        api.get("/insights/summary", { headers }),
-        api.get("/execution/actions", { headers }),
-        api.get("/execution/tasks", { headers }),
-        api.get("/execution/disciplines", { headers }),
-        api.get("/reliability/data-quality", { headers }),
-        api.get("/reliability/gaps", { headers })
+        api.get("/insights/summary"),
+        api.get("/execution/actions"),
+        api.get("/execution/tasks"),
+        api.get("/execution/disciplines"),
+        api.get("/reliability/data-quality"),
+        api.get("/reliability/gaps")
       ]);
       
       setSummary(summaryRes.data);
@@ -87,20 +84,39 @@ const InsightsPage = ({ embedded = false }) => {
       setDisciplinePerformance(disciplinesRes.data);
       setDataQuality(qualityRes.data);
       setGaps(gapsRes.data);
+      
+      // Reset error toast flag on successful load
+      errorToastShownRef.current = false;
     } catch (err) {
       console.error("Error fetching insights:", err);
-      setError("Unable to load reliability data");
-      toast.error("Failed to load insights data");
+      
+      // Check if it's an auth error (401) - don't show toast, let auth flow handle it
+      if (err.response?.status === 401) {
+        setError("Please log in to view insights");
+      } else {
+        setError("Unable to load reliability data");
+        // Only show toast if not already shown (prevents flickering)
+        if (showToastOnError && !errorToastShownRef.current) {
+          errorToastShownRef.current = true;
+          toast.error("Failed to load Insights data");
+        }
+      }
     } finally {
       setLoading(false);
+      fetchInProgressRef.current = false;
     }
-  };
+  }, []);
+
+  // Fetch all data on mount
+  useEffect(() => {
+    fetchAllData();
+  }, [fetchAllData]);
 
   const generateRecommendations = async () => {
     setGeneratingRecommendations(true);
     try {
-      const headers = getAuthHeaders();
-      const res = await api.post("/ai/recommendations", {}, { headers });
+      // API client already handles auth headers via interceptor
+      const res = await api.post("/ai/recommendations", {});
       setRecommendations(res.data);
       toast.success("Recommendations generated successfully");
     } catch (err) {
@@ -163,6 +179,12 @@ const InsightsPage = ({ embedded = false }) => {
     );
   }
 
+  // Handler for manual refresh - reset error toast flag to allow showing toast again
+  const handleRefresh = () => {
+    errorToastShownRef.current = false;
+    fetchAllData(true);
+  };
+
   if (error) {
     return (
       <div className={`${embedded ? 'p-4 sm:p-6' : 'p-6'}`} data-testid="insights-error">
@@ -176,7 +198,7 @@ const InsightsPage = ({ embedded = false }) => {
           <CardContent className="p-6 text-center">
             <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
             <p className="text-red-700 font-medium">{error}</p>
-            <Button onClick={fetchAllData} className="mt-4" variant="outline">
+            <Button onClick={handleRefresh} className="mt-4" variant="outline">
               <RefreshCw className="w-4 h-4 mr-2" />
               Retry
             </Button>
@@ -197,8 +219,8 @@ const InsightsPage = ({ embedded = false }) => {
             <Activity className="w-6 h-6 text-blue-600" />
             <h1 className="text-2xl font-bold text-slate-900">Execution & Reliability Insights</h1>
           </div>
-          <Button onClick={fetchAllData} variant="outline" size="sm">
-            <RefreshCw className="w-4 h-4 mr-2" />
+          <Button onClick={handleRefresh} variant="outline" size="sm" disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
@@ -206,8 +228,8 @@ const InsightsPage = ({ embedded = false }) => {
       
       {embedded && (
         <div className="flex items-center justify-end">
-          <Button onClick={fetchAllData} variant="outline" size="sm">
-            <RefreshCw className="w-4 h-4 mr-2" />
+          <Button onClick={handleRefresh} variant="outline" size="sm" disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
