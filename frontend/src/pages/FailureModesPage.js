@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
+import { usePermissions } from "../contexts/PermissionsContext";
 import { formatDateTime } from "../lib/dateUtils";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import { 
@@ -109,6 +110,11 @@ const FailureModesPage = () => {
   const { pushUndo } = useUndo();
   const { t } = useLanguage();
   const { user } = useAuth();
+  const { hasPermission } = usePermissions();
+  // AI tools (Suggest, Bulk Improve, Review Disciplines, Find Similar, Suggest
+  // New Types, and the Not-improved-yet filter) are gated by the
+  // `library_ai_tools` permission so owners can hide them from junior roles.
+  const canUseAITools = hasPermission("library_ai_tools", "read");
   const [searchParams, setSearchParams] = useSearchParams();
   
   const isMobile = useIsMobile();
@@ -894,7 +900,7 @@ const FailureModesPage = () => {
                   hideAIImproved
                     ? "border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100"
                     : "border-slate-200 text-slate-700 hover:bg-slate-50"
-                }`}
+                } ${canUseAITools ? "" : "hidden"}`}
                 data-testid="hide-ai-improved-toggle"
                 title={`Hide failure modes already improved by AI (${aiImprovedCount} marked)`}
                 aria-pressed={hideAIImproved}
@@ -942,7 +948,7 @@ const FailureModesPage = () => {
               <Button
                 onClick={() => setIsAINewFmOpen(true)}
                 variant="outline"
-                className="h-11 border-purple-200 text-purple-700 hover:bg-purple-50"
+                className={`h-11 border-purple-200 text-purple-700 hover:bg-purple-50 ${canUseAITools ? "" : "hidden"}`}
                 data-testid="ai-suggest-new-failure-modes-btn"
                 disabled={equipmentTypes.length === 0}
                 title="Let AI act as a reliability engineer and suggest failure modes missing from your library"
@@ -953,7 +959,7 @@ const FailureModesPage = () => {
               <Button
                 onClick={() => setIsBulkImproveOpen(true)}
                 variant="outline"
-                className="h-11 border-purple-200 text-purple-700 hover:bg-purple-50"
+                className={`h-11 border-purple-200 text-purple-700 hover:bg-purple-50 ${canUseAITools ? "" : "hidden"}`}
                 data-testid="bulk-improve-fm-btn"
                 disabled={displayedFailureModes.length === 0}
                 title={`Run AI improvement and auto-apply changes for the ${displayedFailureModes.length} visible failure mode(s)`}
@@ -964,7 +970,7 @@ const FailureModesPage = () => {
               <Button
                 onClick={() => setIsReviewDisciplinesOpen(true)}
                 variant="outline"
-                className="h-11 border-purple-200 text-purple-700 hover:bg-purple-50"
+                className={`h-11 border-purple-200 text-purple-700 hover:bg-purple-50 ${canUseAITools ? "" : "hidden"}`}
                 data-testid="review-action-disciplines-btn"
                 disabled={failureModes.length === 0}
                 title="Have AI re-classify the maintenance discipline of every recommended action in the library"
@@ -975,7 +981,7 @@ const FailureModesPage = () => {
               <Button
                 onClick={() => setIsFindSimilarOpen(true)}
                 variant="outline"
-                className="h-11 border-purple-200 text-purple-700 hover:bg-purple-50"
+                className={`h-11 border-purple-200 text-purple-700 hover:bg-purple-50 ${canUseAITools ? "" : "hidden"}`}
                 data-testid="find-similar-fm-btn"
                 disabled={failureModes.length === 0}
                 title="Find similar failure modes per equipment type and merge them"
@@ -1181,7 +1187,7 @@ const FailureModesPage = () => {
                           size="sm"
                           variant="outline"
                           onClick={() => setIsAINewTypesOpen(true)}
-                          className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
+                          className={`bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100 ${canUseAITools ? "" : "hidden"}`}
                           data-testid="ai-suggest-new-types-btn"
                           disabled={hierarchyNodes.length === 0}
                           title="Suggest new equipment types based on your hierarchy"

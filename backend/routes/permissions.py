@@ -26,6 +26,7 @@ DEFAULT_PERMISSIONS = {
         "forms": {"read": True, "write": True, "delete": True},
         "equipment": {"read": True, "write": True, "delete": True},
         "library": {"read": True, "write": True, "delete": True},
+        "library_ai_tools": {"read": True, "write": True, "delete": True},
         "insights": {"read": True, "write": True, "delete": True},
         "chat": {"read": True, "write": True, "delete": True},
         "statistics": {"read": True, "write": True, "delete": True},
@@ -42,6 +43,7 @@ DEFAULT_PERMISSIONS = {
         "forms": {"read": True, "write": True, "delete": True},
         "equipment": {"read": True, "write": True, "delete": False},
         "library": {"read": True, "write": True, "delete": True},
+        "library_ai_tools": {"read": True, "write": True, "delete": False},
         "insights": {"read": True, "write": True, "delete": False},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": True, "write": False, "delete": False},
@@ -58,6 +60,7 @@ DEFAULT_PERMISSIONS = {
         "forms": {"read": True, "write": True, "delete": False},
         "equipment": {"read": True, "write": True, "delete": False},
         "library": {"read": True, "write": True, "delete": False},
+        "library_ai_tools": {"read": False, "write": False, "delete": False},
         "insights": {"read": True, "write": True, "delete": False},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": True, "write": False, "delete": False},
@@ -74,6 +77,7 @@ DEFAULT_PERMISSIONS = {
         "forms": {"read": True, "write": False, "delete": False},
         "equipment": {"read": True, "write": False, "delete": False},
         "library": {"read": True, "write": False, "delete": False},
+        "library_ai_tools": {"read": False, "write": False, "delete": False},
         "insights": {"read": True, "write": False, "delete": False},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": False, "write": False, "delete": False},
@@ -90,6 +94,7 @@ DEFAULT_PERMISSIONS = {
         "forms": {"read": True, "write": False, "delete": False},
         "equipment": {"read": True, "write": False, "delete": False},
         "library": {"read": True, "write": False, "delete": False},
+        "library_ai_tools": {"read": False, "write": False, "delete": False},
         "insights": {"read": True, "write": False, "delete": False},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": False, "write": False, "delete": False},
@@ -106,6 +111,7 @@ DEFAULT_PERMISSIONS = {
         "forms": {"read": True, "write": False, "delete": False},
         "equipment": {"read": True, "write": False, "delete": False},
         "library": {"read": True, "write": False, "delete": False},
+        "library_ai_tools": {"read": False, "write": False, "delete": False},
         "insights": {"read": True, "write": False, "delete": False},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": False, "write": False, "delete": False},
@@ -148,6 +154,10 @@ FEATURES = {
     "library": {
         "name": "Library",
         "description": "Failure modes and maintenance strategies"
+    },
+    "library_ai_tools": {
+        "name": "Library — AI Tools",
+        "description": "Heavy-cost AI buttons in the failure-modes library: Suggest Failure Modes, Bulk Improve, Review Disciplines, Find Similar, Suggest New Equipment Types, and the 'Not improved yet' filter"
     },
     "insights": {
         "name": "Reliability Insights",
@@ -209,6 +219,27 @@ class RoleUpdate(BaseModel):
 
 # Store for custom roles
 SYSTEM_ROLES = ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"]
+
+
+def _backfill_permissions(stored_perms: Dict) -> Dict:
+    """Ensure every role in `stored_perms` has an entry for every feature key
+    in FEATURES. When a new permission feature is introduced (e.g.
+    `library_ai_tools`), older stored docs don't have it — we fall back to the
+    role's default permission for that feature, or to `viewer` defaults for
+    custom roles. This keeps the UI permission matrix complete and ensures
+    `hasPermission` doesn't silently return False for newly-added features.
+    """
+    if not isinstance(stored_perms, dict):
+        return DEFAULT_PERMISSIONS.copy()
+    result: Dict = {}
+    for role_name, role_perms in stored_perms.items():
+        merged = dict(role_perms or {})
+        defaults_for_role = DEFAULT_PERMISSIONS.get(role_name) or DEFAULT_PERMISSIONS["viewer"]
+        for feature_key in FEATURES.keys():
+            if feature_key not in merged:
+                merged[feature_key] = dict(defaults_for_role.get(feature_key, {"read": False, "write": False, "delete": False}))
+        result[role_name] = merged
+    return result
 
 
 @router.get("/permissions/roles")
@@ -390,7 +421,7 @@ async def get_all_permissions(current_user: dict = Depends(get_current_user)):
     stored_permissions = await db.permissions.find_one({"type": "role_permissions"})
     
     if stored_permissions:
-        permissions = stored_permissions.get("permissions", DEFAULT_PERMISSIONS)
+        permissions = _backfill_permissions(stored_permissions.get("permissions", DEFAULT_PERMISSIONS))
     else:
         permissions = DEFAULT_PERMISSIONS.copy()
     
@@ -418,7 +449,7 @@ async def get_my_permissions(current_user: dict = Depends(get_current_user)):
     # Get permissions
     stored = await db.permissions.find_one({"type": "role_permissions"})
     if stored:
-        permissions = stored.get("permissions", DEFAULT_PERMISSIONS)
+        permissions = _backfill_permissions(stored.get("permissions", DEFAULT_PERMISSIONS))
     else:
         permissions = DEFAULT_PERMISSIONS
     
@@ -449,7 +480,7 @@ async def check_permission(
     # Get permissions
     stored = await db.permissions.find_one({"type": "role_permissions"})
     if stored:
-        permissions = stored.get("permissions", DEFAULT_PERMISSIONS)
+        permissions = _backfill_permissions(stored.get("permissions", DEFAULT_PERMISSIONS))
     else:
         permissions = DEFAULT_PERMISSIONS
     
@@ -478,7 +509,8 @@ async def get_role_permissions(
     stored_permissions = await db.permissions.find_one({"type": "role_permissions"})
     
     if stored_permissions:
-        permissions = stored_permissions.get("permissions", {}).get(role)
+        all_perms = _backfill_permissions(stored_permissions.get("permissions", {}))
+        permissions = all_perms.get(role)
     else:
         permissions = DEFAULT_PERMISSIONS.get(role)
     

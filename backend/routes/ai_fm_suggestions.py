@@ -1246,9 +1246,9 @@ A. failure_mode (name):
    - Keep verbatim if it is already short, specific and action-oriented.
    - Change ONLY if the existing name is generic ("Pump Failure"), redundant, or hides the mechanism.
 
-B. category / mechanism:
+B. discipline / mechanism:
    - Keep verbatim if the existing value is in the allowed set and matches the equipment family.
-   - category must be one of: Rotating, Static, Piping, Electrical, Instrumentation, Civil, Operations, Laboratory.
+   - discipline must be exactly ONE of: Rotating, Static, Piping, Electrical, Instrumentation, Civil, Operations, Laboratory. (Note: the input field may be named `category` for legacy reasons — treat it as the discipline.)
    - mechanism must be a short ISO 14224 code: BRD, LKG, COR, ERO, FAT, FRA, WEA, CON, INS, CAL, VIB, ELU, OVH, CAV, UNK.
 
 C. severity / occurrence / detectability (SAE J1739 scale, 1-10):
@@ -1265,17 +1265,29 @@ E. potential_effects / potential_causes / recommended_actions (lists):
    - Change ONLY when there is a real gap: missing common cause, missing critical effect, vague actions like "check regularly". When changing, preserve good existing entries and add (don't replace).
    - For `recommended_actions` SPECIFICALLY: aim for a **balanced mix of PM (preventive), CM (corrective) and PDM (predictive)** task types AND tag each action with the correct discipline.
      * Format EVERY action as: `"<Action text> [<DISCIPLINE>] (<TYPE>[, <frequency>])"`.
-     * Allowed disciplines: **Mechanical, Electrical, Instrumentation, Piping, Static, Operations, Civil, Laboratory**. Pick the discipline that actually performs the work (e.g. relubrication = Mechanical, megger test = Electrical, calibration check = Instrumentation, hydrostatic test = Piping, NDT on pressure vessel = Static, operator round = Operations).
+     * Allowed disciplines (EXACTLY 8 — never use any other label, in particular NEVER use "Mechanical"):
+       **Rotating, Static, Piping, Electrical, Instrumentation, Civil, Operations, Laboratory**.
+     * Pick the discipline that actually performs the physical work:
+       - bearings, seals, alignment, lubrication, vibration, couplings, shafts, impellers → Rotating
+       - heat exchangers, pressure vessels, tanks, columns, fouling/corrosion on static metal → Static
+       - pipe/flange/valve work, gasket replacement, line walks → Piping
+       - motor windings, megger tests, MCC/switchgear, cabling, grounding → Electrical
+       - transmitters, calibration, loop checks, PLCs, positioners, DCS → Instrumentation
+       - foundations, baseplates, grouting, anchor bolts, structural steel → Civil
+       - operator rounds, procedure changes, setpoint adjustments, NPSH tweaks, housekeeping → Operations
+       - oil analysis, NDE/UT/RT/PT/MT, metallurgical testing, sampling → Laboratory
      * Allowed type markers: PM, CM, PDM.
      * Examples of correct output:
-         - "Vibration trend monitoring [Mechanical] (PDM, monthly)"
+         - "Vibration trend monitoring [Rotating] (PDM, monthly)"
          - "Megger insulation test [Electrical] (PDM, annually)"
          - "Calibrate temperature transmitter [Instrumentation] (PM, every 6 months)"
-         - "Replace failed bearing [Mechanical] (CM)"
+         - "Replace failed bearing [Rotating] (CM)"
          - "Restart pump with manual reset [Operations] (CM)"
          - "Hydrostatic pressure test [Piping] (PM, every 5 years)"
+         - "Re-grout pump baseplate [Civil] (CM)"
+         - "Send oil sample for ferrography [Laboratory] (PDM, quarterly)"
      * If the existing list already covers the mix well, keep it verbatim.
-     * If the existing list is heavy on one type/discipline (e.g. all Mechanical / all PM), ADD complementary actions across the right disciplines instead of replacing.
+     * If the existing list is heavy on one type/discipline (e.g. all Rotating / all PM), ADD complementary actions across the right disciplines instead of replacing.
 
 F. equipment_type_ids:
    - Keep existing valid IDs verbatim. Add up to 2 more EXACT IDs from the user's catalog ONLY if the failure mode clearly applies and was previously missing.
@@ -1288,6 +1300,7 @@ OUTPUT REQUIREMENTS:
    - One bullet per field you actually CHANGED, referencing the field name.
    - If you changed nothing, return an empty list.
    - NEVER include a bullet for a field you kept verbatim.
+   - In any human-readable text (summary, explanations, rationale) refer to the field as "discipline" — never "category".
 
 2. `field_explanations` (object, keyed by field name) — REQUIRED FOR EVERY FIELD:
    - Include a 1-sentence explanation for **every** field in this list:
@@ -1297,9 +1310,10 @@ OUTPUT REQUIREMENTS:
    - For UNCHANGED fields: state WHY the current value is already strong with concrete reasoning — reference the specific value, scale, scope or ISO context. Avoid generic phrases like "looks good".
      Example: `"keywords": "Already covers mechanism (vibration), location (bearing) and equipment context — 4 lowercase terms aligned with ISO 14224 search vocabulary."`
      Example: `"severity": "S=7 correctly reflects loss-of-containment risk without crossing into catastrophic safety/environmental territory (≥9)."`
+   - In the human-readable explanation TEXT, always say "discipline" (e.g. "discipline is Rotating because…"), even when the JSON key is `category`. Never write the word "category" in any explanation, summary, or rationale.
    - Never leave a field out. Never write empty strings.
 
-3. `rationale`: one short sentence summarising the overall direction. If nothing changed, say so plainly (e.g. "Record is already strong; no changes needed.").
+3. `rationale`: one short sentence summarising the overall direction. If nothing changed, say so plainly (e.g. "Record is already strong; no changes needed."). Use "discipline" wording, not "category".
 
 Return ONLY valid JSON. No prose outside JSON."""
 
@@ -1318,7 +1332,7 @@ def _improve_cache_key(fm: ExistingFailureModeFull, et_ids: List[str]) -> str:
         "catalog": sorted(et_ids),
     }, sort_keys=True)
     # Bump version when prompt schema changes so stale cached responses are not reused.
-    return hashlib.md5(f"IMPROVEFM_V3:{fingerprint}".encode()).hexdigest()
+    return hashlib.md5(f"IMPROVEFM_V4:{fingerprint}".encode()).hexdigest()
 
 
 async def improve_failure_mode_with_ai(
@@ -1453,6 +1467,52 @@ Return JSON:
         occ = _clip(result.get("occurrence"), 1, 10, fm.occurrence or 5)
         det = _clip(result.get("detectability"), 1, 10, fm.detectability or 5)
 
+        # ---- Discipline tag normalisation for recommended_actions ----
+        # Even with an updated prompt, the model occasionally returns legacy
+        # discipline labels like "[Mechanical]" or "[Process]". Rewrite those
+        # to the 8 canonical disciplines so the FM library never persists a
+        # non-standard tag.
+        _DISC_FIX = {
+            "mechanical": "Rotating",
+            "process": "Operations",
+            "i&c": "Instrumentation",
+            "ic": "Instrumentation",
+            "instrument": "Instrumentation",
+            "elec": "Electrical",
+            "ops": "Operations",
+            "operator": "Operations",
+            "structural": "Civil",
+            "civil/structural": "Civil",
+            "lab": "Laboratory",
+            "inspection": "Laboratory",
+            "maintenance": "Operations",
+            "safety": "Operations",
+            "reliability": "Operations",
+            "engineering": "Operations",
+        }
+        _CANONICAL = {"Rotating", "Static", "Piping", "Electrical",
+                      "Instrumentation", "Civil", "Operations", "Laboratory"}
+
+        def _fix_action(text: str) -> str:
+            """Replace any [Discipline] tag inside an action string with a canonical value."""
+            if not isinstance(text, str):
+                return text
+            import re
+            def _repl(m):
+                raw = m.group(1).strip()
+                if raw in _CANONICAL:
+                    return f"[{raw}]"
+                fixed = _DISC_FIX.get(raw.lower())
+                if fixed:
+                    return f"[{fixed}]"
+                # Title-cased close match
+                title = raw.title()
+                if title in _CANONICAL:
+                    return f"[{title}]"
+                # Unknown — coerce to Operations rather than leaving an invalid tag
+                return "[Operations]"
+            return re.sub(r"\[([^\]]+)\]", _repl, text)
+
         raw_ids = result.get("equipment_type_ids") or []
         et_ids_out = [i for i in raw_ids if i in valid_et_ids]
         # Always preserve existing valid IDs even if AI dropped them
@@ -1469,12 +1529,22 @@ Return JSON:
             "keywords", "potential_effects", "potential_causes",
             "recommended_actions", "equipment_type_ids",
         }
+
+        def _no_category_word(text: str) -> str:
+            """Rewrite any literal mention of 'category' in human-readable text
+            to 'discipline'. The JSON key stays `category` (legacy schema) but
+            the prose the user reads should consistently say 'discipline'."""
+            if not isinstance(text, str):
+                return text
+            import re
+            return re.sub(r"\bcategor(y|ies)\b", lambda m: "discipline" + ("" if m.group(1) == "y" else "s"), text, flags=re.IGNORECASE)
+
         raw_expls = result.get("field_explanations") or {}
         field_explanations: Dict[str, str] = {}
         if isinstance(raw_expls, dict):
             for k, v in raw_expls.items():
                 if k in ALLOWED_EXPL_KEYS and isinstance(v, str) and v.strip():
-                    field_explanations[k] = v.strip()
+                    field_explanations[k] = _no_category_word(v.strip())
 
         improved = ImprovedFailureMode(
             failure_mode=(result.get("failure_mode") or fm.failure_mode).strip(),
@@ -1487,12 +1557,12 @@ Return JSON:
             keywords=_str_list(result.get("keywords"), 8),
             potential_effects=_str_list(result.get("potential_effects"), 6),
             potential_causes=_str_list(result.get("potential_causes"), 6),
-            recommended_actions=_str_list(result.get("recommended_actions"), 8),
+            recommended_actions=[_fix_action(a) for a in _str_list(result.get("recommended_actions"), 8)],
             equipment_type_ids=et_ids_out,
             equipment_type_names=et_names_out,
-            improvements_summary=_str_list(result.get("improvements_summary"), 6),
+            improvements_summary=[_no_category_word(s) for s in _str_list(result.get("improvements_summary"), 6)],
             field_explanations=field_explanations,
-            rationale=(result.get("rationale") or "").strip(),
+            rationale=_no_category_word((result.get("rationale") or "").strip()),
         )
 
         _suggestion_cache[cache_key] = improved
