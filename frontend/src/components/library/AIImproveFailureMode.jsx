@@ -181,18 +181,55 @@ export function AIImproveFailureMode({
       return;
     }
     const patch = {};
-    // Parse out the leading PM/CM/PDM marker from an action string.
-    // Accepts: "Vibration trend monitoring (PDM, monthly)" -> {type: "PDM", action: "Vibration trend monitoring"}.
-    // Falls back to PM when no marker is present.
+    const VALID_DISCIPLINES = new Set([
+      "Mechanical",
+      "Electrical",
+      "Instrumentation",
+      "Piping",
+      "Static",
+      "Operations",
+      "Civil",
+      "Laboratory",
+    ]);
+    // Parse out the embedded type marker "(PM|CM|PDM[, freq])" and the discipline
+    // marker "[Discipline]" from an action string.
+    // Accepts e.g. "Vibration trend monitoring [Mechanical] (PDM, monthly)"
+    //   -> {actionType: "PDM", discipline: "Mechanical", cleaned: "Vibration trend monitoring"}
+    // Falls back to PM / Mechanical when markers are missing.
     const parseActionType = (txt) => {
-      const m = String(txt || "").match(/\s*\((PDM|PM|CM)(?:[,)][^)]*)?\)\s*$/i);
-      if (m) {
-        return {
-          actionType: m[1].toUpperCase(),
-          cleaned: String(txt).slice(0, m.index).trim(),
-        };
+      const raw = String(txt || "");
+      const typeMatch = raw.match(/\s*\((PDM|PM|CM)(?:[,)][^)]*)?\)\s*$/i);
+      const discMatch = raw.match(/\s*\[([A-Za-z]+)\]\s*$/);
+      let actionType = "PM";
+      let discipline = "Mechanical";
+      let cleaned = raw;
+      if (typeMatch) {
+        actionType = typeMatch[1].toUpperCase();
+        cleaned = cleaned.slice(0, typeMatch.index).trim();
       }
-      return { actionType: "PM", cleaned: String(txt || "").trim() };
+      const discInTrailing = cleaned.match(/\s*\[([A-Za-z]+)\]\s*$/);
+      if (discInTrailing) {
+        const candidate = discInTrailing[1];
+        const normalized =
+          [...VALID_DISCIPLINES].find(
+            (d) => d.toLowerCase() === candidate.toLowerCase(),
+          ) || candidate;
+        if (VALID_DISCIPLINES.has(normalized)) {
+          discipline = normalized;
+          cleaned = cleaned.slice(0, discInTrailing.index).trim();
+        }
+      } else if (discMatch) {
+        const candidate = discMatch[1];
+        const normalized =
+          [...VALID_DISCIPLINES].find(
+            (d) => d.toLowerCase() === candidate.toLowerCase(),
+          ) || candidate;
+        if (VALID_DISCIPLINES.has(normalized)) {
+          discipline = normalized;
+          cleaned = cleaned.replace(discMatch[0], "").trim();
+        }
+      }
+      return { actionType, discipline, cleaned: cleaned || raw.trim() };
     };
     for (const k of keys) {
       if (k === "recommended_actions") {
@@ -209,11 +246,11 @@ export function AIImproveFailureMode({
         patch[k] = (improved.recommended_actions || []).map((txt) => {
           const existing = existingByAction[String(txt).toLowerCase()];
           if (existing) return existing;
-          const { actionType, cleaned } = parseActionType(txt);
+          const { actionType, discipline, cleaned } = parseActionType(txt);
           return {
             action: cleaned || String(txt).trim(),
             action_type: actionType,
-            discipline: "mechanical",
+            discipline,
           };
         });
       } else if (k === "mechanism") {
@@ -229,14 +266,22 @@ export function AIImproveFailureMode({
   };
 
   const parseTypeFromAction = (txt) => {
-    const m = String(txt || "").match(/\s*\((PDM|PM|CM)(?:[,)][^)]*)?\)\s*$/i);
-    if (m) {
-      return {
-        type: m[1].toUpperCase(),
-        label: String(txt).slice(0, m.index).trim(),
-      };
+    const raw = String(txt || "");
+    const typeMatch = raw.match(/\s*\((PDM|PM|CM)(?:[,)][^)]*)?\)\s*$/i);
+    let type = null;
+    let label = raw;
+    if (typeMatch) {
+      type = typeMatch[1].toUpperCase();
+      label = label.slice(0, typeMatch.index).trim();
     }
-    return { type: null, label: String(txt || "").trim() };
+    // Also strip a trailing "[Discipline]" so the visual label is clean.
+    let discipline = null;
+    const discMatch = label.match(/\s*\[([A-Za-z]+)\]\s*$/);
+    if (discMatch) {
+      discipline = discMatch[1];
+      label = label.slice(0, discMatch.index).trim();
+    }
+    return { type, discipline, label };
   };
 
   const ACTION_TYPE_COLORS = {
@@ -264,13 +309,16 @@ export function AIImproveFailureMode({
             {display.slice(0, 8).map((raw, i) => {
               let label = raw;
               let type = null;
+              let discipline = null;
               if (typeof raw === "string") {
                 const parsed = parseTypeFromAction(raw);
                 label = parsed.label || raw;
                 type = parsed.type;
+                discipline = parsed.discipline;
               } else if (raw && typeof raw === "object") {
                 label = raw.action || raw.description || JSON.stringify(raw);
                 type = (raw.action_type || "").toUpperCase() || null;
+                discipline = raw.discipline || null;
               }
               return (
                 <li
@@ -285,6 +333,14 @@ export function AIImproveFailureMode({
                       }`}
                     >
                       {type}
+                    </span>
+                  )}
+                  {discipline && (
+                    <span
+                      className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded border bg-slate-50 text-slate-600 border-slate-200 flex-shrink-0 mt-0.5 capitalize"
+                      title="Discipline"
+                    >
+                      {discipline}
                     </span>
                   )}
                   <span className="flex-1">{label}</span>

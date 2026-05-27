@@ -52,15 +52,40 @@ const valEqual = (a, b) => {
   return String(a ?? "") === String(b ?? "");
 };
 
+const VALID_DISCIPLINES = new Set([
+  "Mechanical",
+  "Electrical",
+  "Instrumentation",
+  "Piping",
+  "Static",
+  "Operations",
+  "Civil",
+  "Laboratory",
+]);
+
 const parseActionType = (txt) => {
-  const m = String(txt || "").match(/\s*\((PDM|PM|CM)(?:[,)][^)]*)?\)\s*$/i);
-  if (m) {
-    return {
-      actionType: m[1].toUpperCase(),
-      cleaned: String(txt).slice(0, m.index).trim(),
-    };
+  const raw = String(txt || "");
+  const typeMatch = raw.match(/\s*\((PDM|PM|CM)(?:[,)][^)]*)?\)\s*$/i);
+  let actionType = "PM";
+  let discipline = "Mechanical";
+  let cleaned = raw;
+  if (typeMatch) {
+    actionType = typeMatch[1].toUpperCase();
+    cleaned = cleaned.slice(0, typeMatch.index).trim();
   }
-  return { actionType: "PM", cleaned: String(txt || "").trim() };
+  const discMatch = cleaned.match(/\s*\[([A-Za-z]+)\]\s*$/);
+  if (discMatch) {
+    const candidate = discMatch[1];
+    const normalized =
+      [...VALID_DISCIPLINES].find(
+        (d) => d.toLowerCase() === candidate.toLowerCase(),
+      ) || candidate;
+    if (VALID_DISCIPLINES.has(normalized)) {
+      discipline = normalized;
+      cleaned = cleaned.slice(0, discMatch.index).trim();
+    }
+  }
+  return { actionType, discipline, cleaned: cleaned || raw.trim() };
 };
 
 const buildPatch = (fm, improved) => {
@@ -96,11 +121,11 @@ const buildPatch = (fm, improved) => {
         (txt) => {
           const existing = existingByAction[String(txt).toLowerCase()];
           if (existing) return existing;
-          const { actionType, cleaned } = parseActionType(txt);
+          const { actionType, discipline, cleaned } = parseActionType(txt);
           return {
             action: cleaned || String(txt).trim(),
             action_type: actionType,
-            discipline: "mechanical",
+            discipline,
           };
         },
       );

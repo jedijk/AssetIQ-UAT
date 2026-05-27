@@ -1263,16 +1263,19 @@ D. keywords (3-6, lowercase):
 E. potential_effects / potential_causes / recommended_actions (lists):
    - Keep verbatim if the existing list has 3+ specific, well-written entries.
    - Change ONLY when there is a real gap: missing common cause, missing critical effect, vague actions like "check regularly". When changing, preserve good existing entries and add (don't replace).
-   - For `recommended_actions` SPECIFICALLY: aim for a **balanced mix of PM (preventive), CM (corrective) and PDM (predictive)** task types whenever the failure mode supports it.
-     * Always end each action with the type marker in parentheses: "(PM)", "(CM)" or "(PDM)". You may add a frequency hint after, e.g. "(PDM, monthly)" or "(PM, every 6 months)".
-     * Examples of good output:
-         - "Vibration trend monitoring (PDM, monthly)"
-         - "Lubrication analysis (PDM, quarterly)"
-         - "Replace mechanical seal at planned shutdown (PM)"
-         - "Replace bearing on failure (CM)"
-         - "Restart pump with manual reset (CM)"
+   - For `recommended_actions` SPECIFICALLY: aim for a **balanced mix of PM (preventive), CM (corrective) and PDM (predictive)** task types AND tag each action with the correct discipline.
+     * Format EVERY action as: `"<Action text> [<DISCIPLINE>] (<TYPE>[, <frequency>])"`.
+     * Allowed disciplines: **Mechanical, Electrical, Instrumentation, Piping, Static, Operations, Civil, Laboratory**. Pick the discipline that actually performs the work (e.g. relubrication = Mechanical, megger test = Electrical, calibration check = Instrumentation, hydrostatic test = Piping, NDT on pressure vessel = Static, operator round = Operations).
+     * Allowed type markers: PM, CM, PDM.
+     * Examples of correct output:
+         - "Vibration trend monitoring [Mechanical] (PDM, monthly)"
+         - "Megger insulation test [Electrical] (PDM, annually)"
+         - "Calibrate temperature transmitter [Instrumentation] (PM, every 6 months)"
+         - "Replace failed bearing [Mechanical] (CM)"
+         - "Restart pump with manual reset [Operations] (CM)"
+         - "Hydrostatic pressure test [Piping] (PM, every 5 years)"
      * If the existing list already covers the mix well, keep it verbatim.
-     * If the existing list is heavy on one type (e.g. only PM), ADD complementary PDM / CM actions instead of replacing.
+     * If the existing list is heavy on one type/discipline (e.g. all Mechanical / all PM), ADD complementary actions across the right disciplines instead of replacing.
 
 F. equipment_type_ids:
    - Keep existing valid IDs verbatim. Add up to 2 more EXACT IDs from the user's catalog ONLY if the failure mode clearly applies and was previously missing.
@@ -1315,7 +1318,7 @@ def _improve_cache_key(fm: ExistingFailureModeFull, et_ids: List[str]) -> str:
         "catalog": sorted(et_ids),
     }, sort_keys=True)
     # Bump version when prompt schema changes so stale cached responses are not reused.
-    return hashlib.md5(f"IMPROVEFM_V2:{fingerprint}".encode()).hexdigest()
+    return hashlib.md5(f"IMPROVEFM_V3:{fingerprint}".encode()).hexdigest()
 
 
 async def improve_failure_mode_with_ai(
