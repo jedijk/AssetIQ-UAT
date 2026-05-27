@@ -805,20 +805,23 @@ const FailureModesPage = () => {
             </div>
           </div>
 
-          {/* Filters - Same as ThreatsPage */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6" data-testid="filters">
-            <div className="relative flex-1">
+          {/* Filters - wraps to multiple rows when the toolbar gets crowded */}
+          <div
+            className="flex flex-wrap items-center gap-2 mb-6"
+            data-testid="filters"
+          >
+            <div className="relative flex-1 min-w-[220px] sm:min-w-[260px] basis-full sm:basis-auto sm:max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
               <Input
                 placeholder={t("library.searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 h-11"
+                className="pl-10 h-11 w-full"
                 data-testid="search-input"
               />
             </div>
             <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
-              <SelectTrigger className="w-full sm:w-48 h-11" data-testid="category-filter">
+              <SelectTrigger className="w-44 h-11" data-testid="category-filter">
                 <Filter className="w-4 h-4 mr-2 text-slate-400" />
                 <SelectValue placeholder="All Disciplines" />
               </SelectTrigger>
@@ -830,7 +833,7 @@ const FailureModesPage = () => {
               </SelectContent>
             </Select>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-full sm:w-52 h-11" data-testid="type-filter">
+              <SelectTrigger className="w-44 h-11" data-testid="type-filter">
                 <SelectValue placeholder="All Types" />
               </SelectTrigger>
               <SelectContent>
