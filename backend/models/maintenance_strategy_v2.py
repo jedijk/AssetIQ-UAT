@@ -35,6 +35,7 @@ class MaintenanceStrategyType(str, Enum):
 
 class TaskFrequency(str, Enum):
     """Standard maintenance task frequencies"""
+    NOT_REQUIRED = "not_required"
     CONTINUOUS = "continuous"
     HOURLY = "hourly"
     SHIFT = "shift"

@@ -104,6 +104,7 @@ const CRITICALITY_LEVELS = [
 ];
 
 const FREQUENCY_OPTIONS = [
+  { value: "not_required", label: "Not Required" },
   { value: "continuous", label: "Continuous" },
   { value: "hourly", label: "Hourly" },
   { value: "shift", label: "Per Shift" },
