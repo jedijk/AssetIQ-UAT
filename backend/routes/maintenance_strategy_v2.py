@@ -329,14 +329,33 @@ async def create_equipment_type_strategy(
         tasks = generate_default_tasks_for_failure_mode(fm, strategy_type, detection_methods)
         all_tasks.extend(tasks)
         
-        # Create failure mode strategy
+        # Create failure mode strategy with RPN data
+        severity = fm.get("severity", 5)
+        occurrence = fm.get("occurrence", 5)
+        detectability = fm.get("detectability", 5)
+        rpn = fm.get("rpn", severity * occurrence * detectability)
+        
+        # Determine risk level from RPN
+        if rpn >= 200:
+            risk_level = "critical"
+        elif rpn >= 120:
+            risk_level = "high"
+        elif rpn >= 60:
+            risk_level = "medium"
+        else:
+            risk_level = "low"
+        
         fm_strategy = FailureModeStrategy(
             failure_mode_id=fm_id,
             failure_mode_name=fm_name,
             strategy_type=strategy_type,
             detection_methods=[DetectionMethod(m) for m in detection_methods if m in [e.value for e in DetectionMethod]],
             task_ids=[t.id for t in tasks],
-            risk_if_unaddressed=fm.get("risk_category", "medium"),
+            severity=severity,
+            occurrence=occurrence,
+            detectability=detectability,
+            rpn=rpn,
+            risk_if_unaddressed=risk_level,
             enabled=True
         )
         fm_strategies.append(fm_strategy)

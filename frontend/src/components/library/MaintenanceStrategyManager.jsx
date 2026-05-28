@@ -92,6 +92,7 @@ import {
   CollapsibleTrigger,
 } from "../ui/collapsible";
 import { Progress } from "../ui/progress";
+import { Switch } from "../ui/switch";
 import { maintenanceStrategyV2API } from "../../lib/api";
 
 // ============= Constants =============
@@ -154,6 +155,22 @@ const getFrequencyLabel = (value) => {
 
 const getCriticalityConfig = (level) => {
   return CRITICALITY_LEVELS.find((c) => c.value === level) || CRITICALITY_LEVELS[1];
+};
+
+/**
+ * Get RPN (Risk Priority Number) configuration
+ * RPN = Severity × Occurrence × Detectability (range: 1-1000)
+ */
+const getRPNConfig = (rpn) => {
+  if (rpn >= 200) {
+    return { level: "critical", color: "bg-red-500 text-white", textColor: "text-red-600" };
+  } else if (rpn >= 120) {
+    return { level: "high", color: "bg-orange-500 text-white", textColor: "text-orange-600" };
+  } else if (rpn >= 60) {
+    return { level: "medium", color: "bg-yellow-500 text-white", textColor: "text-yellow-600" };
+  } else {
+    return { level: "low", color: "bg-green-500 text-white", textColor: "text-green-600" };
+  }
 };
 
 // ============= Sub-Components =============
@@ -228,7 +245,8 @@ const FailureModeStrategyRow = ({
   fmStrategy, 
   isExpanded, 
   onToggle, 
-  onUpdate, 
+  onUpdate,
+  onUpdateTask,
   taskTemplates,
   onViewInFMEA 
 }) => {
@@ -237,6 +255,10 @@ const FailureModeStrategyRow = ({
   const linkedTasks = taskTemplates?.filter((t) => 
     fmStrategy.task_ids?.includes(t.id)
   ) || [];
+  
+  // RPN data
+  const rpn = fmStrategy.rpn || (fmStrategy.severity || 5) * (fmStrategy.occurrence || 5) * (fmStrategy.detectability || 5);
+  const rpnConfig = getRPNConfig(rpn);
 
   return (
     <div className="border rounded-lg overflow-hidden">
@@ -248,7 +270,9 @@ const FailureModeStrategyRow = ({
           <div className={`w-1.5 h-8 rounded-full ${fmStrategy.enabled ? "bg-green-500" : "bg-slate-300"}`} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-medium text-sm truncate">{fmStrategy.failure_mode_name}</span>
+              <span className={`font-medium text-sm truncate ${!fmStrategy.enabled ? "text-slate-400" : ""}`}>
+                {fmStrategy.failure_mode_name}
+              </span>
               {!fmStrategy.enabled && (
                 <Badge variant="outline" className="text-xs bg-slate-100">Disabled</Badge>
               )}
@@ -258,13 +282,49 @@ const FailureModeStrategyRow = ({
                 <StrategyIcon className="w-2.5 h-2.5 mr-1" />
                 {strategyConfig.label}
               </Badge>
+              {/* RPN Badge */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge className={`text-[10px] ${rpnConfig.color}`}>
+                      RPN: {rpn}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="text-xs space-y-1">
+                      <p className="font-medium">Risk Priority Number</p>
+                      <p>Severity: {fmStrategy.severity || 5}</p>
+                      <p>Occurrence: {fmStrategy.occurrence || 5}</p>
+                      <p>Detectability: {fmStrategy.detectability || 5}</p>
+                      <p className="pt-1 border-t">Risk Level: <span className="capitalize">{rpnConfig.level}</span></p>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <span className="text-[10px] text-slate-400">
                 {linkedTasks.length} task{linkedTasks.length !== 1 ? "s" : ""}
               </span>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* Failure Mode Toggle Switch */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Switch
+                    checked={fmStrategy.enabled}
+                    onCheckedChange={(checked) => onUpdate({ enabled: checked })}
+                    className="data-[state=checked]:bg-green-500"
+                  />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                {fmStrategy.enabled ? "Disable failure mode" : "Enable failure mode"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -320,24 +380,47 @@ const FailureModeStrategyRow = ({
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex items-end gap-2">
-                  <Button
-                    size="sm"
-                    variant={fmStrategy.enabled ? "outline" : "default"}
-                    className="text-xs h-8"
-                    onClick={() => onUpdate({ enabled: !fmStrategy.enabled })}
-                  >
-                    {fmStrategy.enabled ? (
-                      <>
-                        <EyeOff className="w-3 h-3 mr-1" /> Disable
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="w-3 h-3 mr-1" /> Enable
-                      </>
-                    )}
-                  </Button>
+                <div className="flex items-end">
+                  <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
+                    <Label className="text-xs text-slate-600">Failure Mode Active</Label>
+                    <Switch
+                      checked={fmStrategy.enabled}
+                      onCheckedChange={(checked) => onUpdate({ enabled: checked })}
+                      className="data-[state=checked]:bg-green-500"
+                    />
+                  </div>
                 </div>
+              </div>
+
+              {/* RPN Score Display */}
+              <div className="p-3 rounded-lg border bg-slate-50">
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-xs font-medium">Risk Priority Number (RPN)</Label>
+                  <Badge className={`${rpnConfig.color}`}>
+                    {rpnConfig.level.toUpperCase()} RISK
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-4 gap-3">
+                  <div className="text-center p-2 bg-white rounded border">
+                    <div className="text-lg font-bold text-slate-700">{fmStrategy.severity || 5}</div>
+                    <div className="text-[10px] text-slate-500">Severity</div>
+                  </div>
+                  <div className="text-center p-2 bg-white rounded border">
+                    <div className="text-lg font-bold text-slate-700">{fmStrategy.occurrence || 5}</div>
+                    <div className="text-[10px] text-slate-500">Occurrence</div>
+                  </div>
+                  <div className="text-center p-2 bg-white rounded border">
+                    <div className="text-lg font-bold text-slate-700">{fmStrategy.detectability || 5}</div>
+                    <div className="text-[10px] text-slate-500">Detectability</div>
+                  </div>
+                  <div className={`text-center p-2 rounded border-2 ${rpnConfig.color.includes('red') ? 'border-red-300 bg-red-50' : rpnConfig.color.includes('orange') ? 'border-orange-300 bg-orange-50' : rpnConfig.color.includes('yellow') ? 'border-yellow-300 bg-yellow-50' : 'border-green-300 bg-green-50'}`}>
+                    <div className={`text-lg font-bold ${rpnConfig.textColor}`}>{rpn}</div>
+                    <div className="text-[10px] text-slate-500">RPN Score</div>
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2">
+                  RPN = Severity × Occurrence × Detectability (Range: 1-1000)
+                </p>
               </div>
 
               {/* Detection Methods */}
@@ -367,23 +450,63 @@ const FailureModeStrategyRow = ({
                 </div>
               </div>
 
-              {/* Linked Tasks */}
+              {/* Linked Tasks with Toggle Switches */}
               <div>
-                <Label className="text-xs">Linked Tasks ({linkedTasks.length})</Label>
-                <div className="mt-2 space-y-1">
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-xs">Linked Tasks ({linkedTasks.length})</Label>
+                  {linkedTasks.length > 0 && (
+                    <span className="text-[10px] text-slate-400">Toggle to enable/disable actions</span>
+                  )}
+                </div>
+                <div className="space-y-2">
                   {linkedTasks.length === 0 ? (
-                    <p className="text-xs text-slate-400 italic">No tasks linked to this failure mode</p>
+                    <p className="text-xs text-slate-400 italic p-2 bg-slate-50 rounded">
+                      No tasks linked to this failure mode
+                    </p>
                   ) : (
                     linkedTasks.map((task) => (
                       <div
                         key={task.id}
-                        className="flex items-center gap-2 p-2 bg-slate-50 rounded text-xs"
+                        className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                          task.is_mandatory !== false ? "bg-white" : "bg-slate-50 border-slate-200"
+                        }`}
                       >
-                        <ListChecks className="w-3 h-3 text-slate-400" />
-                        <span className="flex-1 truncate">{task.name}</span>
-                        <Badge variant="outline" className="text-[10px]">
-                          {getStrategyConfig(task.task_type).label}
-                        </Badge>
+                        {/* Task Toggle Switch */}
+                        <Switch
+                          checked={task.is_mandatory !== false}
+                          onCheckedChange={(checked) => {
+                            if (onUpdateTask) {
+                              onUpdateTask(task.id, { is_mandatory: checked });
+                            }
+                          }}
+                          className="data-[state=checked]:bg-blue-500 flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <ListChecks className={`w-3.5 h-3.5 ${task.is_mandatory !== false ? "text-blue-500" : "text-slate-300"}`} />
+                            <span className={`text-sm truncate ${task.is_mandatory !== false ? "text-slate-900" : "text-slate-400"}`}>
+                              {task.name}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="outline" className="text-[10px]">
+                              {getStrategyConfig(task.task_type).label}
+                            </Badge>
+                            <span className="text-[10px] text-slate-400">
+                              {getFrequencyLabel(task.frequency_matrix?.medium || "monthly")}
+                            </span>
+                          </div>
+                        </div>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Info className="w-3.5 h-3.5 text-slate-300" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="text-xs">{task.description || "No description available"}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
                     ))
                   )}

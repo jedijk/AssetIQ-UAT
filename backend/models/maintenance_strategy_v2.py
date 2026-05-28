@@ -137,7 +137,11 @@ class FailureModeStrategy(BaseModel):
     # Criticality frequency override (if different from task defaults)
     frequency_override: Optional[CriticalityFrequency] = None
     
-    # Risk assessment
+    # Risk assessment - RPN (Risk Priority Number)
+    severity: int = 5  # 1-10 scale
+    occurrence: int = 5  # 1-10 scale  
+    detectability: int = 5  # 1-10 scale
+    rpn: int = 125  # severity * occurrence * detectability (1-1000)
     risk_if_unaddressed: str = "medium"  # low, medium, high, critical
     
     # Confidence score for AI-generated strategies
