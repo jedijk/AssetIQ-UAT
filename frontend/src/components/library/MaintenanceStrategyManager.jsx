@@ -97,15 +97,6 @@ import { maintenanceStrategyV2API } from "../../lib/api";
 
 // ============= Constants =============
 
-const STRATEGY_TYPES = [
-  { value: "reactive", label: "Reactive", color: "bg-red-100 text-red-700", icon: AlertTriangle },
-  { value: "preventive", label: "Preventive", color: "bg-blue-100 text-blue-700", icon: Calendar },
-  { value: "predictive", label: "Predictive", color: "bg-purple-100 text-purple-700", icon: BarChart3 },
-  { value: "condition_based", label: "Condition-Based", color: "bg-cyan-100 text-cyan-700", icon: Activity },
-  { value: "reliability_centered", label: "Reliability Centered", color: "bg-green-100 text-green-700", icon: Target },
-  { value: "risk_based", label: "Risk-Based", color: "bg-orange-100 text-orange-700", icon: Shield },
-];
-
 const CRITICALITY_LEVELS = [
   { value: "low", label: "Low", color: "bg-green-100 text-green-700 border-green-200", description: "Non-critical equipment" },
   { value: "medium", label: "Medium", color: "bg-yellow-100 text-yellow-700 border-yellow-200", description: "Operationally important" },
@@ -145,16 +136,27 @@ const DETECTION_METHODS = [
 
 // ============= Helper Functions =============
 
-const getStrategyConfig = (type) => {
-  return STRATEGY_TYPES.find((s) => s.value === type) || STRATEGY_TYPES[1];
-};
-
 const getFrequencyLabel = (value) => {
   return FREQUENCY_OPTIONS.find((f) => f.value === value)?.label || value;
 };
 
 const getCriticalityConfig = (level) => {
   return CRITICALITY_LEVELS.find((c) => c.value === level) || CRITICALITY_LEVELS[1];
+};
+
+// Task type config for display (used in task templates)
+const TASK_TYPES = [
+  { value: "pm", label: "PM", color: "bg-blue-100 text-blue-700" },
+  { value: "pdm", label: "PdM", color: "bg-purple-100 text-purple-700" },
+  { value: "cm", label: "CM", color: "bg-red-100 text-red-700" },
+  { value: "inspection", label: "Inspection", color: "bg-cyan-100 text-cyan-700" },
+  { value: "calibration", label: "Calibration", color: "bg-orange-100 text-orange-700" },
+  { value: "lubrication", label: "Lubrication", color: "bg-yellow-100 text-yellow-700" },
+  { value: "other", label: "Other", color: "bg-slate-100 text-slate-700" },
+];
+
+const getTaskTypeConfig = (type) => {
+  return TASK_TYPES.find((t) => t.value === type) || TASK_TYPES[0];
 };
 
 /**
@@ -250,8 +252,6 @@ const FailureModeStrategyRow = ({
   taskTemplates,
   onViewInFMEA 
 }) => {
-  const strategyConfig = getStrategyConfig(fmStrategy.strategy_type);
-  const StrategyIcon = strategyConfig.icon;
   const linkedTasks = taskTemplates?.filter((t) => 
     fmStrategy.task_ids?.includes(t.id)
   ) || [];
@@ -278,10 +278,6 @@ const FailureModeStrategyRow = ({
               )}
             </div>
             <div className="flex items-center gap-2 mt-0.5">
-              <Badge className={`text-[10px] ${strategyConfig.color}`}>
-                <StrategyIcon className="w-2.5 h-2.5 mr-1" />
-                {strategyConfig.label}
-              </Badge>
               {/* RPN Badge */}
               <TooltipProvider>
                 <Tooltip>
@@ -360,36 +356,14 @@ const FailureModeStrategyRow = ({
             transition={{ duration: 0.2 }}
           >
             <div className="p-4 border-t bg-white space-y-4">
-              {/* Strategy Type */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-xs">Strategy Type</Label>
-                  <Select
-                    value={fmStrategy.strategy_type}
-                    onValueChange={(v) => onUpdate({ strategy_type: v })}
-                  >
-                    <SelectTrigger className="mt-1 h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STRATEGY_TYPES.map((s) => (
-                        <SelectItem key={s.value} value={s.value} className="text-xs">
-                          {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-end">
-                  <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
-                    <Label className="text-xs text-slate-600">Failure Mode Active</Label>
-                    <Switch
-                      checked={fmStrategy.enabled}
-                      onCheckedChange={(checked) => onUpdate({ enabled: checked })}
-                      className="data-[state=checked]:bg-green-500"
-                    />
-                  </div>
-                </div>
+              {/* Failure Mode Active Toggle */}
+              <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                <Label className="text-xs text-slate-600">Failure Mode Active</Label>
+                <Switch
+                  checked={fmStrategy.enabled}
+                  onCheckedChange={(checked) => onUpdate({ enabled: checked })}
+                  className="data-[state=checked]:bg-green-500"
+                />
               </div>
 
               {/* RPN Score Display */}
@@ -490,7 +464,7 @@ const FailureModeStrategyRow = ({
                           </div>
                           <div className="flex items-center gap-2 mt-1">
                             <Badge variant="outline" className="text-[10px]">
-                              {getStrategyConfig(task.task_type).label}
+                              {getTaskTypeConfig(task.task_type).label}
                             </Badge>
                             <span className="text-[10px] text-slate-400">
                               {getFrequencyLabel(task.frequency_matrix?.medium || "monthly")}
@@ -564,7 +538,7 @@ const CriticalityMatrixEditor = ({ task, onUpdate }) => {
  */
 const TaskTemplateCard = ({ task, onEdit, onDelete, failureModes }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const strategyConfig = getStrategyConfig(task.task_type);
+  const strategyConfig = getTaskTypeConfig(task.task_type);
   const StrategyIcon = strategyConfig.icon;
   
   const linkedFMs = failureModes?.filter((fm) => 
@@ -813,7 +787,7 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {STRATEGY_TYPES.map((s) => (
+                  {TASK_TYPES.map((s) => (
                     <SelectItem key={s.value} value={s.value}>
                       {s.label}
                     </SelectItem>
@@ -1135,9 +1109,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
     if (!searchQuery) return fmStrategies;
     const q = searchQuery.toLowerCase();
     return fmStrategies.filter(
-      (fm) =>
-        fm.failure_mode_name?.toLowerCase().includes(q) ||
-        fm.strategy_type?.toLowerCase().includes(q)
+      (fm) => fm.failure_mode_name?.toLowerCase().includes(q)
     );
   }, [strategy, searchQuery]);
 
