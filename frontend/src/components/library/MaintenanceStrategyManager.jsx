@@ -135,6 +135,22 @@ const DETECTION_METHODS = [
   { value: "operator_rounds", label: "Operator Rounds" },
 ];
 
+const DISCIPLINES = [
+  { value: "", label: "Select Discipline" },
+  { value: "Rotating", label: "Rotating" },
+  { value: "Static", label: "Static" },
+  { value: "Piping", label: "Piping" },
+  { value: "Instrumentation", label: "Instrumentation" },
+  { value: "Electrical", label: "Electrical" },
+  { value: "Civil", label: "Civil" },
+  { value: "Operations", label: "Operations" },
+  { value: "Laboratory", label: "Laboratory" },
+  { value: "Safety", label: "Safety" },
+  { value: "HVAC", label: "HVAC" },
+  { value: "Mechanical", label: "Mechanical" },
+  { value: "Process", label: "Process" },
+];
+
 // ============= Helper Functions =============
 
 const getFrequencyLabel = (value) => {
@@ -848,12 +864,21 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
             </div>
             <div>
               <Label>Discipline</Label>
-              <Input
+              <Select
                 value={formData.discipline}
-                onChange={(e) => setFormData({ ...formData, discipline: e.target.value })}
-                placeholder="e.g., Rotating"
-                className="mt-1"
-              />
+                onValueChange={(v) => setFormData({ ...formData, discipline: v })}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select Discipline" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DISCIPLINES.filter(d => d.value).map((d) => (
+                    <SelectItem key={d.value} value={d.value}>
+                      {d.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
