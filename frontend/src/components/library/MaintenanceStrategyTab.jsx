@@ -119,27 +119,17 @@ const MaintenanceStrategyTab = () => {
   const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [selectedType, setSelectedType] = useState(null);
 
-  // Fetch equipment types (built-in + custom)
+  // Fetch equipment types (built-in + custom merged from backend)
   const { data: equipmentTypesData, isLoading: typesLoading } = useQuery({
     queryKey: ["equipment-types-all"],
     queryFn: async () => {
-      const [builtIn, custom] = await Promise.all([
-        equipmentHierarchyAPI.getEquipmentTypes(),
-        equipmentHierarchyAPI.getCustomEquipmentTypes(),
-      ]);
-      
-      // Combine and normalize
-      const builtInTypes = (builtIn.equipment_types || builtIn || []).map((t) => ({
+      const response = await equipmentHierarchyAPI.getEquipmentTypes();
+      // Backend returns merged built-in + custom types
+      const types = response.equipment_types || response || [];
+      return types.map((t) => ({
         ...t,
-        isCustom: false,
+        isCustom: t.is_custom || false,
       }));
-      
-      const customTypes = (custom.equipment_types || custom || []).map((t) => ({
-        ...t,
-        isCustom: true,
-      }));
-      
-      return [...builtInTypes, ...customTypes];
     },
   });
 
