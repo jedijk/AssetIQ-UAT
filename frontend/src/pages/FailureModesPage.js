@@ -64,7 +64,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../components/ui/dialog";
 import { toast } from "sonner";
 import api, { equipmentHierarchyAPI, failureModesAPI, getErrorMessage } from "../lib/api";
-import MaintenanceStrategiesPanel from "../components/MaintenanceStrategiesPanel";
+import MaintenanceStrategyTab from "../components/library/MaintenanceStrategyTab";
 import BackButton from "../components/BackButton";
 
 // Extracted components
@@ -1289,7 +1289,7 @@ const FailureModesPage = () => {
         {/* Maintenance Strategies Tab */}
         <TabsContent value="maintenance" className="h-[calc(100vh-200px)]">
           <div className="card h-full overflow-hidden">
-            <MaintenanceStrategiesPanel />
+            <MaintenanceStrategyTab />
           </div>
         </TabsContent>
       </Tabs>

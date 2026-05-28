@@ -42,6 +42,7 @@ from routes.granulometry import router as granulometry_router
 from routes.pm_import import router as pm_import_router
 from routes.process_import import router as process_import_router
 from routes.ai_fm_suggestions import router as ai_fm_suggestions_router
+from routes.maintenance_strategy_v2 import router as maintenance_strategy_v2_router
 
 all_routers = [
     auth_router,
@@ -85,4 +86,5 @@ all_routers = [
     pm_import_router,
     process_import_router,
     ai_fm_suggestions_router,
+    maintenance_strategy_v2_router,
 ]

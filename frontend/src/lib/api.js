@@ -10,6 +10,7 @@ export { investigationAPI } from "./apis/investigations";
 export { actionsAPI } from "./apis/actions";
 export { aiRiskAPI } from "./apis/aiRisk";
 export { maintenanceStrategyAPI } from "./apis/maintenanceStrategies";
+export { maintenanceStrategyV2API } from "./apis/maintenanceStrategyV2";
 export { usersAPI, rbacAPI } from "./apis/users";
 export { feedbackAPI } from "./apis/feedback";
 export { imageAnalysisAPI } from "./apis/imageAnalysis";
