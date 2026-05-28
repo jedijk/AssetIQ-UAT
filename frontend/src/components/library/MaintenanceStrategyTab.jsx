@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Package,
   Filter,
+  Cog,
 } from "lucide-react";
 import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
@@ -30,48 +31,14 @@ import {
 } from "../ui/select";
 import { equipmentHierarchyAPI, maintenanceStrategyV2API } from "../../lib/api";
 import MaintenanceStrategyManager from "./MaintenanceStrategyManager";
-
-// Equipment Type Icons mapping
-const EQUIPMENT_ICONS = {
-  droplets: "💧",
-  wind: "💨",
-  cog: "⚙️",
-  zap: "⚡",
-  gauge: "📊",
-  thermometer: "🌡️",
-  "circle-dot": "⭕",
-  cpu: "🖥️",
-  battery: "🔋",
-  settings: "⚙️",
-  cylinder: "🛢️",
-  "move-horizontal": "↔️",
-  "arrow-up-down": "↕️",
-  activity: "📈",
-  sliders: "🎚️",
-  cable: "🔌",
-  flame: "🔥",
-  shield: "🛡️",
-  "alert-triangle": "⚠️",
-};
-
-// Discipline colors
-const DISCIPLINE_COLORS = {
-  Rotating: "bg-blue-100 text-blue-700 border-blue-200",
-  Static: "bg-purple-100 text-purple-700 border-purple-200",
-  Piping: "bg-orange-100 text-orange-700 border-orange-200",
-  Instrumentation: "bg-cyan-100 text-cyan-700 border-cyan-200",
-  Electrical: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  Civil: "bg-stone-100 text-stone-700 border-stone-200",
-  Operations: "bg-slate-100 text-slate-700 border-slate-200",
-  Laboratory: "bg-pink-100 text-pink-700 border-pink-200",
-};
+import { EQUIPMENT_ICONS, DISCIPLINE_COLORS } from "./EquipmentTypeItem";
 
 /**
  * Equipment Type List Item
  */
 const EquipmentTypeItem = ({ type, isSelected, hasStrategy, onClick }) => {
-  const icon = EQUIPMENT_ICONS[type.icon] || "📦";
-  const disciplineColor = DISCIPLINE_COLORS[type.discipline] || "bg-slate-100 text-slate-700";
+  const Icon = EQUIPMENT_ICONS[type.icon] || Cog;
+  const disciplineStyle = DISCIPLINE_COLORS[type.discipline] || DISCIPLINE_COLORS["Rotating"];
 
   return (
     <div
@@ -82,7 +49,9 @@ const EquipmentTypeItem = ({ type, isSelected, hasStrategy, onClick }) => {
       }`}
       onClick={onClick}
     >
-      <div className="text-xl">{icon}</div>
+      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${disciplineStyle.bg}`}>
+        <Icon className={`w-4 h-4 ${disciplineStyle.icon}`} />
+      </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className={`text-sm font-medium truncate ${isSelected ? "text-blue-900" : "text-slate-900"}`}>
@@ -95,7 +64,7 @@ const EquipmentTypeItem = ({ type, isSelected, hasStrategy, onClick }) => {
           )}
         </div>
         <div className="flex items-center gap-1.5 mt-0.5">
-          <Badge className={`text-[10px] px-1.5 py-0 ${disciplineColor}`}>
+          <Badge className={`text-[10px] px-1.5 py-0 ${disciplineStyle.bg} ${disciplineStyle.text} ${disciplineStyle.border}`}>
             {type.discipline}
           </Badge>
           {type.iso_class && (
