@@ -146,13 +146,16 @@ const getCriticalityConfig = (level) => {
 
 // Task type config for display (used in task templates)
 const TASK_TYPES = [
-  { value: "pm", label: "PM", color: "bg-blue-100 text-blue-700" },
-  { value: "pdm", label: "PdM", color: "bg-purple-100 text-purple-700" },
-  { value: "cm", label: "CM", color: "bg-red-100 text-red-700" },
-  { value: "inspection", label: "Inspection", color: "bg-cyan-100 text-cyan-700" },
-  { value: "calibration", label: "Calibration", color: "bg-orange-100 text-orange-700" },
-  { value: "lubrication", label: "Lubrication", color: "bg-yellow-100 text-yellow-700" },
-  { value: "other", label: "Other", color: "bg-slate-100 text-slate-700" },
+  { value: "pm", label: "PM", color: "bg-blue-100 text-blue-700", icon: Wrench },
+  { value: "pdm", label: "PdM", color: "bg-purple-100 text-purple-700", icon: Activity },
+  { value: "cm", label: "CM", color: "bg-red-100 text-red-700", icon: AlertTriangle },
+  { value: "inspection", label: "Inspection", color: "bg-cyan-100 text-cyan-700", icon: Eye },
+  { value: "calibration", label: "Calibration", color: "bg-orange-100 text-orange-700", icon: Gauge },
+  { value: "lubrication", label: "Lubrication", color: "bg-yellow-100 text-yellow-700", icon: Settings },
+  { value: "preventive", label: "Preventive", color: "bg-blue-100 text-blue-700", icon: Calendar },
+  { value: "predictive", label: "Predictive", color: "bg-purple-100 text-purple-700", icon: BarChart3 },
+  { value: "condition_based", label: "Condition-Based", color: "bg-cyan-100 text-cyan-700", icon: Activity },
+  { value: "other", label: "Other", color: "bg-slate-100 text-slate-700", icon: ListChecks },
 ];
 
 const getTaskTypeConfig = (type) => {
