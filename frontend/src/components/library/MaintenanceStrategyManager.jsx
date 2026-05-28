@@ -180,7 +180,7 @@ const getRPNConfig = (rpn) => {
 /**
  * Strategy Overview Card
  */
-const StrategyOverviewCard = ({ strategy, onEdit }) => {
+const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating }) => {
   const hasStrategy = strategy?.exists && strategy?.strategy;
   const data = strategy?.strategy;
 
@@ -198,20 +198,56 @@ const StrategyOverviewCard = ({ strategy, onEdit }) => {
     );
   }
 
+  const isActive = data.status === "active";
+
   return (
-    <Card>
+    <Card className={!isActive ? "opacity-60" : ""}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Wrench className="w-5 h-5 text-blue-600" />
+            <Wrench className={`w-5 h-5 ${isActive ? "text-blue-600" : "text-slate-400"}`} />
             <CardTitle className="text-lg">Strategy Overview</CardTitle>
           </div>
-          <Badge variant="outline" className="text-xs">
-            v{data.version || "1.0"}
-          </Badge>
+          <div className="flex items-center gap-3">
+            <Badge variant="outline" className="text-xs">
+              v{data.version || "1.0"}
+            </Badge>
+            {/* Strategy Enable/Disable Toggle */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100">
+                    <span className={`text-xs font-medium ${isActive ? "text-green-700" : "text-slate-500"}`}>
+                      {isActive ? "Active" : "Disabled"}
+                    </span>
+                    <Switch
+                      checked={isActive}
+                      onCheckedChange={(checked) => onToggleStrategy(checked ? "active" : "disabled")}
+                      disabled={isUpdating}
+                      className="data-[state=checked]:bg-green-500"
+                    />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isActive 
+                    ? "Disable this strategy to stop generating tasks for this equipment type" 
+                    : "Enable this strategy to resume generating tasks"
+                  }
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
         {data.description && (
           <CardDescription className="mt-2">{data.description}</CardDescription>
+        )}
+        {!isActive && (
+          <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-xs text-yellow-700 flex items-center gap-1">
+              <AlertCircle className="w-3.5 h-3.5" />
+              Strategy is disabled. No maintenance tasks will be generated for this equipment type.
+            </p>
+          </div>
         )}
       </CardHeader>
       <CardContent>
@@ -229,7 +265,7 @@ const StrategyOverviewCard = ({ strategy, onEdit }) => {
             <div className="text-xs text-slate-500">Coverage</div>
           </div>
           <div className="text-center p-3 bg-slate-50 rounded-lg">
-            <Badge className={data.status === "active" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}>
+            <Badge className={isActive ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"}>
               {data.status || "draft"}
             </Badge>
             <div className="text-xs text-slate-500 mt-1">Status</div>
@@ -1001,6 +1037,17 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
     },
   });
 
+  const updateStrategyMutation = useMutation({
+    mutationFn: (data) => maintenanceStrategyV2API.updateStrategy(equipmentTypeId, data),
+    onSuccess: () => {
+      toast.success("Strategy updated");
+      queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.detail || "Failed to update strategy");
+    },
+  });
+
   const updateFMStrategyMutation = useMutation({
     mutationFn: ({ failureModeId, data }) =>
       maintenanceStrategyV2API.updateFailureModeStrategy(equipmentTypeId, failureModeId, data),
@@ -1075,6 +1122,10 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
 
   const handleUpdateFMStrategy = (failureModeId, updates) => {
     updateFMStrategyMutation.mutate({ failureModeId, data: updates });
+  };
+
+  const handleToggleStrategy = (newStatus) => {
+    updateStrategyMutation.mutate({ status: newStatus });
   };
 
   const handleSaveTask = (formData) => {
@@ -1178,7 +1229,11 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
       </div>
 
       {/* Strategy Overview */}
-      <StrategyOverviewCard strategy={strategyData} />
+      <StrategyOverviewCard 
+        strategy={strategyData} 
+        onToggleStrategy={handleToggleStrategy}
+        isUpdating={updateStrategyMutation.isPending}
+      />
 
       {/* Tabs (only show if strategy exists) */}
       {hasStrategy && (
