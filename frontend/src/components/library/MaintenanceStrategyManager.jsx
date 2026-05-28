@@ -162,11 +162,11 @@ const getCriticalityConfig = (level) => {
  * RPN = Severity × Occurrence × Detectability (range: 1-1000)
  */
 const getRPNConfig = (rpn) => {
-  if (rpn >= 200) {
+  if (rpn >= 250) {
     return { level: "critical", color: "bg-red-500 text-white", textColor: "text-red-600" };
-  } else if (rpn >= 120) {
+  } else if (rpn >= 180) {
     return { level: "high", color: "bg-orange-500 text-white", textColor: "text-orange-600" };
-  } else if (rpn >= 60) {
+  } else if (rpn >= 100) {
     return { level: "medium", color: "bg-yellow-500 text-white", textColor: "text-yellow-600" };
   } else {
     return { level: "low", color: "bg-green-500 text-white", textColor: "text-green-600" };

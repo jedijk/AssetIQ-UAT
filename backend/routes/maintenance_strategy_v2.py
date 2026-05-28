@@ -336,11 +336,11 @@ async def create_equipment_type_strategy(
         rpn = fm.get("rpn", severity * occurrence * detectability)
         
         # Determine risk level from RPN
-        if rpn >= 200:
+        if rpn >= 250:
             risk_level = "critical"
-        elif rpn >= 120:
+        elif rpn >= 180:
             risk_level = "high"
-        elif rpn >= 60:
+        elif rpn >= 100:
             risk_level = "medium"
         else:
             risk_level = "low"
