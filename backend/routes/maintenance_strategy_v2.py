@@ -363,6 +363,37 @@ async def get_equipment_type_strategy(
             "exists": False
         }
     
+    # Enrich failure mode strategies with potential_effects from library if missing
+    fm_strategies = strategy.get("failure_mode_strategies", [])
+    needs_update = False
+    
+    for fm_strategy in fm_strategies:
+        # Check if potential_effects is missing or empty
+        if not fm_strategy.get("potential_effects"):
+            # Try to find the failure mode in the library
+            fm_id = fm_strategy.get("failure_mode_id")
+            fm_name = fm_strategy.get("failure_mode_name")
+            
+            # Search by ID first, then by name
+            library_fm = await db.failure_modes.find_one(
+                {"$or": [
+                    {"id": fm_id},
+                    {"failure_mode": fm_name}
+                ]},
+                {"potential_effects": 1, "_id": 0}
+            )
+            
+            if library_fm and library_fm.get("potential_effects"):
+                fm_strategy["potential_effects"] = library_fm["potential_effects"]
+                needs_update = True
+    
+    # Optionally update the database with the enriched data
+    if needs_update:
+        await db.equipment_type_strategies.update_one(
+            {"equipment_type_id": equipment_type_id},
+            {"$set": {"failure_mode_strategies": fm_strategies}}
+        )
+    
     return {
         "strategy": strategy,
         "equipment_type_id": equipment_type_id,
