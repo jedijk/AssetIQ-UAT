@@ -7,6 +7,10 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Maintenance Strategy V2 — Stability Fix (VERIFIED)**:
+  - Resolved the React runtime crash on `TaskTemplateCard` ("Element type is invalid... but got: undefined") — the page now renders the full Strategy Overview, Failure Modes, Task Templates, Frequency Matrix, and Version History tabs without errors.
+  - Patched `Badge` (`/app/frontend/src/components/ui/badge.jsx`) with `React.forwardRef` to silence the "Function components cannot be given refs" warning emitted by Radix `<TooltipTrigger asChild>` around the RPN badge inside `FailureModeStrategyRow`.
+  - Verified live (Library → Maintenance → Battery Charger): all four tabs render, expanding TaskTemplateCard works, Add Task dialog opens, console is clean.
 - [May 26, 2026] **AI Suggest New Equipment Types** in Library → Equipment Types (VERIFIED):
   - New "Suggest New Types" button in the Equipment Types tab (Library)
   - Backend endpoint `POST /api/ai-suggestions/new-equipment-types` scans the user's plant hierarchy nodes, compares against the existing catalog, and proposes NEW equipment types that should be added (with id, name, discipline, rationale, example nodes, node_count). Conservative — at most 15 high-quality suggestions.

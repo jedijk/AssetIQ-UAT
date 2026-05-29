@@ -23,12 +23,13 @@ const badgeVariants = cva(
   }
 )
 
-function Badge({
+const Badge = React.forwardRef(({
   className,
   variant,
   ...props
-}) {
-  return (<div className={cn(badgeVariants({ variant }), className)} {...props} />);
-}
+}, ref) => {
+  return (<div ref={ref} className={cn(badgeVariants({ variant }), className)} {...props} />);
+});
+Badge.displayName = "Badge";
 
 export { Badge, badgeVariants }
