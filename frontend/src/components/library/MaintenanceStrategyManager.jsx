@@ -223,7 +223,7 @@ const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating }) => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Wrench className={`w-5 h-5 ${isActive ? "text-blue-600" : "text-slate-400"}`} />
-            <CardTitle className="text-lg">Strategy Overview</CardTitle>
+            <CardTitle className="text-lg">Overview</CardTitle>
           </div>
           <div className="flex items-center gap-3">
             <Badge variant="outline" className="text-xs">
@@ -255,9 +255,6 @@ const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating }) => {
             </TooltipProvider>
           </div>
         </div>
-        {data.description && (
-          <CardDescription className="mt-2">{data.description}</CardDescription>
-        )}
         {!isActive && (
           <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p className="text-xs text-yellow-700 flex items-center gap-1">
