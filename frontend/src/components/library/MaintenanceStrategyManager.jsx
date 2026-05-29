@@ -201,9 +201,16 @@ const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating }) => {
   const hasStrategy = strategy?.exists && strategy?.strategy;
   const data = strategy?.strategy;
 
-  // Calculate expected FTE load based on task templates
+  // Calculate expected FTE load based on ACTIVE task templates only
   const calculateFTELoad = () => {
-    if (!data?.task_templates || data.task_templates.length === 0) return 0;
+    if (!data?.task_templates || data.task_templates.length === 0) return { fte: 0, activeTasks: 0, totalTasks: 0 };
+    
+    // Get enabled failure mode IDs
+    const enabledFMIds = new Set(
+      (data.failure_mode_strategies || [])
+        .filter(fm => fm.enabled !== false)
+        .map(fm => fm.failure_mode_id)
+    );
     
     // Frequency to annual occurrences mapping
     const frequencyToAnnual = {
@@ -223,21 +230,33 @@ const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating }) => {
     };
     
     let totalAnnualHours = 0;
+    let activeTasks = 0;
     
     data.task_templates.forEach(task => {
-      const duration = task.duration_hours || 1;
-      // Use medium criticality frequency as default for estimation
-      const frequency = task.frequency_matrix?.medium || task.frequency_matrix?.low || "monthly";
-      const annualOccurrences = frequencyToAnnual[frequency] || 12;
-      totalAnnualHours += duration * annualOccurrences;
+      // Check if task is active (is_mandatory !== false)
+      const isTaskActive = task.is_mandatory !== false;
+      
+      // Check if any of the task's linked failure modes are enabled
+      const taskFMIds = task.failure_mode_ids || [];
+      const hasEnabledFM = taskFMIds.length === 0 || taskFMIds.some(id => enabledFMIds.has(id));
+      
+      // Only count task if it's active AND has at least one enabled failure mode
+      if (isTaskActive && hasEnabledFM) {
+        activeTasks++;
+        const duration = task.duration_hours || 1;
+        // Use medium criticality frequency as default for estimation
+        const frequency = task.frequency_matrix?.medium || task.frequency_matrix?.low || "monthly";
+        const annualOccurrences = frequencyToAnnual[frequency] || 12;
+        totalAnnualHours += duration * annualOccurrences;
+      }
     });
     
     // FTE = annual hours / 2080 (standard work hours per year: 40hrs * 52 weeks)
     const fte = totalAnnualHours / 2080;
-    return fte;
+    return { fte, activeTasks, totalTasks: data.task_templates.length };
   };
 
-  const fteLoad = hasStrategy ? calculateFTELoad() : 0;
+  const fteData = hasStrategy ? calculateFTELoad() : { fte: 0, activeTasks: 0, totalTasks: 0 };
 
   if (!hasStrategy) {
     return (
@@ -328,14 +347,17 @@ const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating }) => {
               <TooltipTrigger asChild>
                 <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-100 cursor-help">
                   <div className="text-2xl font-bold text-blue-600">
-                    {fteLoad.toFixed(2)}
+                    {fteData.fte.toFixed(2)}
                   </div>
-                  <div className="text-xs text-slate-500">Expected FTE Load</div>
+                  <div className="text-xs text-slate-500">
+                    FTE Load ({fteData.activeTasks}/{fteData.totalTasks} tasks)
+                  </div>
                 </div>
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
                 <p className="text-xs">
-                  Estimated Full-Time Equivalent based on task durations and frequencies. 
+                  Estimated Full-Time Equivalent based on {fteData.activeTasks} active task templates. 
+                  Only counts tasks that are enabled and linked to active failure modes.
                   Calculated using medium criticality frequencies (2080 work hours/year).
                 </p>
               </TooltipContent>
