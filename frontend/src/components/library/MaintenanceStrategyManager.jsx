@@ -306,7 +306,7 @@ const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating }) => {
         )}
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center p-3 bg-slate-50 rounded-lg">
             <div className="text-2xl font-bold text-slate-900">{data.total_failure_modes || 0}</div>
             <div className="text-xs text-slate-500">Failure Modes</div>
@@ -341,12 +341,6 @@ const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating }) => {
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-          <div className="text-center p-3 bg-slate-50 rounded-lg">
-            <Badge className={isActive ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"}>
-              {data.status || "draft"}
-            </Badge>
-            <div className="text-xs text-slate-500 mt-1">Status</div>
-          </div>
         </div>
       </CardContent>
     </Card>
