@@ -777,7 +777,7 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
     task_type: "preventive",
     duration_hours: 1,
     discipline: "",
-    detection_methods: [],
+    failure_mode_impact: "",
     failure_mode_ids: [],
     frequency_matrix: {
       low: "quarterly",
@@ -796,7 +796,7 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
         task_type: task.task_type || "preventive",
         duration_hours: task.duration_hours || 1,
         discipline: normalizeDiscipline(task.discipline) || "",
-        detection_methods: task.detection_methods || [],
+        failure_mode_impact: task.failure_mode_impact || "",
         failure_mode_ids: task.failure_mode_ids || [],
         frequency_matrix: task.frequency_matrix || {
           low: "quarterly",
@@ -813,7 +813,7 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
         task_type: "preventive",
         duration_hours: 1,
         discipline: "",
-        detection_methods: [],
+        failure_mode_impact: "",
         failure_mode_ids: [],
         frequency_matrix: {
           low: "quarterly",
@@ -980,30 +980,29 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
             </div>
           )}
 
-          {/* Detection Methods */}
+          {/* Failure Mode Impact Description */}
           <div>
-            <Label>Detection Methods</Label>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {DETECTION_METHODS.map((method) => (
-                <Badge
-                  key={method.value}
-                  variant="outline"
-                  className={`cursor-pointer transition-colors ${
-                    formData.detection_methods.includes(method.value)
-                      ? "bg-blue-100 text-blue-700 border-blue-300"
-                      : "hover:bg-slate-50"
-                  }`}
-                  onClick={() => {
-                    const updated = formData.detection_methods.includes(method.value)
-                      ? formData.detection_methods.filter((m) => m !== method.value)
-                      : [...formData.detection_methods, method.value];
-                    setFormData({ ...formData, detection_methods: updated });
-                  }}
-                >
-                  {method.label}
-                </Badge>
-              ))}
-            </div>
+            <Label className="flex items-center gap-2">
+              Failure Mode Impact Description
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Info className="w-3.5 h-3.5 text-slate-400" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    Describe the impact when this failure mode occurs - including effects on safety, 
+                    production, environment, and asset condition.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </Label>
+            <Textarea
+              value={formData.failure_mode_impact || ""}
+              onChange={(e) => setFormData({ ...formData, failure_mode_impact: e.target.value })}
+              placeholder="Describe the impact of the failure mode (e.g., production loss, safety hazards, environmental impact, equipment damage...)"
+              className="mt-1"
+              rows={3}
+            />
           </div>
 
           {/* Linked Failure Modes */}
