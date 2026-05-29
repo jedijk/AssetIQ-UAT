@@ -461,16 +461,16 @@ const FailureModeStrategyRow = ({
                     </Tooltip>
                   </TooltipProvider>
                 </Label>
-                <div className="mt-2 p-3 bg-slate-50 rounded-lg border">
+                <div className="mt-2">
                   {fmStrategy.potential_effects && fmStrategy.potential_effects.length > 0 ? (
-                    <ul className="space-y-1.5">
+                    <div className="flex flex-wrap gap-2">
                       {fmStrategy.potential_effects.map((effect, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-sm text-slate-700">
-                          <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
-                          <span>{effect}</span>
-                        </li>
+                        <Badge key={idx} variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                          <AlertTriangle className="w-3 h-3 mr-1" />
+                          {effect}
+                        </Badge>
                       ))}
-                    </ul>
+                    </div>
                   ) : (
                     <p className="text-sm text-slate-400 italic">
                       No potential effects defined for this failure mode
