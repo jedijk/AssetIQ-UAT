@@ -1312,14 +1312,10 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
       {/* Tabs (only show if strategy exists) */}
       {hasStrategy && (
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="overview" className="text-xs">
               <Layers className="w-3.5 h-3.5 mr-1.5" />
               Failure Modes
-            </TabsTrigger>
-            <TabsTrigger value="tasks" className="text-xs">
-              <ListChecks className="w-3.5 h-3.5 mr-1.5" />
-              Task Templates
             </TabsTrigger>
             <TabsTrigger value="matrix" className="text-xs">
               <BarChart3 className="w-3.5 h-3.5 mr-1.5" />
@@ -1364,42 +1360,6 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                     onEditTask={handleEditTask}
                     taskTemplates={strategy?.task_templates}
                     onViewInFMEA={handleViewInFMEA}
-                  />
-                ))
-              )}
-            </div>
-          </TabsContent>
-
-          {/* Task Templates Tab */}
-          <TabsContent value="tasks" className="mt-4">
-            <div className="flex justify-end mb-3">
-              <Button
-                size="sm"
-                onClick={() => {
-                  setEditingTask(null);
-                  setTaskDialogOpen(true);
-                }}
-              >
-                <Plus className="w-3.5 h-3.5 mr-1" />
-                Add Task
-              </Button>
-            </div>
-            <div className="space-y-2">
-              {filteredTasks.length === 0 ? (
-                <Card className="p-8 text-center">
-                  <ListChecks className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                  <p className="text-sm text-slate-500">
-                    {searchQuery ? "No tasks match your search" : "No task templates defined"}
-                  </p>
-                </Card>
-              ) : (
-                filteredTasks.map((task) => (
-                  <TaskTemplateCard
-                    key={task.id}
-                    task={task}
-                    onEdit={handleEditTask}
-                    onDelete={handleDeleteTask}
-                    failureModes={strategy?.failure_mode_strategies}
                   />
                 ))
               )}
