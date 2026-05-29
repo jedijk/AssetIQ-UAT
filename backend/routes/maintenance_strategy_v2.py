@@ -387,11 +387,24 @@ async def get_equipment_type_strategy(
                 fm_strategy["potential_effects"] = library_fm["potential_effects"]
                 needs_update = True
     
+    # Calculate coverage based on active failure modes
+    total_fms = len(fm_strategies)
+    active_fms = sum(1 for fm in fm_strategies if fm.get("enabled", True))
+    coverage_score = (active_fms / total_fms * 100) if total_fms > 0 else 0.0
+    
+    # Update strategy stats
+    strategy["active_failure_modes"] = active_fms
+    strategy["coverage_score"] = round(coverage_score, 1)
+    
     # Optionally update the database with the enriched data
-    if needs_update:
+    if needs_update or strategy.get("active_failure_modes") != active_fms:
         await db.equipment_type_strategies.update_one(
             {"equipment_type_id": equipment_type_id},
-            {"$set": {"failure_mode_strategies": fm_strategies}}
+            {"$set": {
+                "failure_mode_strategies": fm_strategies,
+                "active_failure_modes": active_fms,
+                "coverage_score": round(coverage_score, 1)
+            }}
         )
     
     return {
@@ -487,7 +500,8 @@ async def create_equipment_type_strategy(
         task_templates=all_tasks,
         total_failure_modes=len(fm_strategies),
         total_tasks=len(all_tasks),
-        coverage_score=100.0 if fm_strategies else 0.0,
+        coverage_score=100.0 if fm_strategies else 0.0,  # All FMs are enabled by default
+        active_failure_modes=len(fm_strategies),  # Track active count
         created_by=current_user.get("user_id"),
         auto_generated=request.auto_generate,
         status="active"
@@ -705,17 +719,30 @@ async def update_failure_mode_strategy(
     if not updated:
         raise HTTPException(status_code=404, detail="Failure mode not found in strategy")
     
+    # Recalculate coverage based on active failure modes
+    total_fms = len(fm_strategies)
+    active_fms = sum(1 for fm in fm_strategies if fm.get("enabled", True))
+    coverage_score = (active_fms / total_fms * 100) if total_fms > 0 else 0.0
+    
     await db.equipment_type_strategies.update_one(
         {"equipment_type_id": equipment_type_id},
         {
             "$set": {
                 "failure_mode_strategies": fm_strategies,
+                "active_failure_modes": active_fms,
+                "coverage_score": round(coverage_score, 1),
                 "updated_at": datetime.utcnow().isoformat()
             }
         }
     )
     
-    return {"message": "Failure mode strategy updated", "failure_mode_id": failure_mode_id}
+    return {
+        "message": "Failure mode strategy updated", 
+        "failure_mode_id": failure_mode_id,
+        "active_failure_modes": active_fms,
+        "total_failure_modes": total_fms,
+        "coverage_score": round(coverage_score, 1)
+    }
 
 
 # ============= Task Template Endpoints =============

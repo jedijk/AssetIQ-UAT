@@ -182,8 +182,9 @@ class EquipmentTypeStrategy(BaseModel):
     
     # Statistics (auto-calculated)
     total_failure_modes: int = 0
+    active_failure_modes: int = 0  # Count of enabled failure modes
     total_tasks: int = 0
-    coverage_score: Optional[float] = None  # % of failure modes with strategies
+    coverage_score: Optional[float] = None  # % of failure modes that are active/enabled
     
     # Metadata
     created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())

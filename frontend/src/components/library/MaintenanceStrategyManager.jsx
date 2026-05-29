@@ -270,15 +270,20 @@ const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating }) => {
       <CardContent>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center p-3 bg-slate-50 rounded-lg">
-            <div className="text-2xl font-bold text-slate-900">{data.total_failure_modes || 0}</div>
-            <div className="text-xs text-slate-500">Failure Modes</div>
+            <div className="text-2xl font-bold text-slate-900">
+              {data.active_failure_modes ?? data.total_failure_modes ?? 0}
+              <span className="text-sm font-normal text-slate-400">/{data.total_failure_modes || 0}</span>
+            </div>
+            <div className="text-xs text-slate-500">Active Failure Modes</div>
           </div>
           <div className="text-center p-3 bg-slate-50 rounded-lg">
             <div className="text-2xl font-bold text-slate-900">{data.total_tasks || 0}</div>
             <div className="text-xs text-slate-500">Task Templates</div>
           </div>
           <div className="text-center p-3 bg-slate-50 rounded-lg">
-            <div className="text-2xl font-bold text-green-600">{data.coverage_score || 0}%</div>
+            <div className={`text-2xl font-bold ${(data.coverage_score || 0) >= 80 ? 'text-green-600' : (data.coverage_score || 0) >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+              {data.coverage_score || 0}%
+            </div>
             <div className="text-xs text-slate-500">Coverage</div>
           </div>
           <div className="text-center p-3 bg-slate-50 rounded-lg">
