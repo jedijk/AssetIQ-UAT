@@ -305,6 +305,7 @@ const FailureModeStrategyRow = ({
   onToggle, 
   onUpdate,
   onUpdateTask,
+  onEditTask,
   taskTemplates,
   onViewInFMEA 
 }) => {
@@ -522,15 +523,37 @@ const FailureModeStrategyRow = ({
                             <Badge variant="outline" className="text-[10px]">
                               {getTaskTypeConfig(task.task_type).label}
                             </Badge>
-                            <span className="text-[10px] text-slate-400">
-                              {getFrequencyLabel(task.frequency_matrix?.medium || "monthly")}
-                            </span>
+                            {task.discipline && (
+                              <Badge variant="outline" className="text-[10px] bg-slate-50 text-slate-600 border-slate-200">
+                                {task.discipline}
+                              </Badge>
+                            )}
                           </div>
                         </div>
                         <TooltipProvider>
                           <Tooltip>
-                            <TooltipTrigger>
-                              <Info className="w-3.5 h-3.5 text-slate-300" />
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (onEditTask) onEditTask(task);
+                                }}
+                              >
+                                <Edit2 className="w-3.5 h-3.5 text-slate-500" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Edit task</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex">
+                                <Info className="w-3.5 h-3.5 text-slate-300" />
+                              </span>
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs">
                               <p className="text-xs">{task.description || "No description available"}</p>
@@ -1315,6 +1338,8 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                     isExpanded={expandedFMs.has(fm.failure_mode_id)}
                     onToggle={() => handleToggleFM(fm.failure_mode_id)}
                     onUpdate={(updates) => handleUpdateFMStrategy(fm.failure_mode_id, updates)}
+                    onUpdateTask={(taskId, updates) => updateTaskMutation.mutate({ taskId, data: updates })}
+                    onEditTask={handleEditTask}
                     taskTemplates={strategy?.task_templates}
                     onViewInFMEA={handleViewInFMEA}
                   />
