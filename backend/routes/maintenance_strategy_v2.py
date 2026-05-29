@@ -117,6 +117,83 @@ def determine_strategy_type(failure_mode: Dict) -> MaintenanceStrategyType:
     return MaintenanceStrategyType.PREVENTIVE
 
 
+def determine_action_type_from_text(action_text: str, stored_action_type: str = "PM") -> str:
+    """
+    AI-enhanced logic to determine the correct action type based on action text content.
+    This overrides the stored action_type if the text clearly indicates a different type.
+    
+    Returns: "PM", "PDM", or "CM"
+    """
+    action_lower = action_text.lower()
+    
+    # CM (Corrective/Reactive) indicators - actions taken AFTER failure
+    cm_keywords = [
+        "replace on failure", "repair", "fix", "restore", "rebuild", 
+        "overhaul", "recondition", "refurbish", "emergency", "breakdown",
+        "corrective", "reactive", "on failure", "when fail", "if fail",
+        "after failure", "upon failure", "failure occurs", "has failed",
+        "replace failed", "replace damaged", "replace worn", "remove debris",
+        "clear blockage", "unplug", "reset", "restart after"
+    ]
+    
+    # PDM (Predictive) indicators - condition monitoring, trending, analysis
+    pdm_keywords = [
+        "monitor", "analyze", "analysis", "trend", "measure", "check level",
+        "vibration", "thermograph", "ultrasonic", "oil sample", "oil analysis",
+        "infrared", "acoustic", "condition", "baseline", "benchmark",
+        "track", "log reading", "record", "sample", "test result",
+        "inspect for wear", "inspect for crack", "inspect for corrosion",
+        "check for signs", "look for indication", "detect", "diagnose",
+        "assess condition", "evaluate", "non-destructive", "ndt", "nde",
+        "thickness measurement", "wear measurement", "temperature monitoring",
+        "pressure monitoring", "flow monitoring", "continuous monitoring"
+    ]
+    
+    # PM (Preventive) indicators - scheduled, time-based, routine
+    pm_keywords = [
+        "lubricate", "grease", "oil change", "replace filter", "clean",
+        "tighten", "adjust", "calibrate", "align", "balance",
+        "inspect", "visual inspection", "check", "verify", "ensure",
+        "service", "maintain", "routine", "scheduled", "periodic",
+        "preventive", "planned", "regular", "annual", "monthly", "weekly",
+        "replace seal", "replace gasket", "replace belt", "replace bearing",
+        "top up", "refill", "flush", "drain", "purge",
+        "install", "upgrade", "improve", "modify", "protect", "coat",
+        "paint", "apply", "treat", "preserve"
+    ]
+    
+    # Count keyword matches
+    cm_score = sum(1 for kw in cm_keywords if kw in action_lower)
+    pdm_score = sum(1 for kw in pdm_keywords if kw in action_lower)
+    pm_score = sum(1 for kw in pm_keywords if kw in action_lower)
+    
+    # Strong CM indicators override everything
+    strong_cm_indicators = ["on failure", "after failure", "when fail", "replace on failure", 
+                           "breakdown", "emergency", "corrective", "reactive"]
+    if any(ind in action_lower for ind in strong_cm_indicators):
+        return "CM"
+    
+    # Strong PDM indicators
+    strong_pdm_indicators = ["monitor", "analysis", "trending", "vibration analysis", 
+                            "oil analysis", "thermograph", "ultrasonic", "continuous monitoring",
+                            "condition monitoring", "predictive"]
+    if any(ind in action_lower for ind in strong_pdm_indicators):
+        return "PDM"
+    
+    # If clear winner by score
+    max_score = max(cm_score, pdm_score, pm_score)
+    if max_score > 0:
+        if cm_score == max_score and cm_score > pdm_score and cm_score > pm_score:
+            return "CM"
+        elif pdm_score == max_score and pdm_score > cm_score and pdm_score > pm_score:
+            return "PDM"
+        elif pm_score == max_score:
+            return "PM"
+    
+    # Fall back to stored action type
+    return stored_action_type
+
+
 def generate_default_tasks_for_failure_mode(
     failure_mode: Dict,
     strategy_type: MaintenanceStrategyType,
@@ -132,16 +209,19 @@ def generate_default_tasks_for_failure_mode(
     
     for idx, action in enumerate(recommended_actions[:5]):  # Limit to 5 tasks per FM
         action_text = action.get("action", action) if isinstance(action, dict) else str(action)
-        action_type = action.get("action_type", "PM") if isinstance(action, dict) else "PM"
+        stored_action_type = action.get("action_type", "PM") if isinstance(action, dict) else "PM"
         discipline = action.get("discipline", None) if isinstance(action, dict) else None
         
-        # Determine task type from action_type
-        if action_type == "CM":
+        # Use AI-enhanced logic to determine correct action type
+        determined_action_type = determine_action_type_from_text(action_text, stored_action_type)
+        
+        # Map to MaintenanceStrategyType
+        if determined_action_type == "CM":
             task_type = MaintenanceStrategyType.REACTIVE
-        elif action_type == "PDM":
+        elif determined_action_type == "PDM":
             task_type = MaintenanceStrategyType.PREDICTIVE
         else:
-            task_type = strategy_type
+            task_type = MaintenanceStrategyType.PREVENTIVE
         
         # Set frequency based on task type and severity
         severity = failure_mode.get("severity", 5)
