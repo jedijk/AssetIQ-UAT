@@ -265,7 +265,7 @@ const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating }) => {
         )}
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-4">
           <div className="text-center p-3 bg-slate-50 rounded-lg">
             <div className="text-2xl font-bold text-slate-900">{data.total_failure_modes || 0}</div>
             <div className="text-xs text-slate-500">Failure Modes</div>
@@ -282,6 +282,24 @@ const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating }) => {
               Coverage ({data.active_failure_modes ?? data.total_failure_modes ?? 0}/{data.total_failure_modes || 0} active)
             </div>
           </div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-100 cursor-help">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {data.affected_equipment_count || 0}
+                  </div>
+                  <div className="text-xs text-slate-500">Equipment Affected</div>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                <p className="text-xs">
+                  Number of equipment items in the hierarchy using this equipment type. 
+                  This strategy will apply to all these equipment assets.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </CardContent>
     </Card>

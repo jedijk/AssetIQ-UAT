@@ -396,6 +396,12 @@ async def get_equipment_type_strategy(
     strategy["active_failure_modes"] = active_fms
     strategy["coverage_score"] = round(coverage_score, 1)
     
+    # Count affected equipment from hierarchy
+    affected_equipment_count = await db.equipment_nodes.count_documents({
+        "equipment_type_id": equipment_type_id
+    })
+    strategy["affected_equipment_count"] = affected_equipment_count
+    
     # Optionally update the database with the enriched data
     if needs_update or strategy.get("active_failure_modes") != active_fms:
         await db.equipment_type_strategies.update_one(
@@ -410,7 +416,8 @@ async def get_equipment_type_strategy(
     return {
         "strategy": strategy,
         "equipment_type_id": equipment_type_id,
-        "exists": True
+        "exists": True,
+        "affected_equipment_count": affected_equipment_count
     }
 
 
