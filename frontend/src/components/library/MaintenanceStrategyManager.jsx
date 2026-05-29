@@ -414,16 +414,6 @@ const FailureModeStrategyRow = ({
             transition={{ duration: 0.2 }}
           >
             <div className="p-4 border-t bg-white space-y-4">
-              {/* Failure Mode Active Toggle */}
-              <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
-                <Label className="text-xs text-slate-600">Failure Mode Active</Label>
-                <Switch
-                  checked={fmStrategy.enabled}
-                  onCheckedChange={(checked) => onUpdate({ enabled: checked })}
-                  className="data-[state=checked]:bg-green-500"
-                />
-              </div>
-
               {/* RPN Score Display */}
               <div className="p-3 rounded-lg border bg-slate-50">
                 <div className="flex items-center justify-between mb-2">
