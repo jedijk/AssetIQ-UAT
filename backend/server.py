@@ -225,7 +225,7 @@ BASE_ORIGINS = [
     "https://asset-iq-uat.vercel.app",
     "https://assetiq-uat.vercel.app",
     # Preview/Development
-    "https://bug-detector-37.preview.emergentagent.com",
+    "https://cm-task-config.preview.emergentagent.com",
     "http://localhost:3000",
     "http://localhost:5000",
 ]

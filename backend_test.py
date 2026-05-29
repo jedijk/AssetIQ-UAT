@@ -12,7 +12,7 @@ from typing import Optional, Dict, Any
 from openpyxl import Workbook
 
 # Configuration
-BASE_URL = "https://bug-detector-37.preview.emergentagent.com/api"
+BASE_URL = "https://cm-task-config.preview.emergentagent.com/api"
 TEST_EMAIL = "jedijk@gmail.com"
 TEST_PASSWORD = "Jaap8019@"
 
