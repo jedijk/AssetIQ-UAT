@@ -94,6 +94,7 @@ import {
 import { Progress } from "../ui/progress";
 import { Switch } from "../ui/switch";
 import { maintenanceStrategyV2API } from "../../lib/api";
+import { DISCIPLINES as FM_DISCIPLINES, DISCIPLINE_COLORS } from "./EquipmentTypeItem";
 
 // ============= Constants =============
 
@@ -137,19 +138,15 @@ const DETECTION_METHODS = [
 
 const DISCIPLINES = [
   { value: "", label: "Select Discipline" },
-  { value: "Rotating", label: "Rotating" },
-  { value: "Static", label: "Static" },
-  { value: "Piping", label: "Piping" },
-  { value: "Instrumentation", label: "Instrumentation" },
-  { value: "Electrical", label: "Electrical" },
-  { value: "Civil", label: "Civil" },
-  { value: "Operations", label: "Operations" },
-  { value: "Laboratory", label: "Laboratory" },
-  { value: "Safety", label: "Safety" },
-  { value: "HVAC", label: "HVAC" },
-  { value: "Mechanical", label: "Mechanical" },
-  { value: "Process", label: "Process" },
+  ...FM_DISCIPLINES.map((d) => ({ value: d, label: d })),
 ];
+
+// Normalize discipline value to canonical case (matches Failure Modes module)
+const normalizeDiscipline = (value) => {
+  if (!value) return "";
+  const match = FM_DISCIPLINES.find((d) => d.toLowerCase() === String(value).toLowerCase());
+  return match || value;
+};
 
 // ============= Helper Functions =============
 
@@ -523,11 +520,15 @@ const FailureModeStrategyRow = ({
                             <Badge variant="outline" className="text-[10px]">
                               {getTaskTypeConfig(task.task_type).label}
                             </Badge>
-                            {task.discipline && (
-                              <Badge variant="outline" className="text-[10px] bg-slate-50 text-slate-600 border-slate-200">
-                                {task.discipline}
-                              </Badge>
-                            )}
+                            {task.discipline && (() => {
+                              const d = normalizeDiscipline(task.discipline);
+                              const c = DISCIPLINE_COLORS[d] || DISCIPLINE_COLORS["Mechanical"];
+                              return (
+                                <Badge variant="outline" className={`text-[10px] ${c.bg} ${c.text} ${c.border}`}>
+                                  {d}
+                                </Badge>
+                              );
+                            })()}
                           </div>
                         </div>
                         <TooltipProvider>
@@ -643,11 +644,15 @@ const TaskTemplateCard = ({ task, onEdit, onDelete, failureModes }) => {
               <Badge className={`text-[10px] ${strategyConfig.color}`}>
                 {strategyConfig.label}
               </Badge>
-              {task.discipline && (
-                <Badge variant="outline" className="text-[10px]">
-                  {task.discipline}
-                </Badge>
-              )}
+              {task.discipline && (() => {
+                const d = normalizeDiscipline(task.discipline);
+                const c = DISCIPLINE_COLORS[d] || DISCIPLINE_COLORS["Mechanical"];
+                return (
+                  <Badge variant="outline" className={`text-[10px] ${c.bg} ${c.text} ${c.border}`}>
+                    {d}
+                  </Badge>
+                );
+              })()}
               <span className="text-[10px] text-slate-400">
                 {linkedFMs.length} FM{linkedFMs.length !== 1 ? "s" : ""}
               </span>
@@ -781,7 +786,7 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
         description: task.description || "",
         task_type: task.task_type || "preventive",
         duration_hours: task.duration_hours || 1,
-        discipline: task.discipline || "",
+        discipline: normalizeDiscipline(task.discipline) || "",
         detection_methods: task.detection_methods || [],
         failure_mode_ids: task.failure_mode_ids || [],
         frequency_matrix: task.frequency_matrix || {
