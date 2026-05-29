@@ -1294,9 +1294,8 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-3 text-slate-900">
             <Wrench className="w-7 h-7 text-blue-600" />
-            Maintenance Strategy
+            {equipmentTypeName} <span className="text-slate-400 font-normal">|</span> Maintenance Strategy
           </h1>
-          <p className="text-base text-slate-500 mt-1">{equipmentTypeName}</p>
         </div>
         <div className="flex items-center gap-2">
           {hasStrategy ? (
