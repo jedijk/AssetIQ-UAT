@@ -451,31 +451,29 @@ const FailureModeStrategyRow = ({
                 </p>
               </div>
 
-              {/* Detection Methods */}
+              {/* Failure Mode Impact Description */}
               <div>
-                <Label className="text-xs">Detection Methods</Label>
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {DETECTION_METHODS.map((method) => (
-                    <Badge
-                      key={method.value}
-                      variant="outline"
-                      className={`text-[10px] cursor-pointer transition-colors ${
-                        fmStrategy.detection_methods?.includes(method.value)
-                          ? "bg-blue-100 text-blue-700 border-blue-200"
-                          : "bg-white hover:bg-slate-50"
-                      }`}
-                      onClick={() => {
-                        const current = fmStrategy.detection_methods || [];
-                        const updated = current.includes(method.value)
-                          ? current.filter((m) => m !== method.value)
-                          : [...current, method.value];
-                        onUpdate({ detection_methods: updated });
-                      }}
-                    >
-                      {method.label}
-                    </Badge>
-                  ))}
-                </div>
+                <Label className="text-xs flex items-center gap-1.5">
+                  Failure Mode Impact Description
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="w-3 h-3 text-slate-400" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        Describe the impact when this failure mode occurs - effects on safety, 
+                        production, environment, and asset condition.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </Label>
+                <Textarea
+                  value={fmStrategy.impact_description || ""}
+                  onChange={(e) => onUpdate({ impact_description: e.target.value })}
+                  placeholder="Describe the impact of this failure mode (e.g., production loss, safety hazards, environmental impact, equipment damage...)"
+                  className="mt-2 text-sm"
+                  rows={3}
+                />
               </div>
 
               {/* Linked Tasks with Toggle Switches */}
