@@ -425,9 +425,15 @@ async def create_equipment_type_strategy(
         else:
             risk_level = "low"
         
+        # Get potential effects from the failure mode
+        potential_effects = fm.get("potential_effects", [])
+        if isinstance(potential_effects, str):
+            potential_effects = [potential_effects] if potential_effects else []
+        
         fm_strategy = FailureModeStrategy(
             failure_mode_id=fm_id,
             failure_mode_name=fm_name,
+            potential_effects=potential_effects,
             strategy_type=strategy_type,
             detection_methods=[DetectionMethod(m) for m in detection_methods if m in [e.value for e in DetectionMethod]],
             task_ids=[t.id for t in tasks],

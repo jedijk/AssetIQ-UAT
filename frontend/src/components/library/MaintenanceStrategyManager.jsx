@@ -451,29 +451,38 @@ const FailureModeStrategyRow = ({
                 </p>
               </div>
 
-              {/* Failure Mode Impact Description */}
+              {/* Potential Effects (from Failure Mode Library) */}
               <div>
                 <Label className="text-xs flex items-center gap-1.5">
-                  Failure Mode Impact Description
+                  Potential Effects
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger>
                         <Info className="w-3 h-3 text-slate-400" />
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs">
-                        Describe the impact when this failure mode occurs - effects on safety, 
-                        production, environment, and asset condition.
+                        Effects of this failure mode on safety, production, environment, 
+                        and asset condition (from FMEA Library).
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 </Label>
-                <Textarea
-                  value={fmStrategy.impact_description || ""}
-                  onChange={(e) => onUpdate({ impact_description: e.target.value })}
-                  placeholder="Describe the impact of this failure mode (e.g., production loss, safety hazards, environmental impact, equipment damage...)"
-                  className="mt-2 text-sm"
-                  rows={3}
-                />
+                <div className="mt-2 p-3 bg-slate-50 rounded-lg border">
+                  {fmStrategy.potential_effects && fmStrategy.potential_effects.length > 0 ? (
+                    <ul className="space-y-1.5">
+                      {fmStrategy.potential_effects.map((effect, idx) => (
+                        <li key={idx} className="flex items-start gap-2 text-sm text-slate-700">
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+                          <span>{effect}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-slate-400 italic">
+                      No potential effects defined for this failure mode
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* Linked Tasks with Toggle Switches */}

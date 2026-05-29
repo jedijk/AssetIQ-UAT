@@ -128,6 +128,9 @@ class FailureModeStrategy(BaseModel):
     failure_mode_id: str
     failure_mode_name: str
     
+    # Potential effects of the failure mode (from FMEA library)
+    potential_effects: List[str] = []
+    
     # Strategy configuration
     strategy_type: MaintenanceStrategyType = MaintenanceStrategyType.PREVENTIVE
     detection_methods: List[DetectionMethod] = []
