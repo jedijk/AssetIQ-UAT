@@ -695,21 +695,30 @@ const TaskTemplateCard = ({ task, onEdit, onDelete, failureModes }) => {
             exit={{ height: 0, opacity: 0 }}
           >
             <div className="px-3 pb-3 pt-2 border-t bg-slate-50 space-y-3">
-              {/* Frequency Matrix */}
-              <div>
-                <Label className="text-xs font-medium">Criticality-Based Frequency</Label>
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  {CRITICALITY_LEVELS.map((crit) => {
-                    const freq = task.frequency_matrix?.[crit.value] || "monthly";
-                    return (
-                      <div key={crit.value} className={`p-2 rounded border ${crit.color}`}>
-                        <div className="text-[10px] font-medium">{crit.label}</div>
-                        <div className="text-xs mt-0.5">{getFrequencyLabel(freq)}</div>
-                      </div>
-                    );
-                  })}
+              {/* Frequency Matrix - Hidden for CM (Corrective/Reactive) tasks */}
+              {task.task_type !== "reactive" ? (
+                <div>
+                  <Label className="text-xs font-medium">Criticality-Based Frequency</Label>
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    {CRITICALITY_LEVELS.map((crit) => {
+                      const freq = task.frequency_matrix?.[crit.value] || "monthly";
+                      return (
+                        <div key={crit.value} className={`p-2 rounded border ${crit.color}`}>
+                          <div className="text-[10px] font-medium">{crit.label}</div>
+                          <div className="text-xs mt-0.5">{getFrequencyLabel(freq)}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="p-2 rounded border border-amber-200 bg-amber-50">
+                  <p className="text-xs text-amber-700 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    Corrective task - no scheduled frequency (triggered on failure)
+                  </p>
+                </div>
+              )}
 
               {/* Detection Methods */}
               {task.detection_methods?.length > 0 && (
@@ -910,51 +919,66 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
             </div>
           </div>
 
-          {/* Criticality Frequency Matrix */}
-          <div>
-            <Label className="flex items-center gap-2">
-              Criticality-Based Frequency
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <Info className="w-3.5 h-3.5 text-slate-400" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    Set different frequencies based on equipment criticality. High-criticality
-                    equipment will be inspected more frequently.
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </Label>
-            <div className="grid grid-cols-3 gap-3 mt-2">
-              {CRITICALITY_LEVELS.map((crit) => (
-                <div key={crit.value} className={`p-3 rounded-lg border ${crit.color}`}>
-                  <Label className="text-xs font-medium">{crit.label}</Label>
-                  <p className="text-[10px] text-slate-500 mb-2">{crit.description}</p>
-                  <Select
-                    value={formData.frequency_matrix[crit.value]}
-                    onValueChange={(v) =>
-                      setFormData({
-                        ...formData,
-                        frequency_matrix: { ...formData.frequency_matrix, [crit.value]: v },
-                      })
-                    }
-                  >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FREQUENCY_OPTIONS.map((f) => (
-                        <SelectItem key={f.value} value={f.value} className="text-xs">
-                          {f.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
+          {/* Criticality Frequency Matrix - Hidden for CM (Corrective/Reactive) tasks */}
+          {formData.task_type !== "reactive" ? (
+            <div>
+              <Label className="flex items-center gap-2">
+                Criticality-Based Frequency
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="w-3.5 h-3.5 text-slate-400" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      Set different frequencies based on equipment criticality. High-criticality
+                      equipment will be inspected more frequently.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </Label>
+              <div className="grid grid-cols-3 gap-3 mt-2">
+                {CRITICALITY_LEVELS.map((crit) => (
+                  <div key={crit.value} className={`p-3 rounded-lg border ${crit.color}`}>
+                    <Label className="text-xs font-medium">{crit.label}</Label>
+                    <p className="text-[10px] text-slate-500 mb-2">{crit.description}</p>
+                    <Select
+                      value={formData.frequency_matrix[crit.value]}
+                      onValueChange={(v) =>
+                        setFormData({
+                          ...formData,
+                          frequency_matrix: { ...formData.frequency_matrix, [crit.value]: v },
+                        })
+                      }
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FREQUENCY_OPTIONS.map((f) => (
+                          <SelectItem key={f.value} value={f.value} className="text-xs">
+                            {f.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="p-4 rounded-lg border border-amber-200 bg-amber-50">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <Label className="text-sm font-medium text-amber-800">Corrective Maintenance Task</Label>
+                  <p className="text-xs text-amber-700 mt-1">
+                    CM (Corrective) tasks are reactive and do not have a scheduled frequency. 
+                    They are triggered when equipment fails or issues are detected.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Detection Methods */}
           <div>
@@ -1414,15 +1438,29 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                     </thead>
                     <tbody>
                       {(strategy?.task_templates || []).map((task) => (
-                        <tr key={task.id} className="border-b hover:bg-slate-50">
-                          <td className="py-2 px-3 max-w-xs truncate">{task.name}</td>
-                          {CRITICALITY_LEVELS.map((crit) => (
-                            <td key={crit.value} className="text-center py-2 px-3">
-                              <Badge variant="outline" className="text-xs">
-                                {getFrequencyLabel(task.frequency_matrix?.[crit.value] || "monthly")}
+                        <tr key={task.id} className={`border-b hover:bg-slate-50 ${task.task_type === "reactive" ? "bg-amber-50/50" : ""}`}>
+                          <td className="py-2 px-3 max-w-xs">
+                            <div className="truncate">{task.name}</div>
+                            {task.task_type === "reactive" && (
+                              <span className="text-[10px] text-amber-600">(Corrective)</span>
+                            )}
+                          </td>
+                          {task.task_type === "reactive" ? (
+                            <td colSpan={3} className="text-center py-2 px-3">
+                              <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                                <AlertTriangle className="w-3 h-3 mr-1" />
+                                No scheduled frequency - triggered on failure
                               </Badge>
                             </td>
-                          ))}
+                          ) : (
+                            CRITICALITY_LEVELS.map((crit) => (
+                              <td key={crit.value} className="text-center py-2 px-3">
+                                <Badge variant="outline" className="text-xs">
+                                  {getFrequencyLabel(task.frequency_matrix?.[crit.value] || "monthly")}
+                                </Badge>
+                              </td>
+                            ))
+                          )}
                         </tr>
                       ))}
                     </tbody>
