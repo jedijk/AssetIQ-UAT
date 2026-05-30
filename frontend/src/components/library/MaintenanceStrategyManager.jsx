@@ -1270,13 +1270,39 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Maintenance Strategy?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will permanently delete the maintenance strategy for <strong>{equipmentTypeName}</strong>, 
-                      including all {strategy?.failure_mode_strategies?.length || 0} failure mode configurations 
-                      and {strategy?.task_templates?.length || 0} task templates.
-                      <br /><br />
-                      This action cannot be undone.
+                    <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+                      <AlertTriangle className="w-5 h-5" />
+                      Delete Maintenance Strategy?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription asChild>
+                      <div className="space-y-3">
+                        <p>
+                          This will permanently delete the maintenance strategy for <strong>{equipmentTypeName}</strong>, 
+                          including all {strategy?.failure_mode_strategies?.length || 0} failure mode configurations 
+                          and {strategy?.task_templates?.length || 0} task templates.
+                        </p>
+                        
+                        {(strategy?.affected_equipment_count || 0) > 0 && (
+                          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                            <div className="flex items-start gap-2">
+                              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <p className="font-medium text-amber-800">
+                                  This will impact {strategy?.affected_equipment_count} equipment items
+                                </p>
+                                <p className="text-sm text-amber-700 mt-1">
+                                  All equipment in the hierarchy using this equipment type will lose their maintenance strategy 
+                                  and scheduled tasks will no longer be generated.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        <p className="text-red-600 font-medium">
+                          This action cannot be undone.
+                        </p>
+                      </div>
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
