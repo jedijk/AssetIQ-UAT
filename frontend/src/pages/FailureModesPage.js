@@ -1200,6 +1200,24 @@ const FailureModesPage = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
+                      {/* Search Equipment Types */}
+                      <div className="relative flex-1 min-w-[200px]">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <Input
+                          placeholder="Search equipment types..."
+                          value={equipmentTypeSearch}
+                          onChange={(e) => setEquipmentTypeSearch(e.target.value)}
+                          className="pl-9 h-9"
+                        />
+                        {equipmentTypeSearch && (
+                          <button
+                            onClick={() => setEquipmentTypeSearch("")}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                       {/* Filter: No Failure Modes */}
                       <label className="flex items-center gap-2 text-sm cursor-pointer bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
                         <input
@@ -1234,6 +1252,14 @@ const FailureModesPage = () => {
                   {/* Group equipment types by discipline */}
                   {DISCIPLINES.filter(d => typeFilterDiscipline === "all" || d === typeFilterDiscipline).map(discipline => {
                     let disciplineTypes = equipmentTypes.filter(t => t.discipline === discipline);
+                    // Apply search filter
+                    if (equipmentTypeSearch) {
+                      const search = equipmentTypeSearch.toLowerCase();
+                      disciplineTypes = disciplineTypes.filter(t => 
+                        t.name.toLowerCase().includes(search) ||
+                        (t.description && t.description.toLowerCase().includes(search))
+                      );
+                    }
                     // Apply "no failure modes" filter
                     if (typeFilterNoFailureModes) {
                       disciplineTypes = disciplineTypes.filter(t => getConnectedFmCount(t.id) === 0);
