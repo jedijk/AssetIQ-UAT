@@ -93,6 +93,17 @@ import {
 } from "../ui/collapsible";
 import { Progress } from "../ui/progress";
 import { Switch } from "../ui/switch";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "../ui/alert-dialog";
 import { maintenanceStrategyV2API } from "../../lib/api";
 import { DISCIPLINES as FM_DISCIPLINES, DISCIPLINE_COLORS } from "./EquipmentTypeItem";
 
@@ -1114,6 +1125,17 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
     },
   });
 
+  const deleteStrategyMutation = useMutation({
+    mutationFn: () => maintenanceStrategyV2API.deleteStrategy(equipmentTypeId),
+    onSuccess: () => {
+      toast.success("Strategy deleted successfully");
+      queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.detail || "Failed to delete strategy");
+    },
+  });
+
   // ============= Handlers =============
 
   const handleCreateStrategy = () => {
@@ -1229,6 +1251,41 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                 <RefreshCw className="w-3.5 h-3.5 mr-1" />
                 Refresh
               </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                    <Trash2 className="w-3.5 h-3.5 mr-1" />
+                    Delete
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Maintenance Strategy?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete the maintenance strategy for <strong>{equipmentTypeName}</strong>, 
+                      including all {strategy?.failure_mode_strategies?.length || 0} failure mode configurations 
+                      and {strategy?.task_templates?.length || 0} task templates.
+                      <br /><br />
+                      This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteStrategyMutation.mutate()}
+                      className="bg-red-600 hover:bg-red-700"
+                      disabled={deleteStrategyMutation.isPending}
+                    >
+                      {deleteStrategyMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4 mr-2" />
+                      )}
+                      Delete Strategy
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </>
           ) : (
             <Button size="sm" onClick={handleCreateStrategy} disabled={createStrategyMutation.isPending}>
