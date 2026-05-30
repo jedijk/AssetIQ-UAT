@@ -1560,8 +1560,9 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                       medium: { label: "Medium", color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
                       low: { label: "Low", color: "bg-green-100 text-green-700 border-green-200" },
                     };
-                    const crit = equip.criticality 
-                      ? criticalityConfig[equip.criticality.toLowerCase()] 
+                    const critValue = typeof equip.criticality === 'string' ? equip.criticality.toLowerCase() : null;
+                    const crit = critValue && criticalityConfig[critValue]
+                      ? criticalityConfig[critValue] 
                       : { label: "Not Yet Assessed", color: "bg-slate-100 text-slate-500 border-slate-200" };
                     
                     return (
