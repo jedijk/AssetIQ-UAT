@@ -639,7 +639,7 @@ async def get_affected_equipment(
     # Find all equipment nodes that use this equipment type
     equipment_nodes = await db.equipment_nodes.find(
         {"equipment_type_id": equipment_type_id},
-        {"_id": 0, "id": 1, "name": 1, "tag_number": 1, "level": 1, "location": 1, "parent_id": 1}
+        {"_id": 0, "id": 1, "name": 1, "tag": 1, "level": 1, "location": 1, "parent_id": 1}
     ).to_list(500)
     
     return {

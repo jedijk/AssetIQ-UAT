@@ -1565,9 +1565,9 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                           <div className="text-xs text-slate-500 mt-0.5">{equip.location}</div>
                         )}
                       </div>
-                      {equip.tag_number && (
+                      {equip.tag && (
                         <Badge variant="outline" className="ml-2 text-xs font-mono bg-white">
-                          {equip.tag_number}
+                          {equip.tag}
                         </Badge>
                       )}
                     </div>
