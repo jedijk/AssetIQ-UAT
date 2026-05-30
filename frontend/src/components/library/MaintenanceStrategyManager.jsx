@@ -1560,12 +1560,14 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                       medium: { label: "Medium", color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
                       low: { label: "Low", color: "bg-green-100 text-green-700 border-green-200" },
                     };
-                    const crit = criticalityConfig[equip.criticality?.toLowerCase()] || null;
+                    const crit = equip.criticality 
+                      ? criticalityConfig[equip.criticality.toLowerCase()] 
+                      : { label: "Not Yet Assessed", color: "bg-slate-100 text-slate-500 border-slate-200" };
                     
                     return (
                       <div 
                         key={equip.id} 
-                        className="flex items-center justify-between p-3 rounded-lg border bg-slate-50 hover:bg-slate-100 transition-colors"
+                        className="flex items-center justify-between p-3 rounded-lg border bg-slate-50 hover:bg-slate-100 transition-colors group"
                       >
                         <div className="flex-1">
                           <div className="font-medium text-sm text-slate-900">{equip.name}</div>
@@ -1574,16 +1576,34 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          {crit && (
-                            <Badge variant="outline" className={`text-xs ${crit.color}`}>
-                              {crit.label}
-                            </Badge>
-                          )}
+                          <Badge variant="outline" className={`text-xs ${crit.color}`}>
+                            {crit.label}
+                          </Badge>
                           {equip.tag && (
                             <Badge variant="outline" className="text-xs font-mono bg-white">
                               {equip.tag}
                             </Badge>
                           )}
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={() => {
+                                    setAffectedEquipmentDialogOpen(false);
+                                    window.location.href = `/equipment?id=${equip.id}`;
+                                  }}
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">Edit in Equipment Manager</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
                       </div>
                     );
