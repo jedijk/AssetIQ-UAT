@@ -1162,7 +1162,7 @@ const FailureModesPage = () => {
 
         {/* Equipment Types Tab */}
         <TabsContent value="libraries" className="space-y-6">
-          <div className="flex gap-4 h-[calc(100vh-280px)]">
+          <div className="flex gap-4 h-[calc(100vh-180px)]">
             {/* Left Panel: Equipment Types List */}
             <div className={`${selectedEquipmentType ? 'w-1/2 lg:w-2/5' : 'w-full'} transition-all duration-300 min-w-0`}>
               <div className="card h-full flex flex-col overflow-hidden">
