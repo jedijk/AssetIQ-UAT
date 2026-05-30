@@ -208,7 +208,7 @@ const getRPNConfig = (rpn) => {
 /**
  * Strategy Overview Card
  */
-const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating }) => {
+const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating, affectedEquipment, onShowAffectedEquipment }) => {
   const hasStrategy = strategy?.exists && strategy?.strategy;
   const data = strategy?.strategy;
 
@@ -296,7 +296,10 @@ const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating }) => {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-100 cursor-help">
+                <div 
+                  className="text-center p-3 bg-blue-50 rounded-lg border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={onShowAffectedEquipment}
+                >
                   <div className="text-2xl font-bold text-blue-600">
                     {data.affected_equipment_count || 0}
                   </div>
@@ -305,8 +308,7 @@ const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating }) => {
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
                 <p className="text-xs">
-                  Number of equipment items in the hierarchy using this equipment type. 
-                  This strategy will apply to all these equipment assets.
+                  Click to view the list of equipment using this strategy.
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -1029,6 +1031,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const [expandedFMs, setExpandedFMs] = useState(new Set());
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [affectedEquipmentDialogOpen, setAffectedEquipmentDialogOpen] = useState(false);
 
   const equipmentTypeId = equipmentType?.id;
   const equipmentTypeName = equipmentType?.name;
@@ -1043,6 +1046,13 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
 
   const strategy = strategyData?.strategy;
   const hasStrategy = strategyData?.exists;
+
+  // Affected equipment query
+  const { data: affectedEquipmentData, isLoading: affectedEquipmentLoading } = useQuery({
+    queryKey: ["maintenance-strategy-v2-affected-equipment", equipmentTypeId],
+    queryFn: () => maintenanceStrategyV2API.getAffectedEquipment(equipmentTypeId),
+    enabled: !!equipmentTypeId && affectedEquipmentDialogOpen,
+  });
 
   // Version history query
   const { data: versionHistoryData } = useQuery({
@@ -1305,6 +1315,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
         strategy={strategyData} 
         onToggleStrategy={handleToggleStrategy}
         isUpdating={updateStrategyMutation.isPending}
+        onShowAffectedEquipment={() => setAffectedEquipmentDialogOpen(true)}
       />
 
       {/* Tabs (only show if strategy exists) */}
@@ -1516,6 +1527,63 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
         onSave={handleSaveTask}
         isLoading={addTaskMutation.isPending || updateTaskMutation.isPending}
       />
+
+      {/* Affected Equipment Dialog */}
+      <Dialog open={affectedEquipmentDialogOpen} onOpenChange={setAffectedEquipmentDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wrench className="w-5 h-5 text-blue-600" />
+              Equipment Using This Strategy
+            </DialogTitle>
+            <DialogDescription>
+              {affectedEquipmentData?.total || 0} equipment items in the hierarchy are using the <strong>{equipmentTypeName}</strong> equipment type.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="mt-4">
+            {affectedEquipmentLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+              </div>
+            ) : affectedEquipmentData?.equipment?.length === 0 ? (
+              <div className="text-center py-8 text-slate-500">
+                <AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                <p>No equipment found using this equipment type.</p>
+              </div>
+            ) : (
+              <ScrollArea className="h-[400px] pr-4">
+                <div className="space-y-2">
+                  {affectedEquipmentData?.equipment?.map((equip) => (
+                    <div 
+                      key={equip.id} 
+                      className="flex items-center justify-between p-3 rounded-lg border bg-slate-50 hover:bg-slate-100 transition-colors"
+                    >
+                      <div className="flex-1">
+                        <div className="font-medium text-sm text-slate-900">{equip.name}</div>
+                        {equip.location && (
+                          <div className="text-xs text-slate-500 mt-0.5">{equip.location}</div>
+                        )}
+                      </div>
+                      {equip.tag_number && (
+                        <Badge variant="outline" className="ml-2 text-xs font-mono bg-white">
+                          {equip.tag_number}
+                        </Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAffectedEquipmentDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -630,6 +630,25 @@ async def delete_equipment_type_strategy(
     return {"message": "Strategy deleted", "equipment_type_id": equipment_type_id}
 
 
+@router.get("/{equipment_type_id}/affected-equipment")
+async def get_affected_equipment(
+    equipment_type_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get list of equipment affected by this strategy"""
+    # Find all equipment nodes that use this equipment type
+    equipment_nodes = await db.equipment_nodes.find(
+        {"equipment_type_id": equipment_type_id},
+        {"_id": 0, "id": 1, "name": 1, "tag_number": 1, "level": 1, "location": 1, "parent_id": 1}
+    ).to_list(500)
+    
+    return {
+        "equipment": equipment_nodes,
+        "total": len(equipment_nodes),
+        "equipment_type_id": equipment_type_id
+    }
+
+
 @router.get("/{equipment_type_id}/version-history")
 async def get_strategy_version_history(
     equipment_type_id: str,

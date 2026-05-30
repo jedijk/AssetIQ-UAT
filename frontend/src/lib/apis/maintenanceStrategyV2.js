@@ -173,6 +173,14 @@ export const maintenanceStrategyV2API = {
   },
 
   /**
+   * Get affected equipment for a strategy
+   */
+  getAffectedEquipment: async (equipmentTypeId) => {
+    const response = await api.get(`/maintenance-strategies-v2/${equipmentTypeId}/affected-equipment`);
+    return response.data;
+  },
+
+  /**
    * Get audit log for a strategy
    */
   getAuditLog: async (equipmentTypeId, limit = 50) => {
