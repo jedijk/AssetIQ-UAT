@@ -539,7 +539,7 @@ const FailureModeStrategyRow = ({
                               {task.name}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 mt-1">
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <Badge variant="outline" className="text-[10px]">
                               {getTaskTypeConfig(task.task_type).label}
                             </Badge>
@@ -553,6 +553,21 @@ const FailureModeStrategyRow = ({
                               );
                             })()}
                           </div>
+                          {/* Frequency per Criticality */}
+                          {task.task_type !== "reactive" && task.frequency_matrix && (
+                            <div className="flex items-center gap-1.5 mt-2">
+                              <span className="text-[10px] text-slate-400">Freq:</span>
+                              <Badge variant="outline" className="text-[9px] bg-green-50 text-green-700 border-green-200 px-1.5 py-0">
+                                L: {getFrequencyLabel(task.frequency_matrix.low || "quarterly")}
+                              </Badge>
+                              <Badge variant="outline" className="text-[9px] bg-yellow-50 text-yellow-700 border-yellow-200 px-1.5 py-0">
+                                M: {getFrequencyLabel(task.frequency_matrix.medium || "monthly")}
+                              </Badge>
+                              <Badge variant="outline" className="text-[9px] bg-red-50 text-red-700 border-red-200 px-1.5 py-0">
+                                H: {getFrequencyLabel(task.frequency_matrix.high || "weekly")}
+                              </Badge>
+                            </div>
+                          )}
                         </div>
                         <TooltipProvider>
                           <Tooltip>
