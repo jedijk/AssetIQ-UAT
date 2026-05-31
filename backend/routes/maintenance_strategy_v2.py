@@ -298,6 +298,9 @@ async def _resync_programs_with_strategy(equipment_type_id: str):
             new_active = False
         elif task.get("is_mandatory") is False:
             new_active = False
+        elif task.get("task_type") in ("reactive", "corrective"):
+            # CM tasks are triggered on failure, not scheduled
+            new_active = False
         else:
             linked_fms = task_to_fms.get(tid, [])
             if not linked_fms:

@@ -7,6 +7,18 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Horizontal Gantt Timeline + drag-to-reschedule (VERIFIED)**:
+  - Rebuilt `TimelineView` as a proper horizontal Gantt:
+    - Sticky left column (task name + equipment tag); scrollable timeline grid on the right.
+    - **Three zoom levels**: Day (40px/day), Week (16px/day, weeks labelled W21..W26), Month (6px/day, compact).
+    - Date range auto-derived from earliest planned_date to latest, padded ±7 days, min 30-day span.
+    - Per-row bar positioned by `planned_date`, width based on `ceil(estimated_hours / 8)` days, status-driven colour (blue/amber/purple/red/green) and priority badge on the bar.
+    - Vertical red "Today" line with label; weekend tinting; ISO-week labels.
+  - **Drag-to-reschedule**:
+    - Pointer-down on a bar → cursor-grabbing + ring; pointer-move shows live `+Nd / -Nd` delta floater above the bar.
+    - Pointer-up commits via `PATCH /maintenance-scheduler/tasks/{id}` with the new `planned_date`; React-Query invalidates so the bar lands at the persisted position.
+    - Pointer-up without drag → opens the existing `TaskDetailsDialog`.
+  - Verified live: 18 forklift tasks render in all three zooms; live reschedule `2026-05-31 → 2026-06-05` round-trips successfully.
 - [Feb 2026] **Schedule fully synced with active/inactive tasks & FMs + human-readable version history (VERIFIED)**:
   - **Bug A**: Toggling a task off via `is_mandatory` (per-task switch) saved on the strategy but did NOT touch maintenance_programs or scheduled_tasks — the Planner kept showing tasks that had been "deactivated".
   - **Bug B**: Existing `maintenance_programs` had `failure_mode_id = None` because `apply-strategy` was matching `task.failure_mode_ids[0]` (library FM id) against `fm_strategies.failure_mode_id` (strategy-minted id), so they never matched. Result: FM enable/disable did not cascade to the schedule for already-applied equipment.

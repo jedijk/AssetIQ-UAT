@@ -178,7 +178,88 @@ const DashboardCards = ({ dashboard, isLoading }) => {
 /**
  * Timeline View Component
  */
-const TimelineView = ({ timeline, isLoading, onTaskClick }) => {
+/**
+ * Horizontal Gantt-style Timeline
+ *  - One row per task, sorted by planned_date / due_date
+ *  - Time runs left → right; zoom levels: day · week · month
+ *  - Bars are draggable to reschedule planned_date (commits on pointer-up)
+ *  - Click a bar to open the task-details dialog
+ */
+const TimelineView = ({ timeline, isLoading, onTaskClick, onTaskReschedule }) => {
+  const [zoom, setZoom] = useState("week"); // "day" | "week" | "month"
+
+  const DAY_PX = useMemo(() => ({ day: 40, week: 16, month: 6 }[zoom]), [zoom]);
+
+  // Flatten the equipment-grouped timeline into a list of task rows
+  const rows = useMemo(() => {
+    if (!timeline?.timeline) return [];
+    const list = [];
+    for (const equipment of timeline.timeline) {
+      for (const t of equipment.tasks || []) {
+        list.push({ ...t, _equipmentName: equipment.equipment_name, _equipmentTag: equipment.equipment_tag });
+      }
+    }
+    list.sort((a, b) => (a.planned_date || a.due_date || "") .localeCompare(b.planned_date || b.due_date || ""));
+    return list;
+  }, [timeline]);
+
+  // Date range: pad earliest/latest by ~7 days, ensure at least 30-day span
+  const { startDate, endDate, totalDays } = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (rows.length === 0) {
+      const e = new Date(today.getTime() + 30 * 86400000);
+      return { startDate: today, endDate: e, totalDays: 31 };
+    }
+    let minMs = Infinity;
+    let maxMs = -Infinity;
+    for (const r of rows) {
+      const d = new Date(r.planned_date || r.due_date);
+      const dur = Math.max(1, Math.ceil((r.estimated_hours || 1) / 8));
+      const endMs = d.getTime() + dur * 86400000;
+      minMs = Math.min(minMs, d.getTime());
+      maxMs = Math.max(maxMs, endMs);
+    }
+    minMs = Math.min(minMs, today.getTime()) - 7 * 86400000;
+    maxMs = Math.max(maxMs, today.getTime() + 30 * 86400000) + 7 * 86400000;
+    const s = new Date(minMs); s.setHours(0, 0, 0, 0);
+    const e = new Date(maxMs); e.setHours(0, 0, 0, 0);
+    const days = Math.ceil((e - s) / 86400000) + 1;
+    return { startDate: s, endDate: e, totalDays: days };
+  }, [rows]);
+
+  const dayDelta = (d) => Math.floor((new Date(d).getTime() - startDate.getTime()) / 86400000);
+
+  // Build header markers
+  const headers = useMemo(() => {
+    const months = [];
+    const subs = [];
+    const cur = new Date(startDate);
+    let curMonth = -1;
+    let monthAcc = { label: "", days: 0, key: "" };
+    for (let i = 0; i < totalDays; i++) {
+      const m = cur.getMonth();
+      if (m !== curMonth) {
+        if (monthAcc.days > 0) months.push(monthAcc);
+        monthAcc = {
+          label: cur.toLocaleDateString(undefined, { month: "short", year: "numeric" }),
+          days: 0,
+          key: `${cur.getFullYear()}-${m}`,
+        };
+        curMonth = m;
+      }
+      monthAcc.days += 1;
+      if (zoom === "day") {
+        subs.push({ key: i, label: cur.getDate(), isWeekStart: cur.getDay() === 1 });
+      } else if (zoom === "week" && cur.getDay() === 1) {
+        subs.push({ key: i, label: `W${getISOWeek(cur)}`, isWeekStart: true, days: 7 });
+      }
+      cur.setDate(cur.getDate() + 1);
+    }
+    if (monthAcc.days > 0) months.push(monthAcc);
+    return { months, subs };
+  }, [startDate, totalDays, zoom]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -186,7 +267,6 @@ const TimelineView = ({ timeline, isLoading, onTaskClick }) => {
       </div>
     );
   }
-
   if (!timeline?.timeline || timeline.timeline.length === 0) {
     return (
       <div className="text-center py-12">
@@ -197,96 +277,264 @@ const TimelineView = ({ timeline, isLoading, onTaskClick }) => {
     );
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const todayDelta = dayDelta(new Date());
+  const gridWidth = totalDays * DAY_PX;
 
   return (
-    <div className="space-y-4">
-      {timeline.timeline.map((equipment) => (
-        <Card key={equipment.equipment_id} className="overflow-hidden">
-          <CardHeader className="py-3 px-4 bg-slate-50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Wrench className="w-4 h-4 text-slate-500" />
-                <span className="font-medium text-sm">{equipment.equipment_name}</span>
-                {equipment.equipment_tag && (
-                  <Badge variant="outline" className="text-xs font-mono">
-                    {equipment.equipment_tag}
-                  </Badge>
-                )}
-              </div>
-              <Badge variant="outline" className="text-xs">
-                {equipment.tasks.length} tasks
-              </Badge>
+    <div className="space-y-3" data-testid="timeline-gantt">
+      {/* Zoom controls */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-slate-500 mr-2">Zoom:</span>
+        {[
+          { k: "day", label: "Day" },
+          { k: "week", label: "Week" },
+          { k: "month", label: "Month" },
+        ].map((opt) => (
+          <Button
+            key={opt.k}
+            size="sm"
+            variant={zoom === opt.k ? "default" : "outline"}
+            onClick={() => setZoom(opt.k)}
+            className="h-7 text-xs px-2.5"
+            data-testid={`timeline-zoom-${opt.k}`}
+          >
+            {opt.label}
+          </Button>
+        ))}
+        <span className="ml-auto text-xs text-slate-500">
+          {rows.length} task{rows.length === 1 ? "" : "s"} · drag a bar to reschedule
+        </span>
+      </div>
+
+      {/* Gantt chart */}
+      <Card className="overflow-hidden">
+        <div className="flex">
+          {/* Left: sticky task names */}
+          <div className="flex-shrink-0 w-64 border-r bg-slate-50">
+            {/* Header spacer */}
+            <div className="h-12 border-b flex items-center px-3 text-xs font-medium text-slate-600">
+              Task / Equipment
             </div>
-          </CardHeader>
-          <CardContent className="p-4">
-            <div className="relative">
-              {/* Timeline line */}
-              <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-slate-200" />
-              
-              {/* Tasks */}
-              <div className="space-y-3">
-                {equipment.tasks.map((task, idx) => {
-                  const statusConfig = TASK_STATUS_CONFIG[task.status] || TASK_STATUS_CONFIG.draft;
-                  const priorityConfig = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.medium;
-                  const isOverdue = task.is_overdue;
-                  const isToday = task.due_date === today;
-                  
-                  return (
-                    <div
-                      key={task.id}
-                      className={`relative pl-10 cursor-pointer group ${isOverdue ? "animate-pulse" : ""}`}
-                      onClick={() => onTaskClick?.(task)}
-                    >
-                      {/* Timeline dot */}
-                      <div className={`absolute left-2 w-5 h-5 rounded-full border-2 flex items-center justify-center
-                        ${isOverdue ? "bg-red-500 border-red-500" : isToday ? "bg-blue-500 border-blue-500" : "bg-white border-slate-300"}
-                      `}>
-                        {isOverdue ? (
-                          <AlertTriangle className="w-3 h-3 text-white" />
-                        ) : task.status === "completed" ? (
-                          <CheckCircle2 className="w-3 h-3 text-green-500" />
-                        ) : (
-                          <div className={`w-2 h-2 rounded-full ${isToday ? "bg-white" : "bg-slate-300"}`} />
-                        )}
-                      </div>
-                      
-                      {/* Task card */}
-                      <div className={`p-3 rounded-lg border transition-all group-hover:shadow-md
-                        ${isOverdue ? "border-red-200 bg-red-50" : "border-slate-200 bg-white hover:border-blue-200"}
-                      `}>
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-sm truncate">{task.task_name}</span>
-                              <Badge className={`text-[10px] ${priorityConfig.color}`}>
-                                {priorityConfig.label}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
-                              <span className="flex items-center gap-1">
-                                <Calendar className="w-3 h-3" />
-                                {task.due_date}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {task.estimated_hours}h
-                              </span>
-                            </div>
-                          </div>
-                          <Badge className={`text-[10px] ${statusConfig.color}`}>
-                            {statusConfig.label}
-                          </Badge>
-                        </div>
-                      </div>
+            <div>
+              {rows.map((r) => (
+                <div
+                  key={r.id}
+                  className="h-10 border-b px-3 flex items-center text-xs cursor-pointer hover:bg-slate-100"
+                  onClick={() => onTaskClick?.(r)}
+                  data-testid={`gantt-row-label-${r.id}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate font-medium text-slate-900">{r.task_name}</div>
+                    <div className="truncate text-[10px] text-slate-500">
+                      {r._equipmentName}
+                      {r._equipmentTag && ` · ${r._equipmentTag}`}
                     </div>
-                  );
-                })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right: scrollable grid */}
+          <ScrollArea className="flex-1">
+            <div style={{ width: gridWidth, minWidth: "100%" }}>
+              {/* Header */}
+              <div className="h-12 border-b relative">
+                {/* Month strip */}
+                <div className="flex h-6 border-b bg-slate-50">
+                  {headers.months.map((m) => (
+                    <div
+                      key={m.key}
+                      className="border-r text-[10px] flex items-center justify-center text-slate-700 font-medium overflow-hidden"
+                      style={{ width: m.days * DAY_PX }}
+                    >
+                      {m.days * DAY_PX > 60 ? m.label : ""}
+                    </div>
+                  ))}
+                </div>
+                {/* Day/week strip */}
+                <div className="flex h-6 relative">
+                  {zoom === "day" &&
+                    Array.from({ length: totalDays }).map((_, i) => {
+                      const d = new Date(startDate.getTime() + i * 86400000);
+                      const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                      return (
+                        <div
+                          key={i}
+                          className={`border-r text-[10px] flex items-center justify-center ${
+                            isWeekend ? "bg-slate-100 text-slate-400" : "text-slate-600"
+                          }`}
+                          style={{ width: DAY_PX }}
+                        >
+                          {d.getDate()}
+                        </div>
+                      );
+                    })}
+                  {zoom === "week" && (
+                    <>
+                      {Array.from({ length: Math.ceil(totalDays / 7) }).map((_, i) => (
+                        <div
+                          key={i}
+                          className="border-r text-[10px] flex items-center justify-center text-slate-600"
+                          style={{ width: DAY_PX * 7 }}
+                        >
+                          W{getISOWeek(new Date(startDate.getTime() + i * 7 * 86400000))}
+                        </div>
+                      ))}
+                    </>
+                  )}
+                  {zoom === "month" && <div className="flex-1" />}
+                </div>
+              </div>
+
+              {/* Task rows */}
+              <div className="relative">
+                {/* Today line */}
+                {todayDelta >= 0 && todayDelta < totalDays && (
+                  <div
+                    className="absolute top-0 bottom-0 w-px bg-red-400 pointer-events-none z-10"
+                    style={{ left: todayDelta * DAY_PX + DAY_PX / 2 }}
+                  >
+                    <div className="absolute -top-5 -left-3 text-[9px] text-red-500 font-semibold">
+                      Today
+                    </div>
+                  </div>
+                )}
+
+                {rows.map((r) => (
+                  <GanttRow
+                    key={r.id}
+                    task={r}
+                    startDate={startDate}
+                    dayPx={DAY_PX}
+                    totalDays={totalDays}
+                    onClick={() => onTaskClick?.(r)}
+                    onReschedule={onTaskReschedule}
+                  />
+                ))}
               </div>
             </div>
-          </CardContent>
-        </Card>
-      ))}
+          </ScrollArea>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+// ISO week number helper
+function getISOWeek(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+}
+
+/** Single Gantt row with a draggable bar */
+const GanttRow = ({ task, startDate, dayPx, totalDays, onClick, onReschedule }) => {
+  const [drag, setDrag] = useState(null); // { startX, deltaDays }
+
+  const taskStart = task.planned_date || task.due_date;
+  if (!taskStart) return <div className="h-10 border-b" />;
+
+  const startIdx = Math.floor(
+    (new Date(taskStart).getTime() - startDate.getTime()) / 86400000,
+  );
+  const durationDays = Math.max(1, Math.ceil((task.estimated_hours || 1) / 8));
+
+  const priorityConfig = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.medium;
+  const statusConfig = TASK_STATUS_CONFIG[task.status] || TASK_STATUS_CONFIG.draft;
+
+  // Bar colour: status-driven, overdue overrides
+  let barColor = "bg-blue-500";
+  if (task.is_overdue) barColor = "bg-red-500";
+  else if (task.status === "completed") barColor = "bg-green-500";
+  else if (task.status === "in_progress") barColor = "bg-amber-500";
+  else if (task.status === "assigned") barColor = "bg-purple-500";
+
+  const deltaDays = drag?.deltaDays || 0;
+  const visibleLeft = (startIdx + deltaDays) * dayPx;
+  const visibleWidth = durationDays * dayPx;
+
+  const handlePointerDown = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const startX = e.clientX;
+    setDrag({ startX, deltaDays: 0 });
+
+    const onMove = (ev) => {
+      const dx = ev.clientX - startX;
+      const dd = Math.round(dx / dayPx);
+      setDrag({ startX, deltaDays: dd });
+    };
+    const onUp = (ev) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      const dx = ev.clientX - startX;
+      const dd = Math.round(dx / dayPx);
+      setDrag(null);
+      if (dd !== 0 && onReschedule) {
+        const newDate = new Date(new Date(taskStart).getTime() + dd * 86400000);
+        const iso = newDate.toISOString().split("T")[0];
+        onReschedule(task.id, iso);
+      } else if (dd === 0) {
+        // No drag = click
+        onClick?.();
+      }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
+  return (
+    <div
+      className="h-10 border-b relative hover:bg-slate-50/50 transition-colors"
+      style={{ width: totalDays * dayPx }}
+      data-testid={`gantt-row-${task.id}`}
+    >
+      {/* Background day grid */}
+      {dayPx >= 16 && (
+        <div className="absolute inset-0 flex pointer-events-none">
+          {Array.from({ length: totalDays }).map((_, i) => {
+            const d = new Date(startDate.getTime() + i * 86400000);
+            const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+            return (
+              <div
+                key={i}
+                className={`border-r ${isWeekend ? "bg-slate-50/60" : ""}`}
+                style={{ width: dayPx }}
+              />
+            );
+          })}
+        </div>
+      )}
+      {/* The task bar */}
+      <div
+        className={`absolute top-1.5 h-7 rounded-md ${barColor} ${
+          drag ? "opacity-70 cursor-grabbing ring-2 ring-blue-300" : "cursor-grab"
+        } shadow-sm hover:brightness-110 transition-[filter] z-[1] flex items-center px-2 overflow-hidden`}
+        style={{ left: visibleLeft, width: visibleWidth }}
+        onPointerDown={handlePointerDown}
+        title={`${task.task_name} · ${taskStart}${deltaDays !== 0 ? ` → ${new Date(new Date(taskStart).getTime() + deltaDays * 86400000).toISOString().split("T")[0]}` : ""} · ${task.estimated_hours}h`}
+      >
+        <span className="text-[10px] text-white font-medium truncate select-none">
+          {task.task_name}
+        </span>
+        {dayPx >= 30 && (
+          <Badge className={`ml-auto text-[9px] py-0 px-1 ${priorityConfig.color} pointer-events-none`}>
+            {priorityConfig.label.charAt(0)}
+          </Badge>
+        )}
+      </div>
+      {/* Drag-delta preview */}
+      {drag && drag.deltaDays !== 0 && (
+        <div
+          className="absolute -top-3 text-[9px] font-semibold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded pointer-events-none z-20"
+          style={{ left: visibleLeft }}
+        >
+          {drag.deltaDays > 0 ? `+${drag.deltaDays}` : drag.deltaDays}d
+        </div>
+      )}
     </div>
   );
 };
@@ -1492,6 +1740,9 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
             timeline={timeline} 
             isLoading={timelineLoading} 
             onTaskClick={handleTaskClick}
+            onTaskReschedule={(taskId, newDate) =>
+              updateTaskMutation.mutate({ taskId, data: { planned_date: newDate } })
+            }
           />
         </TabsContent>
 

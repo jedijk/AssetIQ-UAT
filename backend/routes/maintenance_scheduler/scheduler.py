@@ -43,6 +43,12 @@ async def run_scheduler(
 
     for program in programs:
         program_id = program.get("id")
+
+        # Belt-and-suspenders: skip CM/reactive programs even if they exist
+        if program.get("task_type") in ("reactive", "corrective"):
+            tasks_skipped += 1
+            continue
+
         criticality = program.get("criticality") or "low"
 
         horizon = request.planning_horizon_days or get_planning_horizon(criticality)

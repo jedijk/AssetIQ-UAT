@@ -83,9 +83,14 @@ async def apply_strategy_to_equipment(
             if not task.get("is_mandatory", True):
                 continue
 
+            task_type = task.get("task_type", "preventive")
+            # CM / Corrective / Reactive tasks are triggered on failure, not
+            # scheduled. They never become maintenance programs.
+            if task_type in ("reactive", "corrective"):
+                continue
+
             task_id = task.get("id")
             task_name = task.get("name")
-            task_type = task.get("task_type", "preventive")
 
             freq_matrix = task.get("frequency_matrix", {})
             frequency = freq_matrix.get(equip_criticality, "monthly")
