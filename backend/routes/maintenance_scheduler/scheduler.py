@@ -43,7 +43,7 @@ async def run_scheduler(
 
     for program in programs:
         program_id = program.get("id")
-        criticality = program.get("criticality", "medium")
+        criticality = program.get("criticality") or "low"
 
         horizon = request.planning_horizon_days or get_planning_horizon(criticality)
         horizon_date = (today + timedelta(days=horizon)).isoformat()

@@ -50,7 +50,14 @@ async def apply_strategy_to_equipment(
 
     task_templates = strategy.get("task_templates", [])
     failure_mode_strategies = strategy.get("failure_mode_strategies", [])
-    fm_lookup = {fm.get("failure_mode_id"): fm for fm in failure_mode_strategies}
+
+    # Build reverse map: task_template_id -> first FM-strategy that references it.
+    # This is the source of truth — each strategy mints its own FM-strategy ids
+    # distinct from the library FM ids stored inside task.failure_mode_ids.
+    task_to_fm = {}
+    for fm in failure_mode_strategies:
+        for tid in (fm.get("task_ids") or []):
+            task_to_fm.setdefault(tid, fm)
 
     programs_created = []
     today = datetime.utcnow().date().isoformat()
@@ -60,12 +67,15 @@ async def apply_strategy_to_equipment(
         equipment_name = equipment.get("name")
         equipment_tag = equipment.get("tag")
 
-        # Equipment criticality may be a dict {level: ...} or a string
-        equip_criticality = "medium"
+        # Equipment criticality may be a dict {level: ...} or a string.
+        # When criticality is not assessed yet, treat the equipment as LOW
+        # so it receives the most conservative (longest-interval) frequency.
+        equip_criticality = "low"
         if equipment.get("criticality"):
             crit = equipment["criticality"]
             if isinstance(crit, dict):
-                equip_criticality = crit.get("level", "medium").lower()
+                level = crit.get("level")
+                equip_criticality = level.lower() if level else "low"
             elif isinstance(crit, str):
                 equip_criticality = crit.lower()
 
@@ -80,13 +90,12 @@ async def apply_strategy_to_equipment(
             freq_matrix = task.get("frequency_matrix", {})
             frequency = freq_matrix.get(equip_criticality, "monthly")
 
-            fm_ids = task.get("failure_mode_ids", [])
             fm_name = None
             fm_id = None
-            if fm_ids and fm_ids[0] in fm_lookup:
-                fm = fm_lookup[fm_ids[0]]
-                fm_id = fm.get("failure_mode_id")
-                fm_name = fm.get("failure_mode_name")
+            fm_for_task = task_to_fm.get(task_id)
+            if fm_for_task:
+                fm_id = fm_for_task.get("failure_mode_id")
+                fm_name = fm_for_task.get("failure_mode_name")
 
             existing = await db.maintenance_programs.find_one({
                 "equipment_id": equipment_id,
@@ -102,6 +111,8 @@ async def apply_strategy_to_equipment(
                         "frequency_days": frequency_to_days(frequency),
                         "criticality": equip_criticality,
                         "is_active": True,
+                        "failure_mode_id": fm_id,
+                        "failure_mode_name": fm_name,
                         "updated_at": datetime.utcnow().isoformat(),
                     }},
                 )
@@ -132,11 +143,17 @@ async def apply_strategy_to_equipment(
                 await db.maintenance_programs.insert_one(program.model_dump())
                 programs_created.append(program.id)
 
+    # Resync active state for all programs of this equipment type so disabled
+    # FMs / non-mandatory tasks immediately propagate to the newly-created ones.
+    from routes.maintenance_strategy_v2 import _resync_programs_with_strategy
+    resync = await _resync_programs_with_strategy(equipment_type_id)
+
     return {
         "message": f"Strategy applied to {len(equipment_list)} equipment",
         "equipment_count": len(equipment_list),
         "programs_created": len(programs_created),
         "programs_updated": len(equipment_list) * len(task_templates) - len(programs_created),
+        "programs_deactivated_on_resync": resync["programs_deactivated"],
     }
 
 

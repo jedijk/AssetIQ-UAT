@@ -65,7 +65,7 @@ async def _propagate_task_template_to_programs(equipment_type_id: str, task_temp
 
     updated = 0
     for prog in programs:
-        criticality = prog.get("criticality", "medium")
+        criticality = prog.get("criticality") or "low"
         frequency = freq_matrix.get(criticality, prog.get("frequency", "monthly"))
         freq_days = _FREQUENCY_DAYS.get(frequency, 30)
 
@@ -248,6 +248,147 @@ async def _cancel_open_scheduled_tasks_for_strategy(equipment_type_id: str):
         }},
     )
     return result.modified_count
+
+
+# ---------- Comprehensive sync: derive active state from strategy truth ----------
+
+async def _resync_programs_with_strategy(equipment_type_id: str):
+    """
+    Re-derive `is_active` on every maintenance_program for this strategy and
+    cancel any open scheduled_tasks for newly inactive programs.
+
+    A program is ACTIVE iff its task template:
+      - still exists in the strategy, AND
+      - is not toggled off (`is_mandatory != False`), AND
+      - either has no FM-strategy linking it OR at least one linking FM is enabled.
+
+    Tasks can be linked from multiple FM-strategies (FM-strategy.task_ids), so
+    disabling one FM does NOT deactivate the program if another enabled FM
+    still references the same task.
+    """
+    strategy = await db.equipment_type_strategies.find_one(
+        {"equipment_type_id": equipment_type_id}
+    )
+    if not strategy:
+        return {"programs_activated": 0, "programs_deactivated": 0, "scheduled_tasks_cancelled": 0}
+
+    tasks = strategy.get("task_templates", []) or []
+    fms = strategy.get("failure_mode_strategies", []) or []
+    task_by_id = {t.get("id"): t for t in tasks if t.get("id")}
+
+    task_to_fms: dict = {}
+    for fm in fms:
+        for tid in (fm.get("task_ids") or []):
+            task_to_fms.setdefault(tid, []).append(fm)
+
+    programs = await db.maintenance_programs.find(
+        {"equipment_type_id": equipment_type_id}
+    ).to_list(5000)
+
+    now = datetime.now(timezone.utc).isoformat()
+    activated = 0
+    deactivated = 0
+    scheduled_cancelled = 0
+
+    for prog in programs:
+        tid = prog.get("task_template_id")
+        task = task_by_id.get(tid)
+
+        if not task:
+            new_active = False
+        elif task.get("is_mandatory") is False:
+            new_active = False
+        else:
+            linked_fms = task_to_fms.get(tid, [])
+            if not linked_fms:
+                new_active = True
+            else:
+                new_active = any(fm.get("enabled") is not False for fm in linked_fms)
+
+        if prog.get("is_active") != new_active:
+            await db.maintenance_programs.update_one(
+                {"_id": prog["_id"]},
+                {"$set": {"is_active": new_active, "updated_at": now}},
+            )
+            if new_active:
+                activated += 1
+            else:
+                deactivated += 1
+
+            if not new_active:
+                r = await db.scheduled_tasks.update_many(
+                    {
+                        "maintenance_program_id": prog.get("id"),
+                        "status": {"$nin": ["completed", "cancelled"]},
+                    },
+                    {"$set": {
+                        "status": "cancelled",
+                        "notes": "Auto-cancelled: source task or failure mode disabled",
+                        "updated_at": now,
+                    }},
+                )
+                scheduled_cancelled += r.modified_count
+
+    return {
+        "programs_activated": activated,
+        "programs_deactivated": deactivated,
+        "scheduled_tasks_cancelled": scheduled_cancelled,
+    }
+
+
+# ---------- Human-readable version-history descriptors ----------
+
+def _describe_task_change(task: dict, changed_fields: list, action: str = "edit") -> str:
+    """Build a human-readable change description for the strategy version history."""
+    name = (task or {}).get("name") or "Task"
+    if action == "delete":
+        return f"Deleted task '{name}'"
+    if action == "add":
+        return f"Added task '{name}'"
+    label_map = {
+        "name": "name",
+        "description": "description",
+        "task_type": "task type",
+        "duration_hours": "duration",
+        "discipline": "discipline",
+        "skills_required": "skills",
+        "procedure_steps": "procedure",
+        "detection_methods": "detection methods",
+        "failure_mode_ids": "linked failure modes",
+        "frequency_matrix": "frequency matrix",
+        "tools_required": "tools",
+        "spare_parts": "spare parts",
+        "estimated_cost_eur": "cost",
+        "is_mandatory": "active state",
+    }
+    nice = [label_map.get(k, k) for k in changed_fields]
+    if not nice:
+        return f"Edited task '{name}'"
+    if len(nice) == 1:
+        return f"Edited task '{name}' ({nice[0]})"
+    return f"Edited task '{name}' ({', '.join(nice)})"
+
+
+def _describe_fm_change(fm: dict, request) -> str:
+    """Build a human-readable change description for a failure-mode mutation."""
+    name = (fm or {}).get("failure_mode_name") or "Failure mode"
+    parts = []
+    if getattr(request, "enabled", None) is True:
+        parts.append("enabled")
+    elif getattr(request, "enabled", None) is False:
+        parts.append("disabled")
+    if getattr(request, "strategy_type", None) is not None:
+        parts.append(f"strategy → {request.strategy_type}")
+    if getattr(request, "frequency_override", None) is not None:
+        parts.append(f"frequency override → {request.frequency_override}")
+    if getattr(request, "detection_methods", None) is not None:
+        parts.append("detection methods updated")
+    if getattr(request, "task_ids", None) is not None:
+        parts.append("linked tasks updated")
+    if not parts:
+        return f"Updated failure mode '{name}'"
+    return f"Failure mode '{name}' " + ", ".join(parts)
+
 
 
 def _bump_version(current_version: str) -> str:
@@ -1239,26 +1380,32 @@ async def update_failure_mode_strategy(
         }
     )
 
-    # Propagate enable/disable to maintenance_programs
+    # Propagate enable/disable to maintenance_programs (legacy fm_id matching) +
+    # do a comprehensive resync from strategy truth so multi-FM tasks and
+    # is_mandatory toggles are all reflected on the schedule.
     programs_toggled = 0
-    scheduled_cancelled = 0
+    legacy_scheduled_cancelled = 0
     if request.enabled is not None:
         programs_toggled = await _toggle_programs_for_failure_mode(
             equipment_type_id,
             failure_mode_id,
             request.enabled,
         )
-        # On disable, cascade-cancel open scheduled tasks linked to that FM
         if request.enabled is False:
-            scheduled_cancelled = await _cancel_open_scheduled_tasks_for_failure_mode(
+            legacy_scheduled_cancelled = await _cancel_open_scheduled_tasks_for_failure_mode(
                 equipment_type_id, failure_mode_id,
             )
 
-    # Bump strategy version
-    changed_keys = [k for k in ["strategy_type", "detection_methods", "task_ids", "frequency_override", "enabled"] if getattr(request, k, None) is not None]
+    resync = await _resync_programs_with_strategy(equipment_type_id)
+
+    # Find the FM-strategy dict for a friendly description
+    fm_dict = next(
+        (fm for fm in fm_strategies if fm.get("failure_mode_id") == failure_mode_id),
+        {"failure_mode_id": failure_mode_id, "failure_mode_name": "Failure mode"},
+    )
     new_version = await _bump_strategy_version(
         strategy,
-        changes=[f"fm:{failure_mode_id}:{','.join(changed_keys)}"],
+        changes=[_describe_fm_change(fm_dict, request)],
         user_id=current_user.get("user_id"),
     )
 
@@ -1269,7 +1416,9 @@ async def update_failure_mode_strategy(
         "total_failure_modes": total_fms,
         "coverage_score": round(coverage_score, 1),
         "programs_toggled": programs_toggled,
-        "scheduled_tasks_cancelled": scheduled_cancelled,
+        "programs_activated": resync["programs_activated"],
+        "programs_deactivated": resync["programs_deactivated"],
+        "scheduled_tasks_cancelled": legacy_scheduled_cancelled + resync["scheduled_tasks_cancelled"],
         "version": new_version,
     }
 
@@ -1341,7 +1490,7 @@ async def add_task_template(
 
     new_version = await _bump_strategy_version(
         strategy,
-        changes=[f"task:{task.id}:added"],
+        changes=[_describe_task_change(task_dict, [], action="add")],
         user_id=current_user.get("user_id"),
     )
 
@@ -1394,10 +1543,10 @@ async def update_task_template(
         }
     )
 
-    # Bump strategy version
+    # Bump strategy version with a human-readable change descriptor
     new_version = await _bump_strategy_version(
         strategy,
-        changes=[f"task:{task_id}:{','.join(updates.keys())}"],
+        changes=[_describe_task_change(updated_task, list(updates.keys()))],
         user_id=current_user.get("user_id"),
     )
 
@@ -1411,12 +1560,19 @@ async def update_task_template(
         equipment_type_id, updated_task,
     )
 
+    # If the toggle affects active state (is_mandatory) or linked FMs were
+    # changed, recompute every program's active state and cascade-cancel.
+    resync = await _resync_programs_with_strategy(equipment_type_id)
+
     return {
         "message": "Task template updated",
         "task_id": task_id,
         "version": new_version,
         "programs_updated": programs_updated,
         "scheduled_tasks_synced": scheduled_synced,
+        "programs_activated": resync["programs_activated"],
+        "programs_deactivated": resync["programs_deactivated"],
+        "scheduled_tasks_cancelled": resync["scheduled_tasks_cancelled"],
     }
 
 
@@ -1433,6 +1589,12 @@ async def delete_task_template(
     if not strategy:
         raise HTTPException(status_code=404, detail="Strategy not found")
 
+    # Capture the task name BEFORE removing it (for the version-history label)
+    deleted_task = next(
+        (t for t in strategy.get("task_templates", []) if t.get("id") == task_id),
+        None,
+    )
+
     result = await db.equipment_type_strategies.update_one(
         {"equipment_type_id": equipment_type_id},
         {
@@ -1447,7 +1609,7 @@ async def delete_task_template(
 
     new_version = await _bump_strategy_version(
         strategy,
-        changes=[f"task:{task_id}:deleted"],
+        changes=[_describe_task_change(deleted_task or {"name": "Task"}, [], action="delete")],
         user_id=current_user.get("user_id"),
     )
 
@@ -1714,7 +1876,7 @@ async def regenerate_equipment_tasks(
         }
     
     # Regenerate tasks
-    criticality = CriticalityLevel(instance.get("criticality", "medium"))
+    criticality = CriticalityLevel(instance.get("criticality", "low"))
     disabled_fms = instance.get("disabled_failure_modes", [])
     
     # Preserve overrides if requested

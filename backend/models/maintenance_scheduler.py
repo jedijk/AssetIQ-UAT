@@ -56,7 +56,7 @@ class EquipmentMaintenanceProgram(BaseModel):
     # Scheduling parameters
     frequency: str  # daily, weekly, monthly, quarterly, etc.
     frequency_days: int  # Converted to days for scheduling
-    criticality: CriticalityLevel = CriticalityLevel.MEDIUM
+    criticality: CriticalityLevel = CriticalityLevel.LOW
     estimated_duration_hours: float = 1.0
     
     # Scheduling state

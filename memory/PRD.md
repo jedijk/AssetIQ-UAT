@@ -7,6 +7,24 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Schedule fully synced with active/inactive tasks & FMs + human-readable version history (VERIFIED)**:
+  - **Bug A**: Toggling a task off via `is_mandatory` (per-task switch) saved on the strategy but did NOT touch maintenance_programs or scheduled_tasks — the Planner kept showing tasks that had been "deactivated".
+  - **Bug B**: Existing `maintenance_programs` had `failure_mode_id = None` because `apply-strategy` was matching `task.failure_mode_ids[0]` (library FM id) against `fm_strategies.failure_mode_id` (strategy-minted id), so they never matched. Result: FM enable/disable did not cascade to the schedule for already-applied equipment.
+  - **Bug C**: `version_history` entries were terse codes (`task:<uuid>:duration_hours`) — useless to humans.
+  - **Fix** (`backend/routes/maintenance_strategy_v2.py`):
+    - Added `_resync_programs_with_strategy(equipment_type_id)` — single source-of-truth that re-derives `is_active` on every program from the live strategy (task removed, `is_mandatory=false`, or all linking FMs disabled → inactive) and cancels any open scheduled_tasks for newly-inactive programs.
+    - Wired into `update_task_template`, `update_failure_mode_strategy`, and the `apply-strategy` route. Multi-FM tasks are now handled correctly (disabling one FM doesn't deactivate the program if another FM still references the task).
+    - Added `_describe_task_change(task, fields, action)` and `_describe_fm_change(fm, request)` helpers; all version_history entries now read like `"Edited task 'Balance rotor' (duration, frequency matrix)"`, `"Failure mode 'Imbalance' disabled"`, `"Added task 'New PM'"`, `"Deleted task 'Old check'"`.
+  - **Fix** (`backend/routes/maintenance_scheduler/programs.py`):
+    - Rebuilt FM linkage on programs using the **reverse map** `FM-strategy.task_ids → task.id` (the actual source of truth on the strategy), instead of trying to match library FM ids.
+    - `apply-strategy` now also **backfills** `failure_mode_id` + `failure_mode_name` on existing programs (previously only set on insert).
+  - **Default criticality** for equipment without a criticality assessment changed from `medium` → `low` (most conservative interval).
+  - **Verified live**:
+    - is_mandatory toggle: `programs_deactivated: 2, scheduled_tasks_cancelled: 3` → open tasks dropped to 0; toggle back on → `programs_activated: 2`.
+    - FM linkage repopulated: 10 Imbalance + 8 Rotor Crack programs (vs 0 before).
+    - FM disable → `programs_toggled: 10, scheduled_tasks_cancelled: 10`. FM enable → `programs_toggled: 10` back.
+    - Version history reads cleanly: `"Failure mode 'Imbalance' disabled"`, `"Edited task 'Balance rotor' (active state)"`.
+  - **pytest 18/18 passing**.
 - [Feb 2026] **Frequency Matrix respects active/inactive task state (BUG FIX, VERIFIED)**:
   - **Bug**: The Frequency Matrix tab listed *every* task on the strategy regardless of whether its parent failure mode was enabled — disabled FM tasks polluted the matrix.
   - **Fix** (`MaintenanceStrategyManager.jsx`):

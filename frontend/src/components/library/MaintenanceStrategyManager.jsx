@@ -1078,14 +1078,21 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
 // ============= Main Component =============
 
 /**
- * A strategy task is "active" if either:
- *   - no failure-mode strategy references it in its `task_ids` (general/standalone task), OR
- *   - at least one failure-mode strategy that references it is enabled.
- * The data model is FM-strategy.task_ids → task.id (reverse linkage), since each
- * strategy instantiates its own FM ids that differ from the library FM ids.
+ * A strategy task is "active" when ALL of the following hold:
+ *   - task.is_mandatory is not explicitly false (the per-task toggle in the UI)
+ *   - either no failure-mode strategy references it (standalone task)
+ *     OR at least one referencing failure-mode strategy is enabled
+ *
+ * Tasks that are toggled off (is_mandatory=false) OR tied exclusively to
+ * disabled failure modes are considered "inactive".
+ *
+ * The FM linkage uses reverse mapping: FM-strategy.task_ids → task.id, because
+ * each strategy mints its own FM-strategy id distinct from the library FM id
+ * stored inside task.failure_mode_ids.
  */
 const isTaskActive = (task, failureModeStrategies = []) => {
   if (!task?.id) return true;
+  if (task.is_mandatory === false) return false;
   const linkedFms = failureModeStrategies.filter((fm) =>
     (fm?.task_ids || []).includes(task.id),
   );
