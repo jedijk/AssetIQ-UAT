@@ -294,6 +294,33 @@ async def get_entity_translations(
     return {"entity_id": entity_id, "entity_type": entity_type, "translations": translations}
 
 
+@router.get("/batch/{entity_type}")
+async def get_batch_translations(
+    entity_type: EntityType,
+    language_code: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Return ALL translations for the given entity_type and language in one shot.
+    Result shape: { entity_id: { field_name: translated_value, ... }, ... }
+    This avoids hundreds of parallel HTTP requests when a list page needs
+    translations for many rows.
+    """
+    result: Dict[str, Dict[str, str]] = {}
+    cursor = db.entity_translations.find(
+        {"entity_type": entity_type.value, "language_code": language_code},
+        {"_id": 0, "entity_id": 1, "field_name": 1, "translation_value": 1},
+    )
+    async for doc in cursor:
+        eid = doc.get("entity_id")
+        field = doc.get("field_name")
+        value = doc.get("translation_value")
+        if not eid or not field:
+            continue
+        result.setdefault(eid, {})[field] = value
+    return {"entity_type": entity_type, "language_code": language_code, "translations": result, "count": len(result)}
+
+
 @router.post("/generate")
 async def generate_translations(
     request: GenerateTranslationsRequest,
@@ -335,12 +362,21 @@ async def generate_translations(
                 fm = await db.failure_modes.find_one({"legacy_id": int(entity_id)})
             if fm:
                 # Normalize fields for translation
+                actions = fm.get("recommended_actions", [])
+                if isinstance(actions, list):
+                    # Handle both str and dict shapes (some FMs store structured actions)
+                    actions_str = ", ".join(
+                        a if isinstance(a, str) else (a.get("title") or a.get("action") or a.get("name") or "")
+                        for a in actions
+                    )
+                else:
+                    actions_str = actions or ""
                 return {
                     "name": fm.get("failure_mode") or fm.get("name", ""),
                     "description": fm.get("description", ""),
                     "effects": fm.get("potential_effects", ""),
                     "causes": fm.get("potential_causes", ""),
-                    "recommended_actions": ", ".join(fm.get("recommended_actions", [])) if isinstance(fm.get("recommended_actions"), list) else fm.get("recommended_actions", ""),
+                    "recommended_actions": actions_str,
                 }
             return None
         elif entity_type == EntityType.EQUIPMENT_TYPE:

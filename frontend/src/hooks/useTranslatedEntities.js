@@ -9,34 +9,26 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { api } from "../lib/apiClient";
 
 /**
- * Batch fetch translations for multiple entities
+ * Batch fetch translations for multiple entities.
+ * Uses a single backend call (/translations/batch/{type}) to avoid N+1 HTTP requests.
  */
-async function fetchBatchTranslations(entityType, entityIds, languageCode, maxItems = 500) {
+async function fetchBatchTranslations(entityType, entityIds, languageCode) {
   if (!entityIds.length || languageCode === "en") return {};
-  
-  // Fetch translations for each entity (cap for performance, but high enough for full libraries)
-  const idsToFetch = entityIds.slice(0, maxItems);
-  const translationsMap = {};
-  
-  await Promise.all(
-    idsToFetch.map(async (id) => {
-      try {
-        // URL encode the entity ID since failure mode names can have spaces
-        const encodedId = encodeURIComponent(id);
-        const response = await api.get(`/translations/entities/${entityType}/${encodedId}`, {
-          params: { language_code: languageCode }
-        });
-        if (response.data?.translations?.[languageCode]) {
-          translationsMap[id] = response.data.translations[languageCode];
-        }
-      } catch (e) {
-        // Silently fail for individual translations
-        console.debug(`No translation found for ${entityType}/${id}`);
-      }
-    })
-  );
-  
-  return translationsMap;
+  try {
+    const response = await api.get(`/translations/batch/${entityType}`, {
+      params: { language_code: languageCode }
+    });
+    const allTranslations = response.data?.translations || {};
+    // Filter to just the requested entity_ids
+    const map = {};
+    for (const id of entityIds) {
+      if (allTranslations[id]) map[id] = allTranslations[id];
+    }
+    return map;
+  } catch (e) {
+    console.debug(`Batch translation fetch failed for ${entityType}:`, e);
+    return {};
+  }
 }
 
 /**
