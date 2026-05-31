@@ -121,6 +121,135 @@ async def _toggle_programs_for_failure_mode(
     return result.modified_count
 
 
+# ---------- Scheduled-task cascade (Planner side) ----------
+
+OPEN_TASK_STATUSES_FILTER = {"$nin": ["completed", "cancelled"]}
+
+
+async def _sync_metadata_to_open_scheduled_tasks(
+    equipment_type_id: str,
+    task_template: dict,
+):
+    """
+    Push name / description / type / hours changes from a strategy task template
+    onto every OPEN scheduled_task that was generated from it.
+    Completed/cancelled tasks remain historical.
+    """
+    task_template_id = task_template.get("id")
+    if not task_template_id:
+        return 0
+
+    # Find the linked program ids first (scheduled_tasks reference them)
+    program_ids = [
+        p["id"] async for p in db.maintenance_programs.find(
+            {"equipment_type_id": equipment_type_id, "task_template_id": task_template_id},
+            {"id": 1, "_id": 0},
+        )
+    ]
+    if not program_ids:
+        return 0
+
+    now = datetime.now(timezone.utc).isoformat()
+    result = await db.scheduled_tasks.update_many(
+        {
+            "maintenance_program_id": {"$in": program_ids},
+            "status": OPEN_TASK_STATUSES_FILTER,
+        },
+        {"$set": {
+            "task_name": task_template.get("name", ""),
+            "task_description": task_template.get("description"),
+            "task_type": task_template.get("task_type"),
+            "estimated_hours": task_template.get("duration_hours", 1.0),
+            "updated_at": now,
+        }},
+    )
+    return result.modified_count
+
+
+async def _cancel_open_scheduled_tasks_for_task(
+    equipment_type_id: str,
+    task_template_id: str,
+):
+    """Cancel every OPEN scheduled_task generated from a (now removed) strategy task."""
+    program_ids = [
+        p["id"] async for p in db.maintenance_programs.find(
+            {"equipment_type_id": equipment_type_id, "task_template_id": task_template_id},
+            {"id": 1, "_id": 0},
+        )
+    ]
+    if not program_ids:
+        return 0
+
+    now = datetime.now(timezone.utc).isoformat()
+    result = await db.scheduled_tasks.update_many(
+        {
+            "maintenance_program_id": {"$in": program_ids},
+            "status": OPEN_TASK_STATUSES_FILTER,
+        },
+        {"$set": {
+            "status": "cancelled",
+            "notes": "Auto-cancelled: source task removed from strategy",
+            "updated_at": now,
+        }},
+    )
+    return result.modified_count
+
+
+async def _cancel_open_scheduled_tasks_for_failure_mode(
+    equipment_type_id: str,
+    failure_mode_id: str,
+):
+    """Cancel every OPEN scheduled_task whose program is linked to the disabled FM."""
+    program_ids = [
+        p["id"] async for p in db.maintenance_programs.find(
+            {"equipment_type_id": equipment_type_id, "failure_mode_id": failure_mode_id},
+            {"id": 1, "_id": 0},
+        )
+    ]
+    if not program_ids:
+        return 0
+
+    now = datetime.now(timezone.utc).isoformat()
+    result = await db.scheduled_tasks.update_many(
+        {
+            "maintenance_program_id": {"$in": program_ids},
+            "status": OPEN_TASK_STATUSES_FILTER,
+        },
+        {"$set": {
+            "status": "cancelled",
+            "notes": "Auto-cancelled: failure mode disabled on strategy",
+            "updated_at": now,
+        }},
+    )
+    return result.modified_count
+
+
+async def _cancel_open_scheduled_tasks_for_strategy(equipment_type_id: str):
+    """Cancel every OPEN scheduled_task linked to the given equipment-type strategy."""
+    program_ids = [
+        p["id"] async for p in db.maintenance_programs.find(
+            {"equipment_type_id": equipment_type_id},
+            {"id": 1, "_id": 0},
+        )
+    ]
+    if not program_ids:
+        return 0
+
+    now = datetime.now(timezone.utc).isoformat()
+    result = await db.scheduled_tasks.update_many(
+        {
+            "maintenance_program_id": {"$in": program_ids},
+            "status": OPEN_TASK_STATUSES_FILTER,
+        },
+        {"$set": {
+            "status": "cancelled",
+            "notes": "Auto-cancelled: maintenance strategy deleted",
+            "updated_at": now,
+        }},
+    )
+    return result.modified_count
+
+
 def _bump_version(current_version: str) -> str:
     """Bump a semver-like 'major.minor' string. Defaults to 1.1 if unparseable."""
     try:
@@ -765,22 +894,38 @@ async def delete_equipment_type_strategy(
     equipment_type_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Delete an equipment type strategy"""
+    """Delete an equipment type strategy and cancel its open scheduled tasks."""
+    # Cascade-cancel open scheduled tasks BEFORE deleting the strategy so we can still
+    # find the linked maintenance_programs.
+    scheduled_cancelled = await _cancel_open_scheduled_tasks_for_strategy(equipment_type_id)
+
     result = await db.equipment_type_strategies.delete_one({
         "equipment_type_id": equipment_type_id
     })
-    
+
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Strategy not found")
-    
+
+    # Deactivate all linked maintenance_programs
+    now = datetime.now(timezone.utc).isoformat()
+    progs_result = await db.maintenance_programs.update_many(
+        {"equipment_type_id": equipment_type_id},
+        {"$set": {"is_active": False, "updated_at": now}},
+    )
+
     # Log audit
     await log_strategy_audit(
         action="delete_strategy",
         equipment_type_id=equipment_type_id,
         user_id=current_user.get("user_id")
     )
-    
-    return {"message": "Strategy deleted", "equipment_type_id": equipment_type_id}
+
+    return {
+        "message": "Strategy deleted",
+        "equipment_type_id": equipment_type_id,
+        "programs_deactivated": progs_result.modified_count,
+        "scheduled_tasks_cancelled": scheduled_cancelled,
+    }
 
 
 @router.post("/{equipment_type_id}/sync")
@@ -1096,12 +1241,18 @@ async def update_failure_mode_strategy(
 
     # Propagate enable/disable to maintenance_programs
     programs_toggled = 0
+    scheduled_cancelled = 0
     if request.enabled is not None:
         programs_toggled = await _toggle_programs_for_failure_mode(
             equipment_type_id,
             failure_mode_id,
             request.enabled,
         )
+        # On disable, cascade-cancel open scheduled tasks linked to that FM
+        if request.enabled is False:
+            scheduled_cancelled = await _cancel_open_scheduled_tasks_for_failure_mode(
+                equipment_type_id, failure_mode_id,
+            )
 
     # Bump strategy version
     changed_keys = [k for k in ["strategy_type", "detection_methods", "task_ids", "frequency_override", "enabled"] if getattr(request, k, None) is not None]
@@ -1118,6 +1269,7 @@ async def update_failure_mode_strategy(
         "total_failure_modes": total_fms,
         "coverage_score": round(coverage_score, 1),
         "programs_toggled": programs_toggled,
+        "scheduled_tasks_cancelled": scheduled_cancelled,
         "version": new_version,
     }
 
@@ -1254,11 +1406,17 @@ async def update_task_template(
         equipment_type_id, updated_task, new_version
     )
 
+    # Push metadata changes onto already-generated open scheduled_tasks
+    scheduled_synced = await _sync_metadata_to_open_scheduled_tasks(
+        equipment_type_id, updated_task,
+    )
+
     return {
         "message": "Task template updated",
         "task_id": task_id,
         "version": new_version,
         "programs_updated": programs_updated,
+        "scheduled_tasks_synced": scheduled_synced,
     }
 
 
@@ -1294,12 +1452,14 @@ async def delete_task_template(
     )
 
     programs_deactivated = await _deactivate_programs_for_task(equipment_type_id, task_id)
+    scheduled_cancelled = await _cancel_open_scheduled_tasks_for_task(equipment_type_id, task_id)
 
     return {
         "message": "Task template deleted",
         "task_id": task_id,
         "version": new_version,
         "programs_deactivated": programs_deactivated,
+        "scheduled_tasks_cancelled": scheduled_cancelled,
     }
 
 

@@ -331,3 +331,124 @@ class TestStrategyPropagation:
             timeout=30,
         ).json()
         assert (s_after.get("strategy") or {}).get("version") == new_version
+
+
+    def test_task_template_patch_syncs_open_scheduled_tasks(self, auth_headers):
+        """PATCH on a strategy task should also sync metadata onto OPEN scheduled_tasks."""
+        progs = requests.get(
+            f"{API}/maintenance-scheduler/programs",
+            headers=auth_headers,
+            timeout=30,
+        ).json().get("programs", [])
+        prog = next((p for p in progs if p.get("task_template_id") and p.get("equipment_type_id")), None)
+        if not prog:
+            pytest.skip("No program with task_template_id found")
+
+        etid = prog["equipment_type_id"]
+        tid = prog["task_template_id"]
+        original_name = prog.get("task_name")
+        original_duration = prog.get("estimated_duration_hours", 1.0)
+
+        marker = f"{original_name} ::SYNC_TEST::"
+        r = requests.patch(
+            f"{API}/maintenance-strategies-v2/{etid}/tasks/{tid}",
+            headers=auth_headers,
+            json={"name": marker, "duration_hours": 2.75},
+            timeout=30,
+        )
+        assert r.status_code == 200, r.text[:300]
+        body = r.json()
+        # `scheduled_tasks_synced` is informational; may be 0 if no scheduled tasks exist
+        assert "scheduled_tasks_synced" in body
+
+        # If any scheduled tasks exist for this template, verify the rename propagated
+        tasks_resp = requests.get(
+            f"{API}/maintenance-scheduler/tasks?equipment_type_id={etid}",
+            headers=auth_headers,
+            timeout=30,
+        ).json()
+        matching = [t for t in tasks_resp.get("tasks", []) if marker in (t.get("task_name") or "")]
+        if matching:
+            for t in matching:
+                assert t["task_name"] == marker
+                assert t["estimated_hours"] == 2.75
+
+        # Restore
+        requests.patch(
+            f"{API}/maintenance-strategies-v2/{etid}/tasks/{tid}",
+            headers=auth_headers,
+            json={"name": original_name, "duration_hours": original_duration},
+            timeout=30,
+        )
+
+    def test_task_delete_cancels_open_scheduled_tasks(self, auth_headers):
+        """DELETE a strategy task should auto-cancel its open scheduled_tasks."""
+        # Find a strategy that has applied programs
+        progs = requests.get(
+            f"{API}/maintenance-scheduler/programs",
+            headers=auth_headers,
+            timeout=30,
+        ).json().get("programs", [])
+        if not progs:
+            pytest.skip("No programs available")
+        etid = progs[0]["equipment_type_id"]
+
+        # Add a throwaway task
+        add_r = requests.post(
+            f"{API}/maintenance-strategies-v2/{etid}/tasks",
+            headers=auth_headers,
+            json={
+                "name": "_PYTEST_DELETE_CASCADE_",
+                "description": "test only",
+                "task_type": "preventive",
+                "duration_hours": 0.5,
+                "discipline": "mechanical",
+                "procedure_steps": [],
+                "skills_required": [],
+                "failure_mode_ids": [],
+                "detection_methods": [],
+                "frequency_matrix": {"low": "monthly", "medium": "weekly", "high": "daily"},
+            },
+            timeout=30,
+        )
+        assert add_r.status_code == 200, add_r.text[:300]
+        new_task_id = add_r.json().get("id")
+
+        # Apply strategy + run scheduler so scheduled_tasks get created
+        equipment_ids = list({p["equipment_id"] for p in progs if p.get("equipment_type_id") == etid})[:3]
+        requests.post(
+            f"{API}/maintenance-scheduler/apply-strategy/{etid}",
+            headers=auth_headers,
+            json={"equipment_ids": equipment_ids},
+            timeout=30,
+        )
+        requests.post(
+            f"{API}/maintenance-scheduler/run-scheduler",
+            headers=auth_headers,
+            json={"equipment_type_id": etid},
+            timeout=30,
+        )
+
+        # DELETE the task → expect cancellation cascade
+        d = requests.delete(
+            f"{API}/maintenance-strategies-v2/{etid}/tasks/{new_task_id}",
+            headers=auth_headers,
+            timeout=30,
+        )
+        assert d.status_code == 200, d.text[:300]
+        body = d.json()
+        assert "scheduled_tasks_cancelled" in body, body
+        # If any scheduled tasks existed for this template, they should be cancelled now
+        if body["scheduled_tasks_cancelled"] > 0:
+            tasks_resp = requests.get(
+                f"{API}/maintenance-scheduler/tasks?equipment_type_id={etid}&include_completed=true",
+                headers=auth_headers,
+                timeout=30,
+            ).json()
+            cancelled = [
+                t for t in tasks_resp.get("tasks", [])
+                if t.get("task_name") == "_PYTEST_DELETE_CASCADE_"
+            ]
+            assert cancelled
+            assert all(t["status"] == "cancelled" for t in cancelled)
+

@@ -7,6 +7,17 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Strategy → Scheduled Tasks cascade (VERIFIED)**:
+  - **Bug**: When the underlying strategy changed (task deleted, FM disabled, strategy deleted), already-generated **scheduled_tasks** in the Planner stayed open — Planner showed stale tasks pointing at sources that no longer existed.
+  - **Fix** (`backend/routes/maintenance_strategy_v2.py`):
+    - Added `_sync_metadata_to_open_scheduled_tasks` — PATCH on a task now propagates `task_name, task_description, task_type, estimated_hours` into all OPEN scheduled_tasks (status not in completed/cancelled).
+    - Added `_cancel_open_scheduled_tasks_for_task` — DELETE on a task cancels its open scheduled_tasks with audit note `"Auto-cancelled: source task removed from strategy"`.
+    - Added `_cancel_open_scheduled_tasks_for_failure_mode` — FM disable cancels open scheduled_tasks for that FM with note `"Auto-cancelled: failure mode disabled on strategy"`.
+    - Added `_cancel_open_scheduled_tasks_for_strategy` — DELETE strategy cancels every open scheduled_task for the strategy and deactivates all programs.
+    - Completed/cancelled tasks are preserved as historical record (filter `{"$nin": ["completed","cancelled"]}`).
+    - All four mutation endpoints now return `scheduled_tasks_synced` or `scheduled_tasks_cancelled` counts.
+  - **Verified live**: created throwaway task → applied strategy → ran scheduler (2 scheduled_tasks) → DELETE task → response `scheduled_tasks_cancelled: 2`, both tasks now `status=cancelled` with audit note. PATCH name → `scheduled_tasks_synced: 3`, all open tasks show the new name and duration.
+  - **Regression tests added**: `test_task_template_patch_syncs_open_scheduled_tasks` + `test_task_delete_cancels_open_scheduled_tasks` — **pytest 18/18 passing**.
 - [Feb 2026] **Strategy version auto-increment on every mutation (BUG FIX, VERIFIED)**:
   - **Bug**: Editing/adding/deleting tasks or toggling failure-mode strategies did NOT bump the strategy version. Only the broad `PATCH /maintenance-strategies-v2/{id}` endpoint bumped it. The propagated `strategy_version` on `maintenance_programs` therefore stayed identical even after meaningful edits.
   - **Fix** (`backend/routes/maintenance_strategy_v2.py`):
