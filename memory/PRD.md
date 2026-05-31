@@ -7,6 +7,13 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Daily/Weekly/14-day/90-day Planner UI (VERIFIED)**:
+  - New **Planner** tab inside `MaintenanceScheduleManager.jsx` alongside Timeline / Tasks / Programs
+  - Horizon selector: **Daily** (overdue/today/tomorrow buckets) · **Weekly** (7-day grid with capacity bars) · **14 Days** (daily mini-cards) · **90 Days** (weekly buckets, ~13 cards)
+  - Each day/bucket shows: planned hours vs **total daily technician capacity**, colour-coded utilisation bar (green ≤80%, amber 80-100%, red over-capacity), task count
+  - Daily & Weekly reuse existing `/tasks/daily-planner` and `/tasks/weekly-planner` endpoints; 14/90-day reuse `/tasks?from_date=…&to_date=…` with frontend bucketing
+  - Header chip shows technician count + total daily capacity hours
+  - Verified live (Fork Lift): Daily shows 17 tasks in Today bucket; 14-day shows 19 tasks distributed across daily cards with 3.0h/40h green utilisation bars
 - [Feb 2026] **Maintenance Scheduler — Code review follow-up (VERIFIED)**:
   - **Modularised** `routes/maintenance_scheduler.py` (1019 lines) into a package with one router per concern: `programs.py`, `scheduler.py`, `tasks.py`, `timeline.py`, `dashboard.py`, `technicians.py`, `ai_planner.py`, plus `_shared.py` for helpers and request models
   - **Pydantic validation** on `POST /ai-plan/apply` — now takes `{recommendations: [AIPlanRecommendation, ...]}` (frontend updated accordingly)

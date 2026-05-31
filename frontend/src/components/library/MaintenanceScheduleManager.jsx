@@ -487,6 +487,377 @@ const ApplyStrategyDialog = ({ open, onClose, equipmentTypeId, equipmentTypeName
 
 // ============= Main Component =============
 
+/**
+ * Planner View: Daily / Weekly / 14-day / 90-day workload
+ */
+const PlannerView = ({ equipmentTypeId }) => {
+  const [horizon, setHorizon] = useState("daily"); // daily | weekly | "14" | "90"
+
+  // ---- Daily uses dedicated endpoint (overdue / today / tomorrow buckets) ----
+  const { data: dailyData, isLoading: dailyLoading } = useQuery({
+    queryKey: ["maintenance-scheduler-daily-planner"],
+    queryFn: () => maintenanceSchedulerAPI.getDailyPlanner(),
+    enabled: horizon === "daily",
+  });
+
+  // ---- Weekly uses dedicated endpoint (7-day grid with technicians) ----
+  const { data: weeklyData, isLoading: weeklyLoading } = useQuery({
+    queryKey: ["maintenance-scheduler-weekly-planner"],
+    queryFn: () => maintenanceSchedulerAPI.getWeeklyPlanner(),
+    enabled: horizon === "weekly",
+  });
+
+  // ---- 14-day & 90-day use /tasks with from/to + frontend grouping ----
+  const today = new Date();
+  const todayStr = today.toISOString().split("T")[0];
+
+  const rangeDays = horizon === "14" ? 14 : horizon === "90" ? 90 : 0;
+  const endDate = new Date(today.getTime() + rangeDays * 86400000)
+    .toISOString()
+    .split("T")[0];
+
+  const { data: rangeData, isLoading: rangeLoading } = useQuery({
+    queryKey: ["maintenance-scheduler-range", horizon, equipmentTypeId || "all"],
+    queryFn: () =>
+      maintenanceSchedulerAPI.getTasks({
+        from_date: todayStr,
+        to_date: endDate,
+        ...(equipmentTypeId ? { equipment_type_id: equipmentTypeId } : {}),
+      }),
+    enabled: horizon === "14" || horizon === "90",
+  });
+
+  // Technician capacity for the look-ahead views
+  const { data: techData } = useQuery({
+    queryKey: ["maintenance-scheduler-technicians"],
+    queryFn: () => maintenanceSchedulerAPI.getTechnicians(),
+  });
+
+  const technicians = techData?.technicians || [];
+  const totalDailyCapacityHours = technicians.reduce(
+    (sum, t) => sum + (t.daily_available_hours || 8),
+    0,
+  );
+
+  // ---- Group tasks by day for 14-day, by week for 90-day ----
+  const groupedRange = useMemo(() => {
+    if (!rangeData?.tasks) return [];
+    const tasks = rangeData.tasks;
+
+    if (horizon === "14") {
+      // 14 daily buckets
+      const buckets = [];
+      for (let i = 0; i < 14; i++) {
+        const d = new Date(today.getTime() + i * 86400000);
+        const iso = d.toISOString().split("T")[0];
+        buckets.push({
+          key: iso,
+          label: d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }),
+          date: iso,
+          dayName: d.toLocaleDateString(undefined, { weekday: "short" }),
+          tasks: [],
+          hours: 0,
+          capacityHours: totalDailyCapacityHours,
+        });
+      }
+      const byDate = Object.fromEntries(buckets.map((b) => [b.key, b]));
+      tasks.forEach((t) => {
+        const d = t.planned_date || t.due_date;
+        if (byDate[d]) {
+          byDate[d].tasks.push(t);
+          byDate[d].hours += t.estimated_hours || 1;
+        }
+      });
+      return buckets;
+    }
+
+    if (horizon === "90") {
+      // ~13 weekly buckets
+      const buckets = [];
+      const numWeeks = Math.ceil(90 / 7);
+      for (let w = 0; w < numWeeks; w++) {
+        const start = new Date(today.getTime() + w * 7 * 86400000);
+        const end = new Date(start.getTime() + 6 * 86400000);
+        const startIso = start.toISOString().split("T")[0];
+        const endIso = end.toISOString().split("T")[0];
+        buckets.push({
+          key: startIso,
+          label: `${start.toLocaleDateString(undefined, { month: "short", day: "numeric" })} – ${end.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`,
+          startDate: startIso,
+          endDate: endIso,
+          tasks: [],
+          hours: 0,
+          capacityHours: totalDailyCapacityHours * 5, // assume 5 working days
+        });
+      }
+      tasks.forEach((t) => {
+        const d = t.planned_date || t.due_date;
+        const bucket = buckets.find((b) => d >= b.startDate && d <= b.endDate);
+        if (bucket) {
+          bucket.tasks.push(t);
+          bucket.hours += t.estimated_hours || 1;
+        }
+      });
+      return buckets;
+    }
+
+    return [];
+  }, [rangeData, horizon, totalDailyCapacityHours]);
+
+  // ---- Renderers ----
+  const isLoading =
+    (horizon === "daily" && dailyLoading) ||
+    (horizon === "weekly" && weeklyLoading) ||
+    ((horizon === "14" || horizon === "90") && rangeLoading);
+
+  return (
+    <div className="space-y-4">
+      {/* Horizon selector */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {[
+          { key: "daily", label: "Daily", icon: CalendarDays },
+          { key: "weekly", label: "Weekly", icon: CalendarRange },
+          { key: "14", label: "14 Days", icon: Calendar },
+          { key: "90", label: "90 Days", icon: Calendar },
+        ].map((opt) => {
+          const Icon = opt.icon;
+          const isActive = horizon === opt.key;
+          return (
+            <Button
+              key={opt.key}
+              size="sm"
+              variant={isActive ? "default" : "outline"}
+              onClick={() => setHorizon(opt.key)}
+              className="text-xs"
+              data-testid={`planner-horizon-${opt.key}`}
+            >
+              <Icon className="w-3.5 h-3.5 mr-1.5" />
+              {opt.label}
+            </Button>
+          );
+        })}
+        {technicians.length > 0 && (
+          <div className="ml-auto text-xs text-slate-500 flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5" />
+            {technicians.length} tech{technicians.length === 1 ? "" : "s"} · {totalDailyCapacityHours}h/day
+          </div>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        </div>
+      ) : (
+        <>
+          {horizon === "daily" && <DailyPlanner data={dailyData} />}
+          {horizon === "weekly" && (
+            <WeeklyGrid days={weeklyData?.days || []} capacityHours={totalDailyCapacityHours} />
+          )}
+          {horizon === "14" && (
+            <FourteenDayGrid buckets={groupedRange} totalTasks={rangeData?.total || 0} />
+          )}
+          {horizon === "90" && (
+            <NinetyDayGrid buckets={groupedRange} totalTasks={rangeData?.total || 0} />
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
+
+/** Daily planner: 3 vertical bucket cards (overdue, today, tomorrow) */
+const DailyPlanner = ({ data }) => {
+  if (!data) return null;
+  const buckets = [
+    { key: "overdue", title: "Overdue", color: "border-red-200 bg-red-50", titleColor: "text-red-700", icon: AlertTriangle, bucket: data.overdue },
+    { key: "today", title: "Today", color: "border-blue-200 bg-blue-50", titleColor: "text-blue-700", icon: Calendar, bucket: data.today },
+    { key: "tomorrow", title: "Tomorrow", color: "border-slate-200 bg-white", titleColor: "text-slate-700", icon: ArrowRight, bucket: data.tomorrow },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3" data-testid="daily-planner-grid">
+      {buckets.map(({ key, title, color, titleColor, icon: Icon, bucket }) => (
+        <Card key={key} className={`${color}`}>
+          <CardHeader className="py-3 px-4">
+            <div className="flex items-center justify-between">
+              <div className={`flex items-center gap-2 font-medium ${titleColor}`}>
+                <Icon className="w-4 h-4" />
+                {title}
+              </div>
+              <Badge variant="outline" className="text-xs">{bucket?.count || 0}</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="p-3 pt-0">
+            <ScrollArea className="h-[300px]">
+              <div className="space-y-2">
+                {(bucket?.tasks || []).length === 0 ? (
+                  <p className="text-xs text-slate-400 py-4 text-center">No tasks</p>
+                ) : (
+                  bucket.tasks.map((t) => <PlannerTaskMini key={t.id} task={t} />)
+                )}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+};
+
+
+/** Weekly grid: 7 day columns with hours / capacity bar */
+const WeeklyGrid = ({ days, capacityHours }) => {
+  if (!days?.length) {
+    return <div className="text-center py-12 text-sm text-slate-500">No scheduled tasks this week</div>;
+  }
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-2" data-testid="weekly-planner-grid">
+      {days.map((d) => {
+        const utilization = capacityHours > 0 ? Math.min(100, (d.total_hours / capacityHours) * 100) : 0;
+        const isOver = d.total_hours > capacityHours && capacityHours > 0;
+        return (
+          <Card key={d.date} className="overflow-hidden">
+            <CardHeader className="py-2 px-3 bg-slate-50">
+              <div className="text-xs font-medium text-slate-700">{d.day_name.slice(0, 3)}</div>
+              <div className="text-[10px] text-slate-400">{d.date.slice(5)}</div>
+            </CardHeader>
+            <CardContent className="p-2">
+              <div className="text-xs font-semibold mb-1">
+                {d.total_hours.toFixed(1)}h
+                {capacityHours > 0 && <span className="text-slate-400 font-normal">/{capacityHours}h</span>}
+              </div>
+              {capacityHours > 0 && (
+                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden mb-2">
+                  <div
+                    className={`h-full ${isOver ? "bg-red-500" : utilization > 80 ? "bg-amber-500" : "bg-green-500"}`}
+                    style={{ width: `${utilization}%` }}
+                  />
+                </div>
+              )}
+              <ScrollArea className="h-[200px]">
+                <div className="space-y-1">
+                  {d.tasks.length === 0 ? (
+                    <p className="text-[10px] text-slate-300 text-center py-2">—</p>
+                  ) : (
+                    d.tasks.map((t) => <PlannerTaskMini key={t.id} task={t} compact />)
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+};
+
+
+/** 14-day grid: 2 rows of 7 day-cards each */
+const FourteenDayGrid = ({ buckets, totalTasks }) => (
+  <div className="space-y-2">
+    <div className="text-xs text-slate-500" data-testid="planner-summary-14">
+      {totalTasks} task{totalTasks === 1 ? "" : "s"} scheduled in the next 14 days
+    </div>
+    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
+      {buckets.map((b) => {
+        const util = b.capacityHours > 0 ? Math.min(100, (b.hours / b.capacityHours) * 100) : 0;
+        const isOver = b.hours > b.capacityHours && b.capacityHours > 0;
+        return (
+          <Card key={b.key} className="overflow-hidden">
+            <CardHeader className="py-1.5 px-2 bg-slate-50">
+              <div className="text-[10px] text-slate-500 truncate">{b.label}</div>
+            </CardHeader>
+            <CardContent className="p-2">
+              <div className="text-xs font-semibold mb-1">
+                {b.hours.toFixed(1)}h
+                {b.capacityHours > 0 && <span className="text-slate-400 font-normal">/{b.capacityHours}h</span>}
+              </div>
+              {b.capacityHours > 0 && (
+                <div className="h-1 bg-slate-100 rounded-full overflow-hidden mb-1.5">
+                  <div
+                    className={`h-full ${isOver ? "bg-red-500" : util > 80 ? "bg-amber-500" : "bg-green-500"}`}
+                    style={{ width: `${util}%` }}
+                  />
+                </div>
+              )}
+              <div className="text-[10px] text-slate-500">
+                {b.tasks.length} task{b.tasks.length === 1 ? "" : "s"}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  </div>
+);
+
+
+/** 90-day grid: weekly buckets */
+const NinetyDayGrid = ({ buckets, totalTasks }) => (
+  <div className="space-y-2">
+    <div className="text-xs text-slate-500" data-testid="planner-summary-90">
+      {totalTasks} task{totalTasks === 1 ? "" : "s"} scheduled in the next 90 days (weekly buckets)
+    </div>
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
+      {buckets.map((b) => {
+        const util = b.capacityHours > 0 ? Math.min(100, (b.hours / b.capacityHours) * 100) : 0;
+        const isOver = b.hours > b.capacityHours && b.capacityHours > 0;
+        return (
+          <Card key={b.key} className="overflow-hidden">
+            <CardHeader className="py-1.5 px-2 bg-slate-50">
+              <div className="text-[10px] text-slate-500 truncate">{b.label}</div>
+            </CardHeader>
+            <CardContent className="p-2">
+              <div className="text-xs font-semibold mb-1">
+                {b.hours.toFixed(1)}h
+                {b.capacityHours > 0 && (
+                  <span className="text-slate-400 font-normal">/{b.capacityHours}h</span>
+                )}
+              </div>
+              {b.capacityHours > 0 && (
+                <div className="h-1 bg-slate-100 rounded-full overflow-hidden mb-1.5">
+                  <div
+                    className={`h-full ${isOver ? "bg-red-500" : util > 80 ? "bg-amber-500" : "bg-green-500"}`}
+                    style={{ width: `${util}%` }}
+                  />
+                </div>
+              )}
+              <div className="text-[10px] text-slate-500">
+                {b.tasks.length} task{b.tasks.length === 1 ? "" : "s"}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  </div>
+);
+
+
+/** Compact task row used inside planner buckets */
+const PlannerTaskMini = ({ task, compact = false }) => {
+  const priorityConfig = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.medium;
+  return (
+    <div className="p-1.5 bg-white border border-slate-100 rounded text-xs hover:border-slate-200 transition-colors">
+      <div className="flex items-center justify-between gap-1">
+        <span className="truncate font-medium text-[11px]">{task.task_name}</span>
+        <Badge className={`text-[9px] px-1 py-0 ${priorityConfig.color}`}>
+          {priorityConfig.label.charAt(0)}
+        </Badge>
+      </div>
+      {!compact && (
+        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500">
+          <span className="truncate">{task.equipment_name}</span>
+          <span className="ml-auto whitespace-nowrap">{task.estimated_hours}h</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 const MaintenanceScheduleManager = ({ equipmentType }) => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("timeline");
@@ -710,16 +1081,20 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="timeline" className="text-xs">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="timeline" className="text-xs" data-testid="tab-timeline">
             <CalendarRange className="w-3.5 h-3.5 mr-1.5" />
             Timeline
           </TabsTrigger>
-          <TabsTrigger value="tasks" className="text-xs">
+          <TabsTrigger value="planner" className="text-xs" data-testid="tab-planner">
+            <CalendarDays className="w-3.5 h-3.5 mr-1.5" />
+            Planner
+          </TabsTrigger>
+          <TabsTrigger value="tasks" className="text-xs" data-testid="tab-tasks">
             <ListChecks className="w-3.5 h-3.5 mr-1.5" />
             Tasks
           </TabsTrigger>
-          <TabsTrigger value="programs" className="text-xs">
+          <TabsTrigger value="programs" className="text-xs" data-testid="tab-programs">
             <Wrench className="w-3.5 h-3.5 mr-1.5" />
             Programs
           </TabsTrigger>
@@ -732,6 +1107,11 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
             isLoading={timelineLoading} 
             onTaskClick={handleTaskClick}
           />
+        </TabsContent>
+
+        {/* Planner Tab */}
+        <TabsContent value="planner" className="mt-4">
+          <PlannerView equipmentTypeId={equipmentTypeId} />
         </TabsContent>
 
         {/* Tasks Tab */}
