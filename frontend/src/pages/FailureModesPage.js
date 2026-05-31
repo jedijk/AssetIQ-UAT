@@ -83,7 +83,6 @@ import BulkImproveFailureModes from "../components/library/BulkImproveFailureMod
 import AIReviewActionDisciplines from "../components/library/AIReviewActionDisciplines";
 import TranslationGeneratorModal from "../components/library/TranslationGeneratorModal";
 import AIFindSimilarFailureModes from "../components/library/AIFindSimilarFailureModes";
-import { Upload, Sparkles } from "lucide-react";
 
 const disciplineIcons = {
   Rotating: Cog,

@@ -3,7 +3,7 @@
  * Handles language management, dictionary, and entity translations
  */
 
-import api from '../apiClient';
+import { api } from '../apiClient';
 
 const translationsAPI = {
   // ============= Languages =============
