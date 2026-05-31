@@ -856,7 +856,6 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
     task_type: "preventive",
     duration_hours: 1,
     discipline: "",
-    failure_mode_impact: "",
     failure_mode_ids: [],
     frequency_matrix: {
       low: "quarterly",
@@ -875,7 +874,6 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
         task_type: task.task_type || "preventive",
         duration_hours: task.duration_hours || 1,
         discipline: normalizeDiscipline(task.discipline) || "",
-        failure_mode_impact: task.failure_mode_impact || "",
         failure_mode_ids: task.failure_mode_ids || [],
         frequency_matrix: task.frequency_matrix || {
           low: "quarterly",
@@ -892,7 +890,6 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
         task_type: "preventive",
         duration_hours: 1,
         discipline: "",
-        failure_mode_impact: "",
         failure_mode_ids: [],
         frequency_matrix: {
           low: "quarterly",
@@ -1145,9 +1142,15 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const updateFMStrategyMutation = useMutation({
     mutationFn: ({ failureModeId, data }) =>
       maintenanceStrategyV2API.updateFailureModeStrategy(equipmentTypeId, failureModeId, data),
-    onSuccess: () => {
-      toast.success("Failure mode strategy updated");
+    onSuccess: (data) => {
+      const toggled = data?.programs_toggled || 0;
+      toast.success(
+        toggled > 0
+          ? `Failure mode updated · ${toggled} program${toggled === 1 ? "" : "s"} synced`
+          : "Failure mode strategy updated"
+      );
       queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
+      queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to update");
@@ -1170,11 +1173,17 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const updateTaskMutation = useMutation({
     mutationFn: ({ taskId, data }) =>
       maintenanceStrategyV2API.updateTaskTemplate(equipmentTypeId, taskId, data),
-    onSuccess: () => {
-      toast.success("Task template updated");
+    onSuccess: (data) => {
+      const propagated = data?.programs_updated || 0;
+      toast.success(
+        propagated > 0
+          ? `Task updated · ${propagated} program${propagated === 1 ? "" : "s"} synced`
+          : "Task template updated"
+      );
       setTaskDialogOpen(false);
       setEditingTask(null);
       queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
+      queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to update task");
@@ -1183,9 +1192,15 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
 
   const deleteTaskMutation = useMutation({
     mutationFn: (taskId) => maintenanceStrategyV2API.deleteTaskTemplate(equipmentTypeId, taskId),
-    onSuccess: () => {
-      toast.success("Task template deleted");
+    onSuccess: (data) => {
+      const deactivated = data?.programs_deactivated || 0;
+      toast.success(
+        deactivated > 0
+          ? `Task deleted · ${deactivated} program${deactivated === 1 ? "" : "s"} deactivated`
+          : "Task template deleted"
+      );
       queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
+      queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to delete task");

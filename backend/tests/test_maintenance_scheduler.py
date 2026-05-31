@@ -223,3 +223,66 @@ class TestTaskLifecycle:
                           timeout=30)
         assert d.status_code == 200, d.text[:300]
         assert d.json().get("new_due_date") == new_date
+
+
+
+# -------- Strategy → Program Propagation (regression for "not saved + not in schedule") --------
+class TestStrategyPropagation:
+    def test_task_template_patch_propagates_to_programs(self, auth_headers):
+        """PATCH on a strategy task should sync name/duration/freq to all linked maintenance_programs."""
+        # Find a strategy that has programs
+        progs_r = requests.get(
+            f"{API}/maintenance-scheduler/programs",
+            headers=auth_headers,
+            timeout=30,
+        )
+        programs = progs_r.json().get("programs", [])
+        if not programs:
+            pytest.skip("No maintenance programs to verify propagation against")
+
+        # Pick a program — capture its equipment_type_id and task_template_id
+        prog = next((p for p in programs if p.get("task_template_id") and p.get("equipment_type_id")), None)
+        if not prog:
+            pytest.skip("No program with task_template_id found")
+
+        etid = prog["equipment_type_id"]
+        tid = prog["task_template_id"]
+        original_name = prog.get("task_name")
+        original_duration = prog.get("estimated_duration_hours", 1.0)
+
+        # PATCH the task template with new name + duration + freq matrix
+        new_name = f"{original_name} [TEST]"
+        new_duration = 4.25
+        patch = requests.patch(
+            f"{API}/maintenance-strategies-v2/{etid}/tasks/{tid}",
+            headers=auth_headers,
+            json={
+                "name": new_name,
+                "duration_hours": new_duration,
+                "frequency_matrix": {"low": "annual", "medium": "quarterly", "high": "monthly"},
+            },
+            timeout=30,
+        )
+        assert patch.status_code == 200, patch.text[:300]
+        body = patch.json()
+        assert "programs_updated" in body, "patch response missing programs_updated"
+        assert body["programs_updated"] >= 1, f"expected at least 1 program updated, got {body}"
+
+        # Verify program reflects the change
+        progs_after = requests.get(
+            f"{API}/maintenance-scheduler/programs",
+            headers=auth_headers,
+            timeout=30,
+        ).json().get("programs", [])
+        synced = next((p for p in progs_after if p.get("task_template_id") == tid), None)
+        assert synced is not None
+        assert synced.get("task_name") == new_name, f"name not propagated: {synced.get('task_name')}"
+        assert synced.get("estimated_duration_hours") == new_duration, f"duration not propagated: {synced.get('estimated_duration_hours')}"
+
+        # Restore original values
+        requests.patch(
+            f"{API}/maintenance-strategies-v2/{etid}/tasks/{tid}",
+            headers=auth_headers,
+            json={"name": original_name, "duration_hours": original_duration},
+            timeout=30,
+        )

@@ -7,6 +7,16 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Strategy → Schedule auto-propagation (BUG FIX, VERIFIED)**:
+  - **Bug**: Editing a task template on a maintenance strategy (name, duration, freq matrix, discipline, skills, etc.) saved on the strategy itself but **never updated the existing `maintenance_programs`**, so the schedule kept showing stale data.
+  - **Fix**:
+    - `PATCH /maintenance-strategies-v2/{id}/tasks/{task_id}` now auto-propagates `task_name, task_description, task_type, estimated_duration_hours, discipline, skills_required, frequency (per-equipment-criticality lookup → frequency_days), strategy_version` to every `maintenance_program` referencing that task. Returns `programs_updated: N`.
+    - `DELETE /tasks/{task_id}` deactivates programs that came from the removed task. Returns `programs_deactivated: N`.
+    - `PATCH /failure-modes/{fm_id}` (enable/disable) toggles `is_active` on all programs whose `failure_mode_id` matches.
+    - PATCH whitelist extended with `tools_required, spare_parts, estimated_cost_eur`.
+    - Frontend mutations now invalidate the `["maintenance-scheduler"]` query family, so the Planner / Timeline / Dashboard refresh automatically. Toasts now show "Task updated · N programs synced".
+    - Removed dead `failure_mode_impact` field from `TaskDialog` (never rendered, never accepted by backend).
+  - **Regression test added**: `TestStrategyPropagation.test_task_template_patch_propagates_to_programs` — 15/15 pytest passing.
 - [Feb 2026] **TaskDetailsDialog — click-through editing (VERIFIED)**:
   - Clicking any task card in the **Daily** or **Weekly** Planner views (and existing Timeline / Tasks views) opens a `TaskDetailsDialog`
   - Three modes inside the dialog: **Details** (edit planned_date, status, priority, assigned technician, notes) · **Complete** (actual hours, findings, observations, failure-observed toggle) · **Defer** (new due date + reason)

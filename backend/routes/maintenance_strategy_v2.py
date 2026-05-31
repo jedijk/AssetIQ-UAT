@@ -36,6 +36,91 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/maintenance-strategies-v2", tags=["Maintenance Strategies V2"])
 
 
+# ============= Strategy → Program Propagation =============
+
+_FREQUENCY_DAYS = {
+    "continuous": 1, "daily": 1, "weekly": 7, "bi_weekly": 14,
+    "monthly": 30, "quarterly": 90, "semi_annual": 180, "annual": 365,
+    "biennial": 730, "on_condition": 30,
+}
+
+
+async def _propagate_task_template_to_programs(equipment_type_id: str, task_template: dict, new_strategy_version: str):
+    """
+    When a task template is added/edited on a strategy, propagate the changed
+    fields to all maintenance_programs that reference it. Frequency is
+    re-derived per-program based on each equipment's criticality.
+    """
+    task_template_id = task_template.get("id")
+    if not task_template_id:
+        return 0
+
+    freq_matrix = task_template.get("frequency_matrix", {}) or {}
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Find all programs that reference this task template
+    programs = await db.maintenance_programs.find(
+        {"equipment_type_id": equipment_type_id, "task_template_id": task_template_id}
+    ).to_list(5000)
+
+    updated = 0
+    for prog in programs:
+        criticality = prog.get("criticality", "medium")
+        frequency = freq_matrix.get(criticality, prog.get("frequency", "monthly"))
+        freq_days = _FREQUENCY_DAYS.get(frequency, 30)
+
+        set_fields = {
+            "task_name": task_template.get("name", prog.get("task_name")),
+            "task_description": task_template.get("description"),
+            "task_type": task_template.get("task_type", prog.get("task_type")),
+            "estimated_duration_hours": task_template.get("duration_hours", prog.get("estimated_duration_hours", 1.0)),
+            "frequency": frequency,
+            "frequency_days": freq_days,
+            "discipline": task_template.get("discipline"),
+            "skills_required": task_template.get("skills_required", []),
+            "strategy_version": new_strategy_version,
+            "updated_at": now,
+        }
+        result = await db.maintenance_programs.update_one(
+            {"_id": prog["_id"]},
+            {"$set": set_fields},
+        )
+        if result.modified_count > 0:
+            updated += 1
+
+    return updated
+
+
+async def _deactivate_programs_for_task(equipment_type_id: str, task_template_id: str):
+    """Mark all programs for this deleted task template as inactive."""
+    now = datetime.now(timezone.utc).isoformat()
+    result = await db.maintenance_programs.update_many(
+        {"equipment_type_id": equipment_type_id, "task_template_id": task_template_id},
+        {"$set": {"is_active": False, "updated_at": now}},
+    )
+    return result.modified_count
+
+
+async def _toggle_programs_for_failure_mode(
+    equipment_type_id: str,
+    failure_mode_id: str,
+    enabled: bool,
+):
+    """
+    When a failure mode strategy is enabled/disabled, activate/deactivate
+    all programs whose failure_mode_id matches.
+    """
+    now = datetime.now(timezone.utc).isoformat()
+    result = await db.maintenance_programs.update_many(
+        {
+            "equipment_type_id": equipment_type_id,
+            "failure_mode_id": failure_mode_id,
+        },
+        {"$set": {"is_active": enabled, "updated_at": now}},
+    )
+    return result.modified_count
+
+
 # ============= Helper Functions =============
 
 def calculate_frequency_for_criticality(
@@ -971,13 +1056,23 @@ async def update_failure_mode_strategy(
             }
         }
     )
-    
+
+    # Propagate enable/disable to maintenance_programs
+    programs_toggled = 0
+    if request.enabled is not None:
+        programs_toggled = await _toggle_programs_for_failure_mode(
+            equipment_type_id,
+            failure_mode_id,
+            request.enabled,
+        )
+
     return {
-        "message": "Failure mode strategy updated", 
+        "message": "Failure mode strategy updated",
         "failure_mode_id": failure_mode_id,
         "active_failure_modes": active_fms,
         "total_failure_modes": total_fms,
-        "coverage_score": round(coverage_score, 1)
+        "coverage_score": round(coverage_score, 1),
+        "programs_toggled": programs_toggled,
     }
 
 
@@ -1056,7 +1151,7 @@ async def update_task_template(
     updates: Dict[str, Any],
     current_user: dict = Depends(get_current_user)
 ):
-    """Update a task template"""
+    """Update a task template and propagate to existing maintenance_programs."""
     strategy = await db.equipment_type_strategies.find_one({
         "equipment_type_id": equipment_type_id
     })
@@ -1066,33 +1161,46 @@ async def update_task_template(
     
     task_templates = strategy.get("task_templates", [])
     updated = False
+    updated_task = None
     
     for i, task in enumerate(task_templates):
         if task.get("id") == task_id:
             for key, value in updates.items():
                 if key in ["name", "description", "task_type", "duration_hours", 
                           "skills_required", "discipline", "detection_methods",
-                          "failure_mode_ids", "procedure_steps", "is_mandatory"]:
+                          "failure_mode_ids", "procedure_steps", "is_mandatory",
+                          "tools_required", "spare_parts", "estimated_cost_eur"]:
                     task_templates[i][key] = value
                 elif key == "frequency_matrix" and isinstance(value, dict):
                     task_templates[i]["frequency_matrix"] = value
             updated = True
+            updated_task = task_templates[i]
             break
     
     if not updated:
         raise HTTPException(status_code=404, detail="Task template not found")
     
+    new_version = strategy.get("version", "1.0")
     await db.equipment_type_strategies.update_one(
         {"equipment_type_id": equipment_type_id},
         {
             "$set": {
                 "task_templates": task_templates,
-                "updated_at": datetime.utcnow().isoformat()
+                "updated_at": datetime.now(timezone.utc).isoformat()
             }
         }
     )
-    
-    return {"message": "Task template updated", "task_id": task_id}
+
+    # Propagate to all maintenance_programs that reference this task
+    programs_updated = await _propagate_task_template_to_programs(
+        equipment_type_id, updated_task, new_version
+    )
+
+    return {
+        "message": "Task template updated",
+        "task_id": task_id,
+        "programs_updated": programs_updated,
+    }
 
 
 @router.delete("/{equipment_type_id}/tasks/{task_id}")
@@ -1101,20 +1209,26 @@ async def delete_task_template(
     task_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Delete a task template"""
+    """Delete a task template and deactivate any maintenance_programs that referenced it."""
     result = await db.equipment_type_strategies.update_one(
         {"equipment_type_id": equipment_type_id},
         {
             "$pull": {"task_templates": {"id": task_id}},
             "$inc": {"total_tasks": -1},
-            "$set": {"updated_at": datetime.utcnow().isoformat()}
+            "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}
         }
     )
     
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Task template not found")
-    
-    return {"message": "Task template deleted", "task_id": task_id}
+
+    programs_deactivated = await _deactivate_programs_for_task(equipment_type_id, task_id)
+
+    return {
+        "message": "Task template deleted",
+        "task_id": task_id,
+        "programs_deactivated": programs_deactivated,
+    }
 
 
 # ============= Task Generation Endpoints =============
