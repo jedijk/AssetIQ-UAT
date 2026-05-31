@@ -106,6 +106,7 @@ import {
 } from "../ui/alert-dialog";
 import { maintenanceStrategyV2API } from "../../lib/api";
 import { DISCIPLINES as FM_DISCIPLINES, DISCIPLINE_COLORS } from "./EquipmentTypeItem";
+import MaintenanceScheduleManager from "./MaintenanceScheduleManager";
 
 // ============= Constants =============
 
@@ -1081,6 +1082,7 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
 
 const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const queryClient = useQueryClient();
+  const [mainView, setMainView] = useState("strategy"); // "strategy" or "schedule"
   const [activeTab, setActiveTab] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedFMs, setExpandedFMs] = useState(new Set());
@@ -1310,8 +1312,52 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
     );
   }
 
+  // Main View Toggle between Strategy and Schedule
+  if (mainView === "schedule") {
+    return (
+      <div className="space-y-4">
+        {/* View Toggle */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Tabs value={mainView} onValueChange={setMainView} className="w-auto">
+              <TabsList className="h-9">
+                <TabsTrigger value="strategy" className="text-xs px-4">
+                  <Wrench className="w-3.5 h-3.5 mr-1.5" />
+                  Maintenance Strategy
+                </TabsTrigger>
+                <TabsTrigger value="schedule" className="text-xs px-4">
+                  <Calendar className="w-3.5 h-3.5 mr-1.5" />
+                  Maintenance Schedule
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        </div>
+        
+        {/* Schedule Manager */}
+        <MaintenanceScheduleManager equipmentType={equipmentType} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
+      {/* View Toggle */}
+      <div className="flex items-center gap-2 mb-2">
+        <Tabs value={mainView} onValueChange={setMainView} className="w-auto">
+          <TabsList className="h-9">
+            <TabsTrigger value="strategy" className="text-xs px-4">
+              <Wrench className="w-3.5 h-3.5 mr-1.5" />
+              Maintenance Strategy
+            </TabsTrigger>
+            <TabsTrigger value="schedule" className="text-xs px-4">
+              <Calendar className="w-3.5 h-3.5 mr-1.5" />
+              Maintenance Schedule
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
