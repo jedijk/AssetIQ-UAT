@@ -41,6 +41,11 @@ async def run_scheduler(
     tasks_created = []
     tasks_skipped = 0
 
+    # Default 90-day horizon so the timeline shows recurring occurrences.
+    # Cap occurrences per program so a daily/weekly task doesn't explode.
+    DEFAULT_HORIZON_DAYS = 90
+    MAX_OCCURRENCES_PER_PROGRAM = 60
+
     for program in programs:
         program_id = program.get("id")
 
@@ -51,56 +56,65 @@ async def run_scheduler(
 
         criticality = program.get("criticality") or "low"
 
-        horizon = request.planning_horizon_days or get_planning_horizon(criticality)
-        horizon_date = (today + timedelta(days=horizon)).isoformat()
+        horizon = request.planning_horizon_days or DEFAULT_HORIZON_DAYS
+        horizon_date_obj = today + timedelta(days=horizon)
 
-        next_due = program.get("next_due_date") or today_str
+        freq_days = max(1, int(program.get("frequency_days") or 30))
 
-        if next_due > horizon_date:
-            tasks_skipped += 1
-            continue
+        next_due_str = program.get("next_due_date") or today_str
+        try:
+            current_due = datetime.fromisoformat(next_due_str).date()
+        except (TypeError, ValueError):
+            current_due = today
 
-        existing_task = await db.scheduled_tasks.find_one({
-            "maintenance_program_id": program_id,
-            "due_date": next_due,
-            "status": {"$nin": [TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value]},
-        })
+        occurrences = 0
+        last_created_iso = None
+        while current_due <= horizon_date_obj and occurrences < MAX_OCCURRENCES_PER_PROGRAM:
+            iso = current_due.isoformat()
 
-        if existing_task:
-            tasks_skipped += 1
-            continue
+            existing_task = await db.scheduled_tasks.find_one({
+                "maintenance_program_id": program_id,
+                "due_date": iso,
+                "status": {"$nin": [TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value]},
+            })
 
-        due_date = datetime.fromisoformat(next_due).date()
-        days_until_due = (due_date - today).days
-        is_overdue = days_until_due < 0
-        priority = calculate_priority(criticality, days_until_due, is_overdue)
+            if existing_task:
+                tasks_skipped += 1
+            else:
+                days_until_due = (current_due - today).days
+                is_overdue = days_until_due < 0
+                priority = calculate_priority(criticality, days_until_due, is_overdue)
 
-        task = ScheduledTask(
-            equipment_id=program.get("equipment_id"),
-            equipment_name=program.get("equipment_name"),
-            equipment_tag=program.get("equipment_tag"),
-            task_name=program.get("task_name"),
-            task_description=program.get("task_description"),
-            task_type=program.get("task_type"),
-            due_date=next_due,
-            planned_date=next_due,
-            priority=priority,
-            status=TaskStatus.SCHEDULED,
-            estimated_hours=program.get("estimated_duration_hours", 1.0),
-            maintenance_program_id=program_id,
-            strategy_id=program.get("strategy_id"),
-            strategy_version=program.get("strategy_version"),
-            failure_mode_id=program.get("failure_mode_id"),
-            failure_mode_name=program.get("failure_mode_name"),
-        )
+                task = ScheduledTask(
+                    equipment_id=program.get("equipment_id"),
+                    equipment_name=program.get("equipment_name"),
+                    equipment_tag=program.get("equipment_tag"),
+                    task_name=program.get("task_name"),
+                    task_description=program.get("task_description"),
+                    task_type=program.get("task_type"),
+                    due_date=iso,
+                    planned_date=iso,
+                    priority=priority,
+                    status=TaskStatus.SCHEDULED,
+                    estimated_hours=program.get("estimated_duration_hours", 1.0),
+                    maintenance_program_id=program_id,
+                    strategy_id=program.get("strategy_id"),
+                    strategy_version=program.get("strategy_version"),
+                    failure_mode_id=program.get("failure_mode_id"),
+                    failure_mode_name=program.get("failure_mode_name"),
+                )
+                await db.scheduled_tasks.insert_one(task.model_dump())
+                tasks_created.append(task.id)
+                last_created_iso = iso
 
-        await db.scheduled_tasks.insert_one(task.model_dump())
-        tasks_created.append(task.id)
+            occurrences += 1
+            current_due = current_due + timedelta(days=freq_days)
 
-        await db.maintenance_programs.update_one(
-            {"id": program_id},
-            {"$set": {"last_scheduled_date": today_str}},
-        )
+        if last_created_iso:
+            await db.maintenance_programs.update_one(
+                {"id": program_id},
+                {"$set": {"last_scheduled_date": today_str}},
+            )
 
     return {
         "message": "Scheduler run completed",

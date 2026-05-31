@@ -23,11 +23,12 @@ async def get_timeline(
     if not start_date:
         start_date = datetime.utcnow().date().isoformat()
     if not end_date:
-        end_date = (datetime.utcnow().date() + timedelta(days=30)).isoformat()
+        end_date = (datetime.utcnow().date() + timedelta(days=90)).isoformat()
 
     query = {
         "due_date": {"$gte": start_date, "$lte": end_date},
         "status": {"$nin": [TaskStatus.CANCELLED.value]},
+        "task_type": {"$nin": ["reactive", "corrective"]},
     }
 
     if equipment_type_id:

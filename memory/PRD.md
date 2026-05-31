@@ -7,6 +7,11 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Equipment Types sidebar fold/hide + reactive task filter (VERIFIED)**:
+  - Added a **collapse button** in the Maintenance tab's equipment-types sidebar (`PanelLeftClose` icon, top-right of the pane).
+  - When collapsed, the pane shrinks from 320px to a 40px vertical rail with a re-open button (`PanelLeftOpen`) and a vertical "Equipment Types" label. Click to expand back.
+  - Net effect: in the screenshots, collapsing the pane extends the Gantt visible range from W26 → W29 (3 more weeks visible at Week zoom).
+  - **Reactive task filter**: reactive/corrective tasks are now stripped at query time from `/tasks`, `/tasks/daily-planner`, `/tasks/weekly-planner`, `/timeline`, and `/dashboard` (in addition to the existing apply-strategy and scheduler exclusions). Ran a one-off cleanup that cancelled 1 stale reactive scheduled_task and deactivated 1 reactive program. Verified `/tasks` now returns only `condition_based`, `predictive`, `preventive` types.
 - [Feb 2026] **Horizontal Gantt Timeline + drag-to-reschedule (VERIFIED)**:
   - Rebuilt `TimelineView` as a proper horizontal Gantt:
     - Sticky left column (task name + equipment tag); scrollable timeline grid on the right.

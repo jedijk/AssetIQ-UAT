@@ -18,6 +18,11 @@ from models.maintenance_scheduler import (
 router = APIRouter()
 
 
+# Task types that are corrective/reactive — these are triggered on failure, not planned.
+# They must never appear in scheduled-task views.
+CORRECTIVE_TASK_TYPES = ("reactive", "corrective")
+
+
 @router.get("/tasks")
 async def get_scheduled_tasks(
     status: Optional[str] = None,
@@ -59,6 +64,9 @@ async def get_scheduled_tasks(
 
     tasks = await db.scheduled_tasks.find(query, {"_id": 0}).sort("due_date", 1).to_list(1000)
 
+    # Always exclude reactive/corrective tasks — they are triggered on failure
+    tasks = [t for t in tasks if t.get("task_type") not in CORRECTIVE_TASK_TYPES]
+
     today = datetime.utcnow().date().isoformat()
     for task in tasks:
         task["is_overdue"] = (
@@ -84,16 +92,19 @@ async def get_daily_planner(
     overdue_tasks = await db.scheduled_tasks.find({
         "due_date": {"$lt": today},
         "status": {"$nin": [TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value]},
+        "task_type": {"$nin": list(CORRECTIVE_TASK_TYPES)},
     }, {"_id": 0}).sort("priority", -1).to_list(100)
 
     today_tasks = await db.scheduled_tasks.find({
         "due_date": today,
         "status": {"$nin": [TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value]},
+        "task_type": {"$nin": list(CORRECTIVE_TASK_TYPES)},
     }, {"_id": 0}).sort("priority", -1).to_list(100)
 
     tomorrow_tasks = await db.scheduled_tasks.find({
         "due_date": tomorrow,
         "status": {"$nin": [TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value]},
+        "task_type": {"$nin": list(CORRECTIVE_TASK_TYPES)},
     }, {"_id": 0}).sort("priority", -1).to_list(100)
 
     for task in overdue_tasks:
@@ -124,6 +135,7 @@ async def get_weekly_planner(
     tasks = await db.scheduled_tasks.find({
         "planned_date": {"$gte": start.isoformat(), "$lte": end.isoformat()},
         "status": {"$nin": [TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value]},
+        "task_type": {"$nin": list(CORRECTIVE_TASK_TYPES)},
     }, {"_id": 0}).to_list(500)
 
     days = {}

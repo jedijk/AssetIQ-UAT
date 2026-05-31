@@ -10,6 +10,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
   ChevronRight,
+  ChevronLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
   Wrench,
   Loader2,
   CheckCircle2,
@@ -87,6 +90,7 @@ const MaintenanceStrategyTab = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [selectedType, setSelectedType] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Fetch equipment types (built-in + custom merged from backend)
   const { data: equipmentTypesData, isLoading: typesLoading } = useQuery({
@@ -158,32 +162,69 @@ const MaintenanceStrategyTab = () => {
 
   return (
     <div className="flex h-full">
-      {/* Left Sidebar - Equipment Types */}
-      <div className="w-80 border-r flex flex-col bg-white">
-        {/* Search & Filter */}
-        <div className="p-3 border-b space-y-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <Input
-              placeholder="Search equipment types..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 text-sm"
-            />
+      {/* Collapsed rail - shows a button to reopen the sidebar */}
+      {sidebarCollapsed && (
+        <div className="w-10 border-r bg-slate-50 flex flex-col items-center pt-3 gap-2 flex-shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setSidebarCollapsed(false)}
+            title="Show equipment types"
+            data-testid="sidebar-expand-btn"
+          >
+            <PanelLeftOpen className="w-4 h-4" />
+          </Button>
+          <div className="text-[10px] text-slate-500 [writing-mode:vertical-rl] rotate-180 mt-2">
+            Equipment Types
           </div>
-          <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
-            <SelectTrigger className="h-8 text-xs">
-              <Filter className="w-3 h-3 mr-1.5 text-slate-400" />
-              <SelectValue placeholder="All Disciplines" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" className="text-xs">All Disciplines</SelectItem>
-              {disciplines.map((d) => (
-                <SelectItem key={d} value={d} className="text-xs">{d}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
+      )}
+
+      {/* Left Sidebar - Equipment Types */}
+      {!sidebarCollapsed && (
+        <div className="w-80 border-r flex flex-col bg-white flex-shrink-0">
+          {/* Header with collapse button */}
+          <div className="px-3 pt-3 pb-1 flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-600 uppercase tracking-wide">
+              Equipment Types
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setSidebarCollapsed(true)}
+              title="Hide equipment types"
+              data-testid="sidebar-collapse-btn"
+            >
+              <PanelLeftClose className="w-4 h-4" />
+            </Button>
+          </div>
+
+          {/* Search & Filter */}
+          <div className="p-3 border-b space-y-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                placeholder="Search equipment types..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9 text-sm"
+              />
+            </div>
+            <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
+              <SelectTrigger className="h-8 text-xs">
+                <Filter className="w-3 h-3 mr-1.5 text-slate-400" />
+                <SelectValue placeholder="All Disciplines" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs">All Disciplines</SelectItem>
+                {disciplines.map((d) => (
+                  <SelectItem key={d} value={d} className="text-xs">{d}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
         {/* Types List */}
         <ScrollArea className="flex-1">
@@ -211,17 +252,18 @@ const MaintenanceStrategyTab = () => {
           </div>
         </ScrollArea>
 
-        {/* Summary */}
-        <div className="p-3 border-t bg-slate-50 text-xs text-slate-500">
-          <div className="flex justify-between">
-            <span>{filteredTypes.length} equipment types</span>
-            <span className="flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3 text-green-500" />
-              {strategiesMap.size} with strategies
-            </span>
+          {/* Summary */}
+          <div className="p-3 border-t bg-slate-50 text-xs text-slate-500">
+            <div className="flex justify-between">
+              <span>{filteredTypes.length} equipment types</span>
+              <span className="flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3 text-green-500" />
+                {strategiesMap.size} with strategies
+              </span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Right Panel - Strategy Manager */}
       <div className="flex-1 overflow-auto bg-slate-50">

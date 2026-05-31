@@ -30,6 +30,9 @@ async def get_scheduler_dashboard(
         program_ids = [p["id"] for p in programs]
         base_query["maintenance_program_id"] = {"$in": program_ids}
 
+    # Exclude reactive/corrective tasks — they're triggered on failure, not planned
+    base_query["task_type"] = {"$nin": ["reactive", "corrective"]}
+
     open_query = {**base_query, "status": {"$nin": [TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value]}}
     overdue_query = {
         **base_query,
