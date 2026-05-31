@@ -97,6 +97,7 @@ class ThreatResponse(BaseModel):
 
 class ThreatUpdate(BaseModel):
     title: Optional[str] = None
+    description: Optional[str] = None
     asset: Optional[str] = None
     equipment_type: Optional[str] = None
     failure_mode: Optional[str] = None

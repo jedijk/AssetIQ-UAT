@@ -1,0 +1,54 @@
+{
+  "summary": "Frontend testing of Multi-Language Translation framework. Verified the LanguageSwitcher (top-right header) works end-to-end for EN→NL: after selecting Nederlands, the entire header/navigation translates correctly (Observaties, Oorzaakanalyse, Acties, Mijn Taken, Planner, Rapporten, Bibliotheek, Overzicht van uw risicobeheer status). State persists across the session. Could NOT complete deep verification of failure-mode-specific NL/DE translations on /failure-modes page within this run because navigation to /failure-modes timed out repeatedly on `networkidle` and persistent overlays (IntroOverlay tour + sonner toast 'AI photo capture warns…') intercepted subsequent language-switcher clicks. Stopped after 3 attempts per loop-prevention rules.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "LanguageSwitcher.jsx (DropdownMenuTrigger)",
+        "issue": "Console warning every render: 'Warning: Function components cannot be given refs. Did you mean to use React.forwardRef()? Check the render method of Primitive.button.SlotClone.' Originates from the custom Button used inside DropdownMenuTrigger asChild — Button needs React.forwardRef. Does not break functionality but pollutes console and may cause focus-management issues.",
+        "selector": "header button (globe icon)",
+        "priority": "LOW"
+      },
+      {
+        "component": "IntroOverlay / Sonner toast",
+        "issue": "data-testid='intro-overlay' (the 9-step product tour) and a persistent sonner toast 'AI photo capture warns on wrong dates…' remain mounted over the header and intercept pointer events to the language switcher and other top-right header controls. Toast did not auto-dismiss within 30s. Blocks UI clicks until manually removed.",
+        "selector": "[data-testid='intro-overlay'], [data-sonner-toast]",
+        "priority": "MEDIUM"
+      },
+      {
+        "component": "LanguageSwitcher button",
+        "issue": "No data-testid on the language switcher trigger button (e.g. data-testid='language-switcher-trigger') or on the dropdown items. Makes automated testing brittle and forced reliance on text 'EN'/'NL'/'DE' which collide with other UI buttons (initial run found EN appearing in 2 separate buttons on the dashboard).",
+        "selector": "header button:has(svg.lucide-globe)",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Navigation to /failure-modes after language switch",
+        "issue": "page.goto('/failure-modes', wait_until='networkidle') timed out at 20s and 30s in this preview environment, suggesting long-poll / SSE / open network connections keep networkidle from settling. Switching to wait_until='domcontentloaded' is required for tests. Not a functional bug but worth flagging.",
+        "affected_selectors": ["/failure-modes route"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_34.json"],
+  "action_items": [
+    "Add data-testid attributes: language-switcher-trigger on the DropdownMenuTrigger Button, and language-option-{en|nl|de} on each DropdownMenuItem in /app/frontend/src/components/layout/LanguageSwitcher.jsx for reliable automated testing.",
+    "Wrap the shared Button component with React.forwardRef so DropdownMenuTrigger asChild does not emit the ref warning.",
+    "Investigate the persistent IntroOverlay + sonner announcement toast that block header clicks; ensure toasts auto-dismiss (duration) and the IntroOverlay has a top-most close button reachable via pointer events.",
+    "Re-run full NL/DE failure-mode translation verification (Cavitatie/Kavitation, Uitlijning, Onevenwicht, task templates in detail panel, persistence across reload) once data-testids are added — using wait_until='domcontentloaded' for /failure-modes route."
+  ],
+  "critical_code_review_comments": [
+    "LanguageSwitcher.jsx lacks data-testid attributes on trigger and items — violates the project rule that all interactive elements have data-testid.",
+    "Console emits React 'function components cannot be given refs' warning every time the language switcher renders, indicating a forwardRef miss in the underlying Button component.",
+    "/failure-modes navigation never reaches networkidle in 30s — long-lived requests or SSE connections likely; verify the page doesn't have a leaked polling interval."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "40% - language switch + UI translation verified; failure-mode entity-level translations on /failure-modes NOT verified due to overlay/timeout"},
+  "test_credentials": "jedijk@gmail.com / Jaap8019@ (works)",
+  "seed_data_creation": "None",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Language switch from EN→NL is confirmed working at the UI-translation level (sidebar/nav text becomes Dutch). What remains to be verified: (1) on /failure-modes, that 'Cavitation'→'Cavitatie', 'Misalignment'→'Uitlijning', 'Imbalance'→'Onevenwicht' render (these come from useTranslatedFailureModes hook fetching /api/translations/entities/failure_mode/{name}?language_code=nl); (2) detail panel task templates translate; (3) DE 'Kavitation'; (4) persistence after reload. Tester should: a) use wait_until='domcontentloaded' for /failure-modes goto, b) remove IntroOverlay and sonner toast via page.evaluate before clicking the language switcher, c) target the lang switcher with header button.last() containing 'EN' or scope by header role, since two 'EN' buttons exist on Dashboard. Backend translations are confirmed populated per iteration_33 report.",
+  "rca of the issue": "No bug fixed in this iteration. RCA for incomplete coverage: (1) sonner toast announcing AssetIQ 3.7.1 features stays mounted indefinitely and intercepts pointer events to top-right header; (2) IntroOverlay first-login tour also overlays the header; both forced clicks to fall back to force=True which was insufficient because Playwright validates target stability; (3) /failure-modes networkidle never resolves in 20-30s. These environment issues prevented Cavitatie verification end-to-end."
+}
