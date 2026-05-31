@@ -328,9 +328,25 @@ async def generate_translations(
                             return task
                 return None
             elif request.entity_type == EntityType.FAILURE_MODE:
-                return await db.failure_modes.find_one({"id": entity_id})
+                # Try multiple ID fields
+                fm = await db.failure_modes.find_one({"id": entity_id})
+                if not fm:
+                    fm = await db.failure_modes.find_one({"legacy_id": int(entity_id) if entity_id.isdigit() else entity_id})
+                if not fm:
+                    fm = await db.failure_modes.find_one({"failure_mode": entity_id})
+                return fm
             elif request.entity_type == EntityType.EQUIPMENT_TYPE:
-                return await db.equipment_types.find_one({"id": entity_id})
+                # Check both collections
+                et = await db.equipment_types.find_one({"id": entity_id})
+                if not et:
+                    et = await db.custom_equipment_types.find_one({"id": entity_id})
+                return et
+            elif request.entity_type == EntityType.OBSERVATION:
+                return await db.threats.find_one({"id": entity_id})
+            elif request.entity_type == EntityType.INVESTIGATION:
+                return await db.investigations.find_one({"id": entity_id})
+            elif request.entity_type == EntityType.EQUIPMENT_NODE:
+                return await db.equipment_nodes.find_one({"id": entity_id})
             return None
         
         job = await service.process_translation_job(job.id, fetch_entity)

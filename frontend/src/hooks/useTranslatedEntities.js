@@ -42,8 +42,9 @@ async function fetchBatchTranslations(entityType, entityIds, languageCode) {
 export function useTranslatedFailureModes(failureModes = []) {
   const { language } = useLanguage();
   
+  // Use id, legacy_id, or failure_mode as identifier
   const fmIds = useMemo(() => 
-    failureModes.map(fm => fm.id).filter(Boolean), 
+    failureModes.map(fm => fm.id || fm.legacy_id?.toString() || fm.failure_mode).filter(Boolean), 
     [failureModes]
   );
   
@@ -60,7 +61,8 @@ export function useTranslatedFailureModes(failureModes = []) {
     if (language === "en") return failureModes;
     
     return failureModes.map(fm => {
-      const trans = translationsMap[fm.id];
+      const fmId = fm.id || fm.legacy_id?.toString() || fm.failure_mode;
+      const trans = translationsMap[fmId];
       if (!trans) return fm;
       
       return {

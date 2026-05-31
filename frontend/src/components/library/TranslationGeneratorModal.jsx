@@ -100,7 +100,10 @@ export default function TranslationGeneratorModal({
         const batchSize = 5;
         for (let i = 0; i < entities.length; i += batchSize) {
           const batch = entities.slice(i, i + batchSize);
-          const entityIds = batch.map(e => e.id);
+          // Use id, legacy_id, or failure_mode as identifier
+          const entityIds = batch.map(e => e.id || e.legacy_id?.toString() || e.failure_mode).filter(Boolean);
+
+          if (entityIds.length === 0) continue;
 
           setProgress(prev => ({
             ...prev,
