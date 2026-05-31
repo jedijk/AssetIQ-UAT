@@ -368,8 +368,8 @@ const FailureModeStrategyRow = ({
                     <TooltipContent>
                       <div className="text-xs space-y-1">
                         <p className="font-medium">Failure Mode Updated in Library</p>
-                        <p>Strategy: v{fmStrategy.fm_version || 1}</p>
-                        <p>Library: v{fmStrategy.library_version || 1}</p>
+                        <p>Your version: v{fmStrategy.fm_version || 1}</p>
+                        <p>Library version: v{fmStrategy.library_version || 1}</p>
                         <p className="text-blue-600 pt-1">Click "Sync Library" to update</p>
                       </div>
                     </TooltipContent>
@@ -378,19 +378,22 @@ const FailureModeStrategyRow = ({
               )}
             </div>
             <div className="flex items-center gap-2 mt-0.5">
-              {/* Version Badge - Show strategy version with library version in tooltip */}
+              {/* Version Badge - Shows the FM version stored in strategy */}
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Badge variant="outline" className="text-[10px] bg-slate-50 cursor-help">
-                      v{fmStrategy.library_version || fmStrategy.fm_version || 1}
+                    <Badge variant="outline" className={`text-[10px] cursor-help ${fmStrategy.has_new_version ? 'bg-amber-50 border-amber-200' : 'bg-slate-50'}`}>
+                      v{fmStrategy.fm_version || 1}
                     </Badge>
                   </TooltipTrigger>
                   <TooltipContent>
                     <div className="text-xs space-y-1">
-                      <p className="font-medium">Version Info</p>
-                      <p>Strategy version: v{fmStrategy.fm_version || 1}</p>
-                      <p>Library version: v{fmStrategy.library_version || 1}</p>
+                      <p className="font-medium">Failure Mode Version</p>
+                      <p>In strategy: v{fmStrategy.fm_version || 1}</p>
+                      <p>In library: v{fmStrategy.library_version || 1}</p>
+                      {fmStrategy.has_new_version && (
+                        <p className="text-amber-600 pt-1">⚠️ Newer version available</p>
+                      )}
                     </div>
                   </TooltipContent>
                 </Tooltip>
