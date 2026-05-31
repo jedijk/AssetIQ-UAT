@@ -21,7 +21,9 @@ async function fetchBatchTranslations(entityType, entityIds, languageCode) {
   await Promise.all(
     idsToFetch.map(async (id) => {
       try {
-        const response = await api.get(`/translations/entities/${entityType}/${id}`, {
+        // URL encode the entity ID since failure mode names can have spaces
+        const encodedId = encodeURIComponent(id);
+        const response = await api.get(`/translations/entities/${entityType}/${encodedId}`, {
           params: { language_code: languageCode }
         });
         if (response.data?.translations?.[languageCode]) {
@@ -29,6 +31,7 @@ async function fetchBatchTranslations(entityType, entityIds, languageCode) {
         }
       } catch (e) {
         // Silently fail for individual translations
+        console.debug(`No translation found for ${entityType}/${id}`);
       }
     })
   );
