@@ -45,28 +45,39 @@ async function fetchBatchTranslations(entityType, entityIds, languageCode) {
 export function useTranslatedFailureModes(failureModes = []) {
   const { language } = useLanguage();
   
-  // Use id, legacy_id, or failure_mode as identifier
+  // Use failure_mode NAME as the primary identifier (this is how translations are stored)
   const fmIds = useMemo(() => 
-    failureModes.map(fm => fm.id || fm.legacy_id?.toString() || fm.failure_mode).filter(Boolean), 
+    failureModes.map(fm => fm.failure_mode).filter(Boolean), 
     [failureModes]
   );
   
-  const { data: translationsMap = {} } = useQuery({
-    queryKey: ["fm-translations", fmIds.slice(0, 20).join(","), language],
-    queryFn: () => fetchBatchTranslations("failure_mode", fmIds, language),
+  // Debug logging
+  console.log('[Translation] Language:', language, 'Total FMs:', fmIds.length, 'Sample IDs:', fmIds.slice(0, 3));
+  
+  const { data: translationsMap = {}, isLoading, error } = useQuery({
+    queryKey: ["fm-translations", language, fmIds.slice(0, 50).join(",")],
+    queryFn: () => {
+      console.log('[Translation] Fetching translations for', fmIds.length, 'failure modes in', language);
+      return fetchBatchTranslations("failure_mode", fmIds, language);
+    },
     enabled: language !== "en" && fmIds.length > 0,
     staleTime: 1000 * 60 * 5, // 5 minutes cache
     retry: false,
   });
+  
+  // Debug logging
+  console.log('[Translation] TranslationsMap keys:', Object.keys(translationsMap).slice(0, 5), 'Error:', error);
   
   // Apply translations
   const translatedModes = useMemo(() => {
     if (language === "en") return failureModes;
     
     return failureModes.map(fm => {
-      const fmId = fm.id || fm.legacy_id?.toString() || fm.failure_mode;
-      const trans = translationsMap[fmId];
+      // Use failure_mode name as the key to look up translations
+      const trans = translationsMap[fm.failure_mode];
       if (!trans) return fm;
+      
+      console.log('[Translation] Applying translation for:', fm.failure_mode, '->', trans.name);
       
       return {
         ...fm,
@@ -86,6 +97,7 @@ export function useTranslatedFailureModes(failureModes = []) {
   return {
     failureModes: translatedModes,
     isTranslated: language !== "en" && Object.keys(translationsMap).length > 0,
+    isLoading,
   };
 }
 
