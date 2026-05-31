@@ -655,6 +655,185 @@ async def delete_equipment_type_strategy(
     return {"message": "Strategy deleted", "equipment_type_id": equipment_type_id}
 
 
+@router.post("/{equipment_type_id}/sync")
+async def sync_equipment_type_strategy(
+    equipment_type_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Sync strategy with library - adds new failure modes and tasks without overwriting existing ones.
+    - Keeps all existing failure mode configurations
+    - Keeps all existing task templates
+    - Only adds NEW failure modes from the library
+    - Only adds NEW tasks for the new failure modes
+    - Updates version info for existing failure modes if they have been updated in library
+    """
+    # Get existing strategy
+    existing_strategy = await db.equipment_type_strategies.find_one({
+        "equipment_type_id": equipment_type_id
+    })
+    
+    if not existing_strategy:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+    
+    equipment_type_name = existing_strategy.get("equipment_type_name", "")
+    
+    # Get all failure modes for this equipment type from library
+    library_failure_modes = await get_failure_modes_for_equipment_type(
+        equipment_type_id,
+        equipment_type_name
+    )
+    
+    # Get existing FM IDs and names for comparison
+    existing_fm_strategies = existing_strategy.get("failure_mode_strategies", [])
+    existing_fm_ids = {fm.get("failure_mode_id") for fm in existing_fm_strategies}
+    existing_fm_names = {fm.get("failure_mode_name") for fm in existing_fm_strategies}
+    existing_tasks = existing_strategy.get("task_templates", [])
+    
+    # Track what was added
+    new_fm_strategies = []
+    new_tasks = []
+    updated_fms = []
+    
+    for fm in library_failure_modes:
+        fm_id = fm.get("id", str(uuid.uuid4()))
+        fm_name = fm.get("failure_mode", fm.get("name", "Unknown"))
+        fm_version = fm.get("version", 1)
+        fm_updated_at = fm.get("updated_at")
+        if fm_updated_at:
+            fm_updated_at = str(fm_updated_at)
+        
+        # Check if this FM already exists in strategy
+        if fm_id in existing_fm_ids or fm_name in existing_fm_names:
+            # Update version info for existing FM
+            for existing_fm in existing_fm_strategies:
+                if existing_fm.get("failure_mode_id") == fm_id or existing_fm.get("failure_mode_name") == fm_name:
+                    if existing_fm.get("fm_version", 1) < fm_version:
+                        # Update version tracking and potential effects
+                        existing_fm["fm_version"] = fm_version
+                        existing_fm["fm_updated_at"] = fm_updated_at
+                        potential_effects = fm.get("potential_effects", [])
+                        if isinstance(potential_effects, str):
+                            potential_effects = [potential_effects] if potential_effects else []
+                        existing_fm["potential_effects"] = potential_effects
+                        updated_fms.append(fm_name)
+                    break
+            continue
+        
+        # This is a NEW failure mode - add it
+        detection_methods = map_detection_methods(fm)
+        strategy_type = determine_strategy_type(fm)
+        
+        # Generate tasks for this new failure mode
+        tasks = generate_default_tasks_for_failure_mode(fm, strategy_type, detection_methods)
+        new_tasks.extend(tasks)
+        
+        # Create failure mode strategy
+        severity = fm.get("severity", 5)
+        occurrence = fm.get("occurrence", 5)
+        detectability = fm.get("detectability", 5)
+        rpn = fm.get("rpn", severity * occurrence * detectability)
+        
+        if rpn >= 250:
+            risk_level = "critical"
+        elif rpn >= 180:
+            risk_level = "high"
+        elif rpn >= 100:
+            risk_level = "medium"
+        else:
+            risk_level = "low"
+        
+        potential_effects = fm.get("potential_effects", [])
+        if isinstance(potential_effects, str):
+            potential_effects = [potential_effects] if potential_effects else []
+        
+        fm_strategy = FailureModeStrategy(
+            failure_mode_id=fm_id,
+            failure_mode_name=fm_name,
+            potential_effects=potential_effects,
+            fm_version=fm_version,
+            fm_updated_at=fm_updated_at,
+            strategy_type=strategy_type,
+            detection_methods=[DetectionMethod(m) for m in detection_methods if m in [e.value for e in DetectionMethod]],
+            task_ids=[t.id for t in tasks],
+            severity=severity,
+            occurrence=occurrence,
+            detectability=detectability,
+            rpn=rpn,
+            risk_if_unaddressed=risk_level,
+            enabled=True
+        )
+        new_fm_strategies.append(fm_strategy)
+    
+    # Merge: existing + new
+    all_fm_strategies = existing_fm_strategies + [fm.model_dump() for fm in new_fm_strategies]
+    all_tasks = existing_tasks + [t.model_dump() for t in new_tasks]
+    
+    # Update totals
+    total_fms = len(all_fm_strategies)
+    active_fms = sum(1 for fm in all_fm_strategies if fm.get("enabled", True))
+    coverage_score = (active_fms / total_fms * 100) if total_fms > 0 else 0.0
+    
+    # Increment version
+    current_version = existing_strategy.get("version", "1.0")
+    try:
+        major, minor = map(int, current_version.split("."))
+        new_version = f"{major}.{minor + 1}"
+    except (ValueError, AttributeError):
+        new_version = "1.1"
+    
+    # Create version history entry
+    version_entry = {
+        "version": new_version,
+        "changed_at": datetime.utcnow().isoformat(),
+        "changed_by": current_user.get("user_id"),
+        "change_type": "sync",
+        "change_summary": f"Synced with library: Added {len(new_fm_strategies)} new failure modes, {len(new_tasks)} new tasks. Updated {len(updated_fms)} existing FMs."
+    }
+    
+    # Update the strategy
+    await db.equipment_type_strategies.update_one(
+        {"equipment_type_id": equipment_type_id},
+        {
+            "$set": {
+                "failure_mode_strategies": all_fm_strategies,
+                "task_templates": all_tasks,
+                "total_failure_modes": total_fms,
+                "total_tasks": len(all_tasks),
+                "active_failure_modes": active_fms,
+                "coverage_score": round(coverage_score, 1),
+                "version": new_version,
+                "updated_at": datetime.utcnow().isoformat()
+            },
+            "$push": {"version_history": version_entry}
+        }
+    )
+    
+    # Log audit
+    await log_strategy_audit(
+        action="sync_strategy",
+        equipment_type_id=equipment_type_id,
+        user_id=current_user.get("user_id"),
+        details={
+            "new_failure_modes": len(new_fm_strategies),
+            "new_tasks": len(new_tasks),
+            "updated_fms": len(updated_fms),
+            "new_version": new_version
+        }
+    )
+    
+    return {
+        "message": "Strategy synced with library",
+        "equipment_type_id": equipment_type_id,
+        "new_failure_modes_added": len(new_fm_strategies),
+        "new_tasks_added": len(new_tasks),
+        "updated_failure_modes": len(updated_fms),
+        "total_failure_modes": total_fms,
+        "total_tasks": len(all_tasks),
+        "new_version": new_version
+    }
+
+
 @router.get("/{equipment_type_id}/affected-equipment")
 async def get_affected_equipment(
     equipment_type_id: str,

@@ -43,6 +43,14 @@ export const maintenanceStrategyV2API = {
     return response.data;
   },
 
+  /**
+   * Sync strategy with library - adds new FMs and tasks without overwriting existing
+   */
+  syncStrategy: async (equipmentTypeId) => {
+    const response = await api.post(`/maintenance-strategies-v2/${equipmentTypeId}/sync`);
+    return response.data;
+  },
+
   // ============= Failure Mode Strategies =============
 
   /**

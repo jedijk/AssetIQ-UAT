@@ -1185,6 +1185,17 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
     },
   });
 
+  const syncStrategyMutation = useMutation({
+    mutationFn: () => maintenanceStrategyV2API.syncStrategy(equipmentTypeId),
+    onSuccess: (data) => {
+      toast.success(`Synced with library: ${data.new_failure_modes_added} new failure modes, ${data.new_tasks_added} new tasks added`);
+      queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.detail || "Failed to sync with library");
+    },
+  });
+
   // ============= Handlers =============
 
   const handleCreateStrategy = () => {
@@ -1300,6 +1311,32 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                 <RefreshCw className="w-3.5 h-3.5 mr-1" />
                 Refresh
               </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => syncStrategyMutation.mutate()}
+                      disabled={syncStrategyMutation.isPending}
+                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                    >
+                      {syncStrategyMutation.isPending ? (
+                        <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                      )}
+                      Sync Library
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <p className="text-xs">
+                      Sync with library to add new failure modes and tasks. 
+                      <strong> Existing configurations will be preserved.</strong>
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50">
