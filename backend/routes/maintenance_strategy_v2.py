@@ -3,7 +3,7 @@ Maintenance Strategy v2 Routes
 Equipment Type Level Strategy Management with Task Generation
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 import uuid
@@ -12,6 +12,7 @@ import os
 
 from database import db
 from routes.auth import get_current_user
+from utils.auto_translate import translate_maintenance_task
 from models.maintenance_strategy_v2 import (
     EquipmentTypeStrategy,
     FailureModeStrategy,
@@ -1452,6 +1453,7 @@ async def get_task_templates(
 async def add_task_template(
     equipment_type_id: str,
     request: AddTaskTemplateRequest,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user)
 ):
     """Add a new task template to an equipment type strategy"""
@@ -1491,6 +1493,18 @@ async def add_task_template(
         }
     )
 
+    # Auto-translate task template
+    background_tasks.add_task(
+        translate_maintenance_task,
+        task_dict["id"],
+        {
+            "name": request.name,
+            "description": request.description or "",
+            "procedure_steps": request.procedure_steps or []
+        },
+        current_user.get("id")
+    )
+
     new_version = await _bump_strategy_version(
         strategy,
         changes=[_describe_task_change(task_dict, [], action="add")],
@@ -1505,6 +1519,7 @@ async def update_task_template(
     equipment_type_id: str,
     task_id: str,
     updates: Dict[str, Any],
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user)
 ):
     """Update a task template and propagate to existing maintenance_programs."""
@@ -1566,6 +1581,19 @@ async def update_task_template(
     # If the toggle affects active state (is_mandatory) or linked FMs were
     # changed, recompute every program's active state and cascade-cancel.
     resync = await _resync_programs_with_strategy(equipment_type_id)
+
+    # Auto-translate if name or description changed
+    if any(k in updates for k in ["name", "description", "procedure_steps"]):
+        background_tasks.add_task(
+            translate_maintenance_task,
+            task_id,
+            {
+                "name": updated_task.get("name", ""),
+                "description": updated_task.get("description", ""),
+                "procedure_steps": updated_task.get("procedure_steps", [])
+            },
+            current_user.get("id")
+        )
 
     return {
         "message": "Task template updated",

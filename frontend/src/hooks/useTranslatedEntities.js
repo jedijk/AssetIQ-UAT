@@ -51,22 +51,13 @@ export function useTranslatedFailureModes(failureModes = []) {
     [failureModes]
   );
   
-  // Debug logging
-  console.log('[Translation] Language:', language, 'Total FMs:', fmIds.length, 'Sample IDs:', fmIds.slice(0, 3));
-  
   const { data: translationsMap = {}, isLoading, error } = useQuery({
     queryKey: ["fm-translations", language, fmIds.slice(0, 50).join(",")],
-    queryFn: () => {
-      console.log('[Translation] Fetching translations for', fmIds.length, 'failure modes in', language);
-      return fetchBatchTranslations("failure_mode", fmIds, language);
-    },
+    queryFn: () => fetchBatchTranslations("failure_mode", fmIds, language),
     enabled: language !== "en" && fmIds.length > 0,
     staleTime: 1000 * 60 * 5, // 5 minutes cache
     retry: false,
   });
-  
-  // Debug logging
-  console.log('[Translation] TranslationsMap keys:', Object.keys(translationsMap).slice(0, 5), 'Error:', error);
   
   // Apply translations
   const translatedModes = useMemo(() => {
@@ -76,8 +67,6 @@ export function useTranslatedFailureModes(failureModes = []) {
       // Use failure_mode name as the key to look up translations
       const trans = translationsMap[fm.failure_mode];
       if (!trans) return fm;
-      
-      console.log('[Translation] Applying translation for:', fm.failure_mode, '->', trans.name);
       
       return {
         ...fm,
@@ -270,10 +259,54 @@ export function useTranslatedObservations(observations = []) {
   };
 }
 
+/**
+ * Hook to translate maintenance task templates
+ */
+export function useTranslatedTasks(tasks = []) {
+  const { language } = useLanguage();
+  
+  const taskIds = useMemo(() => 
+    tasks.map(t => t.id).filter(Boolean), 
+    [tasks]
+  );
+  
+  const { data: translationsMap = {} } = useQuery({
+    queryKey: ["task-translations", language, taskIds.slice(0, 50).join(",")],
+    queryFn: () => fetchBatchTranslations("maintenance_task_template", taskIds, language),
+    enabled: language !== "en" && taskIds.length > 0,
+    staleTime: 1000 * 60 * 5,
+    retry: false,
+  });
+  
+  const translatedTasks = useMemo(() => {
+    if (language === "en") return tasks;
+    
+    return tasks.map(task => {
+      const trans = translationsMap[task.id];
+      if (!trans) return task;
+      
+      return {
+        ...task,
+        name: trans.name || task.name,
+        description: trans.description || task.description,
+        procedure_steps: trans.procedure_steps ? trans.procedure_steps.split('\n') : task.procedure_steps,
+        _translated: true,
+        _originalName: task.name,
+      };
+    });
+  }, [tasks, translationsMap, language]);
+  
+  return {
+    tasks: translatedTasks,
+    isTranslated: language !== "en" && Object.keys(translationsMap).length > 0,
+  };
+}
+
 export default {
   useTranslatedFailureModes,
   useTranslatedEquipmentTypes,
   useTranslatedHierarchyNodes,
   useTranslatedActions,
   useTranslatedObservations,
+  useTranslatedTasks,
 };
