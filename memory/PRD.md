@@ -7,6 +7,12 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **TaskDetailsDialog — click-through editing (VERIFIED)**:
+  - Clicking any task card in the **Daily** or **Weekly** Planner views (and existing Timeline / Tasks views) opens a `TaskDetailsDialog`
+  - Three modes inside the dialog: **Details** (edit planned_date, status, priority, assigned technician, notes) · **Complete** (actual hours, findings, observations, failure-observed toggle) · **Defer** (new due date + reason)
+  - Surfaces saved **AI reasoning** for tasks that came from the AI Planner (purple panel)
+  - Wired to `PATCH /tasks/{id}`, `POST /tasks/{id}/complete`, `POST /tasks/{id}/defer` with React-Query cache invalidation so dashboards/KPIs refresh on save
+  - Verified live: PATCH notes round-trip through dialog works
 - [Feb 2026] **Daily/Weekly/14-day/90-day Planner UI (VERIFIED)**:
   - New **Planner** tab inside `MaintenanceScheduleManager.jsx` alongside Timeline / Tasks / Programs
   - Horizon selector: **Daily** (overdue/today/tomorrow buckets) · **Weekly** (7-day grid with capacity bars) · **14 Days** (daily mini-cards) · **90 Days** (weekly buckets, ~13 cards)
