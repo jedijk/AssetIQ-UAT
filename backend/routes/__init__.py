@@ -44,6 +44,7 @@ from routes.process_import import router as process_import_router
 from routes.ai_fm_suggestions import router as ai_fm_suggestions_router
 from routes.maintenance_strategy_v2 import router as maintenance_strategy_v2_router
 from routes.maintenance_scheduler import router as maintenance_scheduler_router
+from routes.translations import router as translations_router
 
 all_routers = [
     auth_router,
@@ -89,4 +90,5 @@ all_routers = [
     ai_fm_suggestions_router,
     maintenance_strategy_v2_router,
     maintenance_scheduler_router,
+    translations_router,
 ]

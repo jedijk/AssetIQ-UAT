@@ -529,5 +529,516 @@ def main():
     
     sys.exit(0 if success else 1)
 
+# ============================================================================
+# Translation & Localization Framework Tests
+# ============================================================================
+
+def test_translation_seed_languages(token: str, results: TestResult) -> bool:
+    """Test POST /api/translations/languages/seed"""
+    print(f"\n{Colors.BLUE}=== Test: Seed Default Languages ==={Colors.END}")
+    try:
+        response = requests.post(
+            f"{BASE_URL}/translations/languages/seed",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success") and "created" in data:
+                results.add_pass(f"Seed languages - created {data['created']} languages")
+                return True
+            else:
+                results.add_fail("Seed languages", f"Unexpected response: {data}")
+                return False
+        else:
+            results.add_fail("Seed languages", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("Seed languages", str(e))
+        return False
+
+
+def test_translation_get_languages(token: str, results: TestResult) -> bool:
+    """Test GET /api/translations/languages"""
+    print(f"\n{Colors.BLUE}=== Test: Get Languages ==={Colors.END}")
+    try:
+        response = requests.get(
+            f"{BASE_URL}/translations/languages",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            languages = data.get("languages", [])
+            if len(languages) >= 3:  # Should have EN, NL, DE at minimum
+                lang_codes = [lang.get("code") for lang in languages]
+                if "en" in lang_codes and "nl" in lang_codes and "de" in lang_codes:
+                    results.add_pass(f"Get languages - found {len(languages)} languages (EN, NL, DE)")
+                    return True
+                else:
+                    results.add_fail("Get languages", f"Missing expected languages. Found: {lang_codes}")
+                    return False
+            else:
+                results.add_fail("Get languages", f"Expected at least 3 languages, got {len(languages)}")
+                return False
+        else:
+            results.add_fail("Get languages", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("Get languages", str(e))
+        return False
+
+
+def test_translation_create_language(token: str, results: TestResult) -> bool:
+    """Test POST /api/translations/languages - Create French"""
+    print(f"\n{Colors.BLUE}=== Test: Create Language (French) ==={Colors.END}")
+    try:
+        response = requests.post(
+            f"{BASE_URL}/translations/languages",
+            headers=get_headers(token),
+            json={
+                "code": "fr",
+                "name": "French",
+                "native_name": "Français",
+                "active": True,
+                "is_default": False,
+                "ai_translation_enabled": True
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success") and data.get("language", {}).get("code") == "fr":
+                results.add_pass("Create language (French)")
+                return True
+            else:
+                results.add_fail("Create language", f"Unexpected response: {data}")
+                return False
+        elif response.status_code == 400 and "already exists" in response.text.lower():
+            # Language already exists - that's okay
+            results.add_pass("Create language (French) - already exists")
+            return True
+        else:
+            results.add_fail("Create language", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("Create language", str(e))
+        return False
+
+
+def test_translation_update_language(token: str, results: TestResult) -> bool:
+    """Test PATCH /api/translations/languages/{code} - Disable French"""
+    print(f"\n{Colors.BLUE}=== Test: Update Language (Disable French) ==={Colors.END}")
+    try:
+        response = requests.patch(
+            f"{BASE_URL}/translations/languages/fr",
+            headers=get_headers(token),
+            json={"active": False},
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success") and data.get("language", {}).get("active") == False:
+                results.add_pass("Update language (disable French)")
+                return True
+            else:
+                results.add_fail("Update language", f"Unexpected response: {data}")
+                return False
+        else:
+            results.add_fail("Update language", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("Update language", str(e))
+        return False
+
+
+def test_translation_seed_dictionary(token: str, results: TestResult) -> bool:
+    """Test POST /api/translations/dictionary/seed"""
+    print(f"\n{Colors.BLUE}=== Test: Seed Technical Dictionary ==={Colors.END}")
+    try:
+        response = requests.post(
+            f"{BASE_URL}/translations/dictionary/seed",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success") and "created" in data:
+                results.add_pass(f"Seed dictionary - created {data['created']} terms")
+                return True
+            else:
+                results.add_fail("Seed dictionary", f"Unexpected response: {data}")
+                return False
+        else:
+            results.add_fail("Seed dictionary", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("Seed dictionary", str(e))
+        return False
+
+
+def test_translation_get_dictionary(token: str, results: TestResult) -> bool:
+    """Test GET /api/translations/dictionary"""
+    print(f"\n{Colors.BLUE}=== Test: Get Dictionary Terms ==={Colors.END}")
+    try:
+        response = requests.get(
+            f"{BASE_URL}/translations/dictionary",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            terms = data.get("terms", [])
+            if len(terms) >= 20:  # Should have at least 20+ terms from seed
+                # Check for some expected terms
+                term_names = [term.get("source_term") for term in terms]
+                expected_terms = ["Bearing", "Pump", "Seal", "Failure Mode"]
+                found_terms = [t for t in expected_terms if t in term_names]
+                if len(found_terms) >= 3:
+                    results.add_pass(f"Get dictionary - found {len(terms)} terms including {', '.join(found_terms)}")
+                    return True
+                else:
+                    results.add_fail("Get dictionary", f"Missing expected terms. Found: {term_names[:10]}")
+                    return False
+            else:
+                results.add_fail("Get dictionary", f"Expected at least 20 terms, got {len(terms)}")
+                return False
+        else:
+            results.add_fail("Get dictionary", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("Get dictionary", str(e))
+        return False
+
+
+def test_translation_create_dictionary_term(token: str, results: TestResult) -> str:
+    """Test POST /api/translations/dictionary - Create Compressor term"""
+    print(f"\n{Colors.BLUE}=== Test: Create Dictionary Term (Compressor) ==={Colors.END}")
+    try:
+        response = requests.post(
+            f"{BASE_URL}/translations/dictionary",
+            headers=get_headers(token),
+            json={
+                "source_term": "Compressor",
+                "category": "mechanical",
+                "translations": {
+                    "nl": "Compressor",
+                    "de": "Kompressor"
+                },
+                "context": "Mechanical equipment that compresses gas",
+                "is_protected": False
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            term_id = data.get("term", {}).get("id")
+            if data.get("success") and term_id:
+                results.add_pass(f"Create dictionary term (Compressor) - ID: {term_id}")
+                return term_id
+            else:
+                results.add_fail("Create dictionary term", f"Unexpected response: {data}")
+                return None
+        elif response.status_code == 400 and "already exists" in response.text.lower():
+            # Term already exists - try to get its ID
+            results.add_pass("Create dictionary term (Compressor) - already exists")
+            # Get the term ID by searching
+            search_response = requests.get(
+                f"{BASE_URL}/translations/dictionary?search=Compressor",
+                headers=get_headers(token),
+                timeout=10
+            )
+            if search_response.status_code == 200:
+                terms = search_response.json().get("terms", [])
+                if terms:
+                    return terms[0].get("id")
+            return "existing-term-id"
+        else:
+            results.add_fail("Create dictionary term", f"Status {response.status_code}: {response.text}")
+            return None
+    except Exception as e:
+        results.add_fail("Create dictionary term", str(e))
+        return None
+
+
+def test_translation_update_dictionary_term(token: str, term_id: str, results: TestResult) -> bool:
+    """Test PATCH /api/translations/dictionary/{term_id}"""
+    print(f"\n{Colors.BLUE}=== Test: Update Dictionary Term ==={Colors.END}")
+    if not term_id:
+        results.add_fail("Update dictionary term", "No term_id provided")
+        return False
+    
+    try:
+        response = requests.patch(
+            f"{BASE_URL}/translations/dictionary/{term_id}",
+            headers=get_headers(token),
+            json={
+                "translations": {
+                    "nl": "Compressor",
+                    "de": "Kompressor",
+                    "fr": "Compresseur"
+                }
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success"):
+                results.add_pass("Update dictionary term (added French translation)")
+                return True
+            else:
+                results.add_fail("Update dictionary term", f"Unexpected response: {data}")
+                return False
+        else:
+            results.add_fail("Update dictionary term", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("Update dictionary term", str(e))
+        return False
+
+
+def test_translation_delete_dictionary_term(token: str, term_id: str, results: TestResult) -> bool:
+    """Test DELETE /api/translations/dictionary/{term_id}"""
+    print(f"\n{Colors.BLUE}=== Test: Delete Dictionary Term ==={Colors.END}")
+    if not term_id or term_id == "existing-term-id":
+        # Skip delete if we're using an existing term
+        results.add_pass("Delete dictionary term - skipped (using existing term)")
+        return True
+    
+    try:
+        response = requests.delete(
+            f"{BASE_URL}/translations/dictionary/{term_id}",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success"):
+                results.add_pass("Delete dictionary term")
+                return True
+            else:
+                results.add_fail("Delete dictionary term", f"Unexpected response: {data}")
+                return False
+        else:
+            results.add_fail("Delete dictionary term", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("Delete dictionary term", str(e))
+        return False
+
+
+def test_translation_get_user_preference(token: str, results: TestResult) -> bool:
+    """Test GET /api/translations/user/preference"""
+    print(f"\n{Colors.BLUE}=== Test: Get User Language Preference ==={Colors.END}")
+    try:
+        response = requests.get(
+            f"{BASE_URL}/translations/user/preference",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            preference = data.get("preference", {})
+            if "preferred_language" in preference:
+                results.add_pass(f"Get user preference - language: {preference.get('preferred_language')}")
+                return True
+            else:
+                results.add_fail("Get user preference", f"Missing preferred_language in response: {data}")
+                return False
+        else:
+            results.add_fail("Get user preference", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("Get user preference", str(e))
+        return False
+
+
+def test_translation_set_user_preference(token: str, results: TestResult) -> bool:
+    """Test POST /api/translations/user/preference - Set to Dutch"""
+    print(f"\n{Colors.BLUE}=== Test: Set User Language Preference (Dutch) ==={Colors.END}")
+    try:
+        response = requests.post(
+            f"{BASE_URL}/translations/user/preference",
+            headers=get_headers(token),
+            json={
+                "preferred_language": "nl",
+                "secondary_language": "en"
+            },
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("success") and data.get("preference", {}).get("preferred_language") == "nl":
+                results.add_pass("Set user preference to Dutch")
+                return True
+            else:
+                results.add_fail("Set user preference", f"Unexpected response: {data}")
+                return False
+        else:
+            results.add_fail("Set user preference", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("Set user preference", str(e))
+        return False
+
+
+def test_translation_get_stats(token: str, results: TestResult) -> bool:
+    """Test GET /api/translations/stats"""
+    print(f"\n{Colors.BLUE}=== Test: Get Translation Statistics ==={Colors.END}")
+    try:
+        response = requests.get(
+            f"{BASE_URL}/translations/stats",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "stats" in data and "languages" in data:
+                results.add_pass(f"Get translation stats - {len(data.get('languages', []))} languages")
+                return True
+            else:
+                results.add_fail("Get translation stats", f"Missing expected fields in response: {data}")
+                return False
+        else:
+            results.add_fail("Get translation stats", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("Get translation stats", str(e))
+        return False
+
+
+def test_translation_translate_text(token: str, results: TestResult) -> bool:
+    """Test POST /api/translations/translate-text - AI translation"""
+    print(f"\n{Colors.BLUE}=== Test: AI Text Translation ==={Colors.END}")
+    try:
+        response = requests.post(
+            f"{BASE_URL}/translations/translate-text",
+            headers=get_headers(token),
+            params={
+                "text": "Inspect bearing for wear and damage",
+                "target_language": "nl",
+                "source_language": "en"
+            },
+            timeout=30  # AI translation may take longer
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("translated") and data.get("confidence"):
+                translated = data.get("translated")
+                confidence = data.get("confidence")
+                results.add_pass(f"AI translate text - '{translated}' (confidence: {confidence})")
+                return True
+            else:
+                results.add_fail("AI translate text", f"Missing translation or confidence: {data}")
+                return False
+        elif response.status_code == 500 and "api key" in response.text.lower():
+            results.add_pass("AI translate text - SKIPPED (OpenAI API key not configured)")
+            return True
+        else:
+            results.add_fail("AI translate text", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("AI translate text", str(e))
+        return False
+
+
+def test_translation_get_entity_translations(token: str, results: TestResult) -> bool:
+    """Test GET /api/translations/entities/{type}/{id}"""
+    print(f"\n{Colors.BLUE}=== Test: Get Entity Translations ==={Colors.END}")
+    try:
+        # Use a dummy entity ID - may return empty if no translations exist
+        response = requests.get(
+            f"{BASE_URL}/translations/entities/maintenance_task_template/test-task-123",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "entity_id" in data and "entity_type" in data and "translations" in data:
+                translations = data.get("translations", {})
+                if translations:
+                    results.add_pass(f"Get entity translations - found translations for {len(translations)} languages")
+                else:
+                    results.add_pass("Get entity translations - no translations exist (expected for test entity)")
+                return True
+            else:
+                results.add_fail("Get entity translations", f"Missing expected fields: {data}")
+                return False
+        else:
+            results.add_fail("Get entity translations", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("Get entity translations", str(e))
+        return False
+
+
+def run_translation_tests():
+    """Run all translation framework tests"""
+    print(f"\n{Colors.BLUE}{'='*60}{Colors.END}")
+    print(f"{Colors.BLUE}Translation & Localization Framework Tests{Colors.END}")
+    print(f"{Colors.BLUE}{'='*60}{Colors.END}")
+    
+    results = TestResult()
+    
+    # Login
+    token = login()
+    if not token:
+        print(f"\n{Colors.RED}Failed to authenticate. Cannot proceed with tests.{Colors.END}")
+        sys.exit(1)
+    
+    # Run tests in order
+    # 1. Language Management
+    test_translation_seed_languages(token, results)
+    test_translation_get_languages(token, results)
+    test_translation_create_language(token, results)
+    test_translation_update_language(token, results)
+    
+    # 2. Technical Dictionary
+    test_translation_seed_dictionary(token, results)
+    test_translation_get_dictionary(token, results)
+    term_id = test_translation_create_dictionary_term(token, results)
+    if term_id:
+        test_translation_update_dictionary_term(token, term_id, results)
+        test_translation_delete_dictionary_term(token, term_id, results)
+    
+    # 3. User Language Preference
+    test_translation_get_user_preference(token, results)
+    test_translation_set_user_preference(token, results)
+    
+    # 4. Translation Statistics
+    test_translation_get_stats(token, results)
+    
+    # 5. AI Translation (if OpenAI key available)
+    test_translation_translate_text(token, results)
+    
+    # 6. Entity Translations
+    test_translation_get_entity_translations(token, results)
+    
+    # Print summary
+    success = results.summary()
+    
+    return success
+
+
 if __name__ == "__main__":
-    main()
+    # Check if we should run translation tests
+    if len(sys.argv) > 1 and sys.argv[1] == "translation":
+        success = run_translation_tests()
+        sys.exit(0 if success else 1)
+    else:
+        # Run original PM Import tests
+        main()

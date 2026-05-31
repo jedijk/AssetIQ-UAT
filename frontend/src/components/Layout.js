@@ -59,7 +59,7 @@ const Layout = () => {
   const { user, logout, mustChangePassword, mustAcceptTerms } = useAuth();
   const { hasPermission, canSeeNavItem } = usePermissions();
   const { canUndo, undo, isUndoing, getLastAction, undoCount } = useUndo();
-  const { language, toggleLanguage, t } = useLanguage();
+  const { language, setLanguage, toggleLanguage, t } = useLanguage();
   const { isOnline, totalPending, isSyncing, syncAllPending } = useOfflineSync();
   const navigate = useNavigate();
   const location = useLocation();
@@ -1029,24 +1029,52 @@ const Layout = () => {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <motion.div
-                    whileHover={{ scale: 1.08 }}
-                    whileTap={{ scale: 0.92 }}
-                    transition={springPresets.snappy}
-                  >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={toggleLanguage}
-                      className="h-6 w-6 sm:h-7 sm:w-7 text-[10px] sm:text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                      data-testid="language-switcher"
-                    >
-                      <span className="font-medium">{language.toUpperCase()}</span>
-                    </Button>
-                  </motion.div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <motion.div
+                        whileHover={{ scale: 1.08 }}
+                        whileTap={{ scale: 0.92 }}
+                        transition={springPresets.snappy}
+                      >
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 sm:h-7 sm:w-7 text-[10px] sm:text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                          data-testid="language-switcher"
+                        >
+                          <span className="font-medium">{language.toUpperCase()}</span>
+                        </Button>
+                      </motion.div>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuLabel className="text-xs">Language / Sprache</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onClick={() => setLanguage("en")}
+                        className={`cursor-pointer ${language === "en" ? "bg-blue-50" : ""}`}
+                      >
+                        <span className="mr-2">🇬🇧</span> English
+                        {language === "en" && <span className="ml-auto text-blue-600">✓</span>}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => setLanguage("nl")}
+                        className={`cursor-pointer ${language === "nl" ? "bg-blue-50" : ""}`}
+                      >
+                        <span className="mr-2">🇳🇱</span> Nederlands
+                        {language === "nl" && <span className="ml-auto text-blue-600">✓</span>}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => setLanguage("de")}
+                        className={`cursor-pointer ${language === "de" ? "bg-blue-50" : ""}`}
+                      >
+                        <span className="mr-2">🇩🇪</span> Deutsch
+                        {language === "de" && <span className="ml-auto text-blue-600">✓</span>}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  <p>{language === "en" ? "Switch to Dutch" : "Wissel naar Engels"}</p>
+                  <p>Change language</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

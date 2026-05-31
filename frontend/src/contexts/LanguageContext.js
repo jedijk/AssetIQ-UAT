@@ -2503,12 +2503,26 @@ const nl = {
   },
 };
 
-const translations = { en, nl };
+// Import German translations
+import de from "../lib/i18n/de";
+
+const translations = { en, nl, de };
+
+// Supported languages configuration
+const SUPPORTED_LANGUAGES = [
+  { code: "en", name: "English", nativeName: "English" },
+  { code: "nl", name: "Dutch", nativeName: "Nederlands" },
+  { code: "de", name: "German", nativeName: "Deutsch" },
+];
 
 export const LanguageProvider = ({ children }) => {
   const [language, setLanguage] = useState(() => {
     const saved = localStorage.getItem("reliabilityos_language");
-    return saved || "en";
+    // Validate saved language is supported
+    if (saved && SUPPORTED_LANGUAGES.find(l => l.code === saved)) {
+      return saved;
+    }
+    return "en";
   });
 
   useEffect(() => {
@@ -2517,12 +2531,30 @@ export const LanguageProvider = ({ children }) => {
 
   const t = useMemo(() => createTranslator(translations, language), [language]);
 
+  // Cycle through languages: en -> nl -> de -> en
   const toggleLanguage = () => {
-    setLanguage(prev => prev === "en" ? "nl" : "en");
+    setLanguage(prev => {
+      const currentIndex = SUPPORTED_LANGUAGES.findIndex(l => l.code === prev);
+      const nextIndex = (currentIndex + 1) % SUPPORTED_LANGUAGES.length;
+      return SUPPORTED_LANGUAGES[nextIndex].code;
+    });
   };
 
+  // Get current language info
+  const currentLanguage = useMemo(() => 
+    SUPPORTED_LANGUAGES.find(l => l.code === language) || SUPPORTED_LANGUAGES[0],
+    [language]
+  );
+
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, toggleLanguage, t }}>
+    <LanguageContext.Provider value={{ 
+      language, 
+      setLanguage, 
+      toggleLanguage, 
+      t,
+      currentLanguage,
+      supportedLanguages: SUPPORTED_LANGUAGES
+    }}>
       {children}
     </LanguageContext.Provider>
   );
