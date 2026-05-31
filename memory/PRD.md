@@ -7,6 +7,15 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Frequency Matrix respects active/inactive task state (BUG FIX, VERIFIED)**:
+  - **Bug**: The Frequency Matrix tab listed *every* task on the strategy regardless of whether its parent failure mode was enabled — disabled FM tasks polluted the matrix.
+  - **Fix** (`MaintenanceStrategyManager.jsx`):
+    - Added `isTaskActive(task, fmStrategies)` helper using the actual reverse linkage (`FM.task_ids → task.id`); a task is active iff at least one referencing FM strategy is enabled, OR if no FM references it (standalone task).
+    - Default Matrix view hides inactive tasks and shows `"N inactive tasks hidden (linked failure mode disabled). Show"` info row with an inline action.
+    - "Show inactive" Switch toggles full view; inactive rows are rendered with `opacity-50` + an `Inactive` badge.
+    - Empty-state copy adapts: "No active tasks. Toggle 'Show inactive' to see disabled ones." when only inactive tasks exist.
+  - **Notes**: First attempt used `task.failure_mode_ids → FM.failure_mode_id` linkage but those IDs don't match (each strategy mints its own FM-strategy id different from the library FM id used inside task templates). Switched to the FM-side `task_ids` array which IS the populated linkage.
+  - **Verified live**: Fork Lift screenshot shows all 9 active tasks with proper frequency badges (`Balance rotor: Annual/Quarterly/Monthly`, etc.). Disabling an FM correctly hides its tasks; toggle restores them.
 - [Feb 2026] **Strategy → Scheduled Tasks cascade (VERIFIED)**:
   - **Bug**: When the underlying strategy changed (task deleted, FM disabled, strategy deleted), already-generated **scheduled_tasks** in the Planner stayed open — Planner showed stale tasks pointing at sources that no longer existed.
   - **Fix** (`backend/routes/maintenance_strategy_v2.py`):

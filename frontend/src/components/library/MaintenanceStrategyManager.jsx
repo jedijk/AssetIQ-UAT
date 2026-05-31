@@ -1077,6 +1077,22 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
 
 // ============= Main Component =============
 
+/**
+ * A strategy task is "active" if either:
+ *   - no failure-mode strategy references it in its `task_ids` (general/standalone task), OR
+ *   - at least one failure-mode strategy that references it is enabled.
+ * The data model is FM-strategy.task_ids → task.id (reverse linkage), since each
+ * strategy instantiates its own FM ids that differ from the library FM ids.
+ */
+const isTaskActive = (task, failureModeStrategies = []) => {
+  if (!task?.id) return true;
+  const linkedFms = failureModeStrategies.filter((fm) =>
+    (fm?.task_ids || []).includes(task.id),
+  );
+  if (!linkedFms.length) return true;
+  return linkedFms.some((fm) => fm?.enabled !== false);
+};
+
 const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const queryClient = useQueryClient();
   const [mainView, setMainView] = useState("strategy"); // "strategy" or "schedule"
@@ -1086,6 +1102,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [affectedEquipmentDialogOpen, setAffectedEquipmentDialogOpen] = useState(false);
+  const [showInactiveInMatrix, setShowInactiveInMatrix] = useState(false);
 
   const equipmentTypeId = equipmentType?.id;
   const equipmentTypeName = equipmentType?.name;
@@ -1558,62 +1575,125 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
           <TabsContent value="matrix" className="mt-4">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Criticality-Based Frequency Matrix</CardTitle>
-                <CardDescription>
-                  How task frequencies change based on equipment criticality level
-                </CardDescription>
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-sm">Criticality-Based Frequency Matrix</CardTitle>
+                    <CardDescription>
+                      How task frequencies change based on equipment criticality level
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="show-inactive-matrix"
+                      checked={showInactiveInMatrix}
+                      onCheckedChange={setShowInactiveInMatrix}
+                      data-testid="matrix-show-inactive-toggle"
+                    />
+                    <Label htmlFor="show-inactive-matrix" className="text-xs text-slate-600 cursor-pointer">
+                      Show inactive
+                    </Label>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                {/* Matrix Table */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-2 px-3 font-medium">Task</th>
-                        {CRITICALITY_LEVELS.map((crit) => (
-                          <th key={crit.value} className={`text-center py-2 px-3 font-medium ${crit.color} rounded-t`}>
-                            {crit.label}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(strategy?.task_templates || []).map((task) => (
-                        <tr key={task.id} className={`border-b hover:bg-slate-50 ${task.task_type === "reactive" ? "bg-amber-50/50" : ""}`}>
-                          <td className="py-2 px-3 max-w-xs">
-                            <div className="truncate">{task.name}</div>
-                            {task.task_type === "reactive" && (
-                              <span className="text-[10px] text-amber-600">(Corrective)</span>
-                            )}
-                          </td>
-                          {task.task_type === "reactive" ? (
-                            <td colSpan={3} className="text-center py-2 px-3">
-                              <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
-                                <AlertTriangle className="w-3 h-3 mr-1" />
-                                No scheduled frequency - triggered on failure
-                              </Badge>
-                            </td>
-                          ) : (
-                            CRITICALITY_LEVELS.map((crit) => (
-                              <td key={crit.value} className="text-center py-2 px-3">
-                                <Badge variant="outline" className="text-xs">
-                                  {getFrequencyLabel(task.frequency_matrix?.[crit.value] || "monthly")}
-                                </Badge>
-                              </td>
-                            ))
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                {(() => {
+                  const allTasks = strategy?.task_templates || [];
+                  const fmStrategies = strategy?.failure_mode_strategies || [];
+                  const visibleTasks = showInactiveInMatrix
+                    ? allTasks
+                    : allTasks.filter((t) => isTaskActive(t, fmStrategies));
+                  const hiddenCount = allTasks.length - visibleTasks.length;
 
-                {(!strategy?.task_templates || strategy.task_templates.length === 0) && (
-                  <div className="py-8 text-center">
-                    <BarChart3 className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                    <p className="text-sm text-slate-500">Add task templates to see the frequency matrix</p>
-                  </div>
-                )}
+                  return (
+                    <>
+                      {!showInactiveInMatrix && hiddenCount > 0 && (
+                        <div
+                          className="mb-3 flex items-center gap-2 text-xs text-slate-500"
+                          data-testid="matrix-hidden-count"
+                        >
+                          <Info className="w-3.5 h-3.5" />
+                          {hiddenCount} inactive task{hiddenCount === 1 ? "" : "s"} hidden (linked failure mode disabled).
+                          <button
+                            type="button"
+                            className="text-blue-600 hover:underline"
+                            onClick={() => setShowInactiveInMatrix(true)}
+                          >
+                            Show
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Matrix Table */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left py-2 px-3 font-medium">Task</th>
+                              {CRITICALITY_LEVELS.map((crit) => (
+                                <th key={crit.value} className={`text-center py-2 px-3 font-medium ${crit.color} rounded-t`}>
+                                  {crit.label}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {visibleTasks.map((task) => {
+                              const active = isTaskActive(task, fmStrategies);
+                              return (
+                                <tr
+                                  key={task.id}
+                                  className={`border-b hover:bg-slate-50 ${task.task_type === "reactive" ? "bg-amber-50/50" : ""} ${!active ? "opacity-50" : ""}`}
+                                  data-testid={`matrix-row-${task.id}`}
+                                >
+                                  <td className="py-2 px-3 max-w-xs">
+                                    <div className="flex items-center gap-2">
+                                      <span className="truncate">{task.name}</span>
+                                      {!active && (
+                                        <Badge variant="outline" className="text-[10px] py-0 px-1 bg-slate-100 text-slate-500 border-slate-300">
+                                          Inactive
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    {task.task_type === "reactive" && (
+                                      <span className="text-[10px] text-amber-600">(Corrective)</span>
+                                    )}
+                                  </td>
+                                  {task.task_type === "reactive" ? (
+                                    <td colSpan={3} className="text-center py-2 px-3">
+                                      <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                                        <AlertTriangle className="w-3 h-3 mr-1" />
+                                        No scheduled frequency - triggered on failure
+                                      </Badge>
+                                    </td>
+                                  ) : (
+                                    CRITICALITY_LEVELS.map((crit) => (
+                                      <td key={crit.value} className="text-center py-2 px-3">
+                                        <Badge variant="outline" className="text-xs">
+                                          {getFrequencyLabel(task.frequency_matrix?.[crit.value] || "monthly")}
+                                        </Badge>
+                                      </td>
+                                    ))
+                                  )}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {visibleTasks.length === 0 && (
+                        <div className="py-8 text-center">
+                          <BarChart3 className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                          <p className="text-sm text-slate-500">
+                            {allTasks.length === 0
+                              ? "Add task templates to see the frequency matrix"
+                              : "No active tasks. Toggle 'Show inactive' to see disabled ones."}
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </CardContent>
             </Card>
           </TabsContent>
