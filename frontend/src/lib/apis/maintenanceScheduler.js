@@ -1,7 +1,7 @@
 /**
  * Maintenance Scheduler & Planning Engine API
  */
-import api from './index';
+import { api } from "../apiClient";
 
 export const maintenanceSchedulerAPI = {
   // ============= Equipment Maintenance Programs =============
