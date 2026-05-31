@@ -1201,7 +1201,7 @@ const FailureModesPage = () => {
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0">
                         <h3 className="font-semibold text-slate-800">{t("library.equipmentTypes")}</h3>
-                        <p className="text-xs text-slate-500 mt-1">{equipmentTypes.length} {t("library.typesDefined")} • Click to view connected failure modes</p>
+                        <p className="text-xs text-slate-500 mt-1">{equipmentTypes.length} {t("library.typesDefined")} • {t("library.clickToViewConnected")}</p>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <Button 
@@ -1211,7 +1211,7 @@ const FailureModesPage = () => {
                           className="bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
                           data-testid="ai-map-failure-modes-btn"
                         >
-                          <Sparkles className="w-4 h-4 mr-1" /> Map Failure Modes
+                          <Sparkles className="w-4 h-4 mr-1" /> {t("library.mapFailureModes")}
                         </Button>
                         <Button
                           size="sm"
@@ -1222,10 +1222,10 @@ const FailureModesPage = () => {
                           disabled={hierarchyNodes.length === 0}
                           title="Suggest new equipment types based on your hierarchy"
                         >
-                          <Sparkles className="w-4 h-4 mr-1" /> Suggest New Types
+                          <Sparkles className="w-4 h-4 mr-1" /> {t("library.suggestNewTypes")}
                         </Button>
                         <Button size="sm" onClick={() => { setEditingType(null); resetTypeForm(); setIsTypeDialogOpen(true); }} data-testid="add-equipment-type-btn">
-                          <Plus className="w-4 h-4 mr-1" /> Add Type
+                          <Plus className="w-4 h-4 mr-1" /> {t("library.addEquipmentType")}
                         </Button>
                       </div>
                     </div>
@@ -1234,7 +1234,7 @@ const FailureModesPage = () => {
                       <div className="relative flex-1 min-w-[200px]">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <Input
-                          placeholder="Search equipment types..."
+                          placeholder={t("library.searchEquipmentTypes")}
                           value={equipmentTypeSearch}
                           onChange={(e) => setEquipmentTypeSearch(e.target.value)}
                           className="pl-9 h-9"

@@ -347,6 +347,13 @@ async def generate_translations(
             et = await db.equipment_types.find_one({"id": entity_id})
             if not et:
                 et = await db.custom_equipment_types.find_one({"id": entity_id})
+            if not et:
+                # Fallback to built-in iso14224 EQUIPMENT_TYPES static list
+                try:
+                    from iso14224_models import EQUIPMENT_TYPES as _BUILTIN_EQ_TYPES
+                    et = next((x for x in _BUILTIN_EQ_TYPES if x.get("id") == entity_id), None)
+                except Exception:
+                    et = None
             return et
         elif entity_type == EntityType.OBSERVATION:
             obs = await db.threats.find_one({"id": entity_id})
@@ -408,12 +415,22 @@ async def generate_all_translations(
             if name:
                 entity_ids.append(name)
     elif entity_type == EntityType.EQUIPMENT_TYPE:
+        # Include built-in iso14224 types
+        try:
+            from iso14224_models import EQUIPMENT_TYPES as _BUILTIN_EQ_TYPES
+            for et in _BUILTIN_EQ_TYPES:
+                if et.get("id"):
+                    entity_ids.append(et["id"])
+        except Exception:
+            pass
         async for et in db.custom_equipment_types.find({}, {"id": 1, "_id": 0}):
             if et.get("id"):
                 entity_ids.append(et["id"])
         async for et in db.equipment_types.find({}, {"id": 1, "_id": 0}):
             if et.get("id"):
                 entity_ids.append(et["id"])
+        # Deduplicate
+        entity_ids = list(dict.fromkeys(entity_ids))
     elif entity_type == EntityType.EQUIPMENT_NODE:
         async for n in db.equipment_nodes.find({}, {"id": 1, "_id": 0}):
             if n.get("id"):

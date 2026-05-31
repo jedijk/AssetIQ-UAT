@@ -11,11 +11,11 @@ import { api } from "../lib/apiClient";
 /**
  * Batch fetch translations for multiple entities
  */
-async function fetchBatchTranslations(entityType, entityIds, languageCode) {
+async function fetchBatchTranslations(entityType, entityIds, languageCode, maxItems = 500) {
   if (!entityIds.length || languageCode === "en") return {};
   
-  // Fetch translations for each entity (limit to 100 for performance)
-  const idsToFetch = entityIds.slice(0, 100);
+  // Fetch translations for each entity (cap for performance, but high enough for full libraries)
+  const idsToFetch = entityIds.slice(0, maxItems);
   const translationsMap = {};
   
   await Promise.all(
@@ -52,7 +52,7 @@ export function useTranslatedFailureModes(failureModes = []) {
   );
   
   const { data: translationsMap = {}, isLoading, error } = useQuery({
-    queryKey: ["fm-translations", language, fmIds.slice(0, 50).join(",")],
+    queryKey: ["fm-translations", language, fmIds.length, fmIds.slice(0, 5).join(",")],
     queryFn: () => fetchBatchTranslations("failure_mode", fmIds, language),
     enabled: language !== "en" && fmIds.length > 0,
     staleTime: 1000 * 60 * 5, // 5 minutes cache
@@ -102,8 +102,8 @@ export function useTranslatedEquipmentTypes(equipmentTypes = []) {
   );
   
   const { data: translationsMap = {}, isLoading } = useQuery({
-    queryKey: ["et-translations", language, typeIds.slice(0, 50).join(",")],
-    queryFn: () => fetchBatchTranslations("equipment_type", typeIds.slice(0, 50), language),
+    queryKey: ["et-translations", language, typeIds.length, typeIds.slice(0, 5).join(",")],
+    queryFn: () => fetchBatchTranslations("equipment_type", typeIds, language),
     enabled: language !== "en" && typeIds.length > 0,
     staleTime: 1000 * 60 * 5,
     retry: false,
@@ -145,7 +145,7 @@ export function useTranslatedHierarchyNodes(nodes = []) {
   );
   
   const { data: translationsMap = {} } = useQuery({
-    queryKey: ["node-translations", nodeIds.slice(0, 50).join(","), language],
+    queryKey: ["node-translations", language, nodeIds.length, nodeIds.slice(0, 5).join(",")],
     queryFn: () => fetchBatchTranslations("equipment_node", nodeIds, language),
     enabled: language !== "en" && nodeIds.length > 0,
     staleTime: 1000 * 60 * 5,
@@ -188,7 +188,7 @@ export function useTranslatedActions(actions = []) {
   );
   
   const { data: translationsMap = {} } = useQuery({
-    queryKey: ["action-translations", actionIds.slice(0, 50).join(","), language],
+    queryKey: ["action-translations", language, actionIds.length, actionIds.slice(0, 5).join(",")],
     queryFn: () => fetchBatchTranslations("observation", actionIds, language),
     enabled: language !== "en" && actionIds.length > 0,
     staleTime: 1000 * 60 * 5,
@@ -230,7 +230,7 @@ export function useTranslatedObservations(observations = []) {
   );
   
   const { data: translationsMap = {} } = useQuery({
-    queryKey: ["obs-translations", obsIds.slice(0, 50).join(","), language],
+    queryKey: ["obs-translations", language, obsIds.length, obsIds.slice(0, 5).join(",")],
     queryFn: () => fetchBatchTranslations("observation", obsIds, language),
     enabled: language !== "en" && obsIds.length > 0,
     staleTime: 1000 * 60 * 5,
@@ -272,7 +272,7 @@ export function useTranslatedTasks(tasks = []) {
   );
   
   const { data: translationsMap = {} } = useQuery({
-    queryKey: ["task-translations", language, taskIds.slice(0, 50).join(",")],
+    queryKey: ["task-translations", language, taskIds.length, taskIds.slice(0, 5).join(",")],
     queryFn: () => fetchBatchTranslations("maintenance_task_template", taskIds, language),
     enabled: language !== "en" && taskIds.length > 0,
     staleTime: 1000 * 60 * 5,
