@@ -7,6 +7,14 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Gantt timeline pan controls (VERIFIED)**:
+  - Decoupled the timeline window from task data — now controlled by a `viewStart` state independent of where tasks live.
+  - Three buttons: **◀** (back), **Today**, **▶** (forward). Pan distance scales with zoom (Day=7d, Week=28d, Month=90d).
+  - Visible-window indicator chip shows `start → end` next to the controls.
+  - View span is also zoom-aware: Day=30d, Week=84d (12 weeks), Month=365d.
+  - Backend timeline query now fetches a wide range (−30d to +365d) so panning anywhere in the visible window always finds tasks.
+  - **Side fix**: re-enabled the two FMs (`Imbalance`, `Rotor Crack`) that earlier testing left disabled, restoring 14 active fork-lift programs and 18 scheduled tasks.
+  - Verified live: panned forward 2× from W21–W26 → W29–W34, "Today" button instantly jumps back.
 - [Feb 2026] **Equipment Types sidebar fold/hide + reactive task filter (VERIFIED)**:
   - Added a **collapse button** in the Maintenance tab's equipment-types sidebar (`PanelLeftClose` icon, top-right of the pane).
   - When collapsed, the pane shrinks from 320px to a 40px vertical rail with a re-open button (`PanelLeftOpen`) and a vertical "Equipment Types" label. Click to expand back.

@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   AlertCircle,
   ChevronRight,
+  ChevronLeft,
   ChevronDown,
   Loader2,
   RefreshCw,
@@ -182,13 +183,30 @@ const DashboardCards = ({ dashboard, isLoading }) => {
  * Horizontal Gantt-style Timeline
  *  - One row per task, sorted by planned_date / due_date
  *  - Time runs left → right; zoom levels: day · week · month
+ *  - Pan with ←/Today/→ buttons; native horizontal scroll inside the visible window
  *  - Bars are draggable to reschedule planned_date (commits on pointer-up)
  *  - Click a bar to open the task-details dialog
  */
 const TimelineView = ({ timeline, isLoading, onTaskClick, onTaskReschedule }) => {
   const [zoom, setZoom] = useState("week"); // "day" | "week" | "month"
 
-  const DAY_PX = useMemo(() => ({ day: 40, week: 16, month: 6 }[zoom]), [zoom]);
+  const ZOOM_CONFIG = useMemo(
+    () => ({
+      day:   { dayPx: 40, viewSpan: 30,  panDays: 7  },
+      week:  { dayPx: 16, viewSpan: 84,  panDays: 28 },
+      month: { dayPx: 6,  viewSpan: 365, panDays: 90 },
+    }),
+    [],
+  );
+  const { dayPx: DAY_PX, viewSpan: VIEW_SPAN, panDays: PAN_DAYS } = ZOOM_CONFIG[zoom];
+
+  // viewStart drifts independently of task data — anchored to "today minus a bit"
+  const [viewStart, setViewStart] = useState(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - 7);
+    return d;
+  });
 
   // Flatten the equipment-grouped timeline into a list of task rows
   const rows = useMemo(() => {
@@ -199,41 +217,26 @@ const TimelineView = ({ timeline, isLoading, onTaskClick, onTaskReschedule }) =>
         list.push({ ...t, _equipmentName: equipment.equipment_name, _equipmentTag: equipment.equipment_tag });
       }
     }
-    list.sort((a, b) => (a.planned_date || a.due_date || "") .localeCompare(b.planned_date || b.due_date || ""));
+    list.sort((a, b) =>
+      (a.planned_date || a.due_date || "").localeCompare(b.planned_date || b.due_date || ""),
+    );
     return list;
   }, [timeline]);
 
-  // Date range: pad earliest/latest by ~7 days, ensure at least 30-day span
-  const { startDate, endDate, totalDays } = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (rows.length === 0) {
-      const e = new Date(today.getTime() + 30 * 86400000);
-      return { startDate: today, endDate: e, totalDays: 31 };
-    }
-    let minMs = Infinity;
-    let maxMs = -Infinity;
-    for (const r of rows) {
-      const d = new Date(r.planned_date || r.due_date);
-      const dur = Math.max(1, Math.ceil((r.estimated_hours || 1) / 8));
-      const endMs = d.getTime() + dur * 86400000;
-      minMs = Math.min(minMs, d.getTime());
-      maxMs = Math.max(maxMs, endMs);
-    }
-    minMs = Math.min(minMs, today.getTime()) - 7 * 86400000;
-    maxMs = Math.max(maxMs, today.getTime() + 30 * 86400000) + 7 * 86400000;
-    const s = new Date(minMs); s.setHours(0, 0, 0, 0);
-    const e = new Date(maxMs); e.setHours(0, 0, 0, 0);
-    const days = Math.ceil((e - s) / 86400000) + 1;
-    return { startDate: s, endDate: e, totalDays: days };
-  }, [rows]);
+  const startDate = viewStart;
+  const endDate = useMemo(() => {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + VIEW_SPAN - 1);
+    return d;
+  }, [startDate, VIEW_SPAN]);
+  const totalDays = VIEW_SPAN;
 
-  const dayDelta = (d) => Math.floor((new Date(d).getTime() - startDate.getTime()) / 86400000);
+  const dayDelta = (d) =>
+    Math.floor((new Date(d).getTime() - startDate.getTime()) / 86400000);
 
-  // Build header markers
+  // Header markers
   const headers = useMemo(() => {
     const months = [];
-    const subs = [];
     const cur = new Date(startDate);
     let curMonth = -1;
     let monthAcc = { label: "", days: 0, key: "" };
@@ -249,16 +252,25 @@ const TimelineView = ({ timeline, isLoading, onTaskClick, onTaskReschedule }) =>
         curMonth = m;
       }
       monthAcc.days += 1;
-      if (zoom === "day") {
-        subs.push({ key: i, label: cur.getDate(), isWeekStart: cur.getDay() === 1 });
-      } else if (zoom === "week" && cur.getDay() === 1) {
-        subs.push({ key: i, label: `W${getISOWeek(cur)}`, isWeekStart: true, days: 7 });
-      }
       cur.setDate(cur.getDate() + 1);
     }
     if (monthAcc.days > 0) months.push(monthAcc);
-    return { months, subs };
-  }, [startDate, totalDays, zoom]);
+    return { months };
+  }, [startDate, totalDays]);
+
+  const pan = (deltaDays) => {
+    setViewStart((prev) => {
+      const next = new Date(prev);
+      next.setDate(next.getDate() + deltaDays);
+      return next;
+    });
+  };
+  const goToToday = () => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - 7);
+    setViewStart(d);
+  };
 
   if (isLoading) {
     return (
@@ -279,11 +291,13 @@ const TimelineView = ({ timeline, isLoading, onTaskClick, onTaskReschedule }) =>
 
   const todayDelta = dayDelta(new Date());
   const gridWidth = totalDays * DAY_PX;
+  const viewStartIso = startDate.toISOString().split("T")[0];
+  const viewEndIso = endDate.toISOString().split("T")[0];
 
   return (
     <div className="space-y-3" data-testid="timeline-gantt">
-      {/* Zoom controls */}
-      <div className="flex items-center gap-2">
+      {/* Controls */}
+      <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs text-slate-500 mr-2">Zoom:</span>
         {[
           { k: "day", label: "Day" },
@@ -301,6 +315,43 @@ const TimelineView = ({ timeline, isLoading, onTaskClick, onTaskReschedule }) =>
             {opt.label}
           </Button>
         ))}
+
+        {/* Pan controls */}
+        <div className="ml-2 flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 w-7 p-0"
+            onClick={() => pan(-PAN_DAYS)}
+            title={`Back ${PAN_DAYS} days`}
+            data-testid="timeline-pan-prev"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs px-2.5"
+            onClick={goToToday}
+            data-testid="timeline-today"
+          >
+            Today
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 w-7 p-0"
+            onClick={() => pan(PAN_DAYS)}
+            title={`Forward ${PAN_DAYS} days`}
+            data-testid="timeline-pan-next"
+          >
+            <ChevronRight className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+
+        <span className="text-xs text-slate-500 ml-2">
+          {viewStartIso} → {viewEndIso}
+        </span>
         <span className="ml-auto text-xs text-slate-500">
           {rows.length} task{rows.length === 1 ? "" : "s"} · drag a bar to reschedule
         </span>
@@ -311,7 +362,6 @@ const TimelineView = ({ timeline, isLoading, onTaskClick, onTaskReschedule }) =>
         <div className="flex">
           {/* Left: sticky task names */}
           <div className="flex-shrink-0 w-64 border-r bg-slate-50">
-            {/* Header spacer */}
             <div className="h-12 border-b flex items-center px-3 text-xs font-medium text-slate-600">
               Task / Equipment
             </div>
@@ -1478,7 +1528,17 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
 
   const { data: timeline, isLoading: timelineLoading, refetch: refetchTimeline } = useQuery({
     queryKey: ["maintenance-scheduler-timeline", equipmentTypeId || "all"],
-    queryFn: () => maintenanceSchedulerAPI.getTimeline(equipmentTypeId ? { equipment_type_id: equipmentTypeId } : {}),
+    queryFn: () => {
+      // Fetch a wide window so panning in the Gantt always finds tasks
+      const today = new Date();
+      const past = new Date(today.getTime() - 30 * 86400000).toISOString().split("T")[0];
+      const future = new Date(today.getTime() + 365 * 86400000).toISOString().split("T")[0];
+      return maintenanceSchedulerAPI.getTimeline({
+        start_date: past,
+        end_date: future,
+        ...(equipmentTypeId ? { equipment_type_id: equipmentTypeId } : {}),
+      });
+    },
   });
 
   const { data: tasksData, isLoading: tasksLoading } = useQuery({
