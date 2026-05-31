@@ -372,3 +372,85 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 
 ## Test Credentials
 See `/app/memory/test_credentials.md`
+
+## 2026-05-31 — Multi-Language Translation Coverage Expansion (P0 + P1)
+**Status: COMPLETE & VERIFIED**
+
+### Resolved P0 — Failure Mode Translation Rendering
+- Root cause: newly-created failure modes were stored with UUID as `entity_id`
+  while library failure modes used the NAME as `entity_id`, causing the
+  frontend hook (`useTranslatedEntities.js → useTranslatedFailureModes`,
+  which keys lookups by `fm.failure_mode`) to miss user-created FMs.
+- Fix: `routes/failure_modes_routes.py` POST and PATCH now pass
+  `data.failure_mode` (the NAME) to `auto_translate_failure_mode` for both
+  create and update flows, matching the library scheme.
+- Verified: `/library` page in NL renders translated failure modes
+  ("Filter geblokkeerd", "Verkeerd Materiaal in Bunker", "Kortsluiting",
+  "Schroefbreuk", "Onevenwicht", etc.) and translated UI labels.
+
+### P1 — Auto-Translate Extended to More Entity Types
+- **Observations**: `POST /api/observations` and `PATCH /api/observations/{id}`
+  now register BackgroundTasks → `translate_observation` (which uses
+  `EntityType.OBSERVATION`, not the previous bug of `EQUIPMENT_NODE`).
+- **Threats**: `PATCH /api/threats/{id}` registers BackgroundTasks for
+  translation when title/description changes. Added `description: Optional[str]`
+  to `ThreatUpdate` Pydantic model (`models/api_models.py`).
+- **Form templates**: `POST /api/form-templates` and `PATCH /api/form-templates/{id}`
+  now register BackgroundTasks → `translate_form_template`.
+- **Investigations**: already wired in `routes/investigations.py` (no change).
+- **Equipment nodes/types**: already wired in `routes/equipment/*` (no change).
+- **Maintenance task templates**: already wired in
+  `routes/maintenance_strategy_v2.py` (no change).
+
+### New Endpoint — Bulk Legacy Translation
+- `POST /api/translations/generate-all/{entity_type}?target_languages=nl&target_languages=de&only_missing=true`
+  Translates ALL existing entities of the given type. Skips entities that
+  already have both target languages when `only_missing=true`.
+- Supports: `failure_mode`, `equipment_type`, `equipment_node`,
+  `observation`, `investigation`, `maintenance_task_template`,
+  `form_template`.
+- Sync if ≤5 entities; queued via FastAPI BackgroundTasks otherwise
+  (previously the >5 path silently dropped jobs — also fixed).
+
+### Coverage Endpoint Fix
+- `GET /api/translations/coverage` now includes `form_template` total count
+  (was missing).
+
+### Data-testids Added
+- `data-testid="language-switcher"` (trigger), `language-switcher-menu`,
+  and `language-option-{en|nl|de}` items in `components/Layout.js`.
+- Same on the standalone `LanguageSwitcher.jsx` for any future usage.
+
+### Backend Coverage (current snapshot)
+- failure_mode: 25 of 542 translated (user can click "Generate Translations" UI)
+- equipment_type: 23 of 23 ✅
+- maintenance_task_template: 24 of 759
+- observation: 11 of 11 ✅
+- form_template: 13 of N (legacy bulk in progress)
+- equipment_node: 0 of 239 (user-triggered bulk recommended due to OpenAI cost)
+- investigation: 4 of 4 ✅ (auto-translated after this release)
+
+### Backlog (Future)
+- **P1**: Translation Management Dashboard (admin view of coverage, missing
+  translations, bulk regenerate actions per entity type)
+- **P1**: Technical Dictionary enforcement (already seeded; need validator)
+- **P2**: Multilingual PDF/Excel/CSV exports
+- **P2**: Import with multi-language support
+- **P2**: Global multilingual search
+
+### Files Touched
+- `/app/backend/routes/translations.py` (generate-all endpoint, coverage fix)
+- `/app/backend/routes/observations.py` (BackgroundTasks)
+- `/app/backend/routes/threats.py` (BackgroundTasks + import)
+- `/app/backend/routes/forms.py` (BackgroundTasks)
+- `/app/backend/routes/failure_modes_routes.py` (NAME-based entity_id)
+- `/app/backend/utils/auto_translate.py` (fixed translate_observation)
+- `/app/backend/models/api_models.py` (added description to ThreatUpdate)
+- `/app/frontend/src/components/Layout.js` (testids on lang switcher)
+- `/app/frontend/src/components/layout/LanguageSwitcher.jsx` (testids)
+
+### Tests
+- `/app/backend/tests/test_translations_localization.py` — 10/10 pass
+- Test reports: `/app/test_reports/iteration_33.json` (backend),
+  `/app/test_reports/iteration_34.json` (frontend)
+

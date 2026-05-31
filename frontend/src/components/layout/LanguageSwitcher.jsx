@@ -39,6 +39,8 @@ export function LanguageSwitcher({ variant = 'default', showLabel = true }) {
           variant={variant === 'ghost' ? 'ghost' : 'outline'} 
           size="sm"
           className="gap-2"
+          data-testid="language-switcher-trigger"
+          aria-label="Change language"
         >
           <Globe className="h-4 w-4" />
           {showLabel && (
@@ -47,12 +49,13 @@ export function LanguageSwitcher({ variant = 'default', showLabel = true }) {
           {!showLabel && <span>{currentLang.flag}</span>}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
+      <DropdownMenuContent align="end" className="w-48" data-testid="language-switcher-menu">
         {LANGUAGES.map((lang) => (
           <DropdownMenuItem
             key={lang.code}
             onClick={() => handleLanguageChange(lang.code)}
             className="flex items-center justify-between cursor-pointer"
+            data-testid={`language-option-${lang.code}`}
           >
             <span className="flex items-center gap-2">
               <span className="text-lg">{lang.flag}</span>

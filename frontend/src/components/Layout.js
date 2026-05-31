@@ -1046,12 +1046,13 @@ const Layout = () => {
                         </Button>
                       </motion.div>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-40">
+                    <DropdownMenuContent align="end" className="w-40" data-testid="language-switcher-menu">
                       <DropdownMenuLabel className="text-xs">Language / Sprache</DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem 
                         onClick={() => setLanguage("en")}
                         className={`cursor-pointer ${language === "en" ? "bg-blue-50" : ""}`}
+                        data-testid="language-option-en"
                       >
                         <span className="mr-2">🇬🇧</span> English
                         {language === "en" && <span className="ml-auto text-blue-600">✓</span>}
@@ -1059,6 +1060,7 @@ const Layout = () => {
                       <DropdownMenuItem 
                         onClick={() => setLanguage("nl")}
                         className={`cursor-pointer ${language === "nl" ? "bg-blue-50" : ""}`}
+                        data-testid="language-option-nl"
                       >
                         <span className="mr-2">🇳🇱</span> Nederlands
                         {language === "nl" && <span className="ml-auto text-blue-600">✓</span>}
@@ -1066,6 +1068,7 @@ const Layout = () => {
                       <DropdownMenuItem 
                         onClick={() => setLanguage("de")}
                         className={`cursor-pointer ${language === "de" ? "bg-blue-50" : ""}`}
+                        data-testid="language-option-de"
                       >
                         <span className="mr-2">🇩🇪</span> Deutsch
                         {language === "de" && <span className="ml-auto text-blue-600">✓</span>}
