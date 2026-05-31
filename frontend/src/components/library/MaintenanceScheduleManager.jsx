@@ -70,7 +70,7 @@ import {
   TooltipTrigger,
 } from "../ui/tooltip";
 import { Textarea } from "../ui/textarea";
-import { maintenanceSchedulerAPI } from "../../lib/api";
+import { maintenanceSchedulerAPI, maintenanceStrategyV2API } from "../../lib/api";
 
 
 // ============= Constants =============
@@ -492,6 +492,9 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
   const [activeTab, setActiveTab] = useState("timeline");
   const [applyDialogOpen, setApplyDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
+  const [aiPlanOpen, setAiPlanOpen] = useState(false);
+  const [aiPlanResult, setAiPlanResult] = useState(null);
+  const [selectedAiRecs, setSelectedAiRecs] = useState(new Set());
 
   const equipmentTypeId = equipmentType?.id;
   const equipmentTypeName = equipmentType?.name || "All Equipment";
@@ -522,14 +525,7 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
 
   const { data: affectedEquipmentData } = useQuery({
     queryKey: ["maintenance-strategy-v2-affected-equipment", equipmentTypeId],
-    queryFn: async () => {
-      const response = await fetch(`${import.meta.env.REACT_APP_BACKEND_URL}/api/maintenance-strategies-v2/${equipmentTypeId}/affected-equipment`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-      return response.json();
-    },
+    queryFn: () => maintenanceStrategyV2API.getAffectedEquipment(equipmentTypeId),
     enabled: !!equipmentTypeId,
   });
 
@@ -555,6 +551,38 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to apply strategy");
+    },
+  });
+
+  const aiPlanMutation = useMutation({
+    mutationFn: () => {
+      const today = new Date().toISOString().split("T")[0];
+      const end = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+      return maintenanceSchedulerAPI.aiPlan({ start_date: today, end_date: end });
+    },
+    onSuccess: (data) => {
+      setAiPlanResult(data);
+      // Pre-select all recommendations
+      const allIds = new Set((data?.recommendations || []).map(r => r.task_id));
+      setSelectedAiRecs(allIds);
+      setAiPlanOpen(true);
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.detail || "AI planner failed");
+    },
+  });
+
+  const applyAiPlanMutation = useMutation({
+    mutationFn: (recs) => maintenanceSchedulerAPI.applyAiPlan(recs),
+    onSuccess: (data) => {
+      toast.success(`AI plan applied: ${data.tasks_updated} tasks updated`);
+      setAiPlanOpen(false);
+      setAiPlanResult(null);
+      setSelectedAiRecs(new Set());
+      queryClient.invalidateQueries(["maintenance-scheduler"]);
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.detail || "Failed to apply AI plan");
     },
   });
 
@@ -587,6 +615,7 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
             size="sm" 
             variant="outline" 
             onClick={() => setApplyDialogOpen(true)}
+            data-testid="apply-strategy-btn"
           >
             <Play className="w-3.5 h-3.5 mr-1" />
             Apply Strategy
@@ -594,10 +623,35 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => aiPlanMutation.mutate()}
+                  disabled={aiPlanMutation.isPending}
+                  className="border-purple-200 text-purple-700 hover:bg-purple-50"
+                  data-testid="ai-planner-btn"
+                >
+                  {aiPlanMutation.isPending ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5 mr-1" />
+                  )}
+                  AI Planner
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">AI-optimised assignments &amp; planned dates with reasoning</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <Button 
                   size="sm" 
                   onClick={handleRunScheduler}
                   disabled={runSchedulerMutation.isPending}
+                  data-testid="run-scheduler-btn"
                 >
                   {runSchedulerMutation.isPending ? (
                     <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
@@ -742,6 +796,143 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
         onApply={(equipmentIds) => applyStrategyMutation.mutate(equipmentIds)}
         isApplying={applyStrategyMutation.isPending}
       />
+
+      {/* AI Planner Dialog */}
+      <Dialog open={aiPlanOpen} onOpenChange={setAiPlanOpen}>
+        <DialogContent className="max-w-3xl" data-testid="ai-planner-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-purple-600" />
+              AI Maintenance Plan
+            </DialogTitle>
+            <DialogDescription>
+              Review and select recommendations to apply. Each item includes the AI's explicit reasoning.
+            </DialogDescription>
+          </DialogHeader>
+
+          {aiPlanResult?.summary && (
+            <div className="p-3 bg-purple-50 border border-purple-100 rounded-lg" data-testid="ai-plan-summary">
+              <div className="flex items-start gap-2">
+                <Info className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-purple-800">{aiPlanResult.summary}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between text-xs text-slate-500">
+            <span>
+              {aiPlanResult?.tasks_analyzed || 0} tasks analysed,{" "}
+              {aiPlanResult?.technicians_considered || 0} technicians considered
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const all = new Set((aiPlanResult?.recommendations || []).map(r => r.task_id));
+                if (selectedAiRecs.size === all.size) {
+                  setSelectedAiRecs(new Set());
+                } else {
+                  setSelectedAiRecs(all);
+                }
+              }}
+            >
+              {selectedAiRecs.size === (aiPlanResult?.recommendations?.length || 0)
+                ? "Deselect All"
+                : "Select All"}
+            </Button>
+          </div>
+
+          <ScrollArea className="max-h-[420px] pr-2">
+            <div className="space-y-2">
+              {(aiPlanResult?.recommendations || []).length === 0 ? (
+                <div className="text-center py-8 text-sm text-slate-500">
+                  No recommendations returned.
+                </div>
+              ) : (
+                aiPlanResult.recommendations.map((rec) => {
+                  const task = tasksData?.tasks?.find(t => t.id === rec.task_id);
+                  const isSelected = selectedAiRecs.has(rec.task_id);
+                  return (
+                    <div
+                      key={rec.task_id}
+                      className={`p-3 border rounded-lg cursor-pointer transition-all ${
+                        isSelected ? "border-purple-300 bg-purple-50" : "border-slate-200 hover:border-slate-300"
+                      }`}
+                      onClick={() => {
+                        const next = new Set(selectedAiRecs);
+                        if (next.has(rec.task_id)) next.delete(rec.task_id);
+                        else next.add(rec.task_id);
+                        setSelectedAiRecs(next);
+                      }}
+                      data-testid={`ai-rec-${rec.task_id}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          readOnly
+                          className="mt-1 pointer-events-none"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium">
+                              {task?.task_name || rec.task_id}
+                            </span>
+                            {task?.equipment_tag && (
+                              <Badge variant="outline" className="text-[10px] font-mono">
+                                {task.equipment_tag}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 mt-1 text-xs text-slate-500 flex-wrap">
+                            <span className="flex items-center gap-1">
+                              <Users className="w-3 h-3" />
+                              {rec.assigned_technician_name || "Unassigned"}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {rec.planned_date || "—"}
+                            </span>
+                          </div>
+                          <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-100">
+                            <div className="flex items-start gap-2">
+                              <Sparkles className="w-3.5 h-3.5 text-blue-500 flex-shrink-0 mt-0.5" />
+                              <p className="text-xs text-blue-800">{rec.reasoning}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </ScrollArea>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAiPlanOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                const recs = (aiPlanResult?.recommendations || []).filter(r =>
+                  selectedAiRecs.has(r.task_id)
+                );
+                applyAiPlanMutation.mutate(recs);
+              }}
+              disabled={selectedAiRecs.size === 0 || applyAiPlanMutation.isPending}
+              data-testid="apply-ai-plan-btn"
+            >
+              {applyAiPlanMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+              )}
+              Apply {selectedAiRecs.size} Recommendation{selectedAiRecs.size === 1 ? "" : "s"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

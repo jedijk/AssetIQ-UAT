@@ -31,7 +31,10 @@ import {
 } from "../ui/select";
 import { equipmentHierarchyAPI, maintenanceStrategyV2API } from "../../lib/api";
 import MaintenanceStrategyManager from "./MaintenanceStrategyManager";
+import MaintenanceScheduleManager from "./MaintenanceScheduleManager";
 import { EQUIPMENT_ICONS, DISCIPLINE_COLORS } from "./EquipmentTypeItem";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
+import { Calendar as CalendarIcon, Wrench as WrenchIcon } from "lucide-react";
 
 /**
  * Equipment Type List Item
@@ -87,6 +90,7 @@ const MaintenanceStrategyTab = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [selectedType, setSelectedType] = useState(null);
+  const [rightTab, setRightTab] = useState("strategy");
 
   // Fetch equipment types (built-in + custom merged from backend)
   const { data: equipmentTypesData, isLoading: typesLoading } = useQuery({
@@ -235,10 +239,27 @@ const MaintenanceStrategyTab = () => {
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.2 }}
               >
-                <MaintenanceStrategyManager
-                  equipmentType={selectedType}
-                  onViewInFMEA={handleViewInFMEA}
-                />
+                <Tabs value={rightTab} onValueChange={setRightTab} className="w-full">
+                  <TabsList className="grid grid-cols-2 w-full max-w-md mb-4" data-testid="strategy-schedule-tabs">
+                    <TabsTrigger value="strategy" className="text-sm" data-testid="tab-maintenance-strategy">
+                      <WrenchIcon className="w-3.5 h-3.5 mr-1.5" />
+                      Maintenance Strategy
+                    </TabsTrigger>
+                    <TabsTrigger value="schedule" className="text-sm" data-testid="tab-maintenance-schedule">
+                      <CalendarIcon className="w-3.5 h-3.5 mr-1.5" />
+                      Maintenance Schedule
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="strategy" className="mt-0">
+                    <MaintenanceStrategyManager
+                      equipmentType={selectedType}
+                      onViewInFMEA={handleViewInFMEA}
+                    />
+                  </TabsContent>
+                  <TabsContent value="schedule" className="mt-0">
+                    <MaintenanceScheduleManager equipmentType={selectedType} />
+                  </TabsContent>
+                </Tabs>
               </motion.div>
             ) : (
               <motion.div

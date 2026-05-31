@@ -135,6 +135,24 @@ export const maintenanceSchedulerAPI = {
     const response = await api.post('/maintenance-scheduler/technicians', data);
     return response.data;
   },
+
+  // ============= AI Maintenance Planner =============
+
+  /**
+   * Generate AI-driven maintenance plan
+   */
+  aiPlan: async (params = {}) => {
+    const response = await api.post('/maintenance-scheduler/ai-plan', params);
+    return response.data;
+  },
+
+  /**
+   * Apply AI recommendations to scheduled tasks
+   */
+  applyAiPlan: async (recommendations) => {
+    const response = await api.post('/maintenance-scheduler/ai-plan/apply', recommendations);
+    return response.data;
+  },
 };
 
 export default maintenanceSchedulerAPI;
