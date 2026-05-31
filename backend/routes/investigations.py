@@ -3,7 +3,7 @@ Investigations routes.
 """
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Header, Response
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, Header, Response, BackgroundTasks
 from datetime import datetime, timezone
 import uuid
 import json
@@ -20,6 +20,7 @@ from investigation_models import (
     ActionItemCreate, ActionItemUpdate, ActionPriority, ActionStatus,
     EvidenceCreate, RecurringQuadrantData
 )
+from utils.auto_translate import translate_investigation
 
 logger = logging.getLogger(__name__)
 
@@ -212,6 +213,7 @@ async def generate_action_number(investigation_id: str) -> str:
 @router.post("/investigations")
 async def create_investigation(
     data: InvestigationCreate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user)
 ):
     """Create a new investigation case."""
@@ -258,6 +260,14 @@ async def create_investigation(
     
     await db.investigations.insert_one(inv_doc)
     inv_doc.pop("_id", None)
+    
+    # Auto-translate investigation title and description
+    background_tasks.add_task(
+        translate_investigation,
+        inv_id,
+        {"title": data.title, "description": data.description or ""},
+        current_user["id"]
+    )
     
     # Include similar incidents info in response
     inv_doc["similar_incidents"] = similar_check.get("similar_incidents", [])

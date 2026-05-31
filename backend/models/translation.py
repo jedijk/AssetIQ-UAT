@@ -52,6 +52,10 @@ class EntityType(str, Enum):
     TASK_TEMPLATE = "task_template"
     FORM_TEMPLATE = "form_template"
     
+    # Observations & Investigations
+    OBSERVATION = "observation"
+    INVESTIGATION = "investigation"
+    
     # System UI
     UI_TEXT = "ui_text"
 

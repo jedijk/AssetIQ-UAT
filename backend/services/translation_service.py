@@ -31,6 +31,8 @@ TRANSLATABLE_FIELDS = {
     EntityType.EQUIPMENT_NODE: ["name", "description"],
     EntityType.TASK_TEMPLATE: ["name", "description"],
     EntityType.FORM_TEMPLATE: ["name", "description"],
+    EntityType.OBSERVATION: ["name", "description", "title"],
+    EntityType.INVESTIGATION: ["name", "description", "title"],
 }
 
 

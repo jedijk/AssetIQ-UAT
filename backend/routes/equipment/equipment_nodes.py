@@ -1,7 +1,7 @@
 """
 Equipment Node CRUD operations.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from datetime import datetime, timezone
 import uuid
@@ -14,6 +14,7 @@ from iso14224_models import (
     get_valid_child_levels, is_valid_parent_child, EquipmentNodeCreate, EquipmentNodeUpdate
 )
 from services.query_cache import query_cache
+from utils.auto_translate import translate_equipment_node
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -333,6 +334,7 @@ async def get_equipment_node(
 @router.post("/equipment-hierarchy/nodes")
 async def create_equipment_node(
     node_data: EquipmentNodeCreate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user)
 ):
     """Create a new equipment hierarchy node with ISO 14224 validation."""
@@ -433,6 +435,14 @@ async def create_equipment_node(
     # Invalidate cache after create
     invalidate_equipment_cache(current_user["id"])
     
+    # Auto-translate equipment node name and description
+    background_tasks.add_task(
+        translate_equipment_node,
+        node_id,
+        {"name": node_data.name, "description": node_data.description or ""},
+        current_user["id"]
+    )
+    
     node_doc.pop("_id", None)
     return node_doc
 
@@ -441,6 +451,7 @@ async def create_equipment_node(
 async def update_equipment_node(
     node_id: str,
     update: EquipmentNodeUpdate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user)
 ):
     """Update an equipment hierarchy node."""
@@ -508,6 +519,16 @@ async def update_equipment_node(
     invalidate_equipment_cache(current_user["id"])
     
     updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
+    
+    # Auto-translate if name or description changed
+    if update.name or update.description:
+        background_tasks.add_task(
+            translate_equipment_node,
+            node_id,
+            {"name": updated.get("name", ""), "description": updated.get("description", "")},
+            current_user["id"]
+        )
+    
     return updated
 
 
