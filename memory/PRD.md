@@ -7,6 +7,26 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Maintenance Scheduler & Planning Engine — Phase 1d (VERIFIED)**:
+  - New backend module `/api/maintenance-scheduler/*` with full Phase 1 surface:
+    - Equipment Maintenance Programs (apply-strategy, list, summary)
+    - Scheduler engine (`POST /run-scheduler`) generating ScheduledTasks within criticality-based planning horizon (7/14/30 days)
+    - Scheduled Task lifecycle: list, daily-planner, weekly-planner, PATCH update, complete (writes MaintenanceHistory), defer
+    - Timeline view grouped by equipment; Dashboard KPIs (open / overdue / upcoming / compliance / priority breakdown)
+    - Technician Capacity registry (daily/weekly hours, disciplines, skills)
+  - **AI Maintenance Planner** (`POST /ai-plan` + `POST /ai-plan/apply`):
+    - OpenAI gpt-4o via Emergent LLM key (emergentintegrations)
+    - Takes open scheduled tasks + technician capacity, returns assignment + planned_date with explicit reasoning per task
+    - Apply step writes back `ai_scheduled=true`, `ai_reasoning`, `planned_date`, `assigned_technician_*`, status → assigned
+  - **Frontend** `MaintenanceScheduleManager.jsx`:
+    - Dashboard KPI cards, Timeline / Tasks / Programs sub-tabs
+    - Apply Strategy dialog (select equipment, bulk create programs)
+    - Run Scheduler button
+    - AI Planner button + dialog with summary + selectable recommendations (each shows AI reasoning)
+  - Wired into `MaintenanceStrategyManager` as a top-level Strategy ↔ Schedule toggle (in addition to the existing global Schedule tab in `/library`)
+  - Models: `EquipmentMaintenanceProgram`, `ScheduledTask`, `TechnicianCapacity`, `MaintenanceHistory`
+  - Backend tests: 13/14 pytest passed (1 skipped due to no seed tasks)
+- [Feb 2026] **CM tasks no longer have frequency** (VERIFIED): Corrective tasks bypass `frequency_matrix` in `TaskDialog` and `TaskTemplateCard`
 - [Feb 2026] **Maintenance Strategy V2 — Stability Fix (VERIFIED)**:
   - Resolved the React runtime crash on `TaskTemplateCard` ("Element type is invalid... but got: undefined") — the page now renders the full Strategy Overview, Failure Modes, Task Templates, Frequency Matrix, and Version History tabs without errors.
   - Patched `Badge` (`/app/frontend/src/components/ui/badge.jsx`) with `React.forwardRef` to silence the "Function components cannot be given refs" warning emitted by Radix `<TooltipTrigger asChild>` around the RPN badge inside `FailureModeStrategyRow`.
