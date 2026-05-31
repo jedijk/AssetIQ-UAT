@@ -131,6 +131,10 @@ class FailureModeStrategy(BaseModel):
     # Potential effects of the failure mode (from FMEA library)
     potential_effects: List[str] = []
     
+    # Version tracking - to detect when library FM is updated
+    fm_version: int = 1  # Version when strategy was created/last synced
+    fm_updated_at: Optional[str] = None  # Timestamp when FM was last updated
+    
     # Strategy configuration
     strategy_type: MaintenanceStrategyType = MaintenanceStrategyType.PREVENTIVE
     detection_methods: List[DetectionMethod] = []

@@ -356,8 +356,32 @@ const FailureModeStrategyRow = ({
               {!fmStrategy.enabled && (
                 <Badge variant="outline" className="text-xs bg-slate-100">Disabled</Badge>
               )}
+              {fmStrategy.has_new_version && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge className="text-[10px] bg-blue-100 text-blue-700 border-blue-200 animate-pulse">
+                        <RefreshCw className="w-3 h-3 mr-1" />
+                        New Version
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-xs space-y-1">
+                        <p className="font-medium">Failure Mode Updated in Library</p>
+                        <p>Current: v{fmStrategy.fm_version || 1}</p>
+                        <p>Latest: v{fmStrategy.library_version || 1}</p>
+                        <p className="text-blue-600 pt-1">Regenerate strategy to sync updates</p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </div>
             <div className="flex items-center gap-2 mt-0.5">
+              {/* Version Badge */}
+              <Badge variant="outline" className="text-[10px] bg-slate-50">
+                v{fmStrategy.fm_version || fmStrategy.library_version || 1}
+              </Badge>
               {/* RPN Badge */}
               <TooltipProvider>
                 <Tooltip>

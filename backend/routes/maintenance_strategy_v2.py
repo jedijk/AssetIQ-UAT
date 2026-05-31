@@ -364,33 +364,50 @@ async def get_equipment_type_strategy(
         }
     
     # Enrich failure mode strategies with potential_effects from library if missing
+    # Also check for version updates
     fm_strategies = strategy.get("failure_mode_strategies", [])
     needs_update = False
     
     for fm_strategy in fm_strategies:
-        # Check if potential_effects is missing or empty
-        if not fm_strategy.get("potential_effects"):
-            # Try to find the failure mode in the library
-            fm_id = fm_strategy.get("failure_mode_id")
-            fm_name = fm_strategy.get("failure_mode_name")
-            
-            # Search by ID first, then by name
-            library_fm = await db.failure_modes.find_one(
-                {"$or": [
-                    {"id": fm_id},
-                    {"failure_mode": fm_name}
-                ]},
-                {"potential_effects": 1, "_id": 0}
-            )
-            
-            if library_fm and library_fm.get("potential_effects"):
+        fm_id = fm_strategy.get("failure_mode_id")
+        fm_name = fm_strategy.get("failure_mode_name")
+        
+        # Search for the failure mode in the library
+        library_fm = await db.failure_modes.find_one(
+            {"$or": [
+                {"id": fm_id},
+                {"failure_mode": fm_name}
+            ]},
+            {"potential_effects": 1, "version": 1, "updated_at": 1, "_id": 0}
+        )
+        
+        if library_fm:
+            # Check if potential_effects is missing or empty
+            if not fm_strategy.get("potential_effects") and library_fm.get("potential_effects"):
                 fm_strategy["potential_effects"] = library_fm["potential_effects"]
                 needs_update = True
+            
+            # Add current library version info for comparison
+            library_version = library_fm.get("version", 1)
+            library_updated_at = library_fm.get("updated_at")
+            if library_updated_at:
+                library_updated_at = str(library_updated_at)
+            
+            strategy_fm_version = fm_strategy.get("fm_version", 1)
+            
+            # Add version info to the response
+            fm_strategy["library_version"] = library_version
+            fm_strategy["library_updated_at"] = library_updated_at
+            fm_strategy["has_new_version"] = library_version > strategy_fm_version
     
     # Calculate coverage based on active failure modes
     total_fms = len(fm_strategies)
     active_fms = sum(1 for fm in fm_strategies if fm.get("enabled", True))
     coverage_score = (active_fms / total_fms * 100) if total_fms > 0 else 0.0
+    
+    # Count failure modes with new versions available
+    fms_with_updates = sum(1 for fm in fm_strategies if fm.get("has_new_version", False))
+    strategy["failure_modes_with_updates"] = fms_with_updates
     
     # Update strategy stats
     strategy["active_failure_modes"] = active_fms
@@ -481,10 +498,18 @@ async def create_equipment_type_strategy(
         if isinstance(potential_effects, str):
             potential_effects = [potential_effects] if potential_effects else []
         
+        # Get version info for tracking updates
+        fm_version = fm.get("version", 1)
+        fm_updated_at = fm.get("updated_at")
+        if fm_updated_at:
+            fm_updated_at = str(fm_updated_at)
+        
         fm_strategy = FailureModeStrategy(
             failure_mode_id=fm_id,
             failure_mode_name=fm_name,
             potential_effects=potential_effects,
+            fm_version=fm_version,
+            fm_updated_at=fm_updated_at,
             strategy_type=strategy_type,
             detection_methods=[DetectionMethod(m) for m in detection_methods if m in [e.value for e in DetectionMethod]],
             task_ids=[t.id for t in tasks],
