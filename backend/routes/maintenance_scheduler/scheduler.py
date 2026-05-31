@@ -41,10 +41,10 @@ async def run_scheduler(
     tasks_created = []
     tasks_skipped = 0
 
-    # Default 90-day horizon so the timeline shows recurring occurrences.
-    # Cap occurrences per program so a daily/weekly task doesn't explode.
-    DEFAULT_HORIZON_DAYS = 90
-    MAX_OCCURRENCES_PER_PROGRAM = 60
+    # Default 1-year horizon so quarterly/semi-annual tasks show 4+ occurrences
+    # on the Gantt. Per-program cap prevents daily/weekly tasks from exploding.
+    DEFAULT_HORIZON_DAYS = 365
+    MAX_OCCURRENCES_PER_PROGRAM = 52
 
     for program in programs:
         program_id = program.get("id")

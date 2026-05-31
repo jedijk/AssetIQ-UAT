@@ -7,6 +7,11 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Recurring task occurrences visible on Gantt (BUG FIX, VERIFIED)**:
+  - **Bug**: User couldn't see "every quarter" recurrence — only ONE bar per task because (a) scheduler horizon was 90 days (≈ same as quarterly cadence so only 1 occurrence generated), and (b) the Gantt rendered every scheduled_task as a SEPARATE row instead of grouping occurrences of the same program.
+  - **Fix part 1 (backend)**: Bumped scheduler `DEFAULT_HORIZON_DAYS` from 90 → **365** with `MAX_OCCURRENCES_PER_PROGRAM=52`. Quarterly tasks now generate ~4 occurrences, monthly ~12.
+  - **Fix part 2 (frontend)**: Refactored `GanttRow` into `GanttRow` + `GanttBar`. Rows now grouped by `maintenance_program_id` so the same task on the same equipment displays as ONE row with N bars (one per occurrence). Off-window bars are skipped for performance.
+  - **Verified live**: Fork Lift now shows 48 scheduled tasks across 14 unique program rows (vs 14 rows × 1 bar before). At Month zoom, scrolling right reveals quarterly occurrences extending out to May 2027. Drag-to-reschedule still works on each individual bar.
 - [Feb 2026] **Gantt timeline pan controls (VERIFIED)**:
   - Decoupled the timeline window from task data — now controlled by a `viewStart` state independent of where tasks live.
   - Three buttons: **◀** (back), **Today**, **▶** (forward). Pan distance scales with zoom (Day=7d, Week=28d, Month=90d).

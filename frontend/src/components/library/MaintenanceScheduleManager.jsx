@@ -208,18 +208,43 @@ const TimelineView = ({ timeline, isLoading, onTaskClick, onTaskReschedule }) =>
     return d;
   });
 
-  // Flatten the equipment-grouped timeline into a list of task rows
+  // Group occurrences by maintenance_program_id so the same task on the same
+  // equipment shows multiple bars on ONE row.
   const rows = useMemo(() => {
     if (!timeline?.timeline) return [];
-    const list = [];
+    const map = new Map();
     for (const equipment of timeline.timeline) {
       for (const t of equipment.tasks || []) {
-        list.push({ ...t, _equipmentName: equipment.equipment_name, _equipmentTag: equipment.equipment_tag });
+        const key =
+          t.maintenance_program_id ||
+          `${equipment.equipment_id}::${t.task_name}`;
+        if (!map.has(key)) {
+          map.set(key, {
+            id: key,
+            task_name: t.task_name,
+            equipment_id: equipment.equipment_id,
+            _equipmentName: equipment.equipment_name,
+            _equipmentTag: equipment.equipment_tag,
+            occurrences: [],
+          });
+        }
+        map.get(key).occurrences.push(t);
       }
     }
-    list.sort((a, b) =>
-      (a.planned_date || a.due_date || "").localeCompare(b.planned_date || b.due_date || ""),
-    );
+    // Sort each row's occurrences chronologically; sort rows by first occurrence
+    const list = Array.from(map.values());
+    for (const r of list) {
+      r.occurrences.sort((a, b) =>
+        (a.planned_date || a.due_date || "").localeCompare(
+          b.planned_date || b.due_date || "",
+        ),
+      );
+    }
+    list.sort((a, b) => {
+      const ao = a.occurrences[0]?.planned_date || a.occurrences[0]?.due_date || "";
+      const bo = b.occurrences[0]?.planned_date || b.occurrences[0]?.due_date || "";
+      return ao.localeCompare(bo);
+    });
     return list;
   }, [timeline]);
 
@@ -454,11 +479,13 @@ const TimelineView = ({ timeline, isLoading, onTaskClick, onTaskReschedule }) =>
                 {rows.map((r) => (
                   <GanttRow
                     key={r.id}
-                    task={r}
+                    rowKey={r.id}
+                    taskName={r.task_name}
+                    occurrences={r.occurrences}
                     startDate={startDate}
                     dayPx={DAY_PX}
                     totalDays={totalDays}
-                    onClick={() => onTaskClick?.(r)}
+                    onClick={(occ) => onTaskClick?.(occ)}
                     onReschedule={onTaskReschedule}
                   />
                 ))}
@@ -480,22 +507,62 @@ function getISOWeek(date) {
   return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }
 
-/** Single Gantt row with a draggable bar */
-const GanttRow = ({ task, startDate, dayPx, totalDays, onClick, onReschedule }) => {
-  const [drag, setDrag] = useState(null); // { startX, deltaDays }
+/** Single Gantt row that renders MULTIPLE draggable bars (one per occurrence). */
+const GanttRow = ({ rowKey, taskName, occurrences, startDate, dayPx, totalDays, onClick, onReschedule }) => {
+  return (
+    <div
+      className="h-10 border-b relative hover:bg-slate-50/50 transition-colors"
+      style={{ width: totalDays * dayPx }}
+      data-testid={`gantt-row-${rowKey}`}
+    >
+      {/* Background day grid */}
+      {dayPx >= 16 && (
+        <div className="absolute inset-0 flex pointer-events-none">
+          {Array.from({ length: totalDays }).map((_, i) => {
+            const d = new Date(startDate.getTime() + i * 86400000);
+            const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+            return (
+              <div
+                key={i}
+                className={`border-r ${isWeekend ? "bg-slate-50/60" : ""}`}
+                style={{ width: dayPx }}
+              />
+            );
+          })}
+        </div>
+      )}
+      {occurrences.map((occ) => (
+        <GanttBar
+          key={occ.id}
+          task={{ ...occ, task_name: taskName }}
+          startDate={startDate}
+          dayPx={dayPx}
+          totalDays={totalDays}
+          onClick={() => onClick?.(occ)}
+          onReschedule={onReschedule}
+        />
+      ))}
+    </div>
+  );
+};
+
+/** One draggable task bar inside a Gantt row. */
+const GanttBar = ({ task, startDate, dayPx, totalDays, onClick, onReschedule }) => {
+  const [drag, setDrag] = useState(null);
 
   const taskStart = task.planned_date || task.due_date;
-  if (!taskStart) return <div className="h-10 border-b" />;
+  if (!taskStart) return null;
 
   const startIdx = Math.floor(
     (new Date(taskStart).getTime() - startDate.getTime()) / 86400000,
   );
   const durationDays = Math.max(1, Math.ceil((task.estimated_hours || 1) / 8));
 
-  const priorityConfig = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.medium;
-  const statusConfig = TASK_STATUS_CONFIG[task.status] || TASK_STATUS_CONFIG.draft;
+  // Bars outside the visible window: skip render (cheap perf for long ranges)
+  if (startIdx + durationDays < 0 || startIdx > totalDays) return null;
 
-  // Bar colour: status-driven, overdue overrides
+  const priorityConfig = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.medium;
+
   let barColor = "bg-blue-500";
   if (task.is_overdue) barColor = "bg-red-500";
   else if (task.status === "completed") barColor = "bg-green-500";
@@ -528,7 +595,6 @@ const GanttRow = ({ task, startDate, dayPx, totalDays, onClick, onReschedule }) 
         const iso = newDate.toISOString().split("T")[0];
         onReschedule(task.id, iso);
       } else if (dd === 0) {
-        // No drag = click
         onClick?.();
       }
     };
@@ -537,28 +603,7 @@ const GanttRow = ({ task, startDate, dayPx, totalDays, onClick, onReschedule }) 
   };
 
   return (
-    <div
-      className="h-10 border-b relative hover:bg-slate-50/50 transition-colors"
-      style={{ width: totalDays * dayPx }}
-      data-testid={`gantt-row-${task.id}`}
-    >
-      {/* Background day grid */}
-      {dayPx >= 16 && (
-        <div className="absolute inset-0 flex pointer-events-none">
-          {Array.from({ length: totalDays }).map((_, i) => {
-            const d = new Date(startDate.getTime() + i * 86400000);
-            const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-            return (
-              <div
-                key={i}
-                className={`border-r ${isWeekend ? "bg-slate-50/60" : ""}`}
-                style={{ width: dayPx }}
-              />
-            );
-          })}
-        </div>
-      )}
-      {/* The task bar */}
+    <>
       <div
         className={`absolute top-1.5 h-7 rounded-md ${barColor} ${
           drag ? "opacity-70 cursor-grabbing ring-2 ring-blue-300" : "cursor-grab"
@@ -567,16 +612,12 @@ const GanttRow = ({ task, startDate, dayPx, totalDays, onClick, onReschedule }) 
         onPointerDown={handlePointerDown}
         title={`${task.task_name} · ${taskStart}${deltaDays !== 0 ? ` → ${new Date(new Date(taskStart).getTime() + deltaDays * 86400000).toISOString().split("T")[0]}` : ""} · ${task.estimated_hours}h`}
       >
-        <span className="text-[10px] text-white font-medium truncate select-none">
-          {task.task_name}
-        </span>
         {dayPx >= 30 && (
           <Badge className={`ml-auto text-[9px] py-0 px-1 ${priorityConfig.color} pointer-events-none`}>
             {priorityConfig.label.charAt(0)}
           </Badge>
         )}
       </div>
-      {/* Drag-delta preview */}
       {drag && drag.deltaDays !== 0 && (
         <div
           className="absolute -top-3 text-[9px] font-semibold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded pointer-events-none z-20"
@@ -585,7 +626,7 @@ const GanttRow = ({ task, startDate, dayPx, totalDays, onClick, onReschedule }) 
           {drag.deltaDays > 0 ? `+${drag.deltaDays}` : drag.deltaDays}d
         </div>
       )}
-    </div>
+    </>
   );
 };
 
