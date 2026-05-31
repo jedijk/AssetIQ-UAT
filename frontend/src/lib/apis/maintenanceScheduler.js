@@ -150,7 +150,7 @@ export const maintenanceSchedulerAPI = {
    * Apply AI recommendations to scheduled tasks
    */
   applyAiPlan: async (recommendations) => {
-    const response = await api.post('/maintenance-scheduler/ai-plan/apply', recommendations);
+    const response = await api.post('/maintenance-scheduler/ai-plan/apply', { recommendations });
     return response.data;
   },
 };

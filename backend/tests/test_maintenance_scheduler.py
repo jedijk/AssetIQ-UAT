@@ -190,10 +190,10 @@ class TestAIPlanner:
         r = requests.post(
             f"{API}/maintenance-scheduler/ai-plan/apply",
             headers=auth_headers,
-            json=[],
+            json={"recommendations": []},
             timeout=30
         )
-        # Empty list should return 400
+        # Empty recommendations list should return 400
         assert r.status_code == 400, r.text[:300]
 
 

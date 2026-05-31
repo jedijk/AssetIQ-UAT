@@ -7,6 +7,12 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Maintenance Scheduler — Code review follow-up (VERIFIED)**:
+  - **Modularised** `routes/maintenance_scheduler.py` (1019 lines) into a package with one router per concern: `programs.py`, `scheduler.py`, `tasks.py`, `timeline.py`, `dashboard.py`, `technicians.py`, `ai_planner.py`, plus `_shared.py` for helpers and request models
+  - **Pydantic validation** on `POST /ai-plan/apply` — now takes `{recommendations: [AIPlanRecommendation, ...]}` (frontend updated accordingly)
+  - **`response_format={"type": "json_object"}`** on the gpt-4o call for stricter JSON contract
+  - End-to-end exercised live: applied Fork Lift strategy → 18 programs → Run Scheduler created 18 tasks → AI Planner assigned tech + planned_date + reasoning to every one → Apply updated all 18 tasks to assigned
+  - Backend pytest suite: **14/14 passing** (test fixture updated to send the new schema)
 - [Feb 2026] **Maintenance Scheduler & Planning Engine — Phase 1d (VERIFIED)**:
   - New backend module `/api/maintenance-scheduler/*` with full Phase 1 surface:
     - Equipment Maintenance Programs (apply-strategy, list, summary)
