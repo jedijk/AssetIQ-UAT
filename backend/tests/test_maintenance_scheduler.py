@@ -286,3 +286,48 @@ class TestStrategyPropagation:
             json={"name": original_name, "duration_hours": original_duration},
             timeout=30,
         )
+
+    def test_task_template_patch_bumps_strategy_version(self, auth_headers):
+        """PATCH on a task template should increment the strategy's semver version (e.g. 1.0 -> 1.1)."""
+        progs_r = requests.get(
+            f"{API}/maintenance-scheduler/programs",
+            headers=auth_headers,
+            timeout=30,
+        )
+        programs = progs_r.json().get("programs", [])
+        prog = next((p for p in programs if p.get("task_template_id") and p.get("equipment_type_id")), None)
+        if not prog:
+            pytest.skip("No program with task_template_id found")
+
+        etid = prog["equipment_type_id"]
+        tid = prog["task_template_id"]
+
+        # Read current strategy version
+        s_before = requests.get(
+            f"{API}/maintenance-strategies-v2/{etid}",
+            headers=auth_headers,
+            timeout=30,
+        ).json()
+        before_version = (s_before.get("strategy") or {}).get("version", "1.0")
+
+        # PATCH the task
+        patch = requests.patch(
+            f"{API}/maintenance-strategies-v2/{etid}/tasks/{tid}",
+            headers=auth_headers,
+            json={"duration_hours": 1.75},
+            timeout=30,
+        )
+        assert patch.status_code == 200, patch.text[:300]
+        new_version = patch.json().get("version")
+        assert new_version is not None, "patch response missing version"
+        assert new_version != before_version, (
+            f"version should have bumped, but stayed at {new_version}"
+        )
+
+        # Confirm strategy reflects the new version
+        s_after = requests.get(
+            f"{API}/maintenance-strategies-v2/{etid}",
+            headers=auth_headers,
+            timeout=30,
+        ).json()
+        assert (s_after.get("strategy") or {}).get("version") == new_version

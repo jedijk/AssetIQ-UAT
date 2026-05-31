@@ -7,6 +7,14 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Strategy version auto-increment on every mutation (BUG FIX, VERIFIED)**:
+  - **Bug**: Editing/adding/deleting tasks or toggling failure-mode strategies did NOT bump the strategy version. Only the broad `PATCH /maintenance-strategies-v2/{id}` endpoint bumped it. The propagated `strategy_version` on `maintenance_programs` therefore stayed identical even after meaningful edits.
+  - **Fix** (`backend/routes/maintenance_strategy_v2.py`):
+    - Added `_bump_strategy_version(strategy, changes, user_id)` helper that increments the minor version (e.g. `1.0 → 1.1`) and pushes an entry to `version_history` with the change list and updater.
+    - Wired into `add_task_template`, `update_task_template`, `delete_task_template`, `update_failure_mode_strategy`.
+    - All four endpoints now return `version` in their response. The propagation helper now also stamps the *new* version onto every linked `maintenance_program`.
+  - **Verified live**: PATCH task duration → `version: 1.1` returned, programs synced with `strategy_version=1.1`. FM toggle → `version: 1.2`. `version_history` shows both entries with their change descriptors.
+  - **Regression test added**: `test_task_template_patch_bumps_strategy_version` — pytest 16/16 passing.
 - [Feb 2026] **Strategy → Schedule auto-propagation (BUG FIX, VERIFIED)**:
   - **Bug**: Editing a task template on a maintenance strategy (name, duration, freq matrix, discipline, skills, etc.) saved on the strategy itself but **never updated the existing `maintenance_programs`**, so the schedule kept showing stale data.
   - **Fix**:

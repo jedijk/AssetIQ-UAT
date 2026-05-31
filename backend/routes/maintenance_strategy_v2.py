@@ -121,6 +121,43 @@ async def _toggle_programs_for_failure_mode(
     return result.modified_count
 
 
+def _bump_version(current_version: str) -> str:
+    """Bump a semver-like 'major.minor' string. Defaults to 1.1 if unparseable."""
+    try:
+        major, minor = map(int, str(current_version).split("."))
+        return f"{major}.{minor + 1}"
+    except (ValueError, AttributeError):
+        return "1.1"
+
+
+async def _bump_strategy_version(
+    strategy: dict,
+    changes: list,
+    user_id: Optional[str],
+) -> str:
+    """
+    Increment the strategy version and append to version_history.
+    Returns the new version string. The caller is responsible for $set'ing the
+    new version on the strategy (it's bundled in the same update_one call).
+    """
+    new_version = _bump_version(strategy.get("version", "1.0"))
+    now = datetime.now(timezone.utc).isoformat()
+    entry = {
+        "version": new_version,
+        "updated_at": now,
+        "updated_by": user_id,
+        "changes": changes,
+    }
+    await db.equipment_type_strategies.update_one(
+        {"equipment_type_id": strategy["equipment_type_id"]},
+        {
+            "$set": {"version": new_version, "updated_at": now},
+            "$push": {"version_history": entry},
+        },
+    )
+    return new_version
+
+
 # ============= Helper Functions =============
 
 def calculate_frequency_for_criticality(
@@ -1066,6 +1103,14 @@ async def update_failure_mode_strategy(
             request.enabled,
         )
 
+    # Bump strategy version
+    changed_keys = [k for k in ["strategy_type", "detection_methods", "task_ids", "frequency_override", "enabled"] if getattr(request, k, None) is not None]
+    new_version = await _bump_strategy_version(
+        strategy,
+        changes=[f"fm:{failure_mode_id}:{','.join(changed_keys)}"],
+        user_id=current_user.get("user_id"),
+    )
+
     return {
         "message": "Failure mode strategy updated",
         "failure_mode_id": failure_mode_id,
@@ -1073,6 +1118,7 @@ async def update_failure_mode_strategy(
         "total_failure_modes": total_fms,
         "coverage_score": round(coverage_score, 1),
         "programs_toggled": programs_toggled,
+        "version": new_version,
     }
 
 
@@ -1140,8 +1186,14 @@ async def add_task_template(
             "$set": {"updated_at": datetime.utcnow().isoformat()}
         }
     )
-    
-    return task_dict
+
+    new_version = await _bump_strategy_version(
+        strategy,
+        changes=[f"task:{task.id}:added"],
+        user_id=current_user.get("user_id"),
+    )
+
+    return {**task_dict, "version": new_version}
 
 
 @router.patch("/{equipment_type_id}/tasks/{task_id}")
@@ -1180,7 +1232,6 @@ async def update_task_template(
     if not updated:
         raise HTTPException(status_code=404, detail="Task template not found")
     
-    new_version = strategy.get("version", "1.0")
     await db.equipment_type_strategies.update_one(
         {"equipment_type_id": equipment_type_id},
         {
@@ -1191,6 +1242,13 @@ async def update_task_template(
         }
     )
 
+    # Bump strategy version
+    new_version = await _bump_strategy_version(
+        strategy,
+        changes=[f"task:{task_id}:{','.join(updates.keys())}"],
+        user_id=current_user.get("user_id"),
+    )
+
     # Propagate to all maintenance_programs that reference this task
     programs_updated = await _propagate_task_template_to_programs(
         equipment_type_id, updated_task, new_version
@@ -1199,6 +1257,7 @@ async def update_task_template(
     return {
         "message": "Task template updated",
         "task_id": task_id,
+        "version": new_version,
         "programs_updated": programs_updated,
     }
 
@@ -1210,6 +1269,12 @@ async def delete_task_template(
     current_user: dict = Depends(get_current_user)
 ):
     """Delete a task template and deactivate any maintenance_programs that referenced it."""
+    strategy = await db.equipment_type_strategies.find_one({
+        "equipment_type_id": equipment_type_id
+    })
+    if not strategy:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+
     result = await db.equipment_type_strategies.update_one(
         {"equipment_type_id": equipment_type_id},
         {
@@ -1222,11 +1287,18 @@ async def delete_task_template(
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Task template not found")
 
+    new_version = await _bump_strategy_version(
+        strategy,
+        changes=[f"task:{task_id}:deleted"],
+        user_id=current_user.get("user_id"),
+    )
+
     programs_deactivated = await _deactivate_programs_for_task(equipment_type_id, task_id)
 
     return {
         "message": "Task template deleted",
         "task_id": task_id,
+        "version": new_version,
         "programs_deactivated": programs_deactivated,
     }
 
