@@ -1,7 +1,7 @@
 """
 Failure Modes routes.
 """
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any
@@ -12,6 +12,8 @@ import io
 from database import db, failure_modes_service, efm_service
 from auth import get_current_user
 from services.threat_score_service import recalculate_threat_scores_for_failure_mode
+from services.translation_service import TranslationService
+from models.translation import EntityType
 from failure_modes import FAILURE_MODES_LIBRARY
 logger = logging.getLogger(__name__)
 
@@ -460,9 +462,28 @@ def auto_link_equipment_types(equipment_name: str) -> List[str]:
     return []
 
 
+async def auto_translate_failure_mode(fm_id: str, fm_data: dict, created_by: str = None):
+    """Background task to auto-translate a failure mode to Dutch and German."""
+    try:
+        translation_service = TranslationService(db)
+        
+        # Translate to Dutch and German
+        await translation_service.translate_entity(
+            entity_type=EntityType.FAILURE_MODE,
+            entity_id=fm_id,
+            entity_data=fm_data,
+            target_languages=["nl", "de"],
+            created_by=created_by
+        )
+        logger.info(f"Auto-translated failure mode {fm_id} to Dutch and German")
+    except Exception as e:
+        logger.error(f"Failed to auto-translate failure mode {fm_id}: {e}")
+
+
 @router.post("/failure-modes")
 async def create_failure_mode(
     data: FailureModeCreate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user)
 ):
     """Create a new failure mode in MongoDB."""
@@ -500,6 +521,22 @@ async def create_failure_mode(
             },
             created_by=current_user["id"]
         )
+        
+        # Trigger auto-translation in background
+        fm_data_for_translation = {
+            "name": data.failure_mode,
+            "description": data.description or "",
+            "effects": data.potential_effects or "",
+            "causes": data.potential_causes or "",
+            "recommended_actions": ", ".join(data.recommended_actions) if data.recommended_actions else "",
+        }
+        background_tasks.add_task(
+            auto_translate_failure_mode, 
+            new_fm.get("id"), 
+            fm_data_for_translation,
+            current_user["id"]
+        )
+        
         return new_fm
     except HTTPException:
         raise
@@ -537,6 +574,7 @@ async def create_failure_mode(
 async def update_failure_mode(
     mode_id: str,
     data: FailureModeUpdate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user)
 ):
     """Update a failure mode in MongoDB."""
@@ -611,6 +649,24 @@ async def update_failure_mode(
                     logger.info(f"Propagated FMEA change to {efms_updated} EFMs")
                 except Exception as efm_err:
                     logger.error(f"Failed to propagate to EFMs: {efm_err}")
+            
+            # Trigger auto-translation in background when content changes
+            if any([data.failure_mode, data.description, data.potential_effects, 
+                    data.potential_causes, data.recommended_actions]):
+                fm_data_for_translation = {
+                    "name": result.get("failure_mode", ""),
+                    "description": result.get("description", ""),
+                    "effects": result.get("potential_effects", ""),
+                    "causes": result.get("potential_causes", ""),
+                    "recommended_actions": ", ".join(result.get("recommended_actions", [])) if result.get("recommended_actions") else "",
+                }
+                background_tasks.add_task(
+                    auto_translate_failure_mode,
+                    mode_id,
+                    fm_data_for_translation,
+                    current_user["id"]
+                )
+            
             return result
         
         raise HTTPException(status_code=404, detail="Failure mode not found")

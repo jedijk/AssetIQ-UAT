@@ -47,6 +47,9 @@ import {
   Globe,
   Building,
   Calendar,
+  Languages,
+  Upload,
+  Sparkles,
 } from "lucide-react";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -78,6 +81,7 @@ import AINewFailureModeSuggestions from "../components/library/AINewFailureModeS
 import AIImproveFailureMode from "../components/library/AIImproveFailureMode";
 import BulkImproveFailureModes from "../components/library/BulkImproveFailureModes";
 import AIReviewActionDisciplines from "../components/library/AIReviewActionDisciplines";
+import TranslationGeneratorModal from "../components/library/TranslationGeneratorModal";
 import AIFindSimilarFailureModes from "../components/library/AIFindSimilarFailureModes";
 import { Upload, Sparkles } from "lucide-react";
 
@@ -183,6 +187,9 @@ const FailureModesPage = () => {
   
   // PM Import Wizard state
   const [isPMImportOpen, setIsPMImportOpen] = useState(false);
+  
+  // Translation Generator state
+  const [isTranslationOpen, setIsTranslationOpen] = useState(false);
   
   const [newFm, setNewFm] = useState({
     discipline: "Rotating",
@@ -949,6 +956,16 @@ const FailureModesPage = () => {
               >
                 <Upload className="w-4 h-4 mr-1" />
                 Import PM Plan
+              </Button>
+              <Button
+                onClick={() => setIsTranslationOpen(true)}
+                variant="outline"
+                className="h-11 border-green-200 text-green-700 hover:bg-green-50"
+                data-testid="generate-translations-btn"
+                title={t("translation.generateTranslations") || "Generate AI translations for library content"}
+              >
+                <Languages className="w-4 h-4 mr-1" />
+                {t("translation.generateTranslations") || "Translate"}
               </Button>
               <Button
                 onClick={() => setIsAINewFmOpen(true)}
@@ -2111,6 +2128,14 @@ const FailureModesPage = () => {
           queryClient.invalidateQueries({ queryKey: ["failureModes"] });
           // Don't close immediately - let user see summary, they will click Done
         }}
+      />
+
+      {/* Translation Generator Modal */}
+      <TranslationGeneratorModal
+        open={isTranslationOpen}
+        onOpenChange={setIsTranslationOpen}
+        failureModes={failureModes}
+        equipmentTypes={equipmentTypes}
       />
       
       {/* AI Failure Mode Suggestions Dialog */}
