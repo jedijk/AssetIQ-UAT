@@ -494,32 +494,30 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
   const [selectedTask, setSelectedTask] = useState(null);
 
   const equipmentTypeId = equipmentType?.id;
-  const equipmentTypeName = equipmentType?.name;
+  const equipmentTypeName = equipmentType?.name || "All Equipment";
+  const isGlobalView = !equipmentTypeId;
 
   // ============= Queries =============
 
   const { data: dashboard, isLoading: dashboardLoading } = useQuery({
-    queryKey: ["maintenance-scheduler-dashboard", equipmentTypeId],
+    queryKey: ["maintenance-scheduler-dashboard", equipmentTypeId || "all"],
     queryFn: () => maintenanceSchedulerAPI.getDashboard(equipmentTypeId),
-    enabled: !!equipmentTypeId,
   });
 
   const { data: programsSummary, isLoading: programsLoading } = useQuery({
-    queryKey: ["maintenance-scheduler-programs-summary", equipmentTypeId],
+    queryKey: ["maintenance-scheduler-programs-summary", equipmentTypeId || "all"],
     queryFn: () => maintenanceSchedulerAPI.getProgramsSummary(equipmentTypeId),
     enabled: !!equipmentTypeId,
   });
 
   const { data: timeline, isLoading: timelineLoading, refetch: refetchTimeline } = useQuery({
-    queryKey: ["maintenance-scheduler-timeline", equipmentTypeId],
-    queryFn: () => maintenanceSchedulerAPI.getTimeline({ equipment_type_id: equipmentTypeId }),
-    enabled: !!equipmentTypeId,
+    queryKey: ["maintenance-scheduler-timeline", equipmentTypeId || "all"],
+    queryFn: () => maintenanceSchedulerAPI.getTimeline(equipmentTypeId ? { equipment_type_id: equipmentTypeId } : {}),
   });
 
   const { data: tasksData, isLoading: tasksLoading } = useQuery({
-    queryKey: ["maintenance-scheduler-tasks", equipmentTypeId],
-    queryFn: () => maintenanceSchedulerAPI.getTasks({ equipment_type_id: equipmentTypeId }),
-    enabled: !!equipmentTypeId,
+    queryKey: ["maintenance-scheduler-tasks", equipmentTypeId || "all"],
+    queryFn: () => maintenanceSchedulerAPI.getTasks(equipmentTypeId ? { equipment_type_id: equipmentTypeId } : {}),
   });
 
   const { data: affectedEquipmentData } = useQuery({

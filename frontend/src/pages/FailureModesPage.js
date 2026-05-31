@@ -45,7 +45,8 @@ import {
   Maximize2,
   Minimize2,
   Globe,
-  Building
+  Building,
+  Calendar,
 } from "lucide-react";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -68,7 +69,7 @@ import MaintenanceStrategyTab from "../components/library/MaintenanceStrategyTab
 import BackButton from "../components/BackButton";
 
 // Extracted components
-import { EquipmentTypeItem, EquipmentTypeFailureModesPanel, EQUIPMENT_ICONS, ICON_OPTIONS, DISCIPLINES, EQUIPMENT_CATEGORIES, DISCIPLINE_COLORS } from "../components/library";
+import { EquipmentTypeItem, EquipmentTypeFailureModesPanel, EQUIPMENT_ICONS, ICON_OPTIONS, DISCIPLINES, EQUIPMENT_CATEGORIES, DISCIPLINE_COLORS, MaintenanceScheduleManager } from "../components/library";
 import { FailureModeViewPanel } from "../components/library";
 import PMImportWizard from "../components/library/PMImportWizard";
 import AIFailureModeSuggestions from "../components/library/AIFailureModeSuggestions";
@@ -783,10 +784,14 @@ const FailureModesPage = () => {
       
       {/* Main Tabs */}
       <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
-        <TabsList className="grid w-full max-w-lg grid-cols-3">
+        <TabsList className="grid w-full max-w-2xl grid-cols-4">
           <TabsTrigger value="failure-modes">{t("library.failureModes")}</TabsTrigger>
           <TabsTrigger value="libraries">{t("library.equipmentTypes")}</TabsTrigger>
           <TabsTrigger value="maintenance" data-testid="maintenance-strategies-tab">{t("library.maintenance")}</TabsTrigger>
+          <TabsTrigger value="schedule" className="flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5" />
+            Schedule
+          </TabsTrigger>
         </TabsList>
 
         {/* Failure Modes Tab */}
@@ -1316,6 +1321,13 @@ const FailureModesPage = () => {
         <TabsContent value="maintenance" className="h-[calc(100vh-200px)]">
           <div className="card h-full overflow-hidden">
             <MaintenanceStrategyTab />
+          </div>
+        </TabsContent>
+
+        {/* Schedule Tab */}
+        <TabsContent value="schedule" className="h-[calc(100vh-200px)]">
+          <div className="card h-full overflow-auto p-4">
+            <MaintenanceScheduleManager equipmentType={null} />
           </div>
         </TabsContent>
       </Tabs>

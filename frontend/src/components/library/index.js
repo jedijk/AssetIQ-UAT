@@ -2,3 +2,4 @@ export { EquipmentTypeItem, EquipmentTypeFailureModesPanel, EQUIPMENT_ICONS, ICO
 export { FailureModeViewPanel } from "./FailureModeViewPanel";
 export { default as MaintenanceStrategyManager } from "./MaintenanceStrategyManager";
 export { default as MaintenanceStrategyTab } from "./MaintenanceStrategyTab";
+export { default as MaintenanceScheduleManager } from "./MaintenanceScheduleManager";
