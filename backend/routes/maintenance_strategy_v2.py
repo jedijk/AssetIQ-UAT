@@ -388,17 +388,23 @@ async def get_equipment_type_strategy(
                 needs_update = True
             
             # Add current library version info for comparison
-            library_version = library_fm.get("version", 1)
+            library_version = library_fm.get("version") or 1
             library_updated_at = library_fm.get("updated_at")
             if library_updated_at:
                 library_updated_at = str(library_updated_at)
             
-            strategy_fm_version = fm_strategy.get("fm_version", 1)
+            # Get strategy's FM version (handle None explicitly)
+            strategy_fm_version = fm_strategy.get("fm_version")
+            if strategy_fm_version is None:
+                strategy_fm_version = 1
             
             # Add version info to the response
             fm_strategy["library_version"] = library_version
             fm_strategy["library_updated_at"] = library_updated_at
             fm_strategy["has_new_version"] = library_version > strategy_fm_version
+            # Also set fm_version to 1 if it was None for display purposes
+            if fm_strategy.get("fm_version") is None:
+                fm_strategy["fm_version"] = 1
     
     # Calculate coverage based on active failure modes
     total_fms = len(fm_strategies)

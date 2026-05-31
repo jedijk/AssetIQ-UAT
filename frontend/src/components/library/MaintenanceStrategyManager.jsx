@@ -368,9 +368,9 @@ const FailureModeStrategyRow = ({
                     <TooltipContent>
                       <div className="text-xs space-y-1">
                         <p className="font-medium">Failure Mode Updated in Library</p>
-                        <p>Current: v{fmStrategy.fm_version || 1}</p>
-                        <p>Latest: v{fmStrategy.library_version || 1}</p>
-                        <p className="text-blue-600 pt-1">Regenerate strategy to sync updates</p>
+                        <p>Strategy: v{fmStrategy.fm_version || 1}</p>
+                        <p>Library: v{fmStrategy.library_version || 1}</p>
+                        <p className="text-blue-600 pt-1">Click "Sync Library" to update</p>
                       </div>
                     </TooltipContent>
                   </Tooltip>
@@ -378,10 +378,23 @@ const FailureModeStrategyRow = ({
               )}
             </div>
             <div className="flex items-center gap-2 mt-0.5">
-              {/* Version Badge */}
-              <Badge variant="outline" className="text-[10px] bg-slate-50">
-                v{fmStrategy.fm_version || fmStrategy.library_version || 1}
-              </Badge>
+              {/* Version Badge - Show strategy version with library version in tooltip */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="text-[10px] bg-slate-50 cursor-help">
+                      v{fmStrategy.library_version || fmStrategy.fm_version || 1}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div className="text-xs space-y-1">
+                      <p className="font-medium">Version Info</p>
+                      <p>Strategy version: v{fmStrategy.fm_version || 1}</p>
+                      <p>Library version: v{fmStrategy.library_version || 1}</p>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               {/* RPN Badge */}
               <TooltipProvider>
                 <Tooltip>
