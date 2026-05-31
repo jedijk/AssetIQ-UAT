@@ -8,6 +8,7 @@ import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { usePermissions } from "../contexts/PermissionsContext";
 import { formatDate as formatDateUtil, formatDateTime } from "../lib/dateUtils";
+import { useTranslatedActions } from "../hooks/useTranslatedEntities";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
@@ -208,8 +209,12 @@ export default function ActionsPage() {
     queryFn: () => actionsAPI.getAll(),
   });
 
-  const actions = data?.actions || [];
+  const rawActions = data?.actions || [];
   const stats = data?.stats || { total: 0, open: 0, in_progress: 0, completed: 0, overdue: 0 };
+
+  // Apply translations based on current language
+  const { actions: translatedActions } = useTranslatedActions(rawActions);
+  const actions = translatedActions;
 
   // Compute unique disciplines for filter
   const uniqueDisciplines = [...new Set(actions.map(a => a.discipline).filter(Boolean))].sort();

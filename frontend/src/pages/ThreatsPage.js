@@ -8,6 +8,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useNotificationTriggers } from "../hooks/useNotificationTriggers";
+import { useTranslatedObservations } from "../hooks/useTranslatedEntities";
 import { 
   AlertTriangle, 
   TrendingUp, 
@@ -207,7 +208,7 @@ const ThreatsPage = () => {
   });
 
   // Fetch threats (fetch all, filter client-side for multi-select)
-  const { data: threats = [], isLoading, error: threatsError, isFetching, refetch: refetchThreats } = useQuery({
+  const { data: rawThreats = [], isLoading, error: threatsError, isFetching, refetch: refetchThreats } = useQuery({
     queryKey: ["threats"],
     queryFn: async () => {
       const result = await threatsAPI.getAll(null);
@@ -226,6 +227,10 @@ const ThreatsPage = () => {
     refetchInterval: false, // Disable automatic background refetching
     placeholderData: (previousData) => previousData, // Keep previous data while refetching
   });
+
+  // Apply translations based on current language
+  const { observations: translatedThreats } = useTranslatedObservations(rawThreats);
+  const threats = translatedThreats;
 
   // Trigger push notifications for high-severity observations
   useNotificationTriggers({

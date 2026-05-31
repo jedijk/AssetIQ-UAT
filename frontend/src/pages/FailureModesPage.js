@@ -8,6 +8,7 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
 import { usePermissions } from "../contexts/PermissionsContext";
 import { formatDateTime } from "../lib/dateUtils";
+import { useTranslatedFailureModes, useTranslatedEquipmentTypes } from "../hooks/useTranslatedEntities";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import { 
   Search, 
@@ -295,9 +296,17 @@ const FailureModesPage = () => {
   });
 
   const categories = categoriesData?.categories || [];
-  const failureModes = modesData?.failure_modes || [];
-  const equipmentTypes = typesData?.equipment_types || [];
+  const rawFailureModes = modesData?.failure_modes || [];
+  const rawEquipmentTypes = typesData?.equipment_types || [];
   const hierarchyNodes = nodesData?.nodes || [];
+  
+  // Apply translations based on current language
+  const { failureModes: translatedFailureModes } = useTranslatedFailureModes(rawFailureModes);
+  const { equipmentTypes: translatedEquipmentTypes } = useTranslatedEquipmentTypes(rawEquipmentTypes);
+  
+  // Use translated versions
+  const failureModes = translatedFailureModes;
+  const equipmentTypes = translatedEquipmentTypes;
   
   // Calculate dynamic stats
   // Prefer the server's total (real Mongo count) over the page length so the
