@@ -1,0 +1,34 @@
+{
+  "summary": "Backend testing of Multi-Language Translation & Localization framework. Created /app/backend/tests/test_translations_localization.py with 10 tests covering coverage endpoint, generate-all bulk endpoints (observation/form_template/investigation), entity GET (failure_mode/Cavitation/nl), and auto-translate hooks on create/update of observations, threats, form-templates, and failure-modes (NAME-based entity_id). All 10/10 tests pass after fixes.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "PATCH /api/threats/{id}",
+        "issue": "ThreatUpdate Pydantic model (models/api_models.py:98) has no 'description' field. update_data check at routes/threats.py:751 looks for 'description' but Pydantic strips it from incoming payload, so PATCH with {description:...} never triggers auto-translate for description. Only 'title' field is honoured. Translation worked correctly when 'title' was sent (verified: nl 'name'/'title' fields populated). Recommend adding description: Optional[str] to ThreatUpdate model OR removing 'description' from the trigger check to avoid confusion."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_translations_localization.py",
+    "/app/test_reports/pytest/translations.xml"
+  ],
+  "action_items": [
+    "Optional: Add `description: Optional[str] = None` to ThreatUpdate model in /app/backend/models/api_models.py:98 so PATCH /api/threats can update description and have it auto-translated (currently only title triggers translation).",
+    "Seed at least one investigation in DB if you want PATCH/investigation flow tested end-to-end (test_generate_sync_small switched to use observations instead since /api/investigations returned empty)."
+  ],
+  "critical_code_review_comments": [
+    "ThreatUpdate model lacks a 'description' field while routes/threats.py:751 explicitly checks for description in update_data - dead branch.",
+    "routes/translations.py file is ~770 lines (acceptable); services/translation_service.py ~1540 lines - consider splitting (fetchers vs writer vs job-runner) per >700-line rule.",
+    "Auto-translate background tasks log lots of OpenAI calls during bulk generate-all - no rate limiting visible. Could exhaust user OpenAI quota if invoked on large entity sets (failure_mode has 542)."
+  ],
+  "updated_files": ["/app/backend/tests/test_translations_localization.py"],
+  "success_rate": {"backend": "100%", "frontend": "N/A (backend-only)"},
+  "test_credentials": "jedijk@gmail.com / Jaap8019@ (works against REACT_APP_BACKEND_URL)",
+  "seed_data_creation": "Test creates ephemeral TEST_ prefixed observations, form-templates, failure-modes and deletes them after assertion. Threats test patches an existing threat (id 2c923295-c4db-4ca4-af3c-e6822acb2560) - title field gets updated and translated.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Use /app/backend/tests/test_translations_localization.py as regression. PATCH /api/threats currently only auto-translates 'title' (not 'description') because ThreatUpdate model omits description. failure_mode auto-translate confirmed working using NAME as entity_id. Investigations collection is empty in DB - test_generate_sync_small uses observations instead.",
+  "rca of the issue": "PATCH /api/threats description-translate gap: Pydantic ThreatUpdate model (api_models.py:98-115) defines title, asset, equipment_type, cause, impact, frequency, likelihood, detectability, location, status, recommended_actions, linked_equipment_id - but NO 'description'. routes/threats.py:700 builds `update_data = {k:v for k,v in update.model_dump().items() if v is not None}` which therefore never contains description. The downstream check at line 751 `if any(k in update_data for k in ('title','description'))` will only ever fire on title. Mitigation: add `description: Optional[str] = None` to ThreatUpdate."
+}

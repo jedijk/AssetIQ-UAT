@@ -523,6 +523,8 @@ async def create_failure_mode(
         )
         
         # Trigger auto-translation in background
+        # NOTE: Use the failure_mode NAME as the entity_id so that the frontend
+        # can look up translations via fm.failure_mode (consistent with library data).
         fm_data_for_translation = {
             "name": data.failure_mode,
             "description": data.description or "",
@@ -532,7 +534,7 @@ async def create_failure_mode(
         }
         background_tasks.add_task(
             auto_translate_failure_mode, 
-            new_fm.get("id"), 
+            data.failure_mode,
             fm_data_for_translation,
             current_user["id"]
         )
@@ -651,6 +653,7 @@ async def update_failure_mode(
                     logger.error(f"Failed to propagate to EFMs: {efm_err}")
             
             # Trigger auto-translation in background when content changes
+            # NOTE: Use the failure_mode NAME as the entity_id (matches frontend lookup).
             if any([data.failure_mode, data.description, data.potential_effects, 
                     data.potential_causes, data.recommended_actions]):
                 fm_data_for_translation = {
@@ -662,7 +665,7 @@ async def update_failure_mode(
                 }
                 background_tasks.add_task(
                     auto_translate_failure_mode,
-                    mode_id,
+                    result.get("failure_mode", "") or mode_id,
                     fm_data_for_translation,
                     current_user["id"]
                 )

@@ -3,7 +3,7 @@
  * Modal for batch generating translations for failure modes and equipment types
  */
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { Globe, Loader2, Check, AlertCircle, Sparkles, Languages } from "lucide-react";
@@ -13,6 +13,7 @@ import { Progress } from "../ui/progress";
 import { Badge } from "../ui/badge";
 import { toast } from "sonner";
 import translationsAPI from "../../lib/apis/translations";
+import { api } from "../../lib/apiClient";
 
 // Entity types that can be translated
 const TRANSLATABLE_ENTITIES = [
@@ -42,11 +43,51 @@ export default function TranslationGeneratorModal({
   const [progress, setProgress] = useState({ current: 0, total: 0, currentItem: "" });
   const [results, setResults] = useState(null);
 
-  // Get counts for each entity type
+  // Fetch maintenance tasks from strategies
+  const { data: strategiesData } = useQuery({
+    queryKey: ["strategies-for-translation"],
+    queryFn: async () => {
+      const response = await api.get("/maintenance-strategy-v2/strategies");
+      return response.data;
+    },
+    enabled: open,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  // Fetch translation coverage stats
+  const { data: coverageData } = useQuery({
+    queryKey: ["translation-coverage"],
+    queryFn: async () => {
+      const response = await api.get("/translations/coverage");
+      return response.data;
+    },
+    enabled: open,
+    staleTime: 1000 * 60 * 2,
+  });
+
+  // Extract all task templates from strategies
+  const maintenanceTasks = useMemo(() => {
+    if (!strategiesData?.strategies) return [];
+    const tasks = [];
+    for (const strategy of strategiesData.strategies) {
+      if (strategy.task_templates) {
+        tasks.push(...strategy.task_templates);
+      }
+    }
+    return tasks;
+  }, [strategiesData]);
+
+  // Get counts for each entity type (total and translated)
   const entityCounts = {
     failure_mode: failureModes.length,
     equipment_type: equipmentTypes.length,
-    maintenance_task_template: 0, // Would need to fetch from strategies
+    maintenance_task_template: maintenanceTasks.length,
+  };
+
+  const translatedCounts = {
+    failure_mode: coverageData?.coverage?.failure_mode?.translated || 0,
+    equipment_type: coverageData?.coverage?.equipment_type?.translated || 0,
+    maintenance_task_template: coverageData?.coverage?.maintenance_task_template?.translated || 0,
   };
 
   const totalItems = selectedEntities.reduce((sum, type) => sum + (entityCounts[type] || 0), 0);
@@ -94,14 +135,21 @@ export default function TranslationGeneratorModal({
           entities = failureModes;
         } else if (entityType === "equipment_type") {
           entities = equipmentTypes;
+        } else if (entityType === "maintenance_task_template") {
+          entities = maintenanceTasks;
         }
 
         // Process in batches of 5 to avoid overwhelming the API
         const batchSize = 5;
         for (let i = 0; i < entities.length; i += batchSize) {
           const batch = entities.slice(i, i + batchSize);
-          // Use id, legacy_id, or failure_mode as identifier
-          const entityIds = batch.map(e => e.id || e.legacy_id?.toString() || e.failure_mode).filter(Boolean);
+          // Use id, legacy_id, or failure_mode as identifier depending on entity type
+          let entityIds;
+          if (entityType === "failure_mode") {
+            entityIds = batch.map(e => e.failure_mode).filter(Boolean);
+          } else {
+            entityIds = batch.map(e => e.id).filter(Boolean);
+          }
 
           if (entityIds.length === 0) continue;
 
@@ -111,11 +159,19 @@ export default function TranslationGeneratorModal({
           }));
 
           try {
+            // Use different fields based on entity type
+            let fields = ["name", "description"];
+            if (entityType === "failure_mode") {
+              fields = ["name", "description", "effects", "causes", "recommended_actions"];
+            } else if (entityType === "maintenance_task_template") {
+              fields = ["name", "description", "procedure_steps"];
+            }
+            
             const response = await translationsAPI.generateTranslations({
               entity_type: entityType,
               entity_ids: entityIds,
               target_languages: selectedLanguages,
-              fields: ["name", "description", "effects", "causes", "recommended_actions"],
+              fields: fields,
               use_dictionary: true,
             });
 

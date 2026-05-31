@@ -314,49 +314,160 @@ async def generate_translations(
     
     await db.translation_jobs.insert_one(job.model_dump())
     
+    service = TranslationService(db)
+    entity_type = request.entity_type
+    
+    async def fetch_entity(entity_id: str) -> Dict[str, Any]:
+        """Fetch entity data based on type"""
+        if entity_type == EntityType.MAINTENANCE_TASK_TEMPLATE:
+            # Find task template in any strategy
+            async for strategy in db.equipment_type_strategies.find({}):
+                for task in strategy.get("task_templates", []):
+                    if task.get("id") == entity_id:
+                        return task
+            return None
+        elif entity_type == EntityType.FAILURE_MODE:
+            # Failure mode translations are keyed by failure_mode NAME
+            fm = await db.failure_modes.find_one({"failure_mode": entity_id})
+            if not fm:
+                fm = await db.failure_modes.find_one({"id": entity_id})
+            if not fm and entity_id.isdigit():
+                fm = await db.failure_modes.find_one({"legacy_id": int(entity_id)})
+            if fm:
+                # Normalize fields for translation
+                return {
+                    "name": fm.get("failure_mode") or fm.get("name", ""),
+                    "description": fm.get("description", ""),
+                    "effects": fm.get("potential_effects", ""),
+                    "causes": fm.get("potential_causes", ""),
+                    "recommended_actions": ", ".join(fm.get("recommended_actions", [])) if isinstance(fm.get("recommended_actions"), list) else fm.get("recommended_actions", ""),
+                }
+            return None
+        elif entity_type == EntityType.EQUIPMENT_TYPE:
+            et = await db.equipment_types.find_one({"id": entity_id})
+            if not et:
+                et = await db.custom_equipment_types.find_one({"id": entity_id})
+            return et
+        elif entity_type == EntityType.OBSERVATION:
+            obs = await db.threats.find_one({"id": entity_id})
+            if not obs:
+                obs = await db.observations.find_one({"id": entity_id})
+            if obs:
+                return {
+                    "title": obs.get("title") or obs.get("name") or (obs.get("description", "")[:120]),
+                    "name": obs.get("title") or obs.get("name") or (obs.get("description", "")[:120]),
+                    "description": obs.get("description", "") or "",
+                }
+            return None
+        elif entity_type == EntityType.INVESTIGATION:
+            inv = await db.investigations.find_one({"id": entity_id})
+            if inv:
+                return {
+                    "title": inv.get("title", ""),
+                    "name": inv.get("title", ""),
+                    "description": inv.get("description", "") or "",
+                }
+            return None
+        elif entity_type == EntityType.EQUIPMENT_NODE:
+            return await db.equipment_nodes.find_one({"id": entity_id})
+        elif entity_type == EntityType.FORM_TEMPLATE:
+            return await db.form_templates.find_one({"id": entity_id})
+        return None
+    
     # For small jobs, process synchronously
     if len(request.entity_ids) <= 5:
-        service = TranslationService(db)
-        
-        async def fetch_entity(entity_id: str) -> Dict[str, Any]:
-            """Fetch entity data based on type"""
-            if request.entity_type == EntityType.MAINTENANCE_TASK_TEMPLATE:
-                # Find task template in any strategy
-                async for strategy in db.equipment_type_strategies.find({}):
-                    for task in strategy.get("task_templates", []):
-                        if task.get("id") == entity_id:
-                            return task
-                return None
-            elif request.entity_type == EntityType.FAILURE_MODE:
-                # Try multiple ID fields
-                fm = await db.failure_modes.find_one({"id": entity_id})
-                if not fm:
-                    fm = await db.failure_modes.find_one({"legacy_id": int(entity_id) if entity_id.isdigit() else entity_id})
-                if not fm:
-                    fm = await db.failure_modes.find_one({"failure_mode": entity_id})
-                return fm
-            elif request.entity_type == EntityType.EQUIPMENT_TYPE:
-                # Check both collections
-                et = await db.equipment_types.find_one({"id": entity_id})
-                if not et:
-                    et = await db.custom_equipment_types.find_one({"id": entity_id})
-                return et
-            elif request.entity_type == EntityType.OBSERVATION:
-                return await db.threats.find_one({"id": entity_id})
-            elif request.entity_type == EntityType.INVESTIGATION:
-                return await db.investigations.find_one({"id": entity_id})
-            elif request.entity_type == EntityType.EQUIPMENT_NODE:
-                return await db.equipment_nodes.find_one({"id": entity_id})
-            return None
-        
         job = await service.process_translation_job(job.id, fetch_entity)
         job_data = job.model_dump()
         job_data.pop("_id", None) if "_id" in job_data else None
         return {"success": True, "job": job_data}
     
-    # For larger jobs, process in background
-    # background_tasks.add_task(process_job_background, job.id)
-    return {"success": True, "job_id": job.id, "status": "queued"}
+    # For larger jobs, process in background (non-blocking)
+    background_tasks.add_task(service.process_translation_job, job.id, fetch_entity)
+    return {"success": True, "job_id": job.id, "status": "queued", "total": len(request.entity_ids)}
+
+
+@router.post("/generate-all/{entity_type}")
+async def generate_all_translations(
+    entity_type: EntityType,
+    background_tasks: BackgroundTasks,
+    target_languages: List[str] = ["nl", "de"],
+    only_missing: bool = True,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Bulk-translate ALL existing entities of a given type to the target languages.
+    Useful for legacy data that was created before auto-translation was enabled.
+    """
+    # Collect entity IDs from the appropriate source collection
+    entity_ids: List[str] = []
+    
+    if entity_type == EntityType.FAILURE_MODE:
+        # Use failure_mode NAME as the canonical entity_id (matches existing storage scheme)
+        async for fm in db.failure_modes.find({}, {"failure_mode": 1, "_id": 0}):
+            name = fm.get("failure_mode")
+            if name:
+                entity_ids.append(name)
+    elif entity_type == EntityType.EQUIPMENT_TYPE:
+        async for et in db.custom_equipment_types.find({}, {"id": 1, "_id": 0}):
+            if et.get("id"):
+                entity_ids.append(et["id"])
+        async for et in db.equipment_types.find({}, {"id": 1, "_id": 0}):
+            if et.get("id"):
+                entity_ids.append(et["id"])
+    elif entity_type == EntityType.EQUIPMENT_NODE:
+        async for n in db.equipment_nodes.find({}, {"id": 1, "_id": 0}):
+            if n.get("id"):
+                entity_ids.append(n["id"])
+    elif entity_type == EntityType.OBSERVATION:
+        async for o in db.threats.find({}, {"id": 1, "_id": 0}):
+            if o.get("id"):
+                entity_ids.append(o["id"])
+    elif entity_type == EntityType.INVESTIGATION:
+        async for i in db.investigations.find({}, {"id": 1, "_id": 0}):
+            if i.get("id"):
+                entity_ids.append(i["id"])
+    elif entity_type == EntityType.MAINTENANCE_TASK_TEMPLATE:
+        async for strategy in db.equipment_type_strategies.find({}):
+            for task in strategy.get("task_templates", []):
+                if task.get("id"):
+                    entity_ids.append(task["id"])
+    elif entity_type == EntityType.FORM_TEMPLATE:
+        async for ft in db.form_templates.find({}, {"id": 1, "_id": 0}):
+            if ft.get("id"):
+                entity_ids.append(ft["id"])
+    else:
+        raise HTTPException(status_code=400, detail=f"Bulk translation not supported for entity_type {entity_type}")
+    
+    # Optionally filter out IDs that already have ANY translation in all target languages
+    if only_missing and entity_ids:
+        already_translated_ids: set = set()
+        pipeline = [
+            {"$match": {
+                "entity_type": entity_type.value,
+                "entity_id": {"$in": entity_ids},
+                "language_code": {"$in": target_languages},
+            }},
+            {"$group": {
+                "_id": "$entity_id",
+                "langs": {"$addToSet": "$language_code"},
+            }},
+        ]
+        async for doc in db.entity_translations.aggregate(pipeline):
+            if set(target_languages).issubset(set(doc.get("langs", []))):
+                already_translated_ids.add(doc["_id"])
+        entity_ids = [eid for eid in entity_ids if eid not in already_translated_ids]
+    
+    if not entity_ids:
+        return {"success": True, "message": "Nothing to translate – everything is up to date", "total": 0}
+    
+    # Re-use the standard /generate endpoint logic
+    req = GenerateTranslationsRequest(
+        entity_type=entity_type,
+        entity_ids=entity_ids,
+        target_languages=target_languages,
+    )
+    return await generate_translations(req, background_tasks, current_user)
+
 
 
 @router.get("/jobs")
@@ -469,6 +580,91 @@ async def get_translation_stats(
         languages.append({"code": lang["code"], "name": lang["name"]})
     
     return {"stats": stats, "languages": languages}
+
+
+@router.get("/coverage")
+async def get_translation_coverage(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get translation coverage - how many entities of each type have translations
+    """
+    coverage = {}
+    
+    # Count unique entity_ids per entity_type that have translations
+    pipeline = [
+        {"$group": {
+            "_id": {
+                "entity_type": "$entity_type",
+                "entity_id": "$entity_id"
+            }
+        }},
+        {"$group": {
+            "_id": "$_id.entity_type",
+            "translated_count": {"$sum": 1}
+        }}
+    ]
+    
+    async for doc in db.entity_translations.aggregate(pipeline):
+        entity_type = doc["_id"]
+        coverage[entity_type] = {
+            "translated": doc["translated_count"],
+            "total": 0  # Will be filled below
+        }
+    
+    # Get total counts for each entity type
+    # Failure modes
+    fm_count = await db.failure_modes.count_documents({})
+    if "failure_mode" not in coverage:
+        coverage["failure_mode"] = {"translated": 0, "total": fm_count}
+    else:
+        coverage["failure_mode"]["total"] = fm_count
+    
+    # Equipment types (custom)
+    et_count = await db.custom_equipment_types.count_documents({})
+    if "equipment_type" not in coverage:
+        coverage["equipment_type"] = {"translated": 0, "total": et_count}
+    else:
+        coverage["equipment_type"]["total"] = et_count
+    
+    # Maintenance task templates (from strategies)
+    task_count = 0
+    async for strategy in db.equipment_type_strategies.find({}):
+        task_count += len(strategy.get("task_templates", []))
+    if "maintenance_task_template" not in coverage:
+        coverage["maintenance_task_template"] = {"translated": 0, "total": task_count}
+    else:
+        coverage["maintenance_task_template"]["total"] = task_count
+    
+    # Equipment nodes
+    node_count = await db.equipment_nodes.count_documents({})
+    if "equipment_node" not in coverage:
+        coverage["equipment_node"] = {"translated": 0, "total": node_count}
+    else:
+        coverage["equipment_node"]["total"] = node_count
+    
+    # Observations
+    obs_count = await db.threats.count_documents({})
+    if "observation" not in coverage:
+        coverage["observation"] = {"translated": 0, "total": obs_count}
+    else:
+        coverage["observation"]["total"] = obs_count
+    
+    # Investigations
+    inv_count = await db.investigations.count_documents({})
+    if "investigation" not in coverage:
+        coverage["investigation"] = {"translated": 0, "total": inv_count}
+    else:
+        coverage["investigation"]["total"] = inv_count
+    
+    # Form templates
+    form_count = await db.form_templates.count_documents({})
+    if "form_template" not in coverage:
+        coverage["form_template"] = {"translated": 0, "total": form_count}
+    else:
+        coverage["form_template"]["total"] = form_count
+    
+    return {"coverage": coverage}
 
 
 # ============= User Language Preference =============

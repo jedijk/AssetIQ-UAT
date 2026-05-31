@@ -4,7 +4,7 @@ Forms routes.
 import os
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Header
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Header, BackgroundTasks
 from datetime import datetime
 from database import db, form_service
 from services.cache_service import cache
@@ -15,6 +15,7 @@ from models.form_models import (
     FormSubmission
 )
 from services.storage_service import put_object, get_object, MIME_TYPES
+from utils.auto_translate import translate_form_template
 import logging
 import uuid
 
@@ -88,18 +89,31 @@ async def get_form_template_versions(
 @router.post("/form-templates")
 async def create_form_template(
     data: FormTemplateCreate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user)
 ):
     """Create a new form template."""
     from services.query_cache import query_cache
     result = await form_service.create_template(data.model_dump(), current_user["id"])
     query_cache.invalidate("form_templates")
+    # Trigger auto-translation in background
+    if result and result.get("id"):
+        background_tasks.add_task(
+            translate_form_template,
+            result["id"],
+            {
+                "name": result.get("name", ""),
+                "description": result.get("description", "") or "",
+            },
+            current_user["id"],
+        )
     return result
 
 @router.patch("/form-templates/{template_id}")
 async def update_form_template(
     template_id: str,
     data: FormTemplateUpdate,
+    background_tasks: BackgroundTasks,
     create_version: bool = True,
     current_user: dict = Depends(get_current_user)
 ):
@@ -127,6 +141,17 @@ async def update_form_template(
         
         query_cache.invalidate("form_templates")
         logger.info(f"[FormTemplateUpdate] success template_id={template_id} version={result.get('version')}")
+        # Trigger auto-translation if name or description changed
+        if any(k in update_data for k in ("name", "description")):
+            background_tasks.add_task(
+                translate_form_template,
+                template_id,
+                {
+                    "name": result.get("name", ""),
+                    "description": result.get("description", "") or "",
+                },
+                current_user["id"],
+            )
         return result
     except HTTPException:
         raise

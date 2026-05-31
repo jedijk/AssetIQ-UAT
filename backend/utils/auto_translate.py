@@ -101,10 +101,11 @@ async def translate_observation(obs_id: str, obs_data: dict, created_by: str = N
     """Translate observation/threat"""
     data_for_translation = {
         "name": obs_data.get("title", obs_data.get("name", "")),
+        "title": obs_data.get("title", obs_data.get("name", "")),
         "description": obs_data.get("description", ""),
     }
     await auto_translate_entity(
-        EntityType.EQUIPMENT_NODE,  # Using EQUIPMENT_NODE as generic, could add OBSERVATION type
+        EntityType.OBSERVATION,
         obs_id,
         data_for_translation,
         created_by=created_by

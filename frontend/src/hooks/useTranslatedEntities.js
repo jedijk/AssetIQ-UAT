@@ -101,9 +101,9 @@ export function useTranslatedEquipmentTypes(equipmentTypes = []) {
     [equipmentTypes]
   );
   
-  const { data: translationsMap = {} } = useQuery({
-    queryKey: ["et-translations", typeIds.slice(0, 20).join(","), language],
-    queryFn: () => fetchBatchTranslations("equipment_type", typeIds, language),
+  const { data: translationsMap = {}, isLoading } = useQuery({
+    queryKey: ["et-translations", language, typeIds.slice(0, 50).join(",")],
+    queryFn: () => fetchBatchTranslations("equipment_type", typeIds.slice(0, 50), language),
     enabled: language !== "en" && typeIds.length > 0,
     staleTime: 1000 * 60 * 5,
     retry: false,
@@ -129,6 +129,7 @@ export function useTranslatedEquipmentTypes(equipmentTypes = []) {
   return {
     equipmentTypes: translatedTypes,
     isTranslated: language !== "en" && Object.keys(translationsMap).length > 0,
+    isLoading,
   };
 }
 

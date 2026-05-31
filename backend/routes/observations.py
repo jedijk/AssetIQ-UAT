@@ -4,9 +4,10 @@ Observations routes.
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from database import db, observation_service
 from auth import get_current_user
+from utils.auto_translate import translate_observation
 
 router = APIRouter(tags=["Observations"])
 
@@ -123,28 +124,54 @@ async def get_observation(
 @router.post("/observations")
 async def create_observation(
     data: ObservationCreate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user)
 ):
     """Create a new observation manually."""
-    return await observation_service.create_observation(
+    result = await observation_service.create_observation(
         data.model_dump(),
         created_by=current_user["id"],
         source="manual"
     )
+    # Trigger auto-translation in background
+    if result and result.get("id"):
+        background_tasks.add_task(
+            translate_observation,
+            result["id"],
+            {
+                "title": result.get("title") or result.get("description", "")[:120],
+                "description": result.get("description", "") or "",
+            },
+            current_user["id"],
+        )
+    return result
 
 @router.patch("/observations/{obs_id}")
 async def update_observation(
     obs_id: str,
     data: ObservationUpdate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user)
 ):
     """Update an observation."""
+    update_payload = data.model_dump(exclude_unset=True)
     result = await observation_service.update_observation(
         obs_id,
-        data.model_dump(exclude_unset=True)
+        update_payload,
     )
     if not result:
         raise HTTPException(status_code=404, detail="Observation not found")
+    # Re-translate if user-facing text changed
+    if any(k in update_payload for k in ("description",)):
+        background_tasks.add_task(
+            translate_observation,
+            obs_id,
+            {
+                "title": result.get("title") or result.get("description", "")[:120],
+                "description": result.get("description", "") or "",
+            },
+            current_user["id"],
+        )
     return result
 
 @router.post("/observations/{obs_id}/close")

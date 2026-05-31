@@ -1,7 +1,7 @@
 """
 Threats routes.
 """
-from fastapi import APIRouter, Depends, HTTPException, Body, Query
+from fastapi import APIRouter, Depends, HTTPException, Body, Query, BackgroundTasks
 from typing import List, Optional
 from datetime import datetime, timezone
 import uuid
@@ -12,6 +12,7 @@ from models.api_models import ThreatResponse, ThreatUpdate
 from failure_modes import FAILURE_MODES_LIBRARY
 from services.threat_score_service import calculate_rank, update_all_ranks, recalculate_threat_scores_for_asset, recalculate_threat_scores_for_failure_mode, propagate_risk_to_linked_entities
 from services.cache_service import cache
+from utils.auto_translate import translate_observation
 from investigation_models import (
     InvestigationCreate, InvestigationUpdate, InvestigationStatus,
     TimelineEventCreate, EventCategory, ConfidenceLevel,
@@ -688,6 +689,7 @@ async def get_threat(
 async def update_threat(
     threat_id: str,
     update: ThreatUpdate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user)
 ):
     # Remove created_by filter - threats are shared tenant entities
@@ -745,6 +747,17 @@ async def update_threat(
     # Ensure risk_score is int
     if isinstance(updated.get("risk_score"), float):
         updated["risk_score"] = int(updated["risk_score"])
+    # Trigger auto-translation if user-facing text changed
+    if any(k in update_data for k in ("title", "description")):
+        background_tasks.add_task(
+            translate_observation,
+            threat_id,
+            {
+                "title": updated.get("title") or updated.get("name", ""),
+                "description": updated.get("description", "") or "",
+            },
+            current_user["id"],
+        )
     return updated
 
 @router.delete("/threats/{threat_id}")
