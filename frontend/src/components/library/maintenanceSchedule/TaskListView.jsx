@@ -1,9 +1,11 @@
 import React from "react";
 import { Calendar, Clock, ListChecks, Loader2, Sparkles } from "lucide-react";
 import { Badge } from "../../ui/badge";
+import { useLanguage } from "../../../contexts/LanguageContext";
 import { useTaskStatusConfig, usePriorityConfig } from "./constants";
 
 export function TaskListView({ tasks, isLoading, onTaskClick, onStatusChange }) {
+  const { t } = useLanguage();
   const statusConfigMap = useTaskStatusConfig();
   const priorityConfigMap = usePriorityConfig();
   if (isLoading) {
@@ -18,7 +20,7 @@ export function TaskListView({ tasks, isLoading, onTaskClick, onStatusChange }) 
     return (
       <div className="text-center py-12">
         <ListChecks className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-        <p className="text-slate-500">No tasks found</p>
+        <p className="text-slate-500">{t("maintenance.noTasksFound")}</p>
       </div>
     );
   }
@@ -50,7 +52,7 @@ export function TaskListView({ tasks, isLoading, onTaskClick, onStatusChange }) 
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm truncate">{task.task_name}</span>
                     {isOverdue && task.status !== "completed" && (
-                      <Badge className="text-[10px] bg-red-500 text-white">Overdue</Badge>
+                      <Badge className="text-[10px] bg-red-500 text-white">{t("maintenance.overdue")}</Badge>
                     )}
                   </div>
                   <div className="flex items-center gap-2 mt-1">
@@ -94,4 +96,4 @@ export function TaskListView({ tasks, isLoading, onTaskClick, onStatusChange }) 
       })}
     </div>
   );
-};
+}

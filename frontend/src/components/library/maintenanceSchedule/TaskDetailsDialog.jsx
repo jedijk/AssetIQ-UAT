@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../ui/select";
+import { useLanguage } from "../../../contexts/LanguageContext";
 import { useTaskStatusConfig, usePriorityConfig } from "./constants";
 
 export function TaskDetailsDialog({
@@ -41,6 +42,7 @@ export function TaskDetailsDialog({
   isCompleting,
   isDeferring,
 }) {
+  const { t } = useLanguage();
   const statusConfigMap = useTaskStatusConfig();
   const priorityConfigMap = usePriorityConfig();
   const [mode, setMode] = useState("view"); // view | complete | defer
@@ -79,7 +81,7 @@ export function TaskDetailsDialog({
       }
     }
     if (Object.keys(data).length === 0) {
-      toast.info("No changes to save");
+      toast.info(t("maintenance.noChangesToSave"));
       return;
     }
     onUpdate(task.id, data);
@@ -87,7 +89,7 @@ export function TaskDetailsDialog({
 
   const handleComplete = () => {
     if (!actualHours) {
-      toast.error("Please enter actual hours");
+      toast.error(t("maintenance.enterActualHours"));
       return;
     }
     onComplete(task.id, {
@@ -100,7 +102,7 @@ export function TaskDetailsDialog({
 
   const handleDefer = () => {
     if (!deferDate || !deferReason) {
-      toast.error("Please pick a new date and reason");
+      toast.error(t("maintenance.pickDeferDateAndReason"));
       return;
     }
     onDefer(task.id, { new_due_date: deferDate, reason: deferReason });
@@ -121,16 +123,16 @@ export function TaskDetailsDialog({
             )}
             <Badge className={`text-xs ${statusCfg.color}`}>{statusCfg.label}</Badge>
             <Badge className={`text-xs ${priorityCfg.color}`}>{priorityCfg.label}</Badge>
-            {task.is_overdue && <Badge className="text-xs bg-red-500 text-white">Overdue</Badge>}
+            {task.is_overdue && <Badge className="text-xs bg-red-500 text-white">{t("maintenance.overdue")}</Badge>}
           </DialogDescription>
         </DialogHeader>
 
         {/* Mode tabs */}
         <div className="flex gap-2 border-b">
           {[
-            { key: "view", label: "Details" },
-            { key: "complete", label: "Complete" },
-            { key: "defer", label: "Defer" },
+            { key: "view", label: t("maintenance.tabDetails") },
+            { key: "complete", label: t("maintenance.tabComplete") },
+            { key: "defer", label: t("maintenance.tabDefer") },
           ].map((m) => (
             <button
               key={m.key}
@@ -152,11 +154,11 @@ export function TaskDetailsDialog({
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs text-slate-500">Due date</Label>
+                <Label className="text-xs text-slate-500">{t("maintenance.dueDateLabel")}</Label>
                 <div className="text-sm font-medium">{task.due_date}</div>
               </div>
               <div>
-                <Label htmlFor="planned-date" className="text-xs text-slate-500">Planned date</Label>
+                <Label htmlFor="planned-date" className="text-xs text-slate-500">{t("maintenance.plannedDate")}</Label>
                 <Input
                   id="planned-date"
                   type="date"
@@ -167,7 +169,7 @@ export function TaskDetailsDialog({
                 />
               </div>
               <div>
-                <Label htmlFor="task-status" className="text-xs text-slate-500">Status</Label>
+                <Label htmlFor="task-status" className="text-xs text-slate-500">{t("maintenance.statusLabel")}</Label>
                 <Select value={status} onValueChange={setStatus}>
                   <SelectTrigger className="h-8 text-sm" data-testid="task-status-select">
                     <SelectValue />
@@ -180,7 +182,7 @@ export function TaskDetailsDialog({
                 </Select>
               </div>
               <div>
-                <Label htmlFor="task-priority" className="text-xs text-slate-500">Priority</Label>
+                <Label htmlFor="task-priority" className="text-xs text-slate-500">{t("maintenance.priorityLabel")}</Label>
                 <Select value={priority} onValueChange={setPriority}>
                   <SelectTrigger className="h-8 text-sm" data-testid="task-priority-select">
                     <SelectValue />
@@ -193,13 +195,13 @@ export function TaskDetailsDialog({
                 </Select>
               </div>
               <div className="col-span-2">
-                <Label htmlFor="task-tech" className="text-xs text-slate-500">Assigned technician</Label>
+                <Label htmlFor="task-tech" className="text-xs text-slate-500">{t("maintenance.assignedTechnician")}</Label>
                 <Select value={assignedId || "__unassigned"} onValueChange={(v) => setAssignedId(v === "__unassigned" ? "" : v)}>
                   <SelectTrigger className="h-8 text-sm" data-testid="task-technician-select">
-                    <SelectValue placeholder="Unassigned" />
+                    <SelectValue placeholder={t("maintenance.unassignedTechnician")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__unassigned">Unassigned</SelectItem>
+                    <SelectItem value="__unassigned">{t("maintenance.unassignedTechnician")}</SelectItem>
                     {technicians.map((t) => (
                       <SelectItem key={t.id} value={t.id}>
                         {t.name} {t.disciplines?.length ? `· ${t.disciplines.join(", ")}` : ""}
@@ -209,11 +211,11 @@ export function TaskDetailsDialog({
                 </Select>
               </div>
               <div>
-                <Label className="text-xs text-slate-500">Estimated hours</Label>
+                <Label className="text-xs text-slate-500">{t("maintenance.estimatedHours")}</Label>
                 <div className="text-sm font-medium">{task.estimated_hours}h</div>
               </div>
               <div>
-                <Label className="text-xs text-slate-500">Task type</Label>
+                <Label className="text-xs text-slate-500">{t("maintenance.taskType")}</Label>
                 <div className="text-sm font-medium capitalize">{task.task_type}</div>
               </div>
             </div>
@@ -223,7 +225,7 @@ export function TaskDetailsDialog({
                 <div className="flex items-start gap-2">
                   <Sparkles className="w-4 h-4 text-purple-500 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <div className="text-xs font-medium text-purple-700 mb-0.5">AI reasoning</div>
+                    <div className="text-xs font-medium text-purple-700 mb-0.5">{t("maintenance.aiReasoning")}</div>
                     <p className="text-xs text-purple-800">{task.ai_reasoning}</p>
                   </div>
                 </div>
@@ -231,14 +233,14 @@ export function TaskDetailsDialog({
             )}
 
             <div>
-              <Label htmlFor="task-notes" className="text-xs text-slate-500">Notes</Label>
+              <Label htmlFor="task-notes" className="text-xs text-slate-500">{t("maintenance.notesLabel")}</Label>
               <Textarea
                 id="task-notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={2}
                 className="text-sm"
-                placeholder="Add notes..."
+                placeholder={t("maintenance.addNotesPlaceholder")}
                 data-testid="task-notes-input"
               />
             </div>
@@ -250,7 +252,7 @@ export function TaskDetailsDialog({
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="actual-hours" className="text-xs text-slate-500">Actual hours *</Label>
+                <Label htmlFor="actual-hours" className="text-xs text-slate-500">{t("maintenance.actualHours")} *</Label>
                 <Input
                   id="actual-hours"
                   type="number"
@@ -267,29 +269,29 @@ export function TaskDetailsDialog({
                   onCheckedChange={setFailureObserved}
                   data-testid="task-failure-observed"
                 />
-                <Label className="text-xs text-slate-700">Failure observed?</Label>
+                <Label className="text-xs text-slate-700">{t("maintenance.failureObserved")}</Label>
               </div>
             </div>
             <div>
-              <Label htmlFor="task-findings" className="text-xs text-slate-500">Findings</Label>
+              <Label htmlFor="task-findings" className="text-xs text-slate-500">{t("maintenance.findings")}</Label>
               <Textarea
                 id="task-findings"
                 value={findings}
                 onChange={(e) => setFindings(e.target.value)}
                 rows={2}
                 className="text-sm"
-                placeholder="What was found?"
+                placeholder={t("maintenance.whatWasFound")}
               />
             </div>
             <div>
-              <Label htmlFor="task-observations" className="text-xs text-slate-500">Observations</Label>
+              <Label htmlFor="task-observations" className="text-xs text-slate-500">{t("maintenance.observationsLabel")}</Label>
               <Textarea
                 id="task-observations"
                 value={observations}
                 onChange={(e) => setObservations(e.target.value)}
                 rows={2}
                 className="text-sm"
-                placeholder="Any observations?"
+                placeholder={t("maintenance.anyObservations")}
               />
             </div>
           </div>
@@ -299,7 +301,7 @@ export function TaskDetailsDialog({
         {mode === "defer" && (
           <div className="space-y-3">
             <div>
-              <Label htmlFor="defer-date" className="text-xs text-slate-500">New due date *</Label>
+              <Label htmlFor="defer-date" className="text-xs text-slate-500">{t("maintenance.newDueDate")} *</Label>
               <Input
                 id="defer-date"
                 type="date"
@@ -310,14 +312,14 @@ export function TaskDetailsDialog({
               />
             </div>
             <div>
-              <Label htmlFor="defer-reason" className="text-xs text-slate-500">Reason *</Label>
+              <Label htmlFor="defer-reason" className="text-xs text-slate-500">{t("maintenance.reason")} *</Label>
               <Textarea
                 id="defer-reason"
                 value={deferReason}
                 onChange={(e) => setDeferReason(e.target.value)}
                 rows={2}
                 className="text-sm"
-                placeholder="Why is this being deferred?"
+                placeholder={t("maintenance.deferReasonPlaceholder")}
                 data-testid="task-defer-reason"
               />
             </div>
@@ -325,11 +327,11 @@ export function TaskDetailsDialog({
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button variant="outline" onClick={onClose}>{t("common.close")}</Button>
           {mode === "view" && (
             <Button onClick={handleSave} disabled={isUpdating} data-testid="task-save-btn">
               {isUpdating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Save changes
+              {t("maintenance.saveChangesBtn")}
             </Button>
           )}
           {mode === "complete" && (
@@ -340,7 +342,7 @@ export function TaskDetailsDialog({
               data-testid="task-complete-btn"
             >
               {isCompleting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
-              Mark complete
+              {t("common.markComplete")}
             </Button>
           )}
           {mode === "defer" && (
@@ -351,11 +353,11 @@ export function TaskDetailsDialog({
               data-testid="task-defer-btn"
             >
               {isDeferring ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <PauseCircle className="w-4 h-4 mr-2" />}
-              Defer task
+              {t("common.deferTask")}
             </Button>
           )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-};
+}

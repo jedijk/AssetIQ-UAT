@@ -144,11 +144,11 @@ export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedul
     <div className="space-y-3" data-testid="timeline-gantt">
       {/* Controls */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs text-slate-500 mr-2">Zoom:</span>
+        <span className="text-xs text-slate-500 mr-2">{t("maintenance.zoom")}</span>
         {[
-          { k: "day", label: "Day" },
-          { k: "week", label: "Week" },
-          { k: "month", label: "Month" },
+          { k: "day", label: t("maintenance.zoomDay") },
+          { k: "week", label: t("maintenance.zoomWeek") },
+          { k: "month", label: t("maintenance.zoomMonth") },
         ].map((opt) => (
           <Button
             key={opt.k}
@@ -169,7 +169,7 @@ export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedul
             variant="outline"
             className="h-7 w-7 p-0"
             onClick={() => pan(-PAN_DAYS)}
-            title={`Back ${PAN_DAYS} days`}
+            title={`${t("maintenance.panBackTitle")} ${PAN_DAYS} ${t("maintenance.daysSuffix")}`}
             data-testid="timeline-pan-prev"
           >
             <ChevronLeft className="w-3.5 h-3.5" />
@@ -181,14 +181,14 @@ export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedul
             onClick={goToToday}
             data-testid="timeline-today"
           >
-            Today
+            {t("maintenance.todayNav")}
           </Button>
           <Button
             size="sm"
             variant="outline"
             className="h-7 w-7 p-0"
             onClick={() => pan(PAN_DAYS)}
-            title={`Forward ${PAN_DAYS} days`}
+            title={`${t("maintenance.panForwardTitle")} ${PAN_DAYS} ${t("maintenance.daysSuffix")}`}
             data-testid="timeline-pan-next"
           >
             <ChevronRight className="w-3.5 h-3.5" />
@@ -199,7 +199,9 @@ export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedul
           {viewStartIso} → {viewEndIso}
         </span>
         <span className="ml-auto text-xs text-slate-500">
-          {rows.length} task{rows.length === 1 ? "" : "s"} · drag a bar to reschedule
+          {rows.length}{" "}
+          {rows.length === 1 ? t("maintenance.timelineTaskOne") : t("maintenance.timelineTasksMany")}{" "}
+          · {t("maintenance.dragToReschedule")}
         </span>
       </div>
 
@@ -209,7 +211,7 @@ export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedul
           {/* Left: sticky task names */}
           <div className="flex-shrink-0 w-64 border-r bg-slate-50">
             <div className="h-12 border-b flex items-center px-3 text-xs font-medium text-slate-600">
-              Task / Equipment
+              {t("maintenance.taskEquipmentColumn")}
             </div>
             <div>
               {rows.map((r) => (
@@ -292,7 +294,7 @@ export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedul
                     style={{ left: todayDelta * DAY_PX + DAY_PX / 2 }}
                   >
                     <div className="absolute -top-5 -left-3 text-[9px] text-red-500 font-semibold">
-                      Today
+                      {t("maintenance.timelineTodayMarker")}
                     </div>
                   </div>
                 )}
@@ -317,4 +319,4 @@ export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedul
       </Card>
     </div>
   );
-};
+}

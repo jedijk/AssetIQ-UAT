@@ -81,7 +81,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
   const [unitFilterOpen, setUnitFilterOpen] = useState(false);
 
   const equipmentTypeId = equipmentType?.id;
-  const equipmentTypeName = equipmentType?.name || "All Equipment";
+  const equipmentTypeName = equipmentType?.name || t("equipment.allEquipment");
   const isGlobalView = !equipmentTypeId;
 
   // ============= Queries =============
@@ -208,23 +208,27 @@ export function MaintenanceScheduleManager({ equipmentType }) {
       return await maintenanceSchedulerAPI.runScheduler(params);
     },
     onSuccess: (data) => {
-      toast.success(`Scheduler completed: ${data.tasks_created} tasks created`);
+      toast.success(
+        `${t("maintenance.schedulerCompleted")} ${data.tasks_created} ${t("maintenance.tasksCreatedSuffix")}`,
+      );
       queryClient.invalidateQueries(["maintenance-scheduler"]);
     },
     onError: (err) => {
-      toast.error(err.response?.data?.detail || "Failed to run scheduler");
+      toast.error(err.response?.data?.detail || t("maintenance.failedRunScheduler"));
     },
   });
 
   const applyStrategyMutation = useMutation({
     mutationFn: (equipmentIds) => maintenanceSchedulerAPI.applyStrategy(equipmentTypeId, equipmentIds),
     onSuccess: (data) => {
-      toast.success(`Strategy applied: ${data.programs_created} programs created`);
+      toast.success(
+        `${t("maintenance.strategyApplied")} ${data.programs_created} ${t("maintenance.programsCreatedSuffix")}`,
+      );
       setApplyDialogOpen(false);
       queryClient.invalidateQueries(["maintenance-scheduler"]);
     },
     onError: (err) => {
-      toast.error(err.response?.data?.detail || "Failed to apply strategy");
+      toast.error(err.response?.data?.detail || t("maintenance.failedApplyStrategy"));
     },
   });
 
@@ -242,57 +246,59 @@ export function MaintenanceScheduleManager({ equipmentType }) {
       setAiPlanOpen(true);
     },
     onError: (err) => {
-      toast.error(err.response?.data?.detail || "AI planner failed");
+      toast.error(err.response?.data?.detail || t("maintenance.aiPlannerFailed"));
     },
   });
 
   const applyAiPlanMutation = useMutation({
     mutationFn: (recs) => maintenanceSchedulerAPI.applyAiPlan(recs),
     onSuccess: (data) => {
-      toast.success(`AI plan applied: ${data.tasks_updated} tasks updated`);
+      toast.success(
+        `${t("maintenance.aiPlanApplied")} ${data.tasks_updated} ${t("maintenance.tasksUpdatedSuffix")}`,
+      );
       setAiPlanOpen(false);
       setAiPlanResult(null);
       setSelectedAiRecs(new Set());
       queryClient.invalidateQueries(["maintenance-scheduler"]);
     },
     onError: (err) => {
-      toast.error(err.response?.data?.detail || "Failed to apply AI plan");
+      toast.error(err.response?.data?.detail || t("maintenance.failedApplyAiPlan"));
     },
   });
 
   const updateTaskMutation = useMutation({
     mutationFn: ({ taskId, data }) => maintenanceSchedulerAPI.updateTask(taskId, data),
     onSuccess: () => {
-      toast.success("Task updated");
+      toast.success(t("maintenance.taskUpdated"));
       queryClient.invalidateQueries(["maintenance-scheduler"]);
       setSelectedTask(null);
     },
     onError: (err) => {
-      toast.error(err.response?.data?.detail || "Failed to update task");
+      toast.error(err.response?.data?.detail || t("maintenance.failedUpdateTask"));
     },
   });
 
   const completeTaskMutation = useMutation({
     mutationFn: ({ taskId, data }) => maintenanceSchedulerAPI.completeTask(taskId, data),
     onSuccess: () => {
-      toast.success("Task completed");
+      toast.success(t("maintenance.taskCompleted"));
       queryClient.invalidateQueries(["maintenance-scheduler"]);
       setSelectedTask(null);
     },
     onError: (err) => {
-      toast.error(err.response?.data?.detail || "Failed to complete task");
+      toast.error(err.response?.data?.detail || t("maintenance.failedCompleteTask"));
     },
   });
 
   const deferTaskMutation = useMutation({
     mutationFn: ({ taskId, data }) => maintenanceSchedulerAPI.deferTask(taskId, data),
     onSuccess: () => {
-      toast.success("Task deferred");
+      toast.success(t("maintenance.taskDeferred"));
       queryClient.invalidateQueries(["maintenance-scheduler"]);
       setSelectedTask(null);
     },
     onError: (err) => {
-      toast.error(err.response?.data?.detail || "Failed to defer task");
+      toast.error(err.response?.data?.detail || t("maintenance.failedDeferTask"));
     },
   });
 
@@ -622,10 +628,10 @@ export function MaintenanceScheduleManager({ equipmentType }) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-purple-600" />
-              AI Maintenance Plan
+              {t("maintenance.aiPlanTitle")}
             </DialogTitle>
             <DialogDescription>
-              Review and select recommendations to apply. Each item includes the AI's explicit reasoning.
+              {t("maintenance.aiPlanDesc")}
             </DialogDescription>
           </DialogHeader>
 
@@ -640,8 +646,8 @@ export function MaintenanceScheduleManager({ equipmentType }) {
 
           <div className="flex items-center justify-between text-xs text-slate-500">
             <span>
-              {aiPlanResult?.tasks_analyzed || 0} tasks analysed,{" "}
-              {aiPlanResult?.technicians_considered || 0} technicians considered
+              {aiPlanResult?.tasks_analyzed || 0} {t("maintenance.tasksAnalysed")}{" "}
+              {aiPlanResult?.technicians_considered || 0} {t("maintenance.techniciansConsidered")}
             </span>
             <Button
               variant="ghost"
@@ -656,8 +662,8 @@ export function MaintenanceScheduleManager({ equipmentType }) {
               }}
             >
               {selectedAiRecs.size === (aiPlanResult?.recommendations?.length || 0)
-                ? "Deselect All"
-                : "Select All"}
+                ? t("maintenance.deselectAll")
+                : t("maintenance.selectAll")}
             </Button>
           </div>
 
@@ -665,7 +671,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
             <div className="space-y-2">
               {(aiPlanResult?.recommendations || []).length === 0 ? (
                 <div className="text-center py-8 text-sm text-slate-500">
-                  No recommendations returned.
+                  {t("maintenance.noAiRecommendations")}
                 </div>
               ) : (
                 aiPlanResult.recommendations.map((rec) => {
@@ -706,7 +712,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
                           <div className="flex items-center gap-3 mt-1 text-xs text-slate-500 flex-wrap">
                             <span className="flex items-center gap-1">
                               <Users className="w-3 h-3" />
-                              {rec.assigned_technician_name || "Unassigned"}
+                              {rec.assigned_technician_name || t("maintenance.unassignedTechnician")}
                             </span>
                             <span className="flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
@@ -730,7 +736,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setAiPlanOpen(false)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={() => {
@@ -747,7 +753,10 @@ export function MaintenanceScheduleManager({ equipmentType }) {
               ) : (
                 <CheckCircle2 className="w-4 h-4 mr-2" />
               )}
-              Apply {selectedAiRecs.size} Recommendation{selectedAiRecs.size === 1 ? "" : "s"}
+              {t("maintenance.applyRecommendations")} {selectedAiRecs.size}{" "}
+              {selectedAiRecs.size === 1
+                ? t("maintenance.recommendationSingular")
+                : t("maintenance.recommendationsPlural")}
             </Button>
           </DialogFooter>
         </DialogContent>

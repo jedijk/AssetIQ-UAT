@@ -7,8 +7,10 @@ import { DailyPlanner } from "./DailyPlanner";
 import { WeeklyGrid } from "./WeeklyGrid";
 import { FourteenDayGrid } from "./FourteenDayGrid";
 import { NinetyDayGrid } from "./NinetyDayGrid";
+import { useLanguage } from "../../../contexts/LanguageContext";
 
 export function PlannerView({ equipmentTypeId, onTaskClick, filteredEquipmentIds }) {
+  const { t } = useLanguage();
   const [horizon, setHorizon] = useState("daily"); // daily | weekly | "14" | "90"
 
   // Apply the Equipment Unit filter to a list of tasks. `filteredEquipmentIds`
@@ -140,10 +142,10 @@ export function PlannerView({ equipmentTypeId, onTaskClick, filteredEquipmentIds
       {/* Horizon selector */}
       <div className="flex items-center gap-2 flex-wrap">
         {[
-          { key: "daily", label: "Daily", icon: CalendarDays },
-          { key: "weekly", label: "Weekly", icon: CalendarRange },
-          { key: "14", label: "14 Days", icon: Calendar },
-          { key: "90", label: "90 Days", icon: Calendar },
+          { key: "daily", label: t("maintenance.plannerHorizonDaily"), icon: CalendarDays },
+          { key: "weekly", label: t("maintenance.plannerHorizonWeekly"), icon: CalendarRange },
+          { key: "14", label: t("maintenance.plannerHorizon14"), icon: Calendar },
+          { key: "90", label: t("maintenance.plannerHorizon90"), icon: Calendar },
         ].map((opt) => {
           const Icon = opt.icon;
           const isActive = horizon === opt.key;
@@ -164,7 +166,12 @@ export function PlannerView({ equipmentTypeId, onTaskClick, filteredEquipmentIds
         {technicians.length > 0 && (
           <div className="ml-auto text-xs text-slate-500 flex items-center gap-1.5">
             <Users className="w-3.5 h-3.5" />
-            {technicians.length} tech{technicians.length === 1 ? "" : "s"} · {totalDailyCapacityHours}h/day
+            {technicians.length}{" "}
+            {technicians.length === 1
+              ? t("maintenance.plannerTechSingular")
+              : t("maintenance.plannerTechPlural")}{" "}
+            · {totalDailyCapacityHours}
+            {t("maintenance.plannerCapacityPerDay")}
           </div>
         )}
       </div>
@@ -224,4 +231,4 @@ export function PlannerView({ equipmentTypeId, onTaskClick, filteredEquipmentIds
       )}
     </div>
   );
-};
+}

@@ -3,14 +3,37 @@ import { AlertTriangle, Calendar, ArrowRight } from "lucide-react";
 import { Card, CardContent, CardHeader } from "../../ui/card";
 import { Badge } from "../../ui/badge";
 import { ScrollArea } from "../../ui/scroll-area";
+import { useLanguage } from "../../../contexts/LanguageContext";
 import { PlannerTaskMini } from "./PlannerTaskMini";
 
 export function DailyPlanner({ data, onTaskClick }) {
+  const { t } = useLanguage();
   if (!data) return null;
   const buckets = [
-    { key: "overdue", title: "Overdue", color: "border-red-200 bg-red-50", titleColor: "text-red-700", icon: AlertTriangle, bucket: data.overdue },
-    { key: "today", title: "Today", color: "border-blue-200 bg-blue-50", titleColor: "text-blue-700", icon: Calendar, bucket: data.today },
-    { key: "tomorrow", title: "Tomorrow", color: "border-slate-200 bg-white", titleColor: "text-slate-700", icon: ArrowRight, bucket: data.tomorrow },
+    {
+      key: "overdue",
+      title: t("maintenance.bucketOverdue"),
+      color: "border-red-200 bg-red-50",
+      titleColor: "text-red-700",
+      icon: AlertTriangle,
+      bucket: data.overdue,
+    },
+    {
+      key: "today",
+      title: t("maintenance.bucketToday"),
+      color: "border-blue-200 bg-blue-50",
+      titleColor: "text-blue-700",
+      icon: Calendar,
+      bucket: data.today,
+    },
+    {
+      key: "tomorrow",
+      title: t("maintenance.bucketTomorrow"),
+      color: "border-slate-200 bg-white",
+      titleColor: "text-slate-700",
+      icon: ArrowRight,
+      bucket: data.tomorrow,
+    },
   ];
 
   return (
@@ -30,10 +53,10 @@ export function DailyPlanner({ data, onTaskClick }) {
             <ScrollArea className="h-[300px]">
               <div className="space-y-2">
                 {(bucket?.tasks || []).length === 0 ? (
-                  <p className="text-xs text-slate-400 py-4 text-center">No tasks</p>
+                  <p className="text-xs text-slate-400 py-4 text-center">{t("maintenance.noTasksInBucket")}</p>
                 ) : (
-                  bucket.tasks.map((t) => (
-                    <PlannerTaskMini key={t.id} task={t} onClick={onTaskClick} />
+                  bucket.tasks.map((task) => (
+                    <PlannerTaskMini key={task.id} task={task} onClick={onTaskClick} />
                   ))
                 )}
               </div>
@@ -43,4 +66,4 @@ export function DailyPlanner({ data, onTaskClick }) {
       ))}
     </div>
   );
-};
+}
