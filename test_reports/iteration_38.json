@@ -1,0 +1,69 @@
+{
+  "summary": "Tested Equipment Unit filter on /library Maintenance Schedule tab and MyTasks discipline auto-seed. Backend my-tasks discipline filter (case-insensitive regex) verified via pytest (6/6 passed). Frontend: filter UI + Tasks-list filtering + Clear button all work. Two issues found: (1) i18n translation keys 'maintenance.equipmentUnit' and 'maintenance.allEquipmentUnits' are missing from LanguageContext, so they render as raw keys in the UI; (2) Timeline (Gantt) view still showed the 'Calibrate scales · Brabender · 11-2001' row after selecting 'CLU - Cooling Unit' as the unit filter, while the Tasks tab correctly removed it — suggests possible equipment_id mismatch in filteredTimeline, or Brabender is indeed under CLU (needs verification with seeded data).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "MaintenanceScheduleManager Equipment Unit filter",
+        "issue": "Translation keys render literally as 'maintenance.equipmentUnit' (label) and 'maintenance.allEquipmentUnits' (default option). Both keys are missing from frontend/src/contexts/LanguageContext.js under the 'maintenance' namespace. Existing key 'hierarchy.equipmentUnit' = 'Equipment Unit' is unrelated and cannot be reused without changing the t() call site.",
+        "selector": "[data-testid='equipment-unit-filter']",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Equipment Unit filter -> Timeline view",
+        "issue": "After selecting 'CLU - Cooling Unit', the Timeline tab still showed the row 'Calibrate scales · Brabender · 11-2001'. The Tasks tab correctly filtered it out. Possible reasons: (a) filteredTimeline filters by timeline.equipment[].equipment_id, which may differ from the hierarchy node id used to compute filteredEquipmentIds; or (b) Brabender 11-2001 is genuinely a descendant of CLU in the seed data — please verify. Tasks-tab filter works, suggesting the equipment_id set is correct for tasks but not for timeline.equipment.",
+        "affected_selectors": ["[data-testid='equipment-unit-filter']", "Timeline view"]
+      }
+    ],
+    "design_issues": []
+  },
+  "tests_passed": {
+    "backend": [
+      "POST /api/auth/login -> 200 with token",
+      "GET /api/my-tasks?filter=open -> 200 returns tasks list",
+      "GET /api/my-tasks?discipline=rotating -> 200 all returned tasks have discipline containing 'rotating'",
+      "GET /api/my-tasks?discipline=Rotating (mixed case) -> 200 case-insensitive regex match works",
+      "GET /api/my-tasks?discipline=zzz_nomatch -> 200 (empty or no matching tasks)",
+      "GET /api/my-tasks for all 8 known disciplines (rotating, static, piping, electrical, instrumentation, civil, operations, laboratory) -> 200"
+    ],
+    "frontend": [
+      "MyTasksPage discipline-filter auto-seeds to 'Operations' for user with department='Engineering' (normalized via DISCIPLINE_LEGACY_MAP)",
+      "MyTasksPage discipline-filter override to 'Rotating' works",
+      "Library -> Maintenance Schedule tab renders <MaintenanceScheduleManager equipmentType={null} />",
+      "equipment-unit-filter dropdown renders with 9 real equipment-unit options (CLU, Cooling Water Unit, EXU, FPU, Lifting Equipment, etc.)",
+      "Selecting an equipment unit populates the filter value + reveals the clear-equipment-unit-filter button",
+      "Tasks tab correctly filters out non-matching tasks (Calibrate scales · Brabender removed when CLU selected)",
+      "Planner tab switch works without errors with the filter active",
+      "Clear button removes the filter, restores full task list, and hides itself"
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_my_tasks_discipline.py",
+    "/app/test_reports/pytest/my_tasks_discipline.xml"
+  ],
+  "action_items": [
+    "Add missing i18n keys 'maintenance.equipmentUnit' (e.g. 'Equipment Unit') and 'maintenance.allEquipmentUnits' (e.g. 'All equipment units') to frontend/src/contexts/LanguageContext.js under the 'maintenance' namespace for both 'en' and 'nl' (and any other supported locales).",
+    "Investigate Timeline filter discrepancy: when CLU - Cooling Unit is selected, verify whether the timeline.equipment[].equipment_id values are present in the filteredEquipmentIds set. Either (a) the IDs are different shapes (string vs ObjectId), or (b) Brabender 11-2001 is actually under CLU in seed (then no bug). Consider logging filteredEquipmentIds and timeline.equipment[].equipment_id once to verify.",
+    "Optional: seed user document with explicit 'discipline' field (e.g. 'operations' or 'rotating') for clearer auto-seed semantics. Current behaviour relies on legacy mapping department='Engineering' -> 'operations'."
+  ],
+  "critical_code_review_comments": [
+    "MaintenanceScheduleManager.jsx is 2216 lines — exceeds 700-line threshold. Recommend splitting Timeline/Tasks/Planner views into separate files for maintainability.",
+    "filteredTimeline (line 1695) and applyUnitFilter both rely on equipment_id strict equality via Set.has(). If timeline.equipment uses a different id shape than hierarchy nodes (e.g. doc.id vs doc._id), filtering will silently fail. Add a one-time dev-mode console.warn or unit test to guarantee parity.",
+    "i18n keys are referenced without fallback strings (no `|| 'Equipment Unit'`), so missing keys leak to the UI. Either add fallbacks at call sites or enable a missing-key reporter in the LanguageContext."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_my_tasks_discipline.py (new)"
+  ],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "~85% (UI renders + filtering works in Tasks tab; Timeline filter behaviour uncertain; i18n keys missing)"},
+  "test_credentials": "jedijk@gmail.com / Jaap8019@  (owner). user.discipline=None, user.department='Engineering', user.position='Senior Reliability Engineer' -> frontend normalises to 'operations' for auto-seed.",
+  "seed_data_creation": "None. Used existing seed data only.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "User jedijk has department='Engineering' (no explicit discipline field) -> auto-seeds to 'Operations'. Equipment unit dropdown lists 9 real units (CLU, Cooling Water Unit, EXU, FPU, Lifting Equipment, ...). When verifying the Timeline filter, pick a unit known NOT to contain a specific task, then assert the row disappears from the timeline. The Tasks tab filter is the source of truth — it works correctly. /library page -> click 'Maintenance Schedule' tab to reach the global view.",
+  "rca_of_the_issue": "i18n keys missing: code calls t('maintenance.equipmentUnit') / t('maintenance.allEquipmentUnits') but neither exists under the 'maintenance' object in LanguageContext.js. Fix: add the keys under the 'maintenance' namespace for each locale, or add a fallback string at the call site. Timeline filter: needs verification that timeline.equipment[].equipment_id values exist in filteredEquipmentIds Set (built from hierarchy descendants)."
+}

@@ -72,7 +72,6 @@ import {
   TooltipTrigger,
 } from "../ui/tooltip";
 import { Textarea } from "../ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { maintenanceSchedulerAPI, maintenanceStrategyV2API, equipmentHierarchyAPI } from "../../lib/api";
 import { useLanguage } from "../../contexts/LanguageContext";
 
@@ -834,8 +833,15 @@ const ApplyStrategyDialog = ({ open, onClose, equipmentTypeId, equipmentTypeName
 /**
  * Planner View: Daily / Weekly / 14-day / 90-day workload
  */
-const PlannerView = ({ equipmentTypeId, onTaskClick }) => {
+const PlannerView = ({ equipmentTypeId, onTaskClick, filteredEquipmentIds }) => {
   const [horizon, setHorizon] = useState("daily"); // daily | weekly | "14" | "90"
+
+  // Apply the Equipment Unit filter to a list of tasks. `filteredEquipmentIds`
+  // is a Set<string> | null — null means no filter.
+  const filterTasksByUnit = (list) => {
+    if (!filteredEquipmentIds || !Array.isArray(list)) return list;
+    return list.filter((t) => t && filteredEquipmentIds.has(t.equipment_id));
+  };
 
   // ---- Daily uses dedicated endpoint (overdue / today / tomorrow buckets) ----
   const { data: dailyData, isLoading: dailyLoading } = useQuery({
@@ -886,7 +892,7 @@ const PlannerView = ({ equipmentTypeId, onTaskClick }) => {
   // ---- Group tasks by day for 14-day, by week for 90-day ----
   const groupedRange = useMemo(() => {
     if (!rangeData?.tasks) return [];
-    const tasks = rangeData.tasks;
+    const tasks = filterTasksByUnit(rangeData.tasks);
 
     if (horizon === "14") {
       // 14 daily buckets
@@ -946,7 +952,7 @@ const PlannerView = ({ equipmentTypeId, onTaskClick }) => {
     }
 
     return [];
-  }, [rangeData, horizon, totalDailyCapacityHours]);
+  }, [rangeData, horizon, totalDailyCapacityHours, filteredEquipmentIds]);
 
   // ---- Renderers ----
   const isLoading =
@@ -994,10 +1000,41 @@ const PlannerView = ({ equipmentTypeId, onTaskClick }) => {
         </div>
       ) : (
         <>
-          {horizon === "daily" && <DailyPlanner data={dailyData} onTaskClick={onTaskClick} />}
+          {horizon === "daily" && (
+            <DailyPlanner
+              data={
+                dailyData && filteredEquipmentIds
+                  ? {
+                      ...dailyData,
+                      overdue: dailyData.overdue
+                        ? { ...dailyData.overdue, tasks: filterTasksByUnit(dailyData.overdue.tasks || []) }
+                        : dailyData.overdue,
+                      today: dailyData.today
+                        ? { ...dailyData.today, tasks: filterTasksByUnit(dailyData.today.tasks || []) }
+                        : dailyData.today,
+                      tomorrow: dailyData.tomorrow
+                        ? { ...dailyData.tomorrow, tasks: filterTasksByUnit(dailyData.tomorrow.tasks || []) }
+                        : dailyData.tomorrow,
+                    }
+                  : dailyData
+              }
+              onTaskClick={onTaskClick}
+            />
+          )}
           {horizon === "weekly" && (
             <WeeklyGrid
-              days={weeklyData?.days || []}
+              days={
+                filteredEquipmentIds
+                  ? (weeklyData?.days || []).map((d) => ({
+                      ...d,
+                      tasks: filterTasksByUnit(d.tasks || []),
+                      total_hours: (filterTasksByUnit(d.tasks || []) || []).reduce(
+                        (sum, t) => sum + (t.estimated_hours || 1),
+                        0,
+                      ),
+                    }))
+                  : weeklyData?.days || []
+              }
               capacityHours={totalDailyCapacityHours}
               onTaskClick={onTaskClick}
             />
