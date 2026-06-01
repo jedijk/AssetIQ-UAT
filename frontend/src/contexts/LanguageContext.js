@@ -671,6 +671,7 @@ const en = {
     failureModesConnectedToType: "failure modes connected to this equipment type",
     customer: "Customer",
     done: "Done",
+    systemLevelBadge: "SYS",
   },
 
   // Disciplines (used across library, equipment types, failure modes)
@@ -2347,6 +2348,7 @@ const nl = {
     failureModesConnectedToType: "faalmodi gekoppeld aan dit apparatuurtype",
     customer: "Klant",
     done: "Klaar",
+    systemLevelBadge: "SYS",
   },
 
   // Disciplines (used across library, equipment types, failure modes)

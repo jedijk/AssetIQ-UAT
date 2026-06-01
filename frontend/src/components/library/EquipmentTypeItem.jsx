@@ -113,7 +113,9 @@ export function EquipmentTypeItem({ item, onEdit, onDelete, onSelect, isSelected
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-slate-700 truncate">{item.name}</span>
           {item.is_system_level && (
-            <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-600 rounded font-medium flex-shrink-0">SYS</span>
+            <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-600 rounded font-medium flex-shrink-0">
+              {t("library.systemLevelBadge")}
+            </span>
           )}
         </div>
         <div className="flex items-center gap-1 flex-wrap">
@@ -126,7 +128,9 @@ export function EquipmentTypeItem({ item, onEdit, onDelete, onSelect, isSelected
         {connectedFmCount > 0 && (
           <div className="flex items-center gap-1 mt-1">
             <Link className="w-3 h-3 text-blue-500 flex-shrink-0" />
-            <span className="text-xs text-blue-600 font-medium truncate">{connectedFmCount} failure modes</span>
+            <span className="text-xs text-blue-600 font-medium truncate">
+              {connectedFmCount} {t("library.failureModes").toLowerCase()}
+            </span>
           </div>
         )}
       </div>
@@ -156,8 +160,10 @@ export function EquipmentTypeFailureModesPanel({
   allFailureModes = [], 
   onUpdateFailureMode, 
   onClose,
-  t 
+  t: tProp,
 }) {
+  const { t: tHook } = useLanguage();
+  const t = tProp || tHook;
   const [searchQuery, setSearchQuery] = useState("");
   const [showOnlyConnected, setShowOnlyConnected] = useState(false);
   
@@ -206,8 +212,8 @@ export function EquipmentTypeFailureModesPanel({
           <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-slate-100 flex items-center justify-center">
             <Cog className="w-8 h-8 text-slate-400" />
           </div>
-          <h3 className="text-lg font-semibold text-slate-600 mb-2">Select an Equipment Type</h3>
-          <p className="text-sm text-slate-400">Click on an equipment type to view and manage connected failure modes</p>
+          <h3 className="text-lg font-semibold text-slate-600 mb-2">{t("library.selectEquipmentTypeTitle")}</h3>
+          <p className="text-sm text-slate-400">{t("library.selectEquipmentTypeDesc")}</p>
         </div>
       </div>
     );
@@ -225,7 +231,9 @@ export function EquipmentTypeFailureModesPanel({
           <div className="flex items-center gap-2 text-sm text-slate-500">
             <span>{translateDiscipline(equipmentType.discipline, t)}</span>
             <span>•</span>
-            <span className="text-blue-600 font-medium">{connectedFms.length} failure modes linked</span>
+            <span className="text-blue-600 font-medium">
+              {connectedFms.length} {t("library.failureModesLinked")}
+            </span>
           </div>
         </div>
         <Button size="sm" variant="ghost" onClick={onClose}>
@@ -238,7 +246,7 @@ export function EquipmentTypeFailureModesPanel({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
-            placeholder="Search failure modes..."
+            placeholder={t("library.searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -252,10 +260,12 @@ export function EquipmentTypeFailureModesPanel({
               onChange={(e) => setShowOnlyConnected(e.target.checked)}
               className="rounded border-slate-300"
             />
-            <span className="text-slate-600">Show only connected ({connectedFms.length})</span>
+            <span className="text-slate-600">
+              {t("library.showOnlyConnected")} ({connectedFms.length})
+            </span>
           </label>
           <span className="text-sm text-slate-400">
-            {filteredFms.length} results
+            {filteredFms.length} {t("library.results")}
           </span>
         </div>
       </div>
@@ -266,7 +276,7 @@ export function EquipmentTypeFailureModesPanel({
           {filteredFms.length === 0 ? (
             <div className="text-center py-12 text-slate-500">
               <AlertTriangle className="w-12 h-12 mx-auto mb-4 opacity-30" />
-              <p>{searchQuery ? "No matching failure modes" : "No failure modes found"}</p>
+              <p>{searchQuery ? t("library.noMatchingFailureModes") : t("library.noFailureModes")}</p>
             </div>
           ) : (
             filteredFms.map(fm => {
@@ -300,7 +310,7 @@ export function EquipmentTypeFailureModesPanel({
                       <Badge variant="outline" className="text-xs px-1.5 py-0">{fm.category}</Badge>
                       {fm.failure_mode_type === "customer_specific" && (
                         <Badge className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0">
-                          Customer
+                          {t("library.customer")}
                         </Badge>
                       )}
                     </div>
@@ -334,10 +344,11 @@ export function EquipmentTypeFailureModesPanel({
       {/* Footer with summary */}
       <div className="p-4 border-t bg-slate-50 flex items-center justify-between">
         <div className="text-sm text-slate-600">
-          <span className="font-medium text-blue-600">{connectedFms.length}</span> failure modes connected to this equipment type
+          <span className="font-medium text-blue-600">{connectedFms.length}</span>{" "}
+          {t("library.failureModesConnectedToType")}
         </div>
         <Button variant="outline" size="sm" onClick={onClose}>
-          Done
+          {t("library.done")}
         </Button>
       </div>
     </div>

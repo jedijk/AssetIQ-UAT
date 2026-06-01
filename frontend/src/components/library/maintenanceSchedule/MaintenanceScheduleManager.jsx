@@ -390,7 +390,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
 
       {/* Equipment Unit Filter (searchable by name OR tag) */}
       <div className="flex items-center gap-2 flex-wrap" data-testid="equipment-unit-filter-row">
-        <span className="text-sm font-medium text-slate-700">{t("maintenance.equipmentUnit") || "Equipment Unit"}:</span>
+        <span className="text-sm font-medium text-slate-700">{t("maintenance.equipmentUnit")}:</span>
         <Popover open={unitFilterOpen} onOpenChange={setUnitFilterOpen}>
           <PopoverTrigger asChild>
             <Button
@@ -402,7 +402,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
             >
               {selectedUnitId ? (() => {
                 const sel = equipmentUnitNodes.find(n => n.id === selectedUnitId);
-                if (!sel) return t("maintenance.allEquipmentUnits") || "All equipment units";
+                if (!sel) return t("maintenance.allEquipmentUnits");
                 return (
                   <span className="flex items-center gap-2 truncate">
                     {sel.tag && (
@@ -414,7 +414,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
                   </span>
                 );
               })() : (
-                <span className="text-slate-500">{t("maintenance.allEquipmentUnits") || "All equipment units"}</span>
+                <span className="text-slate-500">{t("maintenance.allEquipmentUnits")}</span>
               )}
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
@@ -428,11 +428,11 @@ export function MaintenanceScheduleManager({ equipmentType }) {
               }}
             >
               <CommandInput
-                placeholder={t("maintenance.searchUnitByNameOrTag") || "Search by name or tag..."}
+                placeholder={t("maintenance.searchUnitByNameOrTag")}
                 data-testid="equipment-unit-filter-search"
               />
               <CommandList>
-                <CommandEmpty>{t("common.noResults") || "No results found"}</CommandEmpty>
+                <CommandEmpty>{t("common.noResults")}</CommandEmpty>
                 <CommandGroup>
                   <CommandItem
                     value="__all"
@@ -443,7 +443,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
                     data-testid="equipment-unit-filter-option-all"
                   >
                     <Check className={cn("mr-2 h-4 w-4", !selectedUnitId ? "opacity-100" : "opacity-0")} />
-                    {t("maintenance.allEquipmentUnits") || "All equipment units"}
+                    {t("maintenance.allEquipmentUnits")}
                   </CommandItem>
                   {equipmentUnitNodes.map(n => (
                     <CommandItem
@@ -480,7 +480,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
             data-testid="clear-equipment-unit-filter"
           >
             <X className="w-3.5 h-3.5 mr-1" />
-            {t("common.clear") || "Clear"}
+            {t("common.clear")}
           </Button>
         )}
       </div>
