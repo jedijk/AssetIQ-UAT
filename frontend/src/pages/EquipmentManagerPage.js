@@ -8,6 +8,7 @@ import { getBackendUrl, getAuthHeaders } from "../lib/apiConfig";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
+import { useEquipmentNodeIdMap } from "../hooks/useTranslatedEntities";
 import { toast } from "sonner";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import { ChevronRight, ChevronDown, ChevronUp, Building2, Factory, Cog, Settings, Wrench, Plus, Trash2, Edit,
@@ -144,6 +145,9 @@ function flattenTree(treeNodes, expandedIds, depth = 0) {
 
 // Tree Node Component with Drag-Drop for reorder, promote, demote, and unassigned items
 function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, hasChildren, allNodes, onDrop, onReorder, onChangeLevel, siblings, siblingIndex, isSearchMatch, onAddChild, onEdit, onDelete, onMoveUp, onMoveDown }) {
+  // Translation lookup for node name (id-keyed)
+  const nodeTransMap = useEquipmentNodeIdMap();
+  const translatedName = nodeTransMap[node.id]?.name || node.name;
   // Get config, with smart fallback for unknown levels
   const config = LEVEL_CONFIG[node.level] || LEVEL_CONFIG[normalizeLevel(node.level)] || { 
     icon: Cog, 
@@ -380,10 +384,10 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
                       : node.tag}
                   </span>
                   <span className="mx-1 text-slate-300">-</span>
-                  <span>{node.name}</span>
+                  <span>{translatedName}</span>
                 </span>
               ) : (
-                <span className={`text-sm font-medium truncate ${isSearchMatch ? "text-yellow-800" : "text-slate-700"}`}>{node.name}</span>
+                <span className={`text-sm font-medium truncate ${isSearchMatch ? "text-yellow-800" : "text-slate-700"}`}>{translatedName}</span>
               )}
             </div>
             

@@ -30,6 +30,7 @@ import {
 } from "../ui/dialog";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 const ACTION_TYPES = [
   { value: "CM", label: "CM - Corrective", color: "bg-amber-500" },
@@ -68,6 +69,7 @@ const ACTION_STATUS_CONFIG = {
 export const RecommendedActionsSection = ({ threat, threatId }) => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const { user } = useAuth();
   const [showAddRecommendedDialog, setShowAddRecommendedDialog] = useState(false);
   const [showCreateFMDialog, setShowCreateFMDialog] = useState(false);
@@ -461,7 +463,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
         data-testid="recommended-actions-section"
       >
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-semibold text-slate-900 text-sm">Recommended Actions</h3>
+          <h3 className="font-semibold text-slate-900 text-sm">{t("observations.recommendedActions")}</h3>
           <Button
             variant="outline"
             size="sm"
@@ -470,7 +472,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
             data-testid="add-recommended-action-button"
           >
             <Plus className="w-3 h-3 mr-1" />
-            Add
+            {t("common.add")}
           </Button>
         </div>
         <div className="space-y-2">
@@ -608,7 +610,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                       className="bg-green-100 text-green-700 border-green-300 text-[10px] px-2 py-1 ml-1"
                     >
                       <CheckCircle className="w-3 h-3 mr-1" />
-                      Added
+                      {t("common.added")}
                     </Badge>
                   ) : (
                     <Button
@@ -621,11 +623,11 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                       })}
                       disabled={promoteToActionMutation.isPending}
                       className="opacity-0 group-hover:opacity-100 transition-all text-blue-600 hover:text-white hover:bg-blue-600 rounded-md px-2 py-1 h-7 text-xs"
-                      title="Add to action plan"
+                      title={t("observations.addToActionPlan")}
                       data-testid={`promote-action-${idx}`}
                     >
                       <ClipboardList className="w-3 h-3 mr-1" />
-                      Act
+                      {t("observations.act")}
                     </Button>
                   )}
                 </div>

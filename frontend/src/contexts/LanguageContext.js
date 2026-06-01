@@ -305,6 +305,7 @@ const en = {
     deleted: "Deleted",
     notes: "Notes",
     tag: "Tag",
+    added: "Added",
   },
   
   // Threats page
@@ -437,6 +438,10 @@ const en = {
     selectPlaceholder: "Select",
     searchPlaceholder: "Search",
     noResultsFound: "No results found.",
+    relatedActivity: "Related Activity",
+    noRelatedActivity: "No related activity yet",
+    act: "Act",
+    addToActionPlan: "Add to action plan",
   },
   
   // Causal Engine
@@ -1760,6 +1765,7 @@ const nl = {
     deleted: "Verwijderd",
     notes: "Notities",
     tag: "Tag",
+    added: "Toegevoegd",
   },
   
   // Threats page
@@ -1892,6 +1898,10 @@ const nl = {
     selectPlaceholder: "Selecteer",
     searchPlaceholder: "Zoek",
     noResultsFound: "Geen resultaten gevonden.",
+    relatedActivity: "Gerelateerde activiteit",
+    noRelatedActivity: "Nog geen gerelateerde activiteit",
+    act: "Actie",
+    addToActionPlan: "Toevoegen aan actieplan",
   },
   
   // Causal Engine

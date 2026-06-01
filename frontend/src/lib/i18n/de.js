@@ -287,6 +287,7 @@ const de = {
     deleted: "Gelöscht",
     notes: "Notizen",
     tag: "Tag",
+    added: "Hinzugefügt",
   },
   
   // Observations page
@@ -419,6 +420,10 @@ const de = {
     selectPlaceholder: "Auswählen",
     searchPlaceholder: "Suchen",
     noResultsFound: "Keine Ergebnisse gefunden.",
+    relatedActivity: "Zugehörige Aktivität",
+    noRelatedActivity: "Noch keine zugehörige Aktivität",
+    act: "Aktion",
+    addToActionPlan: "Zum Aktionsplan hinzufügen",
   },
   
   // Causal Engine

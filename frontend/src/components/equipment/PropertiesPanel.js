@@ -2,6 +2,7 @@ import { useState, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../../contexts/LanguageContext";
+import { useEquipmentNodeIdMap } from "../../hooks/useTranslatedEntities";
 import { failureModesAPI, qrCodeAPI, equipmentHierarchyAPI } from "../../lib/api";
 import {
   Settings, Cog, Check, Edit, GripVertical, Trash2, ChevronDown, Sparkles, Eye, Search, AlertTriangle, QrCode, Info,
@@ -366,6 +367,10 @@ function EquipmentFiles({ equipmentId }) {
 
 export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCriticality, onDelete, allNodes }) {
   const { t } = useLanguage();
+  const nodeTransMap = useEquipmentNodeIdMap();
+  const nodeTrans = (node && nodeTransMap[node.id]) || {};
+  const translatedName = nodeTrans.name || node?.name;
+  const translatedDescription = nodeTrans.description || node?.description;
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
@@ -520,7 +525,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                     <span className="mx-1 text-slate-300">-</span>
                   </>
                 )}
-                {node.name}
+                {translatedName}
               </h3>
             )}
             <p className="text-xs text-slate-500">{config.label}</p>
@@ -545,7 +550,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
             {isEditing ? (
               <Input value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Add description..." className="h-8 text-sm" />
             ) : (
-              <p className="text-sm text-slate-700">{node.description || <span className="text-slate-400 italic">{t("taskScheduler.noDescription")}</span>}</p>
+              <p className="text-sm text-slate-700">{translatedDescription || <span className="text-slate-400 italic">{t("taskScheduler.noDescription")}</span>}</p>
             )}
           </div>
           

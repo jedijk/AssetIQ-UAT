@@ -393,12 +393,12 @@ const EquipmentTimeline = ({ equipmentId, equipmentName, threatId }) => {
           <div className="flex items-center gap-2 mb-4">
             <Clock className="w-5 h-5 text-blue-400" />
             <h3 className="font-semibold text-primary text-sm">
-              Related Activity
+              {t("observations.relatedActivity")}
             </h3>
           </div>
           <div className="text-center py-4 text-muted">
             <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">No related activity yet</p>
+            <p className="text-sm">{t("observations.noRelatedActivity")}</p>
           </div>
         </motion.div>
       );
@@ -443,7 +443,7 @@ const EquipmentTimeline = ({ equipmentId, equipmentName, threatId }) => {
         <div className="flex items-center gap-2">
           <Clock className="w-4 h-4 text-blue-400" />
           <h3 className="font-semibold text-primary text-sm">
-            Related Activity
+            {t("observations.relatedActivity")}
           </h3>
           <span className="text-xs text-muted">({timeline.length})</span>
         </div>
@@ -456,7 +456,7 @@ const EquipmentTimeline = ({ equipmentId, equipmentName, threatId }) => {
             onClick={() => setFilter("all")}
             className="h-6 text-[10px] px-2 flex-shrink-0"
           >
-            All ({timeline.length})
+            {t("common.all")} ({timeline.length})
           </Button>
           <Button
             variant={filter === "observation" ? "default" : "outline"}
