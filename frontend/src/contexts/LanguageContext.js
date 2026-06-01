@@ -968,6 +968,7 @@ const en = {
     // Equipment Unit filter (Maintenance Schedule)
     equipmentUnit: "Equipment Unit",
     allEquipmentUnits: "All equipment units",
+    searchUnitByNameOrTag: "Search by name or tag...",
     // Strategy Tab additions
     equipmentTypes: "Equipment Types",
     searchEquipmentTypes: "Search equipment types...",
@@ -2508,6 +2509,7 @@ const nl = {
     // Equipment Unit filter (Maintenance Schedule)
     equipmentUnit: "Apparatuureenheid",
     allEquipmentUnits: "Alle apparatuureenheden",
+    searchUnitByNameOrTag: "Zoek op naam of tag...",
     // Strategy Tab additions
     equipmentTypes: "Apparatuurtypen",
     searchEquipmentTypes: "Zoek apparatuurtypen...",

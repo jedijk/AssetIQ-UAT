@@ -72,6 +72,21 @@ import {
   TooltipTrigger,
 } from "../ui/tooltip";
 import { Textarea } from "../ui/textarea";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "../ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "../../lib/utils";
 import { maintenanceSchedulerAPI, maintenanceStrategyV2API, equipmentHierarchyAPI } from "../../lib/api";
 import { useLanguage } from "../../contexts/LanguageContext";
 
@@ -1595,6 +1610,7 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
   const [selectedAiRecs, setSelectedAiRecs] = useState(new Set());
   // Filter: Equipment Unit (ISO 14224 level). "" = all units.
   const [selectedUnitId, setSelectedUnitId] = useState("");
+  const [unitFilterOpen, setUnitFilterOpen] = useState(false);
 
   const equipmentTypeId = equipmentType?.id;
   const equipmentTypeName = equipmentType?.name || "All Equipment";
@@ -1898,20 +1914,89 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
       {/* Dashboard KPIs */}
       <DashboardCards dashboard={dashboard} isLoading={dashboardLoading} />
 
-      {/* Equipment Unit Filter */}
+      {/* Equipment Unit Filter (searchable by name OR tag) */}
       <div className="flex items-center gap-2 flex-wrap" data-testid="equipment-unit-filter-row">
         <span className="text-sm font-medium text-slate-700">{t("maintenance.equipmentUnit") || "Equipment Unit"}:</span>
-        <Select value={selectedUnitId || "all"} onValueChange={(v) => setSelectedUnitId(v === "all" ? "" : v)}>
-          <SelectTrigger className="w-64" data-testid="equipment-unit-filter">
-            <SelectValue placeholder={t("maintenance.allEquipmentUnits") || "All equipment units"} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("maintenance.allEquipmentUnits") || "All equipment units"}</SelectItem>
-            {equipmentUnitNodes.map(n => (
-              <SelectItem key={n.id} value={n.id}>{n.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Popover open={unitFilterOpen} onOpenChange={setUnitFilterOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={unitFilterOpen}
+              className="w-72 justify-between font-normal"
+              data-testid="equipment-unit-filter"
+            >
+              {selectedUnitId ? (() => {
+                const sel = equipmentUnitNodes.find(n => n.id === selectedUnitId);
+                if (!sel) return t("maintenance.allEquipmentUnits") || "All equipment units";
+                return (
+                  <span className="flex items-center gap-2 truncate">
+                    {sel.tag && (
+                      <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0">
+                        {sel.tag}
+                      </Badge>
+                    )}
+                    <span className="truncate">{sel.name}</span>
+                  </span>
+                );
+              })() : (
+                <span className="text-slate-500">{t("maintenance.allEquipmentUnits") || "All equipment units"}</span>
+              )}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-72 p-0" align="start">
+            <Command
+              filter={(value, search) => {
+                // value carries "name|tag" — match either substring
+                const lc = (value || "").toLowerCase();
+                return lc.includes((search || "").toLowerCase()) ? 1 : 0;
+              }}
+            >
+              <CommandInput
+                placeholder={t("maintenance.searchUnitByNameOrTag") || "Search by name or tag..."}
+                data-testid="equipment-unit-filter-search"
+              />
+              <CommandList>
+                <CommandEmpty>{t("common.noResults") || "No results found"}</CommandEmpty>
+                <CommandGroup>
+                  <CommandItem
+                    value="__all"
+                    onSelect={() => {
+                      setSelectedUnitId("");
+                      setUnitFilterOpen(false);
+                    }}
+                    data-testid="equipment-unit-filter-option-all"
+                  >
+                    <Check className={cn("mr-2 h-4 w-4", !selectedUnitId ? "opacity-100" : "opacity-0")} />
+                    {t("maintenance.allEquipmentUnits") || "All equipment units"}
+                  </CommandItem>
+                  {equipmentUnitNodes.map(n => (
+                    <CommandItem
+                      key={n.id}
+                      value={`${n.name || ""}|${n.tag || ""}`}
+                      onSelect={() => {
+                        setSelectedUnitId(n.id);
+                        setUnitFilterOpen(false);
+                      }}
+                      data-testid={`equipment-unit-filter-option-${n.id}`}
+                    >
+                      <Check className={cn("mr-2 h-4 w-4", selectedUnitId === n.id ? "opacity-100" : "opacity-0")} />
+                      <span className="flex items-center gap-2 flex-1 min-w-0">
+                        {n.tag && (
+                          <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0 shrink-0">
+                            {n.tag}
+                          </Badge>
+                        )}
+                        <span className="truncate">{n.name}</span>
+                      </span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
         {selectedUnitId && (
           <Button
             size="sm"

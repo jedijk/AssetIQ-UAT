@@ -876,6 +876,7 @@ const de = {
     // Equipment Unit filter (Maintenance Schedule)
     equipmentUnit: "Anlageneinheit",
     allEquipmentUnits: "Alle Anlageneinheiten",
+    searchUnitByNameOrTag: "Nach Name oder Tag suchen...",
     // Strategy Tab additions
     equipmentTypes: "Anlagentypen",
     searchEquipmentTypes: "Anlagentypen suchen...",
