@@ -332,6 +332,30 @@ export default {
 };
 
 /**
+ * Hook that returns a translation map for maintenance task templates keyed by task.id.
+ * Map: { taskId: { name, description } }
+ * Used to translate task names inside the Maintenance Strategy view, where each
+ * task.id is the same as the translation entity_id (e.g. "task_<strategy_id>_<index>_<ts>").
+ */
+export function useMaintenanceTaskTemplateMap() {
+  const { language } = useLanguage();
+  const { data: map = {} } = useQuery({
+    queryKey: ["maint-task-template-batch", language],
+    queryFn: async () => {
+      if (language === "en") return {};
+      const r = await api.get(`/translations/batch/maintenance_task_template`, {
+        params: { language_code: language },
+      });
+      return r.data?.translations || {};
+    },
+    enabled: language !== "en",
+    staleTime: 1000 * 60 * 10,
+    retry: false,
+  });
+  return map;
+}
+
+/**
  * Hook that returns a name-based translation map for equipment types.
  * Map: { englishName (lowercase): translatedName }.
  * Useful when you have free-text equipment type strings on entities

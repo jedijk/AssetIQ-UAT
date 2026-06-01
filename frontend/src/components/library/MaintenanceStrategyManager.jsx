@@ -108,6 +108,7 @@ import { maintenanceStrategyV2API } from "../../lib/api";
 import { DISCIPLINES as FM_DISCIPLINES, DISCIPLINE_COLORS } from "./EquipmentTypeItem";
 import MaintenanceScheduleManager from "./MaintenanceScheduleManager";
 import { useLanguage } from "../../contexts/LanguageContext";
+import { useFailureModeNameMap, useMaintenanceTaskTemplateMap } from "../../hooks/useTranslatedEntities";
 
 // ============= Constants =============
 
@@ -334,6 +335,9 @@ const FailureModeStrategyRow = ({
   taskTemplates,
   onViewInFMEA 
 }) => {
+  const fmNameMap = useFailureModeNameMap();
+  const taskNameMap = useMaintenanceTaskTemplateMap();
+  const translatedFmName = fmNameMap[String(fmStrategy.failure_mode_name || "").trim().toLowerCase()] || fmStrategy.failure_mode_name;
   const linkedTasks = taskTemplates?.filter((t) => 
     fmStrategy.task_ids?.includes(t.id)
   ) || [];
@@ -353,7 +357,7 @@ const FailureModeStrategyRow = ({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className={`font-medium text-sm truncate ${!fmStrategy.enabled ? "text-slate-400" : ""}`}>
-                {fmStrategy.failure_mode_name}
+                {translatedFmName}
               </span>
               {!fmStrategy.enabled && (
                 <Badge variant="outline" className="text-xs bg-slate-100">Disabled</Badge>
@@ -578,7 +582,7 @@ const FailureModeStrategyRow = ({
                           <div className="flex items-center gap-2">
                             <ListChecks className={`w-3.5 h-3.5 ${task.is_mandatory !== false ? "text-blue-500" : "text-slate-300"}`} />
                             <span className={`text-sm truncate ${task.is_mandatory !== false ? "text-slate-900" : "text-slate-400"}`}>
-                              {task.name}
+                              {taskNameMap[task.id]?.name || task.name}
                             </span>
                           </div>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -637,7 +641,7 @@ const FailureModeStrategyRow = ({
                               </span>
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs">
-                              <p className="text-xs">{task.description || "No description available"}</p>
+                              <p className="text-xs">{taskNameMap[task.id]?.description || task.description || "No description available"}</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
@@ -700,6 +704,10 @@ const TaskTemplateCard = ({ task, onEdit, onDelete, failureModes }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const strategyConfig = getTaskTypeConfig(task.task_type);
   const StrategyIcon = strategyConfig.icon;
+  const fmNameMap = useFailureModeNameMap();
+  const taskNameMap = useMaintenanceTaskTemplateMap();
+  const translatedTaskName = taskNameMap[task.id]?.name || task.name;
+  const translatedTaskDescription = taskNameMap[task.id]?.description || task.description;
   
   const linkedFMs = failureModes?.filter((fm) => 
     task.failure_mode_ids?.includes(fm.failure_mode_id)
@@ -715,10 +723,10 @@ const TaskTemplateCard = ({ task, onEdit, onDelete, failureModes }) => {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <StrategyIcon className={`w-4 h-4 ${strategyConfig.color.replace('bg-', 'text-').replace('-100', '-600')}`} />
-              <span className="font-medium text-sm truncate">{task.name}</span>
+              <span className="font-medium text-sm truncate">{translatedTaskName}</span>
             </div>
-            {task.description && (
-              <p className="text-xs text-slate-500 mt-1 line-clamp-1">{task.description}</p>
+            {translatedTaskDescription && (
+              <p className="text-xs text-slate-500 mt-1 line-clamp-1">{translatedTaskDescription}</p>
             )}
             <div className="flex items-center gap-2 mt-2">
               <Badge className={`text-[10px] ${strategyConfig.color}`}>
@@ -822,7 +830,7 @@ const TaskTemplateCard = ({ task, onEdit, onDelete, failureModes }) => {
                     {linkedFMs.map((fm) => (
                       <Badge key={fm.failure_mode_id} className="text-[10px] bg-amber-50 text-amber-700 border-amber-200">
                         <Link2 className="w-2.5 h-2.5 mr-1" />
-                        {fm.failure_mode_name}
+                        {fmNameMap[String(fm.failure_mode_name || "").trim().toLowerCase()] || fm.failure_mode_name}
                       </Badge>
                     ))}
                   </div>
@@ -1104,6 +1112,7 @@ const isTaskActive = (task, failureModeStrategies = []) => {
 const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
+  const taskNameMap = useMaintenanceTaskTemplateMap();
   const [mainView, setMainView] = useState("strategy"); // "strategy" or "schedule"
   const [activeTab, setActiveTab] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
@@ -1657,7 +1666,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                                 >
                                   <td className="py-2 px-3 max-w-xs">
                                     <div className="flex items-center gap-2">
-                                      <span className="truncate">{task.name}</span>
+                                      <span className="truncate">{taskNameMap[task.id]?.name || task.name}</span>
                                       {!active && (
                                         <Badge variant="outline" className="text-[10px] py-0 px-1 bg-slate-100 text-slate-500 border-slate-300">
                                           Inactive
