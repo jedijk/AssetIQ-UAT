@@ -251,6 +251,37 @@ const de = {
     reportThreat: "Beobachtung melden",
     noObservations: "Keine Beobachtungen erfasst",
     noObservationsDesc: "Klicken Sie auf die + Schaltfläche, um Ihre erste Beobachtung zu erfassen",
+    // Filters
+    search: "Suchen...",
+    status: "Status",
+    allStatus: "Alle Status",
+    risk: "Risiko",
+    allRisks: "Alle Risiken",
+    sort: "Sortieren",
+    clearAllFilters: "Alle Filter löschen",
+    selected: "ausgewählt",
+    // Sort options
+    businessRisk: "Geschäftsrisiko",
+    rpnFmea: "RPN (FMEA)",
+    latestFirst: "Neueste zuerst",
+    oldestFirst: "Älteste zuerst",
+    // Status values
+    statusOpen: "Offen",
+    statusInProgress: "In Bearbeitung",
+    statusParked: "Geparkt",
+    statusMitigated: "Reduziert",
+    statusClosed: "Geschlossen",
+    statusCanceled: "Abgebrochen",
+    // Risk levels (also used by RiskBadge)
+    riskCritical: "Kritisch",
+    riskHigh: "Hoch",
+    riskMedium: "Mittel",
+    riskLow: "Niedrig",
+    // Per-item card labels
+    score: "Bewertung",
+    rpn: "RPN",
+    actions: "Aktionen",
+    // existing keys below
     riskScore: "Risikobewertung",
     riskLevel: "Risikostufe",
     rank: "Rang",

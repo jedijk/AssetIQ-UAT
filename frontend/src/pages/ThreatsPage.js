@@ -509,7 +509,7 @@ const ThreatsPage = () => {
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
-            placeholder="Search..."
+            placeholder={t("observations.search")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-8 h-9 text-sm"
@@ -549,7 +549,7 @@ const ThreatsPage = () => {
                   onClick={clearStatusFilter}
                   className="w-full px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 border-b border-slate-100"
                 >
-                  Clear all filters
+                  {t("observations.clearAllFilters")}
                 </button>
               )}
               
@@ -563,7 +563,7 @@ const ThreatsPage = () => {
                 >
                   <div className="flex items-center gap-2">
                     <span className={`w-2.5 h-2.5 rounded-full ${status.color}`}></span>
-                    <span className="text-sm text-slate-700">{status.label}</span>
+                    <span className="text-sm text-slate-700">{(t(`observations.status${status.value.replace(/\s+/g,'')}`) !== `observations.status${status.value.replace(/\s+/g,'')}` ? t(`observations.status${status.value.replace(/\s+/g,'')}`) : status.label)}</span>
                   </div>
                   {statusFilter.includes(status.value) && (
                     <Check className="w-4 h-4 text-blue-600" />
@@ -578,32 +578,32 @@ const ThreatsPage = () => {
         <Select value={riskFilter} onValueChange={setRiskFilter}>
           <SelectTrigger className="hidden sm:flex w-36 h-9 text-sm" data-testid="risk-filter-select">
             <AlertTriangle className="w-3.5 h-3.5 mr-1 text-slate-400" />
-            <SelectValue placeholder="Risk" />
+            <SelectValue placeholder={t("observations.risk")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Risks</SelectItem>
+            <SelectItem value="all">{t("observations.allRisks")}</SelectItem>
             <SelectItem value="Critical">
               <span className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-red-500"></span>
-                Critical
+                {t("observations.riskCritical")}
               </span>
             </SelectItem>
             <SelectItem value="High">
               <span className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-                High
+                {t("observations.riskHigh")}
               </span>
             </SelectItem>
             <SelectItem value="Medium">
               <span className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
-                Medium
+                {t("observations.riskMedium")}
               </span>
             </SelectItem>
             <SelectItem value="Low">
               <span className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                Low
+                {t("observations.riskLow")}
               </span>
             </SelectItem>
           </SelectContent>
@@ -613,31 +613,31 @@ const ThreatsPage = () => {
         <Select value={sortBy} onValueChange={setSortBy}>
           <SelectTrigger className="hidden sm:flex w-40 h-9 text-sm" data-testid="sort-by-select">
             <BarChart3 className="w-3.5 h-3.5 mr-1 text-slate-400" />
-            <SelectValue placeholder="Sort" />
+            <SelectValue placeholder={t("observations.sort")} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="business_risk">
               <span className="flex items-center gap-2">
                 <Target className="w-3.5 h-3.5 text-purple-500" />
-                Business Risk
+                {t("observations.businessRisk")}
               </span>
             </SelectItem>
             <SelectItem value="rpn">
               <span className="flex items-center gap-2">
                 <Activity className="w-3.5 h-3.5 text-blue-500" />
-                RPN (FMEA)
+                {t("observations.rpnFmea")}
               </span>
             </SelectItem>
             <SelectItem value="latest">
               <span className="flex items-center gap-2">
                 <Clock className="w-3.5 h-3.5 text-green-500" />
-                Latest First
+                {t("observations.latestFirst")}
               </span>
             </SelectItem>
             <SelectItem value="oldest">
               <span className="flex items-center gap-2">
                 <Clock className="w-3.5 h-3.5 text-slate-400" />
-                Oldest First
+                {t("observations.oldestFirst")}
               </span>
             </SelectItem>
           </SelectContent>
@@ -903,7 +903,7 @@ const ThreatsPage = () => {
               <div className="flex sm:flex-row flex-col items-end sm:items-center gap-1 sm:gap-6 flex-shrink-0">
                 {/* Business Risk Score */}
                 <div className="flex sm:flex-col items-center sm:items-center gap-1.5 sm:gap-0 w-auto sm:w-16">
-                  <div className="text-[10px] text-slate-400 sm:mb-0.5">Score</div>
+                  <div className="text-[10px] text-slate-400 sm:mb-0.5">{t("observations.score")}</div>
                   <div className="text-sm sm:text-lg font-bold text-slate-700 tabular-nums">
                     {threat.risk_score}
                   </div>
@@ -911,7 +911,7 @@ const ThreatsPage = () => {
                 
                 {/* RPN */}
                 <div className="flex sm:flex-col items-center sm:items-center gap-1.5 sm:gap-0 w-auto sm:w-16">
-                  <div className="text-[10px] text-slate-400 sm:mb-0.5">RPN</div>
+                  <div className="text-[10px] text-slate-400 sm:mb-0.5">{t("observations.rpn")}</div>
                   {rpnValue ? (
                     <div className={`text-sm sm:text-lg font-bold tabular-nums ${
                       rpnValue >= 300 ? "text-red-600" :
@@ -928,7 +928,7 @@ const ThreatsPage = () => {
                 
                 {/* Actions Count - Hidden on mobile */}
                 <div className="text-center hidden sm:block w-16">
-                  <div className="text-xs text-slate-400 mb-0.5">Actions</div>
+                  <div className="text-xs text-slate-400 mb-0.5">{t("observations.actions")}</div>
                   <div className="text-lg font-bold text-slate-700 tabular-nums">
                     {threat.recommended_actions?.length || 0}
                   </div>
@@ -939,9 +939,11 @@ const ThreatsPage = () => {
                   {(() => {
                     const statusConfig = STATUS_OPTIONS.find(s => s.value === threat.status) || 
                       { bgColor: "bg-slate-100", textColor: "text-slate-600" };
+                    const sKey = `observations.status${threat.status?.replace(/\s+/g,'') || ''}`;
+                    const statusLabel = t(sKey) !== sKey ? t(sKey) : threat.status;
                     return (
                       <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig.bgColor} ${statusConfig.textColor}`}>
-                        {threat.status}
+                        {statusLabel}
                       </span>
                     );
                   })()}

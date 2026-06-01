@@ -1,6 +1,8 @@
 import { cn } from "../lib/utils";
+import { useLanguage } from "../contexts/LanguageContext";
 
 const RiskBadge = ({ level, size = "md", className }) => {
+  const { t } = useLanguage();
   const sizeClasses = {
     sm: "text-xs px-2 py-0.5",
     md: "text-sm px-2.5 py-1",
@@ -14,6 +16,10 @@ const RiskBadge = ({ level, size = "md", className }) => {
     Low: "bg-green-100 text-green-700 border-green-200",
   };
 
+  const key = `observations.risk${level}`;
+  const translated = t(key);
+  const label = translated && translated !== key ? translated : level;
+
   return (
     <span
       className={cn(
@@ -24,7 +30,7 @@ const RiskBadge = ({ level, size = "md", className }) => {
       )}
       data-testid={`risk-badge-${level?.toLowerCase()}`}
     >
-      {level}
+      {label}
     </span>
   );
 };
