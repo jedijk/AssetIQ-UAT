@@ -915,7 +915,7 @@ export default function EquipmentManagerPage() {
     mutationFn: ({ nodeId, direction }) => equipmentHierarchyAPI.reorderNode(nodeId, direction),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
-      toast.success(data.message || "Reordered");
+      toast.success(data.message || t("equipment.reordered"));
     },
     onError: (e) => toast.error(e.response?.data?.detail || t("equipment.failedToReorder"))
   });
@@ -926,7 +926,7 @@ export default function EquipmentManagerPage() {
       equipmentHierarchyAPI.reorderNodeToPosition(nodeId, targetNodeId, position, newParentId),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
-      toast.success(data.message || "Moved");
+      toast.success(data.message || t("equipment.moved"));
     },
     onError: (e) => toast.error(e.response?.data?.detail || t("equipment.failedToMove"))
   });

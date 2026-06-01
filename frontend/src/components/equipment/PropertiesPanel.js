@@ -53,40 +53,32 @@ const CRIT_COLORS = {
   low: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700", dot: "bg-green-500" } 
 };
 
-// Criticality scale descriptions per dimension (ISO 14224 aligned)
-const CRITICALITY_SCALES = {
-  safety: {
-    1: { label: "Negligible", desc: "No injury risk, no health impact" },
-    2: { label: "Minor", desc: "First aid level injury, minor discomfort" },
-    3: { label: "Moderate", desc: "Medical treatment required, restricted work" },
-    4: { label: "Major", desc: "Serious injury, permanent disability possible" },
-    5: { label: "Catastrophic", desc: "Fatality or multiple severe injuries" },
-  },
-  production: {
-    1: { label: "Negligible", desc: "No production loss, no impact on output" },
-    2: { label: "Minor", desc: "< 1 day production loss, easily recoverable" },
-    3: { label: "Moderate", desc: "1-3 days production loss, partial shutdown" },
-    4: { label: "Major", desc: "3-7 days loss, full unit shutdown" },
-    5: { label: "Catastrophic", desc: "> 7 days loss, plant-wide shutdown" },
-  },
-  environmental: {
-    1: { label: "Negligible", desc: "No release, no environmental effect" },
-    2: { label: "Minor", desc: "Small contained release, no off-site impact" },
-    3: { label: "Moderate", desc: "Moderate release, local cleanup required" },
-    4: { label: "Major", desc: "Significant release, regulatory reporting" },
-    5: { label: "Catastrophic", desc: "Major spill/emission, lasting ecosystem damage" },
-  },
-  reputation: {
-    1: { label: "Negligible", desc: "No external awareness, no media interest" },
-    2: { label: "Minor", desc: "Local community awareness, minor complaint" },
-    3: { label: "Moderate", desc: "Regional media coverage, customer concern" },
-    4: { label: "Major", desc: "National media, regulatory scrutiny, contract risk" },
-    5: { label: "Catastrophic", desc: "International coverage, license/permit threat" },
-  },
+const IMPACT_SCALE_DIMS = {
+  safety: "Safety",
+  production: "Production",
+  environmental: "Environmental",
+  reputation: "Reputation",
 };
 
-const CriticalityDimension = ({ label, color, value, onClick, dimension }) => {
-  const scale = CRITICALITY_SCALES[dimension];
+function getCriticalityScales(t) {
+  return Object.fromEntries(
+    Object.entries(IMPACT_SCALE_DIMS).map(([dim, prefix]) => [
+      dim,
+      Object.fromEntries(
+        [1, 2, 3, 4, 5].map((level) => [
+          level,
+          {
+            label: t(`equipment.impact${prefix}${level}Label`),
+            desc: t(`equipment.impact${prefix}${level}Desc`),
+          },
+        ])
+      ),
+    ])
+  );
+}
+
+const CriticalityDimension = ({ label, color, value, onClick, scale, dimension }) => {
+  const { t } = useLanguage();
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
@@ -104,7 +96,7 @@ const CriticalityDimension = ({ label, color, value, onClick, dimension }) => {
               </PopoverTrigger>
               <PopoverContent side="right" align="start" className="w-64 p-0" sideOffset={8}>
                 <div className="px-3 py-2 border-b border-slate-100">
-                  <p className={`text-xs font-semibold text-${color}-700`}>{label} Impact Scale</p>
+                  <p className={`text-xs font-semibold text-${color}-700`}>{label} {t("equipment.impactScaleSuffix")}</p>
                 </div>
                 <div className="p-2 space-y-0.5">
                   {[1, 2, 3, 4, 5].map(level => (
@@ -304,7 +296,7 @@ function EquipmentFiles({ equipmentId }) {
       </div>
 
       {files.length === 0 ? (
-        <p className="text-[11px] text-slate-400 text-center py-3">No files attached</p>
+        <p className="text-[11px] text-slate-400 text-center py-3">{t("equipment.noFilesAttached")}</p>
       ) : (
         <div className="space-y-1">
           {files.map((f) => {
@@ -325,7 +317,7 @@ function EquipmentFiles({ equipmentId }) {
                   <button
                     className="p-1 rounded hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-all sm:opacity-0 sm:group-hover:opacity-100"
                     onClick={() => handleView(f)}
-                    title="View"
+                    title={t("common.view")}
                     data-testid={`view-file-${f.id}`}
                   >
                     <Eye className="w-3.5 h-3.5" />
@@ -334,7 +326,7 @@ function EquipmentFiles({ equipmentId }) {
                 <button
                   className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-blue-600 transition-all sm:opacity-0 sm:group-hover:opacity-100"
                   onClick={() => handleDownload(f.id, f.filename)}
-                  title="Download"
+                  title={t("common.download")}
                   data-testid={`download-file-${f.id}`}
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -342,7 +334,7 @@ function EquipmentFiles({ equipmentId }) {
                 <button
                   className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-all sm:opacity-0 sm:group-hover:opacity-100"
                   onClick={() => deleteMutation.mutate(f.id)}
-                  title="Delete"
+                  title={t("common.delete")}
                   data-testid={`delete-file-${f.id}`}
                 >
                   <X className="w-3.5 h-3.5" />
@@ -369,6 +361,7 @@ function EquipmentFiles({ equipmentId }) {
 
 export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCriticality, onDelete, allNodes }) {
   const { t } = useLanguage();
+  const criticalityScales = useMemo(() => getCriticalityScales(t), [t]);
   const nodeTransMap = useEquipmentNodeIdMap();
   const nodeTrans = (node && nodeTransMap[node.id]) || {};
   const translatedName = nodeTrans.name || node?.name;
@@ -574,7 +567,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                   {recommendedTypes.length > 0 && (
                     <div className="flex items-center gap-2">
                       <Eye className="w-3 h-3 text-slate-400" />
-                      <span className="text-xs text-slate-400">Show all</span>
+                      <span className="text-xs text-slate-400">{t("equipment.showAllTypes")}</span>
                       <Switch 
                         checked={showAllTypes} 
                         onCheckedChange={setShowAllTypes}
@@ -599,7 +592,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                           {fmCounts[selectedType.id] && (
                             <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded flex items-center gap-1">
                               <AlertTriangle className="w-3 h-3" />
-                              {fmCounts[selectedType.id]} FM
+                              {fmCounts[selectedType.id]} {t("equipment.failureModesAbbrev")}
                             </span>
                           )}
                         </div>
@@ -629,7 +622,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                               setTypeSearchQuery("");
                             }}
                           >
-                            <span className="text-slate-400">None (clear selection)</span>
+                            <span className="text-slate-400">{t("equipment.clearTypeSelection")}</span>
                           </CommandItem>
                         </CommandGroup>
                         
@@ -640,7 +633,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                             <CommandGroup heading={
                               <div className="flex items-center gap-1.5 text-blue-600">
                                 <Sparkles className="w-3 h-3" />
-                                <span>Recommended for this system</span>
+                                <span>{t("equipment.recommendedForSystem")}</span>
                               </div>
                             }>
                               {filteredRecommendedTypes.map(eqt => (
@@ -664,7 +657,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                                     </div>
                                     {fmCounts[eqt.id] > 0 && (
                                       <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
-                                        {fmCounts[eqt.id]} FM
+                                        {fmCounts[eqt.id]} {t("equipment.failureModesAbbrev")}
                                       </span>
                                     )}
                                   </div>
@@ -700,7 +693,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                                     </div>
                                     {fmCounts[eqt.id] > 0 && (
                                       <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
-                                        {fmCounts[eqt.id]} FM
+                                        {fmCounts[eqt.id]} {t("equipment.failureModesAbbrev")}
                                       </span>
                                     )}
                                   </div>
@@ -718,7 +711,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                 {parentSystemName && recommendedTypes.length > 0 && !showAllTypes && (
                   <p className="text-xs text-blue-500 mt-1 flex items-center gap-1">
                     <Sparkles className="w-3 h-3" />
-                    Filtered for "{parentSystemName}"
+                    {t("equipment.filteredForSystem")} "{parentSystemName}"
                   </p>
                 )}
                 
@@ -726,7 +719,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                 {selectedType && fmCounts[selectedType.id] > 0 && (
                   <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
                     <AlertTriangle className="w-3 h-3" />
-                    {fmCounts[selectedType.id]} failure modes in library for {selectedType.name}
+                    {fmCounts[selectedType.id]} {t("equipment.failureModesInLibraryFor")} {selectedType.name}
                   </p>
                 )}
               </div>
@@ -767,6 +760,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                 label={t("equipment.safetyImpact")}
                 color="red"
                 dimension="safety"
+                scale={criticalityScales.safety}
                 value={node.criticality?.safety_impact}
                 onClick={(level) => onAssignCriticality(node.id, { ...node.criticality, safety_impact: node.criticality?.safety_impact === level ? null : level })}
               />
@@ -774,6 +768,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                 label={t("equipment.productionImpact")}
                 color="orange"
                 dimension="production"
+                scale={criticalityScales.production}
                 value={node.criticality?.production_impact}
                 onClick={(level) => onAssignCriticality(node.id, { ...node.criticality, production_impact: node.criticality?.production_impact === level ? null : level })}
               />
@@ -781,6 +776,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                 label={t("equipment.environmentalImpact")}
                 color="green"
                 dimension="environmental"
+                scale={criticalityScales.environmental}
                 value={node.criticality?.environmental_impact}
                 onClick={(level) => onAssignCriticality(node.id, { ...node.criticality, environmental_impact: node.criticality?.environmental_impact === level ? null : level })}
               />
@@ -788,6 +784,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                 label={t("equipment.reputationImpact")}
                 color="purple"
                 dimension="reputation"
+                scale={criticalityScales.reputation}
                 value={node.criticality?.reputation_impact}
                 onClick={(level) => onAssignCriticality(node.id, { ...node.criticality, reputation_impact: node.criticality?.reputation_impact === level ? null : level })}
               />
