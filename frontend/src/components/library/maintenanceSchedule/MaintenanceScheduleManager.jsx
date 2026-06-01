@@ -53,6 +53,7 @@ import {
   CommandItem,
   CommandList,
 } from "../../ui/command";
+import { ScrollArea } from "../../ui/scroll-area";
 import { cn } from "../../../lib/utils";
 import {
   maintenanceSchedulerAPI,
