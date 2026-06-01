@@ -7,6 +7,12 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Multi-Language Translation Framework expansion (P0+P1, VERIFIED iteration_36)**:
+  - **P0 ThreatDetailPage**: Added ~30 new UI keys (tryAgain, riskPriorityNumber, fmeaScore, criticalityScore, probableCause, fieldNotes, deleteObservation, shareObservation, etc.) + status enums (Open/In Progress/Parked/Mitigated/Closed/Canceled) + risk level enums (Critical/High/Medium/Low) across EN/NL/DE. Composed translated title via `buildTranslatedTitle()` (e.g. "Condensation Vessel - Sludge Build up" → "Condensatievat - Slibopbouw"). Wired status dropdown + popup risk-level pills through `translateEnum()`.
+  - **P1 Hierarchy descriptions**: Added new hook `useEquipmentNodeIdMap()` (returns `{nodeId: {name, description}}`). Wired into: (a) `EquipmentHierarchy.TreeNode` (sidebar), (b) `EquipmentManagerPage.TreeNode` (main page), (c) `PropertiesPanel` for both header title + description. Closed the inconsistency where sidebar showed Dutch names but /equipment-manager showed English.
+  - **Bonus translations**: Related Activity section title + 'All' filter button (EquipmentTimeline). Recommended Actions title + Add button + Act button + Added badge (RecommendedActionsSection).
+  - **Verified** via testing_agent iteration_35 (P0 PASS in NL+DE+EN regression) and iteration_36 (P1 PASS — /equipment-manager tree shows Lijn-90/Nutvoorzieningen/Vorkheftruck etc., PropertiesPanel header uses translatedName).
+
 - [Feb 2026] **Recurring task occurrences visible on Gantt (BUG FIX, VERIFIED)**:
   - **Bug**: User couldn't see "every quarter" recurrence — only ONE bar per task because (a) scheduler horizon was 90 days (≈ same as quarterly cadence so only 1 occurrence generated), and (b) the Gantt rendered every scheduled_task as a SEPARATE row instead of grouping occurrences of the same program.
   - **Fix part 1 (backend)**: Bumped scheduler `DEFAULT_HORIZON_DAYS` from 90 → **365** with `MAX_OCCURRENCES_PER_PROGRAM=52`. Quarterly tasks now generate ~4 occurrences, monthly ~12.
