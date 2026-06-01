@@ -109,7 +109,7 @@ import { cn } from "../lib/utils";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { imageAnalysisAPI } from "../lib/api";
 import { offlineStorage, useOfflineStatus } from "../services/offlineStorage";
-import { DISCIPLINES } from "../constants/disciplines";
+import { DISCIPLINES, normalizeDiscipline } from "../constants/disciplines";
 import TaskExecutionFrame from "../components/task-execution/TaskExecutionFrame";
 import TaskCard, { SortableTaskCard } from "../components/task-execution/TaskCard";
 import { useSortable } from "@dnd-kit/sortable";
@@ -445,6 +445,33 @@ const MyTasksPage = () => {
   
   // Available disciplines for filtering (from unified constants)
   const disciplines = DISCIPLINES;
+
+  // Auto-discipline filter based on the logged-in user.
+  // - If user is a "maintenance" role → covers ALL technical disciplines
+  //   (rotating, static, piping, electrical, instrumentation, civil, laboratory).
+  // - Otherwise → that single normalised discipline.
+  // The field is read from user.discipline (or user.department/position as fallback).
+  // User can still override via the dropdown — auto only seeds the initial filter.
+  const TECHNICAL_DISCIPLINES = ["rotating", "static", "piping", "electrical", "instrumentation", "civil", "laboratory"];
+  const userDisciplineRaw = (user?.discipline || user?.department || user?.position || "").toString().trim().toLowerCase();
+  const isMaintenanceUser = !!userDisciplineRaw && /maintenance|onderhoud|wartung/.test(userDisciplineRaw);
+  const userNormalisedDiscipline = !isMaintenanceUser && userDisciplineRaw
+    ? normalizeDiscipline(userDisciplineRaw)
+    : "";
+  const autoDisciplinesForUser = isMaintenanceUser
+    ? TECHNICAL_DISCIPLINES
+    : (userNormalisedDiscipline ? [userNormalisedDiscipline] : []);
+
+  // Seed selectedDiscipline once from user discipline (single value) unless they
+  // already chose something or are a maintenance-user (handled client-side).
+  useEffect(() => {
+    if (selectedDiscipline) return; // user already picked
+    if (isMaintenanceUser) return;  // multi-value → applied client-side
+    if (userNormalisedDiscipline) {
+      setSelectedDiscipline(userNormalisedDiscipline);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
   
   // Fetch tasks with offline caching
   const { data: tasksData, isLoading: tasksLoading, error: tasksError, refetch: refetchTasks } = useQuery({

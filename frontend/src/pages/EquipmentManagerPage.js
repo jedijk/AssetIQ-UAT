@@ -66,6 +66,38 @@ const LEVEL_CONFIG = {
 // ISO 14224 Level hierarchy - must match backend iso14224_models.py
 const LEVEL_ORDER = ["installation", "plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"];
 
+// Map raw level key to translation key (canonical + legacy aliases collapsed)
+const LEVEL_LABEL_KEYS = {
+  installation: "tierInstallation",
+  plant_unit: "tierPlantUnit",
+  section_system: "tierSectionSystem",
+  equipment_unit: "tierEquipmentUnit",
+  subunit: "tierSubunit",
+  maintainable_item: "tierMaintainableItem",
+  // legacy aliases → same translated tier
+  plant: "tierPlantUnit",
+  unit: "tierPlantUnit",
+  section: "tierSectionSystem",
+  system: "tierSectionSystem",
+  equipment: "tierEquipmentUnit",
+  site: "tierInstallation",
+  location: "tierInstallation",
+  line: "tierSectionSystem",
+  production_line: "tierSectionSystem",
+  area: "tierSectionSystem",
+  zone: "tierSectionSystem",
+  auxiliary: "tierEquipmentUnit",
+};
+
+const getLevelLabel = (t, level, fallback) => {
+  const key = LEVEL_LABEL_KEYS[level];
+  if (key) {
+    const v = t(`equipment.${key}`);
+    if (v && v !== `equipment.${key}`) return v;
+  }
+  return fallback || (LEVEL_CONFIG[level]?.label) || level;
+};
+
 // Legacy level mapping to ISO 14224 standard - must match backend LEGACY_LEVEL_MAP
 const LEGACY_LEVEL_MAP = { 
   "plant": "plant_unit",
@@ -145,6 +177,7 @@ function flattenTree(treeNodes, expandedIds, depth = 0) {
 
 // Tree Node Component with Drag-Drop for reorder, promote, demote, and unassigned items
 function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, hasChildren, allNodes, onDrop, onReorder, onChangeLevel, siblings, siblingIndex, isSearchMatch, onAddChild, onEdit, onDelete, onMoveUp, onMoveDown }) {
+  const { t } = useLanguage();
   // Translation lookup for node name (id-keyed)
   const nodeTransMap = useEquipmentNodeIdMap();
   const translatedName = nodeTransMap[node.id]?.name || node.name;
@@ -392,52 +425,52 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
             </div>
             
             {isDragOver && dropPosition === "child" && (
-              <span className="text-xs text-blue-600 font-medium">Drop as child</span>
+              <span className="text-xs text-blue-600 font-medium">{t("equipment.dropAsChild")}</span>
             )}
             
             {isSearchMatch && (
-              <span className="text-xs bg-yellow-200 text-yellow-800 px-1.5 py-0.5 rounded">Match</span>
+              <span className="text-xs bg-yellow-200 text-yellow-800 px-1.5 py-0.5 rounded">{t("equipment.match")}</span>
             )}
             
-            <span className="text-xs text-slate-400 hidden sm:block">{config.label}</span>
+            <span className="text-xs text-slate-400 hidden sm:block">{getLevelLabel(t, node.level, config.label)}</span>
             {node.criticality && <div className={`w-2 h-2 rounded-full ${CRIT_COLORS[node.criticality.level]?.dot}`} />}
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-48">
           <ContextMenuItem onClick={() => handleContextMenuAction("select")}>
             <Check className="w-4 h-4 mr-2" />
-            Select
+            {t("common.select") || "Select"}
           </ContextMenuItem>
           {hasChildren && (
             <ContextMenuItem onClick={() => handleContextMenuAction("expand")}>
               {isExpanded ? <ChevronUp className="w-4 h-4 mr-2" /> : <ChevronDown className="w-4 h-4 mr-2" />}
-              {isExpanded ? "Collapse" : "Expand"}
+              {isExpanded ? t("equipment.collapse") : t("equipment.expand")}
             </ContextMenuItem>
           )}
           <ContextMenuSeparator />
           {canAddChild && (
             <ContextMenuItem onClick={() => handleContextMenuAction("addChild")}>
               <Plus className="w-4 h-4 mr-2" />
-              Add Child
+              {t("equipment.addChild")}
             </ContextMenuItem>
           )}
           <ContextMenuItem onClick={() => handleContextMenuAction("edit")}>
             <Edit className="w-4 h-4 mr-2" />
-            Edit
+            {t("common.edit")}
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem onClick={() => handleContextMenuAction("moveUp")} disabled={siblingIndex === 0}>
             <ArrowUp className="w-4 h-4 mr-2" />
-            Move Up
+            {t("equipment.moveUp")}
           </ContextMenuItem>
           <ContextMenuItem onClick={() => handleContextMenuAction("moveDown")} disabled={siblingIndex >= siblings?.length - 1}>
             <ArrowDown className="w-4 h-4 mr-2" />
-            Move Down
+            {t("equipment.moveDown")}
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem onClick={() => handleContextMenuAction("delete")} className="text-red-600 focus:text-red-600">
             <Trash2 className="w-4 h-4 mr-2" />
-            Delete
+            {t("common.delete")}
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
@@ -460,7 +493,7 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
               className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2"
               onClick={() => handleContextMenuAction("select")}
             >
-              <Check className="w-4 h-4" /> Select
+              <Check className="w-4 h-4" /> {t("common.select") || "Select"}
             </button>
             {hasChildren && (
               <button 
@@ -468,7 +501,7 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
                 onClick={() => handleContextMenuAction("expand")}
               >
                 {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                {isExpanded ? "Collapse" : "Expand"}
+                {isExpanded ? t("equipment.collapse") : t("equipment.expand")}
               </button>
             )}
             <div className="h-px bg-slate-200 my-1" />
@@ -477,14 +510,14 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
                 className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2"
                 onClick={() => handleContextMenuAction("addChild")}
               >
-                <Plus className="w-4 h-4" /> Add Child
+                <Plus className="w-4 h-4" /> {t("equipment.addChild")}
               </button>
             )}
             <button 
               className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2"
               onClick={() => handleContextMenuAction("edit")}
             >
-              <Edit className="w-4 h-4" /> Edit
+              <Edit className="w-4 h-4" /> {t("common.edit")}
             </button>
             <div className="h-px bg-slate-200 my-1" />
             <button 
@@ -492,21 +525,21 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
               onClick={() => handleContextMenuAction("moveUp")}
               disabled={siblingIndex === 0}
             >
-              <ArrowUp className="w-4 h-4" /> Move Up
+              <ArrowUp className="w-4 h-4" /> {t("equipment.moveUp")}
             </button>
             <button 
               className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2 disabled:opacity-50"
               onClick={() => handleContextMenuAction("moveDown")}
               disabled={siblingIndex >= siblings?.length - 1}
             >
-              <ArrowDown className="w-4 h-4" /> Move Down
+              <ArrowDown className="w-4 h-4" /> {t("equipment.moveDown")}
             </button>
             <div className="h-px bg-slate-200 my-1" />
             <button 
               className="w-full px-3 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
               onClick={() => handleContextMenuAction("delete")}
             >
-              <Trash2 className="w-4 h-4" /> Delete
+              <Trash2 className="w-4 h-4" /> {t("common.delete")}
             </button>
           </div>
         </div>
@@ -1162,10 +1195,10 @@ export default function EquipmentManagerPage() {
             variant="outline" 
             disabled={isFetching}
             data-testid="refresh-btn"
-            title="Refresh equipment data"
+            title={t("equipment.refreshTooltip")}
           >
             <RefreshCw className={`w-4 h-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} />
-            {isFetching ? "Refreshing..." : "Refresh"}
+            {isFetching ? t("equipment.refreshing") : t("equipment.refresh")}
           </Button>
           <div className="w-px h-6 bg-slate-200" />
           <Button onClick={() => setIsImportOpen(true)} size="sm" variant="outline" data-testid="import-list-btn"><Upload className="w-4 h-4 mr-1" />{t("equipment.importList")}</Button>
@@ -1176,7 +1209,7 @@ export default function EquipmentManagerPage() {
           )}
           {(isOwner || user?.role === "admin") && (
             <Button onClick={() => setIsProcessImportOpen(true)} size="sm" variant="outline" className="border-green-200 text-green-700 hover:bg-green-50" data-testid="import-process-btn">
-              <TreePine className="w-4 h-4 mr-1" />Import Process Diagram
+              <TreePine className="w-4 h-4 mr-1" />{t("equipment.importProcess")}
             </Button>
           )}
           {(isOwner || user?.role === "admin") && (
