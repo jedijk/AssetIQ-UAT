@@ -7,6 +7,12 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Equipment Unit filter on global Maintenance Schedule + MyTasks discipline auto-seed (VERIFIED iteration_38)**:
+  - **MaintenanceScheduleManager.jsx**: Added Equipment Unit filter dropdown (`data-testid='equipment-unit-filter'`) that lists all `equipment_unit` level nodes (CLU, EXU, FPU, etc.). Selection computes the unit's descendant equipment_ids and filters Timeline (Gantt), Tasks list, and Planner views (daily/weekly/14-day/90-day). Clear button restores the full view. Filter is also applied to `timeline.timeline` (the rendered Gantt rows) — earlier version only filtered `timeline.equipment` which the Gantt didn't read from.
+  - **MyTasksPage.js**: Auto-seeds the `discipline-filter` dropdown from the logged-in user's `discipline` (or `department`/`position` fallback) via `normalizeDiscipline()`. Users matching the regex `/maintenance|onderhoud|wartung/` are treated as a wildcard and keep the dropdown at "All Disciplines" since maintenance covers all 7 technical disciplines.
+  - **i18n**: Added `maintenance.equipmentUnit`, `maintenance.allEquipmentUnits`, `common.clear` to EN/NL/DE. Removed duplicate `Select` import that would have broken the JSX build.
+  - **Backend**: `/api/my-tasks?discipline=...` continues to filter case-insensitively via `$regex`. 6/6 pytest PASS, 9/9 frontend review items PASS.
+
 - [Feb 2026] **P1: Translation Management Dashboard + Dictionary Validation (NEW, VERIFIED iteration_37)**:
   - New page `/settings/translations` (owner/admin only) with two tabs:
     - **Coverage tab**: per-entity-type translation stats (Failure Modes, Equipment Types, Equipment Hierarchy, Maintenance Tasks, Observations, Investigations, Form Templates), progress bars, per-row "Translate missing" bulk-generate button, Refresh, and Recent Jobs list (auto-refreshes every 5s).

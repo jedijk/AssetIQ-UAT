@@ -245,6 +245,7 @@ const de = {
     yes: "Ja",
     no: "Nein",
     all: "Alle",
+    clear: "Löschen",
     open: "Offen",
     closed: "Geschlossen",
     inProgress: "In Bearbeitung",
@@ -872,6 +873,9 @@ const de = {
     noStrategies: "Noch keine Wartungsstrategien",
     noStrategiesDesc: "Generieren Sie Wartungsstrategien für Ihre Anlagentypen",
     selectEquipmentType: "Anlagentyp auswählen",
+    // Equipment Unit filter (Maintenance Schedule)
+    equipmentUnit: "Anlageneinheit",
+    allEquipmentUnits: "Alle Anlageneinheiten",
     // Strategy Tab additions
     equipmentTypes: "Anlagentypen",
     searchEquipmentTypes: "Anlagentypen suchen...",

@@ -1695,8 +1695,14 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
   const filteredTimeline = useMemo(() => {
     if (!timeline) return timeline;
     if (!filteredEquipmentIds) return timeline;
+    // The Gantt TimelineView iterates `timeline.timeline` (an array of
+    // { equipment_id, equipment_name, tasks: [...] }); the legacy
+    // `timeline.equipment` shape is preserved for backwards-compat.
     return {
       ...timeline,
+      timeline: Array.isArray(timeline.timeline)
+        ? timeline.timeline.filter(e => filteredEquipmentIds.has(e.equipment_id))
+        : timeline.timeline,
       equipment: Array.isArray(timeline.equipment)
         ? timeline.equipment.filter(e => filteredEquipmentIds.has(e.equipment_id))
         : timeline.equipment,

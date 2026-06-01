@@ -260,6 +260,7 @@ const en = {
     yes: "Yes",
     no: "No",
     all: "All",
+    clear: "Clear",
     open: "Open",
     closed: "Closed",
     inProgress: "In Progress",
@@ -964,6 +965,9 @@ const en = {
     noStrategies: "No maintenance strategies yet",
     noStrategiesDesc: "Generate maintenance strategies for your equipment types",
     selectEquipmentType: "Select Equipment Type",
+    // Equipment Unit filter (Maintenance Schedule)
+    equipmentUnit: "Equipment Unit",
+    allEquipmentUnits: "All equipment units",
     // Strategy Tab additions
     equipmentTypes: "Equipment Types",
     searchEquipmentTypes: "Search equipment types...",
@@ -1796,6 +1800,7 @@ const nl = {
     yes: "Ja",
     no: "Nee",
     all: "Alle",
+    clear: "Wissen",
     open: "Open",
     closed: "Gesloten",
     inProgress: "In uitvoering",
@@ -2500,6 +2505,9 @@ const nl = {
     noStrategies: "Nog geen onderhoudsstrategieën",
     noStrategiesDesc: "Genereer onderhoudsstrategieën voor uw apparatuurtypen",
     selectEquipmentType: "Selecteer apparatuurtype",
+    // Equipment Unit filter (Maintenance Schedule)
+    equipmentUnit: "Apparatuureenheid",
+    allEquipmentUnits: "Alle apparatuureenheden",
     // Strategy Tab additions
     equipmentTypes: "Apparatuurtypen",
     searchEquipmentTypes: "Zoek apparatuurtypen...",
