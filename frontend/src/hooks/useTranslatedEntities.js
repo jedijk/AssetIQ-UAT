@@ -295,6 +295,33 @@ export function useTranslatedTasks(tasks = []) {
   };
 }
 
+/**
+ * Hook that returns a name-based translation map for failure modes.
+ * Map: { englishName (lowercase): translatedName }.
+ */
+export function useFailureModeNameMap() {
+  const { language } = useLanguage();
+  const { data: map = {} } = useQuery({
+    queryKey: ["fm-name-map-batch", language],
+    queryFn: async () => {
+      if (language === "en") return {};
+      const r = await api.get(`/translations/batch/failure_mode`, {
+        params: { language_code: language },
+      });
+      const out = {};
+      const trans = r.data?.translations || {};
+      for (const [name, fields] of Object.entries(trans)) {
+        if (fields?.name) out[String(name).trim().toLowerCase()] = fields.name;
+      }
+      return out;
+    },
+    enabled: language !== "en",
+    staleTime: 1000 * 60 * 10,
+    retry: false,
+  });
+  return map;
+}
+
 export default {
   useTranslatedFailureModes,
   useTranslatedEquipmentTypes,

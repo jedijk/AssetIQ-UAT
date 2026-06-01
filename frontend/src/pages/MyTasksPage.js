@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
+import { useEquipmentNodeNameMap, useEquipmentTypeNameMap } from "../hooks/useTranslatedEntities";
 import { toast } from "sonner";
 import { format, isToday, isBefore, startOfDay, parseISO } from "date-fns";
 import { useNotificationTriggers } from "../hooks/useNotificationTriggers";
@@ -146,7 +147,15 @@ const AdhocPlanCardContent = ({
   executeAdhocMutation,
   dragListeners,
   isDragging,
-}) => (
+}) => {
+  const nodeNameMap = useEquipmentNodeNameMap();
+  const typeNameMap = useEquipmentTypeNameMap();
+  const translateEqName = (n) => {
+    if (!n) return n;
+    const k = String(n).trim().toLowerCase();
+    return nodeNameMap[k] || typeNameMap[k] || n;
+  };
+  return (
   <div
     className={cn(
       "bg-white rounded-lg border border-amber-200 p-4 hover:shadow-md transition-all",
@@ -178,7 +187,7 @@ const AdhocPlanCardContent = ({
             {/* Equipment */}
             <div className="flex items-center gap-1.5 text-sm text-slate-500 mb-2">
               <MapPin className="w-3.5 h-3.5" />
-              <span className="truncate">{plan.equipment_name}</span>
+              <span className="truncate">{translateEqName(plan.equipment_name)}</span>
             </div>
             
             {/* Tags Row */}
@@ -249,7 +258,8 @@ const AdhocPlanCardContent = ({
           </div>
         </div>
   </div>
-);
+  );
+};
 
 const SortableAdhocPlanCard = ({ plan, tasksData, setSelectedTask, setViewMode, executeAdhocMutation }) => {
   const {

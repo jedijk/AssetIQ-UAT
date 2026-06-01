@@ -72,6 +72,7 @@ import {
 } from "../ui/tooltip";
 import { Textarea } from "../ui/textarea";
 import { maintenanceSchedulerAPI, maintenanceStrategyV2API } from "../../lib/api";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 
 // ============= Constants =============
@@ -100,6 +101,7 @@ const PRIORITY_CONFIG = {
  * Dashboard KPI Cards
  */
 const DashboardCards = ({ dashboard, isLoading }) => {
+  const { t } = useLanguage();
   if (isLoading) {
     return (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -124,7 +126,7 @@ const DashboardCards = ({ dashboard, isLoading }) => {
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500">Open Tasks</p>
+              <p className="text-sm text-slate-500">{t("maintenance.openTasks")}</p>
               <p className="text-2xl font-bold">{backlog.open_tasks || 0}</p>
             </div>
             <ListChecks className="w-8 h-8 text-blue-500" />
@@ -136,7 +138,7 @@ const DashboardCards = ({ dashboard, isLoading }) => {
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500">Overdue</p>
+              <p className="text-sm text-slate-500">{t("maintenance.overdue")}</p>
               <p className={`text-2xl font-bold ${backlog.overdue_tasks > 0 ? "text-red-600" : ""}`}>
                 {backlog.overdue_tasks || 0}
               </p>
@@ -150,7 +152,7 @@ const DashboardCards = ({ dashboard, isLoading }) => {
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500">Upcoming (7 days)</p>
+              <p className="text-sm text-slate-500">{t("maintenance.upcoming7Days")}</p>
               <p className="text-2xl font-bold">{backlog.upcoming_tasks || 0}</p>
             </div>
             <Calendar className="w-8 h-8 text-amber-500" />
@@ -162,7 +164,7 @@ const DashboardCards = ({ dashboard, isLoading }) => {
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500">Compliance</p>
+              <p className="text-sm text-slate-500">{t("maintenance.compliance")}</p>
               <p className={`text-2xl font-bold ${compliance.rate >= 90 ? "text-green-600" : compliance.rate >= 70 ? "text-amber-600" : "text-red-600"}`}>
                 {compliance.rate || 100}%
               </p>
@@ -188,6 +190,7 @@ const DashboardCards = ({ dashboard, isLoading }) => {
  *  - Click a bar to open the task-details dialog
  */
 const TimelineView = ({ timeline, isLoading, onTaskClick, onTaskReschedule }) => {
+  const { t } = useLanguage();
   const [zoom, setZoom] = useState("week"); // "day" | "week" | "month"
 
   const ZOOM_CONFIG = useMemo(
@@ -308,8 +311,8 @@ const TimelineView = ({ timeline, isLoading, onTaskClick, onTaskReschedule }) =>
     return (
       <div className="text-center py-12">
         <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-        <p className="text-slate-500">No scheduled tasks in this period</p>
-        <p className="text-sm text-slate-400 mt-1">Run the scheduler to generate tasks</p>
+        <p className="text-slate-500">{t("maintenance.noScheduledTasks")}</p>
+        <p className="text-sm text-slate-400 mt-1">{t("maintenance.runSchedulerHint")}</p>
       </div>
     );
   }
@@ -1054,8 +1057,9 @@ const DailyPlanner = ({ data, onTaskClick }) => {
 
 /** Weekly grid: 7 day columns with hours / capacity bar */
 const WeeklyGrid = ({ days, capacityHours, onTaskClick }) => {
+  const { t } = useLanguage();
   if (!days?.length) {
-    return <div className="text-center py-12 text-sm text-slate-500">No scheduled tasks this week</div>;
+    return <div className="text-center py-12 text-sm text-slate-500">{t("maintenance.noScheduledTasksThisWeek")}</div>;
   }
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-2" data-testid="weekly-planner-grid">
@@ -1542,6 +1546,7 @@ const TaskDetailsDialog = ({
 
 
 const MaintenanceScheduleManager = ({ equipmentType }) => {
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("timeline");
   const [applyDialogOpen, setApplyDialogOpen] = useState(false);
@@ -1713,7 +1718,7 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-3 text-slate-900">
             <Calendar className="w-7 h-7 text-blue-600" />
-            {equipmentTypeName} <span className="text-slate-400 font-normal">|</span> Maintenance Schedule
+            {equipmentTypeName} <span className="text-slate-400 font-normal">|</span> {t("maintenance.maintenanceScheduleTitle")}
           </h1>
         </div>
         <div className="flex items-center gap-2">
@@ -1724,7 +1729,7 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
             data-testid="apply-strategy-btn"
           >
             <Play className="w-3.5 h-3.5 mr-1" />
-            Apply Strategy
+            {t("maintenance.applyStrategy")}
           </Button>
           <TooltipProvider>
             <Tooltip>
@@ -1742,7 +1747,7 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
                   ) : (
                     <Sparkles className="w-3.5 h-3.5 mr-1" />
                   )}
-                  AI Planner
+                  {t("maintenance.aiPlanner")}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -1764,7 +1769,7 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
                   ) : (
                     <RefreshCw className="w-3.5 h-3.5 mr-1" />
                   )}
-                  Run Scheduler
+                  {t("maintenance.runScheduler")}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -1785,17 +1790,17 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-6">
                 <div>
-                  <p className="text-sm text-slate-500">Equipment with Programs</p>
+                  <p className="text-sm text-slate-500">{t("maintenance.equipmentWithPrograms")}</p>
                   <p className="text-xl font-bold">{programsSummary.equipment_count}</p>
                 </div>
                 <div className="h-8 w-px bg-slate-200" />
                 <div>
-                  <p className="text-sm text-slate-500">Total Programs</p>
+                  <p className="text-sm text-slate-500">{t("maintenance.totalPrograms")}</p>
                   <p className="text-xl font-bold">{programsSummary.total_programs}</p>
                 </div>
                 <div className="h-8 w-px bg-slate-200" />
                 <div>
-                  <p className="text-sm text-slate-500">Programs Overdue</p>
+                  <p className="text-sm text-slate-500">{t("maintenance.programsOverdue")}</p>
                   <p className={`text-xl font-bold ${programsSummary.overdue_count > 0 ? "text-red-600" : ""}`}>
                     {programsSummary.overdue_count}
                   </p>
@@ -1805,7 +1810,7 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
                 <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
                   <p className="text-sm text-amber-700 flex items-center gap-2">
                     <AlertCircle className="w-4 h-4" />
-                    No maintenance programs yet. Apply the strategy to equipment to create programs.
+                    {t("maintenance.noProgramsYet")}
                   </p>
                 </div>
               )}
@@ -1819,19 +1824,19 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="timeline" className="text-xs" data-testid="tab-timeline">
             <CalendarRange className="w-3.5 h-3.5 mr-1.5" />
-            Timeline
+            {t("maintenance.timeline")}
           </TabsTrigger>
           <TabsTrigger value="planner" className="text-xs" data-testid="tab-planner">
             <CalendarDays className="w-3.5 h-3.5 mr-1.5" />
-            Planner
+            {t("maintenance.planner")}
           </TabsTrigger>
           <TabsTrigger value="tasks" className="text-xs" data-testid="tab-tasks">
             <ListChecks className="w-3.5 h-3.5 mr-1.5" />
-            Tasks
+            {t("library.tasks") !== "library.tasks" ? t("library.tasks") : t("maintenance.taskTemplatesLabel")}
           </TabsTrigger>
           <TabsTrigger value="programs" className="text-xs" data-testid="tab-programs">
             <Wrench className="w-3.5 h-3.5 mr-1.5" />
-            Programs
+            {t("maintenance.programs")}
           </TabsTrigger>
         </TabsList>
 
@@ -1897,7 +1902,7 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
                 onClick={() => setApplyDialogOpen(true)}
               >
                 <Play className="w-4 h-4 mr-2" />
-                Apply Strategy
+                {t("maintenance.applyStrategy")}
               </Button>
             </div>
           )}

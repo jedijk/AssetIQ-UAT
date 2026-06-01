@@ -805,7 +805,7 @@ const FailureModesPage = () => {
           <TabsTrigger value="maintenance" data-testid="maintenance-strategies-tab">{t("library.maintenance")}</TabsTrigger>
           <TabsTrigger value="schedule" className="flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5" />
-            Schedule
+            {t("maintenance.maintenanceScheduleTitle")}
           </TabsTrigger>
         </TabsList>
 

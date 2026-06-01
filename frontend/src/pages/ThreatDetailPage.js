@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { threatsAPI, actionsAPI, equipmentHierarchyAPI, failureModesAPI, usersAPI } from "../lib/api";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
+import { useEquipmentNodeNameMap, useEquipmentTypeNameMap, useFailureModeNameMap } from "../hooks/useTranslatedEntities";
 import { formatDate, formatTime, formatDateTime } from "../lib/dateUtils";
 import SearchableCombobox from "../components/SearchableCombobox";
 import EquipmentTimeline from "../components/EquipmentTimeline";
@@ -107,7 +108,19 @@ const ThreatDetailPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { pushUndo } = useUndo();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const nodeNameMap = useEquipmentNodeNameMap();
+  const typeNameMap = useEquipmentTypeNameMap();
+  const fmNameMap = useFailureModeNameMap();
+  const translateEquipmentTypeName = (n) => {
+    if (!n) return n;
+    const k = String(n).trim().toLowerCase();
+    return nodeNameMap[k] || typeNameMap[k] || n;
+  };
+  const translateFailureModeName = (n) => {
+    if (!n) return n;
+    return fmNameMap[String(n).trim().toLowerCase()] || n;
+  };
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [scoreCalcPopup, setScoreCalcPopup] = useState({ show: false, x: 0, y: 0 });
@@ -545,15 +558,23 @@ const ThreatDetailPage = () => {
     );
   }
 
+  // Helper: translate enum values (e.g. "Possible" → "Mogelijk"); fall back to original.
+  const translateEnum = (v) => {
+    if (!v) return v;
+    const key = `enums.${v}`;
+    const out = t(key);
+    return out && out !== key ? out : v;
+  };
+
   const infoItems = [
-    { label: t("observations.equipmentType"), value: threat.equipment_type, icon: Target, field: "equipment_type", type: "searchable", options: equipmentTypeOptions },
-    { label: t("observations.failureMode"), value: threat.failure_mode, icon: AlertTriangle, field: "failure_mode", type: "searchable", options: failureModeOptions },
-    { label: t("observations.impact"), value: threat.impact, icon: Activity, field: "impact", type: "select", options: IMPACT_OPTIONS },
-    { label: t("observations.frequency"), value: threat.frequency, icon: Clock, field: "frequency", type: "select", options: FREQUENCY_OPTIONS },
-    { label: t("observations.likelihood"), value: threat.likelihood, icon: Activity, field: "likelihood", type: "select", options: LIKELIHOOD_OPTIONS },
-    { label: t("observations.detectability"), value: threat.detectability, icon: Eye, field: "detectability", type: "select", options: DETECTABILITY_OPTIONS },
-    { label: t("observations.location"), value: threat.location || "Not specified", icon: MapPin, field: "location", type: "text" },
-    { label: "Owner", value: threat.owner_name || "Not assigned", icon: User, field: "owner_id", type: "user-select" },
+    { label: t("observations.equipmentType"), value: translateEquipmentTypeName(threat.equipment_type), rawValue: threat.equipment_type, icon: Target, field: "equipment_type", type: "searchable", options: equipmentTypeOptions },
+    { label: t("observations.failureMode"), value: translateFailureModeName(threat.failure_mode), rawValue: threat.failure_mode, icon: AlertTriangle, field: "failure_mode", type: "searchable", options: failureModeOptions },
+    { label: t("observations.impact"), value: translateEnum(threat.impact), rawValue: threat.impact, icon: Activity, field: "impact", type: "select", options: IMPACT_OPTIONS },
+    { label: t("observations.frequency"), value: translateEnum(threat.frequency), rawValue: threat.frequency, icon: Clock, field: "frequency", type: "select", options: FREQUENCY_OPTIONS },
+    { label: t("observations.likelihood"), value: translateEnum(threat.likelihood), rawValue: threat.likelihood, icon: Activity, field: "likelihood", type: "select", options: LIKELIHOOD_OPTIONS },
+    { label: t("observations.detectability"), value: translateEnum(threat.detectability), rawValue: threat.detectability, icon: Eye, field: "detectability", type: "select", options: DETECTABILITY_OPTIONS },
+    { label: t("observations.location"), value: threat.location || translateEnum("Not specified"), rawValue: threat.location, icon: MapPin, field: "location", type: "text" },
+    { label: translateEnum("Owner"), value: threat.owner_name || translateEnum("Not assigned"), rawValue: threat.owner_name, icon: User, field: "owner_id", type: "user-select" },
   ];
 
   const startEditing = () => {
@@ -1015,7 +1036,7 @@ const ThreatDetailPage = () => {
             </div>
             <div className="min-w-0">
               <div className="text-xs sm:text-sm font-semibold text-slate-900 truncate">
-                {threat.asset || t("observations.noEquipmentLinked")}
+                {translateEquipmentTypeName(threat.asset) || t("observations.noEquipmentLinked")}
               </div>
               {linkedCriticalityData ? (
                 <span className="text-[10px] sm:text-xs text-green-600">{t("observations.criticalityLinked")}</span>
@@ -1235,7 +1256,7 @@ const ThreatDetailPage = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {item.options.map(opt => (
-                      <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                      <SelectItem key={opt} value={opt}>{translateEnum(opt)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1259,7 +1280,7 @@ const ThreatDetailPage = () => {
                     <SelectValue placeholder="Select owner..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="_none">Not assigned</SelectItem>
+                    <SelectItem value="_none">{translateEnum("Not assigned")}</SelectItem>
                     {usersList.map(u => (
                       <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                     ))}
