@@ -11,9 +11,9 @@ import pandas as pd
 from database import db
 from auth import get_current_user
 from iso14224_models import (
-    ISOLevel, detect_equipment_type,
+    ISOLevel, ISO_LEVEL_LABELS, LEGACY_LEVEL_MAP, detect_equipment_type,
     UnstructuredItemCreate, ParseEquipmentListRequest, AssignToHierarchyRequest,
-    is_valid_parent_child, get_valid_child_levels
+    is_valid_parent_child, get_valid_child_levels,
 )
 
 logger = logging.getLogger(__name__)
@@ -295,11 +295,12 @@ async def clear_unstructured_items(
 # =============================================================================
 
 EXCEL_LEVEL_MAPPING = {
-    "Plant/Unit": "plant",
-    "Section/System": "section",
-    "Equipment Unit": "unit",
+    "Plant/Unit": "plant_unit",
+    "Section/System": "section_system",
+    "Equipment Unit": "equipment_unit",
     "Subunit": "subunit",
-    "Maintainable Item": "maintainable_item"
+    "Maintainable Item": "maintainable_item",
+    "Installation": "installation",
 }
 
 
@@ -340,17 +341,96 @@ class ExcelHierarchyImportRequest(BaseModel):
     replace_existing: bool = True
 
 
-# ISO 14224 Level mapping for file imports
-ISO_LEVEL_MAPPING = {
-    "Plant/Unit": "plant_unit",
-    "Section/System": "section_system",
-    "Equipment Unit": "equipment_unit",
-    "Subunit": "subunit",
-    "Maintainable Item": "maintainable_item",
-}
+# ISO 14224 Level mapping for file imports (display labels)
+ISO_LEVEL_MAPPING = dict(EXCEL_LEVEL_MAPPING)
 
-# Level hierarchy order
+# Level hierarchy order (installation is the selected target, not imported as a child row)
 ISO_LEVEL_ORDER = ["plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"]
+
+# Accept many spreadsheet variants for the Level column
+_LEVEL_INPUT_MAP: dict[str, str] = {}
+
+
+def _build_level_input_map() -> dict[str, str]:
+    if _LEVEL_INPUT_MAP:
+        return _LEVEL_INPUT_MAP
+    mapping: dict[str, str] = {}
+    for label, iso in ISO_LEVEL_MAPPING.items():
+        mapping[label.lower()] = iso
+        mapping[label.replace("/", " ").lower()] = iso
+        mapping[label.replace("/", "_").lower()] = iso
+    for enum_member in ISOLevel:
+        val = enum_member.value
+        if val == "installation":
+            continue
+        mapping[val.lower()] = val
+        label = ISO_LEVEL_LABELS.get(enum_member)
+        if label:
+            mapping[label.lower()] = val
+            mapping[label.replace("/", " ").lower()] = val
+            mapping[label.replace("/", "_").lower()] = val
+    for legacy, iso in LEGACY_LEVEL_MAP.items():
+        mapping[legacy.lower()] = iso
+    # Common spreadsheet aliases
+    mapping.update({
+        "plant": "plant_unit",
+        "unit": "plant_unit",
+        "section": "section_system",
+        "system": "section_system",
+        "equipment": "equipment_unit",
+        "maintainable item": "maintainable_item",
+        "maintainable": "maintainable_item",
+        "equipment unit": "equipment_unit",
+    })
+    _LEVEL_INPUT_MAP.update(mapping)
+    return _LEVEL_INPUT_MAP
+
+
+def resolve_iso_level(level_raw) -> str | None:
+    """Map a spreadsheet Level cell to canonical ISO level key."""
+    if level_raw is None or (isinstance(level_raw, float) and pd.isna(level_raw)):
+        return None
+    level_str = str(level_raw).strip()
+    if not level_str:
+        return None
+    if level_str in ISO_LEVEL_MAPPING:
+        return ISO_LEVEL_MAPPING[level_str]
+    key = level_str.lower()
+    resolved = _build_level_input_map().get(key)
+    if resolved:
+        return resolved
+    compact = key.replace("/", "_").replace("-", "_").replace(" ", "_")
+    return _build_level_input_map().get(compact)
+
+
+def _find_df_column(df: pd.DataFrame, *candidates: str) -> str | None:
+    """Case-insensitive column lookup."""
+    lower_map = {str(c).strip().lower(): c for c in df.columns}
+    for cand in candidates:
+        if cand in df.columns:
+            return cand
+        hit = lower_map.get(cand.lower())
+        if hit is not None:
+            return hit
+    return None
+
+
+def _is_uuid_string(value: str) -> bool:
+    try:
+        uuid.UUID(str(value).strip())
+        return True
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
+def _cell_str(row: dict, col: str | None) -> str | None:
+    if not col:
+        return None
+    val = row.get(col)
+    if val is None or (isinstance(val, float) and pd.isna(val)):
+        return None
+    text = str(val).strip()
+    return text or None
 
 
 @router.post("/equipment-hierarchy/import-excel")
@@ -390,9 +470,13 @@ async def import_excel_file(
     try:
         content = await file.read()
         df = pd.read_excel(io.BytesIO(content))
+        df.columns = [str(c).strip() for c in df.columns]
     except Exception as e:
         logger.error(f"Failed to read Excel file: {e}")
         raise HTTPException(status_code=400, detail=f"Failed to read Excel file: {str(e)}")
+    
+    if df.empty:
+        raise HTTPException(status_code=400, detail="Excel file has no data rows")
     
     # Get existing nodes for deduplication
     existing_nodes = await db.equipment_nodes.find(
@@ -402,73 +486,141 @@ async def import_excel_file(
     
     nodes_by_tag = {n.get("tag"): n for n in existing_nodes if n.get("tag")}
     nodes_by_name_parent = {(n.get("name", "").lower(), n.get("parent_id")): n for n in existing_nodes}
+    nodes_by_name = {}
+    for n in existing_nodes:
+        key = (n.get("name") or "").lower()
+        if key and key not in nodes_by_name:
+            nodes_by_name[key] = n
     
     # Track parent at each level for sequential hierarchy inference
     current_parents = {
         -1: {"id": installation_id, "name": installation.get("name")}
     }
     
-    # Determine column names
-    id_col = 'ID' if 'ID' in df.columns else 'Tag' if 'Tag' in df.columns else None
-    name_col = 'Name' if 'Name' in df.columns else 'Line Item Name' if 'Line Item Name' in df.columns else None
+    # Determine column names (case-insensitive)
+    tag_col = _find_df_column(df, "Tag", "Equipment Tag")
+    id_col = _find_df_column(df, "ID", "Identifier")
+    name_col = _find_df_column(df, "Name", "Line Item Name", "Equipment Name")
+    level_col = _find_df_column(df, "Level", "ISO Level", "Hierarchy Level")
+    parent_col = _find_df_column(df, "Parent", "Parent Name")
+    path_col = _find_df_column(df, "Full Path", "Path", "Hierarchy Path")
+    description_col = _find_df_column(df, "Description")
+    equipment_type_col = _find_df_column(df, "Equipment Type", "Type")
+    safety_col = _find_df_column(df, "Safety")
+    production_col = _find_df_column(df, "Production")
+    environmental_col = _find_df_column(df, "Environmental")
+    reputation_col = _find_df_column(df, "Reputation")
     
     if not name_col:
         raise HTTPException(status_code=400, detail="Excel file must have a 'Name' or 'Line Item Name' column")
+    if not level_col:
+        raise HTTPException(status_code=400, detail="Excel file must have a 'Level' column")
     
     # Stats
     created_count = 0
     updated_count = 0
     skipped_count = 0
+    invalid_level_count = 0
+    empty_row_count = 0
     errors = []
+    invalid_level_samples: list[str] = []
     
-    # Process rows
-    rows = df.to_dict('records')
+    def resolve_parent_id(parent_name: str | None, iso_level: str) -> str | None:
+        """Resolve parent from Parent column or Full Path."""
+        if parent_name:
+            parent_key = parent_name.lower()
+            if parent_key in nodes_by_name:
+                return nodes_by_name[parent_key]["id"]
+            install_name = (installation.get("name") or "").lower()
+            if parent_key == install_name:
+                return installation_id
+        return None
+    
+    # Process rows (sort by level depth so sequential parent stack is more reliable)
+    rows = df.to_dict("records")
+
+    def row_sort_key(row):
+        iso = resolve_iso_level(row.get(level_col)) if level_col else None
+        if iso and iso in ISO_LEVEL_ORDER:
+            return ISO_LEVEL_ORDER.index(iso)
+        return 99
+
+    rows = sorted(rows, key=row_sort_key)
     batch_inserts = []
     for idx, row in enumerate(rows):
         try:
-            tag = str(row.get(id_col, '')).strip() if id_col and pd.notna(row.get(id_col)) else None
-            name = str(row.get(name_col, '')).strip() if pd.notna(row.get(name_col)) else None
-            level_str = str(row.get('Level', '')).strip() if pd.notna(row.get('Level')) else None
-            description = str(row.get('Description', '')).strip() if pd.notna(row.get('Description')) else None
-            equipment_type = str(row.get('Equipment Type', '')).strip() if pd.notna(row.get('Equipment Type')) else None
-            
-            # Skip rows without valid level
-            iso_level = ISO_LEVEL_MAPPING.get(level_str) if level_str else None
+            name = _cell_str(row, name_col)
+            level_raw = row.get(level_col) if level_col else None
+            iso_level = resolve_iso_level(level_raw)
+
             if not iso_level:
+                if name or (level_raw is not None and str(level_raw).strip()):
+                    invalid_level_count += 1
+                    if len(invalid_level_samples) < 5 and level_raw is not None:
+                        invalid_level_samples.append(str(level_raw).strip())
+                else:
+                    empty_row_count += 1
                 continue
-            
-            # Skip rows without name
-            if not name:
+
+            if iso_level == "installation":
+                empty_row_count += 1
                 continue
-            
-            # Use tag as name if tag exists but name is empty
+
+            tag = _cell_str(row, tag_col)
+            if not tag and id_col:
+                id_val = _cell_str(row, id_col)
+                if id_val and not _is_uuid_string(id_val):
+                    tag = id_val
+
             if not name and tag:
                 name = tag
-            
+            if not name:
+                empty_row_count += 1
+                continue
+
+            description = _cell_str(row, description_col)
+            equipment_type = _cell_str(row, equipment_type_col)
+
             # Calculate criticality if scores provided
             criticality = None
-            safety = int(row.get('Safety') or 0) if pd.notna(row.get('Safety')) else 0
-            production = int(row.get('Production') or 0) if pd.notna(row.get('Production')) else 0
-            environmental = int(row.get('Environmental') or 0) if pd.notna(row.get('Environmental')) else 0
-            reputation = int(row.get('Reputation') or 0) if pd.notna(row.get('Reputation')) else 0
-            
+            safety = int(row.get(safety_col) or 0) if safety_col and pd.notna(row.get(safety_col)) else 0
+            production = int(row.get(production_col) or 0) if production_col and pd.notna(row.get(production_col)) else 0
+            environmental = int(row.get(environmental_col) or 0) if environmental_col and pd.notna(row.get(environmental_col)) else 0
+            reputation = int(row.get(reputation_col) or 0) if reputation_col and pd.notna(row.get(reputation_col)) else 0
+
             if safety > 0 or production > 0 or environmental > 0 or reputation > 0:
                 criticality = calculate_criticality_from_excel(safety, production, environmental, reputation)
-            
-            # Determine parent from level hierarchy
+
             level_idx = ISO_LEVEL_ORDER.index(iso_level)
             parent_level_idx = level_idx - 1
-            
-            if parent_level_idx not in current_parents:
-                skipped_count += 1
-                continue
-            
-            parent_id = current_parents[parent_level_idx]["id"]
+            parent_id = None
+
+            # Full Path: "Installation > Plant > Section" — parent is second-to-last segment
+            full_path = _cell_str(row, path_col)
+            if full_path:
+                parts = [p.strip() for p in full_path.replace(">", "/").split("/") if p.strip()]
+                if len(parts) >= 2:
+                    parent_id = resolve_parent_id(parts[-2], iso_level)
+
+            if not parent_id:
+                parent_name = _cell_str(row, parent_col)
+                parent_id = resolve_parent_id(parent_name, iso_level)
+
+            if not parent_id:
+                if parent_level_idx not in current_parents:
+                    skipped_count += 1
+                    errors.append(
+                        f"Row {idx + 2}: missing parent for '{name}' ({iso_level}); "
+                        "add parent rows above or use Parent / Full Path columns"
+                    )
+                    continue
+                parent_id = current_parents[parent_level_idx]["id"]
             
             # Check if exists by tag
             if tag and tag in nodes_by_tag:
                 existing = nodes_by_tag[tag]
                 current_parents[level_idx] = existing
+                nodes_by_name[name.lower()] = existing
                 skipped_count += 1
                 continue
             
@@ -486,6 +638,7 @@ async def import_excel_file(
                     await db.equipment_nodes.update_one({"id": existing["id"]}, {"$set": update_data})
                     updated_count += 1
                 current_parents[level_idx] = existing
+                nodes_by_name[name.lower()] = existing
                 if tag:
                     nodes_by_tag[tag] = existing
                 continue
@@ -510,6 +663,7 @@ async def import_excel_file(
             batch_inserts.append(node_doc)
             
             current_parents[level_idx] = node_doc
+            nodes_by_name[name.lower()] = node_doc
             if tag:
                 nodes_by_tag[tag] = node_doc
             nodes_by_name_parent[(name.lower(), parent_id)] = node_doc
@@ -526,6 +680,17 @@ async def import_excel_file(
         for doc in batch_inserts:
             doc.pop("_id", None)
     
+    if created_count == 0 and updated_count == 0 and invalid_level_count > 0:
+        sample = ", ".join(repr(s) for s in invalid_level_samples)
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"No rows imported: {invalid_level_count} row(s) had unrecognized Level values. "
+                f"Use labels like Plant/Unit, Section/System, Equipment Unit, Subunit, Maintainable Item "
+                f"(or plant_unit, section_system, etc.). Examples from file: {sample}"
+            ),
+        )
+
     return {
         "success": True,
         "installation_id": installation_id,
@@ -533,8 +698,15 @@ async def import_excel_file(
         "created_count": created_count,
         "updated_count": updated_count,
         "skipped_count": skipped_count,
+        "invalid_level_count": invalid_level_count,
+        "empty_row_count": empty_row_count,
+        "invalid_level_samples": invalid_level_samples,
         "errors": errors[:10] if errors else [],
-        "message": f"Import complete: {created_count} created, {updated_count} updated, {skipped_count} skipped"
+        "message": (
+            f"Import complete: {created_count} created, {updated_count} updated, "
+            f"{skipped_count} skipped"
+            + (f", {invalid_level_count} invalid level(s)" if invalid_level_count else "")
+        ),
     }
 
 
@@ -569,7 +741,7 @@ async def import_hierarchy_from_excel(
         raise HTTPException(status_code=400, detail=f"Failed to load Excel file: {str(e)}")
     
     headers = [cell.value for cell in ws[1]]
-    level_order = {"plant": 0, "section": 1, "unit": 2, "subunit": 3, "maintainable_item": 4}
+    level_order = {lvl: i for i, lvl in enumerate(ISO_LEVEL_ORDER)}
     
     current_path = []
     all_items = []
@@ -582,8 +754,8 @@ async def import_hierarchy_from_excel(
         if not name or not level_raw:
             continue
         
-        level = EXCEL_LEVEL_MAPPING.get(level_raw)
-        if not level:
+        level = resolve_iso_level(level_raw)
+        if not level or level == "installation":
             logger.warning(f"Unknown level '{level_raw}' for '{name}', skipping...")
             continue
         
@@ -599,7 +771,7 @@ async def import_hierarchy_from_excel(
         if safety > 0 or production > 0 or environmental > 0 or reputation > 0:
             criticality = calculate_criticality_from_excel(safety, production, environmental, reputation)
         
-        while current_path and level_order[current_path[-1][0]] >= level_num:
+        while current_path and level_order.get(current_path[-1][0], 99) >= level_num:
             current_path.pop()
         
         parent_name = current_path[-1][1] if current_path else None

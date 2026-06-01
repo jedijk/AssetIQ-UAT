@@ -439,7 +439,7 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
         <ContextMenuContent className="w-48">
           <ContextMenuItem onClick={() => handleContextMenuAction("select")}>
             <Check className="w-4 h-4 mr-2" />
-            {t("common.select") || "Select"}
+            {t("common.select")}
           </ContextMenuItem>
           {hasChildren && (
             <ContextMenuItem onClick={() => handleContextMenuAction("expand")}>
@@ -493,7 +493,7 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
               className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2"
               onClick={() => handleContextMenuAction("select")}
             >
-              <Check className="w-4 h-4" /> {t("common.select") || "Select"}
+              <Check className="w-4 h-4" /> {t("common.select")}
             </button>
             {hasChildren && (
               <button 
@@ -568,6 +568,7 @@ export default function EquipmentManagerPage() {
   const location = useLocation();
   const { pushUndo } = useUndo();
   const { t } = useLanguage();
+  const nodeTransMap = useEquipmentNodeIdMap();
   const { user } = useAuth();
   const fileInputRef = useRef(null);
   const searchInputRef = useRef(null);
@@ -702,14 +703,16 @@ export default function EquipmentManagerPage() {
   const nodeMatchesSearch = useCallback((node, query) => {
     if (!query) return true;
     const q = query.toLowerCase();
+    const translatedName = nodeTransMap[node.id]?.name;
     const nameMatch = node.name?.toLowerCase().includes(q);
+    const translatedNameMatch = translatedName?.toLowerCase().includes(q);
     const descMatch = node.description?.toLowerCase().includes(q);
     const tagMatch = node.tag?.toLowerCase().includes(q);
     // Also check equipment type name if assigned
-    const eqType = equipmentTypes.find(t => t.id === node.equipment_type_id);
+    const eqType = equipmentTypes.find((et) => et.id === node.equipment_type_id);
     const typeMatch = eqType?.name?.toLowerCase().includes(q);
-    return nameMatch || descMatch || tagMatch || typeMatch;
-  }, [equipmentTypes]);
+    return nameMatch || translatedNameMatch || descMatch || tagMatch || typeMatch;
+  }, [equipmentTypes, nodeTransMap]);
   
   // Find all parent IDs for a given node
   const getParentChain = useCallback((nodeId, nodeList) => {
@@ -1099,13 +1102,19 @@ export default function EquipmentManagerPage() {
       formData.append('installation_id', excelImportInstallation);
       
       const response = await api.post('/equipment-hierarchy/import-excel', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 120000,
       });
       
       const data = response.data;
-      
-      toast.success(`Import complete: ${data.created_count} created, ${data.updated_count} updated`);
+      const summary =
+        data.message ||
+        `Import complete: ${data.created_count} created, ${data.updated_count} updated, ${data.skipped_count ?? 0} skipped`;
+
+      if ((data.created_count ?? 0) === 0 && (data.updated_count ?? 0) === 0) {
+        toast.warning(summary);
+      } else {
+        toast.success(summary);
+      }
       queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
       setIsExcelImportOpen(false);
       setExcelImportFile(null);
@@ -1153,7 +1162,7 @@ export default function EquipmentManagerPage() {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-blue-500" />
             <Input 
               ref={searchInputRef}
-              placeholder={t("equipment.searchPlaceholder") || "Search equipment by name, tag, or description..."} 
+              placeholder={t("equipment.searchPlaceholder")}
               value={searchQuery} 
               onChange={e => setSearchQuery(e.target.value)} 
               className="pl-12 pr-12 h-12 text-base bg-white border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 rounded-lg" 
@@ -1169,18 +1178,20 @@ export default function EquipmentManagerPage() {
               </button>
             ) : (
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-slate-400 hidden sm:block">
-                Press / to search
+                {t("equipment.pressSlashToSearch")}
               </span>
             )}
           </div>
           {searchQuery && (
             <div className="mt-2 flex items-center gap-3">
               <span className="text-sm font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded">
-                {matchingIds.size} {matchingIds.size === 1 ? "match" : "matches"} found
+                {matchingIds.size}{" "}
+                {matchingIds.size === 1 ? t("equipment.matchSingular") : t("equipment.matches")}{" "}
+                {t("equipment.matchesFound")}
               </span>
               {matchingIds.size > 0 && (
                 <span className="text-xs text-slate-500">
-                  Matching items are highlighted in yellow
+                  {t("equipment.searchHighlightHint")}
                 </span>
               )}
             </div>
