@@ -645,19 +645,19 @@ export default function EquipmentManagerPage() {
 
   // Full refresh handler - clears both backend and frontend cache
   const handleFullRefresh = async () => {
-    toast.info("Refreshing equipment data...");
+    toast.info(t("equipment.refreshingData"));
     try {
       // Clear backend cache first
       await equipmentHierarchyAPI.refreshCache();
       // Then clear frontend cache and refetch
       await queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
       await queryClient.refetchQueries({ queryKey: ["equipment-nodes"] });
-      toast.success("Equipment data refreshed");
+      toast.success(t("equipment.dataRefreshed"));
     } catch (error) {
       console.error("Refresh failed:", error);
       // Still try to refetch even if backend cache clear fails
       await queryClient.refetchQueries({ queryKey: ["equipment-nodes"] });
-      toast.success("Equipment data refreshed");
+      toast.success(t("equipment.dataRefreshed"));
     }
   };
 
@@ -763,8 +763,8 @@ export default function EquipmentManagerPage() {
   const flatRows = useMemo(() => flattenTree(treeData, expandedIds), [treeData, expandedIds]);
 
   // Mutations
-  const createMutation = useMutation({ mutationFn: equipmentHierarchyAPI.createNode, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] }); toast.success("Node created"); setIsCreateOpen(false); setNewNode({ name: "", level: "installation", parent_id: null }); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
-  const updateMutation = useMutation({ mutationFn: ({ nodeId, data }) => equipmentHierarchyAPI.updateNode(nodeId, data), onSuccess: data => { queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] }); setSelectedNode(data); toast.success("Updated"); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
+  const createMutation = useMutation({ mutationFn: equipmentHierarchyAPI.createNode, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] }); toast.success(t("equipment.nodeCreated")); setIsCreateOpen(false); setNewNode({ name: "", level: "installation", parent_id: null }); }, onError: e => toast.error(e.response?.data?.detail || t("equipment.operationFailed")) });
+  const updateMutation = useMutation({ mutationFn: ({ nodeId, data }) => equipmentHierarchyAPI.updateNode(nodeId, data), onSuccess: data => { queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] }); setSelectedNode(data); toast.success(t("equipment.nodeUpdated")); }, onError: e => toast.error(e.response?.data?.detail || t("equipment.operationFailed")) });
   const deleteMutation = useMutation({ 
     mutationFn: async (nodeId) => {
       // Find the node to delete before actually deleting
@@ -793,9 +793,9 @@ export default function EquipmentManagerPage() {
       }
       queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] }); 
       setSelectedNode(null); 
-      toast.success("Deleted"); 
+      toast.success(t("equipment.nodeDeleted")); 
     }, 
-    onError: e => toast.error(e.response?.data?.detail || "Failed") 
+    onError: e => toast.error(e.response?.data?.detail || t("equipment.operationFailed")) 
   });
   const criticalityMutation = useMutation({ 
     mutationFn: ({ nodeId, assignment }) => equipmentHierarchyAPI.assignCriticality(nodeId, assignment), 
@@ -803,29 +803,29 @@ export default function EquipmentManagerPage() {
       queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] }); 
       setSelectedNode(data); 
       if (variables.assignment.profile_id === null) {
-        toast.success("Criticality cleared");
+        toast.success(t("equipment.criticalityCleared"));
       } else {
-        toast.success("Criticality assigned");
+        toast.success(t("equipment.criticalityAssigned"));
       }
     }, 
-    onError: e => toast.error(e.response?.data?.detail || "Failed") 
+    onError: e => toast.error(e.response?.data?.detail || t("equipment.operationFailed")) 
   });
-  const disciplineMutation = useMutation({ mutationFn: ({ nodeId, discipline }) => equipmentHierarchyAPI.assignDiscipline(nodeId, discipline), onSuccess: data => { queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] }); setSelectedNode(data); toast.success("Discipline assigned"); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
-  const parseListMutation = useMutation({ mutationFn: ({ content, source }) => equipmentHierarchyAPI.parseEquipmentList(content, source), onSuccess: (data) => { queryClient.invalidateQueries({ queryKey: ["unstructured-items"] }); toast.success(`Parsed ${data.parsed_count} items`); setIsImportOpen(false); setImportText(""); }, onError: e => toast.error(e.response?.data?.detail || "Failed to parse") });
-  const parseFileMutation = useMutation({ mutationFn: (file) => equipmentHierarchyAPI.parseEquipmentFile(file), onSuccess: (data) => { queryClient.invalidateQueries({ queryKey: ["unstructured-items"] }); toast.success(`Parsed ${data.parsed_count} items from ${data.filename}`); }, onError: e => toast.error(e.response?.data?.detail || "Failed to parse file") });
-  const deleteUnstructuredMutation = useMutation({ mutationFn: equipmentHierarchyAPI.deleteUnstructuredItem, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["unstructured-items"] }); }, onError: e => toast.error(e.response?.data?.detail || "Failed") });
-  const assignToHierarchyMutation = useMutation({ mutationFn: ({ itemId, parentId, level }) => equipmentHierarchyAPI.assignUnstructuredToHierarchy(itemId, parentId, level), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] }); queryClient.invalidateQueries({ queryKey: ["unstructured-items"] }); toast.success("Item added to hierarchy"); }, onError: e => toast.error(e.response?.data?.detail || "Failed to assign") });
+  const disciplineMutation = useMutation({ mutationFn: ({ nodeId, discipline }) => equipmentHierarchyAPI.assignDiscipline(nodeId, discipline), onSuccess: data => { queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] }); setSelectedNode(data); toast.success(t("equipment.disciplineAssigned")); }, onError: e => toast.error(e.response?.data?.detail || t("equipment.operationFailed")) });
+  const parseListMutation = useMutation({ mutationFn: ({ content, source }) => equipmentHierarchyAPI.parseEquipmentList(content, source), onSuccess: (data) => { queryClient.invalidateQueries({ queryKey: ["unstructured-items"] }); toast.success(`${data.parsed_count} ${t("equipment.itemsParsed")}`); setIsImportOpen(false); setImportText(""); }, onError: e => toast.error(e.response?.data?.detail || t("equipment.failedToParse")) });
+  const parseFileMutation = useMutation({ mutationFn: (file) => equipmentHierarchyAPI.parseEquipmentFile(file), onSuccess: (data) => { queryClient.invalidateQueries({ queryKey: ["unstructured-items"] }); toast.success(`${data.parsed_count} ${t("equipment.itemsParsedFrom")} ${data.filename}`); }, onError: e => toast.error(e.response?.data?.detail || t("equipment.failedToParseFile")) });
+  const deleteUnstructuredMutation = useMutation({ mutationFn: equipmentHierarchyAPI.deleteUnstructuredItem, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["unstructured-items"] }); }, onError: e => toast.error(e.response?.data?.detail || t("equipment.operationFailed")) });
+  const assignToHierarchyMutation = useMutation({ mutationFn: ({ itemId, parentId, level }) => equipmentHierarchyAPI.assignUnstructuredToHierarchy(itemId, parentId, level), onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] }); queryClient.invalidateQueries({ queryKey: ["unstructured-items"] }); toast.success(t("equipment.itemAddedToHierarchy")); }, onError: e => toast.error(e.response?.data?.detail || t("equipment.failedToAssign")) });
   
   // Move node mutation - simple approach with refetch
   const moveNodeMutation = useMutation({ 
     mutationFn: ({ nodeId, newParentId }) => equipmentHierarchyAPI.moveNode(nodeId, newParentId), 
     onSuccess: () => { 
       queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
-      toast.success("Node moved successfully"); 
+      toast.success(t("equipment.nodeMovedSuccess")); 
       setMovingNode(null);
     }, 
     onError: (e) => { 
-      toast.error(e.response?.data?.detail || "Failed to move node"); 
+      toast.error(e.response?.data?.detail || t("equipment.failedToMoveNode")); 
       setMovingNode(null);
     }
   });
@@ -835,10 +835,10 @@ export default function EquipmentManagerPage() {
     mutationFn: ({ nodeId, newLevel, newParentId }) => equipmentHierarchyAPI.changeNodeLevel(nodeId, newLevel, newParentId),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
-      toast.success(data.message || "Level changed");
+      toast.success(data.message || t("equipment.levelChanged"));
       setSelectedNode(data.node);
     },
-    onError: (e) => toast.error(e.response?.data?.detail || "Failed to change level")
+    onError: (e) => toast.error(e.response?.data?.detail || t("equipment.failedToChangeLevel"))
   });
   
   // State for demote dialog (need to select new parent)
@@ -854,7 +854,7 @@ export default function EquipmentManagerPage() {
       const impact = await equipmentHierarchyAPI.getDeletionImpact(node.id);
       setDeleteConfirmation({ open: true, node, impact, loading: false });
     } catch (error) {
-      toast.error("Failed to analyze deletion impact");
+      toast.error(t("equipment.failedAnalyzeDeletion"));
       setDeleteConfirmation({ open: false, node: null, impact: null, loading: false });
     }
   };
@@ -917,7 +917,7 @@ export default function EquipmentManagerPage() {
       queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
       toast.success(data.message || "Reordered");
     },
-    onError: (e) => toast.error(e.response?.data?.detail || "Failed to reorder")
+    onError: (e) => toast.error(e.response?.data?.detail || t("equipment.failedToReorder"))
   });
 
   // Reorder to position mutation (for drag-drop)
@@ -928,7 +928,7 @@ export default function EquipmentManagerPage() {
       queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
       toast.success(data.message || "Moved");
     },
-    onError: (e) => toast.error(e.response?.data?.detail || "Failed to move")
+    onError: (e) => toast.error(e.response?.data?.detail || t("equipment.failedToMove"))
   });
 
   // Handle reorder via drag-drop
@@ -1024,7 +1024,7 @@ export default function EquipmentManagerPage() {
 
   const handleFileUpload = (e) => { const file = e.target.files?.[0]; if (file) { parseFileMutation.mutate(file); e.target.value = ""; } };
   const getNextLevel = level => { const normalizedLevel = normalizeLevel(level); const idx = LEVEL_ORDER.indexOf(normalizedLevel); return idx >= 0 && idx < LEVEL_ORDER.length - 1 ? LEVEL_ORDER[idx + 1] : null; };
-  const handleAddChild = () => { if (selectedNode) { const next = getNextLevel(selectedNode.level); if (next) { setNewNode({ name: "", level: next, parent_id: selectedNode.id }); setIsCreateOpen(true); } else toast.error("Cannot add children to maintainable items"); } };
+  const handleAddChild = () => { if (selectedNode) { const next = getNextLevel(selectedNode.level); if (next) { setNewNode({ name: "", level: next, parent_id: selectedNode.id }); setIsCreateOpen(true); } else toast.error(t("equipment.cannotAddChildren")); } };
   
   // Context menu handlers for TreeNode
   const handleContextAddChild = (node) => {
@@ -1033,14 +1033,14 @@ export default function EquipmentManagerPage() {
       setNewNode({ name: "", level: next, parent_id: node.id });
       setIsCreateOpen(true);
     } else {
-      toast.error("Cannot add children to maintainable items");
+      toast.error(t("equipment.cannotAddChildren"));
     }
   };
   
   const handleContextEdit = (node) => {
     setSelectedNode(node);
     // Could open an edit dialog here if needed
-    toast.info("Node selected for editing. Use the Properties panel on the right.");
+    toast.info(t("equipment.nodeSelectedForEdit"));
   };
   
   const handleContextDelete = (node) => {
@@ -1079,10 +1079,10 @@ export default function EquipmentManagerPage() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      toast.success(t("equipment.exportSuccess") || "Hierarchy exported successfully");
+      toast.success(t("equipment.exportSuccess"));
     } catch (error) {
       console.error("Export error:", error);
-      toast.error(t("equipment.exportError") || "Failed to export hierarchy");
+      toast.error(t("equipment.exportError"));
     } finally {
       setIsExporting(false);
     }
@@ -1091,7 +1091,7 @@ export default function EquipmentManagerPage() {
   // Import Excel hierarchy
   const handleExcelImport = async () => {
     if (!excelImportFile || !excelImportInstallation) {
-      toast.error("Please select a file and installation");
+      toast.error(t("equipment.selectFileAndInstallation"));
       return;
     }
     
@@ -1121,7 +1121,7 @@ export default function EquipmentManagerPage() {
       setExcelImportInstallation("");
     } catch (error) {
       console.error("Excel import error:", error);
-      toast.error(error.response?.data?.detail || error.message || "Failed to import Excel file");
+      toast.error(error.response?.data?.detail || error.message || t("equipment.failedImportExcel"));
     } finally {
       setIsImportingExcel(false);
     }
@@ -1215,7 +1215,7 @@ export default function EquipmentManagerPage() {
           <Button onClick={() => setIsImportOpen(true)} size="sm" variant="outline" data-testid="import-list-btn"><Upload className="w-4 h-4 mr-1" />{t("equipment.importList")}</Button>
           {(isOwner || user?.role === "admin") && installations.length > 0 && (
             <Button onClick={() => setIsExcelImportOpen(true)} size="sm" variant="outline" data-testid="import-excel-btn">
-              <FileText className="w-4 h-4 mr-1" />{t("equipment.importExcel") || "Import Excel"}
+              <FileText className="w-4 h-4 mr-1" />{t("equipment.importExcel")}
             </Button>
           )}
           {(isOwner || user?.role === "admin") && (
@@ -1237,7 +1237,7 @@ export default function EquipmentManagerPage() {
             </Button>
           )}
           <Button onClick={handleExportExcel} size="sm" variant="outline" disabled={isExporting || nodes.length === 0} data-testid="export-excel-btn">
-            <Download className="w-4 h-4 mr-1" />{isExporting ? (t("common.exporting") || "Exporting...") : (t("equipment.exportExcel") || "Export Excel")}
+            <Download className="w-4 h-4 mr-1" />{isExporting ? t("common.exporting") : t("equipment.exportExcel")}
           </Button>
           {isOwner && (
             <Button onClick={() => { setNewNode({ name: "", level: "installation", parent_id: null }); setIsCreateOpen(true); }} size="sm" className="bg-blue-600 hover:bg-blue-700" data-testid="add-installation-btn"><Plus className="w-4 h-4 mr-1" />{t("equipment.addInstallation")}</Button>
@@ -1267,7 +1267,7 @@ export default function EquipmentManagerPage() {
             <div className="flex flex-col items-center justify-center h-64 text-center">
               <Building2 className="w-12 h-12 text-slate-300 mb-3" />
               <h3 className="text-lg font-semibold text-slate-600 mb-1">{t("equipment.noEquipment")}</h3>
-              <p className="text-sm text-slate-400 mb-4">{isOwner ? t("equipment.addFirstEquipment") : "Contact an owner to add installations"}</p>
+              <p className="text-sm text-slate-400 mb-4">{isOwner ? t("equipment.addFirstEquipment") : t("equipment.contactOwnerForInstall")}</p>
               <div className="flex gap-2">
                 <Button onClick={() => setIsImportOpen(true)} size="sm" variant="outline"><Upload className="w-4 h-4 mr-1" />{t("equipment.importList")}</Button>
                 {isOwner && (
@@ -1376,17 +1376,17 @@ export default function EquipmentManagerPage() {
       <Dialog open={isExcelImportOpen} onOpenChange={(open) => { if (!open) { setExcelImportFile(null); setExcelImportInstallation(""); } setIsExcelImportOpen(open); }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{t("equipment.importExcelHierarchy") || "Import Excel Hierarchy"}</DialogTitle>
+            <DialogTitle>{t("equipment.importExcelHierarchy")}</DialogTitle>
             <DialogDescription>
-              {t("equipment.importExcelDescription") || "Upload an Excel file with equipment hierarchy data. The file should have columns: ID (tag), Name, Level, and optionally Equipment Type, Description, and criticality scores."}
+              {t("equipment.importExcelDescription")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div>
-              <Label>{t("equipment.selectInstallation") || "Select Installation"}</Label>
+              <Label>{t("equipment.selectInstallation")}</Label>
               <Select value={excelImportInstallation} onValueChange={setExcelImportInstallation}>
                 <SelectTrigger className="mt-1">
-                  <SelectValue placeholder={t("equipment.selectInstallation") || "Select installation..."} />
+                  <SelectValue placeholder={t("equipment.selectInstallation")} />
                 </SelectTrigger>
                 <SelectContent>
                   {installations.map(inst => (
@@ -1398,7 +1398,7 @@ export default function EquipmentManagerPage() {
               </Select>
             </div>
             <div>
-              <Label>{t("equipment.selectFile") || "Select Excel File"}</Label>
+              <Label>{t("equipment.selectFile")}</Label>
               <div className="mt-1">
                 <input
                   type="file"
@@ -1409,18 +1409,18 @@ export default function EquipmentManagerPage() {
                 />
               </div>
               {excelImportFile && (
-                <p className="text-sm text-green-600 mt-1">Selected: {excelImportFile.name}</p>
+                <p className="text-sm text-green-600 mt-1">{t("equipment.selectedFile")} {excelImportFile.name}</p>
               )}
             </div>
             <div className="bg-slate-50 p-3 rounded-md text-sm text-slate-600">
-              <p className="font-medium mb-1">{t("equipment.expectedColumns") || "Expected columns:"}</p>
+              <p className="font-medium mb-1">{t("equipment.expectedColumns")}</p>
               <ul className="list-disc list-inside space-y-0.5 text-xs">
-                <li><strong>ID</strong> or <strong>Tag</strong> - Equipment identifier</li>
-                <li><strong>Name</strong> - Display name</li>
-                <li><strong>Level</strong> - Plant/Unit, Section/System, Equipment Unit, Subunit, or Maintainable Item</li>
-                <li><strong>Equipment Type</strong> (optional) - Type classification</li>
-                <li><strong>Description</strong> (optional) - Equipment description</li>
-                <li><strong>Safety, Production, Environmental, Reputation</strong> (optional) - Criticality scores 0-5</li>
+                <li>{t("equipment.expectedColId")}</li>
+                <li>{t("equipment.expectedColName")}</li>
+                <li>{t("equipment.expectedColLevel")}</li>
+                <li>{t("equipment.expectedColType")}</li>
+                <li>{t("equipment.expectedColDescription")}</li>
+                <li>{t("equipment.expectedColCriticality")}</li>
               </ul>
             </div>
           </div>
@@ -1431,7 +1431,7 @@ export default function EquipmentManagerPage() {
               disabled={!excelImportFile || !excelImportInstallation || isImportingExcel}
               data-testid="import-excel-submit-btn"
             >
-              {isImportingExcel ? (t("common.importing") || "Importing...") : (t("equipment.import") || "Import")}
+              {isImportingExcel ? t("common.importing") : t("equipment.import")}
             </Button>
           </DialogFooter>
         </DialogContent>

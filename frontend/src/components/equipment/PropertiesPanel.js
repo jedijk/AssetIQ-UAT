@@ -196,6 +196,7 @@ function formatFileSize(bytes) {
 }
 
 function EquipmentFiles({ equipmentId }) {
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const fileInputRef = useRef(null);
   const [previewFile, setPreviewFile] = useState(null);
@@ -210,18 +211,18 @@ function EquipmentFiles({ equipmentId }) {
     mutationFn: (file) => equipmentHierarchyAPI.uploadEquipmentFile(equipmentId, file),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["equipment-files", equipmentId] });
-      toast.success("File uploaded");
+      toast.success(t("equipment.fileUploaded"));
     },
-    onError: (e) => toast.error(e.response?.data?.detail || "Upload failed"),
+    onError: (e) => toast.error(e.response?.data?.detail || t("equipment.uploadFailed")),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (fileId) => equipmentHierarchyAPI.deleteEquipmentFile(fileId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["equipment-files", equipmentId] });
-      toast.success("File deleted");
+      toast.success(t("equipment.fileDeleted"));
     },
-    onError: () => toast.error("Delete failed"),
+    onError: () => toast.error(t("equipment.deleteFailed")),
   });
 
   const handleDownload = async (fileId, filename) => {
@@ -249,7 +250,7 @@ function EquipmentFiles({ equipmentId }) {
       a.remove();
       window.setTimeout(() => window.URL.revokeObjectURL(url), 5_000);
     } catch {
-      toast.error("Download failed");
+      toast.error(t("equipment.downloadFailed"));
     }
   };
 
@@ -275,7 +276,7 @@ function EquipmentFiles({ equipmentId }) {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5">
           <Icon className="w-3.5 h-3.5 text-slate-400" />
-          <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Files</span>
+          <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{t("equipment.filesLabel")}</span>
           {files.length > 0 && (
             <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{files.length}</span>
           )}
@@ -289,7 +290,7 @@ function EquipmentFiles({ equipmentId }) {
           data-testid="upload-equipment-file-btn"
         >
           <Upload className="w-3.5 h-3.5 mr-1" />
-          {uploadMutation.isPending ? "Uploading..." : "Upload"}
+          {uploadMutation.isPending ? t("common.uploading") : t("equipment.uploadFile")}
         </Button>
         <input
           ref={fileInputRef}
@@ -493,12 +494,12 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
   if (!node) return (
     <div className="flex flex-col items-center justify-center h-full p-6 text-center">
       <Settings className="w-12 h-12 text-slate-300 mb-3" />
-      <p className="text-sm text-slate-400">{t("equipment.selectEquipment") || "Select an equipment item"}</p>
+      <p className="text-sm text-slate-400">{t("equipment.selectEquipment")}</p>
     </div>
   );
   
-  const config = LEVEL_CONFIG[node.level] || { icon: Cog, label: "Unknown" };
-  const levelLabel = getEquipmentLevelLabel(t, node.level);
+  const config = LEVEL_CONFIG[node.level] || { icon: Cog };
+  const levelLabel = getEquipmentLevelLabel(t, node.level) || t("equipment.unknownLevel");
   const LevelIcon = config.icon;
   const critColors = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
   
@@ -543,25 +544,25 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
           <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
             <div className="flex items-center gap-2 text-slate-600">
               <GripVertical className="w-4 h-4" />
-              <span className="text-xs font-medium">Drag to reorder or move</span>
+              <span className="text-xs font-medium">{t("equipment.dragDropHint")}</span>
             </div>
           </div>
           
           <div>
             <Label className="text-xs text-slate-500 mb-1">{t("common.description")}</Label>
             {isEditing ? (
-              <Input value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="Add description..." className="h-8 text-sm" />
+              <Input value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder={t("equipment.addDescriptionPlaceholder")} className="h-8 text-sm" />
             ) : (
               <p className="text-sm text-slate-700">{translatedDescription || <span className="text-slate-400 italic">{t("taskScheduler.noDescription")}</span>}</p>
             )}
           </div>
           
           <div>
-            <Label className="text-xs text-slate-500 mb-1">{t("common.tag") || "Tag"}</Label>
+            <Label className="text-xs text-slate-500 mb-1">{t("common.tag")}</Label>
             {isEditing ? (
-              <Input value={editTag} onChange={e => setEditTag(e.target.value)} placeholder="Add tag (e.g., P-101, HX-201)..." className="h-8 text-sm" data-testid="edit-tag-input" />
+              <Input value={editTag} onChange={e => setEditTag(e.target.value)} placeholder={t("equipment.addTagPlaceholder")} className="h-8 text-sm" data-testid="edit-tag-input" />
             ) : (
-              <p className="text-sm text-slate-700">{node.tag || <span className="text-slate-400 italic">No tag</span>}</p>
+              <p className="text-sm text-slate-700">{node.tag || <span className="text-slate-400 italic">{t("equipment.noTag")}</span>}</p>
             )}
           </div>
           
@@ -569,7 +570,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
             <>
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <Label className="text-xs text-slate-500">{t("equipment.equipmentType") || "Equipment Type"}</Label>
+                  <Label className="text-xs text-slate-500">{t("equipment.equipmentType")}</Label>
                   {recommendedTypes.length > 0 && (
                     <div className="flex items-center gap-2">
                       <Eye className="w-3 h-3 text-slate-400" />
@@ -603,7 +604,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                           )}
                         </div>
                       ) : (
-                        <span className="text-slate-400">Select equipment type...</span>
+                        <span className="text-slate-400">{t("equipment.selectEquipmentTypePlaceholder")}</span>
                       )}
                       <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -611,12 +612,12 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                   <PopoverContent className="w-[340px] p-0" align="start">
                     <Command>
                       <CommandInput 
-                        placeholder="Search equipment types..." 
+                        placeholder={t("equipment.searchEquipmentTypes")}
                         value={typeSearchQuery}
                         onValueChange={setTypeSearchQuery}
                       />
                       <CommandList className="max-h-72">
-                        <CommandEmpty>No equipment type found.</CommandEmpty>
+                        <CommandEmpty>{t("equipment.noEquipmentTypeFound")}</CommandEmpty>
                         
                         {/* Clear selection option */}
                         <CommandGroup>
@@ -677,7 +678,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                         {(showAllTypes || recommendedTypes.length === 0) && filteredOtherTypes.length > 0 && (
                           <>
                             <CommandSeparator />
-                            <CommandGroup heading="All Equipment Types">
+                            <CommandGroup heading={t("equipment.allEquipmentTypesGroup")}>
                               {filteredOtherTypes.map(eqt => (
                                 <CommandItem
                                   key={eqt.id}
@@ -734,9 +735,9 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                 <div>
                   <Label className="text-xs text-slate-500 mb-1">{t("library.discipline")}</Label>
                   <div className="h-9 px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm text-slate-600 capitalize">
-                    {equipmentTypes?.find(eqt => eqt.id === node.equipment_type_id)?.discipline || "Not set"}
+                    {equipmentTypes?.find(eqt => eqt.id === node.equipment_type_id)?.discipline || t("equipment.notSet")}
                   </div>
-                  <p className="text-xs text-slate-400 mt-1">Auto-assigned from equipment type</p>
+                  <p className="text-xs text-slate-400 mt-1">{t("equipment.autoAssigned")}</p>
                 </div>
               )}
             </>
@@ -745,46 +746,46 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
           {/* Process Step - only for subunit and maintainable_item levels */}
           {(node.level === "subunit" || node.level === "maintainable_item") && (
             <div>
-              <Label className="text-xs text-slate-500 mb-1">{t("equipment.processStep") || "Process Step"}</Label>
+              <Label className="text-xs text-slate-500 mb-1">{t("equipment.processStep")}</Label>
               <Input 
                 value={node.process_step || ""} 
                 onChange={e => onUpdate(node.id, { process_step: e.target.value })} 
-                placeholder={t("equipment.processStepPlaceholder") || "e.g., Extrusion, Compounding, Mixing"} 
+                placeholder={t("equipment.processStepPlaceholder")} 
                 className="h-9 text-sm"
                 data-testid="process-step-input"
               />
               {node.process_step && (
-                <p className="text-xs text-slate-400 mt-1">{t("equipment.processStepHint") || "Inherited by child items"}</p>
+                <p className="text-xs text-slate-400 mt-1">{t("equipment.processStepHint")}</p>
               )}
             </div>
           )}
           
           <div>
-            <Label className="text-xs text-slate-500 mb-2">{t("equipment.criticality") || "Criticality Assessment"}</Label>
+            <Label className="text-xs text-slate-500 mb-2">{t("equipment.criticality")}</Label>
             <div className="space-y-3 bg-slate-50 p-3 rounded-lg">
               <CriticalityDimension
-                label={t("equipment.safetyImpact") || "Safety"}
+                label={t("equipment.safetyImpact")}
                 color="red"
                 dimension="safety"
                 value={node.criticality?.safety_impact}
                 onClick={(level) => onAssignCriticality(node.id, { ...node.criticality, safety_impact: node.criticality?.safety_impact === level ? null : level })}
               />
               <CriticalityDimension
-                label={t("equipment.productionImpact") || "Production"}
+                label={t("equipment.productionImpact")}
                 color="orange"
                 dimension="production"
                 value={node.criticality?.production_impact}
                 onClick={(level) => onAssignCriticality(node.id, { ...node.criticality, production_impact: node.criticality?.production_impact === level ? null : level })}
               />
               <CriticalityDimension
-                label={t("equipment.environmentalImpact") || "Environmental"}
+                label={t("equipment.environmentalImpact")}
                 color="green"
                 dimension="environmental"
                 value={node.criticality?.environmental_impact}
                 onClick={(level) => onAssignCriticality(node.id, { ...node.criticality, environmental_impact: node.criticality?.environmental_impact === level ? null : level })}
               />
               <CriticalityDimension
-                label={t("equipment.reputationImpact") || "Reputation"}
+                label={t("equipment.reputationImpact")}
                 color="purple"
                 dimension="reputation"
                 value={node.criticality?.reputation_impact}
@@ -794,7 +795,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
               {(node.criticality?.safety_impact || node.criticality?.production_impact || node.criticality?.environmental_impact || node.criticality?.reputation_impact) && (
                 <div className="pt-2 border-t border-slate-200 mt-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-700">{t("equipment.overallCriticality") || "Overall Criticality"}</span>
+                    <span className="text-xs font-semibold text-slate-700">{t("equipment.overallCriticality")}</span>
                     <span className="text-sm font-bold text-slate-800">
                       {Math.max(
                         node.criticality?.safety_impact || 0,
@@ -812,11 +813,11 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
           {/* QR Code Section */}
           <div className="pt-4 border-t border-slate-200">
             <div className="flex items-center justify-between mb-2">
-              <Label className="text-sm font-medium">QR Code</Label>
+              <Label className="text-sm font-medium">{t("equipment.qrCode")}</Label>
               {qrData?.qr_code && (
                 <span className="text-xs text-green-600 flex items-center gap-1">
                   <Check className="w-3 h-3" />
-                  Active
+                  {t("equipment.qrActive")}
                 </span>
               )}
             </div>
@@ -826,7 +827,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
               onClick={() => setShowQRDialog(true)}
             >
               <QrCode className="w-4 h-4 mr-2" />
-              {qrData?.qr_code ? "View/Edit QR Code" : "Generate QR Code"}
+              {qrData?.qr_code ? t("equipment.viewQrCode") : t("equipment.generateQrCode")}
             </Button>
           </div>
           
