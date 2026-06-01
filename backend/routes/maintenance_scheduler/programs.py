@@ -153,11 +153,18 @@ async def apply_strategy_to_equipment(
     from routes.maintenance_strategy_v2 import _resync_programs_with_strategy
     resync = await _resync_programs_with_strategy(equipment_type_id)
 
+    # Auto-generate scheduled task occurrences for the just-applied programs
+    # so the calendar/Gantt shows recurring tasks immediately (no manual
+    # "Run Scheduler" needed).
+    from routes.maintenance_scheduler.scheduler import schedule_programs_for_equipment
+    scheduled_count = await schedule_programs_for_equipment(request.equipment_ids)
+
     return {
         "message": f"Strategy applied to {len(equipment_list)} equipment",
         "equipment_count": len(equipment_list),
         "programs_created": len(programs_created),
         "programs_updated": len(equipment_list) * len(task_templates) - len(programs_created),
+        "scheduled_tasks_created": scheduled_count,
         "programs_deactivated_on_resync": resync["programs_deactivated"],
     }
 

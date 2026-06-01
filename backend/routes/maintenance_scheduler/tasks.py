@@ -278,6 +278,14 @@ async def complete_task(
             }},
         )
 
+        # Auto-generate the next scheduled occurrence(s) so the calendar is
+        # always populated without needing a manual "Run Scheduler" click.
+        from routes.maintenance_scheduler.scheduler import schedule_program
+        # Refetch the program so it carries the freshly-updated next_due_date.
+        refreshed = await db.maintenance_programs.find_one({"id": program["id"]})
+        if refreshed:
+            await schedule_program(refreshed)
+
     return {
         "message": "Task completed",
         "task_id": task_id,
