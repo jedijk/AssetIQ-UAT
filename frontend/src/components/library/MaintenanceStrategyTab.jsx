@@ -35,11 +35,20 @@ import {
 import { equipmentHierarchyAPI, maintenanceStrategyV2API } from "../../lib/api";
 import MaintenanceStrategyManager from "./MaintenanceStrategyManager";
 import { EQUIPMENT_ICONS, DISCIPLINE_COLORS } from "./EquipmentTypeItem";
+import { useLanguage } from "../../contexts/LanguageContext";
+import { useTranslatedEquipmentTypes } from "../../hooks/useTranslatedEntities";
+
+function translateDiscipline(name, t) {
+  if (!name) return name;
+  const translated = t(`disciplines.${name}`);
+  if (translated && translated !== `disciplines.${name}`) return translated;
+  return name;
+}
 
 /**
  * Equipment Type List Item
  */
-const EquipmentTypeItem = ({ type, isSelected, hasStrategy, onClick }) => {
+const EquipmentTypeItem = ({ type, isSelected, hasStrategy, onClick, t }) => {
   const Icon = EQUIPMENT_ICONS[type.icon] || Cog;
   const disciplineStyle = DISCIPLINE_COLORS[type.discipline] || DISCIPLINE_COLORS["Rotating"];
 
@@ -68,7 +77,7 @@ const EquipmentTypeItem = ({ type, isSelected, hasStrategy, onClick }) => {
         </div>
         <div className="flex items-center gap-1.5 mt-0.5">
           <Badge className={`text-[10px] px-1.5 py-0 ${disciplineStyle.bg} ${disciplineStyle.text} ${disciplineStyle.border}`}>
-            {type.discipline}
+            {translateDiscipline(type.discipline, t)}
           </Badge>
           {type.iso_class && (
             <span className="text-[10px] text-slate-400">ISO {type.iso_class}</span>
@@ -86,6 +95,7 @@ const EquipmentTypeItem = ({ type, isSelected, hasStrategy, onClick }) => {
 const MaintenanceStrategyTab = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { t } = useLanguage();
   
   const [searchQuery, setSearchQuery] = useState("");
   const [disciplineFilter, setDisciplineFilter] = useState("all");
@@ -106,6 +116,9 @@ const MaintenanceStrategyTab = () => {
     },
   });
 
+  // Apply translations to equipment type names (NL/DE)
+  const { equipmentTypes: translatedEquipmentTypes } = useTranslatedEquipmentTypes(equipmentTypesData || []);
+
   // Fetch all strategies to show which types have strategies
   const { data: strategiesData } = useQuery({
     queryKey: ["maintenance-strategies-v2-list"],
@@ -123,15 +136,15 @@ const MaintenanceStrategyTab = () => {
   // Get unique disciplines
   const disciplines = useMemo(() => {
     const set = new Set();
-    (equipmentTypesData || []).forEach((t) => {
+    (translatedEquipmentTypes || []).forEach((t) => {
       if (t.discipline) set.add(t.discipline);
     });
     return Array.from(set).sort();
-  }, [equipmentTypesData]);
+  }, [translatedEquipmentTypes]);
 
   // Filter equipment types
   const filteredTypes = useMemo(() => {
-    let types = equipmentTypesData || [];
+    let types = translatedEquipmentTypes || [];
     
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -152,7 +165,7 @@ const MaintenanceStrategyTab = () => {
       if (a.isCustom !== b.isCustom) return a.isCustom ? -1 : 1;
       return (a.name || "").localeCompare(b.name || "");
     });
-  }, [equipmentTypesData, searchQuery, disciplineFilter]);
+  }, [translatedEquipmentTypes, searchQuery, disciplineFilter]);
 
   // Handle view in FMEA
   const handleViewInFMEA = (failureModeName) => {
@@ -170,13 +183,13 @@ const MaintenanceStrategyTab = () => {
             size="icon"
             className="h-8 w-8"
             onClick={() => setSidebarCollapsed(false)}
-            title="Show equipment types"
+            title={t("maintenance.showEquipmentTypes")}
             data-testid="sidebar-expand-btn"
           >
             <PanelLeftOpen className="w-4 h-4" />
           </Button>
           <div className="text-[10px] text-slate-500 [writing-mode:vertical-rl] rotate-180 mt-2">
-            Equipment Types
+            {t("maintenance.equipmentTypes")}
           </div>
         </div>
       )}
@@ -187,14 +200,14 @@ const MaintenanceStrategyTab = () => {
           {/* Header with collapse button */}
           <div className="px-3 pt-3 pb-1 flex items-center justify-between">
             <span className="text-xs font-medium text-slate-600 uppercase tracking-wide">
-              Equipment Types
+              {t("maintenance.equipmentTypes")}
             </span>
             <Button
               variant="ghost"
               size="icon"
               className="h-7 w-7"
               onClick={() => setSidebarCollapsed(true)}
-              title="Hide equipment types"
+              title={t("maintenance.hideEquipmentTypes")}
               data-testid="sidebar-collapse-btn"
             >
               <PanelLeftClose className="w-4 h-4" />
@@ -206,7 +219,7 @@ const MaintenanceStrategyTab = () => {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Search equipment types..."
+                placeholder={t("maintenance.searchEquipmentTypes")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 h-9 text-sm"
@@ -215,12 +228,12 @@ const MaintenanceStrategyTab = () => {
             <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
               <SelectTrigger className="h-8 text-xs">
                 <Filter className="w-3 h-3 mr-1.5 text-slate-400" />
-                <SelectValue placeholder="All Disciplines" />
+                <SelectValue placeholder={t("disciplines.allDisciplines")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all" className="text-xs">All Disciplines</SelectItem>
+                <SelectItem value="all" className="text-xs">{t("disciplines.allDisciplines")}</SelectItem>
                 {disciplines.map((d) => (
-                  <SelectItem key={d} value={d} className="text-xs">{d}</SelectItem>
+                  <SelectItem key={d} value={d} className="text-xs">{translateDiscipline(d, t)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -236,7 +249,7 @@ const MaintenanceStrategyTab = () => {
             ) : filteredTypes.length === 0 ? (
               <div className="text-center py-8">
                 <Package className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                <p className="text-sm text-slate-500">No equipment types found</p>
+                <p className="text-sm text-slate-500">{t("maintenance.noTypesFound")}</p>
               </div>
             ) : (
               filteredTypes.map((type) => (
@@ -246,6 +259,7 @@ const MaintenanceStrategyTab = () => {
                   isSelected={selectedType?.id === type.id}
                   hasStrategy={strategiesMap.has(type.id)}
                   onClick={() => setSelectedType(type)}
+                  t={t}
                 />
               ))
             )}
@@ -255,10 +269,10 @@ const MaintenanceStrategyTab = () => {
           {/* Summary */}
           <div className="p-3 border-t bg-slate-50 text-xs text-slate-500">
             <div className="flex justify-between">
-              <span>{filteredTypes.length} equipment types</span>
+              <span>{filteredTypes.length} {t("maintenance.typesCount")}</span>
               <span className="flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3 text-green-500" />
-                {strategiesMap.size} with strategies
+                {strategiesMap.size} {t("maintenance.withStrategies")}
               </span>
             </div>
           </div>
@@ -290,11 +304,10 @@ const MaintenanceStrategyTab = () => {
               >
                 <Wrench className="w-16 h-16 text-slate-200 mb-4" />
                 <h3 className="text-lg font-medium text-slate-600 mb-2">
-                  Maintenance Strategy Manager
+                  {t("maintenance.strategyManager")}
                 </h3>
                 <p className="text-sm text-slate-400 text-center max-w-md">
-                  Select an equipment type from the list to view and manage its maintenance strategy.
-                  Strategies are defined at the equipment type level and automatically generate tasks for individual assets.
+                  {t("maintenance.strategyManagerEmpty")}
                 </p>
               </motion.div>
             )}

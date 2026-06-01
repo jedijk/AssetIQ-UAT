@@ -107,6 +107,7 @@ import {
 import { maintenanceStrategyV2API } from "../../lib/api";
 import { DISCIPLINES as FM_DISCIPLINES, DISCIPLINE_COLORS } from "./EquipmentTypeItem";
 import MaintenanceScheduleManager from "./MaintenanceScheduleManager";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 // ============= Constants =============
 
@@ -209,7 +210,7 @@ const getRPNConfig = (rpn) => {
 /**
  * Strategy Overview Card
  */
-const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating, affectedEquipment, onShowAffectedEquipment }) => {
+const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating, affectedEquipment, onShowAffectedEquipment, t }) => {
   const hasStrategy = strategy?.exists && strategy?.strategy;
   const data = strategy?.strategy;
 
@@ -235,7 +236,7 @@ const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating, affected
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Wrench className={`w-5 h-5 ${isActive ? "text-blue-600" : "text-slate-400"}`} />
-            <CardTitle className="text-lg">Overview</CardTitle>
+            <CardTitle className="text-lg">{t("maintenance.overview")}</CardTitle>
           </div>
           <div className="flex items-center gap-3">
             <Badge variant="outline" className="text-xs">
@@ -247,7 +248,7 @@ const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating, affected
                 <TooltipTrigger asChild>
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100">
                     <span className={`text-xs font-medium ${isActive ? "text-green-700" : "text-slate-500"}`}>
-                      {isActive ? "Active" : "Disabled"}
+                      {isActive ? t("maintenance.active") : t("maintenance.disabled")}
                     </span>
                     <Switch
                       checked={isActive}
@@ -280,18 +281,18 @@ const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating, affected
         <div className="grid grid-cols-4 gap-4">
           <div className="text-center p-3 bg-slate-50 rounded-lg">
             <div className="text-2xl font-bold text-slate-900">{data.total_failure_modes || 0}</div>
-            <div className="text-xs text-slate-500">Failure Modes</div>
+            <div className="text-xs text-slate-500">{t("maintenance.failureModesLabel")}</div>
           </div>
           <div className="text-center p-3 bg-slate-50 rounded-lg">
             <div className="text-2xl font-bold text-slate-900">{data.total_tasks || 0}</div>
-            <div className="text-xs text-slate-500">Task Templates</div>
+            <div className="text-xs text-slate-500">{t("maintenance.taskTemplatesLabel")}</div>
           </div>
           <div className="text-center p-3 bg-slate-50 rounded-lg">
             <div className={`text-2xl font-bold ${(data.coverage_score || 0) >= 80 ? 'text-green-600' : (data.coverage_score || 0) >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
               {data.coverage_score || 0}%
             </div>
             <div className="text-xs text-slate-500">
-              Coverage ({data.active_failure_modes ?? data.total_failure_modes ?? 0}/{data.total_failure_modes || 0} active)
+              {t("maintenance.coverage")} ({data.active_failure_modes ?? data.total_failure_modes ?? 0}/{data.total_failure_modes || 0} {t("maintenance.active").toLowerCase()})
             </div>
           </div>
           <TooltipProvider>
@@ -304,7 +305,7 @@ const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating, affected
                   <div className="text-2xl font-bold text-blue-600">
                     {data.affected_equipment_count || 0}
                   </div>
-                  <div className="text-xs text-slate-500">Equipment Affected</div>
+                  <div className="text-xs text-slate-500">{t("maintenance.equipmentAffected")}</div>
                 </div>
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
@@ -1101,6 +1102,7 @@ const isTaskActive = (task, failureModeStrategies = []) => {
 };
 
 const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [mainView, setMainView] = useState("strategy"); // "strategy" or "schedule"
   const [activeTab, setActiveTab] = useState("overview");
@@ -1362,11 +1364,11 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
               <TabsList className="h-9">
                 <TabsTrigger value="strategy" className="text-xs px-4">
                   <Wrench className="w-3.5 h-3.5 mr-1.5" />
-                  Maintenance Strategy
+                  {t("maintenance.maintenanceStrategy")}
                 </TabsTrigger>
                 <TabsTrigger value="schedule" className="text-xs px-4">
                   <Calendar className="w-3.5 h-3.5 mr-1.5" />
-                  Maintenance Schedule
+                  {t("maintenance.maintenanceSchedule")}
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -1387,11 +1389,11 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
           <TabsList className="h-9">
             <TabsTrigger value="strategy" className="text-xs px-4">
               <Wrench className="w-3.5 h-3.5 mr-1.5" />
-              Maintenance Strategy
+              {t("maintenance.maintenanceStrategy")}
             </TabsTrigger>
             <TabsTrigger value="schedule" className="text-xs px-4">
               <Calendar className="w-3.5 h-3.5 mr-1.5" />
-              Maintenance Schedule
+              {t("maintenance.maintenanceSchedule")}
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -1402,7 +1404,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-3 text-slate-900">
             <Wrench className="w-7 h-7 text-blue-600" />
-            {equipmentTypeName} <span className="text-slate-400 font-normal">|</span> Maintenance Strategy
+            {equipmentTypeName} <span className="text-slate-400 font-normal">|</span> {t("maintenance.maintenanceStrategy")}
           </h1>
         </div>
         <div className="flex items-center gap-2">
@@ -1410,7 +1412,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
             <>
               <Button size="sm" variant="outline" onClick={() => refetchStrategy()}>
                 <RefreshCw className="w-3.5 h-3.5 mr-1" />
-                Refresh
+                {t("maintenance.refresh")}
               </Button>
               <TooltipProvider>
                 <Tooltip>
@@ -1427,7 +1429,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                       ) : (
                         <RefreshCw className="w-3.5 h-3.5 mr-1" />
                       )}
-                      Sync Library
+                      {t("maintenance.syncLibrary")}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-xs">
@@ -1442,7 +1444,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                 <AlertDialogTrigger asChild>
                   <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50">
                     <Trash2 className="w-3.5 h-3.5 mr-1" />
-                    Delete
+                    {t("maintenance.deleteStrategyBtn")}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
@@ -1519,6 +1521,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
         onToggleStrategy={handleToggleStrategy}
         isUpdating={updateStrategyMutation.isPending}
         onShowAffectedEquipment={() => setAffectedEquipmentDialogOpen(true)}
+        t={t}
       />
 
       {/* Tabs (only show if strategy exists) */}
@@ -1527,15 +1530,15 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="overview" className="text-xs">
               <Layers className="w-3.5 h-3.5 mr-1.5" />
-              Failure Modes
+              {t("maintenance.failureModesLabel")}
             </TabsTrigger>
             <TabsTrigger value="matrix" className="text-xs">
               <BarChart3 className="w-3.5 h-3.5 mr-1.5" />
-              Frequency Matrix
+              {t("maintenance.frequencyMatrix")}
             </TabsTrigger>
             <TabsTrigger value="history" className="text-xs">
               <History className="w-3.5 h-3.5 mr-1.5" />
-              Version History
+              {t("maintenance.versionHistory")}
             </TabsTrigger>
           </TabsList>
 
@@ -1543,7 +1546,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
           <div className="relative mt-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input
-              placeholder="Search..."
+              placeholder={t("maintenance.search")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 h-9"
