@@ -433,6 +433,104 @@ def _cell_str(row: dict, col: str | None) -> str | None:
     return text or None
 
 
+def _tag_lookup_key(tag: str) -> str:
+    return str(tag).strip().upper()
+
+
+def _index_hierarchy_nodes(existing_nodes: list) -> tuple[dict, dict, dict, dict]:
+    """Build tag/name indexes for parent resolution (case-insensitive tags)."""
+    nodes_by_tag: dict = {}
+    nodes_by_name: dict = {}
+    nodes_by_id = {n["id"]: n for n in existing_nodes}
+    nodes_by_name_parent = {
+        (n.get("name", "").lower(), n.get("parent_id")): n for n in existing_nodes
+    }
+    for n in existing_nodes:
+        name_key = (n.get("name") or "").lower()
+        if name_key and name_key not in nodes_by_name:
+            nodes_by_name[name_key] = n
+        tag = n.get("tag")
+        if tag:
+            nodes_by_tag[tag] = n
+            nodes_by_tag[_tag_lookup_key(tag)] = n
+    return nodes_by_tag, nodes_by_name, nodes_by_id, nodes_by_name_parent
+
+
+async def _load_installation_hierarchy_nodes(installation_id: str, user_id: str) -> list:
+    """Load all nodes under an installation (matches Equipment Manager tree)."""
+    from services.installation_filter_service import installation_filter
+
+    equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
+        [installation_id], user_id
+    )
+    if not equipment_ids:
+        return []
+    return await db.equipment_nodes.find(
+        {"id": {"$in": list(equipment_ids)}},
+        {"_id": 0, "id": 1, "name": 1, "tag": 1, "parent_id": 1, "level": 1, "sort_order": 1},
+    ).to_list(10000)
+
+
+async def _ensure_subunit_parent_for_tag(
+    parent_ref: str,
+    installation_id: str,
+    current_user_id: str,
+    existing_nodes: list,
+    nodes_by_tag: dict,
+    nodes_by_name: dict,
+    nodes_by_name_parent: dict,
+) -> dict | None:
+    """
+    When importing maintainable items under a tag like 1F-3001, ensure a subunit exists.
+    Creates it under the Strainer equipment unit when missing.
+    """
+    if not parent_ref:
+        return None
+
+    hit = nodes_by_tag.get(parent_ref) or nodes_by_tag.get(_tag_lookup_key(parent_ref))
+    if hit:
+        if hit.get("level") == "subunit":
+            return hit
+        if hit.get("level") != "equipment_unit":
+            return hit
+
+    strainer = None
+    if hit and hit.get("level") == "equipment_unit":
+        strainer = hit
+    if not strainer:
+        for n in existing_nodes:
+            if n.get("level") == "equipment_unit" and (n.get("name") or "").strip().lower() == "strainer":
+                strainer = n
+                break
+    if not strainer:
+        return None
+
+    now = datetime.now(timezone.utc).isoformat()
+    sort_orders = [n.get("sort_order") or 0 for n in existing_nodes if n.get("parent_id") == strainer["id"]]
+    tag = parent_ref.strip()
+    name = tag if " " in tag else f"Strainer {tag}"
+    node_doc = {
+        "id": str(uuid.uuid4()),
+        "name": name,
+        "level": "subunit",
+        "parent_id": strainer["id"],
+        "installation_id": installation_id,
+        "tag": tag,
+        "created_by": current_user_id,
+        "created_at": now,
+        "updated_at": now,
+        "sort_order": (max(sort_orders) if sort_orders else 0) + 1,
+    }
+    await db.equipment_nodes.insert_one(node_doc)
+    existing_nodes.append(node_doc)
+    nodes_by_tag[tag] = node_doc
+    nodes_by_tag[_tag_lookup_key(tag)] = node_doc
+    nodes_by_name[name.lower()] = node_doc
+    nodes_by_name_parent[(name.lower(), strainer["id"])] = node_doc
+    logger.info("Auto-created subunit %s (%s) under Strainer for Excel import", tag, name)
+    return node_doc
+
+
 @router.post("/equipment-hierarchy/import-excel")
 async def import_excel_file(
     file: UploadFile = File(...),
@@ -478,19 +576,13 @@ async def import_excel_file(
     if df.empty:
         raise HTTPException(status_code=400, detail="Excel file has no data rows")
     
-    # Get existing nodes for deduplication
-    existing_nodes = await db.equipment_nodes.find(
-        {"installation_id": installation_id},
-        {"_id": 0, "id": 1, "name": 1, "tag": 1, "parent_id": 1, "level": 1}
-    ).to_list(10000)
-    
-    nodes_by_tag = {n.get("tag"): n for n in existing_nodes if n.get("tag")}
-    nodes_by_name_parent = {(n.get("name", "").lower(), n.get("parent_id")): n for n in existing_nodes}
-    nodes_by_name = {}
-    for n in existing_nodes:
-        key = (n.get("name") or "").lower()
-        if key and key not in nodes_by_name:
-            nodes_by_name[key] = n
+    # All nodes under this installation (by tree walk — not installation_id field)
+    existing_nodes = await _load_installation_hierarchy_nodes(
+        installation_id, current_user["id"]
+    )
+    nodes_by_tag, nodes_by_name, nodes_by_id, nodes_by_name_parent = _index_hierarchy_nodes(
+        existing_nodes
+    )
     
     # Track parent at each level for sequential hierarchy inference
     current_parents = {
@@ -531,7 +623,10 @@ async def import_excel_file(
             parent_key = parent_name.lower()
             if parent_key in nodes_by_name:
                 return nodes_by_name[parent_key]["id"]
-            tag_match = nodes_by_tag.get(parent_name) or nodes_by_tag.get(parent_name.strip())
+            tag_match = (
+                nodes_by_tag.get(parent_name)
+                or nodes_by_tag.get(_tag_lookup_key(parent_name))
+            )
             if tag_match:
                 return tag_match["id"]
             install_name = (installation.get("name") or "").lower()
@@ -609,6 +704,26 @@ async def import_excel_file(
                 parent_name = _cell_str(row, parent_col)
                 parent_id = resolve_parent_id(parent_name, iso_level)
 
+            parent_ref = _cell_str(row, parent_col)
+            if iso_level == "maintainable_item" and parent_ref:
+                parent_node = nodes_by_id.get(parent_id) if parent_id else None
+                needs_subunit = (
+                    not parent_id
+                    or (parent_node and parent_node.get("level") == "equipment_unit")
+                )
+                if needs_subunit:
+                    ensured = await _ensure_subunit_parent_for_tag(
+                        parent_ref,
+                        installation_id,
+                        current_user["id"],
+                        existing_nodes,
+                        nodes_by_tag,
+                        nodes_by_name,
+                        nodes_by_name_parent,
+                    )
+                    if ensured:
+                        parent_id = ensured["id"]
+
             if not parent_id:
                 if parent_level_idx not in current_parents:
                     skipped_count += 1
@@ -620,11 +735,16 @@ async def import_excel_file(
                 parent_id = current_parents[parent_level_idx]["id"]
             
             # Check if exists by tag
-            if tag and tag in nodes_by_tag:
-                existing = nodes_by_tag[tag]
+            tag_hit = tag and (
+                nodes_by_tag.get(tag) or nodes_by_tag.get(_tag_lookup_key(tag))
+            )
+            if tag_hit:
+                existing = tag_hit
                 current_parents[level_idx] = existing
                 nodes_by_name[name.lower()] = existing
                 skipped_count += 1
+                if len(errors) < 10:
+                    errors.append(f"Row {idx + 2}: tag '{tag}' already exists ({existing.get('name')})")
                 continue
             
             # Check if exists by name + parent

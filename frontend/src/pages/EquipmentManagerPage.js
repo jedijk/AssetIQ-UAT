@@ -1074,8 +1074,14 @@ export default function EquipmentManagerPage() {
         data.message ||
         `Import complete: ${data.created_count} created, ${data.updated_count} updated, ${data.skipped_count ?? 0} skipped`;
 
+      const errorHint = Array.isArray(data.errors) && data.errors.length
+        ? data.errors.slice(0, 3).join(" · ")
+        : null;
+
       if ((data.created_count ?? 0) === 0 && (data.updated_count ?? 0) === 0) {
-        toast.warning(summary);
+        toast.warning(summary, { description: errorHint || undefined, duration: 12000 });
+      } else if ((data.skipped_count ?? 0) > 0 && errorHint) {
+        toast.success(summary, { description: errorHint, duration: 10000 });
       } else {
         toast.success(summary);
       }
