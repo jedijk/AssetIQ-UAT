@@ -273,6 +273,78 @@ async def seed_default_dictionary(
     return {"success": True, "created": created, "message": f"Seeded {created} dictionary terms"}
 
 
+@router.post("/dictionary/validate")
+async def validate_dictionary(
+    language_code: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Validate stored entity translations against the technical dictionary.
+    For each protected dictionary term with a known translation in `language_code`,
+    flag entity translations that LIKELY leaked the English source term
+    (untranslated technical term) OR used a divergent term.
+
+    Returns a list of issues: { entity_type, entity_id, field_name,
+    translation_value, expected_term, source_term, issue_type }
+    """
+    issues: List[Dict[str, Any]] = []
+    terms_checked = 0
+    
+    # Build dictionary index for the requested language
+    cursor = db.translation_dictionary.find({})
+    terms = []
+    async for term in cursor:
+        translations = term.get("translations") or {}
+        if language_code in translations and translations[language_code]:
+            terms.append({
+                "source": term["source_term"],
+                "target": translations[language_code],
+                "category": term.get("category"),
+                "is_protected": bool(term.get("is_protected", False)),
+            })
+    terms_checked = len(terms)
+    
+    if not terms:
+        return {"issues": [], "terms_checked": 0, "message": "No dictionary terms with target translations"}
+    
+    # Walk through all entity translations for the requested language and check
+    cursor = db.entity_translations.find(
+        {"language_code": language_code},
+        {"_id": 0, "entity_type": 1, "entity_id": 1, "field_name": 1, "translation_value": 1},
+    )
+    async for doc in cursor:
+        value = (doc.get("translation_value") or "").strip()
+        if not value:
+            continue
+        value_lower = value.lower()
+        for term in terms:
+            src = term["source"]
+            tgt = term["target"]
+            if not src or not tgt:
+                continue
+            src_lower = src.lower()
+            tgt_lower = tgt.lower()
+            # If source and target are equal (e.g. "Filter" -> "Filter"), skip
+            if src_lower == tgt_lower:
+                continue
+            # Issue 1: target language value still contains the English source term
+            # (likely untranslated leak), and DOES NOT contain the target translation
+            if src_lower in value_lower and tgt_lower not in value_lower:
+                issues.append({
+                    "entity_type": doc.get("entity_type"),
+                    "entity_id": doc.get("entity_id"),
+                    "field_name": doc.get("field_name"),
+                    "translation_value": value,
+                    "source_term": src,
+                    "expected_term": tgt,
+                    "category": term.get("category"),
+                    "issue_type": "untranslated_term",
+                    "is_protected": term["is_protected"],
+                })
+    
+    return {"issues": issues, "terms_checked": terms_checked, "total_issues": len(issues)}
+
+
 # ============= Entity Translations =============
 
 @router.get("/entities/{entity_type}/{entity_id}")

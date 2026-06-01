@@ -18,7 +18,8 @@ import {
   Shield,
   ScrollText,
   Trash2,
-  Tag
+  Tag,
+  Languages
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { ScrollArea } from "../components/ui/scroll-area";
@@ -141,6 +142,14 @@ const SETTINGS_SECTIONS = [
     path: "/settings/labels",
     roles: ["owner"],
     desktopOnly: true
+  },
+  {
+    id: "translations",
+    label: "Translations",
+    description: "Coverage dashboard & technical dictionary",
+    icon: Languages,
+    path: "/settings/translations",
+    roles: ["owner", "admin"]
   },
   {
     id: "audit-log",

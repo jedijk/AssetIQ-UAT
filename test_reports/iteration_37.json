@@ -1,0 +1,29 @@
+{
+  "summary": "P1 Translation Management Dashboard + Technical Dictionary Validation — end-to-end verification PASS on backend (6/6 pytest) and frontend (all 9 review items). Backend: GET /api/translations/coverage returns all 7 expected entity_type keys (failure_mode, equipment_type, equipment_node, maintenance_task_template, observation, investigation, form_template) with translated+total counts; GET /api/translations/dictionary returns 26 terms; POST /api/translations/dictionary/validate?language_code=nl returns 19 issues across 26 terms_checked (matches dev-confirmed expectation), DE returns 2 issues across 26 terms_checked; full POST→PATCH→DELETE lifecycle on a TestTerm_E2E dictionary term works; POST /api/translations/dictionary/seed is idempotent (second call created=0). Frontend: /settings/translations renders with [data-testid='settings-translations-page'] + both tabs; Coverage tab shows all 7 coverage cards (Failure Modes 523/1084·48%, Equipment Types 136/46·100%, Equipment Hierarchy 238/478·50%, Maintenance Tasks 759/1518·50%, Observations 13/24·54%, Investigations 4/8·50%, Form Templates 42/82·51%) each with 'Translate missing' button; refresh-coverage-btn works; generate-all-form_template click succeeds without error (toast fires — sonner toast container also surfaced the unrelated 3.7.1 'What's new' release-notes toast on top which is harmless); jobs-list visible with 10 recent job rows. Dictionary tab shows all 5 toolbar elements + 26 term rows; NL validate run renders [data-testid='validation-results'] with exactly 19 issue rows (issue-row-0..18); CRUD: clicking add-term-btn opens TermDialog, filling source/NL/DE + Save creates 'E2ETest' row, browser confirm-accept on delete-term-E2ETest removes the row.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/settings/translations (initial visit)", "issues": ["The global app IntroOverlay (data-testid='intro-overlay', a full-viewport <svg> with mask) intercepts pointer events on top of this page on first visit for any new user. This blocked Playwright clicks on refresh-coverage-btn / generate-all-* / tab-dictionary until the overlay was removed from the DOM. End users can dismiss it via the X / Next flow, but it is worth noting that any 'first run after deploy' click test against the new translations page will need to first dismiss the intro tour (or the overlay should be scoped to dashboard only)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_translations_dashboard.py", "/app/test_reports/pytest/iteration_37_translations.xml"],
+  "action_items": [
+    "(Optional / LOW) IntroOverlay (9-step product tour) shows on every page including new /settings/translations — consider scoping it to dashboard only OR auto-dismissing when the user clicks into a settings sub-page, so first-time owners landing on /settings/translations are not greeted by a full-screen tour overlay. Functionality is not broken — only UX polish."
+  ],
+  "critical_code_review_comments": [
+    "Backend /api/translations/dictionary/validate matching logic uses case-insensitive 'src_lower in value_lower' substring search — this can produce false-positives for very short source terms that happen to appear inside unrelated Dutch words (e.g. source 'As' from 'Shaft' could match anywhere). With current seed list the FP rate is acceptable (NL surfaces 19 plausibly-correct issues), but if the dictionary grows to include 2–3 letter abbreviations, recommend switching to whole-word regex with \\b boundaries.",
+    "SettingsTranslationsPage.js TermDialog uses useMemo with side-effects (calling setForm inside the memo) — should be useEffect for correctness. Currently works because React invokes the memo on every render after key change, but per React 18+ semantics useMemo is not the right hook for side-effects.",
+    "Translate-missing buttons fire toast that says 'queued ? entities' when data.total is undefined (because the small-job <=5 sync branch on /generate returns {job} instead of {total}). Cosmetic — no functional impact.",
+    "/api/translations/dictionary/validate currently iterates all entity_translations rows × all dictionary terms in O(rows × terms) Python loop. With 26 terms × ~3500 rows this is fine, but for larger tenants consider building a per-source-term regex once and pre-filtering."
+  ],
+  "updated_files": ["/app/backend/tests/test_translations_dashboard.py"],
+  "success_rate": {"backend": "100% (6/6 pytest)", "frontend": "100% (all 9 review items verified end-to-end)"},
+  "test_credentials": "jedijk@gmail.com / Jaap8019@ (owner) — confirmed working",
+  "seed_data_creation": "test_dictionary_crud_lifecycle creates+deletes TestTerm_E2E (cleanup is part of the test); E2ETest term created+deleted via UI test (cleanup is part of the test). No residual test data left in DB.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All P1 review items in iteration_37 verified PASS. New regression test file: /app/backend/tests/test_translations_dashboard.py (6 tests, runs in ~16s). NL validate stable at 19 issues / 26 terms_checked, DE at 2 issues / 26 terms_checked. If iteration_38 changes the dictionary seed list or adds new entity_translations rows, the validate numbers may shift — adjust assertions accordingly. Only non-functional note: the global app IntroOverlay (data-testid='intro-overlay') blocks pointer events on the new /settings/translations page on first visit; remove from DOM via page.evaluate() before clicking interactive elements during automated tests.",
+  "rca of the issue": "n/a — no defects found in the in-scope P1 features."
+}
