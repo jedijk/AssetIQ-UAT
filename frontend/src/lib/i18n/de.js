@@ -514,6 +514,25 @@ const de = {
     exportSuccess: "Fehlermodi erfolgreich exportiert",
     exportError: "Export der Fehlermodi fehlgeschlagen",
   },
+
+  // Disciplines (used across library, equipment types, failure modes)
+  disciplines: {
+    allDisciplines: "Alle Disziplinen",
+    Rotating: "Rotierend",
+    Static: "Statisch",
+    Piping: "Rohrleitungen",
+    Electrical: "Elektrisch",
+    Instrumentation: "Instrumentierung",
+    Civil: "Bau",
+    Operations: "Betrieb",
+    Laboratory: "Labor",
+    Mechanical: "Mechanisch",
+    Component: "Komponente",
+    Process: "Prozess",
+    Generic: "Generisch",
+    Customer: "Kunde",
+    "Customer Specific": "Kundenspezifisch",
+  },
   
   // Equipment Manager
   equipment: {

@@ -528,6 +528,25 @@ const en = {
     exportSuccess: "Failure modes exported successfully",
     exportError: "Failed to export failure modes",
   },
+
+  // Disciplines (used across library, equipment types, failure modes)
+  disciplines: {
+    allDisciplines: "All Disciplines",
+    Rotating: "Rotating",
+    Static: "Static",
+    Piping: "Piping",
+    Electrical: "Electrical",
+    Instrumentation: "Instrumentation",
+    Civil: "Civil",
+    Operations: "Operations",
+    Laboratory: "Laboratory",
+    Mechanical: "Mechanical",
+    Component: "Component",
+    Process: "Process",
+    Generic: "Generic",
+    Customer: "Customer",
+    "Customer Specific": "Customer Specific",
+  },
   
   // Equipment Manager
   equipment: {
@@ -1805,6 +1824,25 @@ const nl = {
     exportExcel: "Exporteer Excel",
     exportSuccess: "Faalmodi succesvol geëxporteerd",
     exportError: "Exporteren van faalmodi mislukt",
+  },
+
+  // Disciplines (used across library, equipment types, failure modes)
+  disciplines: {
+    allDisciplines: "Alle disciplines",
+    Rotating: "Roterend",
+    Static: "Statisch",
+    Piping: "Leidingwerk",
+    Electrical: "Elektrisch",
+    Instrumentation: "Instrumentatie",
+    Civil: "Civiel",
+    Operations: "Operaties",
+    Laboratory: "Laboratorium",
+    Mechanical: "Mechanisch",
+    Component: "Component",
+    Process: "Proces",
+    Generic: "Generiek",
+    Customer: "Klant",
+    "Customer Specific": "Klantspecifiek",
   },
   
   // Equipment Manager

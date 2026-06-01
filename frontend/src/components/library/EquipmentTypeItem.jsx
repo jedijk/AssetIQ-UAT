@@ -4,6 +4,16 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { ScrollArea } from "../ui/scroll-area";
+import { useLanguage } from "../../contexts/LanguageContext";
+
+// Translate a discipline label via the i18n dictionary, falling back to the original
+function translateDiscipline(name, t) {
+  if (!name) return name;
+  const translated = t(`disciplines.${name}`);
+  // If t returned the raw key, no translation existed — fall back
+  if (translated && translated !== `disciplines.${name}`) return translated;
+  return name;
+}
 
 // Equipment type icons - Expanded for ISO 14224 coverage
 export const EQUIPMENT_ICONS = { 
@@ -84,6 +94,7 @@ export const DISCIPLINE_COLORS = {
 export function EquipmentTypeItem({ item, onEdit, onDelete, onSelect, isSelected, connectedFmCount = 0 }) {
   const Icon = EQUIPMENT_ICONS[item.icon] || Cog;
   const colors = DISCIPLINE_COLORS[item.discipline] || DISCIPLINE_COLORS["Mechanical"];
+  const { t } = useLanguage();
   
   return (
     <div 
@@ -106,9 +117,9 @@ export function EquipmentTypeItem({ item, onEdit, onDelete, onSelect, isSelected
           )}
         </div>
         <div className="flex items-center gap-1 flex-wrap">
-          <span className={`text-xs ${colors.text} truncate`}>{item.discipline}</span>
+          <span className={`text-xs ${colors.text} truncate`}>{translateDiscipline(item.discipline, t)}</span>
           {item.category && (
-            <span className="text-xs text-slate-400 capitalize truncate">• {item.category}</span>
+            <span className="text-xs text-slate-400 capitalize truncate">• {translateDiscipline(item.category.charAt(0).toUpperCase() + item.category.slice(1), t)}</span>
           )}
         </div>
         {/* Show connected failure modes count */}
@@ -212,7 +223,7 @@ export function EquipmentTypeFailureModesPanel({
         <div className="flex-1 min-w-0">
           <h2 className="font-semibold text-slate-900 text-lg truncate">{equipmentType.name}</h2>
           <div className="flex items-center gap-2 text-sm text-slate-500">
-            <span>{equipmentType.discipline}</span>
+            <span>{translateDiscipline(equipmentType.discipline, t)}</span>
             <span>•</span>
             <span className="text-blue-600 font-medium">{connectedFms.length} failure modes linked</span>
           </div>

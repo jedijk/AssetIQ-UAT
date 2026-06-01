@@ -20,6 +20,13 @@ import {
 } from "../ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../ui/dialog";
 
+function translateDiscipline(name, t) {
+  if (!name) return name;
+  const translated = t(`disciplines.${name}`);
+  if (translated && translated !== `disciplines.${name}`) return translated;
+  return name;
+}
+
 const disciplineIcons = {
   Rotating: Cog,
   Static: Thermometer,
@@ -302,7 +309,7 @@ export function FailureModeViewPanel({
             <>
               <h2 className="font-semibold text-slate-900 text-lg truncate">{fm.failure_mode}</h2>
               <div className="flex items-center gap-2 text-sm text-slate-500">
-                <span>{fm.discipline}</span>
+                <span>{translateDiscipline(fm.discipline, t)}</span>
                 {fm.version && (
                   <Badge variant="outline" className="text-xs py-0 px-1.5">
                     v{fm.version}

@@ -854,12 +854,12 @@ const FailureModesPage = () => {
               <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
                 <SelectTrigger className="w-44 h-11" data-testid="category-filter">
                   <Filter className="w-4 h-4 mr-2 text-slate-400" />
-                  <SelectValue placeholder="All Disciplines" />
+                  <SelectValue placeholder={t("disciplines.allDisciplines")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Disciplines</SelectItem>
+                  <SelectItem value="all">{t("disciplines.allDisciplines")}</SelectItem>
                   {DISCIPLINES.map((d) => (
-                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                    <SelectItem key={d} value={d}>{(t(`disciplines.${d}`) !== `disciplines.${d}` ? t(`disciplines.${d}`) : d)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1084,10 +1084,10 @@ const FailureModesPage = () => {
                         {/* Content */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
-                            <Badge className={`${colors} text-xs px-1.5 py-0`}>{fm.discipline}</Badge>
+                            <Badge className={`${colors} text-xs px-1.5 py-0`}>{(t(`disciplines.${fm.discipline}`) !== `disciplines.${fm.discipline}` ? t(`disciplines.${fm.discipline}`) : fm.discipline)}</Badge>
                             {fm.failure_mode_type === "customer_specific" && (
                               <Badge className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0">
-                                Customer
+                                {(t("disciplines.Customer") !== "disciplines.Customer" ? t("disciplines.Customer") : "Customer")}
                               </Badge>
                             )}
                           </div>
@@ -1266,12 +1266,12 @@ const FailureModesPage = () => {
                       {/* Discipline Filter */}
                       <Select value={typeFilterDiscipline} onValueChange={setTypeFilterDiscipline}>
                         <SelectTrigger className="w-[150px] h-9">
-                          <SelectValue placeholder="All Disciplines" />
+                          <SelectValue placeholder={t("disciplines.allDisciplines")} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="all">All Disciplines</SelectItem>
+                          <SelectItem value="all">{t("disciplines.allDisciplines")}</SelectItem>
                           {DISCIPLINES.map(d => (
-                            <SelectItem key={d} value={d}>{d}</SelectItem>
+                            <SelectItem key={d} value={d}>{(t(`disciplines.${d}`) !== `disciplines.${d}` ? t(`disciplines.${d}`) : d)}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -1300,7 +1300,7 @@ const FailureModesPage = () => {
                     return (
                       <div key={discipline} className="mb-6 last:mb-0">
                         <div className={`flex items-center gap-2 mb-3 px-2 py-1.5 rounded-lg ${colors.bg}`}>
-                          <span className={`text-sm font-semibold ${colors.text}`}>{discipline}</span>
+                          <span className={`text-sm font-semibold ${colors.text}`}>{(t(`disciplines.${discipline}`) !== `disciplines.${discipline}` ? t(`disciplines.${discipline}`) : discipline)}</span>
                           <span className="text-xs text-slate-400">({disciplineTypes.length})</span>
                         </div>
                         <div className={`grid gap-3 ${selectedEquipmentType ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
@@ -1385,7 +1385,7 @@ const FailureModesPage = () => {
               <Select value={newType.discipline} onValueChange={v => setNewType({ ...newType, discipline: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {DISCIPLINES.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  {DISCIPLINES.map(d => <SelectItem key={d} value={d}>{(t(`disciplines.${d}`) !== `disciplines.${d}` ? t(`disciplines.${d}`) : d)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -1441,7 +1441,7 @@ const FailureModesPage = () => {
               <Select value={newFm.discipline} onValueChange={v => setNewFm({ ...newFm, discipline: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {DISCIPLINES.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  {DISCIPLINES.map(d => <SelectItem key={d} value={d}>{(t(`disciplines.${d}`) !== `disciplines.${d}` ? t(`disciplines.${d}`) : d)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
