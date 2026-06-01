@@ -1607,7 +1607,12 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
   // ============= Mutations =============
 
   const runSchedulerMutation = useMutation({
-    mutationFn: (params) => maintenanceSchedulerAPI.runScheduler(params),
+    mutationFn: async (params) => {
+      // Always cleanup orphans first so stale tasks (from deleted strategies)
+      // disappear before regenerating future occurrences.
+      await maintenanceSchedulerAPI.cleanupOrphans();
+      return await maintenanceSchedulerAPI.runScheduler(params);
+    },
     onSuccess: (data) => {
       toast.success(`Scheduler completed: ${data.tasks_created} tasks created`);
       queryClient.invalidateQueries(["maintenance-scheduler"]);

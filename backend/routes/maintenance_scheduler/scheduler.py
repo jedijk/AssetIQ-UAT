@@ -120,6 +120,49 @@ async def schedule_programs_for_equipment(equipment_ids: List[str], horizon_days
     return total
 
 
+@router.post("/cleanup-orphans")
+async def cleanup_orphan_scheduled_tasks(
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Remove scheduled_tasks whose maintenance_program no longer exists,
+    AND maintenance_programs whose equipment_type has no strategy.
+    Used to clean up data left over from older deletes that did not cascade.
+    """
+    # Step 1: existing programs (keep these and their tasks)
+    all_prog_ids = set()
+    async for p in db.maintenance_programs.find({}, {"id": 1}):
+        all_prog_ids.add(p["id"])
+
+    sched_res = await db.scheduled_tasks.delete_many({
+        "maintenance_program_id": {"$nin": list(all_prog_ids), "$ne": None},
+    })
+
+    # Step 2: programs whose equipment_type has no strategy
+    existing_strategy_eq_types = set()
+    async for s in db.equipment_type_strategies.find({}, {"equipment_type_id": 1}):
+        existing_strategy_eq_types.add(s["equipment_type_id"])
+
+    orphan_programs = []
+    async for prog in db.maintenance_programs.find({}, {"id": 1, "equipment_type_id": 1}):
+        et_id = prog.get("equipment_type_id")
+        if et_id and et_id not in existing_strategy_eq_types:
+            orphan_programs.append(prog["id"])
+
+    extra_sched_deleted = 0
+    if orphan_programs:
+        extra = await db.scheduled_tasks.delete_many(
+            {"maintenance_program_id": {"$in": orphan_programs}}
+        )
+        extra_sched_deleted = extra.deleted_count
+    prog_res = await db.maintenance_programs.delete_many({"id": {"$in": orphan_programs}})
+
+    return {
+        "scheduled_tasks_removed": sched_res.deleted_count + extra_sched_deleted,
+        "programs_removed": prog_res.deleted_count,
+    }
+
+
 @router.post("/run-scheduler")
 async def run_scheduler(
     request: RunSchedulerRequest = None,

@@ -1090,12 +1090,12 @@ async def delete_equipment_type_strategy(
         )
     ]
 
-    # Delete all open scheduled tasks for those programs
+    # Delete all scheduled tasks (open + completed) for those programs.
+    # Completed history is preserved separately in `maintenance_history`.
     scheduled_deleted = 0
     if program_ids:
         scheduled_result = await db.scheduled_tasks.delete_many({
             "maintenance_program_id": {"$in": program_ids},
-            "status": OPEN_TASK_STATUSES_FILTER,
         })
         scheduled_deleted = scheduled_result.deleted_count
 
@@ -1709,7 +1709,6 @@ async def delete_task_template(
     if program_ids:
         sched_res = await db.scheduled_tasks.delete_many({
             "maintenance_program_id": {"$in": program_ids},
-            "status": OPEN_TASK_STATUSES_FILTER,
         })
         scheduled_deleted = sched_res.deleted_count
     progs_res = await db.maintenance_programs.delete_many(
@@ -2143,7 +2142,6 @@ async def delete_local_task(
     if program_ids:
         sched_res = await db.scheduled_tasks.delete_many({
             "maintenance_program_id": {"$in": program_ids},
-            "status": OPEN_TASK_STATUSES_FILTER,
         })
         scheduled_deleted = sched_res.deleted_count
     progs_res = await db.maintenance_programs.delete_many(
