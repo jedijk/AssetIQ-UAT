@@ -139,7 +139,7 @@ const ThreatsPage = () => {
   const [statusFilter, setStatusFilter] = useState(["Open", "In Progress"]); // Default: only show active observations
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [riskFilter, setRiskFilter] = useState("all"); // Filter by risk level
-  const [sortBy, setSortBy] = useState("business_risk"); // "business_risk" or "rpn"
+  const [sortBy, setSortBy] = useState("latest"); // Default: newest observations on top
   const [searchQuery, setSearchQuery] = useState("");
   const [assetFilter, setAssetFilter] = useState(""); // Display name for the filter
   const [assetsToFilter, setAssetsToFilter] = useState([]); // Array of asset names to filter by
