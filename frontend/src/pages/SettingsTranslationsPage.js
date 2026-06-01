@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { api } from "../lib/apiClient";
@@ -75,9 +75,12 @@ function CoverageTab() {
     },
     onMutate: (entityType) => setGenerating(entityType),
     onSuccess: (data, entityType) => {
-      const msg = data.total === 0
+      const total = data?.total;
+      const msg = total === 0
         ? `${entityType}: nothing to translate – already up to date`
-        : `${entityType}: queued ${data.total ?? "?"} entities`;
+        : total > 0
+          ? `${entityType}: queued ${total} entities`
+          : `${entityType}: translation job started`;
       toast.success(msg);
       queryClient.invalidateQueries({ queryKey: ["translation-coverage"] });
       queryClient.invalidateQueries({ queryKey: ["translation-jobs"] });
@@ -176,7 +179,7 @@ function TermDialog({ open, onOpenChange, term, onSave }) {
     source_term: "", category: "mechanical", translations: { nl: "", de: "" }, context: "", is_protected: false,
   });
 
-  useMemo(() => {
+  useEffect(() => {
     if (term) setForm({
       source_term: term.source_term || "",
       category: term.category || "mechanical",

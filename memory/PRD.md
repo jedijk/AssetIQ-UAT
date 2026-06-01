@@ -7,6 +7,13 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.1** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **P1: Translation Management Dashboard + Dictionary Validation (NEW, VERIFIED iteration_37)**:
+  - New page `/settings/translations` (owner/admin only) with two tabs:
+    - **Coverage tab**: per-entity-type translation stats (Failure Modes, Equipment Types, Equipment Hierarchy, Maintenance Tasks, Observations, Investigations, Form Templates), progress bars, per-row "Translate missing" bulk-generate button, Refresh, and Recent Jobs list (auto-refreshes every 5s).
+    - **Dictionary tab**: CRUD on `translation_dictionary` (Add/Edit/Delete + Seed defaults), search + category filter, and **"Validate translations against dictionary"** — calls new backend endpoint `POST /api/translations/dictionary/validate?language_code=…` that scans `entity_translations` and flags rows whose translated value still contains the English source term (untranslated technical leak).
+  - **Backend addition**: `POST /api/translations/dictionary/validate` — O(rows × terms) scan returns `{issues: [...], terms_checked, total_issues}`. NL currently surfaces 19 real inconsistencies, DE surfaces 2.
+  - 6/6 pytest PASS + 9/9 frontend review items PASS.
+
 - [Feb 2026] **Multi-Language Translation Framework expansion (P0+P1, VERIFIED iteration_36)**:
   - **P0 ThreatDetailPage**: Added ~30 new UI keys (tryAgain, riskPriorityNumber, fmeaScore, criticalityScore, probableCause, fieldNotes, deleteObservation, shareObservation, etc.) + status enums (Open/In Progress/Parked/Mitigated/Closed/Canceled) + risk level enums (Critical/High/Medium/Low) across EN/NL/DE. Composed translated title via `buildTranslatedTitle()` (e.g. "Condensation Vessel - Sludge Build up" → "Condensatievat - Slibopbouw"). Wired status dropdown + popup risk-level pills through `translateEnum()`.
   - **P1 Hierarchy descriptions**: Added new hook `useEquipmentNodeIdMap()` (returns `{nodeId: {name, description}}`). Wired into: (a) `EquipmentHierarchy.TreeNode` (sidebar), (b) `EquipmentManagerPage.TreeNode` (main page), (c) `PropertiesPanel` for both header title + description. Closed the inconsistency where sidebar showed Dutch names but /equipment-manager showed English.
