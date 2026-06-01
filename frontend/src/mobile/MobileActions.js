@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { actionsAPI } from "../lib/api";
+import { useLanguage } from "../contexts/LanguageContext";
 import { 
   CheckCircle, 
   Clock, 
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 
 const MobileActions = () => {
+  const { t } = useLanguage();
   const [filter, setFilter] = useState("open");
 
   const { data: actionsData = {}, isLoading } = useQuery({
@@ -72,9 +74,9 @@ const MobileActions = () => {
     const today = new Date();
     const diff = Math.ceil((date - today) / (1000 * 60 * 60 * 24));
     
-    if (diff === 0) return "Today";
-    if (diff === 1) return "Tomorrow";
-    if (diff === -1) return "Yesterday";
+    if (diff === 0) return t("common.today");
+    if (diff === 1) return t("common.tomorrow");
+    if (diff === -1) return t("common.yesterday");
     if (diff < -1) return `${Math.abs(diff)} days overdue`;
     if (diff <= 7) return `In ${diff} days`;
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });

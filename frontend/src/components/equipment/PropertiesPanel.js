@@ -21,6 +21,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { QRCodeDialog } from "./QRCodeDialog";
 import { DocumentViewer } from "../DocumentViewer";
 import { getBackendUrl } from "../../lib/apiConfig";
+import { getEquipmentLevelLabel } from "../../lib/equipmentLevelLabels";
 
 const LEVEL_CONFIG = { 
   installation: { icon: Settings, label: "Installation" }, 
@@ -497,6 +498,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
   );
   
   const config = LEVEL_CONFIG[node.level] || { icon: Cog, label: "Unknown" };
+  const levelLabel = getEquipmentLevelLabel(t, node.level);
   const LevelIcon = config.icon;
   const critColors = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
   
@@ -528,7 +530,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                 {translatedName}
               </h3>
             )}
-            <p className="text-xs text-slate-500">{config.label}</p>
+            <p className="text-xs text-slate-500">{levelLabel}</p>
           </div>
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => isEditing ? handleSave() : startEdit()}>
             {isEditing ? <Check className="w-4 h-4" /> : <Edit className="w-4 h-4" />}
@@ -839,7 +841,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                 onClick={() => onDelete(node.id)}
               >
                 <Trash2 className="w-4 h-4 mr-2" />
-                {t("common.delete")} {config.label}
+                {t("common.delete")} {levelLabel}
               </Button>
             </div>
           )}

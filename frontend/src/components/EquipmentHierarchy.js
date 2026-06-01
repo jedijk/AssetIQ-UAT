@@ -42,6 +42,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/t
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { DocumentViewer } from "./DocumentViewer";
 import { getBackendUrl } from "../lib/apiConfig";
+import { getEquipmentLevelLabel } from "../lib/equipmentLevelLabels";
 
 // ISO 14224 Level Configuration
 const ISO_LEVEL_CONFIG = {
@@ -201,6 +202,7 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
     label: node.level ? node.level.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : "Item",
     color: "text-slate-600"
   };
+  const levelLabel = getEquipmentLevelLabel(t, node.level, normalizeLevel);
   const Icon = config.icon;
   const critColor = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
   const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0 });
@@ -459,6 +461,7 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
   const nodeTrans = nodeTransMap[node.id] || {};
   const translatedName = nodeTrans.name || node.name;
   const translatedDescription = nodeTrans.description || node.description;
+  const levelLabel = getEquipmentLevelLabel(t, node.level, normalizeLevel);
 
   const { data: filesData } = useQuery({
     queryKey: ["equipment-files", node.id],
@@ -533,7 +536,7 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
             </div>
             <div className="min-w-0">
               <DialogTitle className="text-sm leading-tight">{translatedName}</DialogTitle>
-              <p className="text-xs text-slate-500 mt-0.5">{config.label}</p>
+              <p className="text-xs text-slate-500 mt-0.5">{levelLabel}</p>
             </div>
           </div>
         </DialogHeader>
@@ -679,12 +682,13 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
 
 
 // ISO Level Summary Item
-const LevelSummaryItem = ({ level, count, isActive, onClick, isHidden, onToggleHidden }) => {
+const LevelSummaryItem = ({ level, count, isActive, onClick, isHidden, onToggleHidden, t }) => {
   const config = ISO_LEVEL_CONFIG[level] || ISO_LEVEL_CONFIG[normalizeLevel(level)] || { 
     icon: Cog, 
     label: level ? level.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : "Item", 
     color: "text-slate-600" 
   };
+  const levelLabel = getEquipmentLevelLabel(t, level, normalizeLevel);
   const Icon = config.icon;
   
   return (
@@ -698,7 +702,7 @@ const LevelSummaryItem = ({ level, count, isActive, onClick, isHidden, onToggleH
         data-testid={`iso-level-${level}`}
       >
         <Icon className={`w-4 h-4 ${config.color}`} />
-        <span className="text-sm font-medium flex-1">{config.label}</span>
+        <span className="text-sm font-medium flex-1">{levelLabel}</span>
         <span className="text-xs bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded-full">
           {count}
         </span>
@@ -706,7 +710,7 @@ const LevelSummaryItem = ({ level, count, isActive, onClick, isHidden, onToggleH
       <button
         onClick={(e) => { e.stopPropagation(); onToggleHidden(level); }}
         className={`p-1.5 rounded hover:bg-slate-100 transition-colors ${isHidden ? "text-slate-300" : "text-slate-400"}`}
-        title={isHidden ? `Show ${config.label} in tree` : `Hide ${config.label} from tree`}
+        title={isHidden ? `${t("common.show")} ${levelLabel}` : `${t("common.hide")} ${levelLabel}`}
         data-testid={`toggle-level-${level}`}
       >
         {isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -1055,6 +1059,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
                   isActive={filterLevel === level}
                   isHidden={hiddenLevels.has(level)}
                   onToggleHidden={toggleHiddenLevel}
+                  t={t}
                   onClick={() => {
                     setFilterLevel(filterLevel === level ? null : level);
                     setViewMode("tree");
@@ -1069,7 +1074,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
                 <div className="mb-2 px-2">
                   <div className="flex items-center justify-between bg-blue-50 rounded-lg px-2 py-1">
                     <span className="text-xs text-blue-700">
-                      Showing: {ISO_LEVEL_CONFIG[filterLevel]?.label || filterLevel}
+                      Showing: {getEquipmentLevelLabel(t, filterLevel, normalizeLevel)}
                     </span>
                     <button 
                       onClick={() => setFilterLevel(null)}

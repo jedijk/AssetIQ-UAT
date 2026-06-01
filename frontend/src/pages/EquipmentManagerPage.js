@@ -1333,10 +1333,10 @@ export default function EquipmentManagerPage() {
       {/* Create Node Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{newNode.parent_id ? `${t("equipment.addChild")} ${LEVEL_CONFIG[newNode.level]?.label}` : t("equipment.addInstallation")}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{newNode.parent_id ? `${t("equipment.addChild")} ${getLevelLabel(t, normalizeLevel(newNode.level), LEVEL_CONFIG[newNode.level]?.label)}` : t("equipment.addInstallation")}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div><Label htmlFor="node-name">{t("common.name")}</Label><Input id="node-name" value={newNode.name} onChange={e => setNewNode({ ...newNode, name: e.target.value })} placeholder={t("common.enterName")} data-testid="new-node-name-input" /></div>
-            {!newNode.parent_id && (<div><Label>{t("equipment.selectLevel")}</Label><Select value={newNode.level} onValueChange={v => setNewNode({ ...newNode, level: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{LEVEL_ORDER.map(l => <SelectItem key={l} value={l}>{LEVEL_CONFIG[l]?.label}</SelectItem>)}</SelectContent></Select></div>)}
+            {!newNode.parent_id && (<div><Label>{t("equipment.selectLevel")}</Label><Select value={newNode.level} onValueChange={v => setNewNode({ ...newNode, level: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{LEVEL_ORDER.map(l => <SelectItem key={l} value={l}>{getLevelLabel(t, l, LEVEL_CONFIG[l]?.label)}</SelectItem>)}</SelectContent></Select></div>)}
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setIsCreateOpen(false)}>{t("common.cancel")}</Button><Button onClick={() => createMutation.mutate(newNode)} disabled={!newNode.name.trim() || createMutation.isPending} data-testid="create-node-btn">{createMutation.isPending ? t("common.creating") : t("common.create")}</Button></DialogFooter>
         </DialogContent>
@@ -1450,7 +1450,7 @@ export default function EquipmentManagerPage() {
                       <SelectItem key={level} value={level}>
                         <div className="flex items-center gap-2">
                           <LevelIcon className="w-4 h-4" />
-                          <span>{config?.label || level}</span>
+                          <span>{getLevelLabel(t, level, LEVEL_CONFIG[level]?.label)}</span>
                         </div>
                       </SelectItem>
                     );
@@ -1477,7 +1477,7 @@ export default function EquipmentManagerPage() {
       <Dialog open={demoteDialog.open} onOpenChange={(open) => !open && setDemoteDialog({ open: false, node: null, newLevel: null })}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t("equipment.demoteTo")} {LEVEL_CONFIG[demoteDialog.newLevel]?.label}</DialogTitle>
+            <DialogTitle>{t("equipment.demoteTo")} {getLevelLabel(t, demoteDialog.newLevel, LEVEL_CONFIG[demoteDialog.newLevel]?.label)}</DialogTitle>
             <DialogDescription>
               {t("equipment.selectNewParent")} "{demoteDialog.node?.name}"
             </DialogDescription>
@@ -1488,7 +1488,7 @@ export default function EquipmentManagerPage() {
               <div className="mt-2 max-h-60 overflow-y-auto border rounded-lg">
                 {getDemoteParentCandidates().length === 0 ? (
                   <div className="p-4 text-center text-slate-500 text-sm">
-                    {t("equipment.noValidParents")} {t("equipment.createFirst")} {LEVEL_CONFIG[LEVEL_ORDER[LEVEL_ORDER.indexOf(demoteDialog.newLevel) - 1]]?.label}.
+                    {t("equipment.noValidParents")} {t("equipment.createFirst")} {getLevelLabel(t, LEVEL_ORDER[LEVEL_ORDER.indexOf(demoteDialog.newLevel) - 1], LEVEL_CONFIG[LEVEL_ORDER[LEVEL_ORDER.indexOf(demoteDialog.newLevel) - 1]]?.label)}.
                   </div>
                 ) : (
                   getDemoteParentCandidates().map(parent => {
@@ -1507,7 +1507,7 @@ export default function EquipmentManagerPage() {
                         <ParentIcon className="w-5 h-5 text-slate-500" />
                         <div>
                           <div className="font-medium text-slate-900">{parent.name}</div>
-                          <div className="text-xs text-slate-500">{parentConfig.label}</div>
+                          <div className="text-xs text-slate-500">{getLevelLabel(t, normalizeLevel(parent.level), LEVEL_CONFIG[parent.level]?.label)}</div>
                         </div>
                       </button>
                     );

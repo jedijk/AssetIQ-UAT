@@ -1,6 +1,7 @@
 import { getBackendUrl } from '../lib/apiConfig';
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLanguage } from "../contexts/LanguageContext";
 import { 
   Clock, 
   CheckCircle2, 
@@ -19,6 +20,7 @@ const API_BASE_URL = getBackendUrl();
 const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
 
 const MobileMyTasks = () => {
+  const { t } = useLanguage();
   const [filter, setFilter] = useState("today");
   const [selectedTask, setSelectedTask] = useState(null);
 
@@ -69,13 +71,13 @@ const MobileMyTasks = () => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    if (date.toDateString() === today.toDateString()) return "Today";
-    if (date.toDateString() === tomorrow.toDateString()) return "Tomorrow";
+    if (date.toDateString() === today.toDateString()) return t("common.today");
+    if (date.toDateString() === tomorrow.toDateString()) return t("common.tomorrow");
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
   const filterTabs = [
-    { id: "today", label: "Today" },
+    { id: "today", label: t("common.today") },
     { id: "week", label: "This Week" },
     { id: "overdue", label: "Overdue" },
     { id: "all", label: "All" },

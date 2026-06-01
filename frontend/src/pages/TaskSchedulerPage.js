@@ -1097,7 +1097,7 @@ const TaskSchedulerPage = () => {
                                 <div key={plan.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                                   <div className="flex-1">
                                     <div className="flex items-center gap-2">
-                                      <span className="font-medium text-sm">{plan.equipment_name || 'All Equipment'}</span>
+                                      <span className="font-medium text-sm">{plan.equipment_name || t("equipment.allEquipment")}</span>
                                       <Badge className={plan.is_active ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-600"} variant="outline">
                                         {plan.is_active ? t("taskScheduler.active") : t("taskScheduler.inactive")}
                                       </Badge>
