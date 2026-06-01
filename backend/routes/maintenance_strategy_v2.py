@@ -167,6 +167,26 @@ async def _sync_metadata_to_open_scheduled_tasks(
     return result.modified_count
 
 
+async def _delete_open_scheduled_tasks_for_task(
+    equipment_type_id: str,
+    task_template_id: str,
+):
+    """Hard-delete every OPEN scheduled_task generated from a (now removed) strategy task."""
+    program_ids = [
+        p["id"] async for p in db.maintenance_programs.find(
+            {"equipment_type_id": equipment_type_id, "task_template_id": task_template_id},
+            {"id": 1, "_id": 0},
+        )
+    ]
+    if not program_ids:
+        return 0
+    result = await db.scheduled_tasks.delete_many({
+        "maintenance_program_id": {"$in": program_ids},
+        "status": OPEN_TASK_STATUSES_FILTER,
+    })
+    return result.deleted_count
+
+
 async def _cancel_open_scheduled_tasks_for_task(
     equipment_type_id: str,
     task_template_id: str,
@@ -223,6 +243,23 @@ async def _cancel_open_scheduled_tasks_for_failure_mode(
         }},
     )
     return result.modified_count
+
+
+async def _delete_open_scheduled_tasks_for_strategy(equipment_type_id: str):
+    """Hard-delete every OPEN scheduled_task linked to the given equipment-type strategy."""
+    program_ids = [
+        p["id"] async for p in db.maintenance_programs.find(
+            {"equipment_type_id": equipment_type_id},
+            {"id": 1, "_id": 0},
+        )
+    ]
+    if not program_ids:
+        return 0
+    result = await db.scheduled_tasks.delete_many({
+        "maintenance_program_id": {"$in": program_ids},
+        "status": OPEN_TASK_STATUSES_FILTER,
+    })
+    return result.deleted_count
 
 
 async def _cancel_open_scheduled_tasks_for_strategy(equipment_type_id: str):
@@ -1039,23 +1076,40 @@ async def delete_equipment_type_strategy(
     equipment_type_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Delete an equipment type strategy and cancel its open scheduled tasks."""
-    # Cascade-cancel open scheduled tasks BEFORE deleting the strategy so we can still
-    # find the linked maintenance_programs.
-    scheduled_cancelled = await _cancel_open_scheduled_tasks_for_strategy(equipment_type_id)
+    """
+    Delete an equipment type strategy AND fully clean up:
+      - Hard-delete all open scheduled_tasks (so they disappear from the schedule view)
+      - Hard-delete all maintenance_programs linked to the strategy
+      - Completed scheduled_tasks remain in `maintenance_history` (preserved separately)
+    """
+    # Capture program ids BEFORE deleting them so we can clean up scheduled_tasks
+    program_ids = [
+        p["id"] async for p in db.maintenance_programs.find(
+            {"equipment_type_id": equipment_type_id},
+            {"id": 1, "_id": 0},
+        )
+    ]
 
+    # Delete all open scheduled tasks for those programs
+    scheduled_deleted = 0
+    if program_ids:
+        scheduled_result = await db.scheduled_tasks.delete_many({
+            "maintenance_program_id": {"$in": program_ids},
+            "status": OPEN_TASK_STATUSES_FILTER,
+        })
+        scheduled_deleted = scheduled_result.deleted_count
+
+    # Delete the strategy itself
     result = await db.equipment_type_strategies.delete_one({
         "equipment_type_id": equipment_type_id
     })
 
-    if result.deleted_count == 0:
+    if result.deleted_count == 0 and not program_ids:
         raise HTTPException(status_code=404, detail="Strategy not found")
 
-    # Deactivate all linked maintenance_programs
-    now = datetime.now(timezone.utc).isoformat()
-    progs_result = await db.maintenance_programs.update_many(
+    # Hard-delete maintenance_programs — no orphan references should remain
+    progs_result = await db.maintenance_programs.delete_many(
         {"equipment_type_id": equipment_type_id},
-        {"$set": {"is_active": False, "updated_at": now}},
     )
 
     # Log audit
@@ -1068,8 +1122,8 @@ async def delete_equipment_type_strategy(
     return {
         "message": "Strategy deleted",
         "equipment_type_id": equipment_type_id,
-        "programs_deactivated": progs_result.modified_count,
-        "scheduled_tasks_cancelled": scheduled_cancelled,
+        "programs_deleted": progs_result.deleted_count,
+        "scheduled_tasks_deleted": scheduled_deleted,
     }
 
 
@@ -1644,15 +1698,30 @@ async def delete_task_template(
         user_id=current_user.get("user_id"),
     )
 
-    programs_deactivated = await _deactivate_programs_for_task(equipment_type_id, task_id)
-    scheduled_cancelled = await _cancel_open_scheduled_tasks_for_task(equipment_type_id, task_id)
+    # Capture program ids before deleting so we can cleanup scheduled_tasks
+    program_ids = [
+        p["id"] async for p in db.maintenance_programs.find(
+            {"equipment_type_id": equipment_type_id, "task_template_id": task_id},
+            {"id": 1, "_id": 0},
+        )
+    ]
+    scheduled_deleted = 0
+    if program_ids:
+        sched_res = await db.scheduled_tasks.delete_many({
+            "maintenance_program_id": {"$in": program_ids},
+            "status": OPEN_TASK_STATUSES_FILTER,
+        })
+        scheduled_deleted = sched_res.deleted_count
+    progs_res = await db.maintenance_programs.delete_many(
+        {"equipment_type_id": equipment_type_id, "task_template_id": task_id},
+    )
 
     return {
         "message": "Task template deleted",
         "task_id": task_id,
         "version": new_version,
-        "programs_deactivated": programs_deactivated,
-        "scheduled_tasks_cancelled": scheduled_cancelled,
+        "programs_deleted": progs_res.deleted_count,
+        "scheduled_tasks_deleted": scheduled_deleted,
     }
 
 
@@ -2051,7 +2120,7 @@ async def delete_local_task(
     task_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Delete a local task from equipment"""
+    """Delete a local task from equipment and clean up its scheduled tasks + maintenance program."""
     result = await db.equipment_strategy_instances.update_one(
         {"equipment_id": equipment_id},
         {
@@ -2059,11 +2128,34 @@ async def delete_local_task(
             "$set": {"updated_at": datetime.utcnow().isoformat()}
         }
     )
-    
+
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Local task not found")
-    
-    return {"message": "Local task deleted", "task_id": task_id}
+
+    # Clean up any maintenance_program + open scheduled_tasks created from this local task
+    program_ids = [
+        p["id"] async for p in db.maintenance_programs.find(
+            {"equipment_id": equipment_id, "task_template_id": task_id},
+            {"id": 1, "_id": 0},
+        )
+    ]
+    scheduled_deleted = 0
+    if program_ids:
+        sched_res = await db.scheduled_tasks.delete_many({
+            "maintenance_program_id": {"$in": program_ids},
+            "status": OPEN_TASK_STATUSES_FILTER,
+        })
+        scheduled_deleted = sched_res.deleted_count
+    progs_res = await db.maintenance_programs.delete_many(
+        {"equipment_id": equipment_id, "task_template_id": task_id},
+    )
+
+    return {
+        "message": "Local task deleted",
+        "task_id": task_id,
+        "programs_deleted": progs_res.deleted_count,
+        "scheduled_tasks_deleted": scheduled_deleted,
+    }
 
 
 @router.post("/equipment/{equipment_id}/enable-failure-mode")
