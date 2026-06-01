@@ -72,9 +72,7 @@ const STATUS_OPTIONS = [
   { value: "Open", label: "Open", color: "bg-blue-500", textColor: "text-blue-700", bgColor: "bg-blue-100" },
   { value: "In Progress", label: "In Progress", color: "bg-amber-500", textColor: "text-amber-700", bgColor: "bg-amber-100" },
   { value: "Parked", label: "Parked", color: "bg-slate-500", textColor: "text-slate-700", bgColor: "bg-slate-100" },
-  { value: "Mitigated", label: "Mitigated", color: "bg-green-500", textColor: "text-green-700", bgColor: "bg-green-100" },
   { value: "Closed", label: "Closed", color: "bg-slate-400", textColor: "text-slate-600", bgColor: "bg-slate-50" },
-  { value: "Canceled", label: "Canceled", color: "bg-red-400", textColor: "text-red-700", bgColor: "bg-red-50" },
 ];
 
 // Equipment type to icon mapping
@@ -138,7 +136,7 @@ const ThreatsPage = () => {
   })();
   const caps = useCapabilities();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [statusFilter, setStatusFilter] = useState([]); // Multi-select: array of selected statuses
+  const [statusFilter, setStatusFilter] = useState(["Open", "In Progress"]); // Default: only show active observations
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [riskFilter, setRiskFilter] = useState("all"); // Filter by risk level
   const [sortBy, setSortBy] = useState("business_risk"); // "business_risk" or "rpn"

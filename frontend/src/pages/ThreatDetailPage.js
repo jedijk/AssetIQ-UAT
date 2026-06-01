@@ -100,7 +100,7 @@ const LIKELIHOOD_OPTIONS = ["Rare", "Unlikely", "Possible", "Likely", "Almost Ce
 const DETECTABILITY_OPTIONS = ["Easy", "Moderate", "Difficult", "Very Difficult", "Almost Impossible"];
 const FREQUENCY_OPTIONS = ["Once", "Rarely", "Occasionally", "Frequently", "Constantly"];
 const IMPACT_OPTIONS = ["Minor", "Moderate", "Significant", "Major", "Catastrophic"];
-const STATUS_OPTIONS = ["Open", "In Progress", "Parked", "Mitigated", "Closed", "Canceled"];
+const STATUS_OPTIONS = ["Open", "In Progress", "Parked", "Closed"];
 const PRIORITY_OPTIONS = ["critical", "high", "medium", "low"];
 
 const ThreatDetailPage = () => {

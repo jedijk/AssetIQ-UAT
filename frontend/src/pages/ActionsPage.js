@@ -139,7 +139,7 @@ export default function ActionsPage() {
   const { t } = useLanguage();
   const { hasPermission } = usePermissions();
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState([]); // Multi-select: array of selected statuses
+  const [statusFilter, setStatusFilter] = useState(["open", "in_progress"]); // Default: only show active actions
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
