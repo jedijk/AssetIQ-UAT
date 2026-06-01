@@ -712,84 +712,94 @@ async def get_translation_coverage(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Get translation coverage - how many entities of each type have translations
+    Get translation coverage broken down per (entity_type, language_code).
+    Returns:
+      coverage: { <entity_type>: { total: N, by_language: { nl: M, de: K, ... }, languages: ["nl","de"] } }
     """
-    coverage = {}
-    
-    # Count unique entity_ids per entity_type that have translations
+    # Pull active target languages dynamically (skip 'en')
+    target_langs: List[str] = []
+    async for lang in db.languages.find({"active": True}):
+        code = lang.get("code")
+        if code and code != "en":
+            target_langs.append(code)
+    if not target_langs:
+        target_langs = ["nl", "de"]
+
+    coverage: Dict[str, Dict[str, Any]] = {}
+
+    # Per-language unique-entity_id counts
     pipeline = [
         {"$group": {
             "_id": {
                 "entity_type": "$entity_type",
-                "entity_id": "$entity_id"
+                "entity_id": "$entity_id",
+                "language_code": "$language_code",
             }
         }},
         {"$group": {
-            "_id": "$_id.entity_type",
-            "translated_count": {"$sum": 1}
+            "_id": {
+                "entity_type": "$_id.entity_type",
+                "language_code": "$_id.language_code",
+            },
+            "count": {"$sum": 1}
         }}
     ]
-    
     async for doc in db.entity_translations.aggregate(pipeline):
-        entity_type = doc["_id"]
-        coverage[entity_type] = {
-            "translated": doc["translated_count"],
-            "total": 0  # Will be filled below
-        }
-    
-    # Get total counts for each entity type
-    # Failure modes
+        et = doc["_id"]["entity_type"]
+        lang = doc["_id"]["language_code"]
+        if et not in coverage:
+            coverage[et] = {"total": 0, "by_language": {lc: 0 for lc in target_langs}, "languages": target_langs}
+        coverage[et]["by_language"][lang] = doc["count"]
+
+    # Helper that ensures the entity_type bucket exists
+    def _ensure(et: str):
+        if et not in coverage:
+            coverage[et] = {"total": 0, "by_language": {lc: 0 for lc in target_langs}, "languages": target_langs}
+        else:
+            for lc in target_langs:
+                coverage[et]["by_language"].setdefault(lc, 0)
+            coverage[et]["languages"] = target_langs
+
+    # Totals per entity type
     fm_count = await db.failure_modes.count_documents({})
-    if "failure_mode" not in coverage:
-        coverage["failure_mode"] = {"translated": 0, "total": fm_count}
-    else:
-        coverage["failure_mode"]["total"] = fm_count
-    
-    # Equipment types (custom)
+    _ensure("failure_mode")
+    coverage["failure_mode"]["total"] = fm_count
+
     et_count = await db.custom_equipment_types.count_documents({})
-    if "equipment_type" not in coverage:
-        coverage["equipment_type"] = {"translated": 0, "total": et_count}
-    else:
-        coverage["equipment_type"]["total"] = et_count
-    
-    # Maintenance task templates (from strategies)
+    _ensure("equipment_type")
+    coverage["equipment_type"]["total"] = et_count
+
     task_count = 0
     async for strategy in db.equipment_type_strategies.find({}):
         task_count += len(strategy.get("task_templates", []))
-    if "maintenance_task_template" not in coverage:
-        coverage["maintenance_task_template"] = {"translated": 0, "total": task_count}
-    else:
-        coverage["maintenance_task_template"]["total"] = task_count
-    
-    # Equipment nodes
+    _ensure("maintenance_task_template")
+    coverage["maintenance_task_template"]["total"] = task_count
+
     node_count = await db.equipment_nodes.count_documents({})
-    if "equipment_node" not in coverage:
-        coverage["equipment_node"] = {"translated": 0, "total": node_count}
-    else:
-        coverage["equipment_node"]["total"] = node_count
-    
-    # Observations
+    _ensure("equipment_node")
+    coverage["equipment_node"]["total"] = node_count
+
     obs_count = await db.threats.count_documents({})
-    if "observation" not in coverage:
-        coverage["observation"] = {"translated": 0, "total": obs_count}
-    else:
-        coverage["observation"]["total"] = obs_count
-    
-    # Investigations
+    _ensure("observation")
+    coverage["observation"]["total"] = obs_count
+
     inv_count = await db.investigations.count_documents({})
-    if "investigation" not in coverage:
-        coverage["investigation"] = {"translated": 0, "total": inv_count}
-    else:
-        coverage["investigation"]["total"] = inv_count
-    
-    # Form templates
+    _ensure("investigation")
+    coverage["investigation"]["total"] = inv_count
+
     form_count = await db.form_templates.count_documents({})
-    if "form_template" not in coverage:
-        coverage["form_template"] = {"translated": 0, "total": form_count}
-    else:
-        coverage["form_template"]["total"] = form_count
-    
-    return {"coverage": coverage}
+    _ensure("form_template")
+    coverage["form_template"]["total"] = form_count
+
+    # Cap by_language[L] at total so we never exceed 100% (e.g. stale orphan translations)
+    for et in coverage:
+        total = coverage[et]["total"] or 0
+        for lc in list(coverage[et]["by_language"].keys()):
+            coverage[et]["by_language"][lc] = min(coverage[et]["by_language"][lc], total)
+        # Backwards-compatible 'translated' field = sum across all target languages
+        coverage[et]["translated"] = sum(coverage[et]["by_language"].values())
+
+    return {"coverage": coverage, "target_languages": target_langs}
 
 
 # ============= User Language Preference =============

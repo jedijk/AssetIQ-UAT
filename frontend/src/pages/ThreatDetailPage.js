@@ -504,6 +504,8 @@ const ThreatDetailPage = () => {
   // Build flat list of equipment nodes for selection
   const flatEquipmentList = useMemo(() => {
     const result = [];
+    const eqTypeNameById = {};
+    for (const et of equipmentTypes) eqTypeNameById[et.id] = et.name;
     const flatten = (nodes, parentPath = "") => {
       for (const node of nodes) {
         const path = parentPath ? `${parentPath} > ${node.name}` : node.name;
@@ -512,8 +514,10 @@ const ThreatDetailPage = () => {
           name: node.name,
           path: path,
           level: node.level,
+          discipline: node.discipline,
+          equipmentTypeName: node.equipment_type_id ? eqTypeNameById[node.equipment_type_id] : null,
           hasCriticality: !!node.criticality,
-          criticalityLevel: node.criticality?.level
+          criticalityLevel: node.criticality?.level,
         });
         if (node.children) {
           flatten(node.children, path);
@@ -522,7 +526,7 @@ const ThreatDetailPage = () => {
     };
     flatten(equipmentNodes);
     return result;
-  }, [equipmentNodes]);
+  }, [equipmentNodes, equipmentTypes]);
 
   // Filtered list when user types into the equipment search box
   const filteredEquipmentList = useMemo(() => {
@@ -530,7 +534,11 @@ const ThreatDetailPage = () => {
     if (!q) return flatEquipmentList;
     return flatEquipmentList.filter(eq =>
       (eq.name || "").toLowerCase().includes(q) ||
-      (eq.path || "").toLowerCase().includes(q)
+      (eq.path || "").toLowerCase().includes(q) ||
+      (eq.level || "").toLowerCase().includes(q) ||
+      (eq.discipline || "").toLowerCase().includes(q) ||
+      (eq.equipmentTypeName || "").toLowerCase().includes(q) ||
+      (eq.criticalityLevel || "").toLowerCase().includes(q)
     );
   }, [flatEquipmentList, equipmentSearch]);
 
@@ -1142,7 +1150,36 @@ const ThreatDetailPage = () => {
                   data-testid={`equipment-option-${eq.id}`}
                 >
                   <div className="font-medium text-slate-800">{eq.name}</div>
-                  <div className="text-xs text-slate-500 mt-0.5">{eq.path}</div>
+                  <div className="text-xs text-slate-500 mt-0.5 truncate">{eq.path}</div>
+                  {(eq.level || eq.equipmentTypeName || eq.discipline || eq.criticalityLevel) && (
+                    <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                      {eq.level && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                          {String(eq.level).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                        </span>
+                      )}
+                      {eq.equipmentTypeName && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-100">
+                          {eq.equipmentTypeName}
+                        </span>
+                      )}
+                      {eq.discipline && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                          {eq.discipline}
+                        </span>
+                      )}
+                      {eq.criticalityLevel && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                          eq.criticalityLevel === "critical" ? "bg-red-50 text-red-700 border-red-200" :
+                          eq.criticalityLevel === "high" ? "bg-orange-50 text-orange-700 border-orange-200" :
+                          eq.criticalityLevel === "medium" ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                          "bg-green-50 text-green-700 border-green-200"
+                        }`}>
+                          {String(eq.criticalityLevel).charAt(0).toUpperCase() + String(eq.criticalityLevel).slice(1)}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </button>
               ))}
               {filteredEquipmentList.length === 0 && (

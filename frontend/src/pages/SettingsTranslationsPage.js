@@ -32,21 +32,40 @@ const ENTITY_TYPES = [
 const TARGET_LANGS = ["nl", "de"];
 const CATEGORIES = ["mechanical", "electrical", "instrumentation", "maintenance", "reliability", "process", "safety", "other"];
 
-function CoverageCard({ entityType, data }) {
+function CoverageCard({ entityType, data, languages }) {
   const total = data?.total ?? 0;
-  const translated = data?.translated ?? 0;
-  // Cap pct at 100 — backend counts unique (entity_id, lang) pairs which can exceed total when both nl+de present
-  const ratio = total > 0 ? Math.min(translated / (total * TARGET_LANGS.length), 1) : 0;
-  const pct = Math.round(ratio * 100);
-  const color = pct >= 95 ? "bg-emerald-500" : pct >= 60 ? "bg-amber-500" : "bg-red-500";
+  const byLang = data?.by_language || {};
+  const langs = (data?.languages && data.languages.length ? data.languages : languages) || TARGET_LANGS;
+
+  // Overall completeness = average per-language %
+  const langPcts = langs.map(lc => total > 0 ? Math.round(((byLang[lc] ?? 0) / total) * 100) : 0);
+  const overall = langPcts.length ? Math.round(langPcts.reduce((a, b) => a + b, 0) / langPcts.length) : 0;
+  const color = overall >= 95 ? "bg-emerald-500" : overall >= 60 ? "bg-amber-500" : "bg-red-500";
+
   return (
     <div className="border border-slate-200 rounded-lg p-4 bg-white" data-testid={`coverage-card-${entityType.id}`}>
       <div className="flex items-baseline justify-between mb-1">
         <h4 className="text-sm font-semibold text-slate-800">{entityType.label}</h4>
-        <span className="text-xs font-mono text-slate-500">{translated} / {total * TARGET_LANGS.length}</span>
+        <span className="text-xs font-mono text-slate-500">{total} entities</span>
       </div>
-      <Progress value={pct} className={`h-2 [&>div]:${color}`} data-testid={`coverage-progress-${entityType.id}`} />
-      <div className="text-xs text-slate-500 mt-1">{pct}% across {TARGET_LANGS.join(" + ").toUpperCase()}</div>
+      <Progress value={overall} className={`h-2 [&>div]:${color}`} data-testid={`coverage-progress-${entityType.id}`} />
+      <div className="mt-2 space-y-1">
+        {langs.map(lc => {
+          const done = byLang[lc] ?? 0;
+          const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+          const pctColor = pct >= 95 ? "text-emerald-600" : pct >= 60 ? "text-amber-600" : "text-red-600";
+          return (
+            <div key={lc} className="flex items-center justify-between text-xs" data-testid={`coverage-lang-${entityType.id}-${lc}`}>
+              <span className="text-slate-500 uppercase tracking-wide">{lc}</span>
+              <span className="font-mono text-slate-600">
+                {done} / {total}
+                {" "}
+                <span className={`${pctColor} font-semibold`}>({pct}%)</span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -92,6 +111,7 @@ function CoverageTab() {
   });
 
   const coverage = covData?.coverage || {};
+  const targetLanguages = covData?.target_languages || TARGET_LANGS;
   const jobs = jobsData?.jobs || [];
 
   return (
@@ -113,7 +133,7 @@ function CoverageTab() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {ENTITY_TYPES.map(et => (
               <div key={et.id} className="space-y-2">
-                <CoverageCard entityType={et} data={coverage[et.id]} />
+                <CoverageCard entityType={et} data={coverage[et.id]} languages={targetLanguages} />
                 <Button
                   variant="outline"
                   size="sm"
