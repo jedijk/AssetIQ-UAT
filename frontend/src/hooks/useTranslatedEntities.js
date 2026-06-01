@@ -303,3 +303,99 @@ export default {
   useTranslatedObservations,
   useTranslatedTasks,
 };
+
+/**
+ * Hook that returns a name-based translation map for equipment types.
+ * Map: { englishName (lowercase): translatedName }.
+ * Useful when you have free-text equipment type strings on entities
+ * (e.g. `threat.asset = "Cooling Water Pump"`) and want to display
+ * their translated counterpart without changing the underlying data.
+ */
+export function useEquipmentTypeNameMap() {
+  const { language } = useLanguage();
+
+  // Fetch all equipment types (provides English name → id)
+  const { data: equipmentTypes = [] } = useQuery({
+    queryKey: ["equipment-types-list-for-name-map"],
+    queryFn: async () => {
+      const r = await api.get("/equipment-hierarchy/types");
+      return r.data?.equipment_types || r.data || [];
+    },
+    staleTime: 1000 * 60 * 10,
+    retry: false,
+  });
+
+  // Fetch batch translations for current language
+  const { data: translationsByEntityId = {} } = useQuery({
+    queryKey: ["equipment-type-batch-translations", language],
+    queryFn: async () => {
+      if (language === "en") return {};
+      const r = await api.get(`/translations/batch/equipment_type`, {
+        params: { language_code: language },
+      });
+      return r.data?.translations || {};
+    },
+    enabled: language !== "en",
+    staleTime: 1000 * 60 * 10,
+    retry: false,
+  });
+
+  return useMemo(() => {
+    if (language === "en") return {};
+    const map = {};
+    for (const et of equipmentTypes) {
+      const trans = translationsByEntityId[et.id];
+      if (!trans?.name) continue;
+      const engName = (et.name || "").trim();
+      if (engName) map[engName.toLowerCase()] = trans.name;
+    }
+    return map;
+  }, [equipmentTypes, translationsByEntityId, language]);
+}
+
+/**
+ * Hook that returns a name-based translation map for equipment hierarchy nodes
+ * (e.g. specific assets like "Cooling Water Pump", "Condensation Vessel").
+ * Map: { englishName (lowercase): translatedName }.
+ */
+export function useEquipmentNodeNameMap() {
+  const { language } = useLanguage();
+
+  // Fetch all hierarchy nodes (provides English name → id)
+  const { data: nodes = [] } = useQuery({
+    queryKey: ["equipment-nodes-list-for-name-map"],
+    queryFn: async () => {
+      const r = await api.get("/equipment-hierarchy/nodes");
+      return r.data?.nodes || r.data || [];
+    },
+    staleTime: 1000 * 60 * 10,
+    retry: false,
+  });
+
+  // Fetch batch translations for current language
+  const { data: translationsByEntityId = {} } = useQuery({
+    queryKey: ["equipment-node-batch-translations", language],
+    queryFn: async () => {
+      if (language === "en") return {};
+      const r = await api.get(`/translations/batch/equipment_node`, {
+        params: { language_code: language },
+      });
+      return r.data?.translations || {};
+    },
+    enabled: language !== "en",
+    staleTime: 1000 * 60 * 10,
+    retry: false,
+  });
+
+  return useMemo(() => {
+    if (language === "en") return {};
+    const map = {};
+    for (const n of nodes) {
+      const trans = translationsByEntityId[n.id];
+      if (!trans?.name) continue;
+      const engName = (n.name || "").trim();
+      if (engName) map[engName.toLowerCase()] = trans.name;
+    }
+    return map;
+  }, [nodes, translationsByEntityId, language]);
+}

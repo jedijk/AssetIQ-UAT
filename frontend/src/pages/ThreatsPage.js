@@ -8,7 +8,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useNotificationTriggers } from "../hooks/useNotificationTriggers";
-import { useTranslatedObservations } from "../hooks/useTranslatedEntities";
+import { useTranslatedObservations, useEquipmentTypeNameMap, useEquipmentNodeNameMap } from "../hooks/useTranslatedEntities";
 import { 
   AlertTriangle, 
   TrendingUp, 
@@ -230,6 +230,16 @@ const ThreatsPage = () => {
 
   // Apply translations based on current language
   const { observations: translatedThreats } = useTranslatedObservations(rawThreats);
+  const equipmentTypeNameMap = useEquipmentTypeNameMap();
+  const equipmentNodeNameMap = useEquipmentNodeNameMap();
+  
+  const translateEquipmentTypeName = (name) => {
+    if (!name) return name;
+    const key = String(name).trim().toLowerCase();
+    // Try node name first (asset names are typically hierarchy nodes),
+    // then fall back to equipment type names.
+    return equipmentNodeNameMap[key] || equipmentTypeNameMap[key] || name;
+  };
   const threats = translatedThreats;
 
   // Trigger push notifications for high-severity observations
@@ -789,8 +799,8 @@ const ThreatsPage = () => {
                           <RiskBadge level={threat.risk_level} size="sm" />
                         </span>
                         <span className="text-xs sm:text-sm text-slate-500 truncate">
-                          <span className="sm:hidden">{threat.equipment_name || threat.asset}</span>
-                          <span className="hidden sm:inline">{threat.asset}</span>
+                          <span className="sm:hidden">{threat.equipment_name || translateEquipmentTypeName(threat.asset)}</span>
+                          <span className="hidden sm:inline">{translateEquipmentTypeName(threat.asset)}</span>
                         </span>
                       </div>
                     </div>
@@ -893,8 +903,8 @@ const ThreatsPage = () => {
                   </span>
                   {/* Mobile: Show equipment, Desktop: Show asset */}
                   <span className="text-xs sm:text-sm text-slate-500 truncate">
-                    <span className="sm:hidden">{threat.asset || threat.title}</span>
-                    <span className="hidden sm:inline">{threat.asset}</span>
+                    <span className="sm:hidden">{translateEquipmentTypeName(threat.asset) || threat.title}</span>
+                    <span className="hidden sm:inline">{translateEquipmentTypeName(threat.asset)}</span>
                   </span>
                 </div>
               </div>
