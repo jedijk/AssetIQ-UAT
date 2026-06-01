@@ -526,11 +526,14 @@ async def import_excel_file(
     invalid_level_samples: list[str] = []
     
     def resolve_parent_id(parent_name: str | None, iso_level: str) -> str | None:
-        """Resolve parent from Parent column or Full Path."""
+        """Resolve parent from Parent column or Full Path (match by name or tag)."""
         if parent_name:
             parent_key = parent_name.lower()
             if parent_key in nodes_by_name:
                 return nodes_by_name[parent_key]["id"]
+            tag_match = nodes_by_tag.get(parent_name) or nodes_by_tag.get(parent_name.strip())
+            if tag_match:
+                return tag_match["id"]
             install_name = (installation.get("name") or "").lower()
             if parent_key == install_name:
                 return installation_id
