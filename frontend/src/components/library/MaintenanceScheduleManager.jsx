@@ -35,6 +35,7 @@ import {
   PlayCircle,
   PauseCircle,
   XCircle,
+  X,
   CheckCircle,
   ClockIcon,
 } from "lucide-react";
@@ -71,7 +72,8 @@ import {
   TooltipTrigger,
 } from "../ui/tooltip";
 import { Textarea } from "../ui/textarea";
-import { maintenanceSchedulerAPI, maintenanceStrategyV2API } from "../../lib/api";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { maintenanceSchedulerAPI, maintenanceStrategyV2API, equipmentHierarchyAPI } from "../../lib/api";
 import { useLanguage } from "../../contexts/LanguageContext";
 
 
@@ -1554,6 +1556,8 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
   const [aiPlanOpen, setAiPlanOpen] = useState(false);
   const [aiPlanResult, setAiPlanResult] = useState(null);
   const [selectedAiRecs, setSelectedAiRecs] = useState(new Set());
+  // Filter: Equipment Unit (ISO 14224 level). "" = all units.
+  const [selectedUnitId, setSelectedUnitId] = useState("");
 
   const equipmentTypeId = equipmentType?.id;
   const equipmentTypeName = equipmentType?.name || "All Equipment";
@@ -1603,6 +1607,69 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
     queryFn: () => maintenanceSchedulerAPI.getTechnicians(),
   });
   const technicians = techniciansData?.technicians || [];
+
+  // Equipment hierarchy nodes — used to build the Equipment Unit filter
+  // and resolve a unit's descendant equipment_ids for client-side filtering.
+  const { data: nodesData } = useQuery({
+    queryKey: ["equipment-hierarchy-nodes-for-schedule-filter"],
+    queryFn: () => equipmentHierarchyAPI.getNodes(),
+    staleTime: 1000 * 60 * 5,
+  });
+  const allNodes = useMemo(() => nodesData?.nodes || nodesData || [], [nodesData]);
+
+  // Build list of Equipment Unit nodes (translated via id-map if available)
+  const equipmentUnitNodes = useMemo(
+    () => allNodes
+      .filter(n => n.level === "equipment_unit")
+      .sort((a, b) => (a.name || "").localeCompare(b.name || "")),
+    [allNodes]
+  );
+
+  // Compute the set of equipment_ids included by the current Equipment Unit filter.
+  // "" → return null (no filter); otherwise include the selected unit's id + all descendants.
+  const filteredEquipmentIds = useMemo(() => {
+    if (!selectedUnitId) return null;
+    const childrenByParent = {};
+    for (const n of allNodes) {
+      if (!n.parent_id) continue;
+      (childrenByParent[n.parent_id] = childrenByParent[n.parent_id] || []).push(n.id);
+    }
+    const included = new Set([selectedUnitId]);
+    const stack = [selectedUnitId];
+    while (stack.length) {
+      const cur = stack.pop();
+      for (const child of childrenByParent[cur] || []) {
+        if (!included.has(child)) {
+          included.add(child);
+          stack.push(child);
+        }
+      }
+    }
+    return included;
+  }, [selectedUnitId, allNodes]);
+
+  // Helper to filter any list of tasks/items by the selected Equipment Unit
+  const applyUnitFilter = (items) => {
+    if (!filteredEquipmentIds || !Array.isArray(items)) return items;
+    return items.filter(it => it && filteredEquipmentIds.has(it.equipment_id));
+  };
+
+  // Filtered views passed to children
+  const filteredTimeline = useMemo(() => {
+    if (!timeline) return timeline;
+    if (!filteredEquipmentIds) return timeline;
+    return {
+      ...timeline,
+      equipment: Array.isArray(timeline.equipment)
+        ? timeline.equipment.filter(e => filteredEquipmentIds.has(e.equipment_id))
+        : timeline.equipment,
+    };
+  }, [timeline, filteredEquipmentIds]);
+
+  const filteredTasksList = useMemo(
+    () => applyUnitFilter(tasksData?.tasks),
+    [tasksData, filteredEquipmentIds]
+  );
 
   // ============= Mutations =============
 
@@ -1788,6 +1855,34 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
       {/* Dashboard KPIs */}
       <DashboardCards dashboard={dashboard} isLoading={dashboardLoading} />
 
+      {/* Equipment Unit Filter */}
+      <div className="flex items-center gap-2 flex-wrap" data-testid="equipment-unit-filter-row">
+        <span className="text-sm font-medium text-slate-700">{t("maintenance.equipmentUnit") || "Equipment Unit"}:</span>
+        <Select value={selectedUnitId || "all"} onValueChange={(v) => setSelectedUnitId(v === "all" ? "" : v)}>
+          <SelectTrigger className="w-64" data-testid="equipment-unit-filter">
+            <SelectValue placeholder={t("maintenance.allEquipmentUnits") || "All equipment units"} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("maintenance.allEquipmentUnits") || "All equipment units"}</SelectItem>
+            {equipmentUnitNodes.map(n => (
+              <SelectItem key={n.id} value={n.id}>{n.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {selectedUnitId && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setSelectedUnitId("")}
+            className="h-8 text-xs"
+            data-testid="clear-equipment-unit-filter"
+          >
+            <X className="w-3.5 h-3.5 mr-1" />
+            {t("common.clear") || "Clear"}
+          </Button>
+        )}
+      </div>
+
       {/* Programs Summary */}
       {programsSummary && (
         <Card>
@@ -1848,7 +1943,7 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
         {/* Timeline Tab */}
         <TabsContent value="timeline" className="mt-4">
           <TimelineView 
-            timeline={timeline} 
+            timeline={filteredTimeline} 
             isLoading={timelineLoading} 
             onTaskClick={handleTaskClick}
             onTaskReschedule={(taskId, newDate) =>
@@ -1859,13 +1954,13 @@ const MaintenanceScheduleManager = ({ equipmentType }) => {
 
         {/* Planner Tab */}
         <TabsContent value="planner" className="mt-4">
-          <PlannerView equipmentTypeId={equipmentTypeId} onTaskClick={handleTaskClick} />
+          <PlannerView equipmentTypeId={equipmentTypeId} onTaskClick={handleTaskClick} filteredEquipmentIds={filteredEquipmentIds} />
         </TabsContent>
 
         {/* Tasks Tab */}
         <TabsContent value="tasks" className="mt-4">
           <TaskListView 
-            tasks={tasksData?.tasks} 
+            tasks={filteredTasksList} 
             isLoading={tasksLoading}
             onTaskClick={handleTaskClick}
           />
