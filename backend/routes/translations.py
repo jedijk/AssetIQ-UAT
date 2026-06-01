@@ -563,24 +563,54 @@ async def generate_all_translations(
     else:
         raise HTTPException(status_code=400, detail=f"Bulk translation not supported for entity_type {entity_type}")
     
-    # Optionally filter out IDs that already have ANY translation in all target languages
+    # Optionally filter out IDs that already have FULL field coverage in all target languages
     if only_missing and entity_ids:
-        already_translated_ids: set = set()
-        pipeline = [
-            {"$match": {
-                "entity_type": entity_type.value,
-                "entity_id": {"$in": entity_ids},
-                "language_code": {"$in": target_languages},
-            }},
-            {"$group": {
-                "_id": "$entity_id",
-                "langs": {"$addToSet": "$language_code"},
-            }},
-        ]
-        async for doc in db.entity_translations.aggregate(pipeline):
-            if set(target_languages).issubset(set(doc.get("langs", []))):
-                already_translated_ids.add(doc["_id"])
-        entity_ids = [eid for eid in entity_ids if eid not in already_translated_ids]
+        # Field config drives which fields need translating (see translation_service.TRANSLATION_FIELDS)
+        from services.translation_service import TRANSLATABLE_FIELDS
+        expected_fields = set(TRANSLATABLE_FIELDS.get(entity_type, []))
+        complete_ids: set = set()
+        if expected_fields:
+            # entity_id -> {language_code -> set(field_name)}
+            coverage_map: Dict[str, Dict[str, set]] = {}
+            pipeline = [
+                {"$match": {
+                    "entity_type": entity_type.value,
+                    "entity_id": {"$in": entity_ids},
+                    "language_code": {"$in": target_languages},
+                }},
+                {"$group": {
+                    "_id": {"entity_id": "$entity_id", "language_code": "$language_code"},
+                    "fields": {"$addToSet": "$field_name"},
+                }},
+            ]
+            async for doc in db.entity_translations.aggregate(pipeline):
+                eid = doc["_id"]["entity_id"]
+                lang = doc["_id"]["language_code"]
+                coverage_map.setdefault(eid, {})[lang] = set(doc.get("fields", []))
+            # An entity is "complete" only when every target lang has every expected field
+            for eid, lang_map in coverage_map.items():
+                if all(
+                    expected_fields.issubset(lang_map.get(lang, set()))
+                    for lang in target_languages
+                ):
+                    complete_ids.add(eid)
+        else:
+            # Fallback to legacy behaviour: any translation in all target langs means complete
+            pipeline = [
+                {"$match": {
+                    "entity_type": entity_type.value,
+                    "entity_id": {"$in": entity_ids},
+                    "language_code": {"$in": target_languages},
+                }},
+                {"$group": {
+                    "_id": "$entity_id",
+                    "langs": {"$addToSet": "$language_code"},
+                }},
+            ]
+            async for doc in db.entity_translations.aggregate(pipeline):
+                if set(target_languages).issubset(set(doc.get("langs", []))):
+                    complete_ids.add(doc["_id"])
+        entity_ids = [eid for eid in entity_ids if eid not in complete_ids]
     
     if not entity_ids:
         return {"success": True, "message": "Nothing to translate – everything is up to date", "total": 0}

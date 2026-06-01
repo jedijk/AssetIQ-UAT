@@ -168,6 +168,32 @@ const getFrequencyLabel = (value) => {
   return FREQUENCY_OPTIONS.find((f) => f.value === value)?.label || value;
 };
 
+// Map frequency value -> translation key
+const FREQUENCY_TRANSLATION_KEYS = {
+  not_required: "freqNotRequired",
+  continuous: "freqContinuous",
+  hourly: "freqHourly",
+  shift: "freqShift",
+  daily: "freqDaily",
+  weekly: "freqWeekly",
+  bi_weekly: "freqBiWeekly",
+  monthly: "freqMonthly",
+  quarterly: "freqQuarterly",
+  semi_annual: "freqSemiAnnual",
+  annual: "freqAnnual",
+  biennial: "freqBiennial",
+  on_condition: "freqOnCondition",
+};
+
+const translateFrequency = (t, value) => {
+  const key = FREQUENCY_TRANSLATION_KEYS[value];
+  if (key) {
+    const translated = t(`maintenance.${key}`);
+    if (translated && translated !== `maintenance.${key}`) return translated;
+  }
+  return getFrequencyLabel(value);
+};
+
 const getCriticalityConfig = (level) => {
   return CRITICALITY_LEVELS.find((c) => c.value === level) || CRITICALITY_LEVELS[1];
 };
@@ -220,9 +246,9 @@ const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating, affected
       <Card className="border-dashed border-2 border-slate-300">
         <CardContent className="p-8 text-center">
           <Wrench className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-slate-700 mb-2">No Strategy Defined</h3>
+          <h3 className="text-lg font-medium text-slate-700 mb-2">{t("maintenance.noStrategyDefined")}</h3>
           <p className="text-sm text-slate-500 mb-4">
-            Create a maintenance strategy template for this equipment type to automatically generate tasks.
+            {t("maintenance.createStrategyTemplate")}
           </p>
         </CardContent>
       </Card>
@@ -335,11 +361,12 @@ const FailureModeStrategyRow = ({
   taskTemplates,
   onViewInFMEA 
 }) => {
+  const { t } = useLanguage();
   const fmNameMap = useFailureModeNameMap();
   const taskNameMap = useMaintenanceTaskTemplateMap();
   const translatedFmName = fmNameMap[String(fmStrategy.failure_mode_name || "").trim().toLowerCase()] || fmStrategy.failure_mode_name;
-  const linkedTasks = taskTemplates?.filter((t) => 
-    fmStrategy.task_ids?.includes(t.id)
+  const linkedTasks = taskTemplates?.filter((tt) => 
+    fmStrategy.task_ids?.includes(tt.id)
   ) || [];
   
   // RPN data
@@ -360,7 +387,7 @@ const FailureModeStrategyRow = ({
                 {translatedFmName}
               </span>
               {!fmStrategy.enabled && (
-                <Badge variant="outline" className="text-xs bg-slate-100">Disabled</Badge>
+                <Badge variant="outline" className="text-xs bg-slate-100">{t("maintenance.disabledBadge")}</Badge>
               )}
               {fmStrategy.has_new_version && (
                 <TooltipProvider>
@@ -373,10 +400,10 @@ const FailureModeStrategyRow = ({
                     </TooltipTrigger>
                     <TooltipContent>
                       <div className="text-xs space-y-1">
-                        <p className="font-medium">Failure Mode Updated in Library</p>
-                        <p>Your version: v{fmStrategy.fm_version || 1}</p>
-                        <p>Library version: v{fmStrategy.library_version || 1}</p>
-                        <p className="text-blue-600 pt-1">Click "Sync Library" to update</p>
+                        <p className="font-medium">{t("maintenance.failureModeUpdatedInLibrary")}</p>
+                        <p>{t("maintenance.yourVersion")}: v{fmStrategy.fm_version || 1}</p>
+                        <p>{t("maintenance.libraryVersion")}: v{fmStrategy.library_version || 1}</p>
+                        <p className="text-blue-600 pt-1">{t("maintenance.clickSyncLibraryToUpdate")}</p>
                       </div>
                     </TooltipContent>
                   </Tooltip>
@@ -394,7 +421,7 @@ const FailureModeStrategyRow = ({
                   </TooltipTrigger>
                   <TooltipContent>
                     <div className="text-xs space-y-1">
-                      <p className="font-medium">Failure Mode Version</p>
+                      <p className="font-medium">{t("maintenance.failureModeVersionLabel")}</p>
                       <p>In strategy: v{fmStrategy.fm_version || 1}</p>
                       <p>In library: v{fmStrategy.library_version || 1}</p>
                       {fmStrategy.has_new_version && (
@@ -414,11 +441,11 @@ const FailureModeStrategyRow = ({
                   </TooltipTrigger>
                   <TooltipContent>
                     <div className="text-xs space-y-1">
-                      <p className="font-medium">Risk Priority Number</p>
-                      <p>Severity: {fmStrategy.severity || 5}</p>
-                      <p>Occurrence: {fmStrategy.occurrence || 5}</p>
-                      <p>Detectability: {fmStrategy.detectability || 5}</p>
-                      <p className="pt-1 border-t">Risk Level: <span className="capitalize">{rpnConfig.level}</span></p>
+                      <p className="font-medium">{t("maintenance.riskPriorityNumber")}</p>
+                      <p>{t("maintenance.severity")}: {fmStrategy.severity || 5}</p>
+                      <p>{t("maintenance.occurrence")}: {fmStrategy.occurrence || 5}</p>
+                      <p>{t("maintenance.detectability")}: {fmStrategy.detectability || 5}</p>
+                      <p className="pt-1 border-t">{t("maintenance.riskLevel")}: <span className="capitalize">{rpnConfig.level}</span></p>
                     </div>
                   </TooltipContent>
                 </Tooltip>
@@ -462,7 +489,7 @@ const FailureModeStrategyRow = ({
                   <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>View in FMEA Library</TooltipContent>
+              <TooltipContent>{t("maintenance.viewInFmeaLibrary")}</TooltipContent>
             </Tooltip>
           </TooltipProvider>
           {isExpanded ? (
@@ -485,7 +512,7 @@ const FailureModeStrategyRow = ({
               {/* RPN Score Display */}
               <div className="p-3 rounded-lg border bg-slate-50">
                 <div className="flex items-center justify-between mb-2">
-                  <Label className="text-xs font-medium">Risk Priority Number (RPN)</Label>
+                  <Label className="text-xs font-medium">{t("maintenance.riskPriorityNumberShort")}</Label>
                   <Badge className={`${rpnConfig.color}`}>
                     {rpnConfig.level.toUpperCase()} RISK
                   </Badge>
@@ -493,19 +520,19 @@ const FailureModeStrategyRow = ({
                 <div className="grid grid-cols-4 gap-3">
                   <div className="text-center p-2 bg-white rounded border">
                     <div className="text-lg font-bold text-slate-700">{fmStrategy.severity || 5}</div>
-                    <div className="text-[10px] text-slate-500">Severity</div>
+                    <div className="text-[10px] text-slate-500">{t("maintenance.severity")}</div>
                   </div>
                   <div className="text-center p-2 bg-white rounded border">
                     <div className="text-lg font-bold text-slate-700">{fmStrategy.occurrence || 5}</div>
-                    <div className="text-[10px] text-slate-500">Occurrence</div>
+                    <div className="text-[10px] text-slate-500">{t("maintenance.occurrence")}</div>
                   </div>
                   <div className="text-center p-2 bg-white rounded border">
                     <div className="text-lg font-bold text-slate-700">{fmStrategy.detectability || 5}</div>
-                    <div className="text-[10px] text-slate-500">Detectability</div>
+                    <div className="text-[10px] text-slate-500">{t("maintenance.detectability")}</div>
                   </div>
                   <div className={`text-center p-2 rounded border-2 ${rpnConfig.color.includes('red') ? 'border-red-300 bg-red-50' : rpnConfig.color.includes('orange') ? 'border-orange-300 bg-orange-50' : rpnConfig.color.includes('yellow') ? 'border-yellow-300 bg-yellow-50' : 'border-green-300 bg-green-50'}`}>
                     <div className={`text-lg font-bold ${rpnConfig.textColor}`}>{rpn}</div>
-                    <div className="text-[10px] text-slate-500">RPN Score</div>
+                    <div className="text-[10px] text-slate-500">{t("maintenance.rpnScore")}</div>
                   </div>
                 </div>
                 <p className="text-[10px] text-slate-400 mt-2">
@@ -550,15 +577,15 @@ const FailureModeStrategyRow = ({
               {/* Linked Tasks with Toggle Switches */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <Label className="text-xs">Linked Tasks ({linkedTasks.length})</Label>
+                  <Label className="text-xs">{t("maintenance.linkedTasks")} ({linkedTasks.length})</Label>
                   {linkedTasks.length > 0 && (
-                    <span className="text-[10px] text-slate-400">Toggle to enable/disable actions</span>
+                    <span className="text-[10px] text-slate-400">{t("maintenance.toggleEnableDisable")}</span>
                   )}
                 </div>
                 <div className="space-y-2">
                   {linkedTasks.length === 0 ? (
                     <p className="text-xs text-slate-400 italic p-2 bg-slate-50 rounded">
-                      No tasks linked to this failure mode
+                      {t("maintenance.noTasksLinkedToFailureMode")}
                     </p>
                   ) : (
                     linkedTasks.map((task) => (
@@ -602,15 +629,15 @@ const FailureModeStrategyRow = ({
                           {/* Frequency per Criticality */}
                           {task.task_type !== "reactive" && task.frequency_matrix && (
                             <div className="flex items-center gap-1.5 mt-2">
-                              <span className="text-[10px] text-slate-400">Freq:</span>
+                              <span className="text-[10px] text-slate-400">{t("maintenance.freqShort")}</span>
                               <Badge variant="outline" className="text-[9px] bg-green-50 text-green-700 border-green-200 px-1.5 py-0">
-                                L: {getFrequencyLabel(task.frequency_matrix.low || "quarterly")}
+                                L: {translateFrequency(t, task.frequency_matrix.low || "quarterly")}
                               </Badge>
                               <Badge variant="outline" className="text-[9px] bg-yellow-50 text-yellow-700 border-yellow-200 px-1.5 py-0">
-                                M: {getFrequencyLabel(task.frequency_matrix.medium || "monthly")}
+                                M: {translateFrequency(t, task.frequency_matrix.medium || "monthly")}
                               </Badge>
                               <Badge variant="outline" className="text-[9px] bg-red-50 text-red-700 border-red-200 px-1.5 py-0">
-                                H: {getFrequencyLabel(task.frequency_matrix.high || "weekly")}
+                                H: {translateFrequency(t, task.frequency_matrix.high || "weekly")}
                               </Badge>
                             </div>
                           )}
@@ -630,7 +657,7 @@ const FailureModeStrategyRow = ({
                                 <Edit2 className="w-3.5 h-3.5 text-slate-500" />
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent>Edit task</TooltipContent>
+                            <TooltipContent>{t("maintenance.editTask")}</TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
                         <TooltipProvider>
@@ -641,7 +668,7 @@ const FailureModeStrategyRow = ({
                               </span>
                             </TooltipTrigger>
                             <TooltipContent className="max-w-xs">
-                              <p className="text-xs">{taskNameMap[task.id]?.description || task.description || "No description available"}</p>
+                              <p className="text-xs">{taskNameMap[task.id]?.description || task.description || t("maintenance.noDescriptionAvailable")}</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
@@ -662,13 +689,14 @@ const FailureModeStrategyRow = ({
  * Criticality Frequency Matrix Editor
  */
 const CriticalityMatrixEditor = ({ task, onUpdate }) => {
+  const { t } = useLanguage();
   const freqMatrix = task.frequency_matrix || {};
 
   return (
     <div className="grid grid-cols-3 gap-2">
       {CRITICALITY_LEVELS.map((crit) => (
         <div key={crit.value}>
-          <Label className="text-[10px] text-slate-500">{crit.label} Criticality</Label>
+          <Label className="text-[10px] text-slate-500">{t(`maintenance.criticality${crit.value.charAt(0).toUpperCase() + crit.value.slice(1)}`)} {t("strategy.criticality")}</Label>
           <Select
             value={freqMatrix[crit.value] || "monthly"}
             onValueChange={(v) => {
@@ -686,7 +714,7 @@ const CriticalityMatrixEditor = ({ task, onUpdate }) => {
             <SelectContent>
               {FREQUENCY_OPTIONS.map((f) => (
                 <SelectItem key={f.value} value={f.value} className="text-xs">
-                  {f.label}
+                  {translateFrequency(t, f.value)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -701,6 +729,7 @@ const CriticalityMatrixEditor = ({ task, onUpdate }) => {
  * Task Template Card
  */
 const TaskTemplateCard = ({ task, onEdit, onDelete, failureModes }) => {
+  const { t } = useLanguage();
   const [isExpanded, setIsExpanded] = useState(false);
   const strategyConfig = getTaskTypeConfig(task.task_type);
   const StrategyIcon = strategyConfig.icon;
@@ -786,14 +815,14 @@ const TaskTemplateCard = ({ task, onEdit, onDelete, failureModes }) => {
               {/* Frequency Matrix - Hidden for CM (Corrective/Reactive) tasks */}
               {task.task_type !== "reactive" ? (
                 <div>
-                  <Label className="text-xs font-medium">Criticality-Based Frequency</Label>
+                  <Label className="text-xs font-medium">{t("maintenance.criticalityBasedFrequency")}</Label>
                   <div className="grid grid-cols-3 gap-2 mt-2">
                     {CRITICALITY_LEVELS.map((crit) => {
                       const freq = task.frequency_matrix?.[crit.value] || "monthly";
                       return (
                         <div key={crit.value} className={`p-2 rounded border ${crit.color}`}>
-                          <div className="text-[10px] font-medium">{crit.label}</div>
-                          <div className="text-xs mt-0.5">{getFrequencyLabel(freq)}</div>
+                          <div className="text-[10px] font-medium">{t(`maintenance.criticality${crit.value.charAt(0).toUpperCase() + crit.value.slice(1)}`)}</div>
+                          <div className="text-xs mt-0.5">{translateFrequency(t, freq)}</div>
                         </div>
                       );
                     })}
@@ -811,7 +840,7 @@ const TaskTemplateCard = ({ task, onEdit, onDelete, failureModes }) => {
               {/* Detection Methods */}
               {task.detection_methods?.length > 0 && (
                 <div>
-                  <Label className="text-xs font-medium">Detection Methods</Label>
+                  <Label className="text-xs font-medium">{t("maintenance.detectionMethods")}</Label>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {task.detection_methods.map((m) => (
                       <Badge key={m} variant="outline" className="text-[10px]">
@@ -825,7 +854,7 @@ const TaskTemplateCard = ({ task, onEdit, onDelete, failureModes }) => {
               {/* Linked Failure Modes */}
               {linkedFMs.length > 0 && (
                 <div>
-                  <Label className="text-xs font-medium">Addresses Failure Modes</Label>
+                  <Label className="text-xs font-medium">{t("maintenance.addressesFailureModes")}</Label>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {linkedFMs.map((fm) => (
                       <Badge key={fm.failure_mode_id} className="text-[10px] bg-amber-50 text-amber-700 border-amber-200">
@@ -859,6 +888,8 @@ const TaskTemplateCard = ({ task, onEdit, onDelete, failureModes }) => {
  * Add/Edit Task Dialog
  */
 const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) => {
+  const { t } = useLanguage();
+  const fmNameMap = useFailureModeNameMap();
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -923,7 +954,7 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{task ? "Edit Task Template" : "Add Task Template"}</DialogTitle>
+          <DialogTitle>{task ? t("maintenance.editTaskTemplate") : t("maintenance.addTaskTemplate")}</DialogTitle>
           <DialogDescription>
             Define a maintenance task template with criticality-based frequencies
           </DialogDescription>
@@ -933,7 +964,7 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
           {/* Basic Info */}
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <Label>Task Name *</Label>
+              <Label>{t("maintenance.taskName")} *</Label>
               <Input
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -942,11 +973,11 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
               />
             </div>
             <div className="col-span-2">
-              <Label>Description</Label>
+              <Label>{t("maintenance.descriptionLabel")}</Label>
               <Textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Describe what this task involves..."
+                placeholder={t("maintenance.describeTaskPlaceholder")}
                 className="mt-1"
                 rows={2}
               />
@@ -956,7 +987,7 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
           {/* Task Type & Duration */}
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <Label>Task Type</Label>
+              <Label>{t("maintenance.taskType")}</Label>
               <Select
                 value={formData.task_type}
                 onValueChange={(v) => setFormData({ ...formData, task_type: v })}
@@ -974,7 +1005,7 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
               </Select>
             </div>
             <div>
-              <Label>Duration (hours)</Label>
+              <Label>{t("maintenance.durationHours")}</Label>
               <Input
                 type="number"
                 min={0.25}
@@ -985,13 +1016,13 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
               />
             </div>
             <div>
-              <Label>Discipline</Label>
+              <Label>{t("maintenance.discipline")}</Label>
               <Select
                 value={formData.discipline}
                 onValueChange={(v) => setFormData({ ...formData, discipline: v })}
               >
                 <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select Discipline" />
+                  <SelectValue placeholder={t("maintenance.selectDisciplinePlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
                   {DISCIPLINES.filter(d => d.value).map((d) => (
@@ -1024,7 +1055,7 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
               <div className="grid grid-cols-3 gap-3 mt-2">
                 {CRITICALITY_LEVELS.map((crit) => (
                   <div key={crit.value} className={`p-3 rounded-lg border ${crit.color}`}>
-                    <Label className="text-xs font-medium">{crit.label}</Label>
+                    <Label className="text-xs font-medium">{t(`maintenance.criticality${crit.value.charAt(0).toUpperCase() + crit.value.slice(1)}`)}</Label>
                     <p className="text-[10px] text-slate-500 mb-2">{crit.description}</p>
                     <Select
                       value={formData.frequency_matrix[crit.value]}
@@ -1041,7 +1072,7 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
                       <SelectContent>
                         {FREQUENCY_OPTIONS.map((f) => (
                           <SelectItem key={f.value} value={f.value} className="text-xs">
-                            {f.label}
+                            {translateFrequency(t, f.value)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1055,10 +1086,9 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div>
-                  <Label className="text-sm font-medium text-amber-800">Corrective Maintenance Task</Label>
+                  <Label className="text-sm font-medium text-amber-800">{t("maintenance.correctiveMaintenanceTask")}</Label>
                   <p className="text-xs text-amber-700 mt-1">
-                    CM (Corrective) tasks are reactive and do not have a scheduled frequency. 
-                    They are triggered when equipment fails or issues are detected.
+                    {t("maintenance.cmReactiveExplain")}
                   </p>
                 </div>
               </div>
@@ -1068,7 +1098,7 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onClose(false)}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={handleSave} disabled={isLoading}>
             {isLoading ? (
@@ -1076,7 +1106,7 @@ const TaskDialog = ({ open, onClose, task, failureModes, onSave, isLoading }) =>
             ) : (
               <Save className="w-4 h-4 mr-2" />
             )}
-            {task ? "Update" : "Create"} Task
+            {task ? t("maintenance.updateTask") : t("maintenance.createTask")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1348,7 +1378,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
     return (
       <div className="p-8 text-center">
         <Wrench className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-        <p className="text-slate-500">Select an equipment type to view its maintenance strategy</p>
+        <p className="text-slate-500">{t("maintenance.selectEqTypeToViewStrategy")}</p>
       </div>
     );
   }
@@ -1357,7 +1387,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
     return (
       <div className="p-8 text-center">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-        <p className="text-slate-500">Loading strategy...</p>
+        <p className="text-slate-500">{t("maintenance.loadingStrategy")}</p>
       </div>
     );
   }
@@ -1494,7 +1524,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={() => deleteStrategyMutation.mutate()}
                       className="bg-red-600 hover:bg-red-700"
@@ -1596,9 +1626,9 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <CardTitle className="text-sm">Criticality-Based Frequency Matrix</CardTitle>
+                    <CardTitle className="text-sm">{t("maintenance.frequencyMatrixTitle")}</CardTitle>
                     <CardDescription>
-                      How task frequencies change based on equipment criticality level
+                      {t("maintenance.frequencyMatrixDesc")}
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1609,7 +1639,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                       data-testid="matrix-show-inactive-toggle"
                     />
                     <Label htmlFor="show-inactive-matrix" className="text-xs text-slate-600 cursor-pointer">
-                      Show inactive
+                      {t("maintenance.showInactive")}
                     </Label>
                   </div>
                 </div>
@@ -1631,13 +1661,13 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                           data-testid="matrix-hidden-count"
                         >
                           <Info className="w-3.5 h-3.5" />
-                          {hiddenCount} inactive task{hiddenCount === 1 ? "" : "s"} hidden (linked failure mode disabled).
+                          {hiddenCount} {t("maintenance.inactiveTasksHidden")}
                           <button
                             type="button"
                             className="text-blue-600 hover:underline"
                             onClick={() => setShowInactiveInMatrix(true)}
                           >
-                            Show
+                            {t("maintenance.showHidden")}
                           </button>
                         </div>
                       )}
@@ -1647,10 +1677,10 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b">
-                              <th className="text-left py-2 px-3 font-medium">Task</th>
+                              <th className="text-left py-2 px-3 font-medium">{t("maintenance.taskColumn")}</th>
                               {CRITICALITY_LEVELS.map((crit) => (
                                 <th key={crit.value} className={`text-center py-2 px-3 font-medium ${crit.color} rounded-t`}>
-                                  {crit.label}
+                                  {t(`maintenance.criticality${crit.value.charAt(0).toUpperCase() + crit.value.slice(1)}`)}
                                 </th>
                               ))}
                             </tr>
@@ -1669,26 +1699,26 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                                       <span className="truncate">{taskNameMap[task.id]?.name || task.name}</span>
                                       {!active && (
                                         <Badge variant="outline" className="text-[10px] py-0 px-1 bg-slate-100 text-slate-500 border-slate-300">
-                                          Inactive
+                                          {t("maintenance.inactiveLabel")}
                                         </Badge>
                                       )}
                                     </div>
                                     {task.task_type === "reactive" && (
-                                      <span className="text-[10px] text-amber-600">(Corrective)</span>
+                                      <span className="text-[10px] text-amber-600">{t("maintenance.correctiveLabel")}</span>
                                     )}
                                   </td>
                                   {task.task_type === "reactive" ? (
                                     <td colSpan={3} className="text-center py-2 px-3">
                                       <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
                                         <AlertTriangle className="w-3 h-3 mr-1" />
-                                        No scheduled frequency - triggered on failure
+                                        {t("maintenance.noScheduledFrequency")}
                                       </Badge>
                                     </td>
                                   ) : (
                                     CRITICALITY_LEVELS.map((crit) => (
                                       <td key={crit.value} className="text-center py-2 px-3">
                                         <Badge variant="outline" className="text-xs">
-                                          {getFrequencyLabel(task.frequency_matrix?.[crit.value] || "monthly")}
+                                          {translateFrequency(t, task.frequency_matrix?.[crit.value] || "monthly")}
                                         </Badge>
                                       </td>
                                     ))
@@ -1705,8 +1735,8 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                           <BarChart3 className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                           <p className="text-sm text-slate-500">
                             {allTasks.length === 0
-                              ? "Add task templates to see the frequency matrix"
-                              : "No active tasks. Toggle 'Show inactive' to see disabled ones."}
+                              ? t("maintenance.addTaskTemplatesToSeeMatrix")
+                              : t("maintenance.noActiveTasks")}
                           </p>
                         </div>
                       )}
@@ -1725,14 +1755,14 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                   <div>
                     <CardTitle className="text-sm flex items-center gap-2">
                       <GitBranch className="w-4 h-4" />
-                      Version History
+                      {t("maintenance.versionHistory")}
                     </CardTitle>
                     <CardDescription>
-                      Track changes to this maintenance strategy template
+                      {t("maintenance.trackChangesToTemplate")}
                     </CardDescription>
                   </div>
                   <Badge variant="outline" className="text-xs">
-                    Current: v{versionHistoryData?.current_version || strategy?.version || "1.0"}
+                    {t("maintenance.current")}: v{versionHistoryData?.current_version || strategy?.version || "1.0"}
                   </Badge>
                 </div>
               </CardHeader>
@@ -1740,7 +1770,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                 {(!versionHistoryData?.version_history || versionHistoryData.version_history.length === 0) ? (
                   <div className="py-8 text-center">
                     <History className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                    <p className="text-sm text-slate-500">No version history yet</p>
+                    <p className="text-sm text-slate-500">{t("maintenance.noVersionHistory")}</p>
                     <p className="text-xs text-slate-400 mt-1">Changes will be tracked when you update the strategy</p>
                   </div>
                 ) : (
@@ -1881,7 +1911,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p className="text-xs">Edit in Equipment Manager</p>
+                                <p className="text-xs">{t("maintenance.editInEquipmentManager")}</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
