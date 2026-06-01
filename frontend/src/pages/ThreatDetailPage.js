@@ -121,6 +121,16 @@ const ThreatDetailPage = () => {
     if (!n) return n;
     return fmNameMap[String(n).trim().toLowerCase()] || n;
   };
+  // Compose a translated title: "Asset - Failure Mode"
+  const buildTranslatedTitle = (rawTitle, asset, failureMode) => {
+    if (!rawTitle) return rawTitle;
+    const tAsset = translateEquipmentTypeName(asset);
+    const tFm = translateFailureModeName(failureMode);
+    if (tAsset && tFm && rawTitle.includes(" - ")) {
+      return `${tAsset} - ${tFm}`;
+    }
+    return rawTitle;
+  };
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [scoreCalcPopup, setScoreCalcPopup] = useState({ show: false, x: 0, y: 0 });
@@ -547,10 +557,10 @@ const ThreatDetailPage = () => {
           <p className="text-sm text-slate-500 mb-4">ID: {id}</p>
           <div className="flex gap-2 justify-center">
             <Button onClick={() => refetchThreat()} variant="outline">
-              Try Again
+              {t("observations.tryAgain")}
             </Button>
             <Button onClick={() => navigate("/threats")} variant="outline">
-              Back to Observations
+              {t("observations.backToObservations")}
             </Button>
           </div>
         </div>
@@ -628,7 +638,7 @@ const ThreatDetailPage = () => {
                 <ArrowLeft className="w-4 h-4" />
               </Button>
               <h1 className="font-semibold text-sm text-slate-900 line-clamp-2 leading-tight flex-1">
-                {threat.title}
+                {buildTranslatedTitle(threat.title, threat.asset, threat.failure_mode)}
               </h1>
             </div>
             {/* Tag display */}
@@ -679,13 +689,13 @@ const ThreatDetailPage = () => {
                           threat.status === "Mitigated" ? "text-green-600" :
                           "text-slate-600"
                         }`}>
-                          {threat.status === "In Progress" ? "In Prog." : threat.status}
+                          {threat.status === "In Progress" ? t("observations.inProgressShort") : translateEnum(threat.status)}
                         </span>
                         <ChevronDown className="w-3 h-3 text-slate-400" />
                       </SelectTrigger>
                       <SelectContent>
                         {STATUS_OPTIONS.map(s => (
-                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                          <SelectItem key={s} value={s}>{translateEnum(s)}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -699,11 +709,11 @@ const ThreatDetailPage = () => {
                       <DropdownMenuContent align="end" className="w-40">
                         <DropdownMenuItem onClick={startEditing}>
                           <Edit className="w-4 h-4 mr-2" />
-                          Edit
+                          {t("common.edit")}
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={shareLink}>
                           <Share2 className="w-4 h-4 mr-2" />
-                          Share Link
+                          {t("observations.shareLink")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -733,7 +743,7 @@ const ThreatDetailPage = () => {
                 </span>
               </div>
               <h1 className="font-semibold text-base text-slate-900 truncate">
-                {threat.title}
+                {buildTranslatedTitle(threat.title, threat.asset, threat.failure_mode)}
               </h1>
               {threat.equipment_tag && (
                 <span className="text-xs text-slate-400 font-mono">{threat.equipment_tag}</span>
@@ -761,21 +771,21 @@ const ThreatDetailPage = () => {
                 <>
                   <Button size="sm" variant="outline" onClick={cancelEditing} className="h-7 px-2 text-xs">
                     <X className="w-3 h-3 mr-1" />
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                   <Button size="sm" onClick={saveChanges} disabled={updateMutation.isPending} className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700">
                     {updateMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Save className="w-3 h-3 mr-1" />}
-                    Save
+                    {t("common.save")}
                   </Button>
                 </>
               ) : (
                 <>
-                  <Button size="sm" variant="ghost" onClick={shareLink} className="h-7 px-2 text-slate-500 hover:text-slate-700" title="Share link">
+                  <Button size="sm" variant="ghost" onClick={shareLink} className="h-7 px-2 text-slate-500 hover:text-slate-700" title={t("observations.shareLink")}>
                     <Share2 className="w-3.5 h-3.5" />
                   </Button>
                   <Button size="sm" variant="outline" onClick={startEditing} className="h-7 px-2 text-xs">
                     <Edit className="w-3 h-3 mr-1" />
-                    Edit
+                    {t("common.edit")}
                   </Button>
                   <Select
                     value={threat.status}
@@ -783,11 +793,11 @@ const ThreatDetailPage = () => {
                     disabled={updateMutation.isPending}
                   >
                     <SelectTrigger className="h-7 w-24 text-xs px-2">
-                      <SelectValue />
+                      <SelectValue>{translateEnum(threat.status)}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {STATUS_OPTIONS.map(s => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                        <SelectItem key={s} value={s}>{translateEnum(s)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -830,7 +840,7 @@ const ThreatDetailPage = () => {
               <div className="border-l border-slate-200 pl-4 sm:pl-8">
                 <div className="text-xs sm:text-sm font-medium text-slate-500 mb-0.5 sm:mb-1 flex items-center gap-1 sm:gap-2">
                   RPN
-                  <span className="text-[10px] sm:text-xs text-slate-400 font-normal hidden sm:inline">(Risk Priority Number)</span>
+                  <span className="text-[10px] sm:text-xs text-slate-400 font-normal hidden sm:inline">({t("observations.riskPriorityNumber")})</span>
                 </div>
                 <div className={`text-2xl sm:text-4xl font-bold ${
                   rpnValue >= 300 ? "text-red-600" :
@@ -926,7 +936,7 @@ const ThreatDetailPage = () => {
                     threat.risk_level === "Critical" ? "bg-red-100 text-red-700" :
                     threat.risk_level === "High" ? "bg-orange-100 text-orange-700" :
                     threat.risk_level === "Medium" ? "bg-yellow-100 text-yellow-700" : "bg-green-100 text-green-700"
-                  }`}>{threat.risk_level}</span>
+                  }`}>{translateEnum(threat.risk_level)}</span>
                 </div>
               </div>
 
@@ -935,12 +945,12 @@ const ThreatDetailPage = () => {
                 {/* FMEA Score */}
                 <div className="bg-slate-50 rounded-lg p-2">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs font-medium text-slate-700">FMEA Score</span>
+                    <span className="text-xs font-medium text-slate-700">{t("observations.fmeaScore")}</span>
                     <button
                       onClick={() => setShowLinkFailureModeDialog(true)}
                       className="text-[9px] text-blue-600 hover:underline"
                     >
-                      {linkedFmData ? "Relink" : "Link"}
+                      {linkedFmData ? t("observations.relink") : t("observations.link")}
                     </button>
                   </div>
                   {linkedFmData ? (
@@ -962,39 +972,39 @@ const ThreatDetailPage = () => {
                       <div className="text-lg font-bold text-blue-600">= {fmBaseScore}</div>
                     </div>
                   ) : (
-                    <div className="text-xs text-slate-400 italic">Not linked — Score: <span className="font-bold text-slate-600">{fmBaseScore}</span></div>
+                    <div className="text-xs text-slate-400 italic">{t("observations.notLinkedScore")}: <span className="font-bold text-slate-600">{fmBaseScore}</span></div>
                   )}
                 </div>
 
                 {/* Criticality Score */}
                 <div className="bg-slate-50 rounded-lg p-2">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs font-medium text-slate-700">Criticality Score</span>
+                    <span className="text-xs font-medium text-slate-700">{t("observations.criticalityScore")}</span>
                   </div>
                   {linkedCriticalityData ? (
                     <div className="flex items-center gap-2">
                       <div className="flex gap-1 flex-1">
                         <div className="bg-white rounded px-1.5 py-1 text-center flex-1 border border-slate-200">
                           <div className="text-sm font-bold text-red-600">{linkedCriticalityData.safety_impact || 0}</div>
-                          <div className="text-[8px] text-slate-400">Safe</div>
+                          <div className="text-[8px] text-slate-400">{t("observations.safetyShort")}</div>
                         </div>
                         <div className="bg-white rounded px-1.5 py-1 text-center flex-1 border border-slate-200">
                           <div className="text-sm font-bold text-orange-600">{linkedCriticalityData.production_impact || 0}</div>
-                          <div className="text-[8px] text-slate-400">Prod</div>
+                          <div className="text-[8px] text-slate-400">{t("observations.productionShort")}</div>
                         </div>
                         <div className="bg-white rounded px-1.5 py-1 text-center flex-1 border border-slate-200">
                           <div className="text-sm font-bold text-green-600">{linkedCriticalityData.environmental_impact || 0}</div>
-                          <div className="text-[8px] text-slate-400">Env</div>
+                          <div className="text-[8px] text-slate-400">{t("observations.environmentShort")}</div>
                         </div>
                         <div className="bg-white rounded px-1.5 py-1 text-center flex-1 border border-slate-200">
                           <div className="text-sm font-bold text-purple-600">{linkedCriticalityData.reputation_impact || 0}</div>
-                          <div className="text-[8px] text-slate-400">Rep</div>
+                          <div className="text-[8px] text-slate-400">{t("observations.reputationShort")}</div>
                         </div>
                       </div>
                       <div className="text-lg font-bold text-purple-600">= {criticalityScore}</div>
                     </div>
                   ) : (
-                    <div className="text-xs text-slate-400 italic">Not linked — Score: <span className="font-bold text-slate-600">0</span></div>
+                    <div className="text-xs text-slate-400 italic">{t("observations.notLinkedScore")}: <span className="font-bold text-slate-600">0</span></div>
                   )}
                 </div>
               </div>
@@ -1002,10 +1012,10 @@ const ThreatDetailPage = () => {
               {/* Risk Levels */}
               <div className="mt-2 pt-2 border-t border-slate-200">
                 <div className="flex flex-wrap gap-1.5 text-[9px]">
-                  <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-600">≥70 Critical</span>
-                  <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-600">50-69 High</span>
-                  <span className="px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-600">30-49 Medium</span>
-                  <span className="px-1.5 py-0.5 rounded bg-green-100 text-green-600">&lt;30 Low</span>
+                  <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-600">≥70 {translateEnum("Critical")}</span>
+                  <span className="px-1.5 py-0.5 rounded bg-orange-100 text-orange-600">50-69 {translateEnum("High")}</span>
+                  <span className="px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-600">30-49 {translateEnum("Medium")}</span>
+                  <span className="px-1.5 py-0.5 rounded bg-green-100 text-green-600">&lt;30 {translateEnum("Low")}</span>
                 </div>
               </div>
               </div> {/* End scrollable content */}
@@ -1240,9 +1250,9 @@ const ThreatDetailPage = () => {
                   options={item.options}
                   value={editForm[item.field] || ""}
                   onValueChange={(v) => setEditForm({ ...editForm, [item.field]: v })}
-                  placeholder={`Select ${item.label}...`}
-                  searchPlaceholder={`Search ${item.label.toLowerCase()}...`}
-                  emptyText={`No ${item.label.toLowerCase()} found.`}
+                  placeholder={`${t("observations.selectPlaceholder")} ${item.label}...`}
+                  searchPlaceholder={`${t("observations.searchPlaceholder")} ${item.label.toLowerCase()}...`}
+                  emptyText={t("observations.noResultsFound")}
                   allowCustom={true}
                   data-testid={`edit-${item.field}`}
                 />
@@ -1277,7 +1287,7 @@ const ThreatDetailPage = () => {
                   }}
                 >
                   <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm">
-                    <SelectValue placeholder="Select owner..." />
+                    <SelectValue placeholder={t("observations.selectOwner")} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_none">{translateEnum("Not assigned")}</SelectItem>
@@ -1292,10 +1302,10 @@ const ThreatDetailPage = () => {
                   onValueChange={(v) => setEditForm({ ...editForm, discipline: v === "_none" ? "" : v })}
                 >
                   <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm">
-                    <SelectValue placeholder="Select discipline..." />
+                    <SelectValue placeholder={t("observations.selectDiscipline")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="_none">Not specified</SelectItem>
+                    <SelectItem value="_none">{translateEnum("Not specified")}</SelectItem>
                     {DISCIPLINES.map(d => (
                       <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
                     ))}
@@ -1346,7 +1356,7 @@ const ThreatDetailPage = () => {
           data-testid="threat-attachments-section"
         >
           <AttachmentsPanel
-            title="Attachments"
+            title={t("observations.attachments")}
             items={isEditing ? editForm.attachments : (threat.attachments || [])}
             editable={isEditing}
             isUploading={uploadingPhoto}
@@ -1403,10 +1413,10 @@ const ThreatDetailPage = () => {
         >
           <div className="flex items-center gap-2 mb-3">
             <MessageSquare className="w-5 h-5 text-green-600" />
-            <h3 className="font-semibold text-slate-900">Field Notes</h3>
+            <h3 className="font-semibold text-slate-900">{t("observations.fieldNotes")}</h3>
             {threat.context_added_at && (
               <span className="text-xs text-slate-400">
-                Added {formatDateTime(threat.context_added_at)}
+                {t("observations.addedAt")} {formatDateTime(threat.context_added_at)}
               </span>
             )}
           </div>
@@ -1424,16 +1434,16 @@ const ThreatDetailPage = () => {
         className="card p-6 mb-6"
         data-testid="threat-cause-section"
       >
-        <h3 className="font-semibold text-slate-900 mb-2">Probable Cause</h3>
+        <h3 className="font-semibold text-slate-900 mb-2">{t("observations.probableCause")}</h3>
         {isEditing ? (
           <Textarea
             value={editForm.cause || ""}
             onChange={(e) => setEditForm({ ...editForm, cause: e.target.value })}
-            placeholder="Enter probable cause analysis..."
+            placeholder={t("observations.enterProbableCause")}
             rows={3}
           />
         ) : (
-          <p className="text-slate-600">{threat.cause || "Not specified"}</p>
+          <p className="text-slate-600">{threat.cause || translateEnum("Not specified")}</p>
         )}
       </motion.div>
 
@@ -1457,18 +1467,18 @@ const ThreatDetailPage = () => {
               data-testid="delete-threat-button"
             >
               <Trash2 className="w-4 h-4 mr-2" />
-              Delete Observation
+              {t("observations.deleteObservation")}
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete Observation</AlertDialogTitle>
+              <AlertDialogTitle>{t("observations.deleteObservation")}</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete this observation? This action cannot be undone.
+                {t("observations.deleteObservationConfirm")}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => deleteMutation.mutate()}
                 className="bg-red-600 hover:bg-red-700"
@@ -1477,7 +1487,7 @@ const ThreatDetailPage = () => {
                 {deleteMutation.isPending ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  "Delete"
+                  t("common.delete")
                 )}
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -1493,7 +1503,7 @@ const ThreatDetailPage = () => {
         className="mt-6 text-center text-sm text-slate-400"
         data-testid="threat-metadata"
       >
-        Created {formatDateTime(threat.created_at)}
+        {t("observations.createdAt")} {formatDateTime(threat.created_at)}
       </motion.div>
       </div>
 
@@ -1505,12 +1515,12 @@ const ThreatDetailPage = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Share2 className="w-5 h-5 text-blue-600" />
-              Share Observation
+              {t("observations.shareObservation")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-slate-500">
-              Share this observation with others using the link below
+              {t("observations.shareObservationDesc")}
             </p>
             <div className="flex items-center gap-2">
               <div className="flex-1 p-3 bg-slate-100 rounded-lg border text-sm font-mono text-slate-600 truncate">
@@ -1524,11 +1534,11 @@ const ThreatDetailPage = () => {
                 }}
               >
                 <Copy className="w-4 h-4 mr-1" />
-                Copy
+                {t("observations.copy")}
               </Button>
             </div>
             <div className="text-xs text-slate-500">
-              Anyone with this link and access to the application can view this observation.
+              {t("observations.anyoneWithLinkCanView")}
             </div>
           </div>
         </DialogContent>

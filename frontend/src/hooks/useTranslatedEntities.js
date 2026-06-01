@@ -426,3 +426,28 @@ export function useEquipmentNodeNameMap() {
     return map;
   }, [nodes, translationsByEntityId, language]);
 }
+
+/**
+ * Hook that returns a translation map for hierarchy nodes keyed by node ID.
+ * Map: { nodeId: { name, description } } — useful for translating both fields
+ * (e.g. on the equipment hierarchy detail panel).
+ */
+export function useEquipmentNodeIdMap() {
+  const { language } = useLanguage();
+
+  const { data: translationsByEntityId = {} } = useQuery({
+    queryKey: ["equipment-node-batch-translations", language],
+    queryFn: async () => {
+      if (language === "en") return {};
+      const r = await api.get(`/translations/batch/equipment_node`, {
+        params: { language_code: language },
+      });
+      return r.data?.translations || {};
+    },
+    enabled: language !== "en",
+    staleTime: 1000 * 60 * 10,
+    retry: false,
+  });
+
+  return language === "en" ? {} : translationsByEntityId;
+}

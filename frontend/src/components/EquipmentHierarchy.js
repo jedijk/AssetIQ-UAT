@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { equipmentHierarchyAPI, threatsAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
+import { useEquipmentNodeIdMap } from "../hooks/useTranslatedEntities";
 import { toast } from "sonner";
 import { 
   ChevronRight, 
@@ -191,6 +192,9 @@ function getDirectThreatCount(node, threatCounts) {
 // Tree node component
 const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level = 0, threatCount = 0, onAddThreat, onEditEquipment, t, equipmentTypes, isMobile = false, isSearchMatch = false }) => {
   const hasChildren = node.children && node.children.length > 0;
+  // Translation lookup for hierarchy node name (id-keyed)
+  const nodeTransMap = useEquipmentNodeIdMap();
+  const translatedName = nodeTransMap[node.id]?.name || node.name;
   // Get config with smart fallback for unknown levels
   const config = ISO_LEVEL_CONFIG[node.level] || ISO_LEVEL_CONFIG[normalizeLevel(node.level)] || { 
     icon: Cog, 
@@ -349,10 +353,10 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
                   : node.tag}
               </span>
               <span className="mx-1 text-slate-300">-</span>
-              <span>{node.name}</span>
+              <span>{translatedName}</span>
             </span>
           ) : (
-            <span className={`text-sm font-medium truncate flex-1 ${isSearchMatch ? 'text-yellow-800' : ''}`}>{node.name}</span>
+            <span className={`text-sm font-medium truncate flex-1 ${isSearchMatch ? 'text-yellow-800' : ''}`}>{translatedName}</span>
           )}
           {isSearchMatch && (
             <span className="text-[10px] bg-yellow-200 text-yellow-800 px-1 py-0.5 rounded">Match</span>
@@ -450,6 +454,11 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
   const fileInputRef = useRef(null);
   const [previewFile, setPreviewFile] = useState(null);
   const Icon = config.icon;
+  // Translations for hierarchy node (name + description)
+  const nodeTransMap = useEquipmentNodeIdMap();
+  const nodeTrans = nodeTransMap[node.id] || {};
+  const translatedName = nodeTrans.name || node.name;
+  const translatedDescription = nodeTrans.description || node.description;
 
   const { data: filesData } = useQuery({
     queryKey: ["equipment-files", node.id],
@@ -523,7 +532,7 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
               <Icon className={`w-5 h-5 ${critColor || config.color}`} />
             </div>
             <div className="min-w-0">
-              <DialogTitle className="text-sm leading-tight">{node.name}</DialogTitle>
+              <DialogTitle className="text-sm leading-tight">{translatedName}</DialogTitle>
               <p className="text-xs text-slate-500 mt-0.5">{config.label}</p>
             </div>
           </div>
@@ -582,10 +591,10 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
             )}
           </div>
 
-          {node.description && (
+          {translatedDescription && (
             <div>
-              <label className="text-xs text-slate-500 block mb-1">Description</label>
-              <p className="text-sm text-slate-600">{node.description}</p>
+              <label className="text-xs text-slate-500 block mb-1">{t("common.description")}</label>
+              <p className="text-sm text-slate-600">{translatedDescription}</p>
             </div>
           )}
 
