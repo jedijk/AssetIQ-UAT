@@ -23,27 +23,25 @@ import { DocumentViewer } from "../DocumentViewer";
 import { getBackendUrl } from "../../lib/apiConfig";
 import { getEquipmentLevelLabel } from "../../lib/equipmentLevelLabels";
 
-const LEVEL_CONFIG = { 
-  installation: { icon: Settings, label: "Installation" }, 
-  plant_unit: { icon: Settings, label: "Plant/Unit" }, 
-  section_system: { icon: Settings, label: "Section/System" }, 
-  equipment_unit: { icon: Cog, label: "Equipment Unit" }, 
-  subunit: { icon: Settings, label: "Subunit" },
-  maintainable_item: { icon: Settings, label: "Maintainable Item" },
-  // Legacy support - "unit" maps to Equipment Unit
-  unit: { icon: Cog, label: "Equipment Unit" },
-  plant: { icon: Settings, label: "Plant/Unit" },
-  section: { icon: Settings, label: "Section/System" },
-  system: { icon: Settings, label: "Section/System" },
-  equipment: { icon: Cog, label: "Equipment Unit" },
-  // Additional legacy levels from imports
-  site: { icon: Settings, label: "Site/Location" },
-  location: { icon: Settings, label: "Site/Location" },
-  line: { icon: Settings, label: "Production Line" },
-  production_line: { icon: Settings, label: "Production Line" },
-  area: { icon: Settings, label: "Area" },
-  zone: { icon: Settings, label: "Zone" },
-  auxiliary: { icon: Cog, label: "Auxiliary" }
+const LEVEL_CONFIG = {
+  installation: { icon: Settings },
+  plant_unit: { icon: Settings },
+  section_system: { icon: Settings },
+  equipment_unit: { icon: Cog },
+  subunit: { icon: Settings },
+  maintainable_item: { icon: Settings },
+  unit: { icon: Cog },
+  plant: { icon: Settings },
+  section: { icon: Settings },
+  system: { icon: Settings },
+  equipment: { icon: Cog },
+  site: { icon: Settings },
+  location: { icon: Settings },
+  line: { icon: Settings },
+  production_line: { icon: Settings },
+  area: { icon: Settings },
+  zone: { icon: Settings },
+  auxiliary: { icon: Cog },
 };
 
 const CRIT_COLORS = { 

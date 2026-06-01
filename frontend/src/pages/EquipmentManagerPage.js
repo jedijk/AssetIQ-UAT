@@ -36,67 +36,33 @@ import BackButton from "../components/BackButton";
 import { PropertiesPanel } from "../components/equipment/PropertiesPanel";
 import ProcessImportWizard from "../components/equipment/ProcessImportWizard";
 import { AIEquipmentTypeMappingSuggestions } from "../components/equipment/AIEquipmentTypeMappingSuggestions";
+import { getEquipmentLevelLabel, getEquipmentLevelDescription } from "../lib/equipmentLevelLabels";
 
 const EQUIPMENT_ICONS = { droplets: Droplets, wind: Wind, cog: Cog, thermometer: Thermometer, box: Box, "circle-dot": CircleDot, zap: Zap, gauge: Gauge, cpu: Cpu, pipette: Pipette, flame: Flame };
 const ICON_OPTIONS = ["droplets", "wind", "cog", "thermometer", "box", "circle-dot", "zap", "gauge", "cpu", "pipette", "flame"];
-// ISO 14224 Taxonomy Levels - aligned with standard terminology
-const LEVEL_CONFIG = { 
-  // ISO 14224 standard levels
-  installation: { icon: Building2, label: "Installation", description: "Offshore platform, Onshore plant" }, 
-  plant_unit: { icon: Factory, label: "Plant/Unit", description: "Production unit, Utility unit" }, 
-  section_system: { icon: Settings, label: "Section/System", description: "Process unit, Feedstock prep" }, 
-  equipment_unit: { icon: Cog, label: "Equipment Unit", description: "Compressor, Pump, Heat exchanger" }, 
-  subunit: { icon: Box, label: "Subunit", description: "Driver, Driven unit, Control system" },
-  maintainable_item: { icon: Wrench, label: "Maintainable Item", description: "Bearing, Seal, Impeller" },
-  // Legacy/import level aliases - mapped to ISO 14224 equivalents
-  plant: { icon: Factory, label: "Plant/Unit", description: "Production unit, Utility unit" },
-  unit: { icon: Factory, label: "Plant/Unit", description: "Plant unit (mapped from legacy 'unit')" },  // Backend maps unit → plant_unit
-  section: { icon: Settings, label: "Section/System", description: "Production line section" },
-  system: { icon: Settings, label: "Section/System", description: "Gas compression, Water injection" },
-  equipment: { icon: Cog, label: "Equipment Unit", description: "Compressor, Pump, Heat exchanger" },
-  // Additional legacy levels for imported data
-  site: { icon: Building2, label: "Installation", description: "Site (mapped to installation)" },
-  location: { icon: Building2, label: "Installation", description: "Location (mapped to installation)" },
-  line: { icon: Settings, label: "Section/System", description: "Production line or process" },
-  production_line: { icon: Settings, label: "Section/System", description: "Production line or process" },
-  area: { icon: Settings, label: "Section/System", description: "Production area or zone" },
-  zone: { icon: Settings, label: "Section/System", description: "Operational zone" },
-  auxiliary: { icon: Cog, label: "Equipment Unit", description: "Auxiliary or support equipment" }
+// ISO 14224 Taxonomy Levels - icons only; labels/descriptions via equipmentLevelLabels + LanguageContext
+const LEVEL_CONFIG = {
+  installation: { icon: Building2 },
+  plant_unit: { icon: Factory },
+  section_system: { icon: Settings },
+  equipment_unit: { icon: Cog },
+  subunit: { icon: Box },
+  maintainable_item: { icon: Wrench },
+  plant: { icon: Factory },
+  unit: { icon: Factory },
+  section: { icon: Settings },
+  system: { icon: Settings },
+  equipment: { icon: Cog },
+  site: { icon: Building2 },
+  location: { icon: Building2 },
+  line: { icon: Settings },
+  production_line: { icon: Settings },
+  area: { icon: Settings },
+  zone: { icon: Settings },
+  auxiliary: { icon: Cog },
 };
 // ISO 14224 Level hierarchy - must match backend iso14224_models.py
 const LEVEL_ORDER = ["installation", "plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"];
-
-// Map raw level key to translation key (canonical + legacy aliases collapsed)
-const LEVEL_LABEL_KEYS = {
-  installation: "tierInstallation",
-  plant_unit: "tierPlantUnit",
-  section_system: "tierSectionSystem",
-  equipment_unit: "tierEquipmentUnit",
-  subunit: "tierSubunit",
-  maintainable_item: "tierMaintainableItem",
-  // legacy aliases → same translated tier
-  plant: "tierPlantUnit",
-  unit: "tierPlantUnit",
-  section: "tierSectionSystem",
-  system: "tierSectionSystem",
-  equipment: "tierEquipmentUnit",
-  site: "tierInstallation",
-  location: "tierInstallation",
-  line: "tierSectionSystem",
-  production_line: "tierSectionSystem",
-  area: "tierSectionSystem",
-  zone: "tierSectionSystem",
-  auxiliary: "tierEquipmentUnit",
-};
-
-const getLevelLabel = (t, level, fallback) => {
-  const key = LEVEL_LABEL_KEYS[level];
-  if (key) {
-    const v = t(`equipment.${key}`);
-    if (v && v !== `equipment.${key}`) return v;
-  }
-  return fallback || (LEVEL_CONFIG[level]?.label) || level;
-};
 
 // Legacy level mapping to ISO 14224 standard - must match backend LEGACY_LEVEL_MAP
 const LEGACY_LEVEL_MAP = { 
@@ -182,10 +148,8 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
   const nodeTransMap = useEquipmentNodeIdMap();
   const translatedName = nodeTransMap[node.id]?.name || node.name;
   // Get config, with smart fallback for unknown levels
-  const config = LEVEL_CONFIG[node.level] || LEVEL_CONFIG[normalizeLevel(node.level)] || { 
-    icon: Cog, 
-    label: node.level ? node.level.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : "Item"
-  };
+  const config = LEVEL_CONFIG[node.level] || LEVEL_CONFIG[normalizeLevel(node.level)] || { icon: Cog };
+  const levelLabel = getEquipmentLevelLabel(t, node.level, normalizeLevel) || t("equipment.unknownItem");
   const LevelIcon = config.icon;
   const critColors = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
   
@@ -432,7 +396,7 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
               <span className="text-xs bg-yellow-200 text-yellow-800 px-1.5 py-0.5 rounded">{t("equipment.match")}</span>
             )}
             
-            <span className="text-xs text-slate-400 hidden sm:block">{getLevelLabel(t, node.level, config.label)}</span>
+            <span className="text-xs text-slate-400 hidden sm:block">{levelLabel}</span>
             {node.criticality && <div className={`w-2 h-2 rounded-full ${CRIT_COLORS[node.criticality.level]?.dot}`} />}
           </div>
         </ContextMenuTrigger>
@@ -1141,7 +1105,7 @@ export default function EquipmentManagerPage() {
 
   // Mobile: Show desktop-only message
   if (isMobile) {
-    return <DesktopOnlyMessage title="Equipment Manager" icon={Building2} />;
+    return <DesktopOnlyMessage title={t("nav.equipmentManager")} icon={Building2} />;
   }
 
   return (
@@ -1231,9 +1195,9 @@ export default function EquipmentManagerPage() {
               className="border-purple-200 text-purple-700 hover:bg-purple-50"
               data-testid="ai-map-types-btn"
               disabled={nodes.length === 0 || equipmentTypes.length === 0}
-              title="Use AI to suggest equipment type mappings"
+              title={t("equipment.aiMapTypesTitle")}
             >
-              <Sparkles className="w-4 h-4 mr-1" />AI Map Types
+              <Sparkles className="w-4 h-4 mr-1" />{t("equipment.aiMapTypes")}
             </Button>
           )}
           <Button onClick={handleExportExcel} size="sm" variant="outline" disabled={isExporting || nodes.length === 0} data-testid="export-excel-btn">
@@ -1344,10 +1308,10 @@ export default function EquipmentManagerPage() {
       {/* Create Node Dialog */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{newNode.parent_id ? `${t("equipment.addChild")} ${getLevelLabel(t, normalizeLevel(newNode.level), LEVEL_CONFIG[newNode.level]?.label)}` : t("equipment.addInstallation")}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{newNode.parent_id ? `${t("equipment.addChild")} ${getEquipmentLevelLabel(t, normalizeLevel(newNode.level), normalizeLevel)}` : t("equipment.addInstallation")}</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
             <div><Label htmlFor="node-name">{t("common.name")}</Label><Input id="node-name" value={newNode.name} onChange={e => setNewNode({ ...newNode, name: e.target.value })} placeholder={t("common.enterName")} data-testid="new-node-name-input" /></div>
-            {!newNode.parent_id && (<div><Label>{t("equipment.selectLevel")}</Label><Select value={newNode.level} onValueChange={v => setNewNode({ ...newNode, level: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{LEVEL_ORDER.map(l => <SelectItem key={l} value={l}>{getLevelLabel(t, l, LEVEL_CONFIG[l]?.label)}</SelectItem>)}</SelectContent></Select></div>)}
+            {!newNode.parent_id && (<div><Label>{t("equipment.selectLevel")}</Label><Select value={newNode.level} onValueChange={v => setNewNode({ ...newNode, level: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{LEVEL_ORDER.map(l => <SelectItem key={l} value={l}>{getEquipmentLevelLabel(t, l, normalizeLevel)}</SelectItem>)}</SelectContent></Select></div>)}
           </div>
           <DialogFooter><Button variant="outline" onClick={() => setIsCreateOpen(false)}>{t("common.cancel")}</Button><Button onClick={() => createMutation.mutate(newNode)} disabled={!newNode.name.trim() || createMutation.isPending} data-testid="create-node-btn">{createMutation.isPending ? t("common.creating") : t("common.create")}</Button></DialogFooter>
         </DialogContent>
@@ -1358,7 +1322,7 @@ export default function EquipmentManagerPage() {
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>{t("equipment.importEquipmentList")}</DialogTitle><DialogDescription>{t("equipment.pasteEquipmentList")}</DialogDescription></DialogHeader>
           <div className="space-y-4 py-4">
-            <div><Label>{t("equipment.pasteEquipmentList")}</Label><Textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder="Pump P-101&#10;Compressor C-201&#10;Heat Exchanger HX-301&#10;..." className="h-32 mt-1" data-testid="import-text-area" /></div>
+            <div><Label>{t("equipment.pasteEquipmentList")}</Label><Textarea value={importText} onChange={e => setImportText(e.target.value)} placeholder={t("equipment.importListPlaceholder")} className="h-32 mt-1" data-testid="import-text-area" /></div>
             <div className="flex items-center gap-2 text-sm text-slate-500"><div className="flex-1 h-px bg-slate-200" /><span>{t("equipment.orUpload")}</span><div className="flex-1 h-px bg-slate-200" /></div>
             <div>
               <input ref={fileInputRef} type="file" accept=".txt,.csv,.xlsx,.xls,.pdf" onChange={handleFileUpload} className="hidden" />
@@ -1461,7 +1425,7 @@ export default function EquipmentManagerPage() {
                       <SelectItem key={level} value={level}>
                         <div className="flex items-center gap-2">
                           <LevelIcon className="w-4 h-4" />
-                          <span>{getLevelLabel(t, level, LEVEL_CONFIG[level]?.label)}</span>
+                          <span>{getEquipmentLevelLabel(t, level, normalizeLevel)}</span>
                         </div>
                       </SelectItem>
                     );
@@ -1469,7 +1433,7 @@ export default function EquipmentManagerPage() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-slate-500 mt-2">
-                {assignDialog.selectedLevel && LEVEL_CONFIG[assignDialog.selectedLevel]?.description}
+                {assignDialog.selectedLevel && getEquipmentLevelDescription(t, assignDialog.selectedLevel, normalizeLevel)}
               </p>
             </div>
           </div>
@@ -1488,7 +1452,7 @@ export default function EquipmentManagerPage() {
       <Dialog open={demoteDialog.open} onOpenChange={(open) => !open && setDemoteDialog({ open: false, node: null, newLevel: null })}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t("equipment.demoteTo")} {getLevelLabel(t, demoteDialog.newLevel, LEVEL_CONFIG[demoteDialog.newLevel]?.label)}</DialogTitle>
+            <DialogTitle>{t("equipment.demoteTo")} {getEquipmentLevelLabel(t, demoteDialog.newLevel, normalizeLevel)}</DialogTitle>
             <DialogDescription>
               {t("equipment.selectNewParent")} "{demoteDialog.node?.name}"
             </DialogDescription>
@@ -1499,15 +1463,12 @@ export default function EquipmentManagerPage() {
               <div className="mt-2 max-h-60 overflow-y-auto border rounded-lg">
                 {getDemoteParentCandidates().length === 0 ? (
                   <div className="p-4 text-center text-slate-500 text-sm">
-                    {t("equipment.noValidParents")} {t("equipment.createFirst")} {getLevelLabel(t, LEVEL_ORDER[LEVEL_ORDER.indexOf(demoteDialog.newLevel) - 1], LEVEL_CONFIG[LEVEL_ORDER[LEVEL_ORDER.indexOf(demoteDialog.newLevel) - 1]]?.label)}.
+                    {t("equipment.noValidParents")} {t("equipment.createFirst")} {getEquipmentLevelLabel(t, LEVEL_ORDER[LEVEL_ORDER.indexOf(demoteDialog.newLevel) - 1], normalizeLevel)}.
                   </div>
                 ) : (
                   getDemoteParentCandidates().map(parent => {
                     const normalizedLevel = normalizeLevel(parent.level);
-                    const parentConfig = LEVEL_CONFIG[normalizedLevel] || LEVEL_CONFIG[parent.level] || { 
-                      icon: Cog, 
-                      label: parent.level ? parent.level.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : "Item"
-                    };
+                    const parentConfig = LEVEL_CONFIG[normalizedLevel] || LEVEL_CONFIG[parent.level] || { icon: Cog };
                     const ParentIcon = parentConfig.icon;
                     return (
                       <button
@@ -1518,7 +1479,7 @@ export default function EquipmentManagerPage() {
                         <ParentIcon className="w-5 h-5 text-slate-500" />
                         <div>
                           <div className="font-medium text-slate-900">{parent.name}</div>
-                          <div className="text-xs text-slate-500">{getLevelLabel(t, normalizeLevel(parent.level), LEVEL_CONFIG[parent.level]?.label)}</div>
+                          <div className="text-xs text-slate-500">{getEquipmentLevelLabel(t, parent.level, normalizeLevel)}</div>
                         </div>
                       </button>
                     );

@@ -132,13 +132,28 @@ const FailureModesPage = () => {
   const [mainTab, setMainTab] = useState(() => searchParams.get("tab") || "failure-modes");
   const [libraryTab, setLibraryTab] = useState("equipment");
   
-  // Failure mode type options
-  const FAILURE_MODE_TYPE_OPTIONS = [
-    { value: "all", label: "All Types" },
-    { value: "generic", label: "Generic (Industry Standard)", color: "bg-blue-100 text-blue-700", icon: "globe" },
-    { value: "customer_specific", label: "Customer Specific", color: "bg-purple-100 text-purple-700", icon: "building" },
-    { value: "recently_added", label: "Recently Added (30 days)", color: "bg-green-100 text-green-700", icon: "clock" },
-  ];
+  const FAILURE_MODE_TYPE_OPTIONS = useMemo(() => [
+    { value: "all", label: t("library.fmTypeAll") },
+    { value: "generic", label: t("library.fmTypeGeneric"), color: "bg-blue-100 text-blue-700", icon: "globe" },
+    { value: "customer_specific", label: t("library.fmTypeCustomerSpecific"), color: "bg-purple-100 text-purple-700", icon: "building" },
+    { value: "recently_added", label: t("library.fmTypeRecentlyAdded"), color: "bg-green-100 text-green-700", icon: "clock" },
+  ], [t]);
+
+  const DISCIPLINE_OPTIONS = useMemo(() => [
+    { value: "mechanical", label: t("library.mechanical") },
+    { value: "electrical", label: t("library.electrical") },
+    { value: "instrumentation", label: t("library.instrumentation") },
+    { value: "process", label: t("library.process") },
+    { value: "civil", label: t("library.disciplineCivilStructural") },
+    { value: "operations", label: t("disciplines.Operations") },
+    { value: "laboratory", label: t("disciplines.Laboratory") },
+  ], [t]);
+
+  const ACTION_TYPE_OPTIONS = useMemo(() => [
+    { value: "PM", label: t("library.actionPm"), color: "bg-blue-100 text-blue-700" },
+    { value: "CM", label: t("library.actionCm"), color: "bg-amber-100 text-amber-700" },
+    { value: "PDM", label: t("library.actionPdm"), color: "bg-purple-100 text-purple-700" },
+  ], [t]);
   
   // Handle URL parameter changes (e.g., from Maintenance Strategy FMEA links)
   useEffect(() => {
@@ -211,22 +226,6 @@ const FailureModesPage = () => {
   const [actionMinutes, setActionMinutes] = useState("");
   const [actionDiscipline, setActionDiscipline] = useState("mechanical");
   const [actionType, setActionType] = useState("PM");
-  
-  const DISCIPLINE_OPTIONS = [
-    { value: "mechanical", label: "Mechanical" },
-    { value: "electrical", label: "Electrical" },
-    { value: "instrumentation", label: "Instrumentation" },
-    { value: "process", label: "Process" },
-    { value: "civil", label: "Civil/Structural" },
-    { value: "operations", label: "Operations" },
-    { value: "laboratory", label: "Laboratory" },
-  ];
-  
-  const ACTION_TYPE_OPTIONS = [
-    { value: "PM", label: "PM (Preventive)", color: "bg-blue-100 text-blue-700" },
-    { value: "CM", label: "CM (Corrective)", color: "bg-amber-100 text-amber-700" },
-    { value: "PDM", label: "PDM (Predictive)", color: "bg-purple-100 text-purple-700" },
-  ];
   
   const resetTypeForm = () => setNewType({ id: "", name: "", discipline: "Rotating", icon: "cog" });
   const resetFmForm = () => {

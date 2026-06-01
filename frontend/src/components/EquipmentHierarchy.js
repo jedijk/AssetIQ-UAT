@@ -1074,7 +1074,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
                 <div className="mb-2 px-2">
                   <div className="flex items-center justify-between bg-blue-50 rounded-lg px-2 py-1">
                     <span className="text-xs text-blue-700">
-                      Showing: {getEquipmentLevelLabel(t, filterLevel, normalizeLevel)}
+                      {t("equipment.showingFilter")}: {getEquipmentLevelLabel(t, filterLevel, normalizeLevel)}
                     </span>
                     <button 
                       onClick={() => setFilterLevel(null)}

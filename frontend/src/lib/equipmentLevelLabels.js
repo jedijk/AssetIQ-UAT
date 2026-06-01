@@ -50,3 +50,36 @@ export function getEquipmentLevelLabel(t, level, normalizeLevel) {
   }
   return String(level).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+/** ISO / legacy level → LanguageContext key (equipment.tier*Desc). */
+export const LEVEL_DESC_KEYS = {
+  installation: "equipment.tierInstallationDesc",
+  plant_unit: "equipment.tierPlantUnitDesc",
+  section_system: "equipment.tierSectionSystemDesc",
+  equipment_unit: "equipment.tierEquipmentUnitDesc",
+  subunit: "equipment.tierSubunitDesc",
+  maintainable_item: "equipment.tierMaintainableItemDesc",
+  plant: "equipment.tierPlantUnitDesc",
+  unit: "equipment.tierPlantUnitDesc",
+  section: "equipment.tierSectionSystemDesc",
+  system: "equipment.tierSectionSystemDesc",
+  equipment: "equipment.tierEquipmentUnitDesc",
+  site: "equipment.tierInstallationDesc",
+  location: "equipment.tierInstallationDesc",
+  line: "equipment.tierSectionSystemDesc",
+  production_line: "equipment.tierSectionSystemDesc",
+  area: "equipment.tierSectionSystemDesc",
+  zone: "equipment.tierSectionSystemDesc",
+  auxiliary: "equipment.tierEquipmentUnitDesc",
+};
+
+export function getEquipmentLevelDescription(t, level, normalizeLevel) {
+  if (!level) return "";
+  const normalized = normalizeLevel ? normalizeLevel(level) : normalizeEquipmentLevel(level);
+  const key = LEVEL_DESC_KEYS[normalized] || LEVEL_DESC_KEYS[level];
+  if (key) {
+    const desc = t(key);
+    if (desc && desc !== key) return desc;
+  }
+  return "";
+}
