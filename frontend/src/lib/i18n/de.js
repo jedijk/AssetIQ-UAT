@@ -366,6 +366,7 @@ const de = {
     changeLink: "Ändern",
     linkToEquipment: "Mit Anlage verknüpfen",
     linkEquipmentDesc: "Wählen Sie eine Anlage aus, um deren Kritikalität anzuwenden.",
+    searchEquipmentPlaceholder: "Anlage nach Name oder Pfad suchen...",
     noEquipmentFound: "Keine Anlagen gefunden",
     linkAndRecalculate: "Verknüpfen & Neuberechnen",
     linkFailureMode: "Fehlermodus verknüpfen",

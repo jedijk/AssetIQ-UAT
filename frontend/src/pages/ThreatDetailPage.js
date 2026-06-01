@@ -465,6 +465,7 @@ const ThreatDetailPage = () => {
   // State for link equipment dialog
   const [showLinkEquipmentDialog, setShowLinkEquipmentDialog] = useState(false);
   const [selectedEquipmentId, setSelectedEquipmentId] = useState("");
+  const [equipmentSearch, setEquipmentSearch] = useState("");
 
   // State for link failure mode dialog
   const [showLinkFailureModeDialog, setShowLinkFailureModeDialog] = useState(false);
@@ -522,6 +523,16 @@ const ThreatDetailPage = () => {
     flatten(equipmentNodes);
     return result;
   }, [equipmentNodes]);
+
+  // Filtered list when user types into the equipment search box
+  const filteredEquipmentList = useMemo(() => {
+    const q = equipmentSearch.trim().toLowerCase();
+    if (!q) return flatEquipmentList;
+    return flatEquipmentList.filter(eq =>
+      (eq.name || "").toLowerCase().includes(q) ||
+      (eq.path || "").toLowerCase().includes(q)
+    );
+  }, [flatEquipmentList, equipmentSearch]);
 
   if (isLoading) {
     return (
@@ -1094,7 +1105,7 @@ const ThreatDetailPage = () => {
       </motion.div>
 
       {/* Link Equipment Dialog */}
-      <Dialog open={showLinkEquipmentDialog} onOpenChange={setShowLinkEquipmentDialog}>
+      <Dialog open={showLinkEquipmentDialog} onOpenChange={(open) => { setShowLinkEquipmentDialog(open); if (!open) setEquipmentSearch(""); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1104,8 +1115,22 @@ const ThreatDetailPage = () => {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <p className="text-sm text-slate-600">{t("observations.linkEquipmentDesc")}</p>
-            <div className="max-h-64 overflow-y-auto space-y-1 border rounded-lg p-2">
-              {flatEquipmentList.map((eq) => (
+
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                placeholder={t("observations.searchEquipmentPlaceholder")}
+                value={equipmentSearch}
+                onChange={(e) => setEquipmentSearch(e.target.value)}
+                className="pl-9"
+                data-testid="equipment-search-input"
+                autoFocus
+              />
+            </div>
+
+            <div className="max-h-64 overflow-y-auto space-y-1 border rounded-lg p-2" data-testid="equipment-list">
+              {filteredEquipmentList.map((eq) => (
                 <button
                   key={eq.id}
                   onClick={() => setSelectedEquipmentId(eq.id)}
@@ -1114,12 +1139,13 @@ const ThreatDetailPage = () => {
                       ? 'bg-purple-100 border-purple-300 border' 
                       : 'hover:bg-slate-50 border border-transparent'
                   }`}
+                  data-testid={`equipment-option-${eq.id}`}
                 >
                   <div className="font-medium text-slate-800">{eq.name}</div>
                   <div className="text-xs text-slate-500 mt-0.5">{eq.path}</div>
                 </button>
               ))}
-              {flatEquipmentList.length === 0 && (
+              {filteredEquipmentList.length === 0 && (
                 <div className="text-center py-4 text-slate-400">{t("observations.noEquipmentFound")}</div>
               )}
             </div>
