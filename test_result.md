@@ -692,3 +692,51 @@ test_plan_translation:
     - "Entity Translation API"
     - "Language Switcher UI"
     - "German UI Translations"
+
+
+# Maintenance Program Module UI Testing
+
+user_problem_statement: "Test the Maintenance Program Module UI - TARGETED TEST focusing on finding equipment at the correct level"
+
+frontend:
+  - task: "Maintenance Program Button Visibility Logic"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/equipment/PropertiesPanel.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: Maintenance Program button visibility logic is working CORRECTLY. The button correctly does NOT appear for Installation level equipment (Tyromer). Code at lines 946-960 in PropertiesPanel.js correctly restricts button visibility to only: equipment_unit, equipment, subunit, maintainable_item, unit levels. Button correctly excluded for: installation, plant_unit, section_system levels. This matches the functional specification exactly."
+  
+  - task: "Maintenance Program Panel Component"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/equipment/MaintenanceProgramPanel.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "testing"
+        comment: "NOT TESTED: Cannot test MaintenanceProgramPanel component because test environment (jedijk@gmail.com account) does not have any equipment at the correct levels (equipment_unit, equipment, subunit, maintainable_item, unit). The only equipment in the hierarchy is 'Tyromer' which is at Installation level. To fully test this component, the test environment needs equipment at equipment_unit/equipment/subunit/maintainable_item/unit levels with equipment_type_id assigned."
+
+metadata:
+  created_by: "testing_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "Maintenance Program Button Visibility Logic"
+    - "Maintenance Program Panel Component"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "testing"
+    message: "MAINTENANCE PROGRAM UI TESTING - PARTIAL SUCCESS. Successfully tested button visibility logic which is working correctly. The 'View Maintenance Program' button correctly does NOT appear for Installation level equipment, which matches the specification. However, CANNOT complete full end-to-end testing because the test environment (jedijk@gmail.com account) only has equipment at Installation level ('Tyromer'). No equipment exists at the required levels: equipment_unit, equipment, subunit, maintainable_item, or unit. The code implementation is correct - the button visibility is properly restricted to the correct equipment levels as specified in PropertiesPanel.js lines 946-960. To complete full testing of the Maintenance Program dialog, task creation, and program management features, the test environment needs equipment at the correct hierarchy levels with equipment_type_id assigned."
