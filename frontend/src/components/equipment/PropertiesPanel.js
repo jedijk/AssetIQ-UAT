@@ -401,12 +401,41 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
   const [typeSearchQuery, setTypeSearchQuery] = useState("");
   const [showQRDialog, setShowQRDialog] = useState(false);
   
-  // Fetch criticality definitions (defaults)
-  const { data: definitionsData } = useQuery({
+  // Find the installation ID for this equipment (traverse up the hierarchy)
+  const installationId = useMemo(() => {
+    if (!node || !allNodes) return null;
+    
+    // If node itself is an installation, use it
+    if (node.level === "installation") return node.id;
+    
+    // Traverse up to find the installation
+    let currentParentId = node.parent_id;
+    while (currentParentId) {
+      const parent = allNodes.find(n => n.id === currentParentId);
+      if (!parent) break;
+      if (parent.level === "installation") return parent.id;
+      currentParentId = parent.parent_id;
+    }
+    return null;
+  }, [node, allNodes]);
+  
+  // Fetch criticality definitions for the installation (or defaults if none)
+  const { data: installationDefinitions } = useQuery({
+    queryKey: ["definitions", installationId],
+    queryFn: () => definitionsAPI.getDefinitions(installationId),
+    enabled: !!installationId,
+    staleTime: 30 * 1000, // 30 seconds - refresh more often to pick up changes
+  });
+  
+  // Fetch default definitions as fallback
+  const { data: defaultDefinitions } = useQuery({
     queryKey: ["definitions-defaults"],
     queryFn: definitionsAPI.getDefaults,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
+  
+  // Use installation definitions if available, otherwise use defaults
+  const definitionsData = installationDefinitions?.is_custom ? installationDefinitions : defaultDefinitions;
   
   // Build criticality scales from definitions
   const criticalityScales = useMemo(() => 
