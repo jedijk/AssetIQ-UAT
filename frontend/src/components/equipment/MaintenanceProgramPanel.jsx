@@ -1,0 +1,1034 @@
+/**
+ * MaintenanceProgramPanel Component
+ * 
+ * Displays and manages the maintenance program for a specific equipment item.
+ * Shows tasks from all sources (strategy, imported, AI, manual) with full CRUD capabilities.
+ */
+import React, { useState, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { maintenanceProgramAPI } from '../../lib/apis/maintenanceProgram';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { toast } from 'sonner';
+import {
+  ClipboardList, Plus, RefreshCw, Sparkles, FileDown, History,
+  ChevronRight, ChevronDown, Filter, Search, MoreVertical,
+  CheckCircle2, XCircle, AlertCircle, Clock, Wrench, Eye,
+  Edit, Trash2, Play, Pause, Settings, Brain, Upload, ArrowUpDown,
+  Shield, Gauge, Activity, Calendar, Target, Package,
+} from 'lucide-react';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Badge } from '../ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../ui/dialog';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { ScrollArea } from '../ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger
+} from '../ui/dropdown-menu';
+
+// Task source icons and colors
+const SOURCE_CONFIG = {
+  strategy_generated: { icon: Target, color: 'bg-blue-100 text-blue-700 border-blue-200', label: 'Strategy' },
+  customer_imported: { icon: Upload, color: 'bg-purple-100 text-purple-700 border-purple-200', label: 'Imported' },
+  ai_generated: { icon: Brain, color: 'bg-amber-100 text-amber-700 border-amber-200', label: 'AI' },
+  manual: { icon: Edit, color: 'bg-green-100 text-green-700 border-green-200', label: 'Manual' },
+  equipment_specific: { icon: Wrench, color: 'bg-gray-100 text-gray-700 border-gray-200', label: 'Specific' },
+};
+
+// Task category icons
+const CATEGORY_CONFIG = {
+  inspection: { icon: Eye, label: 'Inspection' },
+  condition_monitoring: { icon: Activity, label: 'Condition Monitoring' },
+  preventive_maintenance: { icon: Shield, label: 'Preventive' },
+  functional_test: { icon: Play, label: 'Functional Test' },
+  lubrication: { icon: Package, label: 'Lubrication' },
+  calibration: { icon: Gauge, label: 'Calibration' },
+  cleaning: { icon: Sparkles, label: 'Cleaning' },
+  safety_verification: { icon: Shield, label: 'Safety' },
+  regulatory_compliance: { icon: ClipboardList, label: 'Regulatory' },
+  predictive: { icon: Brain, label: 'Predictive' },
+  corrective: { icon: Wrench, label: 'Corrective' },
+};
+
+// Frequency labels
+const FREQUENCY_LABELS = {
+  not_required: 'Not Required',
+  continuous: 'Continuous',
+  hourly: 'Hourly',
+  shift: 'Per Shift',
+  daily: 'Daily',
+  weekly: 'Weekly',
+  bi_weekly: 'Bi-Weekly',
+  monthly: 'Monthly',
+  quarterly: 'Quarterly',
+  semi_annual: 'Semi-Annual',
+  annual: 'Annual',
+  biennial: 'Biennial',
+  on_condition: 'On Condition',
+};
+
+// Priority colors
+const PRIORITY_COLORS = {
+  critical: 'bg-red-100 text-red-700 border-red-200',
+  high: 'bg-orange-100 text-orange-700 border-orange-200',
+  medium: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  low: 'bg-green-100 text-green-700 border-green-200',
+};
+
+// Status badge component
+const StatusBadge = ({ status }) => {
+  const config = {
+    draft: { color: 'bg-gray-100 text-gray-700', label: 'Draft' },
+    active: { color: 'bg-green-100 text-green-700', label: 'Active' },
+    archived: { color: 'bg-blue-100 text-blue-700', label: 'Archived' },
+    superseded: { color: 'bg-amber-100 text-amber-700', label: 'Superseded' },
+  };
+  const { color, label } = config[status] || config.draft;
+  return <Badge variant="outline" className={`${color} text-xs`}>{label}</Badge>;
+};
+
+// Source badge component
+const SourceBadge = ({ source }) => {
+  const config = SOURCE_CONFIG[source] || SOURCE_CONFIG.manual;
+  const IconComponent = config.icon;
+  return (
+    <Badge variant="outline" className={`${config.color} text-xs gap-1`}>
+      <IconComponent className="h-3 w-3" />
+      {config.label}
+    </Badge>
+  );
+};
+
+// Task row component
+const TaskRow = ({ task, onEdit, onDelete, onToggleActive, isExpanded, onToggleExpand }) => {
+  const categoryConfig = CATEGORY_CONFIG[task.task_category] || CATEGORY_CONFIG.preventive_maintenance;
+  const CategoryIcon = categoryConfig.icon;
+  
+  return (
+    <div className={`border rounded-lg mb-2 ${!task.is_active ? 'opacity-60' : ''}`}>
+      {/* Main row */}
+      <div 
+        className="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50"
+        onClick={onToggleExpand}
+      >
+        <div className="flex-shrink-0">
+          {isExpanded ? (
+            <ChevronDown className="h-4 w-4 text-gray-400" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-gray-400" />
+          )}
+        </div>
+        
+        <div className="flex-shrink-0">
+          <div className={`p-2 rounded-lg ${task.is_active ? 'bg-blue-50' : 'bg-gray-50'}`}>
+            <CategoryIcon className={`h-4 w-4 ${task.is_active ? 'text-blue-600' : 'text-gray-400'}`} />
+          </div>
+        </div>
+        
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className={`font-medium truncate ${!task.is_active ? 'line-through text-gray-400' : ''}`}>
+              {task.task_title}
+            </span>
+            {task.is_overridden && (
+              <Badge variant="outline" className="bg-orange-50 text-orange-600 text-xs">Overridden</Badge>
+            )}
+          </div>
+          <div className="text-xs text-gray-500 mt-0.5 truncate">
+            {task.task_description || 'No description'}
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <SourceBadge source={task.task_source} />
+          
+          <Badge variant="outline" className={`${PRIORITY_COLORS[task.priority]} text-xs`}>
+            {task.priority}
+          </Badge>
+          
+          <Badge variant="outline" className="bg-gray-50 text-gray-600 text-xs gap-1">
+            <Clock className="h-3 w-3" />
+            {FREQUENCY_LABELS[task.frequency] || task.frequency}
+          </Badge>
+          
+          <Badge variant="outline" className="bg-gray-50 text-gray-600 text-xs">
+            {task.estimated_duration_hours}h
+          </Badge>
+        </div>
+        
+        <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEdit(task)}>
+                <Edit className="h-4 w-4 mr-2" /> Edit Task
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onToggleActive(task)}>
+                {task.is_active ? (
+                  <><Pause className="h-4 w-4 mr-2" /> Deactivate</>
+                ) : (
+                  <><Play className="h-4 w-4 mr-2" /> Activate</>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onDelete(task)} className="text-red-600">
+                <Trash2 className="h-4 w-4 mr-2" /> Delete Task
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+      
+      {/* Expanded details */}
+      {isExpanded && (
+        <div className="px-12 pb-3 border-t bg-gray-50">
+          <div className="grid grid-cols-2 gap-4 py-3">
+            <div>
+              <div className="text-xs font-medium text-gray-500 mb-1">Category</div>
+              <div className="text-sm">{categoryConfig.label}</div>
+            </div>
+            <div>
+              <div className="text-xs font-medium text-gray-500 mb-1">Skill Required</div>
+              <div className="text-sm capitalize">{task.skill_requirement?.replace('_', ' ') || 'Technician'}</div>
+            </div>
+            {task.discipline && (
+              <div>
+                <div className="text-xs font-medium text-gray-500 mb-1">Discipline</div>
+                <div className="text-sm">{task.discipline}</div>
+              </div>
+            )}
+            {task.traceability?.failure_mode_name && (
+              <div>
+                <div className="text-xs font-medium text-gray-500 mb-1">Linked Failure Mode</div>
+                <div className="text-sm">{task.traceability.failure_mode_name}</div>
+              </div>
+            )}
+          </div>
+          
+          {task.procedure_steps?.length > 0 && (
+            <div className="mt-2">
+              <div className="text-xs font-medium text-gray-500 mb-1">Procedure Steps</div>
+              <ol className="list-decimal list-inside text-sm text-gray-700 space-y-0.5">
+                {task.procedure_steps.map((step, idx) => (
+                  <li key={idx}>{step}</li>
+                ))}
+              </ol>
+            </div>
+          )}
+          
+          {task.traceability?.override_reason && (
+            <div className="mt-2 p-2 bg-orange-50 rounded text-sm">
+              <span className="font-medium text-orange-700">Override Reason:</span>{' '}
+              {task.traceability.override_reason}
+            </div>
+          )}
+          
+          {task.traceability?.ai_reasoning && (
+            <div className="mt-2 p-2 bg-amber-50 rounded text-sm">
+              <span className="font-medium text-amber-700">AI Reasoning:</span>{' '}
+              {task.traceability.ai_reasoning}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Add Task Dialog
+const AddTaskDialog = ({ open, onClose, equipmentId, onSuccess }) => {
+  const [formData, setFormData] = useState({
+    task_title: '',
+    task_description: '',
+    frequency: 'monthly',
+    estimated_duration_hours: 1,
+    task_category: 'preventive_maintenance',
+    priority: 'medium',
+    skill_requirement: 'technician',
+    discipline: '',
+    procedure_steps: [],
+  });
+  const [procedureInput, setProcedureInput] = useState('');
+  
+  const addTaskMutation = useMutation({
+    mutationFn: (data) => maintenanceProgramAPI.addTask(equipmentId, data),
+    onSuccess: (response) => {
+      toast.success('Task added successfully');
+      onSuccess?.(response);
+      onClose();
+      resetForm();
+    },
+    onError: (error) => {
+      toast.error(`Failed to add task: ${error.message}`);
+    },
+  });
+  
+  const resetForm = () => {
+    setFormData({
+      task_title: '',
+      task_description: '',
+      frequency: 'monthly',
+      estimated_duration_hours: 1,
+      task_category: 'preventive_maintenance',
+      priority: 'medium',
+      skill_requirement: 'technician',
+      discipline: '',
+      procedure_steps: [],
+    });
+    setProcedureInput('');
+  };
+  
+  const handleAddStep = () => {
+    if (procedureInput.trim()) {
+      setFormData(prev => ({
+        ...prev,
+        procedure_steps: [...prev.procedure_steps, procedureInput.trim()]
+      }));
+      setProcedureInput('');
+    }
+  };
+  
+  const handleRemoveStep = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      procedure_steps: prev.procedure_steps.filter((_, i) => i !== index)
+    }));
+  };
+  
+  const handleSubmit = () => {
+    if (!formData.task_title.trim()) {
+      toast.error('Task title is required');
+      return;
+    }
+    addTaskMutation.mutate(formData);
+  };
+  
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Plus className="h-5 w-5 text-blue-600" />
+            Add Manual Task
+          </DialogTitle>
+          <DialogDescription>
+            Add a custom maintenance task to this equipment's program.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          <div>
+            <Label>Task Title *</Label>
+            <Input
+              value={formData.task_title}
+              onChange={(e) => setFormData(prev => ({ ...prev, task_title: e.target.value }))}
+              placeholder="Enter task title"
+            />
+          </div>
+          
+          <div>
+            <Label>Description</Label>
+            <Textarea
+              value={formData.task_description}
+              onChange={(e) => setFormData(prev => ({ ...prev, task_description: e.target.value }))}
+              placeholder="Enter task description"
+              rows={2}
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Frequency</Label>
+              <Select 
+                value={formData.frequency}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, frequency: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(FREQUENCY_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Label>Duration (hours)</Label>
+              <Input
+                type="number"
+                min="0.25"
+                step="0.25"
+                value={formData.estimated_duration_hours}
+                onChange={(e) => setFormData(prev => ({ ...prev, estimated_duration_hours: parseFloat(e.target.value) || 1 }))}
+              />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Category</Label>
+              <Select 
+                value={formData.task_category}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, task_category: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(CATEGORY_CONFIG).map(([value, config]) => (
+                    <SelectItem key={value} value={value}>{config.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Label>Priority</Label>
+              <Select 
+                value={formData.priority}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="critical">Critical</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <div>
+            <Label>Procedure Steps</Label>
+            <div className="flex gap-2 mt-1">
+              <Input
+                value={procedureInput}
+                onChange={(e) => setProcedureInput(e.target.value)}
+                placeholder="Enter a step"
+                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddStep())}
+              />
+              <Button type="button" variant="outline" onClick={handleAddStep}>Add</Button>
+            </div>
+            {formData.procedure_steps.length > 0 && (
+              <ol className="list-decimal list-inside mt-2 text-sm space-y-1">
+                {formData.procedure_steps.map((step, idx) => (
+                  <li key={idx} className="flex items-center gap-2">
+                    <span className="flex-1">{step}</span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 w-6 p-0"
+                      onClick={() => handleRemoveStep(idx)}
+                    >
+                      <XCircle className="h-4 w-4 text-red-500" />
+                    </Button>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={addTaskMutation.isPending}>
+            {addTaskMutation.isPending ? 'Adding...' : 'Add Task'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// Edit Task Dialog
+const EditTaskDialog = ({ open, onClose, task, equipmentId, onSuccess }) => {
+  const [formData, setFormData] = useState(null);
+  const [overrideReason, setOverrideReason] = useState('');
+  
+  React.useEffect(() => {
+    if (task) {
+      setFormData({
+        task_title: task.task_title,
+        task_description: task.task_description || '',
+        frequency: task.frequency,
+        estimated_duration_hours: task.estimated_duration_hours,
+        task_category: task.task_category,
+        priority: task.priority,
+        is_active: task.is_active,
+      });
+      setOverrideReason('');
+    }
+  }, [task]);
+  
+  const updateTaskMutation = useMutation({
+    mutationFn: (data) => maintenanceProgramAPI.updateTask(equipmentId, task.id, data),
+    onSuccess: (response) => {
+      toast.success('Task updated successfully');
+      onSuccess?.(response);
+      onClose();
+    },
+    onError: (error) => {
+      toast.error(`Failed to update task: ${error.message}`);
+    },
+  });
+  
+  const handleSubmit = () => {
+    const updates = { ...formData };
+    if (task.task_source === 'strategy_generated' && overrideReason) {
+      updates.override_reason = overrideReason;
+    }
+    updateTaskMutation.mutate(updates);
+  };
+  
+  if (!formData) return null;
+  
+  const isStrategyTask = task?.task_source === 'strategy_generated';
+  
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Edit className="h-5 w-5 text-blue-600" />
+            Edit Task
+          </DialogTitle>
+          {isStrategyTask && (
+            <DialogDescription className="text-amber-600">
+              This is a strategy-generated task. Changes will be tracked as overrides.
+            </DialogDescription>
+          )}
+        </DialogHeader>
+        
+        <div className="space-y-4 py-4">
+          <div>
+            <Label>Task Title</Label>
+            <Input
+              value={formData.task_title}
+              onChange={(e) => setFormData(prev => ({ ...prev, task_title: e.target.value }))}
+            />
+          </div>
+          
+          <div>
+            <Label>Description</Label>
+            <Textarea
+              value={formData.task_description}
+              onChange={(e) => setFormData(prev => ({ ...prev, task_description: e.target.value }))}
+              rows={2}
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Frequency</Label>
+              <Select 
+                value={formData.frequency}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, frequency: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(FREQUENCY_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Label>Duration (hours)</Label>
+              <Input
+                type="number"
+                min="0.25"
+                step="0.25"
+                value={formData.estimated_duration_hours}
+                onChange={(e) => setFormData(prev => ({ ...prev, estimated_duration_hours: parseFloat(e.target.value) || 1 }))}
+              />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Category</Label>
+              <Select 
+                value={formData.task_category}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, task_category: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(CATEGORY_CONFIG).map(([value, config]) => (
+                    <SelectItem key={value} value={value}>{config.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Label>Priority</Label>
+              <Select 
+                value={formData.priority}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="critical">Critical</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          {isStrategyTask && (
+            <div>
+              <Label>Override Reason</Label>
+              <Textarea
+                value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)}
+                placeholder="Explain why this task is being modified..."
+                rows={2}
+              />
+            </div>
+          )}
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={updateTaskMutation.isPending}>
+            {updateTaskMutation.isPending ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// Version History Dialog
+const VersionHistoryDialog = ({ open, onClose, equipmentId }) => {
+  const { data, isLoading } = useQuery({
+    queryKey: ['maintenance-program-version-history', equipmentId],
+    queryFn: () => maintenanceProgramAPI.getVersionHistory(equipmentId),
+    enabled: open && !!equipmentId,
+  });
+  
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <History className="h-5 w-5 text-blue-600" />
+            Version History
+          </DialogTitle>
+          <DialogDescription>
+            Current Version: {data?.current_version || '1.0'}
+          </DialogDescription>
+        </DialogHeader>
+        
+        <ScrollArea className="h-[400px] pr-4">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-32">
+              <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {(data?.version_history || []).map((entry, idx) => (
+                <div key={idx} className="border rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                      v{entry.version}
+                    </Badge>
+                    <span className="text-xs text-gray-500">
+                      {entry.changed_at ? new Date(entry.changed_at).toLocaleString() : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="text-sm font-medium capitalize">{entry.change_type?.replace('_', ' ')}</div>
+                  <div className="text-sm text-gray-600 mt-1">{entry.change_summary}</div>
+                  <div className="flex gap-4 mt-2 text-xs text-gray-500">
+                    {entry.tasks_added > 0 && <span className="text-green-600">+{entry.tasks_added} added</span>}
+                    {entry.tasks_modified > 0 && <span className="text-amber-600">{entry.tasks_modified} modified</span>}
+                    {entry.tasks_removed > 0 && <span className="text-red-600">-{entry.tasks_removed} removed</span>}
+                  </div>
+                </div>
+              ))}
+              {(!data?.version_history || data.version_history.length === 0) && (
+                <div className="text-center text-gray-500 py-8">
+                  No version history available
+                </div>
+              )}
+            </div>
+          )}
+        </ScrollArea>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// Main Component
+const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
+  const { t } = useLanguage();
+  const queryClient = useQueryClient();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('all');
+  const [expandedTasks, setExpandedTasks] = useState(new Set());
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  
+  // Fetch program
+  const { data: programData, isLoading: isLoadingProgram, error: programError } = useQuery({
+    queryKey: ['maintenance-program', equipmentId],
+    queryFn: () => maintenanceProgramAPI.getProgram(equipmentId),
+    enabled: !!equipmentId,
+  });
+  
+  // Create program mutation
+  const createProgramMutation = useMutation({
+    mutationFn: () => maintenanceProgramAPI.createProgram(equipmentId, { 
+      generate_from_strategy: true 
+    }),
+    onSuccess: () => {
+      toast.success('Maintenance program created');
+      queryClient.invalidateQueries(['maintenance-program', equipmentId]);
+    },
+    onError: (error) => {
+      toast.error(`Failed to create program: ${error.message}`);
+    },
+  });
+  
+  // Delete task mutation
+  const deleteTaskMutation = useMutation({
+    mutationFn: (taskId) => maintenanceProgramAPI.deleteTask(equipmentId, taskId),
+    onSuccess: () => {
+      toast.success('Task deleted');
+      queryClient.invalidateQueries(['maintenance-program', equipmentId]);
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete task: ${error.message}`);
+    },
+  });
+  
+  // Toggle task active mutation
+  const toggleActiveMutation = useMutation({
+    mutationFn: (task) => maintenanceProgramAPI.updateTask(equipmentId, task.id, { 
+      is_active: !task.is_active 
+    }),
+    onSuccess: () => {
+      toast.success('Task updated');
+      queryClient.invalidateQueries(['maintenance-program', equipmentId]);
+    },
+    onError: (error) => {
+      toast.error(`Failed to update task: ${error.message}`);
+    },
+  });
+  
+  // Regenerate mutation
+  const regenerateMutation = useMutation({
+    mutationFn: () => maintenanceProgramAPI.regenerateProgram(equipmentId, {
+      preserve_overrides: true,
+      preserve_manual_tasks: true,
+    }),
+    onSuccess: (response) => {
+      const changes = response.changes || {};
+      toast.success(`Program regenerated: ${changes.tasks_to_add?.length || 0} added, ${changes.tasks_to_remove?.length || 0} removed`);
+      queryClient.invalidateQueries(['maintenance-program', equipmentId]);
+    },
+    onError: (error) => {
+      toast.error(`Failed to regenerate: ${error.message}`);
+    },
+  });
+  
+  // Filter and search tasks
+  const filteredTasks = useMemo(() => {
+    if (!programData?.program?.tasks) return [];
+    
+    let tasks = programData.program.tasks;
+    
+    // Apply source filter
+    if (sourceFilter !== 'all') {
+      tasks = tasks.filter(t => t.task_source === sourceFilter);
+    }
+    
+    // Apply search
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      tasks = tasks.filter(t => 
+        t.task_title?.toLowerCase().includes(term) ||
+        t.task_description?.toLowerCase().includes(term) ||
+        t.traceability?.failure_mode_name?.toLowerCase().includes(term)
+      );
+    }
+    
+    return tasks;
+  }, [programData?.program?.tasks, sourceFilter, searchTerm]);
+  
+  // Stats from program
+  const stats = programData?.program ? {
+    total: programData.program.total_tasks || 0,
+    active: programData.program.active_tasks || 0,
+    strategy: programData.program.strategy_tasks || 0,
+    imported: programData.program.imported_tasks || 0,
+    ai: programData.program.ai_tasks || 0,
+    manual: programData.program.manual_tasks || 0,
+  } : null;
+  
+  // Toggle task expansion
+  const toggleExpand = (taskId) => {
+    setExpandedTasks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(taskId)) {
+        newSet.delete(taskId);
+      } else {
+        newSet.add(taskId);
+      }
+      return newSet;
+    });
+  };
+  
+  // Handle task operations
+  const handleDeleteTask = (task) => {
+    if (window.confirm(`Delete task "${task.task_title}"?`)) {
+      deleteTaskMutation.mutate(task.id);
+    }
+  };
+  
+  const handleTaskSuccess = () => {
+    queryClient.invalidateQueries(['maintenance-program', equipmentId]);
+  };
+  
+  if (isLoadingProgram) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center h-64">
+          <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  // No program exists yet
+  if (!programData?.exists) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center h-64 gap-4">
+          <ClipboardList className="h-16 w-16 text-gray-300" />
+          <div className="text-center">
+            <h3 className="text-lg font-medium text-gray-700">No Maintenance Program</h3>
+            <p className="text-sm text-gray-500 mt-1">
+              Create a maintenance program to manage tasks for this equipment.
+            </p>
+          </div>
+          <Button 
+            onClick={() => createProgramMutation.mutate()}
+            disabled={createProgramMutation.isPending}
+          >
+            {createProgramMutation.isPending ? (
+              <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Creating...</>
+            ) : (
+              <><Plus className="h-4 w-4 mr-2" /> Create Maintenance Program</>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  const program = programData.program;
+  
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <ClipboardList className="h-6 w-6 text-blue-600" />
+          <div>
+            <h2 className="text-lg font-semibold">{program.program_name}</h2>
+            <div className="flex items-center gap-2 mt-0.5">
+              <StatusBadge status={program.status} />
+              <span className="text-xs text-gray-500">v{program.version}</span>
+              {programData.strategy_update_available && (
+                <Badge variant="outline" className="bg-amber-50 text-amber-600 text-xs">
+                  Strategy Update Available
+                </Badge>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setShowVersionHistory(true)}
+                >
+                  <History className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Version History</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => regenerateMutation.mutate()}
+                  disabled={regenerateMutation.isPending}
+                >
+                  <RefreshCw className={`h-4 w-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Regenerate from Strategy</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          
+          <Button onClick={() => setShowAddDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Task
+          </Button>
+        </div>
+      </div>
+      
+      {/* Stats Cards */}
+      {stats && (
+        <div className="grid grid-cols-6 gap-3">
+          <Card className="p-3">
+            <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
+            <div className="text-xs text-gray-500">Total Tasks</div>
+          </Card>
+          <Card className="p-3">
+            <div className="text-2xl font-bold text-green-600">{stats.active}</div>
+            <div className="text-xs text-gray-500">Active</div>
+          </Card>
+          <Card className="p-3">
+            <div className="text-2xl font-bold text-blue-600">{stats.strategy}</div>
+            <div className="text-xs text-gray-500">From Strategy</div>
+          </Card>
+          <Card className="p-3">
+            <div className="text-2xl font-bold text-purple-600">{stats.imported}</div>
+            <div className="text-xs text-gray-500">Imported</div>
+          </Card>
+          <Card className="p-3">
+            <div className="text-2xl font-bold text-amber-600">{stats.ai}</div>
+            <div className="text-xs text-gray-500">AI Generated</div>
+          </Card>
+          <Card className="p-3">
+            <div className="text-2xl font-bold text-green-600">{stats.manual}</div>
+            <div className="text-xs text-gray-500">Manual</div>
+          </Card>
+        </div>
+      )}
+      
+      {/* Filter Bar */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search tasks..."
+            className="pl-9"
+          />
+        </div>
+        
+        <Select value={sourceFilter} onValueChange={setSourceFilter}>
+          <SelectTrigger className="w-48">
+            <Filter className="h-4 w-4 mr-2" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Sources</SelectItem>
+            <SelectItem value="strategy_generated">Strategy</SelectItem>
+            <SelectItem value="customer_imported">Imported</SelectItem>
+            <SelectItem value="ai_generated">AI Generated</SelectItem>
+            <SelectItem value="manual">Manual</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      
+      {/* Tasks List */}
+      <Card>
+        <CardContent className="p-4">
+          {filteredTasks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+              <ClipboardList className="h-12 w-12 mb-3 text-gray-300" />
+              <div className="text-center">
+                <div className="font-medium">No tasks found</div>
+                <div className="text-sm mt-1">
+                  {searchTerm || sourceFilter !== 'all' 
+                    ? 'Try adjusting your filters' 
+                    : 'Add tasks to get started'}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div>
+              {filteredTasks.map(task => (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  isExpanded={expandedTasks.has(task.id)}
+                  onToggleExpand={() => toggleExpand(task.id)}
+                  onEdit={setEditingTask}
+                  onDelete={handleDeleteTask}
+                  onToggleActive={(t) => toggleActiveMutation.mutate(t)}
+                />
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      
+      {/* Dialogs */}
+      <AddTaskDialog
+        open={showAddDialog}
+        onClose={() => setShowAddDialog(false)}
+        equipmentId={equipmentId}
+        onSuccess={handleTaskSuccess}
+      />
+      
+      <EditTaskDialog
+        open={!!editingTask}
+        onClose={() => setEditingTask(null)}
+        task={editingTask}
+        equipmentId={equipmentId}
+        onSuccess={handleTaskSuccess}
+      />
+      
+      <VersionHistoryDialog
+        open={showVersionHistory}
+        onClose={() => setShowVersionHistory(false)}
+        equipmentId={equipmentId}
+      />
+    </div>
+  );
+};
+
+export default MaintenanceProgramPanel;

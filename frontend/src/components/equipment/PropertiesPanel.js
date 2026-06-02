@@ -6,7 +6,7 @@ import { useEquipmentNodeIdMap } from "../../hooks/useTranslatedEntities";
 import { failureModesAPI, qrCodeAPI, equipmentHierarchyAPI, definitionsAPI } from "../../lib/api";
 import {
   Settings, Cog, Check, Edit, GripVertical, Trash2, ChevronDown, Sparkles, Eye, Search, AlertTriangle, QrCode, Info,
-  Paperclip, Upload, Download, FileText, Image, File as FileIcon, X,
+  Paperclip, Upload, Download, FileText, Image, File as FileIcon, X, ClipboardList,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -22,6 +22,8 @@ import { QRCodeDialog } from "./QRCodeDialog";
 import { DocumentViewer } from "../DocumentViewer";
 import { getBackendUrl } from "../../lib/apiConfig";
 import { getEquipmentLevelLabel } from "../../lib/equipmentLevelLabels";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
+import MaintenanceProgramPanel from "./MaintenanceProgramPanel";
 
 const LEVEL_CONFIG = {
   installation: { icon: Settings },
@@ -407,6 +409,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
   const [typeSearchOpen, setTypeSearchOpen] = useState(false);
   const [typeSearchQuery, setTypeSearchQuery] = useState("");
   const [showQRDialog, setShowQRDialog] = useState(false);
+  const [showMaintenanceProgramDialog, setShowMaintenanceProgramDialog] = useState(false);
   
   // Find the installation ID for this equipment (traverse up the hierarchy)
   const installationId = useMemo(() => {
@@ -939,6 +942,23 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
             </Button>
           </div>
           
+          {/* Maintenance Program Section - Only show for equipment levels that can have maintenance programs */}
+          {["equipment_unit", "equipment", "subunit", "maintainable_item", "unit"].includes(node.level) && (
+            <div className="pt-4 border-t border-slate-200">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-sm font-medium">{t("equipment.maintenanceProgram") || "Maintenance Program"}</Label>
+              </div>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => setShowMaintenanceProgramDialog(true)}
+              >
+                <ClipboardList className="w-4 h-4 mr-2" />
+                {t("equipment.viewMaintenanceProgram") || "View Maintenance Program"}
+              </Button>
+            </div>
+          )}
+          
           {/* Files Section */}
           <EquipmentFiles equipmentId={node.id} />
 
@@ -964,6 +984,27 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
         equipment={node}
         existingQR={qrData?.qr_code}
       />
+      
+      {/* Maintenance Program Dialog */}
+      <Dialog open={showMaintenanceProgramDialog} onOpenChange={setShowMaintenanceProgramDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5 text-blue-600" />
+              {t("equipment.maintenanceProgram") || "Maintenance Program"}
+            </DialogTitle>
+            <DialogDescription>
+              {translatedName || node?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto py-4">
+            <MaintenanceProgramPanel 
+              equipmentId={node?.id} 
+              equipmentName={translatedName || node?.name}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
