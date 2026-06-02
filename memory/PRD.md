@@ -4,7 +4,7 @@
 Create a robust full-stack platform optimized for multi-environment execution with dynamic database switching, advanced form capabilities, seamless AI integrations, GDPR compliance, version-controlled PWAs, comprehensive log ingestion, and automated data processing.
 
 ## Current Version
-**v3.7.1** (Updated: May 2026)
+**v3.7.2** (Updated: May 2026)
 
 ## Recent Changes
 - [Feb 2026] **Equipment Unit filter on global Maintenance Schedule + MyTasks discipline auto-seed (VERIFIED iteration_38)**:
