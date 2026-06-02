@@ -117,7 +117,14 @@ const CriticalityDimension = ({ label, color, value, onClick, scale, dimension }
                   <Info className={`h-3 w-3 text-${color}-400 hover:text-${color}-600`} />
                 </button>
               </PopoverTrigger>
-              <PopoverContent side="right" align="start" className="w-64 p-0" sideOffset={8}>
+              <PopoverContent 
+                side="top" 
+                align="center" 
+                className="w-64 p-0 z-50" 
+                sideOffset={8}
+                collisionPadding={16}
+                avoidCollisions={true}
+              >
                 <div className="px-3 py-2 border-b border-slate-100">
                   <p className={`text-xs font-semibold text-${color}-700`}>{label} {t("equipment.impactScaleSuffix")}</p>
                 </div>
@@ -135,8 +142,8 @@ const CriticalityDimension = ({ label, color, value, onClick, scale, dimension }
                         {level}
                       </span>
                       <div className="min-w-0">
-                        <span className="font-medium text-slate-800">{scale[level].label}</span>
-                        <p className="text-slate-500 leading-tight">{scale[level].desc}</p>
+                        <span className="font-medium text-slate-800">{scale[level]?.label}</span>
+                        <p className="text-slate-500 leading-tight">{scale[level]?.desc}</p>
                       </div>
                     </div>
                   ))}
