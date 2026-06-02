@@ -1007,12 +1007,12 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
   const validateAndSetFile = (file) => {
     const extension = "." + file.name.split(".").pop().toLowerCase();
     if (!supportedExtensions.includes(extension)) {
-      toast.error("Unsupported file type. Please use Excel, PDF, or image files.");
+      toast.error(t("library.pmImportUnsupportedFileType"));
       return;
     }
     
     if (file.size > 20 * 1024 * 1024) {
-      toast.error("File too large. Maximum size is 20MB.");
+      toast.error(t("library.pmImportFileTooLarge20mb"));
       return;
     }
     
@@ -1035,7 +1035,7 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
       
     } catch (error) {
       console.error("Upload error:", error);
-      toast.error(error.response?.data?.detail || "Failed to upload file");
+      toast.error(error.response?.data?.detail || t("library.pmImportUploadFailed"));
       setStep(1);
     }
   };
@@ -1087,7 +1087,7 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
         stats: result.stats,
       }));
     } catch (error) {
-      toast.error("Failed to accept task");
+      toast.error(t("library.pmImportAcceptTaskFailed"));
     }
   };
   
@@ -1102,20 +1102,20 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
         stats: result.stats,
       }));
     } catch (error) {
-      toast.error("Failed to reject task");
+      toast.error(t("library.pmImportRejectTaskFailed"));
     }
   };
   
   const handleAcceptAllHighConfidence = async () => {
     try {
       const result = await pmImportAPI.acceptAllHighConfidence(sessionId);
-      toast.success(`Accepted ${result.accepted_count} high confidence tasks`);
+      toast.success(`${t("library.pmImportAccepted")} ${result.accepted_count} ${t("library.pmImportHighConfidenceTasks")}`);
       
       // Refresh session
       const sess = await pmImportAPI.getSession(sessionId);
       setSession(sess);
     } catch (error) {
-      toast.error("Failed to accept tasks");
+      toast.error(t("library.pmImportAcceptTasksFailed"));
     }
   };
   
@@ -1146,9 +1146,9 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
         }),
         stats: result.stats,
       }));
-      toast.success(matchName ? `Linked to "${matchName}"` : "Match selected");
+      toast.success(matchName ? `${t("library.pmImportLinkedTo")} \"${matchName}\"` : t("library.pmImportMatchSelected"));
     } catch (error) {
-      toast.error("Failed to select match");
+      toast.error(t("library.pmImportSelectMatchFailed"));
     }
   };
   
@@ -1165,9 +1165,9 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
         ),
         stats: result.stats,
       }));
-      toast.success(`New failure mode "${fmData.failure_mode}" approved`);
+      toast.success(`${t("library.pmImportNewFailureModeApproved")}: \"${fmData.failure_mode}\"`);
     } catch (error) {
-      toast.error("Failed to approve new failure mode");
+      toast.error(t("library.pmImportApproveNewFailureModeFailed"));
     }
   };
   
@@ -1179,14 +1179,14 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
       const result = await pmImportAPI.importToLibrary(sessionId, true);
       setImportResult(result);
       setStep(4);
-      toast.success("Import complete!");
+      toast.success(t("library.pmImportImportComplete"));
       
       if (onImportComplete) {
         onImportComplete(result);
       }
     } catch (error) {
       console.error("Import error:", error);
-      toast.error(error.response?.data?.detail || "Import failed");
+      toast.error(error.response?.data?.detail || t("library.pmImportImportFailed"));
     } finally {
       setImporting(false);
     }
@@ -1211,9 +1211,9 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
       a.click();
       window.URL.revokeObjectURL(url);
       a.remove();
-      toast.success("Review exported");
+      toast.success(t("library.pmImportReviewExported"));
     } catch (error) {
-      toast.error("Export failed");
+      toast.error(t("library.pmImportExportFailed"));
     }
   };
   
