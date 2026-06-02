@@ -1,6 +1,6 @@
 # Database Index Report
 
-**Status:** Pending audit (Priority 4)
+**Status:** Stabilization indexes scripted; run migration on each environment
 
 ## Planned scope
 

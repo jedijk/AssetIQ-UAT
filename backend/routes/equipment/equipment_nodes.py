@@ -15,6 +15,7 @@ from iso14224_models import (
 )
 from services.query_cache import query_cache
 from services.cache_service import invalidate_equipment_related
+from services.background_jobs import schedule_tracked_job
 from utils.auto_translate import translate_equipment_node
 
 logger = logging.getLogger(__name__)
@@ -441,11 +442,13 @@ async def create_equipment_node(
     invalidate_equipment_cache(current_user["id"])
     
     # Auto-translate equipment node name and description
-    background_tasks.add_task(
+    schedule_tracked_job(
+        background_tasks,
+        "translate_equipment_node",
         translate_equipment_node,
         node_id,
         {"name": node_data.name, "description": node_data.description or ""},
-        current_user["id"]
+        user_id=current_user["id"],
     )
     
     node_doc.pop("_id", None)
@@ -527,11 +530,13 @@ async def update_equipment_node(
     
     # Auto-translate if name or description changed
     if update.name or update.description:
-        background_tasks.add_task(
+        schedule_tracked_job(
+            background_tasks,
+            "translate_equipment_node",
             translate_equipment_node,
             node_id,
             {"name": updated.get("name", ""), "description": updated.get("description", "")},
-            current_user["id"]
+            user_id=current_user["id"],
         )
     
     return updated

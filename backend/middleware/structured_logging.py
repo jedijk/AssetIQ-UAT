@@ -17,6 +17,30 @@ logger = logging.getLogger("assetiq.request")
 
 SLOW_API_MS = int(__import__("os").environ.get("SLOW_API_MS", "1000"))
 
+_SECRET_KEYS = frozenset(
+    {
+        "password",
+        "token",
+        "authorization",
+        "api_key",
+        "apikey",
+        "secret",
+        "cookie",
+        "session",
+    }
+)
+
+
+def _mask_secrets(mapping: dict) -> dict:
+    masked = {}
+    for key, value in mapping.items():
+        key_lower = str(key).lower()
+        if any(s in key_lower for s in _SECRET_KEYS):
+            masked[key] = "[REDACTED]"
+        else:
+            masked[key] = value
+    return masked
+
 
 class StructuredLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
@@ -59,6 +83,7 @@ class StructuredLoggingMiddleware(BaseHTTPMiddleware):
             if isinstance(user, dict):
                 log_extra["user_id"] = user.get("id")
                 log_extra["company_id"] = user.get("company_id") or user.get("organization_id")
+            log_extra = _mask_secrets(log_extra)
 
             if duration_ms >= SLOW_API_MS:
                 logger.warning("slow request", extra=log_extra)

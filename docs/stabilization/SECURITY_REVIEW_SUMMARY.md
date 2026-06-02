@@ -1,6 +1,6 @@
 # Security Review Summary
 
-**Status:** Partial (Priority 5 not fully implemented)
+**Status:** Core hardening delivered (Priority 5)
 
 ## Existing controls
 
@@ -15,13 +15,13 @@
 - Structured logging with request IDs (no passwords in new middleware)
 - Sentry optional, PII disabled (`send_default_pii=False`)
 
-## Pending (Priority 5)
+## Delivered (Priority 5)
 
-- [ ] Security headers middleware (HSTS, X-Content-Type-Options, etc.)
-- [ ] Global request body size limits
-- [ ] Secret masking in log formatters
-- [ ] Authentication audit checklist
-- [ ] Input validation review on upload/AI endpoints
+- [x] Security headers middleware (`middleware/security.py`)
+- [x] Global request body size limits (`MAX_REQUEST_BODY_BYTES`, default 25MB)
+- [x] Secret key masking in structured request logs
+- [ ] Authentication audit checklist (manual)
+- [ ] Input validation review on upload/AI endpoints (manual)
 
 ## Notes
 

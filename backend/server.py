@@ -323,9 +323,12 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 
 try:
     from middleware.structured_logging import StructuredLoggingMiddleware
+    from middleware.security import SecurityHeadersMiddleware, RequestSizeLimitMiddleware
 
     app.add_middleware(StructuredLoggingMiddleware)
-    logger.info("Structured logging middleware enabled")
+    app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(RequestSizeLimitMiddleware)
+    logger.info("Structured logging and security middleware enabled")
 except Exception as e:
     logger.warning("Structured logging middleware not available: %s", e)
 

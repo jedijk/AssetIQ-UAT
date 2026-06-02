@@ -1,13 +1,13 @@
 # AssetIQ Technical Debt Remediation Report
 
-**Status:** In progress (Priority 1 foundation delivered)  
+**Status:** Priorities 1–5 foundation delivered (June 2026)  
 **Date:** June 2026
 
 ## Executive summary
 
-Stabilization work focuses on production reliability without changing product behavior. The first delivery unifies caching, adds AI cost guards, structured request logging, optional Sentry, coordinated equipment cache invalidation, and an application metrics endpoint.
+Stabilization work improves production reliability without changing product behavior. Delivered: unified cache, AI guards, observability, background job tracking, maintenance strategy module split, production dashboard extraction, index migration script, and security middleware.
 
-## Completed (Priority 1 – partial)
+## Completed (Priority 1)
 
 ### Unified cache architecture
 
@@ -45,19 +45,36 @@ Stabilization work focuses on production reliability without changing product be
 
 - `backend/tests/test_unified_cache.py` — hit/miss, equipment invalidation, domain invalidation.
 
-## Pending (by priority)
+## Completed (Priority 2)
 
-| Priority | Item | Status |
-|----------|------|--------|
-| P1 | Wire AI guard on all non–`ai_helpers` OpenAI call sites | Pending |
-| P1 | Mongo slow-query logging (>500ms) | Pending |
-| P2 | Background job framework (retries, DLQ) | Pending |
-| P2 | Queue health in `/api/metrics` | Pending |
-| P3 | Split `maintenance_strategy_v2.py` | Pending |
-| P3 | Refactor `ProductionDashboardPage.js` | Pending |
-| P4 | Index audit + documentation | Pending |
-| P4 | Query performance pass | Pending |
-| P5 | Security headers, request size limits, log secret masking | Pending |
+- **`services/background_jobs.py`** — retries, exponential backoff, dead-letter status in MongoDB `background_jobs`
+- **`schedule_tracked_job()`** — wired for equipment translation and maintenance task translation jobs
+- **`GET /api/metrics`** — includes real `queue` health from job service
+
+## Completed (Priority 3)
+
+- **`routes/maintenance_strategy_v2/`** package: `propagation.py`, `strategy_helpers.py`, `routes.py` (endpoints)
+- **`features/production/dashboard/productionDashboardShared.jsx`** — KPI cards, charts, waste panel, form dialog, filter storage (~570 lines extracted from page)
+
+## Completed (Priority 4)
+
+- **`migrations/create_indexes_stabilization.py`** — indexes for equipment tag/level, maintenance programs, scheduled tasks, background jobs
+- **`services/db_monitoring.py`** — slow-query logging helpers (`SLOW_QUERY_MS`, default 500ms)
+
+## Completed (Priority 5)
+
+- **`middleware/security.py`** — security headers + request body size limit (`MAX_REQUEST_BODY_BYTES`)
+- **Secret masking** in structured logging for sensitive field names
+- **`SECURITY_REVIEW_SUMMARY.md`** updated
+
+## Remaining follow-ups
+
+| Item | Status |
+|------|--------|
+| Wire `schedule_tracked_job` on all remaining `BackgroundTasks` call sites | Partial |
+| Wire AI guard on routes outside `ai_helpers` | Pending |
+| Run `create_indexes_stabilization.py` on UAT/prod DB | Ops task |
+| Multi-instance rate limits (Redis) for AI + jobs | Future |
 
 ## Before/after performance metrics
 

@@ -9,6 +9,7 @@ import logging
 
 from database import db
 from auth import get_current_user
+from services.background_jobs import schedule_tracked_job
 from models.translation import (
     Language, DictionaryTerm, EntityTranslation, TranslationJob,
     EntityType, TranslationStatus,
@@ -497,7 +498,14 @@ async def generate_translations(
         return {"success": True, "job": job_data}
     
     # For larger jobs, process in background (non-blocking)
-    background_tasks.add_task(service.process_translation_job, job.id, fetch_entity)
+    schedule_tracked_job(
+        background_tasks,
+        "translation_job",
+        service.process_translation_job,
+        job.id,
+        fetch_entity,
+        user_id=current_user.get("id"),
+    )
     return {"success": True, "job_id": job.id, "status": "queued", "total": len(request.entity_ids)}
 
 

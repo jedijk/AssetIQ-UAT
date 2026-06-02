@@ -417,16 +417,20 @@ async def get_application_metrics(
         cache_stats = unified_cache.get_stats()
         company_id = current_user.get("company_id") or current_user.get("organization_id") or "default"
         ai_daily = ai_cost_guard.get_daily_summary(company_id)
+        from services.background_jobs import background_job_service
+
+        queue_health = await background_job_service.get_queue_health()
     except Exception as exc:
         cache_stats = {"error": str(exc)[:120]}
         ai_daily = {}
+        queue_health = {"status": "unknown", "error": str(exc)[:120]}
 
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "database": {"status": db_status, "latency_ms": db_latency_ms},
         "cache": cache_stats,
         "ai_usage_daily": ai_daily,
-        "queue": {"status": "in_process", "note": "Background job framework pending"},
+        "queue": queue_health,
     }
 
 

@@ -1,8 +1,6 @@
 """
-Maintenance Strategy v2 Routes
-Equipment Type Level Strategy Management with Task Generation
+Maintenance Strategy v2 Routes — equipment type strategy management.
 """
-
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
@@ -13,6 +11,7 @@ import os
 from database import db
 from routes.auth import get_current_user
 from utils.auto_translate import translate_maintenance_task
+from services.background_jobs import schedule_tracked_job
 from models.maintenance_strategy_v2 import (
     EquipmentTypeStrategy,
     FailureModeStrategy,
@@ -30,717 +29,39 @@ from models.maintenance_strategy_v2 import (
     MaintenanceStrategyType,
     TaskFrequency,
     DetectionMethod,
-    TaskActivationState
+    TaskActivationState,
+)
+
+from routes.maintenance_strategy_v2.propagation import (
+    _FREQUENCY_DAYS,
+    _propagate_task_template_to_programs,
+    _deactivate_programs_for_task,
+    _toggle_programs_for_failure_mode,
+    OPEN_TASK_STATUSES_FILTER,
+    _sync_metadata_to_open_scheduled_tasks,
+    _delete_open_scheduled_tasks_for_task,
+    _cancel_open_scheduled_tasks_for_task,
+    _cancel_open_scheduled_tasks_for_failure_mode,
+    _delete_open_scheduled_tasks_for_strategy,
+    _cancel_open_scheduled_tasks_for_strategy,
+    _resync_programs_with_strategy,
+    _describe_task_change,
+    _describe_fm_change,
+    _bump_version,
+    _bump_strategy_version,
+)
+from routes.maintenance_strategy_v2.strategy_helpers import (
+    calculate_frequency_for_criticality,
+    get_failure_modes_for_equipment_type,
+    map_detection_methods,
+    determine_strategy_type,
+    determine_action_type_from_text,
+    generate_default_tasks_for_failure_mode,
+    log_strategy_audit,
 )
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/maintenance-strategies-v2", tags=["Maintenance Strategies V2"])
-
-
-# ============= Strategy → Program Propagation =============
-
-_FREQUENCY_DAYS = {
-    "continuous": 1, "daily": 1, "weekly": 7, "bi_weekly": 14,
-    "monthly": 30, "quarterly": 90, "semi_annual": 180, "annual": 365,
-    "biennial": 730, "on_condition": 30,
-}
-
-
-async def _propagate_task_template_to_programs(equipment_type_id: str, task_template: dict, new_strategy_version: str):
-    """
-    When a task template is added/edited on a strategy, propagate the changed
-    fields to all maintenance_programs that reference it. Frequency is
-    re-derived per-program based on each equipment's criticality.
-    """
-    task_template_id = task_template.get("id")
-    if not task_template_id:
-        return 0
-
-    freq_matrix = task_template.get("frequency_matrix", {}) or {}
-    now = datetime.now(timezone.utc).isoformat()
-
-    # Find all programs that reference this task template
-    programs = await db.maintenance_programs.find(
-        {"equipment_type_id": equipment_type_id, "task_template_id": task_template_id}
-    ).to_list(5000)
-
-    updated = 0
-    for prog in programs:
-        criticality = prog.get("criticality") or "low"
-        frequency = freq_matrix.get(criticality, prog.get("frequency", "monthly"))
-        freq_days = _FREQUENCY_DAYS.get(frequency, 30)
-
-        set_fields = {
-            "task_name": task_template.get("name", prog.get("task_name")),
-            "task_description": task_template.get("description"),
-            "task_type": task_template.get("task_type", prog.get("task_type")),
-            "estimated_duration_hours": task_template.get("duration_hours", prog.get("estimated_duration_hours", 1.0)),
-            "frequency": frequency,
-            "frequency_days": freq_days,
-            "discipline": task_template.get("discipline"),
-            "skills_required": task_template.get("skills_required", []),
-            "strategy_version": new_strategy_version,
-            "updated_at": now,
-        }
-        result = await db.maintenance_programs.update_one(
-            {"_id": prog["_id"]},
-            {"$set": set_fields},
-        )
-        if result.modified_count > 0:
-            updated += 1
-
-    return updated
-
-
-async def _deactivate_programs_for_task(equipment_type_id: str, task_template_id: str):
-    """Mark all programs for this deleted task template as inactive."""
-    now = datetime.now(timezone.utc).isoformat()
-    result = await db.maintenance_programs.update_many(
-        {"equipment_type_id": equipment_type_id, "task_template_id": task_template_id},
-        {"$set": {"is_active": False, "updated_at": now}},
-    )
-    return result.modified_count
-
-
-async def _toggle_programs_for_failure_mode(
-    equipment_type_id: str,
-    failure_mode_id: str,
-    enabled: bool,
-):
-    """
-    When a failure mode strategy is enabled/disabled, activate/deactivate
-    all programs whose failure_mode_id matches.
-    """
-    now = datetime.now(timezone.utc).isoformat()
-    result = await db.maintenance_programs.update_many(
-        {
-            "equipment_type_id": equipment_type_id,
-            "failure_mode_id": failure_mode_id,
-        },
-        {"$set": {"is_active": enabled, "updated_at": now}},
-    )
-    return result.modified_count
-
-
-# ---------- Scheduled-task cascade (Planner side) ----------
-
-OPEN_TASK_STATUSES_FILTER = {"$nin": ["completed", "cancelled"]}
-
-
-async def _sync_metadata_to_open_scheduled_tasks(
-    equipment_type_id: str,
-    task_template: dict,
-):
-    """
-    Push name / description / type / hours changes from a strategy task template
-    onto every OPEN scheduled_task that was generated from it.
-    Completed/cancelled tasks remain historical.
-    """
-    task_template_id = task_template.get("id")
-    if not task_template_id:
-        return 0
-
-    # Find the linked program ids first (scheduled_tasks reference them)
-    program_ids = [
-        p["id"] async for p in db.maintenance_programs.find(
-            {"equipment_type_id": equipment_type_id, "task_template_id": task_template_id},
-            {"id": 1, "_id": 0},
-        )
-    ]
-    if not program_ids:
-        return 0
-
-    now = datetime.now(timezone.utc).isoformat()
-    result = await db.scheduled_tasks.update_many(
-        {
-            "maintenance_program_id": {"$in": program_ids},
-            "status": OPEN_TASK_STATUSES_FILTER,
-        },
-        {"$set": {
-            "task_name": task_template.get("name", ""),
-            "task_description": task_template.get("description"),
-            "task_type": task_template.get("task_type"),
-            "estimated_hours": task_template.get("duration_hours", 1.0),
-            "updated_at": now,
-        }},
-    )
-    return result.modified_count
-
-
-async def _delete_open_scheduled_tasks_for_task(
-    equipment_type_id: str,
-    task_template_id: str,
-):
-    """Hard-delete every OPEN scheduled_task generated from a (now removed) strategy task."""
-    program_ids = [
-        p["id"] async for p in db.maintenance_programs.find(
-            {"equipment_type_id": equipment_type_id, "task_template_id": task_template_id},
-            {"id": 1, "_id": 0},
-        )
-    ]
-    if not program_ids:
-        return 0
-    result = await db.scheduled_tasks.delete_many({
-        "maintenance_program_id": {"$in": program_ids},
-        "status": OPEN_TASK_STATUSES_FILTER,
-    })
-    return result.deleted_count
-
-
-async def _cancel_open_scheduled_tasks_for_task(
-    equipment_type_id: str,
-    task_template_id: str,
-):
-    """Cancel every OPEN scheduled_task generated from a (now removed) strategy task."""
-    program_ids = [
-        p["id"] async for p in db.maintenance_programs.find(
-            {"equipment_type_id": equipment_type_id, "task_template_id": task_template_id},
-            {"id": 1, "_id": 0},
-        )
-    ]
-    if not program_ids:
-        return 0
-
-    now = datetime.now(timezone.utc).isoformat()
-    result = await db.scheduled_tasks.update_many(
-        {
-            "maintenance_program_id": {"$in": program_ids},
-            "status": OPEN_TASK_STATUSES_FILTER,
-        },
-        {"$set": {
-            "status": "cancelled",
-            "notes": "Auto-cancelled: source task removed from strategy",
-            "updated_at": now,
-        }},
-    )
-    return result.modified_count
-
-
-async def _cancel_open_scheduled_tasks_for_failure_mode(
-    equipment_type_id: str,
-    failure_mode_id: str,
-):
-    """Cancel every OPEN scheduled_task whose program is linked to the disabled FM."""
-    program_ids = [
-        p["id"] async for p in db.maintenance_programs.find(
-            {"equipment_type_id": equipment_type_id, "failure_mode_id": failure_mode_id},
-            {"id": 1, "_id": 0},
-        )
-    ]
-    if not program_ids:
-        return 0
-
-    now = datetime.now(timezone.utc).isoformat()
-    result = await db.scheduled_tasks.update_many(
-        {
-            "maintenance_program_id": {"$in": program_ids},
-            "status": OPEN_TASK_STATUSES_FILTER,
-        },
-        {"$set": {
-            "status": "cancelled",
-            "notes": "Auto-cancelled: failure mode disabled on strategy",
-            "updated_at": now,
-        }},
-    )
-    return result.modified_count
-
-
-async def _delete_open_scheduled_tasks_for_strategy(equipment_type_id: str):
-    """Hard-delete every OPEN scheduled_task linked to the given equipment-type strategy."""
-    program_ids = [
-        p["id"] async for p in db.maintenance_programs.find(
-            {"equipment_type_id": equipment_type_id},
-            {"id": 1, "_id": 0},
-        )
-    ]
-    if not program_ids:
-        return 0
-    result = await db.scheduled_tasks.delete_many({
-        "maintenance_program_id": {"$in": program_ids},
-        "status": OPEN_TASK_STATUSES_FILTER,
-    })
-    return result.deleted_count
-
-
-async def _cancel_open_scheduled_tasks_for_strategy(equipment_type_id: str):
-    """Cancel every OPEN scheduled_task linked to the given equipment-type strategy."""
-    program_ids = [
-        p["id"] async for p in db.maintenance_programs.find(
-            {"equipment_type_id": equipment_type_id},
-            {"id": 1, "_id": 0},
-        )
-    ]
-    if not program_ids:
-        return 0
-
-    now = datetime.now(timezone.utc).isoformat()
-    result = await db.scheduled_tasks.update_many(
-        {
-            "maintenance_program_id": {"$in": program_ids},
-            "status": OPEN_TASK_STATUSES_FILTER,
-        },
-        {"$set": {
-            "status": "cancelled",
-            "notes": "Auto-cancelled: maintenance strategy deleted",
-            "updated_at": now,
-        }},
-    )
-    return result.modified_count
-
-
-# ---------- Comprehensive sync: derive active state from strategy truth ----------
-
-async def _resync_programs_with_strategy(equipment_type_id: str):
-    """
-    Re-derive `is_active` on every maintenance_program for this strategy and
-    cancel any open scheduled_tasks for newly inactive programs.
-
-    A program is ACTIVE iff its task template:
-      - still exists in the strategy, AND
-      - is not toggled off (`is_mandatory != False`), AND
-      - either has no FM-strategy linking it OR at least one linking FM is enabled.
-
-    Tasks can be linked from multiple FM-strategies (FM-strategy.task_ids), so
-    disabling one FM does NOT deactivate the program if another enabled FM
-    still references the same task.
-    """
-    strategy = await db.equipment_type_strategies.find_one(
-        {"equipment_type_id": equipment_type_id}
-    )
-    if not strategy:
-        return {"programs_activated": 0, "programs_deactivated": 0, "scheduled_tasks_cancelled": 0}
-
-    tasks = strategy.get("task_templates", []) or []
-    fms = strategy.get("failure_mode_strategies", []) or []
-    task_by_id = {t.get("id"): t for t in tasks if t.get("id")}
-
-    task_to_fms: dict = {}
-    for fm in fms:
-        for tid in (fm.get("task_ids") or []):
-            task_to_fms.setdefault(tid, []).append(fm)
-
-    programs = await db.maintenance_programs.find(
-        {"equipment_type_id": equipment_type_id}
-    ).to_list(5000)
-
-    now = datetime.now(timezone.utc).isoformat()
-    activated = 0
-    deactivated = 0
-    scheduled_cancelled = 0
-
-    for prog in programs:
-        tid = prog.get("task_template_id")
-        task = task_by_id.get(tid)
-
-        if not task:
-            new_active = False
-        elif task.get("is_mandatory") is False:
-            new_active = False
-        elif task.get("task_type") in ("reactive", "corrective"):
-            # CM tasks are triggered on failure, not scheduled
-            new_active = False
-        else:
-            linked_fms = task_to_fms.get(tid, [])
-            if not linked_fms:
-                new_active = True
-            else:
-                new_active = any(fm.get("enabled") is not False for fm in linked_fms)
-
-        if prog.get("is_active") != new_active:
-            await db.maintenance_programs.update_one(
-                {"_id": prog["_id"]},
-                {"$set": {"is_active": new_active, "updated_at": now}},
-            )
-            if new_active:
-                activated += 1
-            else:
-                deactivated += 1
-
-            if not new_active:
-                r = await db.scheduled_tasks.update_many(
-                    {
-                        "maintenance_program_id": prog.get("id"),
-                        "status": {"$nin": ["completed", "cancelled"]},
-                    },
-                    {"$set": {
-                        "status": "cancelled",
-                        "notes": "Auto-cancelled: source task or failure mode disabled",
-                        "updated_at": now,
-                    }},
-                )
-                scheduled_cancelled += r.modified_count
-
-    return {
-        "programs_activated": activated,
-        "programs_deactivated": deactivated,
-        "scheduled_tasks_cancelled": scheduled_cancelled,
-    }
-
-
-# ---------- Human-readable version-history descriptors ----------
-
-def _describe_task_change(task: dict, changed_fields: list, action: str = "edit") -> str:
-    """Build a human-readable change description for the strategy version history."""
-    name = (task or {}).get("name") or "Task"
-    if action == "delete":
-        return f"Deleted task '{name}'"
-    if action == "add":
-        return f"Added task '{name}'"
-    label_map = {
-        "name": "name",
-        "description": "description",
-        "task_type": "task type",
-        "duration_hours": "duration",
-        "discipline": "discipline",
-        "skills_required": "skills",
-        "procedure_steps": "procedure",
-        "detection_methods": "detection methods",
-        "failure_mode_ids": "linked failure modes",
-        "frequency_matrix": "frequency matrix",
-        "tools_required": "tools",
-        "spare_parts": "spare parts",
-        "estimated_cost_eur": "cost",
-        "is_mandatory": "active state",
-    }
-    nice = [label_map.get(k, k) for k in changed_fields]
-    if not nice:
-        return f"Edited task '{name}'"
-    if len(nice) == 1:
-        return f"Edited task '{name}' ({nice[0]})"
-    return f"Edited task '{name}' ({', '.join(nice)})"
-
-
-def _describe_fm_change(fm: dict, request) -> str:
-    """Build a human-readable change description for a failure-mode mutation."""
-    name = (fm or {}).get("failure_mode_name") or "Failure mode"
-    parts = []
-    if getattr(request, "enabled", None) is True:
-        parts.append("enabled")
-    elif getattr(request, "enabled", None) is False:
-        parts.append("disabled")
-    if getattr(request, "strategy_type", None) is not None:
-        parts.append(f"strategy → {request.strategy_type}")
-    if getattr(request, "frequency_override", None) is not None:
-        parts.append(f"frequency override → {request.frequency_override}")
-    if getattr(request, "detection_methods", None) is not None:
-        parts.append("detection methods updated")
-    if getattr(request, "task_ids", None) is not None:
-        parts.append("linked tasks updated")
-    if not parts:
-        return f"Updated failure mode '{name}'"
-    return f"Failure mode '{name}' " + ", ".join(parts)
-
-
-
-def _bump_version(current_version: str) -> str:
-    """Bump a semver-like 'major.minor' string. Defaults to 1.1 if unparseable."""
-    try:
-        major, minor = map(int, str(current_version).split("."))
-        return f"{major}.{minor + 1}"
-    except (ValueError, AttributeError):
-        return "1.1"
-
-
-async def _bump_strategy_version(
-    strategy: dict,
-    changes: list,
-    user_id: Optional[str],
-) -> str:
-    """
-    Increment the strategy version and append to version_history.
-    Returns the new version string. The caller is responsible for $set'ing the
-    new version on the strategy (it's bundled in the same update_one call).
-    """
-    new_version = _bump_version(strategy.get("version", "1.0"))
-    now = datetime.now(timezone.utc).isoformat()
-    entry = {
-        "version": new_version,
-        "updated_at": now,
-        "updated_by": user_id,
-        "changes": changes,
-    }
-    await db.equipment_type_strategies.update_one(
-        {"equipment_type_id": strategy["equipment_type_id"]},
-        {
-            "$set": {"version": new_version, "updated_at": now},
-            "$push": {"version_history": entry},
-        },
-    )
-    return new_version
-
-
-# ============= Helper Functions =============
-
-def calculate_frequency_for_criticality(
-    frequency_matrix: CriticalityFrequency,
-    criticality: CriticalityLevel
-) -> TaskFrequency:
-    """Get the appropriate frequency based on criticality level"""
-    if criticality == CriticalityLevel.LOW:
-        return frequency_matrix.low
-    elif criticality == CriticalityLevel.MEDIUM:
-        return frequency_matrix.medium
-    else:  # HIGH
-        return frequency_matrix.high
-
-
-async def get_failure_modes_for_equipment_type(equipment_type_id: str, equipment_type_name: str) -> List[Dict]:
-    """Get all failure modes linked to an equipment type"""
-    # Query failure modes from database
-    query = {
-        "$or": [
-            {"equipment_type_ids": equipment_type_id},
-            {"equipment_type": {"$regex": equipment_type_name, "$options": "i"}}
-        ]
-    }
-    
-    failure_modes = await db.failure_modes.find(query, {"_id": 0}).to_list(100)
-    return failure_modes
-
-
-def map_detection_methods(failure_mode: Dict) -> List[str]:
-    """Map failure mode detection to detection methods"""
-    detection = failure_mode.get("detection", "").lower()
-    methods = []
-    
-    detection_mapping = {
-        "vibration": DetectionMethod.VIBRATION,
-        "temperature": DetectionMethod.TEMPERATURE,
-        "pressure": DetectionMethod.PRESSURE,
-        "visual": DetectionMethod.VISUAL,
-        "oil": DetectionMethod.OIL_ANALYSIS,
-        "thermograph": DetectionMethod.THERMOGRAPHY,
-        "ultrasonic": DetectionMethod.ULTRASONIC,
-        "acoustic": DetectionMethod.ACOUSTIC,
-        "electrical": DetectionMethod.ELECTRICAL,
-        "operator": DetectionMethod.OPERATOR_ROUNDS,
-        "inspection": DetectionMethod.VISUAL,
-        "monitoring": DetectionMethod.PROCESS,
-    }
-    
-    for keyword, method in detection_mapping.items():
-        if keyword in detection:
-            methods.append(method.value)
-    
-    # Default to visual if no specific detection found
-    if not methods:
-        methods.append(DetectionMethod.VISUAL.value)
-    
-    return methods
-
-
-def determine_strategy_type(failure_mode: Dict) -> MaintenanceStrategyType:
-    """Determine recommended strategy type based on failure mode characteristics"""
-    detection = failure_mode.get("detection", "").lower()
-    severity = failure_mode.get("severity", 5)
-    
-    # High severity failures need predictive/condition-based
-    if severity >= 8:
-        if any(kw in detection for kw in ["vibration", "temperature", "oil", "thermograph"]):
-            return MaintenanceStrategyType.PREDICTIVE
-        return MaintenanceStrategyType.CONDITION_BASED
-    
-    # Medium severity - preventive with some condition monitoring
-    if severity >= 5:
-        if any(kw in detection for kw in ["vibration", "temperature"]):
-            return MaintenanceStrategyType.CONDITION_BASED
-        return MaintenanceStrategyType.PREVENTIVE
-    
-    # Low severity - can be reactive or basic preventive
-    return MaintenanceStrategyType.PREVENTIVE
-
-
-def determine_action_type_from_text(action_text: str, stored_action_type: str = "PM") -> str:
-    """
-    AI-enhanced logic to determine the correct action type based on action text content.
-    This overrides the stored action_type if the text clearly indicates a different type.
-    
-    Returns: "PM", "PDM", or "CM"
-    """
-    action_lower = action_text.lower()
-    
-    # CM (Corrective/Reactive) indicators - actions taken AFTER failure
-    cm_keywords = [
-        "replace on failure", "repair", "fix", "restore", "rebuild", 
-        "overhaul", "recondition", "refurbish", "emergency", "breakdown",
-        "corrective", "reactive", "on failure", "when fail", "if fail",
-        "after failure", "upon failure", "failure occurs", "has failed",
-        "replace failed", "replace damaged", "replace worn", "remove debris",
-        "clear blockage", "unplug", "reset", "restart after"
-    ]
-    
-    # PDM (Predictive) indicators - condition monitoring, trending, analysis
-    pdm_keywords = [
-        "monitor", "analyze", "analysis", "trend", "measure", "check level",
-        "vibration", "thermograph", "ultrasonic", "oil sample", "oil analysis",
-        "infrared", "acoustic", "condition", "baseline", "benchmark",
-        "track", "log reading", "record", "sample", "test result",
-        "inspect for wear", "inspect for crack", "inspect for corrosion",
-        "check for signs", "look for indication", "detect", "diagnose",
-        "assess condition", "evaluate", "non-destructive", "ndt", "nde",
-        "thickness measurement", "wear measurement", "temperature monitoring",
-        "pressure monitoring", "flow monitoring", "continuous monitoring"
-    ]
-    
-    # PM (Preventive) indicators - scheduled, time-based, routine
-    pm_keywords = [
-        "lubricate", "grease", "oil change", "replace filter", "clean",
-        "tighten", "adjust", "calibrate", "align", "balance",
-        "inspect", "visual inspection", "check", "verify", "ensure",
-        "service", "maintain", "routine", "scheduled", "periodic",
-        "preventive", "planned", "regular", "annual", "monthly", "weekly",
-        "replace seal", "replace gasket", "replace belt", "replace bearing",
-        "top up", "refill", "flush", "drain", "purge",
-        "install", "upgrade", "improve", "modify", "protect", "coat",
-        "paint", "apply", "treat", "preserve"
-    ]
-    
-    # Count keyword matches
-    cm_score = sum(1 for kw in cm_keywords if kw in action_lower)
-    pdm_score = sum(1 for kw in pdm_keywords if kw in action_lower)
-    pm_score = sum(1 for kw in pm_keywords if kw in action_lower)
-    
-    # Strong CM indicators override everything
-    strong_cm_indicators = ["on failure", "after failure", "when fail", "replace on failure", 
-                           "breakdown", "emergency", "corrective", "reactive"]
-    if any(ind in action_lower for ind in strong_cm_indicators):
-        return "CM"
-    
-    # Strong PDM indicators
-    strong_pdm_indicators = ["monitor", "analysis", "trending", "vibration analysis", 
-                            "oil analysis", "thermograph", "ultrasonic", "continuous monitoring",
-                            "condition monitoring", "predictive"]
-    if any(ind in action_lower for ind in strong_pdm_indicators):
-        return "PDM"
-    
-    # If clear winner by score
-    max_score = max(cm_score, pdm_score, pm_score)
-    if max_score > 0:
-        if cm_score == max_score and cm_score > pdm_score and cm_score > pm_score:
-            return "CM"
-        elif pdm_score == max_score and pdm_score > cm_score and pdm_score > pm_score:
-            return "PDM"
-        elif pm_score == max_score:
-            return "PM"
-    
-    # Fall back to stored action type
-    return stored_action_type
-
-
-def generate_default_tasks_for_failure_mode(
-    failure_mode: Dict,
-    strategy_type: MaintenanceStrategyType,
-    detection_methods: List[str]
-) -> List[MaintenanceTaskTemplate]:
-    """Generate default task templates based on failure mode and strategy"""
-    tasks = []
-    fm_name = failure_mode.get("failure_mode", failure_mode.get("name", "Unknown"))
-    fm_id = failure_mode.get("id", str(uuid.uuid4()))
-    
-    # Recommended actions from failure mode
-    recommended_actions = failure_mode.get("recommended_actions", [])
-    
-    for idx, action in enumerate(recommended_actions[:5]):  # Limit to 5 tasks per FM
-        action_text = action.get("action", action) if isinstance(action, dict) else str(action)
-        stored_action_type = action.get("action_type", "PM") if isinstance(action, dict) else "PM"
-        discipline = action.get("discipline", None) if isinstance(action, dict) else None
-        
-        # Use AI-enhanced logic to determine correct action type
-        determined_action_type = determine_action_type_from_text(action_text, stored_action_type)
-        
-        # Map to MaintenanceStrategyType
-        if determined_action_type == "CM":
-            task_type = MaintenanceStrategyType.REACTIVE
-        elif determined_action_type == "PDM":
-            task_type = MaintenanceStrategyType.PREDICTIVE
-        else:
-            task_type = MaintenanceStrategyType.PREVENTIVE
-        
-        # Set frequency based on task type and severity
-        severity = failure_mode.get("severity", 5)
-        if task_type == MaintenanceStrategyType.PREDICTIVE:
-            freq_matrix = CriticalityFrequency(
-                low=TaskFrequency.SEMI_ANNUAL,
-                medium=TaskFrequency.QUARTERLY,
-                high=TaskFrequency.MONTHLY
-            )
-        elif task_type == MaintenanceStrategyType.CONDITION_BASED:
-            freq_matrix = CriticalityFrequency(
-                low=TaskFrequency.QUARTERLY,
-                medium=TaskFrequency.MONTHLY,
-                high=TaskFrequency.WEEKLY
-            )
-        elif severity >= 8:
-            freq_matrix = CriticalityFrequency(
-                low=TaskFrequency.MONTHLY,
-                medium=TaskFrequency.WEEKLY,
-                high=TaskFrequency.DAILY
-            )
-        else:
-            freq_matrix = CriticalityFrequency(
-                low=TaskFrequency.QUARTERLY,
-                medium=TaskFrequency.MONTHLY,
-                high=TaskFrequency.WEEKLY
-            )
-        
-        task = MaintenanceTaskTemplate(
-            id=f"task_{fm_id}_{idx}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
-            name=action_text[:100] if len(action_text) > 100 else action_text,
-            description=f"Task for: {fm_name}",
-            task_type=task_type,
-            frequency_matrix=freq_matrix,
-            detection_methods=[DetectionMethod(m) for m in detection_methods if m in [e.value for e in DetectionMethod]],
-            failure_mode_ids=[fm_id],
-            discipline=discipline,
-            source="template"
-        )
-        tasks.append(task)
-    
-    # If no recommended actions, create default inspection task
-    if not tasks:
-        default_freq = CriticalityFrequency(
-            low=TaskFrequency.QUARTERLY,
-            medium=TaskFrequency.MONTHLY,
-            high=TaskFrequency.WEEKLY
-        )
-        
-        task = MaintenanceTaskTemplate(
-            id=f"task_{fm_id}_default_{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
-            name=f"Inspect for {fm_name}",
-            description=f"Inspection task for failure mode: {fm_name}",
-            task_type=strategy_type,
-            frequency_matrix=default_freq,
-            detection_methods=[DetectionMethod(m) for m in detection_methods if m in [e.value for e in DetectionMethod]],
-            failure_mode_ids=[fm_id],
-            source="template"
-        )
-        tasks.append(task)
-    
-    return tasks
-
-
-async def log_strategy_audit(
-    action: str,
-    equipment_type_id: str,
-    user_id: str,
-    details: Dict[str, Any] = None,
-    entity_type: str = "equipment_type_strategy"
-):
-    """Log audit entry for maintenance strategy changes"""
-    audit_entry = {
-        "id": str(uuid.uuid4()),
-        "entity_type": entity_type,
-        "entity_id": equipment_type_id,
-        "action": action,
-        "user_id": user_id,
-        "timestamp": datetime.utcnow().isoformat(),
-        "details": details or {}
-    }
-    
-    try:
-        await db.maintenance_strategy_audit.insert_one(audit_entry)
-    except Exception as e:
-        logger.warning(f"Failed to log audit entry: {e}")
 
 
 # ============= Equipment Type Strategy Endpoints =============
@@ -1548,7 +869,9 @@ async def add_task_template(
     )
 
     # Auto-translate task template
-    background_tasks.add_task(
+    schedule_tracked_job(
+        background_tasks,
+        "translate_maintenance_task",
         translate_maintenance_task,
         task_dict["id"],
         {
@@ -1556,7 +879,7 @@ async def add_task_template(
             "description": request.description or "",
             "procedure_steps": request.procedure_steps or []
         },
-        current_user.get("id")
+        user_id=current_user.get("id"),
     )
 
     new_version = await _bump_strategy_version(
@@ -1638,7 +961,9 @@ async def update_task_template(
 
     # Auto-translate if name or description changed
     if any(k in updates for k in ["name", "description", "procedure_steps"]):
-        background_tasks.add_task(
+        schedule_tracked_job(
+            background_tasks,
+            "translate_maintenance_task",
             translate_maintenance_task,
             task_id,
             {
@@ -1646,7 +971,7 @@ async def update_task_template(
                 "description": updated_task.get("description", ""),
                 "procedure_steps": updated_task.get("procedure_steps", [])
             },
-            current_user.get("id")
+            user_id=current_user.get("id"),
         )
 
     return {
