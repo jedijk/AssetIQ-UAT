@@ -71,6 +71,14 @@ const SETTINGS_SECTIONS = [
     roles: ["owner", "admin"]
   },
   {
+    id: "definitions",
+    label: "Criticality Definitions",
+    description: "Define criticality impact scales",
+    icon: Sliders,
+    path: "/definitions",
+    roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"]
+  },
+  {
     id: "notifications",
     label: "Notifications",
     description: "Email and alert preferences",
