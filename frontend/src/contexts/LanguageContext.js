@@ -180,7 +180,7 @@ const en = {
   announcements: {
     liteModeTitle: "AssetIQ 3.7.2 — What's new",
     liteModeBody:
-      "AI photo capture warns on wrong dates and blocks far-off years on submit. Ops dashboard submissions open Reports. Mobile: Reports scrolling, compact waste list, waste Add on desktop only. Clearer login message when temporarily locked out.",
+      "Equipment Manager: fixed caching/update issues so changes persist reliably. Maintenance Scheduling: new beta section for planning and timeline scheduling.",
   },
   
   // Shared enum value translations (impact areas, frequencies, likelihoods, etc.)
@@ -2009,7 +2009,7 @@ const nl = {
   announcements: {
     liteModeTitle: "AssetIQ 3.7.2 — Wat is er nieuw",
     liteModeBody:
-      "AI-foto: waarschuwing bij verkeerde datums en blokkade van jaartallen ver van vandaag. Ops-dashboard: inzendingen openen Rapporten. Mobiel: scroll in Rapporten, compacte afvallijst, Afval toevoegen alleen op desktop. Duidelijker loginbericht bij tijdelijke blokkade.",
+      "Apparatuurbeheer: cache/updateproblemen opgelost zodat wijzigingen betrouwbaar worden opgeslagen. Onderhoudsplanning: nieuwe beta-sectie voor planning en tijdlijn scheduling.",
   },
   
   // Shared enum value translations (NL)

@@ -173,7 +173,7 @@ const de = {
 
   announcements: {
     liteModeTitle: "AssetIQ 3.7.2 — Was gibt's Neues",
-    liteModeBody: "KI-Fotoaufnahme warnt bei falschen Daten. Ops-Dashboard-Einsendungen öffnen Berichte.",
+    liteModeBody: "Equipment Manager: Cache-/Update-Probleme behoben, sodass Änderungen zuverlässig gespeichert werden. Wartungsplanung: neuer Beta-Bereich für Planung und Timeline-Scheduling.",
   },
   
   // Shared enum value translations (DE)
