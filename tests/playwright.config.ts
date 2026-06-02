@@ -11,7 +11,7 @@ export default defineConfig({
     ['json', { outputFile: './test-results/results.json' }],
   ],
   use: {
-    baseURL: process.env.REACT_APP_BACKEND_URL || 'https://equipment-sync-fix.preview.emergentagent.com',
+    baseURL: process.env.REACT_APP_BACKEND_URL || 'https://impl-audit.preview.emergentagent.com',
     screenshot: 'on',
     trace: 'on-first-retry',
     headless: true,

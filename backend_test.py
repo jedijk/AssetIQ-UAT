@@ -12,7 +12,7 @@ from typing import Optional, Dict, Any
 from openpyxl import Workbook
 
 # Configuration
-BASE_URL = "https://equipment-sync-fix.preview.emergentagent.com/api"
+BASE_URL = "https://impl-audit.preview.emergentagent.com/api"
 TEST_EMAIL = "jedijk@gmail.com"
 TEST_PASSWORD = "Jaap8019@"
 
