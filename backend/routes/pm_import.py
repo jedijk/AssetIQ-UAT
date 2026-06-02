@@ -197,7 +197,7 @@ async def get_session(
     """
     
     pm_service = PMImportService(db)
-    session = await pm_service.get_session(session_id)
+    session = await pm_service.ensure_equipment_impacts(session_id, current_user)
     
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")

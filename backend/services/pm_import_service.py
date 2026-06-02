@@ -21,6 +21,16 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 logger = logging.getLogger(__name__)
 
+# Tag-like equipment identifier extraction (best-effort).
+# Examples: P-101, HX-201, 1F-3001, 1F-3001-0129
+TAG_REGEX = re.compile(
+    r"\b(?:"
+    r"[A-Z]{1,5}\s*-\s*\d{2,6}(?:-\d{2,6})?"          # P-101, 1F-3001, 1F-3001-0129
+    r"|"
+    r"\d{1,3}[A-Z]{1,5}\s*-\s*\d{2,6}(?:-\d{2,6})?"   # 1F-3001 (number+letters prefix)
+    r")\b"
+)
+
 # Task type classifications
 TASK_TYPES = [
     "Inspection",
@@ -328,6 +338,295 @@ class PMImportService:
         if session:
             session["_id"] = str(session["_id"])
         return session
+
+    async def ensure_equipment_impacts(
+        self,
+        session_id: str,
+        current_user: dict,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Enrich tasks with equipment/tag impact information.
+
+        Adds per-task fields:
+        - equipment_tag_refs: extracted tag strings from task text/component
+        - equipment_matches: matched equipment nodes (id/tag/name/level)
+        - equipment_unmatched_tags: extracted tags that didn't match any node
+
+        Adds session fields:
+        - equipment_impact_summary
+        - equipment_impact_updated_at
+        """
+        session = await self.sessions_collection.find_one({"session_id": session_id})
+        if not session:
+            return None
+
+        tasks = session.get("tasks_extracted") or []
+        if not tasks:
+            session["_id"] = str(session["_id"])
+            return session
+
+        # Only recompute if we haven't done it yet, or if tasks changed since last compute.
+        # We keep this heuristic simple (count + updated_at).
+        prev = session.get("equipment_impact_summary") or {}
+        if prev.get("tasks_count") == len(tasks) and session.get("equipment_impact_updated_at"):
+            session["_id"] = str(session["_id"])
+            return session
+
+        equipment_nodes = await self._load_accessible_equipment_nodes(current_user)
+        tag_to_node = {}
+        for n in equipment_nodes:
+            tag = (n.get("tag") or "").strip()
+            if tag:
+                tag_to_node[tag.upper()] = {
+                    "id": n.get("id"),
+                    "tag": n.get("tag"),
+                    "name": n.get("name"),
+                    "level": n.get("level"),
+                }
+
+        matched_task_count = 0
+        unmatched_tag_total = 0
+        matched_tag_total = 0
+
+        # Failure mode import impact preview (what will change)
+        try:
+            from services.failure_modes_service import FailureModesService
+            fm_service = FailureModesService(self.db)
+        except Exception:
+            fm_service = None
+
+        for task in tasks:
+            raw = " ".join(
+                [
+                    str(task.get("component") or ""),
+                    str(task.get("asset") or ""),
+                    str(task.get("original_task") or ""),
+                ]
+            )
+            refs = self._extract_tag_refs(raw)
+            matches = []
+            unmatched = []
+            for ref in refs:
+                hit = tag_to_node.get(ref.upper())
+                if hit:
+                    matches.append(hit)
+                    matched_tag_total += 1
+                else:
+                    unmatched.append(ref)
+                    unmatched_tag_total += 1
+
+            # De-dup matches by node id (same tag referenced multiple times)
+            seen = set()
+            uniq_matches = []
+            for m in matches:
+                mid = m.get("id")
+                if mid and mid not in seen:
+                    seen.add(mid)
+                    uniq_matches.append(m)
+
+            task["equipment_tag_refs"] = refs
+            task["equipment_matches"] = uniq_matches
+            task["equipment_unmatched_tags"] = unmatched
+            if uniq_matches:
+                matched_task_count += 1
+
+            if fm_service:
+                task["import_impact"] = await self._compute_import_impact_preview(task, fm_service)
+
+        summary = {
+            "tasks_count": len(tasks),
+            "tasks_with_matches": matched_task_count,
+            "matched_tag_refs": matched_tag_total,
+            "unmatched_tag_refs": unmatched_tag_total,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        await self.sessions_collection.update_one(
+            {"session_id": session_id},
+            {"$set": {
+                "tasks_extracted": tasks,
+                "equipment_impact_summary": summary,
+                "equipment_impact_updated_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc),
+            }},
+        )
+
+        session["tasks_extracted"] = tasks
+        session["equipment_impact_summary"] = summary
+        session["equipment_impact_updated_at"] = datetime.now(timezone.utc)
+        session["_id"] = str(session["_id"])
+        return session
+
+    async def _load_accessible_equipment_nodes(self, current_user: dict) -> List[Dict[str, Any]]:
+        """
+        Load equipment nodes the user can access (based on installation assignments).
+        """
+        try:
+            from services.installation_filter_service import installation_filter
+
+            installation_ids = await installation_filter.get_user_installation_ids(current_user)
+            if not installation_ids:
+                return []
+            equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
+                installation_ids, current_user.get("id")
+            )
+            if not equipment_ids:
+                return []
+            return await self.db.equipment_nodes.find(
+                {"id": {"$in": list(equipment_ids)}},
+                {"_id": 0, "id": 1, "tag": 1, "name": 1, "level": 1},
+            ).to_list(20000)
+        except Exception as e:
+            logger.error(f"Failed to load accessible equipment nodes for PM impact: {e}")
+            return []
+
+    def _extract_tag_refs(self, text: str) -> List[str]:
+        if not text:
+            return []
+        refs = []
+        for m in TAG_REGEX.finditer(text.upper()):
+            val = m.group(0).replace(" ", "")
+            if val and val not in refs:
+                refs.append(val)
+        return refs
+
+    async def _compute_import_impact_preview(self, task: Dict[str, Any], fm_service) -> Dict[str, Any]:
+        """
+        Compute a best-effort preview of what the PM import would change for this task.
+
+        Returns:
+          {
+            "action": "link_existing" | "create_new" | "skip" | "rejected",
+            "target_failure_mode": {id, failure_mode, equipment, category} | null,
+            "changes": [{field, from, to, note}]  // human readable change intents
+            "action_preview": {...} | null         // recommended action object we would add
+            "reason": string | null
+          }
+        """
+        status = task.get("review_status")
+        if status == "rejected":
+            return {"action": "rejected", "target_failure_mode": None, "changes": [], "action_preview": None, "reason": "Rejected"}
+
+        if status not in ["accepted", "edited"]:
+            return {"action": "skip", "target_failure_mode": None, "changes": [], "action_preview": None, "reason": "Not accepted"}
+
+        library_match = task.get("library_match") or {}
+        match_status = library_match.get("status", "")
+
+        # Determine scenario target id
+        target_id = None
+        scenario = None
+        if task.get("selected_match_id"):
+            target_id = task.get("selected_match_id")
+            scenario = "selected_match"
+        elif match_status == "existing_match" and library_match.get("matched_id"):
+            target_id = library_match.get("matched_id")
+            scenario = "existing_match"
+
+        action_type = task.get("action_type") or "PM"
+        discipline = task.get("discipline") or "Maintenance"
+        estimated_time = task.get("estimated_time") or ""
+        desc = task.get("existing_control") or task.get("original_task") or ""
+        freq = task.get("frequency")
+
+        if target_id:
+            existing_fm = await fm_service.get_by_id(target_id)
+            if not existing_fm:
+                return {"action": "skip", "target_failure_mode": None, "changes": [], "action_preview": None, "reason": "Matched failure mode not found"}
+
+            actions = existing_fm.get("recommended_actions", []) or []
+            action_exists = any(
+                isinstance(a, dict) and (a.get("description") or "").lower() == desc.lower()
+                for a in actions
+            )
+
+            new_action = {
+                "description": desc,
+                "action_type": action_type,
+                "discipline": discipline,
+                "source": "PM Import",
+                "frequency": freq,
+                "estimated_time": estimated_time,
+            }
+
+            changes = []
+            if not action_exists:
+                changes.append({"field": "recommended_actions", "from": "unchanged", "to": "add 1 action", "note": desc[:120]})
+            else:
+                changes.append({"field": "recommended_actions", "from": "already contains action", "to": "unchanged", "note": desc[:120]})
+
+            fm_type = existing_fm.get("failure_mode_type")
+            if fm_type != "customer_specific":
+                changes.append({"field": "failure_mode_type", "from": fm_type or "", "to": "customer_specific", "note": "Marked as customized by PM import"})
+
+            return {
+                "action": "link_existing",
+                "target_failure_mode": {
+                    "id": str(existing_fm.get("id") or target_id),
+                    "failure_mode": existing_fm.get("failure_mode", ""),
+                    "equipment": existing_fm.get("equipment", ""),
+                    "category": existing_fm.get("category", ""),
+                },
+                "changes": changes,
+                "action_preview": new_action,
+                "reason": None if scenario else None,
+            }
+
+        # Scenario C: approved new FM
+        if task.get("approved_new_fm"):
+            approved = task.get("approved_new_fm") or {}
+            fm_name = approved.get("failure_mode") or approved.get("name") or ""
+            if not fm_name:
+                return {"action": "skip", "target_failure_mode": None, "changes": [], "action_preview": None, "reason": "No failure mode name approved"}
+
+            # If name already exists, we will link instead of create
+            existing = await fm_service.find_by_name(fm_name)
+            if existing:
+                # best-effort: existing may have _id not id
+                existing_id = str(existing.get("id") or existing.get("_id"))
+                # Recursively treat as link
+                task_copy = dict(task)
+                task_copy["selected_match_id"] = existing_id
+                return await self._compute_import_impact_preview(task_copy, fm_service)
+
+            equipment = approved.get("equipment") or task.get("component") or "General Equipment"
+            category = approved.get("category") or self._determine_category(task)
+            new_action = {
+                "description": desc,
+                "action_type": action_type,
+                "discipline": discipline,
+                "source": "PM Import",
+                "frequency": freq,
+                "estimated_time": estimated_time,
+            }
+
+            return {
+                "action": "create_new",
+                "target_failure_mode": {
+                    "id": None,
+                    "failure_mode": fm_name,
+                    "equipment": equipment,
+                    "category": category,
+                },
+                "changes": [
+                    {"field": "failure_mode", "from": "", "to": fm_name, "note": "New failure mode created"},
+                    {"field": "recommended_actions", "from": "", "to": "1 action", "note": desc[:120]},
+                    {"field": "failure_mode_type", "from": "", "to": "customer_specific", "note": "Created as customer-specific"},
+                ],
+                "action_preview": new_action,
+                "reason": None,
+            }
+
+        # Otherwise skip reasons based on match status
+        reason = "No failure mode mapping confirmed"
+        if match_status == "multiple_possible":
+            reason = "Multiple matches — no selection"
+        elif match_status == "new_proposed":
+            reason = "New failure mode proposed — not approved"
+        elif match_status == "weak_match":
+            reason = "Weak match — not confirmed"
+
+        return {"action": "skip", "target_failure_mode": None, "changes": [], "action_preview": None, "reason": reason}
     
     async def update_task(
         self,

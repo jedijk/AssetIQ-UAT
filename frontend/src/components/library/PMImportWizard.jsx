@@ -550,6 +550,33 @@ const TaskRow = ({ task, onAccept, onReject, onSelectMatch, onApproveNewFM, onSe
                   {task.component}
                 </Badge>
               )}
+              {Array.isArray(task.equipment_matches) && task.equipment_matches.length > 0 && (
+                <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+                  Affects: {task.equipment_matches.slice(0, 2).map((m) => m.tag || m.name).filter(Boolean).join(", ")}
+                  {task.equipment_matches.length > 2 ? ` +${task.equipment_matches.length - 2}` : ""}
+                </Badge>
+              )}
+              {Array.isArray(task.equipment_unmatched_tags) && task.equipment_unmatched_tags.length > 0 && (
+                <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                  Unmatched: {task.equipment_unmatched_tags.slice(0, 2).join(", ")}
+                  {task.equipment_unmatched_tags.length > 2 ? ` +${task.equipment_unmatched_tags.length - 2}` : ""}
+                </Badge>
+              )}
+              {task.import_impact?.action === "link_existing" && task.import_impact?.target_failure_mode?.failure_mode && (
+                <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                  Will update: {task.import_impact.target_failure_mode.failure_mode}
+                </Badge>
+              )}
+              {task.import_impact?.action === "create_new" && task.import_impact?.target_failure_mode?.failure_mode && (
+                <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                  Will create: {task.import_impact.target_failure_mode.failure_mode}
+                </Badge>
+              )}
+              {task.import_impact?.action === "skip" && task.import_impact?.reason && (
+                <Badge variant="outline" className="text-xs bg-slate-50 text-slate-600 border-slate-200">
+                  No change: {task.import_impact.reason}
+                </Badge>
+              )}
               <Badge className={`text-xs ${TASK_TYPE_COLORS[task.task_type] || TASK_TYPE_COLORS.Unknown}`}>
                 {task.task_type}
               </Badge>
