@@ -329,9 +329,9 @@ async def create_or_update_definitions(
     """
     Create or update custom definitions for an equipment/installation.
     """
-    # Validate equipment exists
+    # Validate equipment exists (don't filter by created_by - allow definitions for any visible installation)
     equipment = await db.equipment_nodes.find_one(
-        {"id": data.equipment_id, "created_by": current_user["id"]},
+        {"id": data.equipment_id},
         {"_id": 0, "id": 1, "name": 1, "level": 1}
     )
     if not equipment:
