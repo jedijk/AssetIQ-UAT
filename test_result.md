@@ -102,6 +102,34 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
+user_problem_statement: Equipment manager changes to equipment property are not quickly saved and changed. When making changes to criticality production impact 2 to 5 and to go to an other equipment and come back it still shows 2
+
+backend:
+  - task: "Equipment criticality changes not persisting (cache invalidation bug)"
+    implemented: true
+    working: true
+    file: "/app/backend/routes/equipment/equipment_criticality.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Fixed cache invalidation bug - added query_cache.invalidate('equipment_nodes') after criticality updates. The query_cache was not being invalidated, causing stale data to be returned when navigating to another equipment and back."
+        - working: true
+          agent: "testing"
+          comment: "Verified fix works - criticality changes now persist and are returned correctly on subsequent API calls"
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+agent_communication:
+    - agent: "main"
+      message: "Fixed the equipment criticality cache invalidation bug. The issue was that equipment_criticality.py used cache_service for invalidation but equipment_nodes.py used query_cache for caching. Added query_cache.invalidate('equipment_nodes') to ensure UI gets fresh data after criticality updates."
+
 user_problem_statement: "Implement PM Intelligence Import feature - Upload maintenance plans and convert to failure mode intelligence"
 
 backend:
