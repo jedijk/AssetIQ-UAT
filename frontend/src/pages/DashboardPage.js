@@ -48,7 +48,6 @@ import {
   Lightbulb,
   Settings,
   Sparkles,
-  FlaskConical,
 } from "lucide-react";
 import { Progress } from "../components/ui/progress";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../components/ui/hover-card";
@@ -61,7 +60,6 @@ import InsightsPage from "./InsightsPage";
 import { DISCIPLINES } from "../constants/disciplines";
 
 const ProductionDashboardPage = lazy(() => import("./ProductionDashboardPage"));
-const GranulometryPage = lazy(() => import("./GranulometryPage"));
 const SmartDashboardBuilderPanel = lazy(() =>
   import("../features/dashboardBuilder/SmartDashboardBuilderPanel").then((m) => ({ default: m.SmartDashboardBuilderPanel }))
 );
@@ -587,6 +585,12 @@ export default function DashboardPage({ initialTab }) {
       setActiveTab("operational");
     }
   }, [activeTab, canShowBuilder]);
+
+  useEffect(() => {
+    if (activeTab === "lab") {
+      setActiveTab("operational");
+    }
+  }, [activeTab]);
   
   // Filter states
   const [disciplineFilter, setDisciplineFilter] = useState("all");
@@ -897,17 +901,6 @@ export default function DashboardPage({ initialTab }) {
               <Gauge className="w-4 h-4 flex-shrink-0" />
               <span className="hidden xs:inline">Production</span>
               <span className="xs:hidden">Prod</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("lab")}
-              className={`flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-md transition-colors text-sm font-medium ${
-                activeTab === "lab" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"
-              }`}
-              data-testid="lab-tab"
-            >
-              <FlaskConical className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden xs:inline">Lab</span>
-              <span className="xs:hidden">Lab</span>
             </button>
             {canShowBuilder && (
               <button
@@ -1526,32 +1519,6 @@ export default function DashboardPage({ initialTab }) {
             </div>
           )}
 
-          {/* Lab Tab */}
-          {activeTab === "lab" && (
-            <div className="animate-fade-in overflow-x-hidden">
-              <div className="bg-white border border-slate-200 rounded-xl p-4 mb-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-slate-50 flex items-center justify-center">
-                    <FlaskConical className="w-4 h-4 text-slate-700" />
-                  </div>
-                  <div className="min-w-0">
-                    <h2 className="text-sm font-semibold text-slate-900">Lab</h2>
-                    <p className="text-xs text-slate-500">Granulometric analysis report</p>
-                  </div>
-                </div>
-              </div>
-
-              <Suspense
-                fallback={
-                  <div className="bg-white border border-slate-200 rounded-xl p-6 text-sm text-slate-500">
-                    Loading lab report…
-                  </div>
-                }
-              >
-                <GranulometryPage embedded={true} />
-              </Suspense>
-            </div>
-          )}
         </div>
       </div>
       

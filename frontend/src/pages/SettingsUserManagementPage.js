@@ -140,6 +140,7 @@ const SettingsUserManagementPage = () => {
   // State
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [simpleModeFilter, setSimpleModeFilter] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [changeRoleUser, setChangeRoleUser] = useState(null);
@@ -382,6 +383,16 @@ const SettingsUserManagementPage = () => {
   // Extract users from data
   const users = useMemo(() => usersData?.users ?? [], [usersData]);
 
+  const simpleModeCount = useMemo(
+    () => users.filter((u) => u.default_simple_mode).length,
+    [users],
+  );
+
+  const displayUsers = useMemo(
+    () => (simpleModeFilter ? users.filter((u) => u.default_simple_mode) : users),
+    [users, simpleModeFilter],
+  );
+
   // Load avatars when users data changes
   useEffect(() => {
     const loadAvatars = async () => {
@@ -571,6 +582,15 @@ const SettingsUserManagementPage = () => {
                 </Badge>
               );
             })}
+            <Badge
+              variant={simpleModeFilter ? "default" : "outline"}
+              className={`cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1 ${simpleModeFilter ? "bg-green-100 text-green-800 border-green-200" : "bg-green-50 text-green-700 border-green-200"}`}
+              onClick={() => setSimpleModeFilter((v) => !v)}
+              data-testid="simple-mode-filter-mobile"
+            >
+              <Smartphone className="w-3 h-3 shrink-0" />
+              Simple Mode ({simpleModeCount})
+            </Badge>
           </div>
         </div>
 
@@ -635,13 +655,13 @@ const SettingsUserManagementPage = () => {
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
             </div>
-          ) : users.length === 0 ? (
+          ) : displayUsers.length === 0 ? (
             <div className="text-center py-12 text-slate-500">
               <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
               <p className="text-sm">No users found</p>
             </div>
           ) : (
-            users.map((user) => {
+            displayUsers.map((user) => {
               const RoleIcon = roleIcons[user.role] || Shield;
               const avatarUrl = avatarUrls[user.id];
               return (
@@ -1187,6 +1207,15 @@ const SettingsUserManagementPage = () => {
             ))}
           </SelectContent>
         </Select>
+        <Badge
+          variant={simpleModeFilter ? "default" : "outline"}
+          className={`cursor-pointer whitespace-nowrap h-10 px-3 flex items-center ${simpleModeFilter ? "bg-green-100 text-green-800 border-green-200" : "bg-green-50 text-green-700 border-green-200"}`}
+          onClick={() => setSimpleModeFilter((v) => !v)}
+          data-testid="simple-mode-filter-desktop"
+        >
+          <Smartphone className="w-3.5 h-3.5 mr-1.5" />
+          Simple Mode ({simpleModeCount})
+        </Badge>
       </div>
 
       {/* Pending Approvals Section */}
@@ -1271,7 +1300,7 @@ const SettingsUserManagementPage = () => {
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
         </div>
-      ) : users.length === 0 ? (
+      ) : displayUsers.length === 0 ? (
         <div className="text-center py-12 text-slate-500">
           <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p>{t("userManagement.noUsersFound")}</p>
@@ -1292,7 +1321,7 @@ const SettingsUserManagementPage = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {users.map((user) => {
+                {displayUsers.map((user) => {
                   const RoleIcon = roleIcons[user.role] || Shield;
                   const avatarUrl = avatarUrls[user.id];
                   return (

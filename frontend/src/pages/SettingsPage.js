@@ -31,24 +31,21 @@ const APP_VERSION = process.env.REACT_APP_VERSION || "3.7.3";
 const SETTINGS_SECTIONS = [
   {
     id: "general",
-    label: "General",
-    description: "App preferences and display settings",
+    sectionKey: "general",
     icon: Settings,
     path: "/settings/preferences",
     roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"]
   },
   {
     id: "privacy",
-    label: "Privacy & Data",
-    description: "GDPR compliance and data export",
+    sectionKey: "privacy",
     icon: Shield,
     path: "/settings/privacy",
     roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"]
   },
   {
     id: "users",
-    label: "Users & Roles",
-    description: "Manage team members and permissions",
+    sectionKey: "users",
     icon: Users,
     path: "/settings/user-management",
     roles: ["owner", "admin"],
@@ -56,96 +53,84 @@ const SETTINGS_SECTIONS = [
   },
   {
     id: "qr",
-    label: "QR Management",
-    description: "QR codes and scan settings",
+    sectionKey: "qr",
     icon: QrCode,
     path: "/settings/qr",
     roles: ["owner", "admin", "reliability_engineer"]
   },
   {
     id: "risk",
-    label: "Risk Calculation",
-    description: "Risk scoring and thresholds",
+    sectionKey: "risk",
     icon: Sliders,
     path: "/settings/risk-calculation",
     roles: ["owner", "admin"]
   },
   {
     id: "definitions",
-    label: "Criticality Definitions",
-    description: "Define criticality impact scales",
+    sectionKey: "definitions",
     icon: Sliders,
     path: "/definitions",
     roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"]
   },
   {
     id: "notifications",
-    label: "Notifications",
-    description: "Email and alert preferences",
+    sectionKey: "notifications",
     icon: Bell,
     path: "/settings/notifications",
     roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations"]
   },
   {
     id: "ai",
-    label: "AI Usage",
-    description: "AI features and usage statistics",
+    sectionKey: "ai",
     icon: Brain,
     path: "/settings/ai-usage",
     roles: ["owner", "admin"]
   },
   {
     id: "performance",
-    label: "Server Performance",
-    description: "System health and diagnostics",
+    sectionKey: "performance",
     icon: Server,
     path: "/settings/server-performance",
     roles: ["owner"]
   },
   {
     id: "database",
-    label: "Database Environment",
-    description: "Switch between Production and UAT",
+    sectionKey: "database",
     icon: Database,
     path: "/settings/database",
     roles: ["owner"]
   },
   {
     id: "log-ingestion",
-    label: "Log Ingestion",
-    description: "Upload & parse production logs",
+    sectionKey: "logIngestion",
     icon: FileText,
     path: "/settings/log-ingestion",
     roles: ["owner"]
   },
   {
     id: "statistics",
-    label: "Statistics",
-    description: "Usage analytics and reports",
+    sectionKey: "statistics",
     icon: BarChart3,
     path: "/settings/statistics",
     roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations"]
   },
   {
     id: "deletion-requests",
-    label: "Deletion Requests",
-    description: "Review account deletion requests",
+    sectionKey: "deletionRequests",
     icon: Trash2,
     path: "/settings/deletion-requests",
     roles: ["owner"]
   },
   {
     id: "consent-management",
-    label: "Consent Management",
-    description: "Track and reset user consent status",
+    sectionKey: "consentManagement",
     icon: Shield,
     path: "/settings/consent-management",
     roles: ["owner"]
   },
   {
     id: "labels",
-    label: "Smart Labels",
-    description: "Label templates & QR-enabled print",
+    sectionKey: "labels",
     icon: Tag,
     path: "/settings/labels",
     roles: ["owner"],
@@ -153,16 +138,14 @@ const SETTINGS_SECTIONS = [
   },
   {
     id: "translations",
-    label: "Translations",
-    description: "Coverage dashboard & technical dictionary",
+    sectionKey: "translations",
     icon: Languages,
     path: "/settings/translations",
     roles: ["owner", "admin"]
   },
   {
     id: "audit-log",
-    label: "Audit Log",
-    description: "Who changed what, and when",
+    sectionKey: "auditLog",
     icon: ScrollText,
     path: "/settings/audit-log",
     roles: ["owner"]
@@ -249,8 +232,8 @@ export default function SettingsPage() {
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <div>
-              <h1 className="text-lg font-semibold text-slate-900">Settings</h1>
-              <p className="text-xs text-slate-500">Manage your preferences</p>
+              <h1 className="text-lg font-semibold text-slate-900">{t("settings.title")}</h1>
+              <p className="text-xs text-slate-500">{t("settings.subtitle")}</p>
             </div>
           </div>
         </div>
@@ -287,10 +270,10 @@ export default function SettingsPage() {
                       "text-sm font-medium truncate",
                       isActive ? "text-blue-700" : "text-slate-900"
                     )}>
-                      {section.label}
+                      {t(`settings.sections.${section.sectionKey}.label`)}
                     </p>
                     <p className="text-xs text-slate-500 truncate hidden xl:block">
-                      {section.description}
+                      {t(`settings.sections.${section.sectionKey}.description`)}
                     </p>
                   </div>
                   <ChevronRight className={cn(
@@ -307,10 +290,10 @@ export default function SettingsPage() {
         <div className="p-3 border-t border-slate-200 bg-slate-50">
           <div className="text-xs text-slate-500 text-center space-y-1">
             <div>
-              <span className="font-medium">{user?.role}</span> access level
+              {t("settings.accessLevel").replace("{role}", user?.role || "")}
             </div>
             <div className="text-slate-400">
-              Version {APP_VERSION}
+              {t("settings.version").replace("{version}", APP_VERSION)}
             </div>
           </div>
         </div>
@@ -333,7 +316,9 @@ export default function SettingsPage() {
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <span className="font-medium text-slate-900">
-              {visibleSections.find(s => s.id === activeSection)?.label || "Settings"}
+              {visibleSections.find(s => s.id === activeSection)
+                ? t(`settings.sections.${visibleSections.find(s => s.id === activeSection).sectionKey}.label`)
+                : t("settings.title")}
             </span>
           </div>
         )}

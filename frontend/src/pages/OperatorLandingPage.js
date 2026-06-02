@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Building2, ClipboardCheck, Activity } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl } from "../lib/apiConfig";
 import { publicAssetUrl } from "../lib/assetUrl";
 
@@ -56,6 +57,7 @@ const fetchTaskCounts = async () => {
 export default function OperatorLandingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const { data: taskCounts } = useQuery({
     queryKey: ["operatorTaskCounts"],
     queryFn: fetchTaskCounts,
@@ -67,9 +69,9 @@ export default function OperatorLandingPage() {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
+    if (hour < 12) return t("simpleMode.greetingMorning");
+    if (hour < 18) return t("simpleMode.greetingAfternoon");
+    return t("simpleMode.greetingEvening");
   };
 
   const handleClick = (fn) => () => { haptic(); fn(); };
@@ -94,7 +96,7 @@ export default function OperatorLandingPage() {
             {getGreeting()}
             {user?.name ? `, ${user.name.split(" ")[0]}` : ""}
           </h1>
-          <p className="operator-landing-subtitle mt-1 text-sm">What would you like to do?</p>
+          <p className="operator-landing-subtitle mt-1 text-sm">{t("simpleMode.prompt")}</p>
         </div>
       </div>
 
@@ -105,7 +107,7 @@ export default function OperatorLandingPage() {
           data-testid="operator-btn-my-tasks"
         >
           <ClipboardCheck className="w-8 h-8" strokeWidth={2} />
-          <span className="text-sm font-semibold tracking-wide">My Tasks</span>
+          <span className="text-sm font-semibold tracking-wide">{t("nav.myTasks")}</span>
           <span
             className={`absolute -top-2 -right-2 text-xs font-bold rounded-full min-w-[24px] h-6 flex items-center justify-center px-1.5 shadow-md ${
               badge > 0
@@ -113,7 +115,7 @@ export default function OperatorLandingPage() {
                 : "bg-white/90 text-orange-700 border border-orange-200/80"
             }`}
             data-testid="tasks-badge"
-            aria-label={`Open tasks: ${badge}`}
+            aria-label={t("simpleMode.openTasksAria").replace("{count}", badge)}
           >
             {badge > 99 ? "99+" : badge}
           </span>
@@ -126,7 +128,7 @@ export default function OperatorLandingPage() {
             data-testid="operator-btn-equipment"
           >
             <Building2 className="w-8 h-8" strokeWidth={2} />
-            <span className="text-sm font-semibold tracking-wide">Equipment</span>
+            <span className="text-sm font-semibold tracking-wide">{t("simpleMode.equipment")}</span>
           </button>
 
           <button
@@ -135,7 +137,7 @@ export default function OperatorLandingPage() {
             data-testid="operator-btn-production"
           >
             <Activity className="w-8 h-8" strokeWidth={2} />
-            <span className="text-sm font-semibold tracking-wide">Production</span>
+            <span className="text-sm font-semibold tracking-wide">{t("simpleMode.production")}</span>
           </button>
         </div>
       </div>

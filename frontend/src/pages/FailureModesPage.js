@@ -173,7 +173,7 @@ const FailureModesPage = () => {
   const [newType, setNewType] = useState({ id: "", name: "", discipline: "Rotating", icon: "cog" });
   const [typeFilterDiscipline, setTypeFilterDiscipline] = useState("all"); // Filter for Equipment Types tab
   const [typeFilterNoFailureModes, setTypeFilterNoFailureModes] = useState(false); // Filter to show only types without failure modes
-  const [filterLinkedToEquipment, setFilterLinkedToEquipment] = useState(false);
+  const [filterLinkedToEquipment, setFilterLinkedToEquipment] = useState(true);
   const [selectedEquipmentType, setSelectedEquipmentType] = useState(null); // For viewing connected failure modes
   const [isAISuggestionsOpen, setIsAISuggestionsOpen] = useState(false); // AI suggestions dialog
   const [isAINewTypesOpen, setIsAINewTypesOpen] = useState(false); // AI suggest NEW equipment types
@@ -354,13 +354,63 @@ const FailureModesPage = () => {
   );
   
   // Calculate connected failure modes count for each equipment type
-  const getConnectedFmCount = (equipmentTypeId) => {
-    return failureModes.filter(fm => 
-      fm.equipment_type_ids?.includes(equipmentTypeId)
-    ).length;
-  };
-  
-  // Handle updating failure mode equipment_type_ids from the equipment type panel
+  const getConnectedFmCount = useCallback(
+    (equipmentTypeId) =>
+      failureModes.filter((fm) => fm.equipment_type_ids?.includes(equipmentTypeId)).length,
+    [failureModes],
+  );
+
+  const matchesEquipmentTypeTabFilters = useCallback(
+    (t, { requireLinked = false, requireNoFailureModes = false } = {}) => {
+      if (typeFilterDiscipline !== "all" && t.discipline !== typeFilterDiscipline) return false;
+      if (equipmentTypeSearch) {
+        const search = equipmentTypeSearch.toLowerCase();
+        if (
+          !t.name.toLowerCase().includes(search) &&
+          !(t.description && t.description.toLowerCase().includes(search))
+        ) {
+          return false;
+        }
+      }
+      if (requireNoFailureModes && getConnectedFmCount(t.id) !== 0) return false;
+      if (requireLinked && !inUseEquipmentTypeIds.has(t.id)) return false;
+      return true;
+    },
+    [
+      typeFilterDiscipline,
+      equipmentTypeSearch,
+      inUseEquipmentTypeIds,
+      getConnectedFmCount,
+    ],
+  );
+
+  const matchesActiveEquipmentTypeFilters = useCallback(
+    (t) =>
+      matchesEquipmentTypeTabFilters(t, {
+        requireLinked: filterLinkedToEquipment,
+        requireNoFailureModes: typeFilterNoFailureModes,
+      }),
+    [matchesEquipmentTypeTabFilters, filterLinkedToEquipment, typeFilterNoFailureModes],
+  );
+
+  // Filter equipment types based on active tab filters
+  const filteredEquipmentTypes = equipmentTypes.filter(matchesActiveEquipmentTypeFilters);
+
+  const linkedEquipmentTypeCount = useMemo(
+    () =>
+      equipmentTypes.filter((t) =>
+        matchesEquipmentTypeTabFilters(t, { requireLinked: true, requireNoFailureModes: false }),
+      ).length,
+    [equipmentTypes, matchesEquipmentTypeTabFilters],
+  );
+
+  const noFailureModesTypeCount = useMemo(
+    () =>
+      equipmentTypes.filter((t) =>
+        matchesEquipmentTypeTabFilters(t, { requireLinked: false, requireNoFailureModes: true }),
+      ).length,
+    [equipmentTypes, matchesEquipmentTypeTabFilters],
+  );
   const handleUpdateFailureModeConnection = async (fmId, updates) => {
     try {
       await failureModesAPI.update(fmId, updates);
@@ -750,21 +800,6 @@ const FailureModesPage = () => {
       }
     });
   };
-
-  // Filter equipment types based on search
-  const filteredEquipmentTypes = equipmentTypes.filter(et => {
-    if (filterLinkedToEquipment && !inUseEquipmentTypeIds.has(et.id)) return false;
-    return (
-      !equipmentTypeSearch ||
-      et.name.toLowerCase().includes(equipmentTypeSearch.toLowerCase()) ||
-      (et.discipline && et.discipline.toLowerCase().includes(equipmentTypeSearch.toLowerCase()))
-    );
-  });
-
-  const linkedEquipmentTypeCount = useMemo(
-    () => equipmentTypes.filter((t) => inUseEquipmentTypeIds.has(t.id)).length,
-    [equipmentTypes, inUseEquipmentTypeIds],
-  );
 
   // Export failure modes to Excel
   const [isExporting, setIsExporting] = useState(false);
@@ -1291,7 +1326,7 @@ const FailureModesPage = () => {
                         <span className="text-slate-600 whitespace-nowrap">No failure modes</span>
                         {typeFilterNoFailureModes && (
                           <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
-                            {equipmentTypes.filter(t => getConnectedFmCount(t.id) === 0).length}
+                            {noFailureModesTypeCount}
                           </span>
                         )}
                       </label>
@@ -1331,22 +1366,9 @@ const FailureModesPage = () => {
                 <div className="flex-1 p-4 overflow-y-auto">
                   {/* Group equipment types by discipline */}
                   {DISCIPLINES.filter(d => typeFilterDiscipline === "all" || d === typeFilterDiscipline).map(discipline => {
-                    let disciplineTypes = equipmentTypes.filter(t => t.discipline === discipline);
-                    // Apply search filter
-                    if (equipmentTypeSearch) {
-                      const search = equipmentTypeSearch.toLowerCase();
-                      disciplineTypes = disciplineTypes.filter(t => 
-                        t.name.toLowerCase().includes(search) ||
-                        (t.description && t.description.toLowerCase().includes(search))
-                      );
-                    }
-                    // Apply "no failure modes" filter
-                    if (typeFilterNoFailureModes) {
-                      disciplineTypes = disciplineTypes.filter(t => getConnectedFmCount(t.id) === 0);
-                    }
-                    if (filterLinkedToEquipment) {
-                      disciplineTypes = disciplineTypes.filter(t => inUseEquipmentTypeIds.has(t.id));
-                    }
+                    let disciplineTypes = equipmentTypes.filter(
+                      (t) => t.discipline === discipline && matchesActiveEquipmentTypeFilters(t),
+                    );
                     if (disciplineTypes.length === 0) return null;
                     const colors = DISCIPLINE_COLORS[discipline] || DISCIPLINE_COLORS["Mechanical"];
                     
@@ -1398,7 +1420,11 @@ const FailureModesPage = () => {
         {/* Maintenance Strategies Tab */}
         <TabsContent value="maintenance" className="h-[calc(100vh-200px)]">
           <div className="card h-full overflow-hidden">
-            <MaintenanceStrategyTab />
+            <MaintenanceStrategyTab
+              filterLinkedToEquipment={filterLinkedToEquipment}
+              onFilterLinkedToEquipmentChange={setFilterLinkedToEquipment}
+              inUseEquipmentTypeIds={inUseEquipmentTypeIds}
+            />
           </div>
         </TabsContent>
 

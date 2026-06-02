@@ -3,7 +3,7 @@
  * Shows Equipment Types list + Strategy Manager for selected type
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -92,7 +92,11 @@ const EquipmentTypeItem = ({ type, isSelected, hasStrategy, onClick, t }) => {
 /**
  * Main Component
  */
-const MaintenanceStrategyTab = () => {
+const MaintenanceStrategyTab = ({
+  filterLinkedToEquipment = true,
+  onFilterLinkedToEquipmentChange,
+  inUseEquipmentTypeIds = new Set(),
+}) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useLanguage();
@@ -142,7 +146,7 @@ const MaintenanceStrategyTab = () => {
     return Array.from(set).sort();
   }, [translatedEquipmentTypes]);
 
-  // Filter equipment types
+  // Filter equipment types (search, discipline, hierarchy-linked)
   const filteredTypes = useMemo(() => {
     let types = translatedEquipmentTypes || [];
     
@@ -159,13 +163,33 @@ const MaintenanceStrategyTab = () => {
     if (disciplineFilter !== "all") {
       types = types.filter((t) => t.discipline === disciplineFilter);
     }
+
+    if (filterLinkedToEquipment) {
+      types = types.filter((t) => inUseEquipmentTypeIds.has(t.id));
+    }
     
     // Sort: custom first, then by name
     return types.sort((a, b) => {
       if (a.isCustom !== b.isCustom) return a.isCustom ? -1 : 1;
       return (a.name || "").localeCompare(b.name || "");
     });
-  }, [translatedEquipmentTypes, searchQuery, disciplineFilter]);
+  }, [translatedEquipmentTypes, searchQuery, disciplineFilter, filterLinkedToEquipment, inUseEquipmentTypeIds]);
+
+  const strategiesInFilteredTypesCount = useMemo(() => {
+    if (!filterLinkedToEquipment) return strategiesMap.size;
+    let count = 0;
+    for (const typeId of strategiesMap.keys()) {
+      if (inUseEquipmentTypeIds.has(typeId)) count++;
+    }
+    return count;
+  }, [strategiesMap, filterLinkedToEquipment, inUseEquipmentTypeIds]);
+
+  useEffect(() => {
+    if (!selectedType) return;
+    if (filterLinkedToEquipment && !inUseEquipmentTypeIds.has(selectedType.id)) {
+      setSelectedType(null);
+    }
+  }, [filterLinkedToEquipment, selectedType, inUseEquipmentTypeIds]);
 
   // Handle view in FMEA
   const handleViewInFMEA = (failureModeName) => {
@@ -237,6 +261,26 @@ const MaintenanceStrategyTab = () => {
                 ))}
               </SelectContent>
             </Select>
+            {onFilterLinkedToEquipmentChange && (
+              <label
+                className="flex items-center gap-2 text-xs cursor-pointer bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors"
+                title={t("library.filterLinkedToEquipmentHint")}
+              >
+                <input
+                  type="checkbox"
+                  checked={filterLinkedToEquipment}
+                  onChange={(e) => onFilterLinkedToEquipmentChange(e.target.checked)}
+                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  data-testid="linked-to-equipment-toggle-maintenance"
+                />
+                <span className="text-slate-600 whitespace-nowrap">{t("library.filterLinkedToEquipment")}</span>
+                {filterLinkedToEquipment && (
+                  <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">
+                    {filteredTypes.length}
+                  </span>
+                )}
+              </label>
+            )}
           </div>
 
         {/* Types List */}
@@ -272,7 +316,7 @@ const MaintenanceStrategyTab = () => {
               <span>{filteredTypes.length} {t("maintenance.typesCount")}</span>
               <span className="flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3 text-green-500" />
-                {strategiesMap.size} {t("maintenance.withStrategies")}
+                {strategiesInFilteredTypesCount} {t("maintenance.withStrategies")}
               </span>
             </div>
           </div>

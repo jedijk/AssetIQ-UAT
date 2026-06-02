@@ -103,10 +103,10 @@ export default function SettingsPreferencesPage() {
       queryClient.invalidateQueries({ queryKey: ["user-preferences"] });
       // Update cached preferences for date formatting across the app
       updateCachedPreferences(data);
-      toast.success("Preferences saved successfully");
+      toast.success(t("settings.preferences.savedSuccess"));
     },
     onError: () => {
-      toast.error("Failed to save preferences");
+      toast.error(t("settings.preferences.saveFailed"));
     },
   });
 
@@ -189,7 +189,7 @@ export default function SettingsPreferencesPage() {
   const selectedTimezoneLabel =
     timezones.find((tz) => tz.value === preferences?.timezone)?.label ||
     preferences?.timezone ||
-    "Select timezone";
+    t("settings.preferences.selectTimezone");
 
   if (prefsLoading) {
     return (
@@ -217,7 +217,7 @@ export default function SettingsPreferencesPage() {
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <h1 className="text-lg font-bold text-slate-900">Preferences</h1>
+            <h1 className="text-lg font-bold text-slate-900">{t("settings.preferences.title")}</h1>
           </div>
         )}
         
@@ -225,10 +225,10 @@ export default function SettingsPreferencesPage() {
         {!isMobile && (
           <div className="mb-8">
             <h1 className="text-2xl sm:text-3xl font-bold text-slate-800 mb-2">
-              Preferences
+              {t("settings.preferences.title")}
             </h1>
             <p className="text-slate-500">
-              Customize your time zone and display settings
+              {t("settings.preferences.subtitle")}
             </p>
           </div>
         )}
@@ -237,7 +237,7 @@ export default function SettingsPreferencesPage() {
         <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 mb-8 text-white">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-blue-100 text-sm mb-1">Current Time</p>
+              <p className="text-blue-100 text-sm mb-1">{t("settings.preferences.currentTime")}</p>
               <p className="text-4xl font-bold font-mono">{currentTime}</p>
               <p className="text-blue-200 text-sm mt-2 flex items-center gap-1">
                 <MapPin className="w-4 h-4" />
@@ -258,10 +258,10 @@ export default function SettingsPreferencesPage() {
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-slate-800">
-                  Time Zone
+                  {t("settings.preferences.timezone")}
                 </h2>
                 <p className="text-sm text-slate-500">
-                  Set your preferred time zone for displaying dates and times
+                  {t("settings.preferences.timezoneDesc")}
                 </p>
               </div>
             </div>
@@ -273,10 +273,10 @@ export default function SettingsPreferencesPage() {
                   htmlFor="auto-detect"
                   className="text-sm font-medium text-slate-700"
                 >
-                  Auto-detect time zone
+                  {t("settings.preferences.autoDetectTimezone")}
                 </Label>
                 <p className="text-xs text-slate-500 mt-1">
-                  Detected: {detectedTimezone}
+                  {t("settings.preferences.detected").replace("{timezone}", detectedTimezone)}
                 </p>
               </div>
               <Switch
@@ -290,7 +290,7 @@ export default function SettingsPreferencesPage() {
             {/* Manual Timezone Selection */}
             <div className="py-4">
               <Label className="text-sm font-medium text-slate-700 mb-2 block">
-                Select time zone manually
+                {t("settings.preferences.selectTimezoneManually")}
               </Label>
               <Popover open={timezoneOpen} onOpenChange={setTimezoneOpen}>
                 <PopoverTrigger asChild>
@@ -309,12 +309,12 @@ export default function SettingsPreferencesPage() {
                 <PopoverContent className="w-full p-0" align="start">
                   <Command>
                     <CommandInput
-                      placeholder="Search timezone..."
+                      placeholder={t("settings.preferences.searchTimezone")}
                       value={timezoneSearch}
                       onValueChange={setTimezoneSearch}
                     />
                     <CommandList>
-                      <CommandEmpty>No timezone found.</CommandEmpty>
+                      <CommandEmpty>{t("settings.preferences.noTimezoneFound")}</CommandEmpty>
                       <CommandGroup className="max-h-64 overflow-auto">
                         {filteredTimezones.map((tz) => (
                           <CommandItem
@@ -341,7 +341,7 @@ export default function SettingsPreferencesPage() {
               </Popover>
               {preferences?.timezone_auto_detect && (
                 <p className="text-xs text-slate-400 mt-2">
-                  Disable auto-detect to select manually
+                  {t("settings.preferences.disableAutoDetectHint")}
                 </p>
               )}
             </div>
@@ -355,10 +355,10 @@ export default function SettingsPreferencesPage() {
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-slate-800">
-                  Date & Time Format
+                  {t("settings.preferences.dateTimeFormat")}
                 </h2>
                 <p className="text-sm text-slate-500">
-                  Choose how dates and times are displayed
+                  {t("settings.preferences.dateTimeFormatDesc")}
                 </p>
               </div>
             </div>
@@ -367,7 +367,7 @@ export default function SettingsPreferencesPage() {
               {/* Time Format */}
               <div>
                 <Label className="text-sm font-medium text-slate-700 mb-2 block">
-                  Time format
+                  {t("settings.preferences.timeFormat")}
                 </Label>
                 <Select
                   value={preferences?.time_format || "24h"}
@@ -377,8 +377,8 @@ export default function SettingsPreferencesPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="24h">24-hour (14:30)</SelectItem>
-                    <SelectItem value="12h">12-hour (2:30 PM)</SelectItem>
+                    <SelectItem value="24h">{t("settings.preferences.timeFormat24h")}</SelectItem>
+                    <SelectItem value="12h">{t("settings.preferences.timeFormat12h")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -386,7 +386,7 @@ export default function SettingsPreferencesPage() {
               {/* Date Format */}
               <div>
                 <Label className="text-sm font-medium text-slate-700 mb-2 block">
-                  Date format
+                  {t("settings.preferences.dateFormat")}
                 </Label>
                 <Select
                   value={preferences?.date_format || "YYYY-MM-DD"}
@@ -415,16 +415,15 @@ export default function SettingsPreferencesPage() {
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-slate-800">
-                  Language
+                  {t("settings.preferences.language")}
                 </h2>
                 <p className="text-sm text-slate-500">
-                  Language is controlled via the main menu
+                  {t("settings.preferences.languageDesc")}
                 </p>
               </div>
             </div>
             <p className="text-sm text-slate-400">
-              Use the language selector in the navigation menu to change the
-              interface language.
+              {t("settings.preferences.languageHint")}
             </p>
           </div>
         </div>
@@ -433,7 +432,7 @@ export default function SettingsPreferencesPage() {
         {updateMutation.isPending && (
           <div className="fixed bottom-4 right-4 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
             <RefreshCw className="w-4 h-4 animate-spin" />
-            Saving...
+            {t("common.saving")}
           </div>
         )}
       </motion.div>

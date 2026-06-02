@@ -486,13 +486,13 @@ export default function FormSubmissionsPage() {
       return response.json();
     },
     onSuccess: () => {
-      toast.success("Form submission deleted");
+      toast.success(t("reports.deletedSuccess"));
       queryClient.invalidateQueries({ queryKey: ["form-submissions"] });
       setDeleteConfirm(null);
       setSelectedSubmission(null);
     },
     onError: () => {
-      toast.error("Failed to delete submission");
+      toast.error(t("reports.deleteFailed"));
     },
   });
 
@@ -501,7 +501,7 @@ export default function FormSubmissionsPage() {
       return formAPI.updateSubmission(submissionId, values);
     },
     onSuccess: async (_res, vars) => {
-      toast.success("Submission updated");
+      toast.success(t("reports.updatedSuccess"));
       queryClient.invalidateQueries({ queryKey: ["form-submissions"] });
       try {
         const full = await fetchSubmission(vars.submissionId);
@@ -513,7 +513,7 @@ export default function FormSubmissionsPage() {
       setEditValues({});
     },
     onError: (err) => {
-      toast.error(err?.message || "Failed to update submission");
+      toast.error(err?.message || t("reports.updateFailed"));
     },
   });
 
@@ -555,7 +555,7 @@ export default function FormSubmissionsPage() {
       if (String(cur ?? "") !== String(v ?? "")) updates[k] = v ?? "";
     }
     if (Object.keys(updates).length === 0) {
-      toast.info("No changes to save");
+      toast.info(t("reports.noChanges"));
       setEditMode(false);
       return;
     }
@@ -591,7 +591,7 @@ export default function FormSubmissionsPage() {
     const cfg = labelConfigByTemplate[submission.form_template_id];
     const templateId = submission?.label_template_id || cfg?.label_template_id;
     if (!cfg?.enabled || !templateId) {
-      toast.error("This form has no label template configured.");
+      toast.error(t("reports.noLabelTemplate"));
       return;
     }
     // Open a window synchronously inside the click handler so iOS Safari
@@ -621,13 +621,13 @@ export default function FormSubmissionsPage() {
           filename: `${submission.form_template_name || "label"}.pdf`,
         }
       );
-      if (res.method === "window") toast.success("Label print dialog opened");
-      else if (res.mobile) toast.info("Label downloaded — use Share → Print");
-      else if (res.method === "download") toast.info("Print blocked — label downloaded.");
-      else toast.success("Print dialog opened");
+      if (res.method === "window") toast.success(t("reports.printDialogOpened"));
+      else if (res.mobile) toast.info(t("reports.labelDownloaded"));
+      else if (res.method === "download") toast.info(t("reports.printBlocked"));
+      else toast.success(t("reports.printOpened"));
     } catch (err) {
       if (preOpened && !preOpened.closed) preOpened.close();
-      toast.error(err?.response?.data?.detail || "Print failed");
+      toast.error(err?.response?.data?.detail || t("reports.printFailed"));
     } finally {
       setPrintingId(null);
     }
@@ -669,16 +669,16 @@ export default function FormSubmissionsPage() {
 
   const getStatusBadge = (submission) => {
     if (submission.has_critical) {
-      return <Badge className="bg-red-100 text-red-700 border-red-200">Critical</Badge>;
+      return <Badge className="bg-red-100 text-red-700 border-red-200">{t("common.critical")}</Badge>;
     }
     if (submission.has_warnings) {
-      return <Badge className="bg-amber-100 text-amber-700 border-amber-200">Warning</Badge>;
+      return <Badge className="bg-amber-100 text-amber-700 border-amber-200">{t("reports.warning")}</Badge>;
     }
-    return <Badge className="bg-green-100 text-green-700 border-green-200">Normal</Badge>;
+    return <Badge className="bg-green-100 text-green-700 border-green-200">{t("reports.normal")}</Badge>;
   };
 
   const formatDate = (dateStr) => {
-    if (!dateStr) return "N/A";
+    if (!dateStr) return t("common.notAvailable");
     try {
       return formatDateTimeUtil(dateStr);
     } catch {
@@ -688,7 +688,7 @@ export default function FormSubmissionsPage() {
 
   const getDisciplineInfo = (discipline) => {
     const disc = DISCIPLINES.find(d => d.value === discipline);
-    return disc || { label: discipline || "Unknown", color: "bg-slate-500" };
+    return disc || { label: discipline || t("common.unknown"), color: "bg-slate-500" };
   };
 
   return (
@@ -702,10 +702,10 @@ export default function FormSubmissionsPage() {
               <div>
                 <h1 className="text-lg sm:text-2xl font-bold text-slate-800 flex items-center gap-1.5 sm:gap-2">
                   <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
-                  <span className="hidden xs:inline">Form</span> Submissions
+                  <span className="hidden xs:inline">{t("reports.titleShort")} </span>{t("reports.submissions")}
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500 hidden sm:block">
-                  View all submitted forms and their responses
+                  {t("reports.subtitle")}
                 </p>
               </div>
             </div>
@@ -722,10 +722,10 @@ export default function FormSubmissionsPage() {
                 <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
               </div>
               <div className="text-center sm:text-left">
-                <p className="text-[10px] sm:text-xs text-slate-500">Total</p>
+                <p className="text-[10px] sm:text-xs text-slate-500">{t("reports.total")}</p>
                 <p className="text-lg sm:text-xl font-bold text-slate-800 tabular-nums">{stats.total}</p>
                 {totalMatching > returnedCount && (
-                  <p className="text-[10px] text-slate-400 tabular-nums leading-tight">{totalMatching} match filters</p>
+                  <p className="text-[10px] text-slate-400 tabular-nums leading-tight">{t("reports.matchFilters").replace("{count}", totalMatching)}</p>
                 )}
               </div>
             </div>
@@ -736,7 +736,7 @@ export default function FormSubmissionsPage() {
                 <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
               </div>
               <div className="text-center sm:text-left">
-                <p className="text-[10px] sm:text-xs text-slate-500">Today</p>
+                <p className="text-[10px] sm:text-xs text-slate-500">{t("common.today")}</p>
                 <p className="text-lg sm:text-xl font-bold text-slate-800">{stats.today}</p>
               </div>
             </div>
@@ -747,7 +747,7 @@ export default function FormSubmissionsPage() {
                 <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />
               </div>
               <div className="text-center sm:text-left">
-                <p className="text-[10px] sm:text-xs text-slate-500">Warn</p>
+                <p className="text-[10px] sm:text-xs text-slate-500">{t("reports.warn")}</p>
                 <p className="text-lg sm:text-xl font-bold text-slate-800">{stats.withWarnings}</p>
               </div>
             </div>
@@ -758,7 +758,7 @@ export default function FormSubmissionsPage() {
                 <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
               </div>
               <div className="text-center sm:text-left">
-                <p className="text-[10px] sm:text-xs text-slate-500">Critical</p>
+                <p className="text-[10px] sm:text-xs text-slate-500">{t("common.critical")}</p>
                 <p className="text-lg sm:text-xl font-bold text-slate-800">{stats.withCritical}</p>
               </div>
             </div>
@@ -771,7 +771,7 @@ export default function FormSubmissionsPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Search forms..."
+                placeholder={t("reports.searchPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9 h-9 text-sm"
@@ -781,10 +781,10 @@ export default function FormSubmissionsPage() {
               <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
                 <SelectTrigger className="w-full sm:w-[150px] h-9 text-sm">
                   <Wrench className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
-                  <SelectValue placeholder="Discipline" />
+                  <SelectValue placeholder={t("common.discipline")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Disciplines</SelectItem>
+                  <SelectItem value="all">{t("reports.allDisciplines")}</SelectItem>
                   {DISCIPLINES.map(d => (
                     <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
                   ))}
@@ -793,12 +793,12 @@ export default function FormSubmissionsPage() {
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-full sm:w-[130px] h-9 text-sm">
                   <Filter className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
-                  <SelectValue placeholder="Status" />
+                  <SelectValue placeholder={t("common.status")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="warnings">Warnings</SelectItem>
-                  <SelectItem value="critical">Critical</SelectItem>
+                  <SelectItem value="all">{t("common.all")}</SelectItem>
+                  <SelectItem value="warnings">{t("reports.warnings")}</SelectItem>
+                  <SelectItem value="critical">{t("common.critical")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -809,8 +809,7 @@ export default function FormSubmissionsPage() {
         <div className="bg-white rounded-lg sm:rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           {returnedCount < totalMatching && (
             <div className="px-3 sm:px-4 py-2 border-b border-amber-100 bg-amber-50/90 text-[11px] sm:text-xs text-amber-950">
-              Showing the <span className="font-semibold tabular-nums">{returnedCount}</span> most recent of{" "}
-              <span className="font-semibold tabular-nums">{totalMatching}</span> matching submissions (newest first). Narrow with filters if needed.
+              {t("reports.showingRecent").replace("{returned}", returnedCount).replace("{total}", totalMatching)}
             </div>
           )}
           {isLoading ? (
@@ -834,8 +833,8 @@ export default function FormSubmissionsPage() {
           ) : filteredSubmissions.length === 0 ? (
             <div className="p-6 sm:p-8 text-center text-slate-500">
               <FileText className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 text-slate-300" />
-              <p className="font-medium text-sm sm:text-base">No submissions found</p>
-              <p className="text-xs sm:text-sm">Form submissions will appear here when tasks are completed</p>
+              <p className="font-medium text-sm sm:text-base">{t("reports.noSubmissions")}</p>
+              <p className="text-xs sm:text-sm">{t("reports.noSubmissionsDesc")}</p>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
@@ -858,7 +857,7 @@ export default function FormSubmissionsPage() {
                         {/* Form Name & Status & Attachment Badge */}
                         <div className="flex items-center gap-1.5 sm:gap-2 mb-1 flex-wrap">
                           <h3 className="font-semibold text-slate-800 text-sm sm:text-base truncate max-w-[180px] sm:max-w-none">
-                            {submission.form_template_name || "Unknown Form"}
+                            {submission.form_template_name || t("reports.unknownForm")}
                           </h3>
                           {getStatusBadge(submission)}
                           {hasAttachments && (
@@ -878,7 +877,7 @@ export default function FormSubmissionsPage() {
                           <div className="flex items-center gap-1">
                             <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                             <span className="hidden sm:inline">{formatDate(submission.submitted_at)}</span>
-                            <span className="sm:hidden">{submission.submitted_at ? formatDateUtil(submission.submitted_at, { format: 'short' }) : "N/A"}</span>
+                            <span className="sm:hidden">{submission.submitted_at ? formatDateUtil(submission.submitted_at, { format: 'short' }) : t("common.notAvailable")}</span>
                           </div>
                           
                           {/* Submitted By - Hide name on mobile */}
@@ -938,7 +937,7 @@ export default function FormSubmissionsPage() {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8 text-slate-500 hover:text-indigo-600"
-                              title="Reprint label"
+                              title={t("reports.reprintLabel")}
                               data-testid={`reprint-label-${submission.id}`}
                               onClick={(e) => reprintLabel(submission, e)}
                               disabled={isPrinting}
@@ -963,7 +962,7 @@ export default function FormSubmissionsPage() {
                           }}
                         >
                           <Eye className="w-4 h-4 mr-1" />
-                          View
+                          {t("common.view")}
                         </Button>
                         
                         {/* More Menu */}
@@ -983,7 +982,7 @@ export default function FormSubmissionsPage() {
                               e.stopPropagation();
                               handleSubmissionClick(submission);
                             }}>
-                              <Eye className="w-4 h-4 mr-2" /> View Details
+                              <Eye className="w-4 h-4 mr-2" /> {t("reports.viewDetails")}
                             </DropdownMenuItem>
                             <DropdownMenuItem 
                               onClick={(e) => {
@@ -992,7 +991,7 @@ export default function FormSubmissionsPage() {
                               }}
                               className="text-red-600"
                             >
-                              <Trash2 className="w-4 h-4 mr-2" /> Delete
+                              <Trash2 className="w-4 h-4 mr-2" /> {t("common.delete")}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -1029,7 +1028,7 @@ export default function FormSubmissionsPage() {
                 setLoadingSubmission(false);
               }}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100"
-              aria-label="Close"
+              aria-label={t("common.close")}
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
@@ -1043,7 +1042,7 @@ export default function FormSubmissionsPage() {
                   disabled={updateMutation.isPending}
                 >
                   <Pencil className="h-4 w-4" />
-                  <span className="text-sm">Edit</span>
+                  <span className="text-sm">{t("common.edit")}</span>
                 </Button>
               )}
               {selectedSubmission && editMode && (
@@ -1055,7 +1054,7 @@ export default function FormSubmissionsPage() {
                     onClick={cancelEdit}
                     disabled={updateMutation.isPending}
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                   <Button
                     size="sm"
@@ -1066,10 +1065,10 @@ export default function FormSubmissionsPage() {
                     {updateMutation.isPending ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                        Saving
+                        {t("common.saving")}
                       </>
                     ) : (
-                      "Save"
+                      t("common.save")
                     )}
                   </Button>
                 </>
@@ -1101,11 +1100,11 @@ export default function FormSubmissionsPage() {
                       )}
                       <div className="flex items-center gap-2 mt-0.5">
                         <UserAvatar 
-                          name={selectedSubmission.submitted_by_name || "Unknown"} 
+                          name={selectedSubmission.submitted_by_name || t("common.unknown")} 
                           photo={selectedSubmission.submitted_by_photo}
                           size="xs"
                         />
-                        <span className="text-sm text-slate-500">{selectedSubmission.submitted_by_name || "Unknown"}</span>
+                        <span className="text-sm text-slate-500">{selectedSubmission.submitted_by_name || t("common.unknown")}</span>
                         <span className="text-slate-300">•</span>
                         <span className="text-sm text-slate-500">{formatDate(selectedSubmission.submitted_at)}</span>
                       </div>
@@ -1118,7 +1117,7 @@ export default function FormSubmissionsPage() {
                         ? "bg-amber-100 text-amber-700 border-amber-200" 
                         : "bg-green-100 text-green-700 border-green-200"
                   }`}>
-                    {selectedSubmission.has_critical ? "Critical" : selectedSubmission.has_warnings ? "Warning" : "Completed"}
+                    {selectedSubmission.has_critical ? t("common.critical") : selectedSubmission.has_warnings ? t("reports.warning") : t("reports.completed")}
                   </Badge>
                 </div>
                 
@@ -1126,20 +1125,20 @@ export default function FormSubmissionsPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-3 border-y border-slate-100">
                   <div className="flex items-center gap-2">
                     <UserAvatar 
-                      name={selectedSubmission.submitted_by_name || "Unknown"} 
+                      name={selectedSubmission.submitted_by_name || t("common.unknown")} 
                       photo={selectedSubmission.submitted_by_photo}
                       size="md"
                     />
                     <div>
-                      <p className="text-[10px] text-slate-400 uppercase tracking-wide">Submitted by</p>
-                      <p className="text-sm font-medium text-slate-700 mt-0.5">{selectedSubmission.submitted_by_name || "Unknown"}</p>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-wide">{t("reports.submittedBy")}</p>
+                      <p className="text-sm font-medium text-slate-700 mt-0.5">{selectedSubmission.submitted_by_name || t("common.unknown")}</p>
                     </div>
                   </div>
                   {selectedSubmission.equipment_name && (
                     <div className="flex items-center gap-2">
                       <Building2 className="w-4 h-4 text-slate-400" />
                       <div>
-                        <p className="text-[10px] text-slate-400 uppercase tracking-wide">Equipment</p>
+                        <p className="text-[10px] text-slate-400 uppercase tracking-wide">{t("common.equipment")}</p>
                         <p className="text-sm font-medium text-slate-700 mt-0.5">
                           {selectedSubmission.equipment_name}
                         </p>
@@ -1153,7 +1152,7 @@ export default function FormSubmissionsPage() {
                     <div className="flex items-center gap-2">
                       <FileText className="w-4 h-4 text-slate-400" />
                       <div>
-                        <p className="text-[10px] text-slate-400 uppercase tracking-wide">Task</p>
+                        <p className="text-[10px] text-slate-400 uppercase tracking-wide">{t("reports.task")}</p>
                         <p className="text-sm font-medium text-slate-700 mt-0.5">
                           {selectedSubmission.task_template_name}
                         </p>
@@ -1166,7 +1165,7 @@ export default function FormSubmissionsPage() {
                         <span className={`w-2.5 h-2.5 rounded-full ${getDisciplineInfo(selectedSubmission.discipline).color}`} />
                       </span>
                       <div>
-                        <p className="text-[10px] text-slate-400 uppercase tracking-wide">Discipline</p>
+                        <p className="text-[10px] text-slate-400 uppercase tracking-wide">{t("common.discipline")}</p>
                         <p className="text-sm font-medium text-slate-700 mt-0.5">
                           {getDisciplineInfo(selectedSubmission.discipline).label}
                         </p>
@@ -1189,22 +1188,22 @@ export default function FormSubmissionsPage() {
                     <div data-testid="ai-vision-photo-section">
                       <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">
                         <Sparkles className="w-5 h-5 text-blue-500" />
-                        AI Vision Photo
+                        {t("reports.aiVisionPhoto")}
                       </h3>
                       <button
                         type="button"
-                        onClick={() => setViewingImage({ url: apiPath, name: "AI Vision Photo" })}
+                        onClick={() => setViewingImage({ url: apiPath, name: t("reports.aiVisionPhoto") })}
                         className="group relative w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-50 hover:border-blue-300 hover:shadow-md transition-all"
                         data-testid="ai-vision-photo-thumbnail"
                       >
                         <AuthenticatedImage
                           src={apiPath}
-                          alt="AI Vision Source Photo"
+                          alt={t("reports.aiVisionSourcePhoto")}
                           className="w-full max-h-80 object-contain bg-slate-100"
                           fallback={
                             <div className="w-full h-48 flex flex-col items-center justify-center text-slate-400 gap-2">
                               <AlertTriangle className="w-8 h-8" />
-                              <span className="text-xs">Photo unavailable</span>
+                              <span className="text-xs">{t("reports.photoUnavailable")}</span>
                             </div>
                           }
                         />
@@ -1215,7 +1214,7 @@ export default function FormSubmissionsPage() {
                         </div>
                       </button>
                       <p className="text-xs text-slate-400 mt-2">
-                        Source image used by AI to auto-fill the fields below. Tap to enlarge.
+                        {t("reports.aiVisionHint")}
                       </p>
                     </div>
                   );
@@ -1232,7 +1231,7 @@ export default function FormSubmissionsPage() {
                     <div>
                       <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">
                         <CheckSquare className="w-5 h-5 text-slate-600" />
-                        Checklist
+                        {t("reports.checklist")}
                       </h3>
                       <div className="space-y-2">
                         {responses.map((response, idx) => {
@@ -1294,13 +1293,13 @@ export default function FormSubmissionsPage() {
                                     />
                                   ) : isSignature && response.value ? (
                                     <button
-                                      onClick={() => setViewingImage({ url: response.value, name: (response.field_label || "Signature").replace(/_/g, ' ') })}
+                                      onClick={() => setViewingImage({ url: response.value, name: (response.field_label || t("reports.signature")).replace(/_/g, ' ') })}
                                       className="text-blue-600 hover:underline"
                                     >
-                                      View Signature
+                                      {t("reports.viewSignature")}
                                     </button>
                                   ) : isBoolean ? (
-                                    response.value ? "Yes" : "No"
+                                    response.value ? t("common.yes") : t("common.no")
                                   ) : Array.isArray(response.value) ? (
                                     response.value.join(", ")
                                   ) : hasAttachment ? (
@@ -1308,14 +1307,14 @@ export default function FormSubmissionsPage() {
                                       onClick={() => {
                                         if (isImage) {
                                           // Use clean API path - AuthenticatedLightbox handles auth
-                                          setViewingImage({ url: attachmentApiPath, name: (response.field_label || "Image").replace(/_/g, ' ') });
+                                          setViewingImage({ url: attachmentApiPath, name: (response.field_label || t("reports.image")).replace(/_/g, ' ') });
                                         } else {
                                           window.open(attachmentFullUrl, '_blank');
                                         }
                                       }}
                                       className="text-blue-600 hover:underline flex items-center gap-1"
                                     >
-                                      <Paperclip className="w-3 h-3" /> View Attachment
+                                      <Paperclip className="w-3 h-3" /> {t("reports.viewAttachment")}
                                     </button>
                                   ) : (
                                     <>
@@ -1332,7 +1331,7 @@ export default function FormSubmissionsPage() {
                                     ? "bg-amber-100 text-amber-700 border-amber-200" 
                                     : "bg-green-100 text-green-700 border-green-200"
                               }`}>
-                                {isCritical ? "FAIL" : isWarning ? "WARNING" : "PASS"}
+                                {isCritical ? t("reports.fail") : isWarning ? t("reports.warningBadge") : t("reports.pass")}
                               </Badge>
                             </div>
                           );
@@ -1347,7 +1346,7 @@ export default function FormSubmissionsPage() {
                   <div>
                     <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">
                       <Lightbulb className="w-5 h-5 text-slate-600" />
-                      Insights
+                      {t("reports.insights")}
                     </h3>
                     <div className="bg-slate-50 rounded-lg p-4 space-y-2">
                       {(() => {
@@ -1366,25 +1365,33 @@ export default function FormSubmissionsPage() {
                             {criticalItems > 0 && (
                               <div className="flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-red-500" />
-                                <span className="text-sm text-slate-700">{criticalItems} critical issue{criticalItems > 1 ? 's' : ''} require immediate attention</span>
+                                <span className="text-sm text-slate-700">
+                                  {criticalItems > 1
+                                    ? t("reports.criticalIssuesPlural").replace("{count}", criticalItems)
+                                    : t("reports.criticalIssues").replace("{count}", criticalItems)}
+                                </span>
                               </div>
                             )}
                             {warningItems > 0 && (
                               <div className="flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-amber-500" />
-                                <span className="text-sm text-slate-700">{warningItems} warning{warningItems > 1 ? 's' : ''} detected - monitor closely</span>
+                                <span className="text-sm text-slate-700">
+                                  {warningItems > 1
+                                    ? t("reports.warningsDetectedPlural").replace("{count}", warningItems)
+                                    : t("reports.warningsDetected").replace("{count}", warningItems)}
+                                </span>
                               </div>
                             )}
                             {criticalItems === 0 && warningItems === 0 && (
                               <div className="flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-green-500" />
-                                <span className="text-sm text-slate-700">No deviations detected in this round</span>
+                                <span className="text-sm text-slate-700">{t("reports.noDeviations")}</span>
                               </div>
                             )}
                             {passedItems > 0 && (
                               <div className="flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-green-500" />
-                                <span className="text-sm text-slate-700">{passedItems} of {totalItems} checks passed</span>
+                                <span className="text-sm text-slate-700">{t("reports.checksPassed").replace("{passed}", passedItems).replace("{total}", totalItems)}</span>
                               </div>
                             )}
                           </>
@@ -1396,7 +1403,7 @@ export default function FormSubmissionsPage() {
                     <div className="bg-blue-50 rounded-lg p-4 mt-3 border border-blue-100">
                       <h4 className="font-semibold text-slate-800 flex items-center gap-2 mb-2">
                         <Sparkles className="w-4 h-4 text-blue-500" />
-                        Recommendation:
+                        {t("reports.recommendation")}
                       </h4>
                       <p className="text-sm text-slate-600">
                         {(() => {
@@ -1406,11 +1413,11 @@ export default function FormSubmissionsPage() {
                           const warningItems = responses.filter(r => r.threshold_status === "warning").length;
                           
                           if (criticalItems > 0) {
-                            return "Immediate corrective action required. Create observation and action items for critical issues.";
+                            return t("reports.recommendCritical");
                           } else if (warningItems > 0) {
-                            return "Schedule follow-up inspection to monitor warning conditions. Consider preventive maintenance.";
+                            return t("reports.recommendWarning");
                           } else {
-                            return "Continue current maintenance schedule. Equipment is operating normally.";
+                            return t("reports.recommendNormal");
                           }
                         })()}
                       </p>
@@ -1423,7 +1430,7 @@ export default function FormSubmissionsPage() {
                   <div>
                     <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">
                       <Paperclip className="w-5 h-5 text-slate-600" />
-                      Attachments ({selectedSubmission.attachments.length})
+                      {t("reports.attachments").replace("{count}", selectedSubmission.attachments.length)}
                     </h3>
                     <div className="space-y-3">
                       {selectedSubmission.attachments.map((att, idx) => {
@@ -1438,7 +1445,7 @@ export default function FormSubmissionsPage() {
                         const downloadUrl = rawUrl && !rawUrl.startsWith('data:') && !rawUrl.startsWith('http') 
                           ? `${getBackendUrl()}/api/storage/${rawUrl}${authToken ? `?token=${authToken}` : ''}` 
                           : rawUrl;
-                        const fileName = att.name || att.filename || "Attachment";
+                        const fileName = att.name || att.filename || t("reports.attachment");
                         const hasError = att.error || att.needs_migration;
                         
                         return (
@@ -1490,7 +1497,7 @@ export default function FormSubmissionsPage() {
                                   }}
                                   disabled={hasError}
                                 >
-                                  View Full
+                                  {t("reports.viewFull")}
                                 </Button>
                                 <Button
                                   variant="outline"
@@ -1506,7 +1513,7 @@ export default function FormSubmissionsPage() {
                                   }}
                                   disabled={hasError}
                                 >
-                                  Download
+                                  {t("common.download")}
                                 </Button>
                               </div>
                             </div>
@@ -1522,7 +1529,7 @@ export default function FormSubmissionsPage() {
                   <div>
                     <h3 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">
                       <FileText className="w-5 h-5 text-slate-600" />
-                      Notes
+                      {t("common.notes")}
                     </h3>
                     <div className="bg-slate-50 rounded-lg p-4 border border-slate-100">
                       <p className="text-sm text-slate-700 whitespace-pre-wrap">{selectedSubmission.notes}</p>
@@ -1541,22 +1548,21 @@ export default function FormSubmissionsPage() {
                     disabled={editMode || updateMutation.isPending}
                 >
                   <Trash2 className="w-4 h-4 mr-1" />
-                  Delete
+                  {t("common.delete")}
                 </Button>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => setSelectedSubmission(null)}>
-                    Close
+                    {t("common.close")}
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      // Export functionality placeholder
-                      toast.info("Export feature coming soon");
+                      toast.info(t("reports.exportComingSoon"));
                     }}
                   >
                     <Download className="w-4 h-4 mr-1" />
-                    Export
+                    {t("reports.export")}
                   </Button>
                 </div>
               </div>
@@ -1569,20 +1575,19 @@ export default function FormSubmissionsPage() {
       <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Form Submission</AlertDialogTitle>
+            <AlertDialogTitle>{t("reports.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this form submission "{deleteConfirm?.form_template_name}"? 
-              This action cannot be undone.
+              {t("reports.deleteConfirm").replace("{name}", deleteConfirm?.form_template_name || "")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteMutation.mutate(deleteConfirm?.id)}
               className="bg-red-600 hover:bg-red-700"
               disabled={deleteMutation.isPending}
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              {deleteMutation.isPending ? t("common.deleting") : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
