@@ -100,9 +100,20 @@ class DefinitionRow(BaseModel):
     """A single row in a definition table (e.g., severity rank 10)."""
     rank: int
     label: str  # e.g., "Hazardous", "Very High"
-    description: str
+    description: Optional[str] = None
     secondary_description: Optional[str] = None  # Additional column (e.g., manufacturing effect)
     color: Optional[str] = None  # CSS class like "bg-red-600"
+
+
+class CriticalityRow(BaseModel):
+    """A single row in the criticality definition table."""
+    rank: int
+    label: str
+    color: Optional[str] = None
+    safety: Optional[str] = None
+    production: Optional[str] = None
+    environment: Optional[str] = None
+    reputation: Optional[str] = None
 
 
 class DefinitionTable(BaseModel):
@@ -117,7 +128,7 @@ class DefinitionsCreate(BaseModel):
     severity: List[DefinitionRow]
     occurrence: List[DefinitionRow]
     detection: List[DefinitionRow]
-    criticality: Optional[List[DefinitionRow]] = None
+    criticality: Optional[List[CriticalityRow]] = None
 
 
 class DefinitionsUpdate(BaseModel):
@@ -125,7 +136,7 @@ class DefinitionsUpdate(BaseModel):
     severity: Optional[List[DefinitionRow]] = None
     occurrence: Optional[List[DefinitionRow]] = None
     detection: Optional[List[DefinitionRow]] = None
-    criticality: Optional[List[DefinitionRow]] = None
+    criticality: Optional[List[CriticalityRow]] = None
 
 
 # ============= DEFAULT DEFINITIONS =============
