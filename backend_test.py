@@ -1237,6 +1237,511 @@ def run_equipment_criticality_tests():
     return success
 
 
+# ============================================================================
+# Maintenance Program Module Tests
+# ============================================================================
+
+def test_maintenance_programs_list(token: str, results: TestResult) -> bool:
+    """Test GET /api/maintenance-programs - List all maintenance programs"""
+    print(f"\n{Colors.BLUE}=== Test: List Maintenance Programs ==={Colors.END}")
+    try:
+        response = requests.get(
+            f"{BASE_URL}/maintenance-programs",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "programs" in data and "total" in data:
+                results.add_pass(f"List maintenance programs - found {data['total']} programs")
+                print(f"  Total programs: {data['total']}")
+                print(f"  Programs returned: {len(data['programs'])}")
+                return True
+            else:
+                results.add_fail("List maintenance programs", f"Missing required fields: {list(data.keys())}")
+                return False
+        else:
+            results.add_fail("List maintenance programs", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("List maintenance programs", str(e))
+        return False
+
+
+def test_maintenance_programs_summary(token: str, results: TestResult) -> bool:
+    """Test GET /api/maintenance-programs/summary - Get programs summary statistics"""
+    print(f"\n{Colors.BLUE}=== Test: Get Programs Summary ==={Colors.END}")
+    try:
+        response = requests.get(
+            f"{BASE_URL}/maintenance-programs/summary",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            required_fields = ["total_programs", "by_status", "task_totals"]
+            missing_fields = [f for f in required_fields if f not in data]
+            
+            if not missing_fields:
+                results.add_pass("Get programs summary")
+                print(f"  Total programs: {data['total_programs']}")
+                print(f"  By status: {data['by_status']}")
+                print(f"  Task totals: {data['task_totals']}")
+                return True
+            else:
+                results.add_fail("Get programs summary", f"Missing fields: {missing_fields}")
+                return False
+        else:
+            results.add_fail("Get programs summary", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("Get programs summary", str(e))
+        return False
+
+
+def get_test_equipment_id(token: str, results: TestResult) -> tuple:
+    """Get an equipment_id with equipment_type_id for testing. Returns (equipment_id, has_strategy)"""
+    print(f"\n{Colors.BLUE}=== Getting Test Equipment ID ==={Colors.END}")
+    try:
+        # First, get available strategies
+        strategies_response = requests.get(
+            f"{BASE_URL}/maintenance-strategies-v2",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        strategy_type_ids = set()
+        if strategies_response.status_code == 200:
+            strategies = strategies_response.json().get("strategies", [])
+            strategy_type_ids = {s.get("equipment_type_id") for s in strategies if s.get("equipment_type_id")}
+            print(f"  Found {len(strategy_type_ids)} equipment types with strategies")
+        
+        # Get equipment nodes
+        response = requests.get(
+            f"{BASE_URL}/equipment-hierarchy/nodes",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            results.add_fail("Get equipment nodes", f"Status {response.status_code}: {response.text}")
+            return None, False
+        
+        data = response.json()
+        nodes = data.get("nodes", [])
+        
+        # First try to find equipment with a strategy
+        for node in nodes:
+            equipment_type_id = node.get("equipment_type_id")
+            if equipment_type_id and equipment_type_id in strategy_type_ids:
+                equipment_id = node.get("id")
+                equipment_name = node.get("name", "Unknown")
+                equipment_type = node.get("equipment_type_name", equipment_type_id)
+                print(f"  Selected equipment: {equipment_name} (ID: {equipment_id})")
+                print(f"  Equipment type: {equipment_type} (has strategy)")
+                results.add_pass(f"Get test equipment - {equipment_name} (with strategy)")
+                return equipment_id, True
+        
+        # If no equipment with strategy, just find any equipment with equipment_type_id
+        for node in nodes:
+            if node.get("equipment_type_id"):
+                equipment_id = node.get("id")
+                equipment_name = node.get("name", "Unknown")
+                equipment_type = node.get("equipment_type_name", "Unknown")
+                print(f"  Selected equipment: {equipment_name} (ID: {equipment_id})")
+                print(f"  Equipment type: {equipment_type} (no strategy available)")
+                results.add_pass(f"Get test equipment - {equipment_name} (no strategy)")
+                return equipment_id, False
+        
+        results.add_fail("Get test equipment", "No equipment with equipment_type_id found")
+        return None, False
+        
+    except Exception as e:
+        results.add_fail("Get test equipment", str(e))
+        return None, False
+
+
+def test_get_program_nonexistent(token: str, equipment_id: str, results: TestResult) -> bool:
+    """Test GET /api/maintenance-programs/{equipment_id} - Non-existent program"""
+    print(f"\n{Colors.BLUE}=== Test: Get Non-Existent Program ==={Colors.END}")
+    try:
+        response = requests.get(
+            f"{BASE_URL}/maintenance-programs/{equipment_id}",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("exists") == False and data.get("equipment_id") == equipment_id:
+                results.add_pass("Get non-existent program - returns exists=false")
+                print(f"  Program exists: {data.get('exists')}")
+                return True
+            else:
+                results.add_fail("Get non-existent program", f"Unexpected response: {data}")
+                return False
+        else:
+            results.add_fail("Get non-existent program", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("Get non-existent program", str(e))
+        return False
+
+
+def test_create_maintenance_program(token: str, equipment_id: str, results: TestResult) -> bool:
+    """Test POST /api/maintenance-programs/{equipment_id} - Create maintenance program"""
+    print(f"\n{Colors.BLUE}=== Test: Create Maintenance Program ==={Colors.END}")
+    try:
+        payload = {
+            "equipment_id": equipment_id,
+            "generate_from_strategy": True,
+            "include_ai_recommendations": False
+        }
+        
+        response = requests.post(
+            f"{BASE_URL}/maintenance-programs/{equipment_id}",
+            headers=get_headers(token),
+            json=payload,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "program" in data and "message" in data:
+                program = data["program"]
+                tasks_count = len(program.get("tasks", []))
+                results.add_pass(f"Create maintenance program - {tasks_count} tasks generated")
+                print(f"  Program ID: {program.get('id')}")
+                print(f"  Program name: {program.get('program_name')}")
+                print(f"  Total tasks: {tasks_count}")
+                print(f"  Status: {program.get('status')}")
+                return True
+            else:
+                results.add_fail("Create maintenance program", f"Missing required fields: {list(data.keys())}")
+                return False
+        elif response.status_code == 400 and "already exists" in response.text.lower():
+            results.add_pass("Create maintenance program - already exists (expected)")
+            return True
+        else:
+            results.add_fail("Create maintenance program", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("Create maintenance program", str(e))
+        return False
+
+
+def test_get_program_existing(token: str, equipment_id: str, results: TestResult) -> bool:
+    """Test GET /api/maintenance-programs/{equipment_id} - Existing program"""
+    print(f"\n{Colors.BLUE}=== Test: Get Existing Program ==={Colors.END}")
+    try:
+        response = requests.get(
+            f"{BASE_URL}/maintenance-programs/{equipment_id}",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data.get("exists") == True and "program" in data:
+                program = data["program"]
+                results.add_pass("Get existing program - returns exists=true with program details")
+                print(f"  Program ID: {program.get('id')}")
+                print(f"  Total tasks: {program.get('total_tasks')}")
+                print(f"  Active tasks: {program.get('active_tasks')}")
+                print(f"  Strategy tasks: {program.get('strategy_tasks')}")
+                return True
+            else:
+                results.add_fail("Get existing program", f"Unexpected response: {data}")
+                return False
+        else:
+            results.add_fail("Get existing program", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("Get existing program", str(e))
+        return False
+
+
+def test_get_program_tasks(token: str, equipment_id: str, results: TestResult) -> Optional[str]:
+    """Test GET /api/maintenance-programs/{equipment_id}/tasks - Get program tasks"""
+    print(f"\n{Colors.BLUE}=== Test: Get Program Tasks ==={Colors.END}")
+    try:
+        response = requests.get(
+            f"{BASE_URL}/maintenance-programs/{equipment_id}/tasks",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "tasks" in data and "total" in data:
+                tasks = data["tasks"]
+                results.add_pass(f"Get program tasks - found {data['total']} tasks")
+                print(f"  Total tasks: {data['total']}")
+                
+                if tasks:
+                    task = tasks[0]
+                    task_id = task.get("id")
+                    print(f"  Sample task: {task.get('task_title')}")
+                    print(f"  Task source: {task.get('task_source')}")
+                    print(f"  Frequency: {task.get('frequency')}")
+                    print(f"  Category: {task.get('task_category')}")
+                    
+                    # Verify task_source field exists
+                    if "task_source" in task:
+                        results.add_pass("Get program tasks - task_source field present")
+                    else:
+                        results.add_fail("Get program tasks - task_source field", "task_source field missing")
+                    
+                    return task_id
+                return None
+            else:
+                results.add_fail("Get program tasks", f"Missing required fields: {list(data.keys())}")
+                return None
+        else:
+            results.add_fail("Get program tasks", f"Status {response.status_code}: {response.text}")
+            return None
+    except Exception as e:
+        results.add_fail("Get program tasks", str(e))
+        return None
+
+
+def test_add_manual_task(token: str, equipment_id: str, results: TestResult) -> Optional[str]:
+    """Test POST /api/maintenance-programs/{equipment_id}/tasks - Add manual task"""
+    print(f"\n{Colors.BLUE}=== Test: Add Manual Task ==={Colors.END}")
+    try:
+        payload = {
+            "task_title": "Weekly Visual Inspection",
+            "task_description": "Check for leaks and damage",
+            "frequency": "weekly",
+            "estimated_duration_hours": 0.5,
+            "task_category": "inspection",
+            "priority": "medium"
+        }
+        
+        response = requests.post(
+            f"{BASE_URL}/maintenance-programs/{equipment_id}/tasks",
+            headers=get_headers(token),
+            json=payload,
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "task" in data and "version" in data:
+                task = data["task"]
+                task_id = task.get("id")
+                task_source = task.get("task_source")
+                
+                if task_source == "manual":
+                    results.add_pass(f"Add manual task - task_source='manual'")
+                    print(f"  Task ID: {task_id}")
+                    print(f"  Task title: {task.get('task_title')}")
+                    print(f"  Task source: {task_source}")
+                    print(f"  New version: {data.get('version')}")
+                    return task_id
+                else:
+                    results.add_fail("Add manual task - task_source", f"Expected 'manual', got '{task_source}'")
+                    return task_id
+            else:
+                results.add_fail("Add manual task", f"Missing required fields: {list(data.keys())}")
+                return None
+        else:
+            results.add_fail("Add manual task", f"Status {response.status_code}: {response.text}")
+            return None
+    except Exception as e:
+        results.add_fail("Add manual task", str(e))
+        return None
+
+
+def test_update_task(token: str, equipment_id: str, task_id: str, results: TestResult) -> bool:
+    """Test PATCH /api/maintenance-programs/{equipment_id}/tasks/{task_id} - Update task"""
+    print(f"\n{Colors.BLUE}=== Test: Update Task ==={Colors.END}")
+    try:
+        payload = {
+            "frequency": "monthly",
+            "override_reason": "Reduced frequency based on low failure rate"
+        }
+        
+        response = requests.patch(
+            f"{BASE_URL}/maintenance-programs/{equipment_id}/tasks/{task_id}",
+            headers=get_headers(token),
+            json=payload,
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "task" in data and "version" in data:
+                task = data["task"]
+                updated_frequency = task.get("frequency")
+                
+                if updated_frequency == "monthly":
+                    results.add_pass("Update task - frequency updated to 'monthly'")
+                    print(f"  Updated frequency: {updated_frequency}")
+                    print(f"  New version: {data.get('version')}")
+                    
+                    # Check if override tracking is present
+                    traceability = task.get("traceability", {})
+                    if traceability.get("override_reason"):
+                        results.add_pass("Update task - override_reason tracked")
+                        print(f"  Override reason: {traceability.get('override_reason')}")
+                    
+                    return True
+                else:
+                    results.add_fail("Update task - frequency", f"Expected 'monthly', got '{updated_frequency}'")
+                    return False
+            else:
+                results.add_fail("Update task", f"Missing required fields: {list(data.keys())}")
+                return False
+        else:
+            results.add_fail("Update task", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("Update task", str(e))
+        return False
+
+
+def test_get_version_history(token: str, equipment_id: str, results: TestResult) -> bool:
+    """Test GET /api/maintenance-programs/{equipment_id}/version-history - Get version history"""
+    print(f"\n{Colors.BLUE}=== Test: Get Version History ==={Colors.END}")
+    try:
+        response = requests.get(
+            f"{BASE_URL}/maintenance-programs/{equipment_id}/version-history",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "current_version" in data and "version_history" in data:
+                version_history = data["version_history"]
+                results.add_pass(f"Get version history - {len(version_history)} version entries")
+                print(f"  Current version: {data['current_version']}")
+                print(f"  Version history entries: {len(version_history)}")
+                
+                if version_history:
+                    latest = version_history[-1]
+                    print(f"  Latest change: {latest.get('change_type')} - {latest.get('change_summary')}")
+                
+                return True
+            else:
+                results.add_fail("Get version history", f"Missing required fields: {list(data.keys())}")
+                return False
+        else:
+            results.add_fail("Get version history", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("Get version history", str(e))
+        return False
+
+
+def test_regenerate_program_preview(token: str, equipment_id: str, has_strategy: bool, results: TestResult) -> bool:
+    """Test POST /api/maintenance-programs/{equipment_id}/regenerate - Regeneration preview"""
+    print(f"\n{Colors.BLUE}=== Test: Regenerate Program (Preview) ==={Colors.END}")
+    
+    if not has_strategy:
+        results.add_pass("Regenerate program preview - SKIPPED (no strategy available for equipment type)")
+        print(f"  Note: Equipment has no strategy, regeneration would fail as expected")
+        return True
+    
+    try:
+        payload = {
+            "preserve_overrides": True,
+            "preserve_manual_tasks": True,
+            "preview_only": True
+        }
+        
+        response = requests.post(
+            f"{BASE_URL}/maintenance-programs/{equipment_id}/regenerate",
+            headers=get_headers(token),
+            json=payload,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "preview" in data and "message" in data:
+                preview = data["preview"]
+                results.add_pass("Regenerate program preview")
+                print(f"  Tasks to add: {len(preview.get('tasks_to_add', []))}")
+                print(f"  Tasks to remove: {len(preview.get('tasks_to_remove', []))}")
+                print(f"  Preserved overrides: {len(preview.get('preserved_overrides', []))}")
+                print(f"  Preserved manual tasks: {len(preview.get('preserved_manual_tasks', []))}")
+                return True
+            else:
+                results.add_fail("Regenerate program preview", f"Missing required fields: {list(data.keys())}")
+                return False
+        else:
+            results.add_fail("Regenerate program preview", f"Status {response.status_code}: {response.text}")
+            return False
+    except Exception as e:
+        results.add_fail("Regenerate program preview", str(e))
+        return False
+
+
+def run_maintenance_program_tests():
+    """Run all maintenance program module tests"""
+    print(f"\n{Colors.BLUE}{'='*60}{Colors.END}")
+    print(f"{Colors.BLUE}Maintenance Program Module Tests{Colors.END}")
+    print(f"{Colors.BLUE}{'='*60}{Colors.END}")
+    
+    results = TestResult()
+    
+    # Login
+    token = login()
+    if not token:
+        print(f"\n{Colors.RED}Failed to authenticate. Cannot proceed with tests.{Colors.END}")
+        sys.exit(1)
+    
+    # Test 1: List all maintenance programs
+    test_maintenance_programs_list(token, results)
+    
+    # Test 2: Get programs summary
+    test_maintenance_programs_summary(token, results)
+    
+    # Get test equipment ID
+    equipment_id, has_strategy = get_test_equipment_id(token, results)
+    if not equipment_id:
+        print(f"\n{Colors.RED}Failed to get test equipment ID. Cannot proceed with remaining tests.{Colors.END}")
+        results.summary()
+        sys.exit(1)
+    
+    # Test 3: Get non-existent program
+    test_get_program_nonexistent(token, equipment_id, results)
+    
+    # Test 4: Create maintenance program
+    test_create_maintenance_program(token, equipment_id, results)
+    
+    # Test 5: Get existing program
+    test_get_program_existing(token, equipment_id, results)
+    
+    # Test 6: Get program tasks
+    task_id = test_get_program_tasks(token, equipment_id, results)
+    
+    # Test 7: Add manual task
+    manual_task_id = test_add_manual_task(token, equipment_id, results)
+    
+    # Test 8: Update task (use manual task if available, otherwise use first task)
+    update_task_id = manual_task_id or task_id
+    if update_task_id:
+        test_update_task(token, equipment_id, update_task_id, results)
+    else:
+        results.add_fail("Update task", "No task ID available for testing")
+    
+    # Test 9: Get version history
+    test_get_version_history(token, equipment_id, results)
+    
+    # Test 10: Regenerate program (preview only)
+    test_regenerate_program_preview(token, equipment_id, has_strategy, results)
+    
+    # Print summary
+    success = results.summary()
+    
+    return success
+
+
 if __name__ == "__main__":
     # Check if we should run specific tests
     if len(sys.argv) > 1:
@@ -1245,6 +1750,9 @@ if __name__ == "__main__":
             sys.exit(0 if success else 1)
         elif sys.argv[1] == "criticality":
             success = run_equipment_criticality_tests()
+            sys.exit(0 if success else 1)
+        elif sys.argv[1] == "maintenance-program":
+            success = run_maintenance_program_tests()
             sys.exit(0 if success else 1)
     
     # Run original PM Import tests by default

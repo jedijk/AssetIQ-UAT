@@ -291,6 +291,7 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             or "/pm-import" in request.url.path
             or "/ai-insights" in request.url.path
             or "/auth/" in request.url.path
+            or "/maintenance-programs" in request.url.path
         ):
             request_timeout = self.long_timeout
         else:
