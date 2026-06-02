@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams, useLocation } from "react-router-dom";
@@ -173,6 +173,7 @@ const FailureModesPage = () => {
   const [newType, setNewType] = useState({ id: "", name: "", discipline: "Rotating", icon: "cog" });
   const [typeFilterDiscipline, setTypeFilterDiscipline] = useState("all"); // Filter for Equipment Types tab
   const [typeFilterNoFailureModes, setTypeFilterNoFailureModes] = useState(false); // Filter to show only types without failure modes
+  const [filterLinkedToEquipment, setFilterLinkedToEquipment] = useState(false);
   const [selectedEquipmentType, setSelectedEquipmentType] = useState(null); // For viewing connected failure modes
   const [isAISuggestionsOpen, setIsAISuggestionsOpen] = useState(false); // AI suggestions dialog
   const [isAINewTypesOpen, setIsAINewTypesOpen] = useState(false); // AI suggest NEW equipment types
@@ -297,6 +298,19 @@ const FailureModesPage = () => {
   const rawFailureModes = modesData?.failure_modes || [];
   const rawEquipmentTypes = typesData?.equipment_types || [];
   const hierarchyNodes = nodesData?.nodes || [];
+
+  const inUseEquipmentTypeIds = useMemo(() => {
+    const ids = new Set();
+    hierarchyNodes.forEach((node) => {
+      if (node?.equipment_type_id) ids.add(node.equipment_type_id);
+    });
+    return ids;
+  }, [hierarchyNodes]);
+
+  const isFailureModeLinkedToEquipment = useCallback(
+    (fm) => (fm?.equipment_type_ids || []).some((id) => inUseEquipmentTypeIds.has(id)),
+    [inUseEquipmentTypeIds],
+  );
   
   // Apply translations based on current language
   const { failureModes: translatedFailureModes } = useTranslatedFailureModes(rawFailureModes);
@@ -319,6 +333,9 @@ const FailureModesPage = () => {
     if (hideAIImproved) {
       list = list.filter((fm) => !fm.ai_improved_at);
     }
+    if (filterLinkedToEquipment) {
+      list = list.filter(isFailureModeLinkedToEquipment);
+    }
     if (highSeverityOnly) {
       list = list.filter((fm) => (fm.severity ?? 0) >= 8);
       list = [...list].sort((a, b) => {
@@ -329,8 +346,8 @@ const FailureModesPage = () => {
       });
     }
     return list;
-  }, [failureModes, highSeverityOnly, hideAIImproved]);
-  const displayedTotal = highSeverityOnly || hideAIImproved ? displayedFailureModes.length : totalModes;
+  }, [failureModes, highSeverityOnly, hideAIImproved, filterLinkedToEquipment, isFailureModeLinkedToEquipment]);
+  const displayedTotal = highSeverityOnly || hideAIImproved || filterLinkedToEquipment ? displayedFailureModes.length : totalModes;
   const aiImprovedCount = useMemo(
     () => failureModes.filter((fm) => fm.ai_improved_at).length,
     [failureModes],
@@ -735,10 +752,18 @@ const FailureModesPage = () => {
   };
 
   // Filter equipment types based on search
-  const filteredEquipmentTypes = equipmentTypes.filter(et => 
-    !equipmentTypeSearch || 
-    et.name.toLowerCase().includes(equipmentTypeSearch.toLowerCase()) ||
-    (et.discipline && et.discipline.toLowerCase().includes(equipmentTypeSearch.toLowerCase()))
+  const filteredEquipmentTypes = equipmentTypes.filter(et => {
+    if (filterLinkedToEquipment && !inUseEquipmentTypeIds.has(et.id)) return false;
+    return (
+      !equipmentTypeSearch ||
+      et.name.toLowerCase().includes(equipmentTypeSearch.toLowerCase()) ||
+      (et.discipline && et.discipline.toLowerCase().includes(equipmentTypeSearch.toLowerCase()))
+    );
+  });
+
+  const linkedEquipmentTypeCount = useMemo(
+    () => equipmentTypes.filter((t) => inUseEquipmentTypeIds.has(t.id)).length,
+    [equipmentTypes, inUseEquipmentTypeIds],
   );
 
   // Export failure modes to Excel
@@ -937,9 +962,28 @@ const FailureModesPage = () => {
                   </span>
                 )}
               </Button>
+              <Button
+                type="button"
+                onClick={() => setFilterLinkedToEquipment((v) => !v)}
+                variant="outline"
+                className={`h-11 ${
+                  filterLinkedToEquipment
+                    ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                }`}
+                data-testid="linked-to-equipment-toggle-fm"
+                title={t("library.filterLinkedToEquipmentHint")}
+                aria-pressed={filterLinkedToEquipment}
+              >
+                <Cog className="w-4 h-4 mr-1" />
+                {t("library.filterLinkedToEquipment")}
+                {filterLinkedToEquipment && (
+                  <span className="ml-1 text-xs font-semibold bg-blue-100 text-blue-700 px-1.5 rounded">
+                    {displayedFailureModes.length}
+                  </span>
+                )}
+              </Button>
             </div>
-
-            {/* Row 2: Action buttons */}
             <div
               className="flex flex-wrap items-center gap-2"
               data-testid="action-bar"
@@ -1251,6 +1295,24 @@ const FailureModesPage = () => {
                           </span>
                         )}
                       </label>
+                      <label
+                        className="flex items-center gap-2 text-sm cursor-pointer bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors"
+                        title={t("library.filterLinkedToEquipmentHint")}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={filterLinkedToEquipment}
+                          onChange={(e) => setFilterLinkedToEquipment(e.target.checked)}
+                          className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          data-testid="linked-to-equipment-toggle-types"
+                        />
+                        <span className="text-slate-600 whitespace-nowrap">{t("library.filterLinkedToEquipment")}</span>
+                        {filterLinkedToEquipment && (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">
+                            {linkedEquipmentTypeCount}
+                          </span>
+                        )}
+                      </label>
                       {/* Discipline Filter */}
                       <Select value={typeFilterDiscipline} onValueChange={setTypeFilterDiscipline}>
                         <SelectTrigger className="w-[150px] h-9">
@@ -1281,6 +1343,9 @@ const FailureModesPage = () => {
                     // Apply "no failure modes" filter
                     if (typeFilterNoFailureModes) {
                       disciplineTypes = disciplineTypes.filter(t => getConnectedFmCount(t.id) === 0);
+                    }
+                    if (filterLinkedToEquipment) {
+                      disciplineTypes = disciplineTypes.filter(t => inUseEquipmentTypeIds.has(t.id));
                     }
                     if (disciplineTypes.length === 0) return null;
                     const colors = DISCIPLINE_COLORS[discipline] || DISCIPLINE_COLORS["Mechanical"];
