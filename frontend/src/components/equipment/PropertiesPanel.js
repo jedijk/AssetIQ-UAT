@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../../contexts/LanguageContext";
@@ -368,6 +368,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editTag, setEditTag] = useState("");
+  const editNameRef = useRef(null);
   const [showAllTypes, setShowAllTypes] = useState(false);
   const [typeSearchOpen, setTypeSearchOpen] = useState(false);
   const [typeSearchQuery, setTypeSearchQuery] = useState("");
@@ -481,7 +482,14 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
   
   // Get selected equipment type
   const selectedType = equipmentTypes?.find(t => t.id === node?.equipment_type_id);
-  
+
+  useEffect(() => {
+    if (isEditing) {
+      // Focus only when entering edit mode; avoid stealing focus on every re-render.
+      editNameRef.current?.focus?.();
+    }
+  }, [isEditing]);
+
   if (!node) return (
     <div className="flex flex-col items-center justify-center h-full p-6 text-center">
       <Settings className="w-12 h-12 text-slate-300 mb-3" />
@@ -506,7 +514,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
           </div>
           <div className="flex-1 min-w-0">
             {isEditing ? (
-              <Input value={editName} onChange={e => setEditName(e.target.value)} className="h-8 text-sm font-semibold" autoFocus />
+              <Input ref={editNameRef} value={editName} onChange={e => setEditName(e.target.value)} className="h-8 text-sm font-semibold" />
             ) : (
               <h3 className="font-semibold text-slate-800 truncate">
                 {node.tag && (
