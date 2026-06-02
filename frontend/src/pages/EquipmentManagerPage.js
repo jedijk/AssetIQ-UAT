@@ -780,18 +780,70 @@ export default function EquipmentManagerPage() {
     }, 
     onError: e => toast.error(e.response?.data?.detail || t("equipment.operationFailed")) 
   });
-  const criticalityMutation = useMutation({ 
-    mutationFn: ({ nodeId, assignment }) => equipmentHierarchyAPI.assignCriticality(nodeId, assignment), 
-    onSuccess: (data, variables) => { 
-      queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] }); 
-      setSelectedNode(data); 
-      if (variables.assignment.profile_id === null) {
-        toast.success(t("equipment.criticalityCleared"));
-      } else {
-        toast.success(t("equipment.criticalityAssigned"));
-      }
-    }, 
-    onError: e => toast.error(e.response?.data?.detail || t("equipment.operationFailed")) 
+  const computeCriticalityPreview = useCallback((assignment) => {
+    const safety = Number(assignment?.safety_impact || 0);
+    const production = Number(assignment?.production_impact || 0);
+    const environmental = Number(assignment?.environmental_impact || 0);
+    const reputation = Number(assignment?.reputation_impact || 0);
+    const hasAny = safety > 0 || production > 0 || environmental > 0 || reputation > 0;
+    if (!hasAny) return null;
+
+    const maxImpact = Math.max(safety, production, environmental, reputation);
+    let level = "low";
+    let color = "#22C55E";
+    if (safety >= 4 || maxImpact === 5) {
+      level = "safety_critical";
+      color = "#EF4444";
+    } else if (production >= 4 || maxImpact >= 4) {
+      level = "production_critical";
+      color = "#F97316";
+    } else if (maxImpact >= 3) {
+      level = "medium";
+      color = "#EAB308";
+    }
+
+    const riskScore = (safety * 25) + (production * 20) + (environmental * 15) + (reputation * 10);
+    return {
+      safety_impact: safety,
+      production_impact: production,
+      environmental_impact: environmental,
+      reputation_impact: reputation,
+      level,
+      color,
+      max_impact: maxImpact,
+      risk_score: Math.round(riskScore * 100) / 100,
+      profile_id: assignment?.profile_id ?? null,
+      fatality_risk: assignment?.fatality_risk ?? 0,
+      production_loss_per_day: assignment?.production_loss_per_day ?? 0,
+      failure_probability: assignment?.failure_probability ?? 0,
+      downtime_days: assignment?.downtime_days ?? 0,
+    };
+  }, []);
+
+  const criticalityMutation = useMutation({
+    mutationFn: ({ nodeId, assignment }) => equipmentHierarchyAPI.assignCriticality(nodeId, assignment),
+    onMutate: async ({ nodeId, assignment }) => {
+      // Optimistically update selected node so the UI reflects change instantly.
+      const previousSelected = selectedNode;
+      const preview = computeCriticalityPreview(assignment);
+      setSelectedNode((prev) => (prev && prev.id === nodeId ? { ...prev, criticality: preview } : prev));
+      return { previousSelected };
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
+      setSelectedNode(data);
+      const a = variables?.assignment || {};
+      const hasAny =
+        (a.safety_impact && a.safety_impact > 0) ||
+        (a.production_impact && a.production_impact > 0) ||
+        (a.environmental_impact && a.environmental_impact > 0) ||
+        (a.reputation_impact && a.reputation_impact > 0);
+      toast.success(hasAny ? t("equipment.criticalityAssigned") : t("equipment.criticalityCleared"));
+    },
+    onError: (e, _vars, ctx) => {
+      if (ctx?.previousSelected) setSelectedNode(ctx.previousSelected);
+      toast.error(e.response?.data?.detail || t("equipment.operationFailed"));
+    },
   });
   const disciplineMutation = useMutation({ mutationFn: ({ nodeId, discipline }) => equipmentHierarchyAPI.assignDiscipline(nodeId, discipline), onSuccess: data => { queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] }); setSelectedNode(data); toast.success(t("equipment.disciplineAssigned")); }, onError: e => toast.error(e.response?.data?.detail || t("equipment.operationFailed")) });
   const parseListMutation = useMutation({ mutationFn: ({ content, source }) => equipmentHierarchyAPI.parseEquipmentList(content, source), onSuccess: (data) => { queryClient.invalidateQueries({ queryKey: ["unstructured-items"] }); toast.success(`${data.parsed_count} ${t("equipment.itemsParsed")}`); setIsImportOpen(false); setImportText(""); }, onError: e => toast.error(e.response?.data?.detail || t("equipment.failedToParse")) });
