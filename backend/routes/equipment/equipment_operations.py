@@ -11,15 +11,19 @@ from iso14224_models import (
     ISOLevel, ISO_LEVEL_ORDER, MoveNodeRequest,
     get_valid_child_levels, is_valid_parent_child, normalize_level
 )
-from services.query_cache import query_cache
+from services.cache_service import invalidate_equipment_related
 
 router = APIRouter()
 
 
-def invalidate_equipment_cache(user_id: str = None):
+def invalidate_equipment_cache(user_id: str = None, node_id: str = None, node_name: str = None):
     """Invalidate equipment-related caches after mutations."""
-    # Invalidate all equipment_nodes caches (pattern matches anywhere in key)
-    query_cache.invalidate("equipment_nodes")
+    invalidate_equipment_related(
+        equipment_id=node_id,
+        equipment_name=node_name,
+        user_id=user_id,
+        reason="equipment_operations_mutation",
+    )
 
 
 class ChangeLevelRequest(BaseModel):

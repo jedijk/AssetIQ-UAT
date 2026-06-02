@@ -15,8 +15,39 @@ from fastapi import HTTPException
 from openai import OpenAI
 
 from database import db
+from services.ai_cost_guard import guard_ai_request, record_ai_tokens
 
 logger = logging.getLogger(__name__)
+
+
+def chat_completions_create(
+    client: OpenAI,
+    endpoint: str,
+    *,
+    user_id: str = "system",
+    company_id: str = "default",
+    **create_kwargs,
+):
+    """OpenAI chat completion with rate limits and usage tracking."""
+    guard_ai_request(
+        user_id=user_id,
+        company_id=company_id,
+        endpoint=endpoint,
+        estimated_tokens=create_kwargs.get("max_tokens") or 1000,
+    )
+    response = client.chat.completions.create(**create_kwargs)
+    usage = getattr(response, "usage", None)
+    if usage:
+        record_ai_tokens(
+            user_id=user_id,
+            company_id=company_id,
+            endpoint=endpoint,
+            prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
+            completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
+            model=create_kwargs.get("model", ""),
+        )
+    return response
+
 
 def get_openai_client() -> OpenAI:
     """Get OpenAI client with API key from environment."""
@@ -150,7 +181,7 @@ async def classify_user_intent(message: str, session_id: str) -> dict:
     try:
         client = get_openai_client()
         
-        response = client.chat.completions.create(
+        response = chat_completions_create(client, "ai_helpers",
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": QUERY_CLASSIFIER_PROMPT},
@@ -185,7 +216,7 @@ async def summarize_issue_description(text: str, language: str = "en") -> str:
     try:
         client = get_openai_client()
         lang_note = "Dutch" if language == "nl" else "English"
-        response = client.chat.completions.create(
+        response = chat_completions_create(client, "ai_helpers",
             model=os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
             messages=[
                 {
@@ -229,7 +260,7 @@ async def merge_issue_description_with_edit(
     try:
         client = get_openai_client()
         lang = "Dutch" if language == "nl" else "English"
-        response = client.chat.completions.create(
+        response = chat_completions_create(client, "ai_helpers",
             model=os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
             messages=[
                 {
@@ -277,7 +308,7 @@ async def translate_to_english_for_record(text: str, purpose: str = "threat regi
         return t
     try:
         client = get_openai_client()
-        response = client.chat.completions.create(
+        response = chat_completions_create(client, "ai_helpers",
             model=os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
             messages=[
                 {
@@ -376,7 +407,7 @@ async def answer_data_query(message: str, session_id: str, data_context: str) ->
 
         client = get_openai_client()
         
-        response = client.chat.completions.create(
+        response = chat_completions_create(client, "ai_helpers",
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": prompt},
@@ -417,7 +448,7 @@ async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Op
                 }
             ]
             
-            image_response = client.chat.completions.create(
+            image_response = chat_completions_create(client, "ai_helpers",
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": IMAGE_ANALYSIS_SYSTEM_PROMPT},
@@ -430,7 +461,7 @@ async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Op
 
         full_message = message + image_context
         
-        response = client.chat.completions.create(
+        response = chat_completions_create(client, "ai_helpers",
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": THREAT_ANALYSIS_SYSTEM_PROMPT},
@@ -517,7 +548,9 @@ async def analyze_attachment_image(image_base64: str, threat_context: str) -> di
         ]
 
         response = await asyncio.to_thread(
-            client.chat.completions.create,
+            chat_completions_create,
+            client,
+            "analyze_attachment_image",
             model="gpt-4o",
             messages=messages,
             temperature=0.3,

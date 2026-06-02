@@ -382,12 +382,52 @@ async def get_cache_stats(
         )
     
     try:
-        from services.query_cache import get_cache_stats
-        return get_cache_stats()
+        from services.unified_cache import unified_cache
+        return unified_cache.get_stats()
     except ImportError:
         return {"error": "Cache service not available"}
 
 
+@router.get("/metrics")
+async def get_application_metrics(
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Application health metrics: cache, database, version.
+    Owner/admin only. Mounted at /api/metrics.
+    """
+    if current_user.get("role") not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="Only owners/admins can access metrics")
+
+    db_status = "unknown"
+    db_latency_ms = None
+    t0 = time.time()
+    try:
+        await db.command("ping")
+        db_status = "connected"
+        db_latency_ms = round((time.time() - t0) * 1000, 2)
+    except Exception as exc:
+        db_status = f"error: {str(exc)[:120]}"
+
+    cache_stats = {}
+    try:
+        from services.unified_cache import unified_cache
+        from services.ai_cost_guard import ai_cost_guard
+
+        cache_stats = unified_cache.get_stats()
+        company_id = current_user.get("company_id") or current_user.get("organization_id") or "default"
+        ai_daily = ai_cost_guard.get_daily_summary(company_id)
+    except Exception as exc:
+        cache_stats = {"error": str(exc)[:120]}
+        ai_daily = {}
+
+    return {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "database": {"status": db_status, "latency_ms": db_latency_ms},
+        "cache": cache_stats,
+        "ai_usage_daily": ai_daily,
+        "queue": {"status": "in_process", "note": "Background job framework pending"},
+    }
 
 
 @router.get("/system/database")

@@ -22,6 +22,15 @@ from datetime import datetime, timezone
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+try:
+    from middleware.structured_logging import configure_json_logging
+    from middleware.sentry_init import init_sentry
+
+    configure_json_logging()
+    init_sentry()
+except Exception as _logging_init_err:
+    logger.warning("Structured logging / Sentry init skipped: %s", _logging_init_err)
+
 # Single source of truth for the application version.
 # Bump this with each release; the frontend polls /api/health and will force a
 # hard refresh whenever it sees a newer version than the one baked into its bundle.
@@ -311,6 +320,14 @@ app.add_middleware(TimeoutMiddleware, timeout=25.0, long_timeout=120.0)
 
 # Add GZip compression for responses > 500 bytes
 app.add_middleware(GZipMiddleware, minimum_size=500)
+
+try:
+    from middleware.structured_logging import StructuredLoggingMiddleware
+
+    app.add_middleware(StructuredLoggingMiddleware)
+    logger.info("Structured logging middleware enabled")
+except Exception as e:
+    logger.warning("Structured logging middleware not available: %s", e)
 
 
 # =============================================================================

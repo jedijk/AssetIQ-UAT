@@ -14,17 +14,22 @@ from iso14224_models import (
     get_valid_child_levels, is_valid_parent_child, EquipmentNodeCreate, EquipmentNodeUpdate
 )
 from services.query_cache import query_cache
+from services.cache_service import invalidate_equipment_related
 from utils.auto_translate import translate_equipment_node
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def invalidate_equipment_cache(user_id: str = None):
+def invalidate_equipment_cache(user_id: str = None, node_id: str = None, node_name: str = None):
     """Invalidate equipment-related caches after mutations."""
-    # Invalidate all equipment_nodes caches (pattern matches anywhere in key)
-    count = query_cache.invalidate("equipment_nodes")
-    logger.info(f"Invalidated {count} equipment cache entries")
+    counts = invalidate_equipment_related(
+        equipment_id=node_id,
+        equipment_name=node_name,
+        user_id=user_id,
+        reason="equipment_nodes_mutation",
+    )
+    logger.info("Equipment cache invalidated: %s", counts)
 
 
 @router.post("/equipment-hierarchy/refresh")
