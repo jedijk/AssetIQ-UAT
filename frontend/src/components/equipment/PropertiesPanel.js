@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useEquipmentNodeIdMap } from "../../hooks/useTranslatedEntities";
-import { failureModesAPI, qrCodeAPI, equipmentHierarchyAPI } from "../../lib/api";
+import { failureModesAPI, qrCodeAPI, equipmentHierarchyAPI, definitionsAPI } from "../../lib/api";
 import {
   Settings, Cog, Check, Edit, GripVertical, Trash2, ChevronDown, Sparkles, Eye, Search, AlertTriangle, QrCode, Info,
   Paperclip, Upload, Download, FileText, Image, File as FileIcon, X,
@@ -58,21 +58,46 @@ const IMPACT_SCALE_DIMS = {
   reputation: "Reputation",
 };
 
-function getCriticalityScales(t) {
-  return Object.fromEntries(
-    Object.entries(IMPACT_SCALE_DIMS).map(([dim, prefix]) => [
-      dim,
-      Object.fromEntries(
-        [1, 2, 3, 4, 5].map((level) => [
-          level,
-          {
-            label: t(`equipment.impact${prefix}${level}Label`),
-            desc: t(`equipment.impact${prefix}${level}Desc`),
-          },
-        ])
-      ),
-    ])
-  );
+// Map dimension key to the field name in criticality definition
+const DIMENSION_TO_FIELD = {
+  safety: "safety",
+  production: "production", 
+  environmental: "environment",
+  reputation: "reputation",
+};
+
+function getCriticalityScalesFromDefinitions(criticalityDefs, t) {
+  // If no definitions, return fallback using translations
+  if (!criticalityDefs || criticalityDefs.length === 0) {
+    return Object.fromEntries(
+      Object.entries(IMPACT_SCALE_DIMS).map(([dim, prefix]) => [
+        dim,
+        Object.fromEntries(
+          [1, 2, 3, 4, 5].map((level) => [
+            level,
+            {
+              label: t(`equipment.impact${prefix}${level}Label`),
+              desc: t(`equipment.impact${prefix}${level}Desc`),
+            },
+          ])
+        ),
+      ])
+    );
+  }
+
+  // Build scales from definitions - criticality definitions have rank 1-5 (1=minimal, 5=critical)
+  const scales = {};
+  Object.entries(DIMENSION_TO_FIELD).forEach(([dim, field]) => {
+    scales[dim] = {};
+    criticalityDefs.forEach((def) => {
+      scales[dim][def.rank] = {
+        label: def.label || `Level ${def.rank}`,
+        desc: def[field] || "",
+      };
+    });
+  });
+  
+  return scales;
 }
 
 const CriticalityDimension = ({ label, color, value, onClick, scale, dimension }) => {
@@ -359,7 +384,6 @@ function EquipmentFiles({ equipmentId }) {
 
 export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCriticality, onDelete, allNodes }) {
   const { t } = useLanguage();
-  const criticalityScales = useMemo(() => getCriticalityScales(t), [t]);
   const nodeTransMap = useEquipmentNodeIdMap();
   const nodeTrans = (node && nodeTransMap[node.id]) || {};
   const translatedName = nodeTrans.name || node?.name;
@@ -376,6 +400,19 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
   const [typeSearchOpen, setTypeSearchOpen] = useState(false);
   const [typeSearchQuery, setTypeSearchQuery] = useState("");
   const [showQRDialog, setShowQRDialog] = useState(false);
+  
+  // Fetch criticality definitions (defaults)
+  const { data: definitionsData } = useQuery({
+    queryKey: ["definitions-defaults"],
+    queryFn: definitionsAPI.getDefaults,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+  
+  // Build criticality scales from definitions
+  const criticalityScales = useMemo(() => 
+    getCriticalityScalesFromDefinitions(definitionsData?.criticality, t), 
+    [definitionsData?.criticality, t]
+  );
   
   // Sync localProcessStep when node changes
   useEffect(() => {
