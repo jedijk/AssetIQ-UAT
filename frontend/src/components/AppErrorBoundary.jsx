@@ -12,6 +12,35 @@ export class AppErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
+    // Auto-recover from chunk load errors (stale caches after deploy).
+    // Do this once per tab session to avoid reload loops.
+    try {
+      const msg = String(error?.message || error || "");
+      const isChunk =
+        msg.includes("Loading chunk") ||
+        msg.includes("ChunkLoadError") ||
+        msg.includes("dynamically imported module");
+      if (isChunk) {
+        const key = "assetiq_chunk_reload_attempted";
+        const already = (() => {
+          try {
+            return sessionStorage.getItem(key) === "true";
+          } catch (_e) {
+            return false;
+          }
+        })();
+        if (!already) {
+          try {
+            sessionStorage.setItem(key, "true");
+          } catch (_e) {}
+          // Give the error UI a brief moment to paint, then clear caches + reload.
+          setTimeout(() => {
+            this.handleHardReload();
+          }, 300);
+        }
+      }
+    } catch (_e) {}
+
     try {
       debugLog("react_error_boundary", {
         message: String(error?.message || error),
@@ -21,6 +50,20 @@ export class AppErrorBoundary extends React.Component {
       });
     } catch (_e) {}
   }
+
+  handleHardReload = async () => {
+    try {
+      if ("serviceWorker" in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+      }
+      if ("caches" in window) {
+        const names = await caches.keys();
+        await Promise.all(names.map((n) => caches.delete(n)));
+      }
+    } catch (_e) {}
+    window.location.reload();
+  };
 
   render() {
     if (this.state.hasError) {
@@ -34,7 +77,7 @@ export class AppErrorBoundary extends React.Component {
             <button
               type="button"
               className="mt-4 inline-flex items-center justify-center px-4 py-2 rounded-lg bg-slate-900 text-white font-semibold"
-              onClick={() => window.location.reload()}
+              onClick={this.handleHardReload}
             >
               Reload
             </button>
