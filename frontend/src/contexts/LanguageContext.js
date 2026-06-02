@@ -698,6 +698,11 @@ const en = {
     pmImportImportFailed: "Import failed",
     pmImportReviewExported: "Review exported",
     pmImportExportFailed: "Export failed",
+    updatedFields: "Updated:",
+    updatedName: "name",
+    updatedDescription: "description",
+    updatedTag: "tag",
+    updatedEquipmentType: "equipment type",
   },
 
   // Disciplines (used across library, equipment types, failure modes)
@@ -2514,6 +2519,11 @@ const nl = {
     pmImportImportFailed: "Import mislukt",
     pmImportReviewExported: "Review geëxporteerd",
     pmImportExportFailed: "Exporteren mislukt",
+    updatedFields: "Bijgewerkt:",
+    updatedName: "naam",
+    updatedDescription: "beschrijving",
+    updatedTag: "tag",
+    updatedEquipmentType: "apparatuurtype",
   },
 
   // Disciplines (used across library, equipment types, failure modes)

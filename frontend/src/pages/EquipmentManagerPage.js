@@ -728,7 +728,26 @@ export default function EquipmentManagerPage() {
 
   // Mutations
   const createMutation = useMutation({ mutationFn: equipmentHierarchyAPI.createNode, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] }); toast.success(t("equipment.nodeCreated")); setIsCreateOpen(false); setNewNode({ name: "", level: "installation", parent_id: null }); }, onError: e => toast.error(e.response?.data?.detail || t("equipment.operationFailed")) });
-  const updateMutation = useMutation({ mutationFn: ({ nodeId, data }) => equipmentHierarchyAPI.updateNode(nodeId, data), onSuccess: data => { queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] }); setSelectedNode(data); toast.success(t("equipment.nodeUpdated")); }, onError: e => toast.error(e.response?.data?.detail || t("equipment.operationFailed")) });
+  const updateMutation = useMutation({
+    mutationFn: ({ nodeId, data }) => equipmentHierarchyAPI.updateNode(nodeId, data),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
+      setSelectedNode(data);
+
+      const changed = [];
+      if (variables?.data && Object.prototype.hasOwnProperty.call(variables.data, "name")) changed.push(t("equipment.updatedName"));
+      if (variables?.data && Object.prototype.hasOwnProperty.call(variables.data, "description")) changed.push(t("equipment.updatedDescription"));
+      if (variables?.data && Object.prototype.hasOwnProperty.call(variables.data, "tag")) changed.push(t("equipment.updatedTag"));
+      if (variables?.data && Object.prototype.hasOwnProperty.call(variables.data, "equipment_type_id")) changed.push(t("equipment.updatedEquipmentType"));
+
+      if (changed.length) {
+        toast.success(`${t("equipment.updatedFields")} ${changed.join(", ")}`);
+      } else {
+        toast.success(t("equipment.nodeUpdated"));
+      }
+    },
+    onError: (e) => toast.error(e.response?.data?.detail || t("equipment.operationFailed")),
+  });
   const deleteMutation = useMutation({ 
     mutationFn: async (nodeId) => {
       // Find the node to delete before actually deleting
