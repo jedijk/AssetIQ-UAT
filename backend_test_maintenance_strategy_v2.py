@@ -11,7 +11,7 @@ import time
 from typing import Optional, Dict, Any
 
 # Configuration
-BASE_URL = "https://asset-translate.preview.emergentagent.com/api"
+BASE_URL = "https://equipment-sync-fix.preview.emergentagent.com/api"
 TEST_EMAIL = "jedijk@gmail.com"
 TEST_PASSWORD = "Jaap8019@"
 

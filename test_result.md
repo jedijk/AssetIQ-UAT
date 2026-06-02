@@ -407,6 +407,42 @@ agent_communication:
   - agent: "testing"
     message: "BACKEND TESTING COMPLETE - ALL TESTS PASSING (11/11). Tested all Maintenance Strategy v2 API endpoints: (1) List Strategies - returns strategies array correctly. (2) Get Non-Existent Strategy - returns exists=false for pump_centrifugal before creation. (3) Create Strategy - successfully created strategy with auto_generate=true, generated 37 failure mode strategies and 159 task templates with 100% coverage score. (4) Get Existing Strategy - returns exists=true with complete strategy details (version 1.0, 37 FMs, 159 tasks). (5) Get Version History - returns current_version and version_history array. (6) Get Task Templates - returns 159 task templates with frequency_matrix. (7) Add Task Template - successfully added 'Test Inspection Task' with criticality-based frequency matrix (quarterly/monthly/weekly). (8) Get Failure Mode Strategies - returns 37 failure mode strategies with strategy_type and detection_methods. (9) Generate Tasks for Equipment - generated 160 tasks for test-pump-001 with high criticality, correctly applied weekly frequency based on criticality level. (10) Get Equipment Strategy Instance - returns equipment strategy instance with 160 generated tasks, sync_status=current. (11) Get Sync Status - returns sync status with current_version=1.0, latest_version=1.0, is_up_to_date=true. All endpoints working correctly with proper response structures, criticality-based frequency matrix functioning, task generation based on criticality working, version history tracking in place."
 
+# Equipment Criticality Assignment Bug Fix
+backend:
+  - task: "Equipment Criticality Assignment API"
+    implemented: true
+    working: true
+    file: "/app/backend/routes/equipment/equipment_criticality.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Bug fix: Added query_cache.invalidate('equipment_nodes') after criticality updates to ensure GET /api/equipment-hierarchy/nodes returns fresh data instead of stale cached data."
+      - working: true
+        agent: "testing"
+        comment: "TESTED: Equipment criticality assignment and cache invalidation working correctly. (1) GET /api/equipment-hierarchy/nodes successfully retrieved 244 equipment nodes. (2) POST /api/equipment-hierarchy/nodes/{node_id}/criticality successfully updated criticality with production_impact=5, safety_impact=3, environmental_impact=2, reputation_impact=2. Response returned updated criticality with correct values and calculated level='safety_critical', color='#EF4444', risk_score=225. (3) Subsequent GET /api/equipment-hierarchy/nodes returned the updated node with new criticality values, confirming query cache was properly invalidated. (4) Second criticality update (production_impact=4, safety_impact=5) also persisted correctly and cache invalidation worked consistently. All 5 test cases passed. Bug fix verified - query cache invalidation is working as expected."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 10
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Equipment Criticality Assignment API"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "user"
+    message: "Test the equipment criticality assignment API to verify that: (1) When a user updates the criticality of an equipment node, the change is persisted in the database. (2) After the criticality update, subsequent calls to GET /api/equipment-hierarchy/nodes return the updated criticality values. (3) The query cache is properly invalidated after criticality changes. The bug was that the query cache wasn't being invalidated after criticality updates, causing stale data to be returned."
+  - agent: "testing"
+    message: "EQUIPMENT CRITICALITY ASSIGNMENT BUG FIX VERIFIED - ALL TESTS PASSING (5/5). Tested the equipment criticality assignment API with focus on cache invalidation bug fix. Test scenario: (1) Retrieved all equipment nodes (244 nodes found), selected test node 'Line-90'. (2) Updated criticality via POST /api/equipment-hierarchy/nodes/{node_id}/criticality with production_impact=5, safety_impact=3, environmental_impact=2, reputation_impact=2. API returned updated node with correct criticality values. (3) Immediately fetched all nodes again via GET /api/equipment-hierarchy/nodes and verified the updated node contains the new criticality values (production_impact=5), confirming cache was invalidated. (4) Performed second update (production_impact=4, safety_impact=5) and verified cache invalidation works consistently on multiple updates. Bug fix confirmed working - query_cache.invalidate('equipment_nodes') is properly clearing the cache after criticality updates, ensuring fresh data is returned on subsequent GET requests."
+
   - agent: "main"
     message: "Implementing Translation & Localization Framework Phase 1 MVP. Backend: Created models (Language, DictionaryTerm, EntityTranslation, TranslationJob) in /app/backend/models/translation.py. Created TranslationService in /app/backend/services/translation_service.py with OpenAI GPT-4o-mini for AI-powered translations, dictionary term enforcement, entity translation pipeline. Created routes (/api/translations/*) in /app/backend/routes/translations.py for language management, dictionary CRUD, entity translations, AI generation, user preferences. Frontend: Updated LanguageContext.js to support 3 languages (EN, NL, DE) with German translations in /app/frontend/src/lib/i18n/de.js. Updated Layout.js language switcher to show all 3 languages in dropdown. Please test the new translation backend endpoints."
   - agent: "testing"

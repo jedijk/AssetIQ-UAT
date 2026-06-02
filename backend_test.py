@@ -12,7 +12,7 @@ from typing import Optional, Dict, Any
 from openpyxl import Workbook
 
 # Configuration
-BASE_URL = "https://asset-translate.preview.emergentagent.com/api"
+BASE_URL = "https://equipment-sync-fix.preview.emergentagent.com/api"
 TEST_EMAIL = "jedijk@gmail.com"
 TEST_PASSWORD = "Jaap8019@"
 
@@ -1034,11 +1034,218 @@ def run_translation_tests():
     return success
 
 
+# ============================================================================
+# Equipment Criticality Assignment Tests
+# ============================================================================
+
+def test_equipment_criticality_assignment(token: str, results: TestResult) -> bool:
+    """Test equipment criticality assignment and cache invalidation"""
+    print(f"\n{Colors.BLUE}=== Test: Equipment Criticality Assignment ==={Colors.END}")
+    
+    # Step 1: Get all equipment nodes
+    try:
+        response = requests.get(
+            f"{BASE_URL}/equipment-hierarchy/nodes",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            results.add_fail("Get equipment nodes (initial)", f"Status {response.status_code}: {response.text}")
+            return False
+        
+        data = response.json()
+        nodes = data.get("nodes", [])
+        
+        if not nodes:
+            results.add_fail("Get equipment nodes (initial)", "No equipment nodes found")
+            return False
+        
+        # Pick the first node for testing
+        test_node = nodes[0]
+        node_id = test_node.get("id")
+        node_name = test_node.get("name", "Unknown")
+        original_criticality = test_node.get("criticality")
+        
+        results.add_pass(f"Get equipment nodes (initial) - found {len(nodes)} nodes")
+        print(f"  Testing with node: {node_name} (ID: {node_id})")
+        print(f"  Original criticality: {original_criticality}")
+        
+    except Exception as e:
+        results.add_fail("Get equipment nodes (initial)", str(e))
+        return False
+    
+    # Step 2: Update criticality with new production_impact value
+    try:
+        new_criticality = {
+            "production_impact": 5,
+            "safety_impact": 3,
+            "environmental_impact": 2,
+            "reputation_impact": 2
+        }
+        
+        response = requests.post(
+            f"{BASE_URL}/equipment-hierarchy/nodes/{node_id}/criticality",
+            headers=get_headers(token),
+            json=new_criticality,
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            results.add_fail("Update criticality", f"Status {response.status_code}: {response.text}")
+            return False
+        
+        data = response.json()
+        updated_criticality = data.get("criticality")
+        
+        if not updated_criticality:
+            results.add_fail("Update criticality", "No criticality in response")
+            return False
+        
+        # Verify the response contains the updated values
+        if updated_criticality.get("production_impact") == 5:
+            results.add_pass("Update criticality - production_impact set to 5")
+            print(f"  Updated criticality: {updated_criticality}")
+        else:
+            results.add_fail("Update criticality", f"Expected production_impact=5, got {updated_criticality.get('production_impact')}")
+            return False
+        
+    except Exception as e:
+        results.add_fail("Update criticality", str(e))
+        return False
+    
+    # Step 3: Wait a moment for cache invalidation to propagate
+    import time
+    time.sleep(1)
+    
+    # Step 4: Get all equipment nodes again to verify cache was invalidated
+    try:
+        response = requests.get(
+            f"{BASE_URL}/equipment-hierarchy/nodes",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            results.add_fail("Get equipment nodes (after update)", f"Status {response.status_code}: {response.text}")
+            return False
+        
+        data = response.json()
+        nodes = data.get("nodes", [])
+        
+        # Find the updated node
+        updated_node = next((n for n in nodes if n.get("id") == node_id), None)
+        
+        if not updated_node:
+            results.add_fail("Get equipment nodes (after update)", f"Node {node_id} not found in response")
+            return False
+        
+        # Verify the node has the new criticality values
+        node_criticality = updated_node.get("criticality")
+        
+        if not node_criticality:
+            results.add_fail("Verify cache invalidation", "No criticality in node after update")
+            return False
+        
+        if node_criticality.get("production_impact") == 5:
+            results.add_pass("Verify cache invalidation - GET returns updated production_impact=5")
+            print(f"  Verified criticality from GET: {node_criticality}")
+        else:
+            results.add_fail("Verify cache invalidation", f"Expected production_impact=5, got {node_criticality.get('production_impact')} - CACHE NOT INVALIDATED!")
+            return False
+        
+        # Verify all dimensions are correct
+        if (node_criticality.get("safety_impact") == 3 and
+            node_criticality.get("environmental_impact") == 2 and
+            node_criticality.get("reputation_impact") == 2):
+            results.add_pass("Verify all criticality dimensions persisted correctly")
+        else:
+            results.add_fail("Verify criticality dimensions", f"Some dimensions don't match: {node_criticality}")
+            return False
+        
+    except Exception as e:
+        results.add_fail("Get equipment nodes (after update)", str(e))
+        return False
+    
+    # Step 5: Test updating criticality again to ensure it works multiple times
+    try:
+        new_criticality_2 = {
+            "production_impact": 4,
+            "safety_impact": 5,
+            "environmental_impact": 3,
+            "reputation_impact": 3
+        }
+        
+        response = requests.post(
+            f"{BASE_URL}/equipment-hierarchy/nodes/{node_id}/criticality",
+            headers=get_headers(token),
+            json=new_criticality_2,
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            results.add_fail("Update criticality (second time)", f"Status {response.status_code}: {response.text}")
+            return False
+        
+        time.sleep(1)
+        
+        # Verify again
+        response = requests.get(
+            f"{BASE_URL}/equipment-hierarchy/nodes",
+            headers=get_headers(token),
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            nodes = response.json().get("nodes", [])
+            updated_node = next((n for n in nodes if n.get("id") == node_id), None)
+            
+            if updated_node and updated_node.get("criticality", {}).get("production_impact") == 4:
+                results.add_pass("Update criticality (second time) - cache invalidation works consistently")
+            else:
+                results.add_fail("Update criticality (second time)", "Cache invalidation failed on second update")
+                return False
+        
+    except Exception as e:
+        results.add_fail("Update criticality (second time)", str(e))
+        return False
+    
+    print(f"\n{Colors.GREEN}✓ Equipment criticality assignment and cache invalidation working correctly{Colors.END}")
+    return True
+
+
+def run_equipment_criticality_tests():
+    """Run equipment criticality assignment tests"""
+    print(f"\n{Colors.BLUE}{'='*60}{Colors.END}")
+    print(f"{Colors.BLUE}Equipment Criticality Assignment Tests{Colors.END}")
+    print(f"{Colors.BLUE}{'='*60}{Colors.END}")
+    
+    results = TestResult()
+    
+    # Login
+    token = login()
+    if not token:
+        print(f"\n{Colors.RED}Failed to authenticate. Cannot proceed with tests.{Colors.END}")
+        sys.exit(1)
+    
+    # Run test
+    test_equipment_criticality_assignment(token, results)
+    
+    # Print summary
+    success = results.summary()
+    
+    return success
+
+
 if __name__ == "__main__":
-    # Check if we should run translation tests
-    if len(sys.argv) > 1 and sys.argv[1] == "translation":
-        success = run_translation_tests()
-        sys.exit(0 if success else 1)
-    else:
-        # Run original PM Import tests
-        main()
+    # Check if we should run specific tests
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "translation":
+            success = run_translation_tests()
+            sys.exit(0 if success else 1)
+        elif sys.argv[1] == "criticality":
+            success = run_equipment_criticality_tests()
+            sys.exit(0 if success else 1)
+    
+    # Run original PM Import tests by default
+    main()

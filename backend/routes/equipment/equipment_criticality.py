@@ -8,6 +8,7 @@ from database import db, installation_filter
 from auth import get_current_user
 from services.threat_score_service import recalculate_threat_scores_for_asset
 from services.cache_service import cache
+from services.query_cache import query_cache
 from iso14224_models import ISOLevel, ISO_LEVEL_ORDER, Discipline, CriticalityAssignment
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,8 @@ async def assign_criticality(
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }}
         )
+        # Invalidate query cache when criticality is cleared
+        query_cache.invalidate("equipment_nodes")
         updated = await db.equipment_nodes.find_one({"id": node_id}, {"_id": 0})
         return updated
     
@@ -100,6 +103,9 @@ async def assign_criticality(
     # Invalidate equipment cache so threat auto-sync reads fresh data
     cache.invalidate_equipment(node_id)
     cache.invalidate_equipment(f"name:{node.get('name')}")
+    
+    # Invalidate query cache for equipment nodes so UI fetches fresh data
+    query_cache.invalidate("equipment_nodes")
     
     # Recalculate risk scores for all threats linked to this asset
     asset_name = node.get("name")
