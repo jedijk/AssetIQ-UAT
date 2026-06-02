@@ -107,7 +107,7 @@ const CriticalityDimension = ({ label, color, value, onClick, scale, dimension }
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-1">
           <span className={`text-xs font-medium text-${color}-700`}>{label}</span>
-          {scale && (
+          {scale && Object.keys(scale).length > 0 && (
             <Popover>
               <PopoverTrigger asChild>
                 <button
@@ -120,10 +120,10 @@ const CriticalityDimension = ({ label, color, value, onClick, scale, dimension }
               <PopoverContent 
                 side="top" 
                 align="center" 
-                className="w-64 p-0 z-50" 
+                className="w-64 p-0 z-50 !animate-none" 
                 sideOffset={8}
                 collisionPadding={16}
-                avoidCollisions={true}
+                style={{ animation: 'none' }}
               >
                 <div className="px-3 py-2 border-b border-slate-100">
                   <p className={`text-xs font-semibold text-${color}-700`}>{label} {t("equipment.impactScaleSuffix")}</p>
