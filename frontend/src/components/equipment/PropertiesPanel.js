@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../../contexts/LanguageContext";
@@ -369,12 +369,43 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
   const [editDesc, setEditDesc] = useState("");
   const [editTag, setEditTag] = useState("");
   const [editProcessStep, setEditProcessStep] = useState("");
+  const [localProcessStep, setLocalProcessStep] = useState(node?.process_step || "");
+  const processStepTimeoutRef = useRef(null);
   const editNameRef = useRef(null);
   const [showAllTypes, setShowAllTypes] = useState(false);
   const [typeSearchOpen, setTypeSearchOpen] = useState(false);
   const [typeSearchQuery, setTypeSearchQuery] = useState("");
   const [showQRDialog, setShowQRDialog] = useState(false);
   
+  // Sync localProcessStep when node changes
+  useEffect(() => {
+    setLocalProcessStep(node?.process_step || "");
+  }, [node?.id, node?.process_step]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (processStepTimeoutRef.current) {
+        clearTimeout(processStepTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Debounced process step update handler
+  const handleProcessStepChange = useCallback((value) => {
+    setLocalProcessStep(value);
+    
+    // Clear existing timeout
+    if (processStepTimeoutRef.current) {
+      clearTimeout(processStepTimeoutRef.current);
+    }
+    
+    // Debounce API call by 500ms
+    processStepTimeoutRef.current = setTimeout(() => {
+      onUpdate(node.id, { process_step: value });
+    }, 500);
+  }, [node?.id, onUpdate]);
+
   // Fetch QR code for this equipment
   const { data: qrData } = useQuery({
     queryKey: ["qr-code", node?.id],
@@ -503,8 +534,8 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
   const LevelIcon = config.icon;
   const critColors = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
   
-  const handleSave = () => { onUpdate(node.id, { name: editName, description: editDesc, tag: editTag, process_step: editProcessStep }); setIsEditing(false); };
-  const startEdit = () => { setEditName(node.name); setEditDesc(node.description || ""); setEditTag(node.tag || ""); setEditProcessStep(node.process_step || ""); setIsEditing(true); };
+  const handleSave = () => { onUpdate(node.id, { name: editName, description: editDesc, tag: editTag }); setIsEditing(false); };
+  const startEdit = () => { setEditName(node.name); setEditDesc(node.description || ""); setEditTag(node.tag || ""); setIsEditing(true); };
   
   return (
     <div className="h-full flex flex-col" data-testid="properties-panel">
@@ -747,18 +778,14 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
           {(node.level === "subunit" || node.level === "maintainable_item") && (
             <div>
               <Label className="text-xs text-slate-500 mb-1">{t("equipment.processStep")}</Label>
-              {isEditing ? (
-                <Input 
-                  value={editProcessStep} 
-                  onChange={e => setEditProcessStep(e.target.value)} 
-                  placeholder={t("equipment.processStepPlaceholder")} 
-                  className="h-9 text-sm"
-                  data-testid="process-step-input"
-                />
-              ) : (
-                <p className="text-sm text-slate-700">{node.process_step || <span className="text-slate-400 italic">{t("equipment.processStepPlaceholder")}</span>}</p>
-              )}
-              {node.process_step && !isEditing && (
+              <Input 
+                value={localProcessStep} 
+                onChange={e => handleProcessStepChange(e.target.value)} 
+                placeholder={t("equipment.processStepPlaceholder")} 
+                className="h-9 text-sm"
+                data-testid="process-step-input"
+              />
+              {localProcessStep && (
                 <p className="text-xs text-slate-400 mt-1">{t("equipment.processStepHint")}</p>
               )}
             </div>
