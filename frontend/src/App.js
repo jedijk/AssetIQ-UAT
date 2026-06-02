@@ -106,7 +106,7 @@ function MotionWithCapabilities({ children }) {
 }
 
 // Current frontend version - update with each release
-const APP_VERSION = "3.7.2";
+const APP_VERSION = "3.7.3";
 
 // Parse a semver string "A.B.C" into comparable tuple [A, B, C]
 const parseVersion = (v) => {

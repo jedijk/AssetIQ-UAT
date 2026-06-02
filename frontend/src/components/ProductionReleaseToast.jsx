@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 
-const RELEASE_TOAST_VERSION = process.env.REACT_APP_VERSION || "3.7.2";
+const RELEASE_TOAST_VERSION = process.env.REACT_APP_VERSION || "3.7.3";
 
 /**
  * One-time toast per (app version, language) pair after login.

@@ -172,7 +172,7 @@ const de = {
   },
 
   announcements: {
-    liteModeTitle: "AssetIQ 3.7.2 — Was gibt's Neues",
+    liteModeTitle: "AssetIQ 3.7.3 — Was gibt's Neues",
     liteModeBody: "Equipment Manager: Cache-/Update-Probleme behoben, sodass Änderungen zuverlässig gespeichert werden. Wartungsplanung: neuer Beta-Bereich für Planung und Timeline-Scheduling.",
   },
   

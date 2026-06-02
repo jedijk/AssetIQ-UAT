@@ -178,7 +178,7 @@ const en = {
 
   // Release / product announcements (toasts)
   announcements: {
-    liteModeTitle: "AssetIQ 3.7.2 — What's new",
+    liteModeTitle: "AssetIQ 3.7.3 — What's new",
     liteModeBody:
       "Equipment Manager: fixed caching/update issues so changes persist reliably. Maintenance Scheduling: new beta section for planning and timeline scheduling.",
   },
@@ -2007,7 +2007,7 @@ const nl = {
   },
 
   announcements: {
-    liteModeTitle: "AssetIQ 3.7.2 — Wat is er nieuw",
+    liteModeTitle: "AssetIQ 3.7.3 — Wat is er nieuw",
     liteModeBody:
       "Apparatuurbeheer: cache/updateproblemen opgelost zodat wijzigingen betrouwbaar worden opgeslagen. Onderhoudsplanning: nieuwe beta-sectie voor planning en tijdlijn scheduling.",
   },
