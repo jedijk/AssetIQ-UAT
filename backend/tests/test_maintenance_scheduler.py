@@ -8,7 +8,7 @@ import pytest
 import requests
 from datetime import datetime, timedelta
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://impl-audit.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://maintenance-nexus-1.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
 
 EMAIL = "jedijk@gmail.com"
