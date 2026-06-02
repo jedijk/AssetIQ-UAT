@@ -730,21 +730,9 @@ export default function EquipmentManagerPage() {
   const createMutation = useMutation({ mutationFn: equipmentHierarchyAPI.createNode, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] }); toast.success(t("equipment.nodeCreated")); setIsCreateOpen(false); setNewNode({ name: "", level: "installation", parent_id: null }); }, onError: e => toast.error(e.response?.data?.detail || t("equipment.operationFailed")) });
   const updateMutation = useMutation({
     mutationFn: ({ nodeId, data }) => equipmentHierarchyAPI.updateNode(nodeId, data),
-    onSuccess: (data, variables) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
       setSelectedNode(data);
-
-      const changed = [];
-      if (variables?.data && Object.prototype.hasOwnProperty.call(variables.data, "name")) changed.push(t("equipment.updatedName"));
-      if (variables?.data && Object.prototype.hasOwnProperty.call(variables.data, "description")) changed.push(t("equipment.updatedDescription"));
-      if (variables?.data && Object.prototype.hasOwnProperty.call(variables.data, "tag")) changed.push(t("equipment.updatedTag"));
-      if (variables?.data && Object.prototype.hasOwnProperty.call(variables.data, "equipment_type_id")) changed.push(t("equipment.updatedEquipmentType"));
-
-      if (changed.length) {
-        toast.success(`${t("equipment.updatedFields")} ${changed.join(", ")}`);
-      } else {
-        toast.success(t("equipment.nodeUpdated"));
-      }
     },
     onError: (e) => toast.error(e.response?.data?.detail || t("equipment.operationFailed")),
   });
@@ -829,23 +817,16 @@ export default function EquipmentManagerPage() {
       setSelectedNode((prev) => (prev && prev.id === nodeId ? { ...prev, criticality: preview } : prev));
       return { previousSelected };
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
       setSelectedNode(data);
-      const a = variables?.assignment || {};
-      const hasAny =
-        (a.safety_impact && a.safety_impact > 0) ||
-        (a.production_impact && a.production_impact > 0) ||
-        (a.environmental_impact && a.environmental_impact > 0) ||
-        (a.reputation_impact && a.reputation_impact > 0);
-      toast.success(hasAny ? t("equipment.criticalityAssigned") : t("equipment.criticalityCleared"));
     },
     onError: (e, _vars, ctx) => {
       if (ctx?.previousSelected) setSelectedNode(ctx.previousSelected);
       toast.error(e.response?.data?.detail || t("equipment.operationFailed"));
     },
   });
-  const disciplineMutation = useMutation({ mutationFn: ({ nodeId, discipline }) => equipmentHierarchyAPI.assignDiscipline(nodeId, discipline), onSuccess: data => { queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] }); setSelectedNode(data); toast.success(t("equipment.disciplineAssigned")); }, onError: e => toast.error(e.response?.data?.detail || t("equipment.operationFailed")) });
+  const disciplineMutation = useMutation({ mutationFn: ({ nodeId, discipline }) => equipmentHierarchyAPI.assignDiscipline(nodeId, discipline), onSuccess: data => { queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] }); setSelectedNode(data); }, onError: e => toast.error(e.response?.data?.detail || t("equipment.operationFailed")) });
   const parseListMutation = useMutation({ mutationFn: ({ content, source }) => equipmentHierarchyAPI.parseEquipmentList(content, source), onSuccess: (data) => { queryClient.invalidateQueries({ queryKey: ["unstructured-items"] }); toast.success(`${data.parsed_count} ${t("equipment.itemsParsed")}`); setIsImportOpen(false); setImportText(""); }, onError: e => toast.error(e.response?.data?.detail || t("equipment.failedToParse")) });
   const parseFileMutation = useMutation({ mutationFn: (file) => equipmentHierarchyAPI.parseEquipmentFile(file), onSuccess: (data) => { queryClient.invalidateQueries({ queryKey: ["unstructured-items"] }); toast.success(`${data.parsed_count} ${t("equipment.itemsParsedFrom")} ${data.filename}`); }, onError: e => toast.error(e.response?.data?.detail || t("equipment.failedToParseFile")) });
   const deleteUnstructuredMutation = useMutation({ mutationFn: equipmentHierarchyAPI.deleteUnstructuredItem, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["unstructured-items"] }); }, onError: e => toast.error(e.response?.data?.detail || t("equipment.operationFailed")) });
