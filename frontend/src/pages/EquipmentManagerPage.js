@@ -609,19 +609,16 @@ export default function EquipmentManagerPage() {
 
   // Full refresh handler - clears both backend and frontend cache
   const handleFullRefresh = async () => {
-    toast.info(t("equipment.refreshingData"));
     try {
       // Clear backend cache first
       await equipmentHierarchyAPI.refreshCache();
       // Then clear frontend cache and refetch
       await queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
       await queryClient.refetchQueries({ queryKey: ["equipment-nodes"] });
-      toast.success(t("equipment.dataRefreshed"));
     } catch (error) {
       console.error("Refresh failed:", error);
       // Still try to refetch even if backend cache clear fails
       await queryClient.refetchQueries({ queryKey: ["equipment-nodes"] });
-      toast.success(t("equipment.dataRefreshed"));
     }
   };
 
@@ -1231,7 +1228,7 @@ export default function EquipmentManagerPage() {
             title={t("equipment.refreshTooltip")}
           >
             <RefreshCw className={`w-4 h-4 mr-1 ${isFetching ? 'animate-spin' : ''}`} />
-            {isFetching ? t("equipment.refreshing") : t("equipment.refresh")}
+            {t("equipment.refresh")}
           </Button>
           <div className="w-px h-6 bg-slate-200" />
           <Button onClick={() => setIsImportOpen(true)} size="sm" variant="outline" data-testid="import-list-btn"><Upload className="w-4 h-4 mr-1" />{t("equipment.importList")}</Button>
