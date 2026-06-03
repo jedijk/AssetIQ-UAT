@@ -2730,7 +2730,7 @@ Respond in JSON format:
     
     async def _build_equipment_match(self, equipment_node: Dict, partial: bool = False) -> Dict[str, Any]:
         """Build equipment match response with type details."""
-        from iso14224_models import ISO14224_EQUIPMENT_TYPES
+        from iso14224_models import EQUIPMENT_TYPES
         
         equipment_type = None
         equipment_type_id = equipment_node.get("equipment_type_id")
@@ -2745,7 +2745,7 @@ Respond in JSON format:
             # If not found in custom, check ISO14224 standard types
             if not equipment_type:
                 iso_type = next(
-                    (t for t in ISO14224_EQUIPMENT_TYPES if t.get("id") == equipment_type_id),
+                    (t for t in EQUIPMENT_TYPES if t.get("id") == equipment_type_id),
                     None
                 )
                 if iso_type:
