@@ -2803,7 +2803,14 @@ Respond in JSON format:
             fm_list = []
             for i, fm in enumerate(similar_failure_modes[:5], 1):
                 actions = fm.get("recommended_actions", [])
-                actions_str = ", ".join(actions[:3]) if actions else "None"
+                # Handle both string and dict actions
+                actions_strs = []
+                for action in actions[:3]:
+                    if isinstance(action, dict):
+                        actions_strs.append(action.get("description", action.get("action", str(action))))
+                    else:
+                        actions_strs.append(str(action))
+                actions_str = ", ".join(actions_strs) if actions_strs else "None"
                 fm_list.append(
                     f"{i}. ID: {fm.get('id')}, Failure Mode: {fm.get('failure_mode')}, "
                     f"Equipment: {fm.get('equipment')}, Mechanism: {fm.get('mechanism')}, "

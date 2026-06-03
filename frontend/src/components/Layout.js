@@ -1092,20 +1092,14 @@ const Layout = () => {
               onOpenChange={(open) => setOpenHeaderMenu(open ? "help" : null)}
             >
               <DropdownMenuTrigger asChild>
-                <motion.div
-                  whileHover={{ scale: 1.08 }}
-                  whileTap={{ scale: 0.92 }}
-                  transition={springPresets.snappy}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 sm:h-8 sm:w-8 text-slate-600 hover:text-slate-900 hover:scale-105 active:scale-95 transition-transform"
+                  data-testid="help-menu-button"
                 >
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 sm:h-8 sm:w-8 text-slate-600 hover:text-slate-900"
-                    data-testid="help-menu-button"
-                  >
-                    <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  </Button>
-                </motion.div>
+                  <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuLabel className="text-xs">Help</DropdownMenuLabel>
