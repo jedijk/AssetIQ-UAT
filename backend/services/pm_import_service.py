@@ -1716,6 +1716,10 @@ Only return the JSON array, no other text."""
         # Step 3b: Extract discipline from Excel column if present
         # Check common discipline column names (case-insensitive matching via row keys)
         explicit_discipline = ""
+        # Log all keys to debug column detection
+        row_keys = [k for k in row.keys() if not k.startswith('_')]
+        logger.info(f"Row columns (non-internal): {row_keys}")
+        
         for key in row.keys():
             key_lower = key.lower().strip() if isinstance(key, str) else ""
             if key_lower in ("discipline", "disc", "vakgebied", "specialisme", "dept", "department"):
@@ -1724,6 +1728,9 @@ Only return the JSON array, no other text."""
                     explicit_discipline = str(val).strip()
                     logger.info(f"Found explicit discipline '{explicit_discipline}' from column '{key}'")
                     break
+        
+        if not explicit_discipline:
+            logger.info(f"No explicit discipline found in columns")
         
         # Step 4: AI enhancement
         ai_analysis = await self._ai_analyze_task(task_text, task_type, rule_based_data)
