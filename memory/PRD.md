@@ -7,6 +7,12 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **PM Import AI Review — Semantic replace via LLM (VERIFIED)**:
+  - The AI Review LLM now sees each candidate failure mode's FULL `recommended_actions` list (with 1-based indices) and explicitly picks `replace_action_index` — the existing action to overwrite — when it judges the new PM task semantically equivalent (e.g. "Lubricate input bearings with grease" → replaces "Improve lubrication"), else returns `null` to add a new action.
+  - The stored suggestion carries `replace_action_index`, `replace_action_text`, and `target_actions_list`. The frontend renders the FM's existing actions with the to-be-replaced row highlighted in amber + strike-through, and the apply button reads "↻ Will replace with this task" vs "✓ Will add this task".
+  - `apply_ai_suggestion` accepts `replace_action_index` (passed via `ApplySuggestionRequest`). Backend honours the AI's choice; falls back to lexical similarity if the index is missing or out-of-bounds. Lexical check kept as safety net.
+  - Files: `services/pm_import_service.py` (`_ai_generate_recommendation` prompt + post-processing, `_apply_task_to_failure_mode`), `routes/pm_import.py`, `components/library/AIReviewModal.jsx`.
+
 - [Feb 2026] **PM Import AI Review — Replace-or-Add behavior (VERIFIED)**:
   - When applying an AI suggestion that "merges" / "new_task"s a PM task into an existing failure mode, the backend now checks `recommended_actions` for a similar task and **replaces** it in-place; otherwise it appends as a new task. Prevents accumulating near-duplicates like "Inspect bearings" + "Inspect the bearings (Frequency: Monthly)".
   - Similarity = difflib `SequenceMatcher` ratio ≥ 0.6 on normalized text (lowercased, punctuation stripped, "(Frequency: …)" suffix removed). Substring containment forces ratio to ≥ 0.85.

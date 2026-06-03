@@ -2904,24 +2904,36 @@ Respond in JSON format:
         frequency = task.get("frequency") or ""
         equipment_tag = task.get("equipment_tag") or ""
         
-        # Build context for AI
+        # Build context for AI — include the FULL recommended_actions list for the
+        # top candidate so the LLM can pick a specific action to replace.
         fm_context = ""
+        target_actions_list: List[str] = []  # 1-indexed list of action texts for the top FM (used by frontend preview)
         if similar_failure_modes:
             fm_list = []
             for i, fm in enumerate(similar_failure_modes[:5], 1):
-                actions = fm.get("recommended_actions", [])
-                # Handle both string and dict actions
+                actions = fm.get("recommended_actions") or []
                 actions_strs = []
-                for action in actions[:3]:
-                    if isinstance(action, dict):
-                        actions_strs.append(action.get("description", action.get("action", str(action))))
+                for a in actions:
+                    if isinstance(a, dict):
+                        actions_strs.append(
+                            a.get("description") or a.get("action") or a.get("name") or str(a)
+                        )
                     else:
-                        actions_strs.append(str(action))
-                actions_str = ", ".join(actions_strs) if actions_strs else "None"
+                        actions_strs.append(str(a))
+                if i == 1:
+                    target_actions_list = list(actions_strs)
+                # Render each candidate's full action list with 1-based indices so
+                # the LLM can reference them by number.
+                if actions_strs:
+                    actions_block = "\n      ".join(
+                        f"[{idx}] {txt}" for idx, txt in enumerate(actions_strs, 1)
+                    )
+                else:
+                    actions_block = "(no existing actions)"
                 fm_list.append(
-                    f"{i}. ID: {fm.get('id')}, Failure Mode: {fm.get('failure_mode')}, "
-                    f"Equipment: {fm.get('equipment')}, Mechanism: {fm.get('mechanism')}, "
-                    f"Actions: {actions_str}"
+                    f"{i}. ID: {fm.get('id')} | Failure Mode: {fm.get('failure_mode')} | "
+                    f"Equipment: {fm.get('equipment')} | Mechanism: {fm.get('mechanism')}\n"
+                    f"   Existing actions:\n      {actions_block}"
                 )
             fm_context = "\n".join(fm_list)
         else:
@@ -2947,20 +2959,30 @@ TASK DETAILS:
 EQUIPMENT MATCH:
 {equipment_context}
 
-SIMILAR FAILURE MODES IN LIBRARY:
+SIMILAR FAILURE MODES IN LIBRARY (each candidate's existing recommended actions
+are listed with 1-based indices in [brackets]):
 {fm_context}
 
 Based on this information, recommend ONE of these actions:
-1. "merge" - Merge this task into an existing failure mode's recommended actions
-2. "new_failure_mode" - Create a new failure mode for this task
-3. "new_task" - Add as a new task under an existing failure mode
-4. "keep_custom" - Keep as a custom task (not linked to failure mode library)
+1. "merge" - Merge this task into an existing failure mode's recommended actions.
+   IMPORTANT: prefer REPLACING an existing semantically-equivalent action over
+   adding a duplicate. Examples of semantic equivalence:
+     • "Lubricate input bearings with grease" ≡ "Improve lubrication"
+     • "Check vibration on motor monthly" ≡ "Monitor vibration"
+     • "Replace V-belt when worn" ≡ "Replace belt on failure"
+   Only add as a brand-new action if NO existing action covers the same intent.
+2. "new_failure_mode" - Create a new failure mode for this task.
+3. "new_task" - Add as a new task under an existing failure mode (same
+   replace-or-add rule applies — prefer replace when an equivalent action exists).
+4. "keep_custom" - Keep as a custom task (not linked to failure mode library).
 
 Respond with a JSON object:
 {{
     "action": "merge" | "new_failure_mode" | "new_task" | "keep_custom",
     "target_failure_mode_id": "id of failure mode if merge or new_task, null otherwise",
-    "reasoning": "Brief explanation of why this recommendation",
+    "replace_action_index": <integer 1-based index from the target FM's existing actions list to replace, or null to ADD as a new action>,
+    "replace_action_text": "<the EXACT text of the action you chose to replace, copy-paste from the list above, or null>",
+    "reasoning": "Brief explanation of why this recommendation AND why this specific action was chosen for replacement (or why nothing was equivalent and a new task was added)",
     "suggested_failure_mode_name": "Name if creating new failure mode, null otherwise",
     "suggested_equipment_type": "Suggested equipment type if no match found, null otherwise",
     "confidence": 0-100
@@ -3008,7 +3030,25 @@ Respond with a JSON object:
                         "equipment": target_fm.get("equipment"),
                         "category": target_fm.get("category")
                     }
-            
+
+            # Normalize the replace_action_index — accept 1-based int, validate against
+            # the target FM's actions, and attach the resolved text for the frontend.
+            raw_idx = recommendation.get("replace_action_index")
+            replace_idx_zero: Optional[int] = None
+            if raw_idx is not None:
+                try:
+                    raw_idx_int = int(raw_idx)
+                    if 1 <= raw_idx_int <= len(target_actions_list):
+                        replace_idx_zero = raw_idx_int - 1
+                except (TypeError, ValueError):
+                    pass
+            recommendation["replace_action_index"] = replace_idx_zero  # store 0-based for backend use
+            recommendation["replace_action_text"] = (
+                target_actions_list[replace_idx_zero] if replace_idx_zero is not None else None
+            )
+            # Always expose the candidate's full action list so the UI can render a preview.
+            recommendation["target_actions_list"] = target_actions_list
+
             return recommendation
             
         except Exception as e:
@@ -3115,10 +3155,16 @@ Respond with a JSON object:
         action_text: str,
         updated_by: str,
         change_reason: str,
+        replace_action_index: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Replace a similar existing task in a failure mode's recommended_actions,
         otherwise append it. Version history captures the previous state (acts as a
         soft archive of replaced tasks).
+
+        If `replace_action_index` is provided (0-based) and valid, that exact slot
+        is replaced — this is the path used when the AI Review LLM has already
+        chosen a semantically-equivalent action to replace. Otherwise we fall back
+        to lexical similarity (`_find_similar_action_index`) for safety.
 
         Returns {success, message, mode: "replaced"|"added", replaced_index}.
         """
@@ -3143,13 +3189,29 @@ Respond with a JSON object:
             }
 
         existing_actions = list(fm_doc.get("recommended_actions") or [])
-        match_idx, ratio = self._find_similar_action_index(action_text, existing_actions)
+
+        # Prefer the AI-chosen replacement index if it's in bounds.
+        match_idx = -1
+        ratio = 0.0
+        if (
+            replace_action_index is not None
+            and isinstance(replace_action_index, int)
+            and 0 <= replace_action_index < len(existing_actions)
+        ):
+            match_idx = replace_action_index
+            ratio = 1.0  # AI explicitly chose this slot
+        else:
+            match_idx, ratio = self._find_similar_action_index(action_text, existing_actions)
 
         if match_idx >= 0:
             new_actions = list(existing_actions)
             new_actions[match_idx] = action_text
             mode = "replaced"
-            message = f"Replaced existing task (similarity {ratio:.0%})"
+            message = (
+                "Replaced existing task (AI-selected)"
+                if ratio == 1.0 and replace_action_index is not None
+                else f"Replaced existing task (similarity {ratio:.0%})"
+            )
         else:
             new_actions = existing_actions + [action_text]
             mode = "added"
@@ -3188,7 +3250,8 @@ Respond with a JSON object:
         task_id: str, 
         action: str,
         target_failure_mode_id: Optional[str] = None,
-        new_failure_mode_data: Optional[Dict[str, Any]] = None
+        new_failure_mode_data: Optional[Dict[str, Any]] = None,
+        replace_action_index: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         Apply an AI suggestion for a task.
@@ -3218,7 +3281,13 @@ Respond with a JSON object:
         
         result = {"task_id": task_id, "action": action, "success": False}
         updated_by = session.get("created_by") or "PM Import AI Review"
-        
+
+        # If the caller didn't override, use the AI's stored choice for replacement.
+        if replace_action_index is None and suggestion:
+            ai_idx = (suggestion.get("recommendation") or {}).get("replace_action_index")
+            if isinstance(ai_idx, int):
+                replace_action_index = ai_idx
+
         if action == "merge" and target_failure_mode_id:
             task_description = task.get("task_description") or task.get("original_task") or ""
             frequency = task.get("frequency") or ""
@@ -3229,6 +3298,7 @@ Respond with a JSON object:
                 action_text=action_text,
                 updated_by=updated_by,
                 change_reason=f"PM Import AI Review — merge task {task_id}",
+                replace_action_index=replace_action_index,
             )
             result.update(apply_res)
             if apply_res["success"]:
@@ -3286,6 +3356,7 @@ Respond with a JSON object:
                     action_text=action_text,
                     updated_by=updated_by,
                     change_reason=f"PM Import AI Review — new task {task_id}",
+                    replace_action_index=replace_action_index,
                 )
                 result.update(apply_res)
                 if apply_res["success"]:

@@ -70,6 +70,10 @@ class ApplySuggestionRequest(BaseModel):
     action: str  # "merge", "new_failure_mode", "new_task", "keep_custom", "reject"
     target_failure_mode_id: Optional[str] = None
     new_failure_mode_data: Optional[Dict[str, Any]] = None
+    # 0-based index of an existing recommended_action to replace. When omitted
+    # the backend falls back to the AI's stored choice on the suggestion, then to
+    # a lexical similarity check.
+    replace_action_index: Optional[int] = None
 
 
 # Background task for processing
@@ -953,7 +957,8 @@ async def apply_ai_suggestion(
             task_id=task_id,
             action=request.action,
             target_failure_mode_id=request.target_failure_mode_id,
-            new_failure_mode_data=request.new_failure_mode_data
+            new_failure_mode_data=request.new_failure_mode_data,
+            replace_action_index=request.replace_action_index,
         )
         return result
     except ValueError as e:

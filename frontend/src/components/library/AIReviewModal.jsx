@@ -266,27 +266,49 @@ const SuggestionCard = ({ suggestion, onApply, onReject, isApplying }) => {
                     
                     {/* Show existing actions in the target failure mode */}
                     {(() => {
-                      // Find the full FM data from similarFMs to get recommended_actions
+                      // Prefer the actions list captured at AI-review time (with the
+                      // exact index the AI referenced). Falls back to live FM data.
+                      const aiActions = recommendation.target_actions_list;
                       const fullFm = similarFMs.find(fm => fm.id === recommendation.target_failure_mode_id);
-                      const actions = fullFm?.recommended_actions || [];
+                      const actions = (aiActions && aiActions.length > 0)
+                        ? aiActions
+                        : (fullFm?.recommended_actions || []);
+                      const replaceIdx = typeof recommendation.replace_action_index === "number"
+                        ? recommendation.replace_action_index
+                        : null;
                       if (actions.length > 0) {
                         return (
                           <div className="mt-3 pt-3 border-t border-blue-200">
                             <div className="text-xs font-medium text-blue-700 mb-2">
-                              Existing Tasks/Actions ({actions.length}):
-                            </div>
-                            <ul className="space-y-1 text-xs text-blue-600 max-h-24 overflow-y-auto">
-                              {actions.slice(0, 5).map((action, idx) => (
-                                <li key={idx} className="flex items-start gap-1">
-                                  <span className="text-blue-400 mt-0.5">•</span>
-                                  <span className="line-clamp-2">
-                                    {typeof action === 'string' ? action : action?.description || action?.action || JSON.stringify(action)}
-                                  </span>
-                                </li>
-                              ))}
-                              {actions.length > 5 && (
-                                <li className="text-blue-400 italic">...and {actions.length - 5} more</li>
+                              Existing Tasks/Actions ({actions.length})
+                              {replaceIdx !== null && (
+                                <span className="ml-2 text-amber-700">
+                                  — AI will replace #{replaceIdx + 1}
+                                </span>
                               )}
+                            </div>
+                            <ul className="space-y-1 text-xs text-blue-600 max-h-40 overflow-y-auto">
+                              {actions.map((action, idx) => {
+                                const isReplaceTarget = idx === replaceIdx;
+                                const text = typeof action === 'string'
+                                  ? action
+                                  : action?.description || action?.action || JSON.stringify(action);
+                                return (
+                                  <li
+                                    key={idx}
+                                    className={`flex items-start gap-1 px-2 py-1 rounded ${
+                                      isReplaceTarget
+                                        ? "bg-amber-50 border border-amber-300 text-amber-800 line-through"
+                                        : ""
+                                    }`}
+                                  >
+                                    <span className={isReplaceTarget ? "text-amber-500 mt-0.5 no-underline" : "text-blue-400 mt-0.5"}>
+                                      {isReplaceTarget ? "✕" : "•"}
+                                    </span>
+                                    <span className="line-clamp-2">{text}</span>
+                                  </li>
+                                );
+                              })}
                             </ul>
                           </div>
                         );
@@ -294,10 +316,12 @@ const SuggestionCard = ({ suggestion, onApply, onReject, isApplying }) => {
                       return null;
                     })()}
                     
-                    {/* Show what will be added */}
+                    {/* Show what will be added/replaced */}
                     <div className="mt-3 pt-3 border-t border-blue-200">
                       <div className="text-xs font-medium text-green-700 mb-1">
-                        ✓ Will add this task:
+                        {typeof recommendation.replace_action_index === "number"
+                          ? "↻ Will replace with this task:"
+                          : "✓ Will add this task:"}
                       </div>
                       <div className="text-xs text-green-600 bg-green-50 p-2 rounded border border-green-200">
                         {suggestion.task_description}
@@ -411,6 +435,9 @@ export const AIReviewModal = ({ isOpen, onClose, sessionId, onComplete }) => {
       const result = await pmImportAPI.applySuggestion(sessionId, taskId, {
         action: recommendation.action,
         target_failure_mode_id: recommendation.target_failure_mode_id,
+        replace_action_index: typeof recommendation.replace_action_index === "number"
+          ? recommendation.replace_action_index
+          : null,
         new_failure_mode_data: recommendation.action === "new_failure_mode" ? {
           failure_mode: recommendation.suggested_failure_mode_name
         } : null
