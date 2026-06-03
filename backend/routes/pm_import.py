@@ -98,6 +98,31 @@ async def process_pm_file_background(
 
 # ============== ROUTES ==============
 
+@router.get("/template")
+async def download_pm_template():
+    """
+    Download an empty PM Import Excel template.
+    
+    The template includes:
+    - Column headers: Tag, Task, Frequency, Discipline
+    - Example rows (in gray italic)
+    - Instructions sheet with valid discipline values
+    """
+    import os
+    from fastapi.responses import FileResponse
+    
+    template_path = "/app/backend/static/templates/pm_import_template.xlsx"
+    
+    if not os.path.exists(template_path):
+        raise HTTPException(status_code=404, detail="Template file not found")
+    
+    return FileResponse(
+        path=template_path,
+        filename="pm_import_template.xlsx",
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+
 @router.post("/upload")
 async def upload_pm_plan(
     file: UploadFile = File(...),

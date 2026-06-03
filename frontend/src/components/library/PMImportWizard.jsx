@@ -1351,6 +1351,22 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
                 </div>
               </div>
               
+              {/* Download template */}
+              <div className="flex items-center justify-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                  onClick={() => {
+                    const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL || '';
+                    window.open(`${backendUrl}/api/pm-import/template`, '_blank');
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download Excel Template
+                </Button>
+              </div>
+              
               {/* Action buttons */}
               <div className="flex justify-end gap-3">
                 <Button variant="outline" onClick={handleClose}>
