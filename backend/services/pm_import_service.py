@@ -2730,19 +2730,37 @@ Respond in JSON format:
     
     async def _build_equipment_match(self, equipment_node: Dict, partial: bool = False) -> Dict[str, Any]:
         """Build equipment match response with type details."""
+        from iso14224_models import ISO14224_EQUIPMENT_TYPES
+        
         equipment_type = None
-        if equipment_node.get("equipment_type_id"):
+        equipment_type_id = equipment_node.get("equipment_type_id")
+        
+        if equipment_type_id:
+            # First try custom_equipment_types collection
             equipment_type = await self.db.custom_equipment_types.find_one(
-                {"id": equipment_node["equipment_type_id"]},
+                {"id": equipment_type_id},
                 {"_id": 0, "id": 1, "name": 1, "category": 1}
             )
+            
+            # If not found in custom, check ISO14224 standard types
+            if not equipment_type:
+                iso_type = next(
+                    (t for t in ISO14224_EQUIPMENT_TYPES if t.get("id") == equipment_type_id),
+                    None
+                )
+                if iso_type:
+                    equipment_type = {
+                        "id": iso_type.get("id"),
+                        "name": iso_type.get("name"),
+                        "category": iso_type.get("category")
+                    }
         
         result = {
             "matched": True,
             "equipment_id": equipment_node.get("id"),
             "equipment_tag": equipment_node.get("tag") or equipment_node.get("id"),
             "equipment_name": equipment_node.get("name"),
-            "equipment_type_id": equipment_node.get("equipment_type_id"),
+            "equipment_type_id": equipment_type_id,
             "equipment_type_name": equipment_type.get("name") if equipment_type else None,
             "equipment_type_category": equipment_type.get("category") if equipment_type else None,
             "level": equipment_node.get("level")
