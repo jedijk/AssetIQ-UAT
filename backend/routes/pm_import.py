@@ -33,6 +33,7 @@ class TaskUpdateRequest(BaseModel):
     asset: Optional[str] = None
     original_task: Optional[str] = None
     task_type: Optional[str] = None
+    action_type: Optional[str] = None
     discipline: Optional[str] = None
     suggested_failure_modes: Optional[List[str]] = None
     failure_mechanisms: Optional[List[str]] = None

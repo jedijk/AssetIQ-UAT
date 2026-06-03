@@ -210,15 +210,14 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
   
   const getTaskTypeBadge = (taskType) => {
     if (!taskType) return null;
+    const normalized = String(taskType).toUpperCase();
     const colors = {
-      preventive: 'bg-green-100 text-green-700',
-      predictive: 'bg-purple-100 text-purple-700',
-      inspection: 'bg-blue-100 text-blue-700',
-      corrective: 'bg-red-100 text-red-700',
-      condition_based: 'bg-amber-100 text-amber-700',
+      PM: 'bg-green-100 text-green-700',
+      CM: 'bg-red-100 text-red-700',
+      PDM: 'bg-purple-100 text-purple-700',
     };
-    const color = colors[taskType.toLowerCase()] || 'bg-gray-100 text-gray-700';
-    return <Badge variant="outline" className={`${color} text-xs`}>{taskType}</Badge>;
+    const color = colors[normalized] || 'bg-gray-100 text-gray-700';
+    return <Badge variant="outline" className={`${color} text-xs font-semibold`}>{normalized}</Badge>;
   };
   
   if (isLoading) {
@@ -360,7 +359,7 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {getTaskTypeBadge(task.task_type)}
+                      {getTaskTypeBadge(task.action_type)}
                     </td>
                     <td className="px-4 py-3">
                       {getDisciplineBadge(task.discipline)}
@@ -471,7 +470,7 @@ const PMTaskEditDialog = ({ task, onClose, onSave, saving }) => {
         component: task.equipment || '',
         asset: task.equipment_tag || '',
         original_task: task.task || '',
-        task_type: task.task_type || '',
+        action_type: (task.action_type || 'PM').toUpperCase(),
         discipline: task.discipline || '',
         frequency: task.frequency || '',
       });
@@ -518,11 +517,19 @@ const PMTaskEditDialog = ({ task, onClose, onSave, saving }) => {
           <div className="grid grid-cols-3 gap-3">
             <div>
               <Label>Task Type</Label>
-              <Input
-                value={form.task_type}
-                onChange={(e) => setForm({ ...form, task_type: e.target.value })}
-                data-testid="pm-edit-task-type"
-              />
+              <Select
+                value={form.action_type || 'PM'}
+                onValueChange={(v) => setForm({ ...form, action_type: v })}
+              >
+                <SelectTrigger data-testid="pm-edit-task-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PM">PM — Preventive</SelectItem>
+                  <SelectItem value="CM">CM — Corrective</SelectItem>
+                  <SelectItem value="PDM">PDM — Predictive</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Discipline</Label>

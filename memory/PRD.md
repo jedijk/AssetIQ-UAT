@@ -7,6 +7,11 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **PM Import — Task Type mapped to PM/CM/PDM (VERIFIED)**:
+  - Task Type column now renders the **action_type** (PM, CM, PDM) with color-coded badges (green/red/purple) instead of the granular sub-type (Inspection/Lubrication/etc.).
+  - Edit dialog: Task Type is now a Select with three options (PM — Preventive, CM — Corrective, PDM — Predictive).
+  - **Backend**: `TaskUpdateRequest` accepts `action_type` so the dropdown choice persists.
+
 - [Feb 2026] **PM Import tab — actions: edit, delete, accept/reject + Tag column (VERIFIED)**:
   - Added **Tag** column (asset name) alongside Equipment.
   - Added **Actions** column with inline buttons: ✓ Accept, ✗ Reject, ✎ Edit, 🗑 Delete.
