@@ -290,8 +290,16 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
     // Check both equipment_type_id and equipment_type fields
     const typeId = node.equipment_type_id || node.equipment_type;
     if (!typeId) return null;
+    
+    // First try to find in equipment types list
     const eqType = equipmentTypes?.find(et => et.id === typeId);
-    return eqType?.name || node.equipment_type_name || typeId;
+    if (eqType?.name) return eqType.name;
+    
+    // If equipment_type_name is available, use it
+    if (node.equipment_type_name) return node.equipment_type_name;
+    
+    // Otherwise, format the typeId as a display name (capitalize, replace underscores)
+    return typeId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   };
 
   // Get discipline display name
@@ -307,6 +315,13 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
     const disc = node.discipline;
     if (disc && disciplines[disc]) {
       return disciplines[disc];
+    }
+    // If discipline is a string but not in our map, display it formatted
+    if (disc && typeof disc === 'string') {
+      return { 
+        label: disc.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), 
+        color: "bg-slate-100 text-slate-700" 
+      };
     }
     return null;
   };
