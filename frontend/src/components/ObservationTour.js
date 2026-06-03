@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   X, 
@@ -320,6 +320,18 @@ const PreviewRenderer = ({ previewId }) => {
   }
 };
 
+const TOOLTIP_WIDTH = 380;
+const VIEWPORT_PADDING = 20;
+const SPOTLIGHT_INSET = 8;
+const CHAT_SIDEBAR_SELECTOR = '[data-testid="chat-sidebar"]';
+const MOBILE_BREAKPOINT = 640;
+
+const getAnchorSelector = (step) => {
+  if (step?.target) return step.target;
+  if (step?.ensureChat === "open") return CHAT_SIDEBAR_SELECTOR;
+  return null;
+};
+
 // Main ObservationTour component
 export const ObservationTour = ({ 
   isOpen, 
@@ -330,6 +342,8 @@ export const ObservationTour = ({
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [spotlightRect, setSpotlightRect] = useState(null);
+  const [tooltipStyle, setTooltipStyle] = useState({});
+  const tooltipRef = useRef(null);
   
   const step = TOUR_STEPS[currentStep];
   const StepIcon = step?.icon || HelpCircle;
@@ -365,97 +379,140 @@ export const ObservationTour = ({
     }
   }, [isOpen, currentStep, step, setChatOpen, setHierarchyOpen, setChatPrefillMessage]);
   
-  // Update spotlight position for target elements
-  useEffect(() => {
-    if (!isOpen || !step?.target) {
-      setSpotlightRect(null);
-      return;
-    }
-    
-    const updatePosition = () => {
-      const element = document.querySelector(step.target);
+  const updatePositions = useCallback(() => {
+    if (!isOpen || !step) return;
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const isMobileView = viewportWidth < MOBILE_BREAKPOINT;
+    const anchorSelector = getAnchorSelector(step);
+    let anchorRect = null;
+
+    if (anchorSelector) {
+      const element = document.querySelector(anchorSelector);
       if (element) {
         const rect = element.getBoundingClientRect();
-        setSpotlightRect({
-          top: rect.top - 8,
-          left: rect.left - 8,
-          width: rect.width + 16,
-          height: rect.height + 16,
+        anchorRect = {
+          top: rect.top - SPOTLIGHT_INSET,
+          left: rect.left - SPOTLIGHT_INSET,
+          width: rect.width + SPOTLIGHT_INSET * 2,
+          height: rect.height + SPOTLIGHT_INSET * 2,
+        };
+      }
+    }
+
+    setSpotlightRect(anchorRect);
+
+    const tooltipHeight = tooltipRef.current?.offsetHeight ?? 300;
+    const tooltipWidth = Math.min(TOOLTIP_WIDTH, viewportWidth - VIEWPORT_PADDING * 2);
+
+    if (step.position === "center" || !anchorRect) {
+      setTooltipStyle({
+        position: "fixed",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        width: `${tooltipWidth}px`,
+        maxHeight: `${viewportHeight - VIEWPORT_PADDING * 2}px`,
+      });
+      return;
+    }
+
+    if (isMobileView) {
+      const targetCenterY = anchorRect.top + anchorRect.height / 2;
+      if (targetCenterY < viewportHeight / 3) {
+        setTooltipStyle({
+          position: "fixed",
+          top: "auto",
+          bottom: "25%",
+          left: "5vw",
+          right: "5vw",
+          width: "90vw",
+          maxWidth: "90vw",
+          transform: "none",
+          maxHeight: `${viewportHeight - VIEWPORT_PADDING * 2}px`,
         });
       } else {
-        setSpotlightRect(null);
+        setTooltipStyle({
+          position: "fixed",
+          top: "20%",
+          left: "5vw",
+          right: "5vw",
+          width: "90vw",
+          maxWidth: "90vw",
+          transform: "none",
+          maxHeight: `${viewportHeight - VIEWPORT_PADDING * 2}px`,
+        });
       }
-    };
-    
-    // Initial update with delay to allow animations
-    const timer = setTimeout(updatePosition, 300);
-    
-    // Update on resize
-    window.addEventListener("resize", updatePosition);
-    
+      return;
+    }
+
+    const anchorCenterY = anchorRect.top + anchorRect.height / 2;
+    let top = anchorCenterY - tooltipHeight / 2;
+    top = Math.max(
+      VIEWPORT_PADDING,
+      Math.min(top, viewportHeight - tooltipHeight - VIEWPORT_PADDING)
+    );
+
+    let left;
+    if (step.position === "right") {
+      left = anchorRect.left + anchorRect.width + VIEWPORT_PADDING;
+      left = Math.min(left, viewportWidth - tooltipWidth - VIEWPORT_PADDING);
+    } else {
+      left = anchorRect.left - tooltipWidth - VIEWPORT_PADDING;
+      left = Math.max(VIEWPORT_PADDING, left);
+    }
+
+    setTooltipStyle({
+      position: "fixed",
+      top: `${top}px`,
+      left: `${left}px`,
+      width: `${tooltipWidth}px`,
+      maxHeight: `${viewportHeight - VIEWPORT_PADDING * 2}px`,
+    });
+  }, [isOpen, step]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    updatePositions();
+  }, [isOpen, currentStep, step, updatePositions]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const timer = setTimeout(updatePositions, 300);
+    window.addEventListener("resize", updatePositions);
+    window.addEventListener("scroll", updatePositions, true);
+
     return () => {
       clearTimeout(timer);
-      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("resize", updatePositions);
+      window.removeEventListener("scroll", updatePositions, true);
     };
-  }, [isOpen, currentStep, step?.target]);
-  
+  }, [isOpen, currentStep, updatePositions]);
+
+  const handleClose = useCallback(() => {
+    setChatOpen(false);
+    setChatPrefillMessage(null);
+    setHierarchyOpen(false);
+    onClose();
+  }, [setChatOpen, setChatPrefillMessage, setHierarchyOpen, onClose]);
+
   const handleNext = useCallback(() => {
     if (currentStep < TOUR_STEPS.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
       handleClose();
     }
-  }, [currentStep]);
-  
+  }, [currentStep, handleClose]);
+
   const handleBack = useCallback(() => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
     }
   }, [currentStep]);
-  
-  const handleClose = useCallback(() => {
-    // Teardown: close chat and clear prefill
-    setChatOpen(false);
-    setChatPrefillMessage(null);
-    setHierarchyOpen(false);
-    onClose();
-  }, [setChatOpen, setChatPrefillMessage, setHierarchyOpen, onClose]);
-  
+
   if (!isOpen) return null;
-  
-  // Calculate tooltip position based on step config and spotlight
-  const getTooltipPosition = () => {
-    const tooltipWidth = 380;
-    const padding = 20;
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    const headerHeight = 64;
-    
-    // Center position for welcome/complete steps
-    if (step.position === "center") {
-      return {
-        position: "fixed",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        width: `${Math.min(tooltipWidth, viewportWidth - padding * 2)}px`,
-      };
-    }
-    
-    // For all other steps, position consistently on the left side
-    // This prevents jumping around
-    const leftPosition = padding;
-    const topPosition = headerHeight + padding;
-    const maxHeight = viewportHeight - headerHeight - padding * 2;
-    
-    return {
-      position: "fixed",
-      top: `${topPosition}px`,
-      left: `${leftPosition}px`,
-      width: `${Math.min(tooltipWidth, viewportWidth / 2 - padding * 2)}px`,
-      maxHeight: `${maxHeight}px`,
-    };
-  };
   
   return (
     <AnimatePresence>
@@ -516,12 +573,13 @@ export const ObservationTour = ({
           
           {/* Tooltip */}
           <motion.div
+            ref={tooltipRef}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ delay: 0.1 }}
             className="fixed z-[10000]"
-            style={getTooltipPosition()}
+            style={tooltipStyle}
             data-testid="observation-tour-tooltip"
           >
             <div className="bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden overflow-y-auto" style={{ maxHeight: 'inherit' }}>
