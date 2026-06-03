@@ -2780,9 +2780,10 @@ Respond in JSON format:
         """Find similar failure modes from the library."""
         
         # Get all failure modes (we'll score them all)
+        # Include _id since some failure modes use it as identifier
         cursor = self.failure_modes_collection.find(
             {},
-            {"_id": 0, "id": 1, "failure_mode": 1, "equipment": 1, "category": 1, 
+            {"_id": 1, "id": 1, "failure_mode": 1, "equipment": 1, "category": 1, 
              "mechanism": 1, "detection_methods": 1, "severity": 1, "occurrence": 1,
              "detectability": 1, "rpn": 1, "recommended_actions": 1, "equipment_type_ids": 1}
         ).limit(500)
@@ -2791,6 +2792,14 @@ Respond in JSON format:
         
         if not failure_modes:
             return []
+        
+        # Normalize IDs - use 'id' field if present, otherwise convert _id to string
+        for fm in failure_modes:
+            if not fm.get('id') and fm.get('_id'):
+                fm['id'] = str(fm['_id'])
+            # Remove _id from response to avoid serialization issues
+            if '_id' in fm:
+                del fm['_id']
         
         # Score each failure mode based on text similarity
         task_lower = task_description.lower()
@@ -3083,21 +3092,39 @@ Respond with a JSON object:
         
         if action == "merge" and target_failure_mode_id:
             # Add task to existing failure mode's recommended_actions
+            from bson import ObjectId
+            
             task_description = task.get("task_description") or task.get("original_task") or ""
             frequency = task.get("frequency") or ""
             action_text = f"{task_description} (Frequency: {frequency})" if frequency else task_description
             
+            # Try to find failure mode by id field first, then by _id (ObjectId)
+            query = {"id": target_failure_mode_id}
+            fm_exists = await self.failure_modes_collection.find_one(query)
+            
+            if not fm_exists:
+                # Try with ObjectId
+                try:
+                    query = {"_id": ObjectId(target_failure_mode_id)}
+                    fm_exists = await self.failure_modes_collection.find_one(query)
+                except:
+                    pass
+            
+            if not fm_exists:
+                result["message"] = f"Failure mode {target_failure_mode_id} not found"
+                return result
+            
             update_result = await self.failure_modes_collection.update_one(
-                {"id": target_failure_mode_id},
+                query,
                 {
                     "$addToSet": {"recommended_actions": action_text},
                     "$set": {"updated_at": datetime.now(timezone.utc)}
                 }
             )
             
-            if update_result.modified_count > 0:
+            if update_result.modified_count > 0 or update_result.matched_count > 0:
                 result["success"] = True
-                result["message"] = f"Task merged into failure mode {target_failure_mode_id}"
+                result["message"] = f"Task merged into failure mode"
                 # Mark task as imported
                 task["import_status"] = "merged"
                 task["target_failure_mode_id"] = target_failure_mode_id
@@ -3144,25 +3171,41 @@ Respond with a JSON object:
         elif action == "new_task":
             # Add as new task under existing failure mode (same as merge for now)
             if target_failure_mode_id:
+                from bson import ObjectId
+                
                 task_description = task.get("task_description") or task.get("original_task") or ""
                 frequency = task.get("frequency") or ""
                 action_text = f"{task_description} (Frequency: {frequency})" if frequency else task_description
                 
-                update_result = await self.failure_modes_collection.update_one(
-                    {"id": target_failure_mode_id},
-                    {
-                        "$addToSet": {"recommended_actions": action_text},
-                        "$set": {"updated_at": datetime.now(timezone.utc)}
-                    }
-                )
+                # Try to find failure mode by id field first, then by _id (ObjectId)
+                query = {"id": target_failure_mode_id}
+                fm_exists = await self.failure_modes_collection.find_one(query)
                 
-                if update_result.modified_count > 0:
-                    result["success"] = True
-                    result["message"] = f"New task added to failure mode {target_failure_mode_id}"
-                    task["import_status"] = "new_task"
-                    task["target_failure_mode_id"] = target_failure_mode_id
+                if not fm_exists:
+                    try:
+                        query = {"_id": ObjectId(target_failure_mode_id)}
+                        fm_exists = await self.failure_modes_collection.find_one(query)
+                    except:
+                        pass
+                
+                if not fm_exists:
+                    result["message"] = f"Failure mode {target_failure_mode_id} not found"
                 else:
-                    result["message"] = "Failed to add task to failure mode"
+                    update_result = await self.failure_modes_collection.update_one(
+                        query,
+                        {
+                            "$addToSet": {"recommended_actions": action_text},
+                            "$set": {"updated_at": datetime.now(timezone.utc)}
+                        }
+                    )
+                    
+                    if update_result.modified_count > 0 or update_result.matched_count > 0:
+                        result["success"] = True
+                        result["message"] = f"New task added to failure mode"
+                        task["import_status"] = "new_task"
+                        task["target_failure_mode_id"] = target_failure_mode_id
+                    else:
+                        result["message"] = "Failed to add task to failure mode"
             else:
                 result["message"] = "No target failure mode specified"
         
