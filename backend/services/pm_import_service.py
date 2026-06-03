@@ -12,6 +12,7 @@ This service handles:
 import os
 import io
 import re
+import json
 import base64
 import logging
 import uuid
@@ -372,31 +373,15 @@ class PMImportService:
 
         # Use the SAME matchers as the upload pipeline so review and listing stay in sync.
         tasks = await self._match_equipment_to_hierarchy(tasks)
-        tasks = await self._match_equipment_types(tasks)
-
-        # Failure mode import impact preview (what will change)
-        try:
-            from services.failure_modes_service import FailureModesService
-            fm_service = FailureModesService(self.db)
-        except Exception:
-            fm_service = None
 
         matched_task_count = 0
-        unmatched_tag_total = 0
-        matched_tag_total = 0
         for task in tasks:
-            if task.get("equipment_matches"):
+            if task.get("equipment_match"):
                 matched_task_count += 1
-                matched_tag_total += len(task["equipment_matches"])
-            unmatched_tag_total += len(task.get("equipment_unmatched_tags") or [])
-            if fm_service:
-                task["import_impact"] = await self._compute_import_impact_preview(task, fm_service)
 
         summary = {
             "tasks_count": len(tasks),
             "tasks_with_matches": matched_task_count,
-            "matched_tag_refs": matched_tag_total,
-            "unmatched_tag_refs": unmatched_tag_total,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -1013,18 +998,18 @@ class PMImportService:
             if task:
                 tasks.append(task)
         
-        await self._update_progress(session_id, 95, "Matching with library...")
+        await self._update_progress(session_id, 90, "AI enrichment (translate, classify, hours)...")
         
-        # Match with existing library
-        tasks = await self._match_with_library(tasks)
+        # AI enrichment: translate to English, classify PM/PDM/CBM/CM, suggest discipline,
+        # standardize frequency (+ frequency_days), estimate hours.
+        tasks = await self._ai_enrich_tasks(tasks)
         
-        # Match equipment types from the Equipment Type Library
-        await self._update_progress(session_id, 97, "Matching equipment types...")
-        tasks = await self._match_equipment_types(tasks)
-        
-        # Match equipment to hierarchy nodes (tag-based + name-based)
+        # Match equipment to hierarchy (Priority 1: tag exact, Priority 2: description fuzzy)
         await self._update_progress(session_id, 99, "Matching equipment to hierarchy...")
         tasks = await self._match_equipment_to_hierarchy(tasks)
+        
+        # Normalize final shape per the PM Import refactor spec
+        tasks = [self._normalize_task_shape(t) for t in tasks]
         
         return tasks
     
@@ -1378,11 +1363,7 @@ Only return the JSON array, no other text."""
             "estimated_time": estimated_time or ai_analysis.get("estimated_time", ""),
             "confidence_score": confidence,
             "ai_reasoning": ai_analysis.get("reasoning", ""),
-            "library_match": {"status": "pending"},
             "review_status": "pending",
-            # User selections - populated during review
-            "selected_match_id": None,  # When user selects from multiple matches
-            "approved_new_fm": None,    # When user approves a new failure mode to be created
             "source_document": file_name,
             "source_row": row
         }
@@ -1651,257 +1632,294 @@ Respond in JSON format:
         
         return min(100, max(0, int(score)))
     
-    async def _match_with_library(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Match extracted tasks with existing Failure Mode Library."""
+    # ============================================================
+    # AI Enrichment (new — replaces FM/library matching per refactor spec)
+    # ============================================================
+    
+    # Canonical frequency vocabulary + day mapping
+    _FREQUENCY_DAYS = {
+        "Daily": 1,
+        "Weekly": 7,
+        "Biweekly": 14,
+        "Monthly": 30,
+        "Quarterly": 90,
+        "Semi-Annual": 180,
+        "Annual": 365,
+        "Every 2 Years": 730,
+        "Every 3 Years": 1095,
+        "Condition Based": None,
+        "One Time": None,
+    }
+    _DISCIPLINES = [
+        "Mechanical", "Electrical", "Instrumentation",
+        "Process", "Civil", "Operations", "HVAC",
+    ]
+    _TASK_TYPES = ["PM", "PDM", "CBM", "CM"]
+    
+    async def _ai_enrich_tasks(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Synchronous AI enrichment per the PM Import refactor spec. For each task,
+        the LLM is asked to:
+          1. Translate `task_description` to English
+          2. Classify task_type ∈ {PM, PDM, CBM, CM}
+          3. Suggest a discipline from the configured list
+          4. Standardize frequency to canonical vocabulary
+          5. Estimate labor hours
         
-        # Get all failure modes for matching
-        existing_fms = await self.failure_modes_collection.find({}).to_list(5000)
+        Each call is batched to keep cost down. On any failure the task keeps
+        rule-derived defaults so the import never fully blocks.
+        """
+        if not tasks:
+            return tasks
         
-        # Build lookup structures
-        fm_by_name = {}
-        fm_by_keyword = {}
+        from services.openai_service import chat_completion
         
-        for fm in existing_fms:
-            name_lower = fm.get("failure_mode", "").lower()
-            fm_by_name[name_lower] = fm
+        # Batch into groups of 10 to stay within token limits
+        BATCH = 10
+        for batch_start in range(0, len(tasks), BATCH):
+            batch = tasks[batch_start: batch_start + BATCH]
             
-            for keyword in fm.get("keywords", []):
-                kw_lower = keyword.lower()
-                if kw_lower not in fm_by_keyword:
-                    fm_by_keyword[kw_lower] = []
-                fm_by_keyword[kw_lower].append(fm)
-        
-        # Match each task
-        for task in tasks:
-            matches = []
+            # Build a compact prompt
+            payload = []
+            for idx, t in enumerate(batch):
+                payload.append({
+                    "i": idx,
+                    "raw_task": (t.get("original_task") or "")[:400],
+                    "component": (t.get("component") or "")[:120],
+                    "asset": (t.get("asset") or "")[:120],
+                    "raw_frequency": (t.get("frequency") or "")[:80],
+                })
             
-            # Check suggested failure modes against library
-            for fm_name in task.get("suggested_failure_modes", []):
-                fm_name_str = fm_name if isinstance(fm_name, str) else fm_name.get("name", str(fm_name))
-                fm_lower = fm_name_str.lower()
+            sys_prompt = (
+                "You are a maintenance engineering assistant. For each task, return a JSON "
+                "object with keys exactly: task_description (English), task_type, discipline, "
+                "frequency, frequency_days, estimated_hours, confidence_score. "
+                f"task_type MUST be one of {self._TASK_TYPES}. "
+                f"discipline MUST be one of {self._DISCIPLINES}. "
+                f"frequency MUST be one of {list(self._FREQUENCY_DAYS.keys())}. "
+                "frequency_days is the integer day count (null for Condition Based / One Time). "
+                "estimated_hours is a float labor estimate (0.1–24). "
+                "confidence_score is your overall confidence (0–100). "
+                "Translate the task to clear English regardless of source language. "
+                "Return ONLY a JSON object with key 'results' as a list keyed by index 'i'."
+            )
+            user_prompt = (
+                "Enrich these maintenance tasks. Reply with JSON only.\n\n"
+                + json.dumps(payload, ensure_ascii=False)
+            )
+            
+            try:
+                raw = await chat_completion(
+                    messages=[
+                        {"role": "system", "content": sys_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    model="gpt-4o",
+                    temperature=0.1,
+                    response_format={"type": "json_object"},
+                )
+                parsed = json.loads(raw)
+                results = parsed.get("results") or parsed.get("tasks") or []
+                by_idx = {int(r.get("i")): r for r in results if "i" in r}
+            except Exception as e:
+                logger.warning(f"AI enrichment batch failed: {e}")
+                by_idx = {}
+            
+            # Merge back into tasks
+            for idx, t in enumerate(batch):
+                ai = by_idx.get(idx, {})
                 
-                # Direct name match
-                if fm_lower in fm_by_name:
-                    matches.append({
-                        "id": str(fm_by_name[fm_lower].get("_id")),
-                        "name": fm_by_name[fm_lower].get("failure_mode"),
-                        "match_type": "exact",
-                        "score": 100
-                    })
-                    continue
+                # Task description (English)
+                t["task_description"] = (
+                    ai.get("task_description")
+                    or t.get("original_task")
+                    or ""
+                ).strip()
                 
-                # Partial name match
-                for lib_name, lib_fm in fm_by_name.items():
-                    if fm_lower in lib_name or lib_name in fm_lower:
-                        matches.append({
-                            "id": str(lib_fm.get("_id")),
-                            "name": lib_fm.get("failure_mode"),
-                            "match_type": "partial",
-                            "score": 80
-                        })
-            
-            # Check keywords from task text
-            task_words = task.get("original_task", "").lower().split()
-            for word in task_words:
-                if word in fm_by_keyword:
-                    for fm in fm_by_keyword[word][:2]:  # Max 2 per keyword
-                        if not any(m["id"] == str(fm.get("_id")) for m in matches):
-                            matches.append({
-                                "id": str(fm.get("_id")),
-                                "name": fm.get("failure_mode"),
-                                "match_type": "keyword",
-                                "score": 60
-                            })
-            
-            # Sort matches by score
-            matches.sort(key=lambda x: -x["score"])
-            
-            # Determine library match status
-            if matches:
-                if matches[0]["score"] >= 80:
-                    task["library_match"] = {
-                        "status": "existing_match",
-                        "matched_id": matches[0]["id"],
-                        "matched_name": matches[0]["name"],
-                        "match_score": matches[0]["score"],
-                        "all_matches": matches[:3]
-                    }
-                elif len(matches) > 1:
-                    task["library_match"] = {
-                        "status": "multiple_possible",
-                        "matches": matches[:3]
-                    }
-                else:
-                    task["library_match"] = {
-                        "status": "weak_match",
-                        "matches": matches[:3]
-                    }
-            else:
-                task["library_match"] = {
-                    "status": "new_proposed"
-                }
-            
-            # Strict FM library coupling: store only library-backed FM IDs
-            task["library_failure_mode_ids"] = [
-                m["id"] for m in matches if m.get("score", 0) >= 80
-            ]
-            # Track AI-only (non-library) suggestions separately for approval
-            ai_fms = []
-            matched_names_lower = {m.get("name", "").lower() for m in matches}
-            for fm_name in task.get("suggested_failure_modes", []):
-                name = fm_name if isinstance(fm_name, str) else fm_name.get("name", str(fm_name))
-                if name.lower() not in matched_names_lower and name.lower() not in fm_by_name:
-                    ai_fms.append(name)
-            task["ai_only_failure_modes"] = ai_fms
+                # Task type — clamp to allowed
+                tt = (ai.get("task_type") or "").upper().strip()
+                t["task_type"] = tt if tt in self._TASK_TYPES else "PM"
+                
+                # Discipline — clamp to allowed
+                disc = (ai.get("discipline") or "").strip()
+                t["discipline"] = disc if disc in self._DISCIPLINES else (
+                    t.get("discipline") if t.get("discipline") in self._DISCIPLINES
+                    else "Mechanical"
+                )
+                
+                # Frequency — clamp to allowed
+                freq = (ai.get("frequency") or "").strip()
+                if freq not in self._FREQUENCY_DAYS:
+                    # try title-case variant
+                    freq_tc = freq.title()
+                    freq = freq_tc if freq_tc in self._FREQUENCY_DAYS else "Monthly"
+                t["frequency"] = freq
+                
+                # Frequency days
+                fdays = ai.get("frequency_days")
+                if fdays is None:
+                    fdays = self._FREQUENCY_DAYS.get(freq)
+                try:
+                    t["frequency_days"] = int(fdays) if fdays is not None else None
+                except (TypeError, ValueError):
+                    t["frequency_days"] = self._FREQUENCY_DAYS.get(freq)
+                
+                # Estimated hours
+                try:
+                    eh = float(ai.get("estimated_hours") or 0)
+                    t["estimated_hours"] = max(0.1, min(24.0, eh)) if eh else 0.5
+                except (TypeError, ValueError):
+                    t["estimated_hours"] = 0.5
+                
+                # Confidence score
+                try:
+                    cs = int(ai.get("confidence_score") or 0)
+                    t["confidence_score"] = max(0, min(100, cs)) if cs else 50
+                except (TypeError, ValueError):
+                    t["confidence_score"] = 50
         
         return tasks
     
-    async def _match_equipment_types(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _normalize_task_shape(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Match each task's component/asset/task text against the Equipment Type Library
-        (`custom_equipment_types` collection). Populates `equipment_type_match` per task:
-            {id, name, discipline, match_type: 'exact'|'partial', score}
-        or None when no match.
+        Project a task into the canonical PM Import output shape per the refactor spec.
+        Drops FM-related fields entirely.
         """
-        types_cursor = self.db.custom_equipment_types.find({})
-        equipment_types = await types_cursor.to_list(500)
-        
-        if not equipment_types:
-            for task in tasks:
-                task["equipment_type_match"] = None
-            return tasks
-        
-        # Pre-index by lowercase name
-        by_name = {}
-        for et in equipment_types:
-            name = (et.get("name") or "").strip().lower()
-            if name:
-                by_name[name] = et
-        
-        for task in tasks:
-            haystack = " ".join([
-                str(task.get("component") or ""),
-                str(task.get("asset") or ""),
-                str(task.get("original_task") or ""),
-            ]).lower()
-            
-            best = None
-            
-            # 1. Exact full-name token match (most reliable)
-            for name, et in by_name.items():
-                # word boundary check
-                if f" {name} " in f" {haystack} " or haystack.startswith(name + " ") or haystack.endswith(" " + name) or haystack == name:
-                    best = {"id": et.get("id"), "name": et.get("name"),
-                            "discipline": et.get("discipline"),
-                            "match_type": "exact", "score": 100}
-                    break
-            
-            # 2. Partial substring match
-            if not best:
-                for name, et in by_name.items():
-                    if len(name) >= 5 and name in haystack:
-                        best = {"id": et.get("id"), "name": et.get("name"),
-                                "discipline": et.get("discipline"),
-                                "match_type": "partial", "score": 70}
-                        break
-            
-            task["equipment_type_match"] = best
-        
-        return tasks
+        return {
+            "task_id": task.get("task_id"),
+            # Equipment fields
+            "equipment_tag": task.get("equipment_tag") or task.get("asset") or "",
+            "equipment_description": task.get("equipment_description") or task.get("component") or "",
+            # Task fields
+            "task_description": task.get("task_description") or task.get("original_task") or "",
+            "task_type": task.get("task_type") or "PM",
+            "discipline": task.get("discipline") or "Mechanical",
+            "frequency": task.get("frequency") or "Monthly",
+            "frequency_days": task.get("frequency_days"),
+            "estimated_hours": task.get("estimated_hours") or 0.5,
+            "confidence_score": task.get("confidence_score") or 50,
+            # Match + review
+            "equipment_match": task.get("equipment_match"),
+            "review_status": task.get("review_status") or "pending",
+            # Raw source preserved for traceability
+            "original_task": task.get("original_task") or "",
+        }
     
     async def _match_equipment_to_hierarchy(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        Match each task's component/asset/task text against the Equipment Hierarchy
-        (`equipment_nodes` collection) by tag AND by name.
+        Match each task to ONE equipment node per the refactor spec.
         
-        Populates per task:
-            equipment_matches: [{id, tag, name, level}]  (de-duplicated)
-            equipment_tag_refs: [str]                    (raw tag tokens extracted)
-            equipment_unmatched_tags: [str]              (tags that did not match any node)
+        Priority 1: tag exact match against `equipment_nodes.tag`
+        Priority 2: description fuzzy match against `equipment_nodes.name`
+        
+        Stores a single `equipment_match` object (or None) per task.
         """
         nodes_cursor = self.db.equipment_nodes.find({})
         nodes = await nodes_cursor.to_list(20000)
         
-        # Build lookup maps
         by_tag = {}
-        by_name = {}
+        by_name_exact = {}
+        all_names = []  # for fuzzy
         for n in nodes:
             tag = (n.get("tag") or "").strip()
             if tag:
                 by_tag[tag.upper()] = n
             name = (n.get("name") or "").strip()
             if name:
-                by_name[name.lower()] = n
+                by_name_exact[name.lower()] = n
+                all_names.append((name.lower(), n))
         
         for task in tasks:
-            raw_text = " ".join([
-                str(task.get("component") or ""),
-                str(task.get("asset") or ""),
-                str(task.get("original_task") or ""),
+            haystack_for_tags = " ".join([
+                str(task.get("equipment_tag") or task.get("asset") or ""),
+                str(task.get("equipment_description") or task.get("component") or ""),
+                str(task.get("task_description") or task.get("original_task") or ""),
             ])
-            tag_refs = self._extract_tag_refs(raw_text)
+            tag_refs = self._extract_tag_refs(haystack_for_tags)
             
-            matches = []
-            unmatched = []
-            seen_ids = set()
+            match = None
             
-            # Tag-based match
+            # Priority 1: tag exact match
             for ref in tag_refs:
                 hit = by_tag.get(ref.upper())
-                if hit and hit.get("id") not in seen_ids:
-                    seen_ids.add(hit.get("id"))
-                    matches.append({
-                        "id": hit.get("id"),
+                if hit:
+                    match = {
+                        "equipment_id": hit.get("id"),
                         "tag": hit.get("tag"),
                         "name": hit.get("name"),
-                        "level": hit.get("level"),
-                        "match_type": "tag",
-                    })
-                elif not hit:
-                    unmatched.append(ref)
+                        "match_type": "tag_exact",
+                        "confidence": 100,
+                    }
+                    break
             
-            # Name-based fuzzy match on component/asset (only if no tag match yet)
-            if not matches:
-                candidates = [
-                    str(task.get("component") or "").strip().lower(),
-                    str(task.get("asset") or "").strip().lower(),
+            # Priority 2: description fuzzy match
+            if not match:
+                description_candidates = [
+                    str(task.get("equipment_description") or task.get("component") or "").strip().lower(),
+                    str(task.get("equipment_tag") or task.get("asset") or "").strip().lower(),
                 ]
-                for cand in candidates:
-                    if not cand or len(cand) < 3:
-                        continue
-                    if cand in by_name:
-                        hit = by_name[cand]
-                        if hit.get("id") not in seen_ids:
-                            seen_ids.add(hit.get("id"))
-                            matches.append({
-                                "id": hit.get("id"),
-                                "tag": hit.get("tag"),
-                                "name": hit.get("name"),
-                                "level": hit.get("level"),
-                                "match_type": "name_exact",
-                            })
-                            break
-                    # partial contains match
-                    for name_lower, n in by_name.items():
-                        if len(name_lower) >= 4 and (cand in name_lower or name_lower in cand):
-                            if n.get("id") not in seen_ids:
-                                seen_ids.add(n.get("id"))
-                                matches.append({
-                                    "id": n.get("id"),
-                                    "tag": n.get("tag"),
-                                    "name": n.get("name"),
-                                    "level": n.get("level"),
-                                    "match_type": "name_partial",
-                                })
-                                break
-                    if matches:
+                description_candidates = [c for c in description_candidates if len(c) >= 3]
+                
+                # Exact name match
+                for cand in description_candidates:
+                    if cand in by_name_exact:
+                        hit = by_name_exact[cand]
+                        match = {
+                            "equipment_id": hit.get("id"),
+                            "tag": hit.get("tag"),
+                            "name": hit.get("name"),
+                            "match_type": "name_exact",
+                            "confidence": 90,
+                        }
                         break
+                
+                # Partial / fuzzy contains
+                if not match:
+                    for cand in description_candidates:
+                        best = None
+                        best_score = 0
+                        for name_lower, n in all_names:
+                            if len(name_lower) < 4:
+                                continue
+                            # simple substring score
+                            score = 0
+                            if cand == name_lower:
+                                score = 90
+                            elif cand in name_lower:
+                                score = 80
+                            elif name_lower in cand:
+                                score = 70
+                            elif self._token_overlap_score(cand, name_lower) >= 0.5:
+                                score = 60
+                            if score > best_score:
+                                best_score = score
+                                best = n
+                        if best and best_score >= 60:
+                            match = {
+                                "equipment_id": best.get("id"),
+                                "tag": best.get("tag"),
+                                "name": best.get("name"),
+                                "match_type": "name_partial" if best_score < 90 else "name_exact",
+                                "confidence": best_score,
+                            }
+                            break
             
-            task["equipment_tag_refs"] = tag_refs
-            task["equipment_matches"] = matches
-            task["equipment_unmatched_tags"] = unmatched
+            task["equipment_match"] = match
+            # Preserve canonical equipment_tag / equipment_description fields
+            task["equipment_tag"] = task.get("equipment_tag") or task.get("asset") or ""
+            task["equipment_description"] = task.get("equipment_description") or task.get("component") or ""
         
         return tasks
+    
+    @staticmethod
+    def _token_overlap_score(a: str, b: str) -> float:
+        """Cheap token-overlap score in [0,1] used as a fuzzy fallback."""
+        ta = {w for w in a.split() if len(w) >= 3}
+        tb = {w for w in b.split() if len(w) >= 3}
+        if not ta or not tb:
+            return 0.0
+        inter = ta & tb
+        return len(inter) / max(len(ta), len(tb))
     
     def _calculate_stats(self, tasks: List[Dict[str, Any]]) -> Dict[str, int]:
         """Calculate statistics for the session."""

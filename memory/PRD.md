@@ -7,6 +7,22 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **PM Import Service refactor — FM coupling REMOVED, AI enrichment ADDED (VERIFIED)**:
+  - Per the AssetIQ functional spec, PM Import is now scoped to: import → enrich → standardize → match equipment → review → write to `pm_tasks`. Zero failure-mode / FMEA dependencies.
+  - **Removed**: `_match_with_library`, `_match_equipment_types`, `library_failure_mode_ids`, `ai_only_failure_modes`, `approved_failure_mode_ids`, `library_match`, `equipment_type_match`, `/lookup/failure-modes`, `/lookup/equipment-types`, the Equipment Type chip and Failure Modes chip + multi-select dialog.
+  - **Added** `_ai_enrich_tasks` (synchronous batch LLM call, GPT-4o, JSON-mode) producing per task:
+    - `task_description` (translated to English regardless of source language)
+    - `task_type` ∈ {PM, PDM, CBM, CM}
+    - `discipline` from {Mechanical, Electrical, Instrumentation, Process, Civil, Operations, HVAC}
+    - `frequency` ∈ canonical 11-value vocabulary + `frequency_days`
+    - `estimated_hours` ∈ [0.1, 24]
+    - `confidence_score` ∈ [0, 100]
+  - **Rewrote** `_match_equipment_to_hierarchy` to produce a single `equipment_match` object with priority 1 (tag exact) / priority 2 (description fuzzy with confidence score).
+  - **New endpoint** `POST /api/pm-import/session/{sid}/import-to-pm-tasks` writes accepted tasks into new collection `pm_tasks` (never to `failure_modes`, `fmea_library`, or `maintenance_programs`).
+  - **Frontend** review table columns now: Equipment Tag · Equipment Description · Task Description · Task Type · Discipline · Frequency · Est. Hours · Match Status · Review Status · Actions. Edit dialog uses Select dropdowns with the canonical vocabularies.
+  - Wiped existing 19 imported tasks (clean slate per user decision); 29 session shells preserved for traceability.
+  - **End-to-end verified**: 3 sample tasks ran through full pipeline — `Controleer lagers op slijtage maandelijks` → "Check bearings for wear monthly" / PM / Mechanical / Monthly (30d) / 1.0h / 95% / matched to 1T-2001 Brabender (90%).
+
 - [Feb 2026] **Chat — duplicate "What would you like to report?" fix (VERIFIED)**:
   - Previously stray commands ("skip"/"yes"/"no"/"cancel") in INITIAL state were echoed by the bot, producing 2–3 stacked "What would you like to report?" bubbles after the "Got it!" message.
   - Now in `_core_chat_process`: BEFORE storing the user message, if state is INITIAL and content matches `{skip, cancel, yes, y, no, n, ok, okay, revise, ja, nee, klopt, akkoord}` (no image), the function returns `ChatResponse(message="")` immediately. No DB writes, no reply. Chat history stays clean.

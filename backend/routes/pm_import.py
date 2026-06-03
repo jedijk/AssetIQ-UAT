@@ -28,18 +28,15 @@ router = APIRouter(prefix="/pm-import", tags=["PM Intelligence Import"])
 # ============== MODELS ==============
 
 class TaskUpdateRequest(BaseModel):
-    """Request model for updating a task."""
-    component: Optional[str] = None
-    asset: Optional[str] = None
-    original_task: Optional[str] = None
-    task_type: Optional[str] = None
-    action_type: Optional[str] = None
+    """Request model for updating a task (PM Import refactor shape)."""
+    equipment_tag: Optional[str] = None
+    equipment_description: Optional[str] = None
+    task_description: Optional[str] = None
+    task_type: Optional[str] = None  # PM | PDM | CBM | CM
     discipline: Optional[str] = None
-    suggested_failure_modes: Optional[List[str]] = None
-    failure_mechanisms: Optional[List[str]] = None
-    detection_methods: Optional[List[str]] = None
-    existing_control: Optional[str] = None
     frequency: Optional[str] = None
+    frequency_days: Optional[int] = None
+    estimated_hours: Optional[float] = None
 
 
 class ImportRequest(BaseModel):
@@ -301,10 +298,8 @@ async def delete_task(
 
 
 class TaskMappingRequest(BaseModel):
-    """Request model for manually mapping a task to hierarchy / type / failure modes."""
+    """Request model for manually mapping a task to a hierarchy equipment node."""
     equipment_id: Optional[str] = None
-    equipment_type_id: Optional[str] = None
-    failure_mode_ids: Optional[List[str]] = None
 
 
 @router.patch("/session/{session_id}/task/{task_id}/mapping")
@@ -315,8 +310,8 @@ async def update_task_mapping(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Manually map an imported task to an equipment hierarchy node, equipment type,
-    and/or library failure modes (for tasks whose automatic match is empty/wrong).
+    Manually map an imported task to an equipment hierarchy node.
+    PM Import refactor: no longer touches failure modes or equipment types.
     """
     
     session = await db.pm_import_sessions.find_one({"session_id": session_id})
@@ -331,51 +326,22 @@ async def update_task_mapping(
             continue
         matched = True
         
-        # Equipment hierarchy override
         if body.equipment_id is not None:
             node = await db.equipment_nodes.find_one({"id": body.equipment_id})
             if not node:
                 raise HTTPException(status_code=400, detail="Equipment node not found")
-            task["manual_equipment_id"] = body.equipment_id
-            task["equipment_matches"] = [{
-                "id": node.get("id"),
+            task["equipment_match"] = {
+                "equipment_id": node.get("id"),
                 "tag": node.get("tag"),
                 "name": node.get("name"),
-                "level": node.get("level"),
                 "match_type": "manual",
-            }]
-            task["equipment_unmatched_tags"] = []
-        
-        # Equipment type override
-        if body.equipment_type_id is not None:
-            et = await db.custom_equipment_types.find_one({"id": body.equipment_type_id})
-            if not et:
-                raise HTTPException(status_code=400, detail="Equipment type not found")
-            task["manual_equipment_type_id"] = body.equipment_type_id
-            task["equipment_type_match"] = {
-                "id": et.get("id"),
-                "name": et.get("name"),
-                "discipline": et.get("discipline"),
-                "match_type": "manual",
-                "score": 100,
+                "confidence": 100,
             }
-        
-        # Failure mode library overrides (strict — only library IDs accepted)
-        if body.failure_mode_ids is not None:
-            valid_ids = []
-            for fm_id in body.failure_mode_ids:
-                fm = await db.failure_modes.find_one({"id": fm_id})
-                if not fm:
-                    # try _id lookup
-                    try:
-                        from bson import ObjectId
-                        fm = await db.failure_modes.find_one({"_id": ObjectId(fm_id)})
-                    except Exception:
-                        fm = None
-                if fm:
-                    valid_ids.append(fm_id)
-            task["library_failure_mode_ids"] = valid_ids
-            task["approved_failure_mode_ids"] = valid_ids
+            # Also propagate tag/description so the row reads cleanly
+            if node.get("tag"):
+                task["equipment_tag"] = node.get("tag")
+            if node.get("name"):
+                task["equipment_description"] = node.get("name")
         
         task["updated_at"] = datetime.now(timezone.utc).isoformat()
         break
@@ -419,52 +385,59 @@ async def lookup_equipment(
     return {"items": items}
 
 
-@router.get("/lookup/equipment-types")
-async def lookup_equipment_types(
-    q: Optional[str] = None,
-    limit: int = 100,
+@router.post("/session/{session_id}/import-to-pm-tasks")
+async def import_session_to_pm_tasks(
+    session_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Search equipment types library (for manual mapping dropdown)."""
-    query = {}
-    if q:
-        query = {"name": {"$regex": q, "$options": "i"}}
-    cursor = db.custom_equipment_types.find(query).limit(limit)
-    items = []
-    async for et in cursor:
-        items.append({
-            "id": et.get("id"),
-            "name": et.get("name"),
-            "discipline": et.get("discipline"),
-            "category": et.get("category"),
+    """
+    Promote all `accepted` tasks from a session into the `pm_tasks` collection.
+    PM Import refactor: writes to `pm_tasks` only — NOT to maintenance_programs,
+    failure_modes, or fmea_library.
+    """
+    session = await db.pm_import_sessions.find_one({"session_id": session_id})
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    accepted = [
+        t for t in (session.get("tasks_extracted") or [])
+        if t.get("review_status") == "accepted"
+    ]
+    
+    if not accepted:
+        return {"success": True, "imported": 0, "message": "No accepted tasks"}
+    
+    now = datetime.now(timezone.utc).isoformat()
+    docs = []
+    for t in accepted:
+        em = t.get("equipment_match") or {}
+        docs.append({
+            "task_id": str(uuid.uuid4()),
+            "source_task_id": t.get("task_id"),
+            "equipment_id": em.get("equipment_id"),
+            "equipment_tag": t.get("equipment_tag") or em.get("tag") or "",
+            "equipment_description": t.get("equipment_description") or em.get("name") or "",
+            "task_description": t.get("task_description") or "",
+            "task_type": t.get("task_type") or "PM",
+            "discipline": t.get("discipline") or "Mechanical",
+            "frequency": t.get("frequency") or "Monthly",
+            "frequency_days": t.get("frequency_days"),
+            "estimated_hours": t.get("estimated_hours") or 0.5,
+            "source_import_session": session_id,
+            "created_at": now,
+            "created_by": current_user.get("id") or current_user.get("email"),
         })
-    return {"items": items}
-
-
-@router.get("/lookup/failure-modes")
-async def lookup_failure_modes(
-    q: Optional[str] = None,
-    limit: int = 100,
-    current_user: dict = Depends(get_current_user)
-):
-    """Search Failure Mode Library entries (for strict mapping dropdown)."""
-    query = {}
-    if q:
-        query = {"$or": [
-            {"failure_mode": {"$regex": q, "$options": "i"}},
-            {"equipment": {"$regex": q, "$options": "i"}},
-        ]}
-    cursor = db.failure_modes.find(query).limit(limit)
-    items = []
-    async for fm in cursor:
-        fm_id = fm.get("id") or str(fm.get("_id"))
-        items.append({
-            "id": fm_id,
-            "failure_mode": fm.get("failure_mode"),
-            "equipment": fm.get("equipment"),
-            "category": fm.get("category"),
-        })
-    return {"items": items}
+    
+    if docs:
+        await db.pm_tasks.insert_many(docs)
+    
+    # Mark the session as imported (without deleting tasks_extracted, for traceability)
+    await db.pm_import_sessions.update_one(
+        {"session_id": session_id},
+        {"$set": {"status": "imported", "updated_at": datetime.now(timezone.utc)}}
+    )
+    
+    return {"success": True, "imported": len(docs)}
 
 
 @router.post("/session/{session_id}/task/{task_id}/select-match")
@@ -852,33 +825,19 @@ async def list_all_tasks(
                 "session_id": session_id,
                 "file_name": file_name,
                 "imported_at": created_at_iso,
-                # Equipment
-                "equipment": task.get("component") or task.get("asset") or "",
-                "equipment_tag": task.get("asset") or "",
-                # Task
-                "task": task.get("original_task") or task.get("existing_control") or "",
-                "description": task.get("ai_reasoning") or "",
-                # Task type / Discipline / Frequency
-                "task_type": task.get("task_type") or "",
-                "action_type": task.get("action_type") or "",
-                "discipline": task.get("discipline") or "",
-                "frequency": task.get("frequency") or "",
+                # ===== PM Import refactor shape =====
+                "equipment_tag": task.get("equipment_tag") or task.get("asset") or "",
+                "equipment_description": task.get("equipment_description") or task.get("component") or "",
+                "task_description": task.get("task_description") or task.get("original_task") or "",
+                "task_type": task.get("task_type") or "PM",
+                "discipline": task.get("discipline") or "Mechanical",
+                "frequency": task.get("frequency") or "Monthly",
+                "frequency_days": task.get("frequency_days"),
+                "estimated_hours": task.get("estimated_hours") or 0.5,
+                "confidence_score": task.get("confidence_score") or 50,
+                "equipment_match": task.get("equipment_match"),
                 "review_status": task.get("review_status") or "pending",
-                "confidence_score": task.get("confidence_score"),
-                # === MAPPING DATA ===
-                # Hierarchy node matches (from equipment_nodes collection)
-                "equipment_matches": task.get("equipment_matches") or [],
-                "equipment_unmatched_tags": task.get("equipment_unmatched_tags") or [],
-                # Manual hierarchy override
-                "manual_equipment_id": task.get("manual_equipment_id"),
-                # Equipment Type match (from custom_equipment_types library)
-                "equipment_type_match": task.get("equipment_type_match"),
-                "manual_equipment_type_id": task.get("manual_equipment_type_id"),
-                # Failure Mode Library (strict)
-                "library_failure_mode_ids": task.get("library_failure_mode_ids") or [],
-                "ai_only_failure_modes": task.get("ai_only_failure_modes") or [],
-                "library_match": task.get("library_match") or {},
-                "approved_failure_mode_ids": task.get("approved_failure_mode_ids") or [],
+                "original_task": task.get("original_task") or "",
             })
     
     return {

@@ -94,19 +94,11 @@ export const pmImportAPI = {
   },
 
   /**
-   * Search equipment type library.
+   * Import all accepted tasks from a session into the pm_tasks collection.
    */
-  lookupEquipmentTypes: async (q = '') => {
-    const response = await api.get(`/pm-import/lookup/equipment-types`, { params: { q, limit: 100 } });
-    return response.data.items || [];
-  },
-
-  /**
-   * Search failure mode library.
-   */
-  lookupFailureModes: async (q = '') => {
-    const response = await api.get(`/pm-import/lookup/failure-modes`, { params: { q, limit: 100 } });
-    return response.data.items || [];
+  importToPmTasks: async (sessionId) => {
+    const response = await api.post(`/pm-import/session/${sessionId}/import-to-pm-tasks`);
+    return response.data;
   },
 
   /**

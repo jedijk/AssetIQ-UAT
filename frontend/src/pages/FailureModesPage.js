@@ -229,8 +229,9 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
     const normalized = String(taskType).toUpperCase();
     const colors = {
       PM: 'bg-green-100 text-green-700',
-      CM: 'bg-red-100 text-red-700',
       PDM: 'bg-purple-100 text-purple-700',
+      CBM: 'bg-blue-100 text-blue-700',
+      CM: 'bg-red-100 text-red-700',
     };
     const color = colors[normalized] || 'bg-gray-100 text-gray-700';
     return <Badge variant="outline" className={`${color} text-xs font-semibold`}>{normalized}</Badge>;
@@ -356,16 +357,15 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
             <table className="w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Equipment</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Tag</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Hierarchy Tag</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Equipment Type</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Task</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Equipment Tag</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Equipment Description</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Task Description</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Task Type</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Discipline</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Frequency</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Failure Modes</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Status</th>
+                  <th className="text-right px-4 py-3 text-sm font-medium text-gray-600">Est. Hours</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Match Status</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Review Status</th>
                   <th className="text-right px-4 py-3 text-sm font-medium text-gray-600">Actions</th>
                 </tr>
               </thead>
@@ -374,29 +374,17 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
                   <tr key={task.task_id || idx} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div className="text-sm font-medium text-gray-900">
-                        {task.equipment || '-'}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-sm text-gray-700">
                         {task.equipment_tag || '-'}
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <PMHierarchyChip
-                        task={task}
-                        onClick={() => setMappingTask({ task, mode: 'equipment' })}
-                      />
+                      <div className="text-sm text-gray-700 max-w-xs truncate" title={task.equipment_description}>
+                        {task.equipment_description || '-'}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
-                      <PMEquipmentTypeChip
-                        task={task}
-                        onClick={() => setMappingTask({ task, mode: 'equipment-type' })}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-sm font-medium text-gray-900 max-w-md truncate" title={task.task}>
-                        {task.task || '-'}
+                      <div className="text-sm font-medium text-gray-900 max-w-md truncate" title={task.task_description}>
+                        {task.task_description || '-'}
                       </div>
                       {task.file_name && (
                         <div className="text-xs text-gray-400 truncate max-w-xs" title={task.file_name}>
@@ -405,7 +393,7 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {getTaskTypeBadge(task.action_type)}
+                      {getTaskTypeBadge(task.task_type)}
                     </td>
                     <td className="px-4 py-3">
                       {getDisciplineBadge(task.discipline)}
@@ -413,10 +401,13 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
                     <td className="px-4 py-3">
                       {getFrequencyBadge(task.frequency)}
                     </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="text-sm text-gray-700">{task.estimated_hours != null ? `${task.estimated_hours}h` : '-'}</span>
+                    </td>
                     <td className="px-4 py-3">
-                      <PMFailureModesChip
+                      <PMHierarchyChip
                         task={task}
-                        onClick={() => setMappingTask({ task, mode: 'failure-modes' })}
+                        onClick={() => setMappingTask({ task, mode: 'equipment' })}
                       />
                     </td>
                     <td className="px-4 py-3">
@@ -475,7 +466,7 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
                           className="h-7 px-2 text-gray-600 hover:bg-red-50 hover:text-red-600"
                           title="Delete"
                           onClick={() => {
-                            if (window.confirm(`Delete this task?\n\n"${(task.task || '').slice(0, 100)}"`)) {
+                            if (window.confirm(`Delete this task?\n\n"${(task.task_description || '').slice(0, 100)}"`)) {
                               deleteMutation.mutate(task);
                             }
                           }}
@@ -520,21 +511,27 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
   );
 };
 
-// ----- Hierarchy / Type / FM chip components -----
+// ----- Hierarchy chip (single equipment_match per PM Import refactor) -----
 const PMHierarchyChip = ({ task, onClick }) => {
-  const matches = task.equipment_matches || [];
-  if (matches.length > 0) {
-    const m = matches[0];
+  const m = task.equipment_match;
+  if (m && m.equipment_id) {
+    const colorByType = {
+      tag_exact: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
+      name_exact: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
+      name_partial: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100',
+      manual: 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100',
+    };
+    const cls = colorByType[m.match_type] || 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100';
     return (
       <button
         onClick={onClick}
-        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
-        title={`${m.level || ''} — click to change`}
+        className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs border ${cls}`}
+        title={`${m.match_type} · ${m.confidence}% — click to change`}
         data-testid={`pm-hierarchy-chip-${task.task_id}`}
       >
         <Link className="h-3 w-3" />
         {m.tag || m.name || '—'}
-        {matches.length > 1 && <span className="text-emerald-500">+{matches.length - 1}</span>}
+        <span className="ml-1 opacity-60">({m.confidence}%)</span>
       </button>
     );
   }
@@ -549,91 +546,18 @@ const PMHierarchyChip = ({ task, onClick }) => {
   );
 };
 
-const PMEquipmentTypeChip = ({ task, onClick }) => {
-  const match = task.equipment_type_match;
-  if (match) {
-    return (
-      <button
-        onClick={onClick}
-        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200"
-        title={`${match.discipline || ''} — click to change`}
-        data-testid={`pm-eqtype-chip-${task.task_id}`}
-      >
-        <Box className="h-3 w-3" />
-        {match.name}
-      </button>
-    );
-  }
-  return (
-    <button
-      onClick={onClick}
-      className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
-      data-testid={`pm-eqtype-unmatched-${task.task_id}`}
-    >
-      Unmatched
-    </button>
-  );
-};
-
-const PMFailureModesChip = ({ task, onClick }) => {
-  const libIds = task.library_failure_mode_ids || [];
-  const aiOnly = task.ai_only_failure_modes || [];
-  
-  if (libIds.length > 0) {
-    return (
-      <button
-        onClick={onClick}
-        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
-        title={aiOnly.length > 0 ? `${libIds.length} library + ${aiOnly.length} pending AI suggestions` : `${libIds.length} library FMs`}
-        data-testid={`pm-fm-chip-${task.task_id}`}
-      >
-        <BookOpen className="h-3 w-3" />
-        {libIds.length} library
-        {aiOnly.length > 0 && (
-          <span className="ml-1 text-amber-600">+{aiOnly.length} AI</span>
-        )}
-      </button>
-    );
-  }
-  if (aiOnly.length > 0) {
-    return (
-      <button
-        onClick={onClick}
-        className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
-        title="AI-only suggestions — needs library approval"
-        data-testid={`pm-fm-ai-only-${task.task_id}`}
-      >
-        <Sparkles className="h-3 w-3" />
-        {aiOnly.length} AI · approve
-      </button>
-    );
-  }
-  return (
-    <button
-      onClick={onClick}
-      className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200"
-      data-testid={`pm-fm-unmatched-${task.task_id}`}
-    >
-      None
-    </button>
-  );
-};
-
-// ----- Unified mapping dialog (equipment / equipment-type / failure-modes) -----
+// ----- Unified mapping dialog (PM Import refactor: equipment only) -----
 const PMMappingDialog = ({ mapping, onClose, onSave, saving }) => {
   const [query, setQuery] = useState('');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [selected, setSelected] = useState([]); // for FM (multi)
   
-  const mode = mapping?.mode;
   const task = mapping?.task;
   
   useEffect(() => {
     if (!mapping) return;
     setQuery('');
     setItems([]);
-    setSelected(mapping.task?.library_failure_mode_ids || []);
   }, [mapping]);
   
   useEffect(() => {
@@ -642,14 +566,7 @@ const PMMappingDialog = ({ mapping, onClose, onSave, saving }) => {
     const fn = async () => {
       setLoading(true);
       try {
-        let results = [];
-        if (mode === 'equipment') {
-          results = await pmImportAPI.lookupEquipment(query);
-        } else if (mode === 'equipment-type') {
-          results = await pmImportAPI.lookupEquipmentTypes(query);
-        } else if (mode === 'failure-modes') {
-          results = await pmImportAPI.lookupFailureModes(query);
-        }
+        const results = await pmImportAPI.lookupEquipment(query);
         if (!cancelled) setItems(results);
       } catch (e) {
         if (!cancelled) toast.error('Lookup failed');
@@ -659,44 +576,26 @@ const PMMappingDialog = ({ mapping, onClose, onSave, saving }) => {
     };
     const t = setTimeout(fn, 250);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [query, mode, mapping]);
+  }, [query, mapping]);
   
   if (!mapping) return null;
   
-  const title = mode === 'equipment' ? 'Map to Hierarchy Tag'
-              : mode === 'equipment-type' ? 'Map to Equipment Type'
-              : 'Map to Failure Modes (Library only)';
-  
   const handleSelect = (item) => {
-    if (mode === 'failure-modes') {
-      setSelected((prev) =>
-        prev.includes(item.id) ? prev.filter((x) => x !== item.id) : [...prev, item.id]
-      );
-    } else {
-      // single-select — save immediately
-      const payload = mode === 'equipment'
-        ? { equipment_id: item.id }
-        : { equipment_type_id: item.id };
-      onSave(payload);
-    }
-  };
-  
-  const handleSaveFM = () => {
-    onSave({ failure_mode_ids: selected });
+    onSave({ equipment_id: item.id });
   };
   
   return (
     <Dialog open={!!mapping} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-2xl" data-testid="pm-mapping-dialog">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+          <DialogTitle>Map to Hierarchy Tag</DialogTitle>
           <DialogDescription>
-            Task: <span className="font-medium">{(task?.task || '').slice(0, 100)}</span>
+            Task: <span className="font-medium">{(task?.task_description || '').slice(0, 100)}</span>
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <Input
-            placeholder="Search..."
+            placeholder="Search by tag or name..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             data-testid="pm-mapping-search"
@@ -710,49 +609,21 @@ const PMMappingDialog = ({ mapping, onClose, onSave, saving }) => {
             {!loading && items.length === 0 && (
               <div className="py-8 text-center text-gray-400 text-sm">No results</div>
             )}
-            {!loading && items.map((item) => {
-              const isSelected = mode === 'failure-modes' && selected.includes(item.id);
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleSelect(item)}
-                  className={`w-full text-left px-3 py-2 hover:bg-gray-50 border-b text-sm flex items-center justify-between ${isSelected ? 'bg-blue-50' : ''}`}
-                  data-testid={`pm-mapping-item-${item.id}`}
-                >
-                  <div className="flex-1 min-w-0">
-                    {mode === 'equipment' && (
-                      <>
-                        <div className="font-medium">{item.tag || '—'}</div>
-                        <div className="text-xs text-gray-500">{item.name} · {item.level}</div>
-                      </>
-                    )}
-                    {mode === 'equipment-type' && (
-                      <>
-                        <div className="font-medium">{item.name}</div>
-                        <div className="text-xs text-gray-500">{item.discipline} · {item.category}</div>
-                      </>
-                    )}
-                    {mode === 'failure-modes' && (
-                      <>
-                        <div className="font-medium">{item.failure_mode}</div>
-                        <div className="text-xs text-gray-500">{item.equipment} · {item.category}</div>
-                      </>
-                    )}
-                  </div>
-                  {isSelected && <CheckCircle className="h-4 w-4 text-blue-600 ml-2" />}
-                </button>
-              );
-            })}
+            {!loading && items.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => handleSelect(item)}
+                className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b text-sm"
+                data-testid={`pm-mapping-item-${item.id}`}
+              >
+                <div className="font-medium">{item.tag || '—'}</div>
+                <div className="text-xs text-gray-500">{item.name} · {item.level}</div>
+              </button>
+            ))}
           </ScrollArea>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-          {mode === 'failure-modes' && (
-            <Button onClick={handleSaveFM} disabled={saving} data-testid="pm-mapping-save">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Save ({selected.length})
-            </Button>
-          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -762,15 +633,20 @@ const PMMappingDialog = ({ mapping, onClose, onSave, saving }) => {
 const PMTaskEditDialog = ({ task, onClose, onSave, saving }) => {
   const [form, setForm] = useState({});
   
+  const TASK_TYPES = ['PM', 'PDM', 'CBM', 'CM'];
+  const DISCIPLINES = ['Mechanical', 'Electrical', 'Instrumentation', 'Process', 'Civil', 'Operations', 'HVAC'];
+  const FREQUENCIES = ['Daily', 'Weekly', 'Biweekly', 'Monthly', 'Quarterly', 'Semi-Annual', 'Annual', 'Every 2 Years', 'Every 3 Years', 'Condition Based', 'One Time'];
+  
   useEffect(() => {
     if (task) {
       setForm({
-        component: task.equipment || '',
-        asset: task.equipment_tag || '',
-        original_task: task.task || '',
-        action_type: (task.action_type || 'PM').toUpperCase(),
-        discipline: task.discipline || '',
-        frequency: task.frequency || '',
+        equipment_tag: task.equipment_tag || '',
+        equipment_description: task.equipment_description || '',
+        task_description: task.task_description || '',
+        task_type: (task.task_type || 'PM').toUpperCase(),
+        discipline: task.discipline || 'Mechanical',
+        frequency: task.frequency || 'Monthly',
+        estimated_hours: task.estimated_hours ?? 0.5,
       });
     }
   }, [task]);
@@ -787,62 +663,92 @@ const PMTaskEditDialog = ({ task, onClose, onSave, saving }) => {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Equipment</Label>
+              <Label>Equipment Tag</Label>
               <Input
-                value={form.component}
-                onChange={(e) => setForm({ ...form, component: e.target.value })}
-                data-testid="pm-edit-equipment"
+                value={form.equipment_tag}
+                onChange={(e) => setForm({ ...form, equipment_tag: e.target.value })}
+                data-testid="pm-edit-equipment-tag"
               />
             </div>
             <div>
-              <Label>Tag</Label>
+              <Label>Equipment Description</Label>
               <Input
-                value={form.asset}
-                onChange={(e) => setForm({ ...form, asset: e.target.value })}
-                data-testid="pm-edit-tag"
+                value={form.equipment_description}
+                onChange={(e) => setForm({ ...form, equipment_description: e.target.value })}
+                data-testid="pm-edit-equipment-description"
               />
             </div>
           </div>
           <div>
-            <Label>Task</Label>
+            <Label>Task Description</Label>
             <Textarea
-              value={form.original_task}
-              onChange={(e) => setForm({ ...form, original_task: e.target.value })}
+              value={form.task_description}
+              onChange={(e) => setForm({ ...form, task_description: e.target.value })}
               rows={3}
-              data-testid="pm-edit-task"
+              data-testid="pm-edit-task-description"
             />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Task Type</Label>
               <Select
-                value={form.action_type || 'PM'}
-                onValueChange={(v) => setForm({ ...form, action_type: v })}
+                value={form.task_type || 'PM'}
+                onValueChange={(v) => setForm({ ...form, task_type: v })}
               >
                 <SelectTrigger data-testid="pm-edit-task-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="PM">PM — Preventive</SelectItem>
-                  <SelectItem value="CM">CM — Corrective</SelectItem>
-                  <SelectItem value="PDM">PDM — Predictive</SelectItem>
+                  {TASK_TYPES.map(tt => (
+                    <SelectItem key={tt} value={tt}>{tt}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>Discipline</Label>
-              <Input
-                value={form.discipline}
-                onChange={(e) => setForm({ ...form, discipline: e.target.value })}
-                data-testid="pm-edit-discipline"
-              />
+              <Select
+                value={form.discipline || 'Mechanical'}
+                onValueChange={(v) => setForm({ ...form, discipline: v })}
+              >
+                <SelectTrigger data-testid="pm-edit-discipline">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DISCIPLINES.map(d => (
+                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Frequency</Label>
+              <Select
+                value={form.frequency || 'Monthly'}
+                onValueChange={(v) => setForm({ ...form, frequency: v })}
+              >
+                <SelectTrigger data-testid="pm-edit-frequency">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FREQUENCIES.map(f => (
+                    <SelectItem key={f} value={f}>{f}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Estimated Hours</Label>
               <Input
-                value={form.frequency}
-                onChange={(e) => setForm({ ...form, frequency: e.target.value })}
-                data-testid="pm-edit-frequency"
+                type="number"
+                step="0.25"
+                min="0.1"
+                max="24"
+                value={form.estimated_hours}
+                onChange={(e) => setForm({ ...form, estimated_hours: parseFloat(e.target.value) || 0 })}
+                data-testid="pm-edit-estimated-hours"
               />
             </div>
           </div>
