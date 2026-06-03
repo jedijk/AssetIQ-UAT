@@ -148,15 +148,32 @@ const SuggestionCard = ({ suggestion, onApply, onReject, isApplying }) => {
               </div>
             )}
             
-            <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
+            <div className="flex items-center gap-4 mt-2 text-xs text-slate-500 flex-wrap">
               <span className="flex items-center gap-1">
                 <Wrench className="w-3 h-3" />
                 {suggestion.discipline}
               </span>
+              {(suggestion.task_type || suggestion.action_preview?.action_type) && (
+                <span className="flex items-center gap-1">
+                  <Layers className="w-3 h-3" />
+                  {suggestion.task_type || suggestion.action_preview?.action_type}
+                </span>
+              )}
               <span className="flex items-center gap-1">
                 <Clock className="w-3 h-3" />
                 {suggestion.frequency}
               </span>
+              {(suggestion.action_preview?.estimated_minutes != null
+                || suggestion.action_preview?.estimated_time
+                || suggestion.estimated_hours) && (
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {suggestion.action_preview?.estimated_minutes != null
+                    ? `${suggestion.action_preview.estimated_minutes} min`
+                    : suggestion.action_preview?.estimated_time
+                      || `${suggestion.estimated_hours}h`}
+                </span>
+              )}
               <span className="flex items-center gap-1">
                 <Target className="w-3 h-3" />
                 {recommendation.confidence || 0}% confidence

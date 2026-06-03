@@ -2706,7 +2706,9 @@ Respond in JSON format:
             "discipline": discipline,
             "frequency": frequency,
             "task_type": task_type,
+            "estimated_hours": task.get("estimated_hours"),
             "equipment_match": equipment_match,
+            "action_preview": self._build_recommended_action_from_task(task),
             "similar_failure_modes": [
                 self._summarize_failure_mode_for_review(fm)
                 for fm in similar_failure_modes[:5]
@@ -3161,10 +3163,60 @@ Respond with a JSON object:
             return self._default_recommendation(similar_failure_modes, task)
     
     def _build_action_text_from_task(self, task: Dict[str, Any]) -> str:
-        """Build the recommended_actions entry text for a PM import task."""
+        """Build the recommended_actions description text for a PM import task."""
+        return self._build_recommended_action_from_task(task).get("description", "")
+
+    def _build_recommended_action_from_task(
+        self,
+        task: Dict[str, Any],
+        source: str = "PM Import AI Review",
+    ) -> Dict[str, Any]:
+        """Build a structured failure-mode recommended_actions entry from a PM task."""
         task_description = task.get("task_description") or task.get("original_task") or ""
         frequency = task.get("frequency") or ""
-        return f"{task_description} (Frequency: {frequency})" if frequency else task_description
+        description = (
+            f"{task_description} (Frequency: {frequency})"
+            if frequency
+            else task_description
+        )
+
+        raw_type = (task.get("task_type") or task.get("action_type") or "PM").upper().strip()
+        allowed_types = {"PM", "PDM", "CBM", "CM"}
+        action_type = raw_type if raw_type in allowed_types else "PM"
+
+        discipline = task.get("discipline") or "Mechanical"
+
+        estimated_minutes = None
+        try:
+            hours = float(task.get("estimated_hours") or 0)
+            if hours > 0:
+                estimated_minutes = max(1, int(round(hours * 60)))
+        except (TypeError, ValueError):
+            pass
+
+        estimated_time = (task.get("estimated_time") or "").strip()
+        if not estimated_time and estimated_minutes is not None:
+            if estimated_minutes >= 60:
+                h = estimated_minutes / 60
+                estimated_time = (
+                    f"{int(h)} hours" if h == int(h) else f"{h:.1f} hours"
+                )
+            else:
+                estimated_time = f"{estimated_minutes} min"
+
+        action: Dict[str, Any] = {
+            "description": description,
+            "action_type": action_type,
+            "discipline": discipline,
+            "source": source,
+        }
+        if frequency:
+            action["frequency"] = frequency
+        if estimated_minutes is not None:
+            action["estimated_minutes"] = estimated_minutes
+        if estimated_time:
+            action["estimated_time"] = estimated_time
+        return action
 
     def _action_texts_from_fm_actions(self, actions: List[Any]) -> List[str]:
         texts: List[str] = []
@@ -3411,7 +3463,7 @@ Respond with a JSON object:
     async def _apply_task_to_failure_mode(
         self,
         target_failure_mode_id: str,
-        action_text: str,
+        action_entry: Dict[str, Any],
         updated_by: str,
         change_reason: str,
         replace_action_index: Optional[int] = None,
@@ -3419,6 +3471,9 @@ Respond with a JSON object:
         """Replace a similar existing task in a failure mode's recommended_actions,
         otherwise append it. Version history captures the previous state (acts as a
         soft archive of replaced tasks).
+
+        `action_entry` must be a structured dict (description, action_type,
+        discipline, estimated_minutes/time, etc.) — see `_build_recommended_action_from_task`.
 
         If `replace_action_index` is provided (0-based) and valid, that exact slot
         is replaced — this is the path used when the AI Review LLM has already
@@ -3429,6 +3484,13 @@ Respond with a JSON object:
         """
         from bson import ObjectId
         from services.failure_modes_service import FailureModesService
+
+        action_text = (
+            action_entry.get("description")
+            or action_entry.get("action")
+            or action_entry.get("name")
+            or ""
+        )
 
         # Look up the failure mode — accept legacy "id" string or Mongo "_id".
         fm_doc = None
@@ -3477,7 +3539,13 @@ Respond with a JSON object:
 
         if match_idx >= 0:
             new_actions = list(existing_actions)
-            new_actions[match_idx] = action_text
+            existing = existing_actions[match_idx]
+            if isinstance(existing, dict):
+                merged = dict(existing)
+                merged.update(action_entry)
+                new_actions[match_idx] = merged
+            else:
+                new_actions[match_idx] = action_entry
             mode = "replaced"
             message = (
                 "Replaced existing task (AI-selected)"
@@ -3485,7 +3553,7 @@ Respond with a JSON object:
                 else f"Replaced existing task (similarity {ratio:.0%})"
             )
         else:
-            new_actions = existing_actions + [action_text]
+            new_actions = existing_actions + [action_entry]
             mode = "added"
             message = "Added as new task"
 
@@ -3561,9 +3629,7 @@ Respond with a JSON object:
                 replace_action_index = ai_idx
 
         if action == "merge" and target_failure_mode_id:
-            task_description = task.get("task_description") or task.get("original_task") or ""
-            frequency = task.get("frequency") or ""
-            action_text = f"{task_description} (Frequency: {frequency})" if frequency else task_description
+            action_entry = self._build_recommended_action_from_task(task)
 
             if suggestion and (suggestion.get("recommendation") or {}).get("already_exists"):
                 result["success"] = True
@@ -3574,7 +3640,7 @@ Respond with a JSON object:
             else:
                 apply_res = await self._apply_task_to_failure_mode(
                     target_failure_mode_id=target_failure_mode_id,
-                    action_text=action_text,
+                    action_entry=action_entry,
                     updated_by=updated_by,
                     change_reason=f"PM Import AI Review — merge task {task_id}",
                     replace_action_index=replace_action_index,
@@ -3596,8 +3662,7 @@ Respond with a JSON object:
             task_description = task.get("task_description") or task.get("original_task") or ""
             equipment_tag = task.get("equipment_tag") or ""
             discipline = task.get("discipline") or "Mechanical"
-            frequency = task.get("frequency") or ""
-            action_text = f"{task_description} (Frequency: {frequency})" if frequency else task_description
+            action_entry = self._build_recommended_action_from_task(task)
             
             new_fm = new_failure_mode_data or {}
             fm_name = new_fm.get("failure_mode") or f"Custom - {task_description[:50]}"
@@ -3615,7 +3680,7 @@ Respond with a JSON object:
             if merge_target_id:
                 apply_res = await self._apply_task_to_failure_mode(
                     target_failure_mode_id=merge_target_id,
-                    action_text=action_text,
+                    action_entry=action_entry,
                     updated_by=updated_by,
                     change_reason=f"PM Import AI Review — merged instead of new FM for task {task_id}",
                     replace_action_index=replace_action_index,
@@ -3641,7 +3706,7 @@ Respond with a JSON object:
                     "severity": new_fm.get("severity", 5),
                     "occurrence": new_fm.get("occurrence", 5),
                     "detectability": new_fm.get("detectability", 5),
-                    "recommended_actions": [action_text],
+                    "recommended_actions": [action_entry],
                     "detection_methods": task.get("detection_methods", []),
                     "failure_mode_type": "customer_specific",
                     "source": "pm_import"
@@ -3662,13 +3727,11 @@ Respond with a JSON object:
             # Add as new task under existing failure mode — uses same replace-or-add
             # logic as "merge" so duplicates don't accumulate.
             if target_failure_mode_id:
-                task_description = task.get("task_description") or task.get("original_task") or ""
-                frequency = task.get("frequency") or ""
-                action_text = f"{task_description} (Frequency: {frequency})" if frequency else task_description
+                action_entry = self._build_recommended_action_from_task(task)
 
                 apply_res = await self._apply_task_to_failure_mode(
                     target_failure_mode_id=target_failure_mode_id,
-                    action_text=action_text,
+                    action_entry=action_entry,
                     updated_by=updated_by,
                     change_reason=f"PM Import AI Review — new task {task_id}",
                     replace_action_index=replace_action_index,
