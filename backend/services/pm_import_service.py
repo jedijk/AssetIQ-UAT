@@ -1730,7 +1730,7 @@ Only return the JSON array, no other text."""
                     break
         
         if not explicit_discipline:
-            logger.info(f"No explicit discipline found in columns")
+            logger.info("No explicit discipline found in columns")
         
         # Step 4: AI enhancement
         ai_analysis = await self._ai_analyze_task(task_text, task_type, rule_based_data)
@@ -2547,3 +2547,529 @@ Respond in JSON format:
                 "updated_at": datetime.now(timezone.utc)
             }}
         )
+
+    # ============== AI REVIEW FUNCTIONALITY ==============
+    
+    async def ai_review_accepted_tasks(self, session_id: str) -> Dict[str, Any]:
+        """
+        AI-powered review of accepted tasks.
+        
+        For each accepted task:
+        1. Match equipment type by tag → equipment_nodes → equipment_type_id
+        2. Suggest existing failure mode to merge with, or suggest new failure mode
+        3. If failure mode matches but task doesn't, suggest new task under FM
+        
+        Returns suggestions for each accepted task.
+        """
+        from emergentintegrations.llm.openai import chat
+        
+        # Get session
+        session = await self.sessions_collection.find_one({"session_id": session_id})
+        if not session:
+            raise ValueError(f"Session {session_id} not found")
+        
+        tasks = session.get("tasks_extracted", [])
+        accepted_tasks = [t for t in tasks if t.get("review_status") == "accepted"]
+        
+        if not accepted_tasks:
+            return {"suggestions": [], "total_reviewed": 0, "message": "No accepted tasks to review"}
+        
+        suggestions = []
+        
+        for task in accepted_tasks:
+            suggestion = await self._generate_task_suggestion(task)
+            suggestions.append(suggestion)
+        
+        # Store suggestions in session
+        await self.sessions_collection.update_one(
+            {"session_id": session_id},
+            {"$set": {
+                "ai_review_suggestions": suggestions,
+                "ai_review_status": "completed",
+                "updated_at": datetime.now(timezone.utc)
+            }}
+        )
+        
+        return {
+            "suggestions": suggestions,
+            "total_reviewed": len(accepted_tasks),
+            "message": f"AI review completed for {len(accepted_tasks)} tasks"
+        }
+    
+    async def _generate_task_suggestion(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate AI suggestion for a single task."""
+        from emergentintegrations.llm.openai import chat
+        import os
+        
+        task_id = task.get("task_id")
+        equipment_tag = task.get("equipment_tag") or task.get("asset") or ""
+        task_description = task.get("task_description") or task.get("original_task") or ""
+        discipline = task.get("discipline") or "Mechanical"
+        frequency = task.get("frequency") or ""
+        task_type = task.get("task_type") or "PM"
+        
+        # Step 1: Match equipment type by tag
+        equipment_match = await self._match_equipment_by_tag(equipment_tag)
+        
+        # Step 2: Find similar failure modes
+        similar_failure_modes = await self._find_similar_failure_modes(
+            task_description, 
+            equipment_match.get("equipment_type_id") if equipment_match else None,
+            discipline
+        )
+        
+        # Step 3: Use AI to generate recommendation
+        recommendation = await self._ai_generate_recommendation(
+            task=task,
+            equipment_match=equipment_match,
+            similar_failure_modes=similar_failure_modes
+        )
+        
+        return {
+            "task_id": task_id,
+            "equipment_tag": equipment_tag,
+            "task_description": task_description,
+            "discipline": discipline,
+            "frequency": frequency,
+            "task_type": task_type,
+            "equipment_match": equipment_match,
+            "similar_failure_modes": similar_failure_modes[:5],  # Top 5
+            "recommendation": recommendation,
+            "status": "pending"  # pending, accepted, rejected
+        }
+    
+    async def _match_equipment_by_tag(self, tag: str) -> Optional[Dict[str, Any]]:
+        """Match equipment tag to equipment_nodes and get equipment_type_id."""
+        if not tag:
+            return None
+        
+        # Try exact match first
+        equipment_node = await self.db.equipment_nodes.find_one(
+            {"$or": [
+                {"tag": {"$regex": f"^{tag}$", "$options": "i"}},
+                {"id": {"$regex": f"^{tag}$", "$options": "i"}},
+                {"name": {"$regex": f"^{tag}$", "$options": "i"}}
+            ]},
+            {"_id": 0, "id": 1, "tag": 1, "name": 1, "equipment_type_id": 1, "level": 1}
+        )
+        
+        if equipment_node:
+            # Get equipment type details if available
+            equipment_type = None
+            if equipment_node.get("equipment_type_id"):
+                # Check custom types first
+                equipment_type = await self.db.custom_equipment_types.find_one(
+                    {"id": equipment_node["equipment_type_id"]},
+                    {"_id": 0, "id": 1, "name": 1, "category": 1}
+                )
+            
+            return {
+                "matched": True,
+                "equipment_id": equipment_node.get("id"),
+                "equipment_tag": equipment_node.get("tag") or equipment_node.get("id"),
+                "equipment_name": equipment_node.get("name"),
+                "equipment_type_id": equipment_node.get("equipment_type_id"),
+                "equipment_type_name": equipment_type.get("name") if equipment_type else None,
+                "equipment_type_category": equipment_type.get("category") if equipment_type else None,
+                "level": equipment_node.get("level")
+            }
+        
+        # Try partial match
+        equipment_node = await self.db.equipment_nodes.find_one(
+            {"$or": [
+                {"tag": {"$regex": tag, "$options": "i"}},
+                {"id": {"$regex": tag, "$options": "i"}}
+            ]},
+            {"_id": 0, "id": 1, "tag": 1, "name": 1, "equipment_type_id": 1, "level": 1}
+        )
+        
+        if equipment_node:
+            equipment_type = None
+            if equipment_node.get("equipment_type_id"):
+                equipment_type = await self.db.custom_equipment_types.find_one(
+                    {"id": equipment_node["equipment_type_id"]},
+                    {"_id": 0, "id": 1, "name": 1, "category": 1}
+                )
+            
+            return {
+                "matched": True,
+                "partial_match": True,
+                "equipment_id": equipment_node.get("id"),
+                "equipment_tag": equipment_node.get("tag") or equipment_node.get("id"),
+                "equipment_name": equipment_node.get("name"),
+                "equipment_type_id": equipment_node.get("equipment_type_id"),
+                "equipment_type_name": equipment_type.get("name") if equipment_type else None,
+                "equipment_type_category": equipment_type.get("category") if equipment_type else None,
+                "level": equipment_node.get("level")
+            }
+        
+        return {
+            "matched": False,
+            "equipment_tag": tag,
+            "suggestion": "No equipment found. Consider creating new equipment or mapping this tag."
+        }
+    
+    async def _find_similar_failure_modes(
+        self, 
+        task_description: str, 
+        equipment_type_id: Optional[str],
+        discipline: str
+    ) -> List[Dict[str, Any]]:
+        """Find similar failure modes from the library."""
+        
+        # Build search query
+        query = {}
+        
+        # If we have equipment_type_id, prioritize those
+        if equipment_type_id:
+            query["$or"] = [
+                {"equipment_type_ids": equipment_type_id},
+                {"equipment_type_ids": {"$exists": False}},
+                {"equipment_type_ids": []}
+            ]
+        
+        # Get failure modes
+        cursor = self.failure_modes_collection.find(
+            query,
+            {"_id": 0, "id": 1, "failure_mode": 1, "equipment": 1, "category": 1, 
+             "mechanism": 1, "detection_methods": 1, "severity": 1, "occurrence": 1,
+             "detectability": 1, "rpn": 1, "recommended_actions": 1, "equipment_type_ids": 1}
+        ).limit(100)
+        
+        failure_modes = await cursor.to_list(length=100)
+        
+        if not failure_modes:
+            return []
+        
+        # Score each failure mode based on text similarity
+        task_lower = task_description.lower()
+        task_words = set(task_lower.split())
+        
+        scored_modes = []
+        for fm in failure_modes:
+            score = 0
+            fm_text = f"{fm.get('failure_mode', '')} {fm.get('mechanism', '')} {fm.get('equipment', '')}".lower()
+            fm_words = set(fm_text.split())
+            
+            # Word overlap score
+            common_words = task_words & fm_words
+            score += len(common_words) * 10
+            
+            # Check if any recommended action matches
+            for action in fm.get("recommended_actions", []):
+                action_lower = action.lower() if isinstance(action, str) else ""
+                if any(word in action_lower for word in task_words if len(word) > 3):
+                    score += 15
+                    break
+            
+            # Check detection methods
+            for method in fm.get("detection_methods", []):
+                method_lower = method.lower() if isinstance(method, str) else ""
+                if any(word in method_lower for word in task_words if len(word) > 3):
+                    score += 10
+                    break
+            
+            # Equipment type match bonus
+            if equipment_type_id and equipment_type_id in fm.get("equipment_type_ids", []):
+                score += 20
+            
+            if score > 0:
+                scored_modes.append({
+                    **fm,
+                    "similarity_score": score
+                })
+        
+        # Sort by score descending
+        scored_modes.sort(key=lambda x: x["similarity_score"], reverse=True)
+        
+        return scored_modes[:10]
+    
+    async def _ai_generate_recommendation(
+        self,
+        task: Dict[str, Any],
+        equipment_match: Optional[Dict[str, Any]],
+        similar_failure_modes: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Use AI to generate a recommendation for the task."""
+        from emergentintegrations.llm.openai import chat
+        import os
+        import json
+        
+        task_description = task.get("task_description") or task.get("original_task") or ""
+        discipline = task.get("discipline") or "Mechanical"
+        frequency = task.get("frequency") or ""
+        equipment_tag = task.get("equipment_tag") or ""
+        
+        # Build context for AI
+        fm_context = ""
+        if similar_failure_modes:
+            fm_list = []
+            for i, fm in enumerate(similar_failure_modes[:5], 1):
+                actions = fm.get("recommended_actions", [])
+                actions_str = ", ".join(actions[:3]) if actions else "None"
+                fm_list.append(
+                    f"{i}. ID: {fm.get('id')}, Failure Mode: {fm.get('failure_mode')}, "
+                    f"Equipment: {fm.get('equipment')}, Mechanism: {fm.get('mechanism')}, "
+                    f"Actions: {actions_str}"
+                )
+            fm_context = "\n".join(fm_list)
+        else:
+            fm_context = "No similar failure modes found in library."
+        
+        equipment_context = ""
+        if equipment_match and equipment_match.get("matched"):
+            equipment_context = (
+                f"Equipment matched: {equipment_match.get('equipment_name')} "
+                f"(Type: {equipment_match.get('equipment_type_name') or 'Unknown'})"
+            )
+        else:
+            equipment_context = "No equipment match found in hierarchy."
+        
+        prompt = f"""Analyze this maintenance task and recommend how to handle it.
+
+TASK DETAILS:
+- Description: {task_description}
+- Equipment Tag: {equipment_tag}
+- Discipline: {discipline}
+- Frequency: {frequency}
+
+EQUIPMENT MATCH:
+{equipment_context}
+
+SIMILAR FAILURE MODES IN LIBRARY:
+{fm_context}
+
+Based on this information, recommend ONE of these actions:
+1. "merge" - Merge this task into an existing failure mode's recommended actions
+2. "new_failure_mode" - Create a new failure mode for this task
+3. "new_task" - Add as a new task under an existing failure mode
+4. "keep_custom" - Keep as a custom task (not linked to failure mode library)
+
+Respond with a JSON object:
+{{
+    "action": "merge" | "new_failure_mode" | "new_task" | "keep_custom",
+    "target_failure_mode_id": "id of failure mode if merge or new_task, null otherwise",
+    "reasoning": "Brief explanation of why this recommendation",
+    "suggested_failure_mode_name": "Name if creating new failure mode, null otherwise",
+    "suggested_equipment_type": "Suggested equipment type if no match found, null otherwise",
+    "confidence": 0-100
+}}"""
+
+        try:
+            api_key = os.environ.get("EMERGENT_LLM_KEY") or os.environ.get("OPENAI_API_KEY")
+            if not api_key:
+                # Return default recommendation without AI
+                return self._default_recommendation(similar_failure_modes)
+            
+            response = await chat(
+                api_key=api_key,
+                prompt=prompt,
+                model="gpt-4o-mini"
+            )
+            
+            # Parse JSON response
+            response_text = response.strip()
+            if response_text.startswith("```"):
+                response_text = response_text.split("```")[1]
+                if response_text.startswith("json"):
+                    response_text = response_text[4:]
+            response_text = response_text.strip()
+            
+            recommendation = json.loads(response_text)
+            
+            # Validate and enrich recommendation
+            if recommendation.get("action") in ["merge", "new_task"] and recommendation.get("target_failure_mode_id"):
+                # Find the target failure mode details
+                target_fm = next(
+                    (fm for fm in similar_failure_modes if fm.get("id") == recommendation["target_failure_mode_id"]),
+                    None
+                )
+                if target_fm:
+                    recommendation["target_failure_mode"] = {
+                        "id": target_fm.get("id"),
+                        "failure_mode": target_fm.get("failure_mode"),
+                        "equipment": target_fm.get("equipment"),
+                        "category": target_fm.get("category")
+                    }
+            
+            return recommendation
+            
+        except Exception as e:
+            logger.error(f"AI recommendation error: {e}")
+            return self._default_recommendation(similar_failure_modes)
+    
+    def _default_recommendation(self, similar_failure_modes: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Generate default recommendation without AI."""
+        if similar_failure_modes and similar_failure_modes[0].get("similarity_score", 0) > 30:
+            best_match = similar_failure_modes[0]
+            return {
+                "action": "merge",
+                "target_failure_mode_id": best_match.get("id"),
+                "target_failure_mode": {
+                    "id": best_match.get("id"),
+                    "failure_mode": best_match.get("failure_mode"),
+                    "equipment": best_match.get("equipment"),
+                    "category": best_match.get("category")
+                },
+                "reasoning": f"High similarity match found with '{best_match.get('failure_mode')}'",
+                "suggested_failure_mode_name": None,
+                "suggested_equipment_type": None,
+                "confidence": 60
+            }
+        else:
+            return {
+                "action": "keep_custom",
+                "target_failure_mode_id": None,
+                "reasoning": "No strong match found. Recommend keeping as custom task.",
+                "suggested_failure_mode_name": None,
+                "suggested_equipment_type": None,
+                "confidence": 40
+            }
+    
+    async def apply_ai_suggestion(
+        self, 
+        session_id: str, 
+        task_id: str, 
+        action: str,
+        target_failure_mode_id: Optional[str] = None,
+        new_failure_mode_data: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Apply an AI suggestion for a task.
+        
+        Actions:
+        - "merge": Merge task into existing failure mode's recommended_actions
+        - "new_failure_mode": Create new failure mode with this task
+        - "new_task": Add task under existing failure mode
+        - "keep_custom": Mark as custom (stays in session)
+        - "reject": Reject suggestion (stays as accepted task)
+        """
+        from services.failure_modes_service import FailureModesService
+        
+        session = await self.sessions_collection.find_one({"session_id": session_id})
+        if not session:
+            raise ValueError(f"Session {session_id} not found")
+        
+        tasks = session.get("tasks_extracted", [])
+        task = next((t for t in tasks if t.get("task_id") == task_id), None)
+        if not task:
+            raise ValueError(f"Task {task_id} not found in session")
+        
+        suggestions = session.get("ai_review_suggestions", [])
+        suggestion = next((s for s in suggestions if s.get("task_id") == task_id), None)
+        
+        result = {"task_id": task_id, "action": action, "success": False}
+        
+        if action == "merge" and target_failure_mode_id:
+            # Add task to existing failure mode's recommended_actions
+            task_description = task.get("task_description") or task.get("original_task") or ""
+            frequency = task.get("frequency") or ""
+            action_text = f"{task_description} (Frequency: {frequency})" if frequency else task_description
+            
+            update_result = await self.failure_modes_collection.update_one(
+                {"id": target_failure_mode_id},
+                {
+                    "$addToSet": {"recommended_actions": action_text},
+                    "$set": {"updated_at": datetime.now(timezone.utc)}
+                }
+            )
+            
+            if update_result.modified_count > 0:
+                result["success"] = True
+                result["message"] = f"Task merged into failure mode {target_failure_mode_id}"
+                # Mark task as imported
+                task["import_status"] = "merged"
+                task["target_failure_mode_id"] = target_failure_mode_id
+            else:
+                result["message"] = "Failed to update failure mode"
+        
+        elif action == "new_failure_mode":
+            # Create new failure mode
+            fm_service = FailureModesService(self.db)
+            
+            task_description = task.get("task_description") or task.get("original_task") or ""
+            equipment_tag = task.get("equipment_tag") or ""
+            discipline = task.get("discipline") or "Mechanical"
+            frequency = task.get("frequency") or ""
+            
+            new_fm = new_failure_mode_data or {}
+            fm_name = new_fm.get("failure_mode") or f"Custom - {task_description[:50]}"
+            
+            fm_data = {
+                "failure_mode": fm_name,
+                "equipment": new_fm.get("equipment") or equipment_tag,
+                "category": new_fm.get("category") or discipline,
+                "mechanism": new_fm.get("mechanism") or "To be determined",
+                "severity": new_fm.get("severity", 5),
+                "occurrence": new_fm.get("occurrence", 5),
+                "detectability": new_fm.get("detectability", 5),
+                "recommended_actions": [f"{task_description} (Frequency: {frequency})" if frequency else task_description],
+                "detection_methods": task.get("detection_methods", []),
+                "failure_mode_type": "customer_specific",
+                "source": "pm_import"
+            }
+            
+            created_fm = await fm_service.create(fm_data, created_by=session.get("created_by", "system"))
+            
+            if created_fm:
+                result["success"] = True
+                result["message"] = f"New failure mode created: {fm_name}"
+                result["failure_mode_id"] = created_fm.get("id")
+                task["import_status"] = "new_failure_mode"
+                task["target_failure_mode_id"] = created_fm.get("id")
+            else:
+                result["message"] = "Failed to create failure mode"
+        
+        elif action == "new_task":
+            # Add as new task under existing failure mode (same as merge for now)
+            if target_failure_mode_id:
+                task_description = task.get("task_description") or task.get("original_task") or ""
+                frequency = task.get("frequency") or ""
+                action_text = f"{task_description} (Frequency: {frequency})" if frequency else task_description
+                
+                update_result = await self.failure_modes_collection.update_one(
+                    {"id": target_failure_mode_id},
+                    {
+                        "$addToSet": {"recommended_actions": action_text},
+                        "$set": {"updated_at": datetime.now(timezone.utc)}
+                    }
+                )
+                
+                if update_result.modified_count > 0:
+                    result["success"] = True
+                    result["message"] = f"New task added to failure mode {target_failure_mode_id}"
+                    task["import_status"] = "new_task"
+                    task["target_failure_mode_id"] = target_failure_mode_id
+                else:
+                    result["message"] = "Failed to add task to failure mode"
+            else:
+                result["message"] = "No target failure mode specified"
+        
+        elif action == "keep_custom":
+            # Mark as custom - stays in session
+            task["import_status"] = "custom"
+            result["success"] = True
+            result["message"] = "Task marked as custom"
+        
+        elif action == "reject":
+            # Reject suggestion - task stays as accepted
+            task["import_status"] = "pending"
+            result["success"] = True
+            result["message"] = "Suggestion rejected, task remains as accepted"
+        
+        # Update suggestion status
+        if suggestion:
+            suggestion["status"] = "applied" if result["success"] else "failed"
+            suggestion["applied_action"] = action
+        
+        # Save updates to session
+        await self.sessions_collection.update_one(
+            {"session_id": session_id},
+            {"$set": {
+                "tasks_extracted": tasks,
+                "ai_review_suggestions": suggestions,
+                "updated_at": datetime.now(timezone.utc)
+            }}
+        )
+        
+        return result

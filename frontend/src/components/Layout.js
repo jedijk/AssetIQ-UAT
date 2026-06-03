@@ -48,6 +48,7 @@ import { toast } from "sonner";
 import ChatSidebar from "./ChatSidebar";
 import ImageEditor from "./ImageEditor";
 import EquipmentHierarchy from "./EquipmentHierarchy";
+import ObservationTour from "./ObservationTour";
 import { actionsAPI, feedbackAPI } from "../lib/api";
 import { useOfflineSync } from "../hooks/useOfflineSync";
 import { usePageTracking } from "../hooks/useAnalyticsTracking";
@@ -70,6 +71,7 @@ const Layout = () => {
   const [openHeaderMenu, setOpenHeaderMenu] = useState(null); // "notifications" | "help" | "settings" | "profile" | null
   const [chatOpen, setChatOpen] = useState(false);
   const [chatPrefillEquipment, setChatPrefillEquipment] = useState(null);
+  const [chatPrefillMessage, setChatPrefillMessage] = useState(null);
   const [hierarchyOpen, setHierarchyOpen] = useState(typeof window !== 'undefined' && window.innerWidth >= 1024);
   const [hierarchyWidth, setHierarchyWidth] = useState(288); // 288px = w-72 default
   const [isResizing, setIsResizing] = useState(false);
@@ -77,6 +79,7 @@ const Layout = () => {
   const [avatarUrl, setAvatarUrl] = useState(null);
   const avatarObjectUrlRef = useRef(null);
   const [dismissedNotifications, setDismissedNotifications] = useState(false);
+  const [observationTourOpen, setObservationTourOpen] = useState(false);
   
   // Profile edit dialog state
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
@@ -1118,6 +1121,14 @@ const Layout = () => {
                 </DropdownMenuItem>
                 )}
                 <DropdownMenuItem 
+                  onClick={() => setObservationTourOpen(true)}
+                  className="cursor-pointer text-sm"
+                  data-testid="observation-tour-menu-item"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-2" />
+                  Tour: Report Observation
+                </DropdownMenuItem>
+                <DropdownMenuItem 
                   onClick={() => navigate("/settings/feedback")}
                   className="cursor-pointer text-sm"
                 >
@@ -1456,7 +1467,21 @@ const Layout = () => {
       </motion.button>
 
       {/* Chat Sidebar */}
-      <ChatSidebar isOpen={chatOpen} onClose={handleChatClose} prefillEquipment={chatPrefillEquipment} />
+      <ChatSidebar 
+        isOpen={chatOpen} 
+        onClose={handleChatClose} 
+        prefillEquipment={chatPrefillEquipment}
+        prefillMessage={chatPrefillMessage}
+      />
+      
+      {/* Observation Tour */}
+      <ObservationTour
+        isOpen={observationTourOpen}
+        onClose={() => setObservationTourOpen(false)}
+        setChatOpen={setChatOpen}
+        setChatPrefillMessage={setChatPrefillMessage}
+        setHierarchyOpen={setHierarchyOpen}
+      />
 
       {/* Info Dialog */}
       <Dialog open={infoOpen} onOpenChange={setInfoOpen}>

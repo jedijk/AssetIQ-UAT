@@ -195,4 +195,51 @@ export const pmImportAPI = {
     const response = await api.get(`/pm-import/tasks`);
     return response.data;
   },
+
+  // ============== AI REVIEW APIs ==============
+
+  /**
+   * Run AI review on all accepted tasks in a session
+   * @param {string} sessionId 
+   * @returns {Promise<{suggestions: array, total_reviewed: number, message: string}>}
+   */
+  runAIReview: async (sessionId) => {
+    const response = await api.post(`/pm-import/session/${sessionId}/ai-review`, {}, {
+      timeout: 180000, // 3 minute timeout for AI processing
+    });
+    return response.data;
+  },
+
+  /**
+   * Get AI review results for a session
+   * @param {string} sessionId 
+   * @returns {Promise<{suggestions: array, status: string}>}
+   */
+  getAIReviewResults: async (sessionId) => {
+    const response = await api.get(`/pm-import/session/${sessionId}/ai-review`);
+    return response.data;
+  },
+
+  /**
+   * Apply an AI suggestion for a task
+   * @param {string} sessionId 
+   * @param {string} taskId 
+   * @param {object} data - { action, target_failure_mode_id?, new_failure_mode_data? }
+   */
+  applySuggestion: async (sessionId, taskId, data) => {
+    const response = await api.post(
+      `/pm-import/session/${sessionId}/task/${taskId}/apply-suggestion`,
+      data
+    );
+    return response.data;
+  },
+
+  /**
+   * Apply all AI suggestions for a session
+   * @param {string} sessionId 
+   */
+  applyAllSuggestions: async (sessionId) => {
+    const response = await api.post(`/pm-import/session/${sessionId}/apply-all-suggestions`);
+    return response.data;
+  },
 };

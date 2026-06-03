@@ -37,7 +37,7 @@ const LANGUAGE_OPTIONS = [
   { code: "nl", label: "Nederlands", flag: "NL" },
 ];
 
-const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
+const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage = null }) => {
   const { language: appLanguage, setLanguage: setAppLanguage } = useLanguage();
   const [message, setMessage] = useState("");
   const [imageBase64, setImageBase64] = useState(null);
@@ -81,6 +81,20 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
       }, 100);
     }
   }, [prefillEquipment, isOpen]);
+  
+  // Pre-fill message from tour or external source
+  useEffect(() => {
+    if (prefillMessage !== null && prefillMessage !== undefined) {
+      setMessage(prefillMessage);
+      // Trigger auto-resize of textarea
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+      }, 50);
+    }
+  }, [prefillMessage]);
 
   // Fetch chat history
   const { data: messages = [], isLoading, refetch: refetchHistory } = useQuery({

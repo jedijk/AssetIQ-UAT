@@ -58,6 +58,7 @@ import {
   ChevronDown,
   Loader2,
   ClipboardList,
+  Brain,
 } from "lucide-react";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -98,6 +99,7 @@ import AIImproveFailureMode from "../components/library/AIImproveFailureMode";
 import BulkImproveFailureModes from "../components/library/BulkImproveFailureModes";
 import AIReviewActionDisciplines from "../components/library/AIReviewActionDisciplines";
 import AIFindSimilarFailureModes from "../components/library/AIFindSimilarFailureModes";
+import { AIReviewModal } from "../components/library/AIReviewModal";
 
 // Custom PM Import Tab Component
 const CustomPMImportTab = ({ onOpenImportWizard }) => {
@@ -108,6 +110,8 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
   const [filterFrequency, setFilterFrequency] = useState('all');
   const [editingTask, setEditingTask] = useState(null);
   const [mappingTask, setMappingTask] = useState(null); // {task, mode: 'equipment'|'equipment-type'|'failure-modes'}
+  const [showAIReview, setShowAIReview] = useState(false);
+  const [selectedSessionForReview, setSelectedSessionForReview] = useState(null);
   
   // Fetch all flattened tasks across all PM import sessions
   const { data: tasksData, isLoading, refetch } = useQuery({
@@ -158,6 +162,29 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
   
   const allTasks = useMemo(() => tasksData?.tasks || [], [tasksData]);
   const sessionCount = tasksData?.session_count || 0;
+  
+  // Get unique sessions with their accepted task counts for AI Review
+  const sessionsWithAcceptedTasks = useMemo(() => {
+    const sessionMap = new Map();
+    allTasks.forEach(task => {
+      if (task.session_id) {
+        if (!sessionMap.has(task.session_id)) {
+          sessionMap.set(task.session_id, { 
+            session_id: task.session_id, 
+            total: 0, 
+            accepted: 0,
+            filename: task.source_filename || 'Unknown'
+          });
+        }
+        const session = sessionMap.get(task.session_id);
+        session.total++;
+        if (task.review_status === 'accepted') {
+          session.accepted++;
+        }
+      }
+    });
+    return Array.from(sessionMap.values()).filter(s => s.accepted > 0);
+  }, [allTasks]);
   
   // Get unique disciplines and frequencies for filters
   const disciplines = useMemo(() => {
@@ -263,6 +290,38 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
+          {sessionsWithAcceptedTasks.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-purple-200 text-purple-700 hover:bg-purple-50"
+                >
+                  <Brain className="h-4 w-4 mr-2" />
+                  AI Review
+                  <ChevronDown className="h-4 w-4 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                {sessionsWithAcceptedTasks.map((session) => (
+                  <DropdownMenuItem
+                    key={session.session_id}
+                    onClick={() => {
+                      setSelectedSessionForReview(session.session_id);
+                      setShowAIReview(true);
+                    }}
+                    className="flex flex-col items-start"
+                  >
+                    <span className="font-medium text-sm">{session.filename}</span>
+                    <span className="text-xs text-gray-500">
+                      {session.accepted} accepted task{session.accepted !== 1 ? 's' : ''} ready for review
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -483,6 +542,19 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
         onClose={() => setMappingTask(null)}
         onSave={(payload) => mappingMutation.mutate({ task: mappingTask.task, payload })}
         saving={mappingMutation.isPending}
+      />
+      
+      {/* AI Review Modal */}
+      <AIReviewModal
+        isOpen={showAIReview}
+        onClose={() => {
+          setShowAIReview(false);
+          setSelectedSessionForReview(null);
+        }}
+        sessionId={selectedSessionForReview}
+        onComplete={() => {
+          invalidateTasks();
+        }}
       />
     </div>
   );

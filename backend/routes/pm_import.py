@@ -65,6 +65,13 @@ class ApproveNewFMRequest(BaseModel):
     detectability: Optional[int] = 5
 
 
+class ApplySuggestionRequest(BaseModel):
+    """Request model for applying an AI suggestion."""
+    action: str  # "merge", "new_failure_mode", "new_task", "keep_custom", "reject"
+    target_failure_mode_id: Optional[str] = None
+    new_failure_mode_data: Optional[Dict[str, Any]] = None
+
+
 # Background task for processing
 async def process_pm_file_background(
     session_id: str,
@@ -870,3 +877,139 @@ async def list_all_tasks(
         "total": len(tasks),
         "session_count": session_count
     }
+
+
+# ============== AI REVIEW ROUTES ==============
+
+@router.post("/session/{session_id}/ai-review")
+async def ai_review_session(
+    session_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Run AI review on all accepted tasks in a session.
+    
+    For each accepted task:
+    1. Matches equipment type by tag → equipment_nodes → equipment_type_id
+    2. Finds similar failure modes in library
+    3. Generates AI recommendation (merge, new_failure_mode, new_task, keep_custom)
+    
+    Returns suggestions for each accepted task.
+    """
+    pm_service = PMImportService(db)
+    
+    try:
+        result = await pm_service.ai_review_accepted_tasks(session_id)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"AI review error for session {session_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"AI review failed: {str(e)}")
+
+
+@router.get("/session/{session_id}/ai-review")
+async def get_ai_review_results(
+    session_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get the AI review results for a session."""
+    session = await db.pm_import_sessions.find_one(
+        {"session_id": session_id},
+        {"_id": 0, "ai_review_suggestions": 1, "ai_review_status": 1}
+    )
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    return {
+        "suggestions": session.get("ai_review_suggestions", []),
+        "status": session.get("ai_review_status", "not_started")
+    }
+
+
+@router.post("/session/{session_id}/task/{task_id}/apply-suggestion")
+async def apply_ai_suggestion(
+    session_id: str,
+    task_id: str,
+    request: ApplySuggestionRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Apply an AI suggestion for a specific task.
+    
+    Actions:
+    - "merge": Merge task into existing failure mode's recommended_actions
+    - "new_failure_mode": Create new failure mode with this task
+    - "new_task": Add task under existing failure mode
+    - "keep_custom": Mark as custom (stays in session)
+    - "reject": Reject suggestion (stays as accepted task)
+    """
+    pm_service = PMImportService(db)
+    
+    try:
+        result = await pm_service.apply_ai_suggestion(
+            session_id=session_id,
+            task_id=task_id,
+            action=request.action,
+            target_failure_mode_id=request.target_failure_mode_id,
+            new_failure_mode_data=request.new_failure_mode_data
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Apply suggestion error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to apply suggestion: {str(e)}")
+
+
+@router.post("/session/{session_id}/apply-all-suggestions")
+async def apply_all_suggestions(
+    session_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Apply all AI suggestions that have action != 'keep_custom'."""
+    pm_service = PMImportService(db)
+    
+    session = await db.pm_import_sessions.find_one({"session_id": session_id})
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    suggestions = session.get("ai_review_suggestions", [])
+    results = {"applied": 0, "failed": 0, "skipped": 0, "details": []}
+    
+    for suggestion in suggestions:
+        if suggestion.get("status") == "applied":
+            results["skipped"] += 1
+            continue
+        
+        recommendation = suggestion.get("recommendation", {})
+        action = recommendation.get("action", "keep_custom")
+        
+        if action == "keep_custom":
+            results["skipped"] += 1
+            continue
+        
+        try:
+            result = await pm_service.apply_ai_suggestion(
+                session_id=session_id,
+                task_id=suggestion.get("task_id"),
+                action=action,
+                target_failure_mode_id=recommendation.get("target_failure_mode_id")
+            )
+            
+            if result.get("success"):
+                results["applied"] += 1
+            else:
+                results["failed"] += 1
+            
+            results["details"].append(result)
+        except Exception as e:
+            results["failed"] += 1
+            results["details"].append({
+                "task_id": suggestion.get("task_id"),
+                "success": False,
+                "error": str(e)
+            })
+    
+    return results

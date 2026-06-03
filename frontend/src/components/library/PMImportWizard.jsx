@@ -40,6 +40,7 @@ import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
 import { PMImportHelpModal } from "./PMImportHelpModal";
+import { AIReviewModal } from "./AIReviewModal";
 import { failureModesAPI } from "../../lib/apis/failureModes";
 
 // Task type colors
@@ -949,6 +950,7 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
   const [selectedTask, setSelectedTask] = useState(null);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [showAIReview, setShowAIReview] = useState(false);
   
   const fileInputRef = useRef(null);
   const pollingRef = useRef(null);
@@ -1528,6 +1530,15 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
                     Back
                   </Button>
                   <Button
+                    variant="outline"
+                    disabled={acceptedCount === 0}
+                    onClick={() => setShowAIReview(true)}
+                    className="border-purple-200 text-purple-700 hover:bg-purple-50"
+                  >
+                    <Brain className="w-4 h-4 mr-2" />
+                    AI Review
+                  </Button>
+                  <Button
                     disabled={acceptedCount === 0 || importing}
                     onClick={handleImport}
                     className="bg-blue-600 hover:bg-blue-700"
@@ -1546,6 +1557,19 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
                   </Button>
                 </div>
               </div>
+              
+              {/* AI Review Modal */}
+              <AIReviewModal
+                isOpen={showAIReview}
+                onClose={() => setShowAIReview(false)}
+                sessionId={sessionId}
+                onComplete={() => {
+                  // Refresh session data after AI review
+                  if (sessionId) {
+                    pmImportAPI.getSession(sessionId).then(setSession);
+                  }
+                }}
+              />
             </div>
           )}
           
