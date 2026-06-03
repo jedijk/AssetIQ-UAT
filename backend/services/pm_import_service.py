@@ -83,6 +83,11 @@ DISCIPLINE_KEYWORDS = {
         "belt", "chain", "roller", "conveyor", "valve body",
         "pomp", "lager", "tandwiel", "ventilator"
     ],
+    "Operations": [
+        "operator", "operation", "sample", "sampling", "round", "rounds", "walkthrough",
+        "operator round", "shift check", "daily check", "process check", "visual round",
+        "buitendienst", "bemonstering", "ronde", "operator check"
+    ],
 }
 
 # Action type detection via task text keywords (overrides task-type defaults)
@@ -1708,6 +1713,18 @@ Only return the JSON array, no other text."""
         if not component:
             component = self._extract_component(task_text)
         
+        # Step 3b: Extract discipline from Excel column if present
+        # Check common discipline column names (case-insensitive matching via row keys)
+        explicit_discipline = ""
+        for key in row.keys():
+            key_lower = key.lower().strip() if isinstance(key, str) else ""
+            if key_lower in ("discipline", "disc", "vakgebied", "specialisme", "dept", "department"):
+                val = row.get(key, "")
+                if val and str(val).strip():
+                    explicit_discipline = str(val).strip()
+                    logger.info(f"Found explicit discipline '{explicit_discipline}' from column '{key}'")
+                    break
+        
         # Step 4: AI enhancement
         ai_analysis = await self._ai_analyze_task(task_text, task_type, rule_based_data)
         
@@ -1740,7 +1757,8 @@ Only return the JSON array, no other text."""
                 task_text,
                 component or ai_analysis.get("component", ""),
                 ai_analysis.get("task_type", task_type),
-                ai_analysis.get("discipline"),
+                # Priority: explicit Excel column value > AI hint
+                explicit_discipline or ai_analysis.get("discipline"),
             ),
             "suggested_failure_modes": ai_analysis.get("failure_modes", rule_based_data.get("failure_modes", [])),
             "failure_mechanisms": ai_analysis.get("mechanisms", rule_based_data.get("failure_mechanisms", [])),
@@ -1805,11 +1823,14 @@ Only return the JSON array, no other text."""
         """Infer execution discipline from task text, component, and task type."""
         from models.disciplines import normalize_discipline, DISCIPLINE_LIST
         
-        # 1) Honor explicit AI hint if it normalizes to a known discipline
+        # 1) Honor explicit hint (from Excel column or AI) if it normalizes to a known discipline
         if ai_hint:
             normalized = normalize_discipline(ai_hint)
             if normalized in DISCIPLINE_LIST:
+                logger.debug(f"_infer_discipline: Using explicit/AI hint '{ai_hint}' -> normalized to '{normalized}'")
                 return normalized
+            else:
+                logger.debug(f"_infer_discipline: Hint '{ai_hint}' normalized to '{normalized}' but not in DISCIPLINE_LIST, falling back")
         
         haystack = f"{task_text or ''} {component or ''}".lower()
         
@@ -1822,10 +1843,12 @@ Only return the JSON array, no other text."""
         
         best = max(scores.items(), key=lambda kv: kv[1])
         if best[1] > 0:
+            logger.debug(f"_infer_discipline: Keyword match found, returning '{best[0]}'")
             return best[0]
         
         # 3) Fall back to task-type default
         default = TASK_TYPE_DEFAULTS.get(task_type, TASK_TYPE_DEFAULTS["Unknown"])
+        logger.debug(f"_infer_discipline: Falling back to task-type default '{default['discipline']}' for task_type '{task_type}'")
         return default["discipline"]
     
     def _extract_frequency(self, text: str) -> str:

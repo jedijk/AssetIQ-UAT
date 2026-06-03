@@ -11,7 +11,7 @@ import time
 from typing import Optional, Dict, Any
 
 # Configuration
-BASE_URL = "https://tag-dash-flex.preview.emergentagent.com/api"
+BASE_URL = "https://discipline-mapper-1.preview.emergentagent.com/api"
 TEST_EMAIL = "jedijk@gmail.com"
 TEST_PASSWORD = "Jaap8019@"
 
