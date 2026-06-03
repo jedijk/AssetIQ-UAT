@@ -87,6 +87,41 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
     enabled: isOpen,
   });
   
+  /**
+   * Auto-skip on close: when the user closes the chat window while the assistant
+   * is awaiting more context, fire a "skip" message in the background so the
+   * conversation is finalized rather than left in limbo. Then close the sidebar.
+   */
+  const handleCloseWithAutoSkip = () => {
+    const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
+    const isAwaitingContext = lastAssistantMsg?.chat_state === "awaiting_context"
+      || lastAssistantMsg?.awaiting_context_for_threat;
+    
+    if (isAwaitingContext && !contextSkipInFlightRef.current) {
+      contextSkipInFlightRef.current = true;
+      if (autoSkipTimerRef.current) {
+        clearInterval(autoSkipTimerRef.current);
+        autoSkipTimerRef.current = null;
+      }
+      setAutoSkipCountdown(null);
+      contextSkipDeadlineMsRef.current = null;
+      // Fire-and-forget — no need to await before closing the UI
+      chatAPI
+        .sendMessage("skip", null, manualLanguageRef.current)
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
+          queryClient.invalidateQueries({ queryKey: ["threats"] });
+          queryClient.invalidateQueries({ queryKey: ["stats"] });
+        })
+        .catch(() => { /* silently ignore — user is closing the window */ })
+        .finally(() => {
+          contextSkipInFlightRef.current = false;
+        });
+    }
+    
+    onClose();
+  };
+  
   // Track database environment changes
   useEffect(() => {
     if (isOpen) {
@@ -968,7 +1003,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
     <>
       {/* Backdrop - Click anywhere outside to close */}
       <div
-        onClick={onClose}
+        onClick={handleCloseWithAutoSkip}
         className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[210]"
         data-testid="chat-backdrop"
       />
@@ -1006,7 +1041,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={onClose}
+              onClick={handleCloseWithAutoSkip}
               className="text-slate-400 hover:text-slate-600"
               data-testid="close-chat-sidebar"
             >

@@ -7,6 +7,10 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Chat sidebar — auto-skip on close (VERIFIED)**:
+  - When the user closes the Report Observation chat (X button or backdrop click) while the assistant is in `awaiting_context` state, the chat now fires a background `skip` message so the conversation is finalized instead of being left in limbo.
+  - Wrapped `onClose` in a new `handleCloseWithAutoSkip` handler inside `ChatSidebar.js`. Fire-and-forget call to `chatAPI.sendMessage("skip", ...)` then invalidates `chatHistory`, `threats`, `stats` queries.
+
 - [Feb 2026] **PM Import — bug fix: matchers were overwritten on review (VERIFIED)**:
   - Root cause: `ensure_equipment_impacts` (called by review/get-session paths) was using its own legacy tag-only matcher and *overwrote* the rich hierarchy+type matches produced by `_process_file` during upload. End result: `equipment_matches: []` even though upload matched correctly.
   - Fix: refactored `ensure_equipment_impacts` to call the same `_match_equipment_to_hierarchy` + `_match_equipment_types` methods used by the upload pipeline. Both code paths now stay consistent.
