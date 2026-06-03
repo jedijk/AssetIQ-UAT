@@ -14,7 +14,7 @@ import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import { ChevronRight, ChevronDown, ChevronUp, Building2, Factory, Cog, Settings, Wrench, Plus, Trash2, Edit,
   GripVertical, ShieldCheck, Gauge, Zap, Droplets, Wind, Thermometer, Box, CircleDot, 
   Pipette, Flame, Cpu, Search, Check, Upload, FileText, X, Package, Move, ArrowRight, ArrowUp, ArrowDown,
-  Download, MoreVertical, Copy, Scissors, RefreshCw, TreePine, Sparkles,
+  Download, MoreVertical, Copy, Scissors, RefreshCw, TreePine, Sparkles, ClipboardList,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -36,6 +36,7 @@ import BackButton from "../components/BackButton";
 import { PropertiesPanel } from "../components/equipment/PropertiesPanel";
 import ProcessImportWizard from "../components/equipment/ProcessImportWizard";
 import { AIEquipmentTypeMappingSuggestions } from "../components/equipment/AIEquipmentTypeMappingSuggestions";
+import MaintenanceProgramPanel from "../components/equipment/MaintenanceProgramPanel";
 import { getEquipmentLevelLabel, getEquipmentLevelDescription } from "../lib/equipmentLevelLabels";
 
 const EQUIPMENT_ICONS = { droplets: Droplets, wind: Wind, cog: Cog, thermometer: Thermometer, box: Box, "circle-dot": CircleDot, zap: Zap, gauge: Gauge, cpu: Cpu, pipette: Pipette, flame: Flame };
@@ -142,7 +143,7 @@ function flattenTree(treeNodes, expandedIds, depth = 0) {
 }
 
 // Tree Node Component with Drag-Drop for reorder, promote, demote, and unassigned items
-function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, hasChildren, allNodes, onDrop, onReorder, onChangeLevel, siblings, siblingIndex, isSearchMatch, onAddChild, onEdit, onDelete, onMoveUp, onMoveDown }) {
+function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, hasChildren, allNodes, onDrop, onReorder, onChangeLevel, siblings, siblingIndex, isSearchMatch, onAddChild, onEdit, onDelete, onMoveUp, onMoveDown, onViewMaintenanceProgram }) {
   const { t } = useLanguage();
   // Translation lookup for node name (id-keyed)
   const nodeTransMap = useEquipmentNodeIdMap();
@@ -220,12 +221,16 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
       case "moveDown":
         onMoveDown?.(node);
         break;
+      case "viewMaintenanceProgram":
+        onViewMaintenanceProgram?.(node);
+        break;
       default:
         break;
     }
   };
 
   const canAddChild = node.level !== "maintainable_item";
+  const canViewMaintenanceProgram = ["equipment_unit", "equipment", "subunit", "maintainable_item", "unit"].includes(node.level);
 
   const handleDragStart = (e) => {
     e.dataTransfer.setData("application/json", JSON.stringify({ 
@@ -418,6 +423,12 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
               {t("equipment.addChild")}
             </ContextMenuItem>
           )}
+          {canViewMaintenanceProgram && (
+            <ContextMenuItem onClick={() => handleContextMenuAction("viewMaintenanceProgram")}>
+              <ClipboardList className="w-4 h-4 mr-2" />
+              {t("equipment.viewMaintenanceProgram")}
+            </ContextMenuItem>
+          )}
           <ContextMenuItem onClick={() => handleContextMenuAction("edit")}>
             <Edit className="w-4 h-4 mr-2" />
             {t("common.edit")}
@@ -475,6 +486,14 @@ function TreeNode({ node, depth, onSelect, isSelected, isExpanded, onExpand, has
                 onClick={() => handleContextMenuAction("addChild")}
               >
                 <Plus className="w-4 h-4" /> {t("equipment.addChild")}
+              </button>
+            )}
+            {canViewMaintenanceProgram && (
+              <button 
+                className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 flex items-center gap-2"
+                onClick={() => handleContextMenuAction("viewMaintenanceProgram")}
+              >
+                <ClipboardList className="w-4 h-4" /> {t("equipment.viewMaintenanceProgram")}
               </button>
             )}
             <button 
@@ -582,6 +601,8 @@ export default function EquipmentManagerPage() {
   const [movingNode, setMovingNode] = useState(null);
   // State for delete confirmation with impact analysis
   const [deleteConfirmation, setDeleteConfirmation] = useState({ open: false, node: null, impact: null, loading: false });
+  // State for maintenance program dialog
+  const [maintenanceProgramDialog, setMaintenanceProgramDialog] = useState({ open: false, node: null });
 
   // Keyboard shortcut to focus search (press /)
   useEffect(() => {
@@ -1068,6 +1089,10 @@ export default function EquipmentManagerPage() {
     reorderMutation.mutate({ nodeId: node.id, direction: "down" });
   };
   
+  const handleContextViewMaintenanceProgram = (node) => {
+    setMaintenanceProgramDialog({ open: true, node });
+  };
+  
   // Export hierarchy to Excel
   const [isExporting, setIsExporting] = useState(false);
   const handleExportExcel = async () => {
@@ -1322,6 +1347,7 @@ export default function EquipmentManagerPage() {
                     onDelete={handleContextDelete}
                     onMoveUp={handleContextMoveUp}
                     onMoveDown={handleContextMoveDown}
+                    onViewMaintenanceProgram={handleContextViewMaintenanceProgram}
                   />
                 );
               })}
@@ -1672,6 +1698,29 @@ export default function EquipmentManagerPage() {
           queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
         }}
       />
+      
+      {/* Maintenance Program Dialog */}
+      <Dialog open={maintenanceProgramDialog.open} onOpenChange={(open) => setMaintenanceProgramDialog({ open, node: open ? maintenanceProgramDialog.node : null })}>
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5 text-blue-600" />
+              {t("equipment.maintenanceProgram")}
+            </DialogTitle>
+            <DialogDescription>
+              {maintenanceProgramDialog.node?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto min-h-0 py-4">
+            {maintenanceProgramDialog.node && (
+              <MaintenanceProgramPanel 
+                equipmentId={maintenanceProgramDialog.node.id} 
+                equipmentName={maintenanceProgramDialog.node.name}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
       </div>
     </div>
   );

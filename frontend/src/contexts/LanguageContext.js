@@ -1084,6 +1084,8 @@ const en = {
     impactReputation4Desc: "National media, regulatory scrutiny, contract risk",
     impactReputation5Label: "Catastrophic",
     impactReputation5Desc: "International coverage, license/permit threat",
+    maintenanceProgram: "Maintenance Program",
+    viewMaintenanceProgram: "View Maintenance Program",
   },
 
   // Hierarchy context menu
@@ -3043,6 +3045,8 @@ const nl = {
     impactReputation4Desc: "Nationale media, toezicht autoriteiten, contractrisico",
     impactReputation5Label: "Catastrofaal",
     impactReputation5Desc: "Internationale berichtgeving, dreiging voor licentie of vergunning",
+    maintenanceProgram: "Onderhoudsprogramma",
+    viewMaintenanceProgram: "Onderhoudsprogramma bekijken",
   },
 
   // Hierarchy context menu

@@ -946,7 +946,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
           {["equipment_unit", "equipment", "subunit", "maintainable_item", "unit"].includes(node.level) && (
             <div className="pt-4 border-t border-slate-200">
               <div className="flex items-center justify-between mb-2">
-                <Label className="text-sm font-medium">{t("equipment.maintenanceProgram") || "Maintenance Program"}</Label>
+                <Label className="text-sm font-medium">{t("equipment.maintenanceProgram")}</Label>
               </div>
               <Button 
                 variant="outline" 
@@ -954,7 +954,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                 onClick={() => setShowMaintenanceProgramDialog(true)}
               >
                 <ClipboardList className="w-4 h-4 mr-2" />
-                {t("equipment.viewMaintenanceProgram") || "View Maintenance Program"}
+                {t("equipment.viewMaintenanceProgram")}
               </Button>
             </div>
           )}
@@ -987,17 +987,17 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
       
       {/* Maintenance Program Dialog */}
       <Dialog open={showMaintenanceProgramDialog} onOpenChange={setShowMaintenanceProgramDialog}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <ClipboardList className="h-5 w-5 text-blue-600" />
-              {t("equipment.maintenanceProgram") || "Maintenance Program"}
+              {t("equipment.maintenanceProgram")}
             </DialogTitle>
             <DialogDescription>
               {translatedName || node?.name}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 overflow-auto py-4">
+          <div className="flex-1 overflow-auto min-h-0 py-4">
             <MaintenanceProgramPanel 
               equipmentId={node?.id} 
               equipmentName={translatedName || node?.name}

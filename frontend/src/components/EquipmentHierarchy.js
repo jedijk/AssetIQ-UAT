@@ -34,15 +34,17 @@ import {
   File as FileIcon,
   Eye,
   EyeOff,
+  ClipboardList,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { DocumentViewer } from "./DocumentViewer";
 import { getBackendUrl } from "../lib/apiConfig";
 import { getEquipmentLevelLabel } from "../lib/equipmentLevelLabels";
+import MaintenanceProgramPanel from "./equipment/MaintenanceProgramPanel";
 
 // ISO 14224 Level Configuration
 const ISO_LEVEL_CONFIG = {
@@ -207,7 +209,11 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
   const critColor = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
   const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0 });
   const [showDetails, setShowDetails] = useState(false);
+  const [showMaintenanceProgram, setShowMaintenanceProgram] = useState(false);
   const contextMenuRef = useRef(null);
+  
+  // Check if this equipment level can have a maintenance program
+  const canViewMaintenanceProgram = ["equipment_unit", "equipment", "subunit", "maintainable_item", "unit"].includes(node.level);
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -272,6 +278,11 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
   const handleFilterOn = () => {
     setContextMenu({ show: false, x: 0, y: 0 });
     onClick?.(); // Navigate to filtered observations
+  };
+
+  const handleViewMaintenanceProgram = () => {
+    setContextMenu({ show: false, x: 0, y: 0 });
+    setShowMaintenanceProgram(true);
   };
 
   // Get equipment type name
@@ -403,6 +414,19 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
             <Info className="w-4 h-4" />
             {t?.("hierarchy.showDetails") || "Show Details"}
           </button>
+          {canViewMaintenanceProgram && (
+            <>
+              <div className="border-t border-slate-100 my-1" />
+              <button
+                onClick={handleViewMaintenanceProgram}
+                className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2 text-slate-700 hover:text-blue-700"
+                data-testid="context-menu-maintenance-program"
+              >
+                <ClipboardList className="w-4 h-4" />
+                {t?.("equipment.viewMaintenanceProgram") || "View Maintenance Program"}
+              </button>
+            </>
+          )}
           <div className="border-t border-slate-100 my-1" />
           <button
             onClick={handleAddThreatClick}
@@ -430,6 +454,29 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
           getDisciplineDisplay={getDisciplineDisplay}
           onEditEquipment={onEditEquipment}
         />
+      )}
+      
+      {/* Maintenance Program Dialog */}
+      {showMaintenanceProgram && (
+        <Dialog open={showMaintenanceProgram} onOpenChange={setShowMaintenanceProgram}>
+          <DialogContent className="max-w-4xl w-[95vw] max-h-[85vh] overflow-hidden flex flex-col">
+            <DialogHeader className="flex-shrink-0">
+              <DialogTitle className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-blue-600" />
+                {t?.("equipment.maintenanceProgram") || "Maintenance Program"}
+              </DialogTitle>
+              <DialogDescription>
+                {translatedName || node.name}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-auto min-h-0 py-4">
+              <MaintenanceProgramPanel 
+                equipmentId={node.id} 
+                equipmentName={translatedName || node.name}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
       
       {hasChildren && isOpen && (
