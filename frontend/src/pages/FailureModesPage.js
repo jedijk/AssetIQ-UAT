@@ -357,76 +357,53 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
             <table className="w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Equipment Tag</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Equipment Description</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Task Description</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Task Type</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Discipline</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Frequency</th>
-                  <th className="text-right px-4 py-3 text-sm font-medium text-gray-600">Est. Hours</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Match Status</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Review Status</th>
-                  <th className="text-right px-4 py-3 text-sm font-medium text-gray-600">Actions</th>
+                  <th className="text-left px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Equipment Tag</th>
+                  <th className="text-left px-3 py-3 text-xs font-medium text-gray-600">Equipment Description</th>
+                  <th className="text-left px-3 py-3 text-xs font-medium text-gray-600">Task Description</th>
+                  <th className="text-left px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Type</th>
+                  <th className="text-left px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Discipline</th>
+                  <th className="text-left px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Frequency</th>
+                  <th className="text-right px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Hours</th>
+                  <th className="text-right px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap sticky right-0 bg-gray-50 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filteredTasks.map((task, idx) => (
-                  <tr key={task.task_id || idx} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <div className="text-sm font-medium text-gray-900">
-                        {task.equipment_tag || '-'}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-sm text-gray-700 max-w-xs truncate" title={task.equipment_description}>
-                        {task.equipment_description || '-'}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-sm font-medium text-gray-900 max-w-md truncate" title={task.task_description}>
-                        {task.task_description || '-'}
-                      </div>
-                      {task.file_name && (
-                        <div className="text-xs text-gray-400 truncate max-w-xs" title={task.file_name}>
-                          {task.file_name}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {getTaskTypeBadge(task.task_type)}
-                    </td>
-                    <td className="px-4 py-3">
-                      {getDisciplineBadge(task.discipline)}
-                    </td>
-                    <td className="px-4 py-3">
-                      {getFrequencyBadge(task.frequency)}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="text-sm text-gray-700">{task.estimated_hours != null ? `${task.estimated_hours}h` : '-'}</span>
-                    </td>
-                    <td className="px-4 py-3">
+                  <tr key={task.task_id || idx} className="hover:bg-gray-50 group">
+                    <td className="px-3 py-3 whitespace-nowrap">
                       <PMHierarchyChip
                         task={task}
                         onClick={() => setMappingTask({ task, mode: 'equipment' })}
                       />
                     </td>
-                    <td className="px-4 py-3">
-                      {task.review_status ? (
-                        <Badge variant="outline" className={`text-xs ${
-                          task.review_status === 'accepted' ? 'bg-green-100 text-green-700' :
-                          task.review_status === 'rejected' ? 'bg-red-100 text-red-700' :
-                          task.review_status === 'edited' ? 'bg-blue-100 text-blue-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {task.review_status}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs bg-yellow-100 text-yellow-700">
-                          pending
-                        </Badge>
+                    <td className="px-3 py-3 max-w-[220px]">
+                      <div className="text-sm text-gray-700 truncate" title={task.equipment_description}>
+                        {task.equipment_match?.name || task.equipment_description || '-'}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 max-w-[280px]">
+                      <div className="text-sm font-medium text-gray-900 truncate" title={task.task_description}>
+                        {task.task_description || '-'}
+                      </div>
+                      {task.file_name && (
+                        <div className="text-xs text-gray-400 truncate" title={task.file_name}>
+                          {task.file_name}
+                        </div>
                       )}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
+                      {getTaskTypeBadge(task.task_type)}
+                    </td>
+                    <td className="px-3 py-3">
+                      {getDisciplineBadge(task.discipline)}
+                    </td>
+                    <td className="px-3 py-3">
+                      {getFrequencyBadge(task.frequency)}
+                    </td>
+                    <td className="px-3 py-3 text-right whitespace-nowrap">
+                      <span className="text-sm text-gray-700">{task.estimated_hours != null ? `${task.estimated_hours}h` : '-'}</span>
+                    </td>
+                    <td className="px-3 py-3 sticky right-0 bg-white group-hover:bg-gray-50 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]">
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           size="sm"

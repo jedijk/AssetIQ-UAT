@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React from "react";
 import {
-  HelpCircle, X, Upload, Brain, CheckCircle, Library, Sparkles, ChevronRight,
-  FileSpreadsheet, FileText, Image, AlertTriangle, Link, Plus,
+  HelpCircle, ChevronRight, FileSpreadsheet, FileText, Image,
+  Languages, Tag as TagIcon, Clock, Wrench, CheckCircle, Database,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
@@ -15,340 +15,145 @@ export const PMImportHelpModal = ({ isOpen, onClose }) => {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <HelpCircle className="w-5 h-5 text-blue-600" />
-            How PM Plan Import Works
+            How PM Import Works
           </DialogTitle>
         </DialogHeader>
         
         <ScrollArea className="flex-1 pr-4">
           <div className="space-y-8 pb-6">
-            {/* What It Does */}
+            
+            {/* What it does */}
             <section>
               <h3 className="text-lg font-semibold text-slate-900 mb-3">What It Does</h3>
-              <p className="text-slate-600 mb-4">
-                You upload your existing maintenance plan (Excel, PDF, or scanned image), and AssetIQ 
-                automatically extracts maintenance tasks and converts them into <strong>failure prevention intelligence</strong>.
-              </p>
               <p className="text-slate-600 mb-3">
-                Instead of simply importing maintenance tasks, AssetIQ helps identify:
+                You upload an unstructured maintenance plan (Excel, PDF, CSV, or scanned image).
+                AssetIQ turns it into a clean, editable list of standardized maintenance tasks
+                that are linked to your <strong>Equipment Hierarchy</strong>.
               </p>
-              <ul className="space-y-2 text-slate-600">
-                <li className="flex items-start gap-2">
-                  <ChevronRight className="w-4 h-4 text-blue-500 mt-1 flex-shrink-0" />
-                  <span>What <strong>component</strong> the task applies to</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <ChevronRight className="w-4 h-4 text-blue-500 mt-1 flex-shrink-0" />
-                  <span>What <strong>type of maintenance</strong> it is</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <ChevronRight className="w-4 h-4 text-blue-500 mt-1 flex-shrink-0" />
-                  <span>What <strong>failure modes</strong> the task is intended to prevent</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <ChevronRight className="w-4 h-4 text-blue-500 mt-1 flex-shrink-0" />
-                  <span>How that task should <strong>link to your Failure Mode Library</strong></span>
-                </li>
-              </ul>
-              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                <p className="text-sm text-blue-800">
-                  This creates a direct connection between maintenance activities and reliability logic.
-                </p>
+              <p className="text-slate-600">
+                Once you review and accept the tasks, they're written to the
+                <strong> PM Task Library</strong> — ready to be picked up by the Maintenance Program,
+                Scheduler, or other downstream modules.
+              </p>
+              <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-100 text-sm text-amber-800">
+                PM Import does <strong>not</strong> create failure modes, FMEAs, or maintenance
+                strategies. Its only job is to import, enrich and match maintenance tasks.
               </div>
             </section>
 
-            {/* The Process */}
+            {/* The pipeline */}
             <section>
-              <h3 className="text-lg font-semibold text-slate-900 mb-4">The Process (4 Steps)</h3>
-              
-              {/* Step 1 */}
-              <div className="mb-6">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold">1</div>
-                  <h4 className="font-semibold text-slate-800">Upload Your File</h4>
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">The Pipeline (6 stages)</h3>
+
+              {/* 1 */}
+              <Step n={1} icon={<FileSpreadsheet className="w-5 h-5 text-blue-600" />} title="Upload File">
+                Click <strong>Import PM Plan</strong>, then drag &amp; drop or browse for the file.
+                <div className="flex items-center gap-3 mt-3 text-sm">
+                  <span className="text-slate-500">Supported:</span>
+                  <span className="inline-flex items-center gap-1"><FileSpreadsheet className="w-4 h-4 text-green-600" /> Excel</span>
+                  <span className="inline-flex items-center gap-1"><FileText className="w-4 h-4 text-red-500" /> PDF</span>
+                  <span className="inline-flex items-center gap-1"><Image className="w-4 h-4 text-purple-500" /> Images / CSV</span>
                 </div>
-                <div className="ml-11 space-y-2 text-slate-600">
-                  <p>Click <strong>"Import PM Plan"</strong> on the Failure Modes page</p>
-                  <p>Drag & drop or browse for your maintenance plan file</p>
-                  <div className="flex items-center gap-4 mt-3 text-sm">
-                    <span className="text-slate-500">Supported:</span>
-                    <div className="flex items-center gap-1">
-                      <FileSpreadsheet className="w-4 h-4 text-green-600" />
-                      <span>Excel (.xlsx)</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <FileText className="w-4 h-4 text-red-500" />
-                      <span>PDF</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Image className="w-4 h-4 text-purple-500" />
-                      <span>Images</span>
-                    </div>
+              </Step>
+
+              {/* 2 */}
+              <Step n={2} icon={<Database className="w-5 h-5 text-blue-600" />} title="Extract Tasks">
+                AssetIQ parses the file row-by-row (or page-by-page for PDFs) and produces a raw
+                list of candidate maintenance tasks with their source component, asset and raw frequency.
+              </Step>
+
+              {/* 3 */}
+              <Step n={3} icon={<Languages className="w-5 h-5 text-blue-600" />} title="AI Enrichment">
+                Each task is sent through your OpenAI key (GPT-4o) which fills in:
+                <ul className="mt-2 space-y-1 text-sm text-slate-600">
+                  <li className="flex items-start gap-2"><ChevronRight className="w-4 h-4 text-blue-500 mt-0.5" /> Translate the task description to clear English</li>
+                  <li className="flex items-start gap-2"><ChevronRight className="w-4 h-4 text-blue-500 mt-0.5" /> Classify task type: <Badge variant="outline" className="text-xs mx-1">PM</Badge> <Badge variant="outline" className="text-xs mx-1">PDM</Badge> <Badge variant="outline" className="text-xs mx-1">CBM</Badge> <Badge variant="outline" className="text-xs mx-1">CM</Badge></li>
+                  <li className="flex items-start gap-2"><ChevronRight className="w-4 h-4 text-blue-500 mt-0.5" /> Suggest a discipline (Mechanical, Electrical, Instrumentation, Process, Civil, Operations, HVAC)</li>
+                  <li className="flex items-start gap-2"><ChevronRight className="w-4 h-4 text-blue-500 mt-0.5" /> Standardize frequency (Daily &middot; Weekly &middot; Monthly &middot; Quarterly &middot; …) + days</li>
+                  <li className="flex items-start gap-2"><ChevronRight className="w-4 h-4 text-blue-500 mt-0.5" /> Estimate labor hours</li>
+                  <li className="flex items-start gap-2"><ChevronRight className="w-4 h-4 text-blue-500 mt-0.5" /> Confidence score (0–100)</li>
+                </ul>
+              </Step>
+
+              {/* 4 */}
+              <Step n={4} icon={<TagIcon className="w-5 h-5 text-blue-600" />} title="Equipment Matching">
+                Each task is matched to your equipment hierarchy in priority order:
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-100">
+                    <div className="font-semibold text-emerald-800 mb-1">Priority 1 — Tag exact</div>
+                    <p className="text-emerald-700">Extract tag tokens like <code className="bg-white px-1 rounded">P-1001</code> or <code className="bg-white px-1 rounded">1F-3001-0123</code> and look them up in <code className="bg-white px-1 rounded">equipment_nodes.tag</code>.</p>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                    <div className="font-semibold text-blue-800 mb-1">Priority 2 — Description fuzzy</div>
+                    <p className="text-blue-700">If no tag matches, fuzzy-match the equipment description against <code className="bg-white px-1 rounded">equipment_nodes.name</code> with a confidence score.</p>
                   </div>
                 </div>
-              </div>
+                <p className="mt-3 text-sm text-slate-500">If neither matches, the row shows an amber <strong>Unmatched</strong> chip — click it to pick the right node manually.</p>
+              </Step>
 
-              {/* Step 2 */}
-              <div className="mb-6">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold">2</div>
-                  <h4 className="font-semibold text-slate-800">AI Analyzes Your Tasks</h4>
-                </div>
-                <div className="ml-11 text-slate-600">
-                  <p className="mb-3">
-                    The system reads your file and for each maintenance task (for example: <em>"Grease bearings weekly"</em>), 
-                    the AI identifies:
+              {/* 5 */}
+              <Step n={5} icon={<Wrench className="w-5 h-5 text-blue-600" />} title="Review &amp; Edit">
+                Every field is editable before import:
+                <ul className="mt-2 grid grid-cols-2 gap-1 text-sm text-slate-600">
+                  <li>&bull; Equipment Tag</li>
+                  <li>&bull; Equipment Description</li>
+                  <li>&bull; Task Description</li>
+                  <li>&bull; Task Type (PM / PDM / CBM / CM)</li>
+                  <li>&bull; Discipline</li>
+                  <li>&bull; Frequency</li>
+                  <li>&bull; Estimated Hours</li>
+                  <li>&bull; Equipment Match</li>
+                </ul>
+                <p className="mt-2 text-sm text-slate-500">Use the row actions to Accept ✓, Reject ✗, Edit ✎ or Delete 🗑.</p>
+              </Step>
+
+              {/* 6 */}
+              <Step n={6} icon={<CheckCircle className="w-5 h-5 text-green-600" />} title="Import" last>
+                Click <strong>Import</strong> to promote every <Badge variant="outline" className="text-xs mx-1 bg-green-50 text-green-700 border-green-200">accepted</Badge> task into the
+                <code className="bg-slate-100 px-1.5 py-0.5 rounded ml-1">pm_tasks</code> collection (the PM Task Library).
+                Rejected and pending tasks stay in the session for future review.
+              </Step>
+            </section>
+
+            {/* Example */}
+            <section>
+              <h3 className="text-lg font-semibold text-slate-900 mb-3">Example</h3>
+              <div className="bg-slate-50 rounded-lg p-4 border space-y-3">
+                <div>
+                  <p className="text-xs text-slate-500 mb-1">Raw row in your Excel:</p>
+                  <p className="font-mono text-sm bg-white p-2 rounded border">
+                    <code>Brabender · Line-90 · Controleer lagers op slijtage maandelijks</code>
                   </p>
-                  <div className="bg-slate-50 rounded-lg p-4 border">
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <span className="text-slate-500">Component:</span>
-                        <p className="font-medium">Bearing</p>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">Task Type:</span>
-                        <p className="font-medium">Lubrication</p>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">Possible Failure Modes:</span>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          <Badge variant="outline" className="text-xs">Bearing wear</Badge>
-                          <Badge variant="outline" className="text-xs">Seizure</Badge>
-                          <Badge variant="outline" className="text-xs">Overheating</Badge>
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">Detection Methods:</span>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          <Badge variant="outline" className="text-xs">Vibration</Badge>
-                          <Badge variant="outline" className="text-xs">Temperature</Badge>
-                          <Badge variant="outline" className="text-xs">Noise</Badge>
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">Frequency:</span>
-                        <p className="font-medium">Weekly</p>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">Confidence Score:</span>
-                        <p className="font-medium text-green-600">87%</p>
-                      </div>
-                    </div>
-                  </div>
                 </div>
-              </div>
-
-              {/* Step 3 */}
-              <div className="mb-6">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold">3</div>
-                  <h4 className="font-semibold text-slate-800">Review & Accept</h4>
-                </div>
-                <div className="ml-11 text-slate-600">
-                  <p className="mb-3">You see all extracted tasks in a review table. Each task shows:</p>
-                  <ul className="space-y-1 mb-4 text-sm">
-                    <li>• Original PM task</li>
-                    <li>• Suggested component</li>
-                    <li>• Suggested failure mode mapping</li>
-                    <li>• Confidence score</li>
-                    <li>• Existing library match (if found)</li>
-                  </ul>
-                  <p className="mb-3">You can: <strong>Accept</strong>, <strong>Reject</strong>, or <strong>Edit</strong></p>
-                  <div className="flex items-center gap-4 text-sm">
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                      <span>High confidence</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                      <span>Medium confidence</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                      <span>Low confidence (review required)</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Step 4 */}
-              <div>
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold">4</div>
-                  <h4 className="font-semibold text-slate-800">Import to Failure Mode Library</h4>
-                </div>
-                <div className="ml-11 text-slate-600 space-y-4">
-                  <p>When you click "Import", three things can happen:</p>
-                  
-                  {/* Option A */}
-                  <div className="bg-green-50 rounded-lg p-4 border border-green-100">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Link className="w-4 h-4 text-green-600" />
-                      <span className="font-semibold text-green-800">A) Match found in existing library</span>
-                    </div>
-                    <p className="text-sm text-green-700 mb-2">
-                      Example: Task <em>"Grease feed roller bearings weekly"</em>
-                    </p>
-                    <p className="text-sm text-green-700 mb-2">
-                      AI finds: Failure mode <strong>"Bearing Lubrication Starvation"</strong>
-                    </p>
-                    <p className="text-sm text-green-800 font-medium">
-                      → The PM task gets added as a <strong>Recommended Action / Preventive Control</strong> to that existing failure mode.
-                    </p>
-                  </div>
-
-                  {/* Option B */}
-                  <div className="bg-amber-50 rounded-lg p-4 border border-amber-100">
-                    <div className="flex items-center gap-2 mb-2">
-                      <AlertTriangle className="w-4 h-4 text-amber-600" />
-                      <span className="font-semibold text-amber-800">B) Similar failure mode found, user confirms mapping</span>
-                    </div>
-                    <p className="text-sm text-amber-700 mb-2">
-                      AI suggests possible matches:
-                    </p>
-                    <div className="flex gap-2 mb-2">
-                      <Badge variant="outline" className="text-xs bg-white">Bearing Wear</Badge>
-                      <Badge variant="outline" className="text-xs bg-white">Lubrication Starvation</Badge>
-                      <Badge variant="outline" className="text-xs bg-white">Bearing Overheating</Badge>
-                    </div>
-                    <p className="text-sm text-amber-800 font-medium">
-                      → User selects the correct one. The PM task links to the selected existing failure mode.
-                    </p>
-                  </div>
-
-                  {/* Option C */}
-                  <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Plus className="w-4 h-4 text-purple-600" />
-                      <span className="font-semibold text-purple-800">C) No reliable match found</span>
-                    </div>
-                    <p className="text-sm text-purple-700 mb-2">
-                      AssetIQ does <strong>NOT</strong> automatically create failure modes blindly.
-                    </p>
-                    <p className="text-sm text-purple-700 mb-2">
-                      Instead, AI proposes a <strong>new failure mode candidate</strong>. User reviews:
-                    </p>
-                    <ul className="text-sm text-purple-700 mb-2 space-y-1">
-                      <li>• Failure mode name</li>
-                      <li>• Component</li>
-                      <li>• Prevention logic</li>
-                      <li>• Confidence</li>
-                    </ul>
-                    <p className="text-sm text-purple-800 font-medium">
-                      → Only after approval: A new failure mode gets created in the library.
-                    </p>
+                <div>
+                  <p className="text-xs text-slate-500 mb-1">After enrichment + matching:</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm bg-white p-3 rounded border">
+                    <div><span className="text-slate-500">Equipment Tag:</span> <strong>Line-90</strong></div>
+                    <div><span className="text-slate-500">Equipment Match:</span> <strong>1T-2001 Brabender</strong> <Badge variant="outline" className="ml-1 text-xs bg-emerald-50 text-emerald-700">90%</Badge></div>
+                    <div><span className="text-slate-500">Task Description:</span> <strong>Check bearings for wear monthly</strong></div>
+                    <div><span className="text-slate-500">Task Type:</span> <Badge variant="outline" className="text-xs bg-green-50 text-green-700">PM</Badge></div>
+                    <div><span className="text-slate-500">Discipline:</span> <strong>Mechanical</strong></div>
+                    <div><span className="text-slate-500">Frequency:</span> <strong>Monthly</strong> (30 d)</div>
+                    <div className="flex items-center gap-1"><Clock className="w-4 h-4 text-slate-400" /><span className="text-slate-500">Estimated:</span> <strong>1.0 h</strong></div>
+                    <div><span className="text-slate-500">Confidence:</span> <strong className="text-green-600">95%</strong></div>
                   </div>
                 </div>
               </div>
             </section>
 
-            {/* Simple Example */}
-            <section>
-              <h3 className="text-lg font-semibold text-slate-900 mb-3">Simple Example</h3>
-              <div className="bg-slate-50 rounded-lg p-4 border">
-                <p className="text-sm text-slate-500 mb-2">Your Excel has:</p>
-                <p className="font-mono text-sm bg-white p-2 rounded border mb-4">"Grease feed roller bearings weekly"</p>
-                
-                <p className="text-sm text-slate-500 mb-2">AI converts it to:</p>
-                <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-                  <div><span className="text-slate-500">Component:</span> <strong>Feed roller bearing</strong></div>
-                  <div><span className="text-slate-500">Task Type:</span> <strong>Lubrication</strong></div>
-                  <div><span className="text-slate-500">Frequency:</span> <strong>Weekly</strong></div>
-                  <div><span className="text-slate-500">Confidence:</span> <strong className="text-green-600">87%</strong></div>
-                </div>
-                <div className="text-sm mb-2">
-                  <span className="text-slate-500">Possible Failure Modes:</span>
-                  <div className="flex gap-1 mt-1">
-                    <Badge variant="outline" className="text-xs">Lubrication starvation</Badge>
-                    <Badge variant="outline" className="text-xs">Bearing wear</Badge>
-                    <Badge variant="outline" className="text-xs">Bearing seizure</Badge>
-                  </div>
-                </div>
-                
-                <div className="mt-4 pt-4 border-t">
-                  <p className="text-sm text-slate-600 mb-2">
-                    AssetIQ checks the library. If <strong>"Bearing Lubrication Starvation"</strong> already exists:
-                  </p>
-                  <div className="bg-green-100 rounded p-3 text-sm text-green-800">
-                    <strong>Result:</strong> Add PM task as Recommended Preventive Action → 
-                    <em>"Grease feed roller bearings weekly"</em>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* Why This Matters */}
-            <section>
-              <h3 className="text-lg font-semibold text-slate-900 mb-3">Why This Matters</h3>
-              <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="bg-slate-100 rounded-lg p-3">
-                    <p className="text-slate-500 font-medium mb-1">Before</p>
-                    <p className="text-slate-700">Maintenance tasks are just a checklist</p>
-                  </div>
-                  <div className="bg-green-100 rounded-lg p-3">
-                    <p className="text-green-700 font-medium mb-1">After</p>
-                    <p className="text-green-800">Tasks are linked to <strong>why</strong> you do them</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="bg-slate-100 rounded-lg p-3">
-                    <p className="text-slate-500 font-medium mb-1">Before</p>
-                    <p className="text-slate-700">No connection to reliability</p>
-                  </div>
-                  <div className="bg-green-100 rounded-lg p-3">
-                    <p className="text-green-700 font-medium mb-1">After</p>
-                    <p className="text-green-800">PM tasks connect directly to failure modes</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="bg-slate-100 rounded-lg p-3">
-                    <p className="text-slate-500 font-medium mb-1">Before</p>
-                    <p className="text-slate-700">Static maintenance documents</p>
-                  </div>
-                  <div className="bg-green-100 rounded-lg p-3">
-                    <p className="text-green-700 font-medium mb-1">After</p>
-                    <p className="text-green-800">Living, searchable reliability intelligence</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="bg-slate-100 rounded-lg p-3">
-                    <p className="text-slate-500 font-medium mb-1">Before</p>
-                    <p className="text-slate-700">PM actions are isolated</p>
-                  </div>
-                  <div className="bg-green-100 rounded-lg p-3">
-                    <p className="text-green-700 font-medium mb-1">After</p>
-                    <p className="text-green-800">Preventive controls become reusable knowledge</p>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            {/* Bottom Line */}
+            {/* Why */}
             <section className="bg-blue-50 rounded-xl p-6 border border-blue-100">
-              <h3 className="text-lg font-semibold text-blue-900 mb-3">Bottom Line</h3>
-              <p className="text-blue-800 mb-4">
-                Your maintenance plan becomes <strong>failure prevention intelligence</strong>.
+              <h3 className="text-lg font-semibold text-blue-900 mb-3">Why This Matters</h3>
+              <p className="text-blue-800 mb-3">
+                Your scattered maintenance plans become a single, structured task library — translated,
+                classified, time-estimated, and tied to real equipment.
               </p>
-              <p className="text-blue-700 mb-3">
-                Instead of simply storing maintenance tasks, AssetIQ helps answer:
+              <p className="text-blue-700">
+                From there, the Maintenance Program, Scheduler, and Inspection-Sheet modules can pull
+                tasks directly — without any manual data cleanup.
               </p>
-              <p className="text-lg font-semibold text-blue-900 mb-4 italic">
-                "What failure is this task trying to prevent?"
-              </p>
-              <p className="text-blue-700 mb-2">That makes your maintenance plan directly useful for:</p>
-              <div className="flex flex-wrap gap-2">
-                <Badge className="bg-blue-100 text-blue-700">Failure Mode Library</Badge>
-                <Badge className="bg-blue-100 text-blue-700">RCA</Badge>
-                <Badge className="bg-blue-100 text-blue-700">Criticality Analysis</Badge>
-                <Badge className="bg-blue-100 text-blue-700">PM Optimization</Badge>
-                <Badge className="bg-blue-100 text-blue-700">Reliability Analytics</Badge>
-              </div>
-              <div className="mt-4 pt-4 border-t border-blue-200">
-                <p className="text-blue-900 font-semibold">
-                  In short: Your maintenance checklist becomes structured reliability knowledge.
-                </p>
-              </div>
             </section>
+
           </div>
         </ScrollArea>
         
@@ -360,7 +165,21 @@ export const PMImportHelpModal = ({ isOpen, onClose }) => {
   );
 };
 
-// Help button component to trigger the modal
+const Step = ({ n, icon, title, children, last }) => (
+  <div className={last ? "" : "mb-6"}>
+    <div className="flex items-center gap-3 mb-3">
+      <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold">
+        {n}
+      </div>
+      <div className="flex items-center gap-2">
+        {icon}
+        <h4 className="font-semibold text-slate-800">{title}</h4>
+      </div>
+    </div>
+    <div className="ml-11 text-slate-600">{children}</div>
+  </div>
+);
+
 export const PMImportHelpButton = ({ onClick }) => {
   return (
     <button

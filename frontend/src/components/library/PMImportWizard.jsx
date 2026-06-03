@@ -1251,7 +1251,7 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
             </button>
           </div>
           <DialogDescription>
-            Upload an existing preventive maintenance plan and AssetIQ will extract failure mode intelligence automatically.
+            Upload an existing maintenance plan and AssetIQ will extract, translate, and match maintenance tasks to your equipment hierarchy.
           </DialogDescription>
         </DialogHeader>
         
@@ -1396,9 +1396,9 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
               <div className="space-y-3">
                 <ProcessingStep step={1} currentStep={processingStep} label="Reading maintenance plan" />
                 <ProcessingStep step={2} currentStep={processingStep} label="Extracting maintenance tasks" />
-                <ProcessingStep step={3} currentStep={processingStep} label="Identifying components" />
-                <ProcessingStep step={4} currentStep={processingStep} label="Mapping failure modes" />
-                <ProcessingStep step={5} currentStep={processingStep} label="Matching library entries" />
+                <ProcessingStep step={3} currentStep={processingStep} label="AI enrichment (translate, classify, estimate)" />
+                <ProcessingStep step={4} currentStep={processingStep} label="Matching equipment to hierarchy" />
+                <ProcessingStep step={5} currentStep={processingStep} label="Finalizing for review" />
               </div>
             </div>
           )}
