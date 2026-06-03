@@ -1081,6 +1081,11 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
           ) : (
             <>
               {messages.map((msg, idx) => {
+                // Hide "skip" user messages — they're internal signals to advance the
+                // conversation, not real content the user wants to see.
+                if (msg.role === "user" && (msg.content || "").trim().toLowerCase() === "skip") {
+                  return null;
+                }
                 const isLastAssistant = msg.role === "assistant" && 
                   !messages.slice(idx + 1).some(m => m.role === "assistant");
                 return (

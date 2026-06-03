@@ -7,6 +7,9 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Chat — hide the literal "skip" signal from history (VERIFIED)**:
+  - When the chat sends `skip` to advance the conversation (auto-skip on close, 60s timer, or the Skip button), the user bubble showing the word "skip" is now filtered from the rendered history. The word remains a backend signal but never appears as user-visible content.
+
 - [Feb 2026] **Chat sidebar — auto-skip on close (VERIFIED)**:
   - When the user closes the Report Observation chat (X button or backdrop click) while the assistant is in `awaiting_context` state, the chat now fires a background `skip` message so the conversation is finalized instead of being left in limbo.
   - Wrapped `onClose` in a new `handleCloseWithAutoSkip` handler inside `ChatSidebar.js`. Fire-and-forget call to `chatAPI.sendMessage("skip", ...)` then invalidates `chatHistory`, `threats`, `stats` queries.
