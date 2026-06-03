@@ -1362,16 +1362,18 @@ class PMImportService:
                             current_task_info = None
                         else:
                             # Tag with its own task - create individual record
-                            # But first, flush any accumulated tags with the previous task
-                            if current_tags and current_task_info:
+                            # But first, flush any accumulated tags
+                            if current_tags:
+                                # If we have accumulated tags, they should share the current row's task
+                                # (Scenario: Tag1 without task, Tag2 with task → both get Tag2's task)
                                 for accumulated_tag in current_tags:
                                     expanded_rows.append(self._create_task_record(
                                         tag=accumulated_tag["tag"],
-                                        task_text=current_task_info["task_text"],
-                                        description=current_task_info["description"],
-                                        frequency=current_task_info["frequency"],
-                                        duration=current_task_info["duration"],
-                                        row_values=current_task_info["row_values"],
+                                        task_text=task_text,  # Use CURRENT row's task
+                                        description=row_data["description"],
+                                        frequency=row_data["frequency"],
+                                        duration=row_data["duration"],
+                                        row_values=row_data["row_values"],
                                         headers=headers,
                                         sheet_title=sheet.title,
                                         row_num=accumulated_tag["row_num"],
@@ -1724,8 +1726,10 @@ Only return the JSON array, no other text."""
         return {
             "task_id": task_id,
             "original_task": task_text,  # Clean task text without delimiters
+            # CRITICAL: Preserve equipment tag from Column A - this is the ONLY authoritative source
+            "equipment_tag": row.get("_tag", ""),  # From Column A - DO NOT use AI extraction
             "component": component or ai_analysis.get("component", ""),
-            "asset": ai_analysis.get("asset", ""),
+            "asset": row.get("_tag", "") or ai_analysis.get("asset", ""),  # Prefer Column A tag
             "task_type": ai_analysis.get("task_type", task_type),
             "action_type": self._infer_action_type(
                 task_text,

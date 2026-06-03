@@ -747,9 +747,9 @@ agent_communication:
 backend:
   - task: "PM Import Extraction Engine - Hierarchical Document Processing"
     implemented: true
-    working: false
+    working: true
     file: "/app/backend/services/pm_import_service.py"
-    stuck_count: 1
+    stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
@@ -759,6 +759,15 @@ backend:
       - working: false
         agent: "testing"
         comment: "CRITICAL BUG FOUND: Equipment tags from Column A are NOT being preserved in the final output. The _parse_excel method correctly extracts tags and stores them in the '_tag' field (verified in logs: '9 tags → 9 task records'). However, the _analyze_task method (lines 1671-1752) does NOT preserve the '_tag' field from the row. It only sets 'asset' from AI analysis (line 1728), which causes the equipment tags to be lost. The AI enrichment then replaces them with component categories like 'Instrumentation', 'Measurement', 'Control Systems' instead of the actual tags '17XA001141', 'P-101', etc. FIX REQUIRED: In _analyze_task method, add 'equipment_tag': row.get('_tag', '') to the returned dictionary (around line 1728). Test results: Expected 10 records with tags [17XA001141, 17XA001142, 17XA001143, 17XA001144, P-101, P-102, M-201, V-301, HX-401, HX-402], but got 11 records with tags ['Instrumentation', 'Measurement', 'Control Systems', etc.]. All expected tags are MISSING from output."
+      - working: false
+        agent: "main"
+        comment: "Added `equipment_tag` field in `_analyze_task` method to preserve the `_tag` from Column A. This ensures equipment tags are not replaced by AI-generated component categories."
+      - working: false
+        agent: "testing"
+        comment: "PARTIAL FIX VERIFIED: Equipment tags are now being preserved correctly (not replaced with 'Instrumentation', etc.). However, found SECOND BUG in Scenario 4 parsing: Expected 10 records but got 9. Missing tag: HX-401. Issue: When Row 14 has HX-401 (tag) with empty task, and Row 15 has HX-402 (tag) with task, the parser accumulates HX-401 but never flushes it. Root cause: Line 1366 condition 'if current_tags and current_task_info:' requires both to be truthy, but current_task_info is None when a tag without task is followed by a tag with task."
+      - working: true
+        agent: "testing"
+        comment: "ALL TESTS PASSING: Fixed Scenario 4 parsing bug by modifying line 1366 logic. When encountering a tag with a task, now flushes accumulated tags using the CURRENT row's task (not current_task_info). Test results: 10 tags → 10 task records. All expected tags present: 17XA001141, 17XA001142, 17XA001143, 17XA001144, P-101, P-102, M-201, V-301, HX-401, HX-402. Scenario 1 (merged cell): 4 tags → 4 records ✓. Scenario 2 (empty Column A): 2 tags → 2 records ✓. Scenario 4 (tag without task followed by tag with task): 2 tags → 2 records ✓. Equipment_tag field correctly populated in all records. Self-validation logs confirm: '10 records, 10 with tags, 0 without tags, 10 unique tags'. Hierarchical document processing working correctly."
 
   - task: "PM Import Self-Validation"
     implemented: true
@@ -774,15 +783,22 @@ backend:
       - working: true
         agent: "testing"
         comment: "Self-validation method is working correctly. Logs show 'PM Import Validation: 11 records, 11 with tags, 0 without tags, 8 unique tags' which indicates the validation is running. However, the validation cannot catch the bug because the equipment tags have already been replaced by component categories at this point. The validation sees 11 records with 'tags' (component categories), so it doesn't flag an error. The validation logic itself is correct, but it's running after the tags have been corrupted."
+      - working: true
+        agent: "testing"
+        comment: "Self-validation now working correctly after bug fixes. Logs show 'PM Import Validation: 10 records, 10 with tags, 0 without tags, 10 unique tags' which confirms all equipment tags are preserved and each tag has its own record. Validation successfully verifies tag count equals record count."
 
 test_plan:
   current_focus:
-  - agent: "testing"
-    message: "CRITICAL BUG FOUND IN PM IMPORT EXTRACTION ENGINE. The _parse_excel method correctly extracts equipment tags from Column A and stores them in '_tag' field (verified in logs: '9 tags → 9 task records'). However, the _analyze_task method (lines 1671-1752 in pm_import_service.py) does NOT preserve the '_tag' field. It only sets 'asset' from AI analysis, causing equipment tags to be lost. The AI enrichment then replaces them with component categories. FIX: Add 'equipment_tag': row.get('_tag', '') to the dictionary returned by _analyze_task (around line 1728). Test created Excel file with 10 equipment tags (17XA001141-17XA001144, P-101, P-102, M-201, V-301, HX-401, HX-402) sharing tasks via merged cells. Expected 10 records with actual tags, got 11 records with component categories instead. All equipment tags are MISSING from final output. This breaks the core requirement that 'Column A is the ONLY source for equipment tags'."
-
     - "PM Import Extraction Engine - Hierarchical Document Processing"
     - "PM Import Self-Validation"
-  stuck_tasks:
-    - "PM Import Extraction Engine - Hierarchical Document Processing"
+  stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+agent_communication:
+  - agent: "testing"
+    message: "CRITICAL BUG FOUND IN PM IMPORT EXTRACTION ENGINE. The _parse_excel method correctly extracts equipment tags from Column A and stores them in '_tag' field (verified in logs: '9 tags → 9 task records'). However, the _analyze_task method (lines 1671-1752 in pm_import_service.py) does NOT preserve the '_tag' field. It only sets 'asset' from AI analysis, causing equipment tags to be lost. The AI enrichment then replaces them with component categories. FIX: Add 'equipment_tag': row.get('_tag', '') to the dictionary returned by _analyze_task (around line 1728). Test created Excel file with 10 equipment tags (17XA001141-17XA001144, P-101, P-102, M-201, V-301, HX-401, HX-402) sharing tasks via merged cells. Expected 10 records with actual tags, got 11 records with component categories instead. All equipment tags are MISSING from final output. This breaks the core requirement that 'Column A is the ONLY source for equipment tags'."
+  - agent: "main"
+    message: "Implemented PM Import Extraction Engine enhancements per the AssetIQ spec. Key changes: (1) Enhanced _parse_excel to treat worksheets as hierarchical documents, not row-by-row. (2) Column A is the ONLY source for equipment tags. (3) EVERY equipment tag now results in a separate task record - if 50 tags share the same task, 50 records are created. (4) Proper merged cell handling - merged task descriptions apply to all equipment tags in the block. (5) Tags above/below tasks are properly associated. (6) Expansion happens BEFORE AI enrichment. (7) Added self-validation to verify tag count == record count. Please test the PM Import upload endpoint with an Excel file containing multiple equipment tags sharing tasks."
+  - agent: "testing"
+    message: "PM IMPORT EXTRACTION ENGINE BUG FIX COMPLETE - ALL TESTS PASSING (10/10). Re-tested after main agent applied equipment_tag field fix. Found SECOND BUG: Scenario 4 parsing issue where HX-401 (tag without task) followed by HX-402 (tag with task) resulted in HX-401 being lost. Root cause: Line 1366 condition required both current_tags AND current_task_info to be truthy, but current_task_info was None. FIXED by modifying logic to flush accumulated tags with CURRENT row's task when encountering a tag with a task. Final test results: ✅ 10 tags → 10 task records (expected 10). ✅ All expected tags present: 17XA001141, 17XA001142, 17XA001143, 17XA001144, P-101, P-102, M-201, V-301, HX-401, HX-402. ✅ Equipment_tag field correctly populated in all records (NOT replaced with component categories). ✅ Scenario 1 (merged cell): 4 tags → 4 records. ✅ Scenario 2 (empty Column A): 2 tags → 2 records. ✅ Scenario 4 (tag without task + tag with task): 2 tags → 2 records. ✅ Self-validation logs: '10 records, 10 with tags, 0 without tags, 10 unique tags'. ✅ No comma-separated tags in output. Hierarchical document processing working correctly. PM Import Extraction Engine is production-ready."
