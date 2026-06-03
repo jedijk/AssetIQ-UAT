@@ -426,14 +426,50 @@ export const ObservationTour = ({
   // Calculate tooltip position based on step config and spotlight
   const getTooltipPosition = () => {
     const tooltipWidth = 380;
-    const tooltipHeight = 400; // Approximate max height
+    const tooltipHeight = 500; // Increased for steps with large previews
     const padding = 20;
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     
-    // Center position for welcome/complete steps or when no spotlight
-    if (step.position === "center" || !spotlightRect) {
+    // Center position for welcome/complete steps
+    if (step.position === "center") {
       return {
+        position: "fixed",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        width: `${Math.min(tooltipWidth, viewportWidth - padding * 2)}px`,
+      };
+    }
+    
+    // For steps without a target but with left/right position (preview steps)
+    // Position on the left side of the screen, vertically centered
+    if (!spotlightRect) {
+      if (step.position === "left") {
+        // Position on left side of screen
+        return {
+          position: "fixed",
+          top: "50%",
+          left: `${padding}px`,
+          transform: "translateY(-50%)",
+          width: `${Math.min(tooltipWidth, viewportWidth / 2 - padding * 2)}px`,
+          maxHeight: `${viewportHeight - padding * 2 - 60}px`,
+        };
+      }
+      if (step.position === "right") {
+        // Position on right side of screen
+        return {
+          position: "fixed",
+          top: "50%",
+          right: `${padding}px`,
+          transform: "translateY(-50%)",
+          width: `${Math.min(tooltipWidth, viewportWidth / 2 - padding * 2)}px`,
+          maxHeight: `${viewportHeight - padding * 2 - 60}px`,
+        };
+      }
+      // Fallback to center
+      return {
+        position: "fixed",
         top: "50%",
         left: "50%",
         transform: "translate(-50%, -50%)",
@@ -444,14 +480,12 @@ export const ObservationTour = ({
     // Calculate available space on each side
     const spaceLeft = spotlightRect.left - padding;
     const spaceRight = viewportWidth - spotlightRect.left - spotlightRect.width - padding;
-    const spaceTop = spotlightRect.top - padding;
-    const spaceBottom = viewportHeight - spotlightRect.top - spotlightRect.height - padding;
     
     // Calculate vertical position - ensure tooltip stays within viewport
     let topPosition = spotlightRect.top;
     // If tooltip would go below viewport, adjust up
     if (topPosition + tooltipHeight > viewportHeight - padding) {
-      topPosition = Math.max(padding, viewportHeight - tooltipHeight - padding);
+      topPosition = Math.max(padding + 60, viewportHeight - tooltipHeight - padding);
     }
     // Ensure it's not above viewport
     topPosition = Math.max(padding + 60, topPosition); // 60px for header
@@ -463,6 +497,7 @@ export const ObservationTour = ({
         top: `${topPosition}px`,
         left: `${Math.max(padding, spotlightRect.left - tooltipWidth - padding)}px`,
         width: `${Math.min(tooltipWidth, spaceLeft - padding)}px`,
+        maxHeight: `${viewportHeight - padding * 2 - 60}px`,
       };
     }
     
@@ -473,6 +508,7 @@ export const ObservationTour = ({
         top: `${topPosition}px`,
         left: `${spotlightRect.left + spotlightRect.width + padding}px`,
         width: `${Math.min(tooltipWidth, spaceRight - padding)}px`,
+        maxHeight: `${viewportHeight - padding * 2 - 60}px`,
       };
     }
     
@@ -484,6 +520,7 @@ export const ObservationTour = ({
         top: `${topPosition}px`,
         left: `${Math.min(spotlightRect.left + spotlightRect.width + padding, viewportWidth - tooltipWidth - padding)}px`,
         width: `${Math.min(tooltipWidth, viewportWidth - padding * 2)}px`,
+        maxHeight: `${viewportHeight - padding * 2 - 60}px`,
       };
     } else {
       // More space on left
@@ -492,6 +529,7 @@ export const ObservationTour = ({
         top: `${topPosition}px`,
         left: `${Math.max(padding, spotlightRect.left - tooltipWidth - padding)}px`,
         width: `${Math.min(tooltipWidth, viewportWidth - padding * 2)}px`,
+        maxHeight: `${viewportHeight - padding * 2 - 60}px`,
       };
     }
   };
@@ -563,7 +601,7 @@ export const ObservationTour = ({
             style={getTooltipPosition()}
             data-testid="observation-tour-tooltip"
           >
-            <div className="bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden max-h-[calc(100vh-100px)] overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden overflow-y-auto" style={{ maxHeight: 'inherit' }}>
               {/* Header */}
               <div className="px-5 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white">
                 <div className="flex items-center justify-between">
