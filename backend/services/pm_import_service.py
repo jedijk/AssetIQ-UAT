@@ -2643,7 +2643,9 @@ Respond in JSON format:
         # Normalize the tag - remove common variations
         tag_normalized = tag.strip()
         # Also create a version without hyphens for fuzzy matching
-        tag_no_hyphens = tag_normalized.replace("-", "").replace(" ", "")
+        tag_no_hyphens = tag_normalized.replace("-", "").replace(" ", "").lower()
+        
+        logger.info(f"_match_equipment_by_tag: tag='{tag}', normalized='{tag_normalized}', no_hyphens='{tag_no_hyphens}'")
         
         # Try exact match first on tag field
         equipment_node = await self.db.equipment_nodes.find_one(
@@ -2656,10 +2658,12 @@ Respond in JSON format:
         )
         
         if equipment_node:
+            logger.info(f"_match_equipment_by_tag: exact match found - {equipment_node.get('tag')}")
             return await self._build_equipment_match(equipment_node)
         
         # Try matching with normalized tag (no hyphens) against stored tags
         # This handles cases like "1F3001-0122" matching "1F-3001-0122"
+        logger.info(f"_match_equipment_by_tag: trying normalized match for '{tag_no_hyphens}'")
         cursor = self.db.equipment_nodes.find(
             {},
             {"_id": 0, "id": 1, "tag": 1, "name": 1, "equipment_type_id": 1, "level": 1}
@@ -2667,10 +2671,12 @@ Respond in JSON format:
         async for node in cursor:
             node_tag = node.get("tag") or ""
             if node_tag and node_tag != "None":
-                node_tag_normalized = node_tag.replace("-", "").replace(" ", "")
-                if node_tag_normalized.lower() == tag_no_hyphens.lower():
+                node_tag_normalized = node_tag.replace("-", "").replace(" ", "").lower()
+                if node_tag_normalized == tag_no_hyphens:
+                    logger.info(f"_match_equipment_by_tag: normalized match found - {node.get('tag')} (type: {node.get('equipment_type_id')})")
                     return await self._build_equipment_match(node)
         
+        logger.info(f"_match_equipment_by_tag: no normalized match, trying partial")
         # Try partial/prefix match - tag might be a parent (e.g., "1F-3001" should match "1F-3001-0128")
         equipment_node = await self.db.equipment_nodes.find_one(
             {"$or": [
@@ -2681,6 +2687,7 @@ Respond in JSON format:
         )
         
         if equipment_node:
+            logger.info(f"_match_equipment_by_tag: partial match found - {equipment_node.get('tag')}")
             return await self._build_equipment_match(equipment_node, partial=True)
         
         # Try matching where the stored tag starts with our tag (parent equipment)
