@@ -30,7 +30,10 @@ router = APIRouter(prefix="/pm-import", tags=["PM Intelligence Import"])
 class TaskUpdateRequest(BaseModel):
     """Request model for updating a task."""
     component: Optional[str] = None
+    asset: Optional[str] = None
+    original_task: Optional[str] = None
     task_type: Optional[str] = None
+    discipline: Optional[str] = None
     suggested_failure_modes: Optional[List[str]] = None
     failure_mechanisms: Optional[List[str]] = None
     detection_methods: Optional[List[str]] = None
@@ -272,6 +275,23 @@ async def reject_task(
     
     pm_service = PMImportService(db)
     result = await pm_service.reject_task(session_id, task_id)
+    
+    if not result:
+        raise HTTPException(status_code=404, detail="Session or task not found")
+    
+    return {"success": True, "stats": result["stats"]}
+
+
+@router.delete("/session/{session_id}/task/{task_id}")
+async def delete_task(
+    session_id: str,
+    task_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Permanently remove a task from a session."""
+    
+    pm_service = PMImportService(db)
+    result = await pm_service.delete_task(session_id, task_id)
     
     if not result:
         raise HTTPException(status_code=404, detail="Session or task not found")

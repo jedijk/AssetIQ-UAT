@@ -62,6 +62,14 @@ export const pmImportAPI = {
   },
 
   /**
+   * Permanently delete a task from a session
+   */
+  deleteTask: async (sessionId, taskId) => {
+    const response = await api.delete(`/pm-import/session/${sessionId}/task/${taskId}`);
+    return response.data;
+  },
+
+  /**
    * Bulk actions on tasks
    * @param {string} sessionId 
    * @param {string} action - "accept", "reject", or "accept_high_confidence"

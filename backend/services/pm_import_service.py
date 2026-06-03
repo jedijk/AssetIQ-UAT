@@ -671,6 +671,30 @@ class PMImportService:
         """Mark a task as rejected (won't be imported)."""
         return await self.update_task(session_id, task_id, {"review_status": "rejected"})
     
+    async def delete_task(self, session_id: str, task_id: str) -> Optional[Dict[str, Any]]:
+        """Remove a task from a session entirely."""
+        session = await self.sessions_collection.find_one({"session_id": session_id})
+        if not session:
+            return None
+        
+        tasks = session.get("tasks_extracted", [])
+        new_tasks = [t for t in tasks if t.get("task_id") != task_id]
+        if len(new_tasks) == len(tasks):
+            return None
+        
+        stats = self._calculate_stats(new_tasks)
+        
+        await self.sessions_collection.update_one(
+            {"session_id": session_id},
+            {"$set": {
+                "tasks_extracted": new_tasks,
+                "stats": stats,
+                "updated_at": datetime.now(timezone.utc)
+            }}
+        )
+        
+        return {"tasks": new_tasks, "stats": stats}
+    
     async def accept_all_high_confidence(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Accept all tasks with confidence >= 70."""
         session = await self.sessions_collection.find_one({"session_id": session_id})

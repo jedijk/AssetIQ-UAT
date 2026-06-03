@@ -7,6 +7,13 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **PM Import tab — actions: edit, delete, accept/reject + Tag column (VERIFIED)**:
+  - Added **Tag** column (asset name) alongside Equipment.
+  - Added **Actions** column with inline buttons: ✓ Accept, ✗ Reject, ✎ Edit, 🗑 Delete.
+  - **Edit dialog** allows editing Equipment, Tag, Task description, Task Type, Discipline, Frequency.
+  - **Backend**: extended `TaskUpdateRequest` with `asset`, `original_task`, `discipline`; added `DELETE /api/pm-import/session/{sid}/task/{tid}` and `PMImportService.delete_task()` which removes the task and recalculates stats.
+  - **Verified live**: edit + accept + delete curl tests pass; UI dialog renders with all fields prefilled.
+
 - [Feb 2026] **PM Import tab — flat task table (VERIFIED)**:
   - **User request**: Replace the "uploaded files / sessions" view with a flat table of all imported tasks showing Equipment, Task, Task Type, Discipline, Frequency.
   - **Backend**: Added `GET /api/pm-import/tasks` that flattens `tasks_extracted` across all sessions for the current user, returning normalized fields (`equipment`, `task`, `task_type`, `discipline`, `frequency`, `review_status`).
