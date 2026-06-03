@@ -1004,6 +1004,12 @@ class PMImportService:
         # standardize frequency (+ frequency_days), estimate hours.
         tasks = await self._ai_enrich_tasks(tasks)
         
+        # Split tasks whose Tag column contains multiple tags into one task per tag.
+        # E.g. asset="P-1001, P-1002, P-1003" → three tasks with identical content
+        # but distinct equipment_tag values.
+        await self._update_progress(session_id, 95, "Splitting multi-tag tasks...")
+        tasks = self._split_multi_tag_tasks(tasks)
+        
         # Match equipment to hierarchy (Priority 1: tag exact, Priority 2: description fuzzy)
         await self._update_progress(session_id, 99, "Matching equipment to hierarchy...")
         tasks = await self._match_equipment_to_hierarchy(tasks)
@@ -1804,6 +1810,68 @@ Respond in JSON format:
             # Raw source preserved for traceability
             "original_task": task.get("original_task") or "",
         }
+    
+    # ============================================================
+    # Multi-tag splitting (one task per tag in the Tag column)
+    # ============================================================
+    
+    # Recognized separators between tags inside a single Tag-column cell.
+    _MULTI_TAG_SEPARATORS = re.compile(
+        r"\s*(?:,|;|\||/|\\|\+|\bin\b|\band\b|\b&\b|\ben\b|\bof\b|\n|\r)\s*",
+        flags=re.IGNORECASE,
+    )
+    
+    def _split_multi_tag_tasks(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        If a task's Tag column (`equipment_tag` / `asset`) contains multiple tags
+        (e.g. "P-1001, P-1002" or "MTR-01 / MTR-02"), duplicate the task into one
+        row per tag. All other fields are copied; each child gets:
+          - a fresh task_id
+          - parent_task_id pointing at the original
+          - equipment_tag set to the single tag
+        """
+        if not tasks:
+            return tasks
+        
+        out = []
+        for task in tasks:
+            raw_tag = (task.get("equipment_tag") or task.get("asset") or "").strip()
+            if not raw_tag:
+                out.append(task)
+                continue
+            
+            # Split & filter
+            parts = [p.strip() for p in self._MULTI_TAG_SEPARATORS.split(raw_tag)]
+            parts = [p for p in parts if p and len(p) >= 2]
+            
+            # Deduplicate (case-insensitive) while preserving order
+            seen = set()
+            unique_parts = []
+            for p in parts:
+                key = p.upper()
+                if key not in seen:
+                    seen.add(key)
+                    unique_parts.append(p)
+            
+            # If only one tag (or splitting produced nothing useful), keep as-is
+            if len(unique_parts) <= 1:
+                out.append(task)
+                continue
+            
+            parent_id = task.get("task_id")
+            for idx, tag_value in enumerate(unique_parts):
+                child = dict(task)
+                child["task_id"] = str(uuid.uuid4())
+                child["parent_task_id"] = parent_id
+                child["multi_tag_index"] = idx
+                child["multi_tag_total"] = len(unique_parts)
+                child["equipment_tag"] = tag_value
+                child["asset"] = tag_value
+                # Clear any prior auto-match so it's recomputed per tag
+                child["equipment_match"] = None
+                out.append(child)
+        
+        return out
     
     async def _match_equipment_to_hierarchy(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
