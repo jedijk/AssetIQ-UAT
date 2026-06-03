@@ -302,7 +302,7 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
     return typeId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   };
 
-  // Get discipline display name
+  // Get discipline display name - from equipment type or node
   const getDisciplineDisplay = () => {
     const disciplines = {
       mechanical: { label: t ? t("library.mechanical") : "Mechanical", color: "bg-blue-100 text-blue-700" },
@@ -310,20 +310,35 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
       instrumentation: { label: t ? t("library.instrumentation") : "Instrumentation", color: "bg-purple-100 text-purple-700" },
       process: { label: t ? t("library.process") : "Process", color: "bg-green-100 text-green-700" },
       laboratory: { label: t ? t("library.laboratory") : "Laboratory", color: "bg-cyan-100 text-cyan-700" },
+      rotating: { label: t ? t("library.rotating") : "Rotating", color: "bg-orange-100 text-orange-700" },
+      static: { label: t ? t("library.static") : "Static", color: "bg-teal-100 text-teal-700" },
     };
-    // Check if discipline exists directly or in node data
-    const disc = node.discipline;
-    if (disc && disciplines[disc]) {
-      return disciplines[disc];
+    
+    // First check if discipline is directly on the node
+    let disc = node.discipline;
+    
+    // If not, try to get from equipment type
+    if (!disc) {
+      const typeId = node.equipment_type_id || node.equipment_type;
+      if (typeId) {
+        const eqType = equipmentTypes?.find(et => et.id === typeId);
+        disc = eqType?.discipline;
+      }
     }
+    
+    if (!disc) return null;
+    
+    // Normalize to lowercase for lookup
+    const discLower = disc.toLowerCase();
+    if (disciplines[discLower]) {
+      return disciplines[discLower];
+    }
+    
     // If discipline is a string but not in our map, display it formatted
-    if (disc && typeof disc === 'string') {
-      return { 
-        label: disc.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), 
-        color: "bg-slate-100 text-slate-700" 
-      };
-    }
-    return null;
+    return { 
+      label: disc.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), 
+      color: "bg-slate-100 text-slate-700" 
+    };
   };
 
   // Get criticality details
