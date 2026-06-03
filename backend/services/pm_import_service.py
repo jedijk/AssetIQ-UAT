@@ -2561,8 +2561,6 @@ Respond in JSON format:
         
         Returns suggestions for each accepted task.
         """
-        from emergentintegrations.llm.openai import chat
-        
         # Get session
         session = await self.sessions_collection.find_one({"session_id": session_id})
         if not session:
@@ -2791,7 +2789,7 @@ Respond in JSON format:
         similar_failure_modes: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """Use AI to generate a recommendation for the task."""
-        from emergentintegrations.llm.openai import chat
+        from emergentintegrations.llm.openai import LlmChat
         import os
         import json
         
@@ -2861,11 +2859,9 @@ Respond with a JSON object:
                 # Return default recommendation without AI
                 return self._default_recommendation(similar_failure_modes)
             
-            response = await chat(
-                api_key=api_key,
-                prompt=prompt,
-                model="gpt-4o-mini"
-            )
+            # Use LlmChat with the correct API
+            llm = LlmChat(api_key=api_key).with_model("gpt-4o-mini")
+            response = await llm.send_message(prompt)
             
             # Parse JSON response
             response_text = response.strip()
