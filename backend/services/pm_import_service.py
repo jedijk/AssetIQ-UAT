@@ -2596,7 +2596,6 @@ Respond in JSON format:
     
     async def _generate_task_suggestion(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """Generate AI suggestion for a single task."""
-        from emergentintegrations.llm.openai import chat
         import os
         
         task_id = task.get("task_id")
