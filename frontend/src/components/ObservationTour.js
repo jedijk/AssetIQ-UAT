@@ -426,10 +426,10 @@ export const ObservationTour = ({
   // Calculate tooltip position based on step config and spotlight
   const getTooltipPosition = () => {
     const tooltipWidth = 380;
-    const tooltipHeight = 500; // Increased for steps with large previews
     const padding = 20;
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
+    const headerHeight = 64;
     
     // Center position for welcome/complete steps
     if (step.position === "center") {
@@ -442,96 +442,19 @@ export const ObservationTour = ({
       };
     }
     
-    // For steps without a target but with left/right position (preview steps)
-    // Position on the left side of the screen, vertically centered
-    if (!spotlightRect) {
-      if (step.position === "left") {
-        // Position on left side of screen
-        return {
-          position: "fixed",
-          top: "50%",
-          left: `${padding}px`,
-          transform: "translateY(-50%)",
-          width: `${Math.min(tooltipWidth, viewportWidth / 2 - padding * 2)}px`,
-          maxHeight: `${viewportHeight - padding * 2 - 60}px`,
-        };
-      }
-      if (step.position === "right") {
-        // Position on right side of screen
-        return {
-          position: "fixed",
-          top: "50%",
-          right: `${padding}px`,
-          transform: "translateY(-50%)",
-          width: `${Math.min(tooltipWidth, viewportWidth / 2 - padding * 2)}px`,
-          maxHeight: `${viewportHeight - padding * 2 - 60}px`,
-        };
-      }
-      // Fallback to center
-      return {
-        position: "fixed",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        width: `${Math.min(tooltipWidth, viewportWidth - padding * 2)}px`,
-      };
-    }
+    // For all other steps, position consistently on the left side
+    // This prevents jumping around
+    const leftPosition = padding;
+    const topPosition = headerHeight + padding;
+    const maxHeight = viewportHeight - headerHeight - padding * 2;
     
-    // Calculate available space on each side
-    const spaceLeft = spotlightRect.left - padding;
-    const spaceRight = viewportWidth - spotlightRect.left - spotlightRect.width - padding;
-    
-    // Calculate vertical position - ensure tooltip stays within viewport
-    let topPosition = spotlightRect.top;
-    // If tooltip would go below viewport, adjust up
-    if (topPosition + tooltipHeight > viewportHeight - padding) {
-      topPosition = Math.max(padding + 60, viewportHeight - tooltipHeight - padding);
-    }
-    // Ensure it's not above viewport
-    topPosition = Math.max(padding + 60, topPosition); // 60px for header
-    
-    if (step.position === "left" && spaceLeft >= tooltipWidth) {
-      // Position to the left of the target
-      return {
-        position: "fixed",
-        top: `${topPosition}px`,
-        left: `${Math.max(padding, spotlightRect.left - tooltipWidth - padding)}px`,
-        width: `${Math.min(tooltipWidth, spaceLeft - padding)}px`,
-        maxHeight: `${viewportHeight - padding * 2 - 60}px`,
-      };
-    }
-    
-    if (step.position === "right" && spaceRight >= tooltipWidth) {
-      // Position to the right of the target
-      return {
-        position: "fixed",
-        top: `${topPosition}px`,
-        left: `${spotlightRect.left + spotlightRect.width + padding}px`,
-        width: `${Math.min(tooltipWidth, spaceRight - padding)}px`,
-        maxHeight: `${viewportHeight - padding * 2 - 60}px`,
-      };
-    }
-    
-    // Fallback: position based on most available space
-    if (spaceRight >= spaceLeft) {
-      // More space on right
-      return {
-        position: "fixed",
-        top: `${topPosition}px`,
-        left: `${Math.min(spotlightRect.left + spotlightRect.width + padding, viewportWidth - tooltipWidth - padding)}px`,
-        width: `${Math.min(tooltipWidth, viewportWidth - padding * 2)}px`,
-        maxHeight: `${viewportHeight - padding * 2 - 60}px`,
-      };
-    } else {
-      // More space on left
-      return {
-        position: "fixed",
-        top: `${topPosition}px`,
-        left: `${Math.max(padding, spotlightRect.left - tooltipWidth - padding)}px`,
-        width: `${Math.min(tooltipWidth, viewportWidth - padding * 2)}px`,
-        maxHeight: `${viewportHeight - padding * 2 - 60}px`,
-      };
-    }
+    return {
+      position: "fixed",
+      top: `${topPosition}px`,
+      left: `${leftPosition}px`,
+      width: `${Math.min(tooltipWidth, viewportWidth / 2 - padding * 2)}px`,
+      maxHeight: `${maxHeight}px`,
+    };
   };
   
   return (
