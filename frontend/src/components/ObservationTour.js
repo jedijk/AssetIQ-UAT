@@ -425,36 +425,75 @@ export const ObservationTour = ({
   
   // Calculate tooltip position based on step config and spotlight
   const getTooltipPosition = () => {
+    const tooltipWidth = 380;
+    const tooltipHeight = 400; // Approximate max height
+    const padding = 20;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Center position for welcome/complete steps or when no spotlight
     if (step.position === "center" || !spotlightRect) {
       return {
         top: "50%",
         left: "50%",
         transform: "translate(-50%, -50%)",
+        width: `${Math.min(tooltipWidth, viewportWidth - padding * 2)}px`,
       };
     }
     
-    const padding = 16;
-    const tooltipWidth = 380;
+    // Calculate available space on each side
+    const spaceLeft = spotlightRect.left - padding;
+    const spaceRight = viewportWidth - spotlightRect.left - spotlightRect.width - padding;
+    const spaceTop = spotlightRect.top - padding;
+    const spaceBottom = viewportHeight - spotlightRect.top - spotlightRect.height - padding;
     
-    if (step.position === "left") {
+    // Calculate vertical position - ensure tooltip stays within viewport
+    let topPosition = spotlightRect.top;
+    // If tooltip would go below viewport, adjust up
+    if (topPosition + tooltipHeight > viewportHeight - padding) {
+      topPosition = Math.max(padding, viewportHeight - tooltipHeight - padding);
+    }
+    // Ensure it's not above viewport
+    topPosition = Math.max(padding + 60, topPosition); // 60px for header
+    
+    if (step.position === "left" && spaceLeft >= tooltipWidth) {
       // Position to the left of the target
       return {
-        top: `${Math.max(100, spotlightRect.top)}px`,
-        right: `${window.innerWidth - spotlightRect.left + padding}px`,
-        maxWidth: `${spotlightRect.left - padding * 2}px`,
+        position: "fixed",
+        top: `${topPosition}px`,
+        left: `${Math.max(padding, spotlightRect.left - tooltipWidth - padding)}px`,
+        width: `${Math.min(tooltipWidth, spaceLeft - padding)}px`,
       };
     }
     
-    if (step.position === "right") {
+    if (step.position === "right" && spaceRight >= tooltipWidth) {
       // Position to the right of the target
       return {
-        top: `${Math.max(100, spotlightRect.top)}px`,
+        position: "fixed",
+        top: `${topPosition}px`,
         left: `${spotlightRect.left + spotlightRect.width + padding}px`,
-        maxWidth: `${window.innerWidth - spotlightRect.left - spotlightRect.width - padding * 2}px`,
+        width: `${Math.min(tooltipWidth, spaceRight - padding)}px`,
       };
     }
     
-    return {};
+    // Fallback: position based on most available space
+    if (spaceRight >= spaceLeft) {
+      // More space on right
+      return {
+        position: "fixed",
+        top: `${topPosition}px`,
+        left: `${Math.min(spotlightRect.left + spotlightRect.width + padding, viewportWidth - tooltipWidth - padding)}px`,
+        width: `${Math.min(tooltipWidth, viewportWidth - padding * 2)}px`,
+      };
+    } else {
+      // More space on left
+      return {
+        position: "fixed",
+        top: `${topPosition}px`,
+        left: `${Math.max(padding, spotlightRect.left - tooltipWidth - padding)}px`,
+        width: `${Math.min(tooltipWidth, viewportWidth - padding * 2)}px`,
+      };
+    }
   };
   
   return (
@@ -520,11 +559,11 @@ export const ObservationTour = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ delay: 0.1 }}
-            className="fixed z-[10000] w-[380px]"
+            className="fixed z-[10000]"
             style={getTooltipPosition()}
             data-testid="observation-tour-tooltip"
           >
-            <div className="bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden max-h-[calc(100vh-100px)] overflow-y-auto">
               {/* Header */}
               <div className="px-5 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white">
                 <div className="flex items-center justify-between">

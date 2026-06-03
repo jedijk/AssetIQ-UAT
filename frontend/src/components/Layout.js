@@ -1121,6 +1121,14 @@ const Layout = () => {
                 </DropdownMenuItem>
                 )}
                 <DropdownMenuItem 
+                  onClick={() => setObservationTourOpen(true)}
+                  className="cursor-pointer text-sm"
+                  data-testid="observation-tour-menu-item"
+                >
+                  <BookOpen className="w-3.5 h-3.5 mr-2" />
+                  Tour: Report Observation
+                </DropdownMenuItem>
+                <DropdownMenuItem 
                   onClick={() => navigate("/settings/feedback")}
                   className="cursor-pointer text-sm"
                 >
@@ -1129,32 +1137,6 @@ const Layout = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            
-            {/* Observation Tour Button - Below Help */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <motion.div
-                    whileHover={{ scale: 1.08 }}
-                    whileTap={{ scale: 0.92 }}
-                    transition={springPresets.snappy}
-                  >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                      onClick={() => setObservationTourOpen(true)}
-                      data-testid="observation-tour-menu-item"
-                    >
-                      <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    </Button>
-                  </motion.div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Tour: Report Observation</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
 
             {/* Settings - Navigate to /settings on desktop, dropdown on mobile */}
             {isMobileView ? (
