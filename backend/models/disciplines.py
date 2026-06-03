@@ -63,6 +63,13 @@ DISCIPLINE_MAPPING = {
     # Piping maps to Static Equipment
     "piping": UnifiedDiscipline.STATIC_EQUIPMENT.value,
     "Piping": UnifiedDiscipline.STATIC_EQUIPMENT.value,
+    # Abbreviations
+    "ops": UnifiedDiscipline.OPERATIONS.value,
+    "mech": UnifiedDiscipline.MECHANICAL.value,
+    "elec": UnifiedDiscipline.ELECTRICAL.value,
+    "inst": UnifiedDiscipline.INSTRUMENTATION.value,
+    "instr": UnifiedDiscipline.INSTRUMENTATION.value,
+    "maint": UnifiedDiscipline.MAINTENANCE.value,
 }
 
 
