@@ -7,6 +7,12 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **PM Import tab — flat task table (VERIFIED)**:
+  - **User request**: Replace the "uploaded files / sessions" view with a flat table of all imported tasks showing Equipment, Task, Task Type, Discipline, Frequency.
+  - **Backend**: Added `GET /api/pm-import/tasks` that flattens `tasks_extracted` across all sessions for the current user, returning normalized fields (`equipment`, `task`, `task_type`, `discipline`, `frequency`, `review_status`).
+  - **Frontend**: Rewrote `CustomPMImportTab` in `FailureModesPage.js` to consume the new endpoint, render the 5 required columns + status, with search + Discipline/Frequency filters.
+  - **Fix root cause**: The original code read `extracted_tasks` while the DB stores `tasks_extracted` — caused 0 tasks across 26 sessions. Now displays 464 tasks across 26 sessions for the test owner.
+
 - [Feb 2026] **Equipment Unit filter on global Maintenance Schedule + MyTasks discipline auto-seed (VERIFIED iteration_38)**:
   - **MaintenanceScheduleManager.jsx**: Added Equipment Unit filter dropdown (`data-testid='equipment-unit-filter'`) that lists all `equipment_unit` level nodes (CLU, EXU, FPU, etc.). Selection computes the unit's descendant equipment_ids and filters Timeline (Gantt), Tasks list, and Planner views (daily/weekly/14-day/90-day). Clear button restores the full view. Filter is also applied to `timeline.timeline` (the rendered Gantt rows) — earlier version only filtered `timeline.equipment` which the Gantt didn't read from.
   - **MyTasksPage.js**: Auto-seeds the `discipline-filter` dropdown from the logged-in user's `discipline` (or `department`/`position` fallback) via `normalizeDiscipline()`. Users matching the regex `/maintenance|onderhoud|wartung/` are treated as a wildcard and keep the dropdown at "All Disciplines" since maintenance covers all 7 technical disciplines.

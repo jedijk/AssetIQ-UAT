@@ -107,29 +107,14 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
   const [filterDiscipline, setFilterDiscipline] = useState('all');
   const [filterFrequency, setFilterFrequency] = useState('all');
   
-  // Fetch all PM import sessions
-  const { data: sessionsData, isLoading, refetch } = useQuery({
-    queryKey: ['pm-import-sessions'],
-    queryFn: () => pmImportAPI.listSessions(100, 0),
+  // Fetch all flattened tasks across all PM import sessions
+  const { data: tasksData, isLoading, refetch } = useQuery({
+    queryKey: ['pm-import-tasks'],
+    queryFn: () => pmImportAPI.listAllTasks(),
   });
   
-  const sessions = sessionsData?.sessions || [];
-  
-  // Flatten all tasks from all sessions
-  const allTasks = useMemo(() => {
-    const tasks = [];
-    sessions.forEach(session => {
-      (session.extracted_tasks || []).forEach(task => {
-        tasks.push({
-          ...task,
-          session_id: session.session_id,
-          file_name: session.file_name,
-          imported_at: session.created_at,
-        });
-      });
-    });
-    return tasks;
-  }, [sessions]);
+  const allTasks = useMemo(() => tasksData?.tasks || [], [tasksData]);
+  const sessionCount = tasksData?.session_count || 0;
   
   // Get unique disciplines and frequencies for filters
   const disciplines = useMemo(() => {
@@ -151,23 +136,20 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
   // Filter tasks
   const filteredTasks = useMemo(() => {
     return allTasks.filter(task => {
-      // Search filter
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
         const matchesSearch = 
-          task.task_name?.toLowerCase().includes(term) ||
-          task.equipment_name?.toLowerCase().includes(term) ||
+          task.task?.toLowerCase().includes(term) ||
+          task.equipment?.toLowerCase().includes(term) ||
           task.description?.toLowerCase().includes(term) ||
           task.discipline?.toLowerCase().includes(term);
         if (!matchesSearch) return false;
       }
       
-      // Discipline filter
       if (filterDiscipline !== 'all' && task.discipline !== filterDiscipline) {
         return false;
       }
       
-      // Frequency filter
       if (filterFrequency !== 'all' && task.frequency !== filterFrequency) {
         return false;
       }
@@ -256,7 +238,7 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
           <div className="text-sm text-gray-500">Tasks Accepted</div>
         </div>
         <div className="card p-4">
-          <div className="text-2xl font-bold text-gray-600">{sessions.length}</div>
+          <div className="text-2xl font-bold text-gray-600">{sessionCount}</div>
           <div className="text-sm text-gray-500">Import Sessions</div>
         </div>
       </div>
@@ -327,20 +309,22 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filteredTasks.map((task, idx) => (
-                  <tr key={task.id || idx} className="hover:bg-gray-50">
+                  <tr key={task.task_id || idx} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div className="text-sm font-medium text-gray-900">
-                        {task.equipment_name || task.equipment_type || '-'}
+                        {task.equipment || '-'}
                       </div>
-                      {task.equipment_tag && (
+                      {task.equipment_tag && task.equipment_tag !== task.equipment && (
                         <div className="text-xs text-gray-500">{task.equipment_tag}</div>
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="text-sm font-medium text-gray-900">{task.task_name}</div>
-                      {task.description && (
-                        <div className="text-xs text-gray-500 truncate max-w-xs" title={task.description}>
-                          {task.description}
+                      <div className="text-sm font-medium text-gray-900 max-w-md truncate" title={task.task}>
+                        {task.task || '-'}
+                      </div>
+                      {task.file_name && (
+                        <div className="text-xs text-gray-400 truncate max-w-xs" title={task.file_name}>
+                          {task.file_name}
                         </div>
                       )}
                     </td>

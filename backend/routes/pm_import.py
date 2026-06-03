@@ -588,3 +588,57 @@ async def list_sessions(
         "sessions": sessions,
         "total": total
     }
+
+
+@router.get("/tasks")
+async def list_all_tasks(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    List all extracted tasks across all PM import sessions for the current user.
+    
+    Returns a flattened view of tasks with the fields needed for the
+    Custom PM Import tab: equipment, task, task type, discipline, frequency.
+    """
+    
+    user_id = current_user.get("id", current_user.get("email", "unknown"))
+    
+    cursor = db.pm_import_sessions.find(
+        {"created_by": user_id}
+    ).sort("created_at", -1)
+    
+    tasks = []
+    session_count = 0
+    async for session in cursor:
+        session_count += 1
+        session_id = session.get("session_id")
+        file_name = session.get("file_name")
+        created_at = session.get("created_at")
+        created_at_iso = created_at.isoformat() if created_at else None
+        
+        for task in session.get("tasks_extracted", []) or []:
+            tasks.append({
+                "task_id": task.get("task_id"),
+                "session_id": session_id,
+                "file_name": file_name,
+                "imported_at": created_at_iso,
+                # Equipment
+                "equipment": task.get("component") or task.get("asset") or "",
+                "equipment_tag": task.get("asset") or "",
+                # Task
+                "task": task.get("original_task") or task.get("existing_control") or "",
+                "description": task.get("ai_reasoning") or "",
+                # Task type / Discipline / Frequency
+                "task_type": task.get("task_type") or "",
+                "action_type": task.get("action_type") or "",
+                "discipline": task.get("discipline") or "",
+                "frequency": task.get("frequency") or "",
+                "review_status": task.get("review_status") or "pending",
+                "confidence_score": task.get("confidence_score"),
+            })
+    
+    return {
+        "tasks": tasks,
+        "total": len(tasks),
+        "session_count": session_count
+    }

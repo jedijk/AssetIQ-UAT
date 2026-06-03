@@ -147,4 +147,12 @@ export const pmImportAPI = {
     const response = await api.get(`/pm-import/sessions?limit=${limit}&skip=${skip}`);
     return response.data;
   },
+
+  /**
+   * List all extracted tasks across all sessions (flattened view).
+   */
+  listAllTasks: async () => {
+    const response = await api.get(`/pm-import/tasks`);
+    return response.data;
+  },
 };
