@@ -252,7 +252,7 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
         <div>
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <ClipboardList className="h-5 w-5 text-purple-600" />
-            {t("library.customPmImport") || "Custom PM Import"}
+            Custom PM Import
           </h2>
           <p className="text-sm text-gray-500 mt-1">
             {t("library.customPmImportDesc") || "View and manage imported maintenance tasks"}
