@@ -134,6 +134,15 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
     onError: (e) => toast.error(`Delete failed: ${e?.message || 'error'}`),
   });
   
+  const deleteAllMutation = useMutation({
+    mutationFn: () => pmImportAPI.deleteAllTasks(),
+    onSuccess: (data) => { 
+      toast.success(`Deleted ${data.deleted_tasks} tasks across ${data.sessions_cleared} sessions`);
+      invalidateTasks();
+    },
+    onError: (e) => toast.error(`Delete all failed: ${e?.message || 'error'}`),
+  });
+  
   const updateMutation = useMutation({
     mutationFn: ({ task, updates }) => pmImportAPI.updateTask(task.session_id, task.task_id, updates),
     onSuccess: () => { toast.success('Task updated'); invalidateTasks(); setEditingTask(null); },
@@ -245,6 +254,21 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
+            disabled={totalTasks === 0 || deleteAllMutation.isPending}
+            onClick={() => {
+              if (window.confirm(`Permanently delete ALL ${totalTasks} imported tasks?\n\nThis cannot be undone.`)) {
+                deleteAllMutation.mutate();
+              }
+            }}
+            data-testid="pm-delete-all-btn"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete All
           </Button>
           <Button onClick={onOpenImportWizard}>
             <Upload className="h-4 w-4 mr-2" />

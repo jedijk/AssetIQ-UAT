@@ -70,6 +70,14 @@ export const pmImportAPI = {
   },
 
   /**
+   * Delete ALL imported tasks across all sessions for the current user.
+   */
+  deleteAllTasks: async () => {
+    const response = await api.delete(`/pm-import/tasks`);
+    return response.data;
+  },
+
+  /**
    * Bulk actions on tasks
    * @param {string} sessionId 
    * @param {string} action - "accept", "reject", or "accept_high_confidence"

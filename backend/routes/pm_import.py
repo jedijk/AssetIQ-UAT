@@ -611,6 +611,48 @@ async def list_sessions(
     }
 
 
+@router.delete("/tasks")
+async def delete_all_tasks(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Delete ALL imported tasks across ALL sessions for the current user.
+    Sessions are preserved (file metadata kept), but `tasks_extracted` is cleared.
+    """
+    
+    user_id = current_user.get("id", current_user.get("email", "unknown"))
+    
+    # Count tasks before
+    cursor = db.pm_import_sessions.find({"created_by": user_id})
+    deleted_count = 0
+    session_count = 0
+    async for session in cursor:
+        session_count += 1
+        deleted_count += len(session.get("tasks_extracted", []) or [])
+    
+    # Clear all tasks across all sessions
+    cleared_stats = {
+        "total_tasks": 0, "failure_modes_identified": 0,
+        "existing_matches": 0, "new_proposed": 0,
+        "low_confidence_items": 0, "manual_review_required": 0,
+        "accepted": 0, "rejected": 0, "pending": 0,
+    }
+    result = await db.pm_import_sessions.update_many(
+        {"created_by": user_id},
+        {"$set": {
+            "tasks_extracted": [],
+            "stats": cleared_stats,
+            "updated_at": datetime.now(timezone.utc)
+        }}
+    )
+    
+    return {
+        "success": True,
+        "deleted_tasks": deleted_count,
+        "sessions_cleared": result.modified_count
+    }
+
+
 @router.get("/tasks")
 async def list_all_tasks(
     current_user: dict = Depends(get_current_user)
