@@ -7,6 +7,11 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Chat — duplicate "What would you like to report?" fix (VERIFIED)**:
+  - Previously stray commands ("skip"/"yes"/"no"/"cancel") in INITIAL state were echoed by the bot, producing 2–3 stacked "What would you like to report?" bubbles after the "Got it!" message.
+  - Now in `_core_chat_process`: BEFORE storing the user message, if state is INITIAL and content matches `{skip, cancel, yes, y, no, n, ok, okay, revise, ja, nee, klopt, akkoord}` (no image), the function returns `ChatResponse(message="")` immediately. No DB writes, no reply. Chat history stays clean.
+  - Verified via curl: stray "skip" → 0 messages stored. Real "Pump P-104 is leaking" → normal issue_confirm flow.
+
 - [Feb 2026] **Chat — fix: "skip" being processed as a new observation (VERIFIED)**:
   - Bug: When the chat was in INITIAL state, sending "skip" (from auto-skip-on-close, the 60-second timer, or a manual click after the conversation ended) caused the AI to start a new issue_confirm flow with "skip" as the parsed issue ("Here's what I understood: skip").
   - **Backend guard** (`/api/chat/send`): in INITIAL state, command words (`skip`, `cancel`, `yes`, `no`, `ok`, `okay`, `revise`, `ja`, `nee`, `klopt`, `akkoord`) are ignored and bounce back "What would you like to report?" instead of being parsed as observations.
