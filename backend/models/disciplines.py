@@ -63,13 +63,28 @@ DISCIPLINE_MAPPING = {
     # Piping maps to Static Equipment
     "piping": UnifiedDiscipline.STATIC_EQUIPMENT.value,
     "Piping": UnifiedDiscipline.STATIC_EQUIPMENT.value,
-    # Abbreviations
+    # Abbreviations - Operations
     "ops": UnifiedDiscipline.OPERATIONS.value,
+    "op": UnifiedDiscipline.OPERATIONS.value,  # Common Dutch abbreviation
+    "oper": UnifiedDiscipline.OPERATIONS.value,
+    "bediening": UnifiedDiscipline.OPERATIONS.value,  # Dutch for Operations
+    # Abbreviations - Mechanical
     "mech": UnifiedDiscipline.MECHANICAL.value,
+    "td": UnifiedDiscipline.MECHANICAL.value,  # Technical Department -> Mechanical
+    "tech": UnifiedDiscipline.MECHANICAL.value,
+    "technisch": UnifiedDiscipline.MECHANICAL.value,  # Dutch for Technical
+    "werktuigbouw": UnifiedDiscipline.MECHANICAL.value,  # Dutch for Mechanical Engineering
+    # Abbreviations - Electrical
     "elec": UnifiedDiscipline.ELECTRICAL.value,
+    "elektro": UnifiedDiscipline.ELECTRICAL.value,  # Dutch for Electrical
+    "e&i": UnifiedDiscipline.ELECTRICAL.value,
+    # Abbreviations - Instrumentation
     "inst": UnifiedDiscipline.INSTRUMENTATION.value,
     "instr": UnifiedDiscipline.INSTRUMENTATION.value,
+    "i&c": UnifiedDiscipline.INSTRUMENTATION.value,
+    # Abbreviations - Maintenance
     "maint": UnifiedDiscipline.MAINTENANCE.value,
+    "onderhoud": UnifiedDiscipline.MAINTENANCE.value,  # Dutch for Maintenance
 }
 
 
