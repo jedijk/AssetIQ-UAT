@@ -103,68 +103,114 @@ import AIFindSimilarFailureModes from "../components/library/AIFindSimilarFailur
 const CustomPMImportTab = ({ onOpenImportWizard }) => {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
-  const [selectedSession, setSelectedSession] = useState(null);
-  const [expandedTasks, setExpandedTasks] = useState(new Set());
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterDiscipline, setFilterDiscipline] = useState('all');
+  const [filterFrequency, setFilterFrequency] = useState('all');
   
   // Fetch all PM import sessions
-  const { data: sessionsData, isLoading, error, refetch } = useQuery({
+  const { data: sessionsData, isLoading, refetch } = useQuery({
     queryKey: ['pm-import-sessions'],
     queryFn: () => pmImportAPI.listSessions(100, 0),
   });
   
-  // Delete session mutation
-  const deleteSessionMutation = useMutation({
-    mutationFn: (sessionId) => pmImportAPI.deleteSession(sessionId),
-    onSuccess: () => {
-      toast.success('Import session deleted');
-      queryClient.invalidateQueries(['pm-import-sessions']);
-      setSelectedSession(null);
-    },
-    onError: (error) => {
-      toast.error(`Failed to delete: ${error.message}`);
-    },
-  });
-  
   const sessions = sessionsData?.sessions || [];
   
-  const formatDate = (dateStr) => {
-    if (!dateStr) return 'N/A';
-    return new Date(dateStr).toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+  // Flatten all tasks from all sessions
+  const allTasks = useMemo(() => {
+    const tasks = [];
+    sessions.forEach(session => {
+      (session.extracted_tasks || []).forEach(task => {
+        tasks.push({
+          ...task,
+          session_id: session.session_id,
+          file_name: session.file_name,
+          imported_at: session.created_at,
+        });
+      });
     });
-  };
+    return tasks;
+  }, [sessions]);
   
-  const getStatusBadge = (status) => {
-    const statusConfig = {
-      completed: { color: 'bg-green-100 text-green-700', label: 'Completed' },
-      processing: { color: 'bg-blue-100 text-blue-700', label: 'Processing' },
-      pending: { color: 'bg-yellow-100 text-yellow-700', label: 'Pending' },
-      failed: { color: 'bg-red-100 text-red-700', label: 'Failed' },
-    };
-    const config = statusConfig[status] || statusConfig.pending;
-    return <Badge variant="outline" className={`${config.color} text-xs`}>{config.label}</Badge>;
-  };
+  // Get unique disciplines and frequencies for filters
+  const disciplines = useMemo(() => {
+    const set = new Set();
+    allTasks.forEach(task => {
+      if (task.discipline) set.add(task.discipline);
+    });
+    return Array.from(set).sort();
+  }, [allTasks]);
   
-  const toggleTaskExpand = (taskId) => {
-    setExpandedTasks(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(taskId)) {
-        newSet.delete(taskId);
-      } else {
-        newSet.add(taskId);
+  const frequencies = useMemo(() => {
+    const set = new Set();
+    allTasks.forEach(task => {
+      if (task.frequency) set.add(task.frequency);
+    });
+    return Array.from(set).sort();
+  }, [allTasks]);
+  
+  // Filter tasks
+  const filteredTasks = useMemo(() => {
+    return allTasks.filter(task => {
+      // Search filter
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        const matchesSearch = 
+          task.task_name?.toLowerCase().includes(term) ||
+          task.equipment_name?.toLowerCase().includes(term) ||
+          task.description?.toLowerCase().includes(term) ||
+          task.discipline?.toLowerCase().includes(term);
+        if (!matchesSearch) return false;
       }
-      return newSet;
+      
+      // Discipline filter
+      if (filterDiscipline !== 'all' && task.discipline !== filterDiscipline) {
+        return false;
+      }
+      
+      // Frequency filter
+      if (filterFrequency !== 'all' && task.frequency !== filterFrequency) {
+        return false;
+      }
+      
+      return true;
     });
+  }, [allTasks, searchTerm, filterDiscipline, filterFrequency]);
+  
+  // Stats
+  const totalTasks = allTasks.length;
+  const acceptedTasks = allTasks.filter(t => t.review_status === 'accepted').length;
+  
+  const getDisciplineBadge = (discipline) => {
+    if (!discipline) return null;
+    const colors = {
+      mechanical: 'bg-blue-100 text-blue-700',
+      electrical: 'bg-yellow-100 text-yellow-700',
+      instrumentation: 'bg-purple-100 text-purple-700',
+      rotating: 'bg-orange-100 text-orange-700',
+      static: 'bg-teal-100 text-teal-700',
+      process: 'bg-green-100 text-green-700',
+    };
+    const color = colors[discipline.toLowerCase()] || 'bg-gray-100 text-gray-700';
+    return <Badge variant="outline" className={`${color} text-xs`}>{discipline}</Badge>;
   };
   
-  // Count stats
-  const totalSessions = sessions.length;
-  const totalTasks = sessions.reduce((sum, s) => sum + (s.extracted_tasks?.length || s.stats?.total_tasks || 0), 0);
-  const acceptedTasks = sessions.reduce((sum, s) => sum + (s.stats?.accepted || 0), 0);
+  const getFrequencyBadge = (frequency) => {
+    if (!frequency) return null;
+    return <Badge variant="outline" className="bg-blue-50 text-blue-700 text-xs">{frequency}</Badge>;
+  };
+  
+  const getTaskTypeBadge = (taskType) => {
+    if (!taskType) return null;
+    const colors = {
+      preventive: 'bg-green-100 text-green-700',
+      predictive: 'bg-purple-100 text-purple-700',
+      inspection: 'bg-blue-100 text-blue-700',
+      corrective: 'bg-red-100 text-red-700',
+      condition_based: 'bg-amber-100 text-amber-700',
+    };
+    const color = colors[taskType.toLowerCase()] || 'bg-gray-100 text-gray-700';
+    return <Badge variant="outline" className={`${color} text-xs`}>{taskType}</Badge>;
+  };
   
   if (isLoading) {
     return (
@@ -184,7 +230,7 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
             {t("library.customPmImport") || "Custom PM Import"}
           </h2>
           <p className="text-sm text-gray-500 mt-1">
-            {t("library.customPmImportDesc") || "View and manage imported maintenance plans"}
+            {t("library.customPmImportDesc") || "View and manage imported maintenance tasks"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -202,24 +248,61 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
       {/* Stats Cards */}
       <div className="grid grid-cols-3 gap-4">
         <div className="card p-4">
-          <div className="text-2xl font-bold text-gray-900">{totalSessions}</div>
-          <div className="text-sm text-gray-500">Import Sessions</div>
-        </div>
-        <div className="card p-4">
           <div className="text-2xl font-bold text-purple-600">{totalTasks}</div>
-          <div className="text-sm text-gray-500">Total Tasks Extracted</div>
+          <div className="text-sm text-gray-500">Total Tasks Imported</div>
         </div>
         <div className="card p-4">
           <div className="text-2xl font-bold text-green-600">{acceptedTasks}</div>
           <div className="text-sm text-gray-500">Tasks Accepted</div>
         </div>
+        <div className="card p-4">
+          <div className="text-2xl font-bold text-gray-600">{sessions.length}</div>
+          <div className="text-sm text-gray-500">Import Sessions</div>
+        </div>
       </div>
       
-      {/* Sessions List */}
-      {sessions.length === 0 ? (
+      {/* Filters */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search tasks, equipment..."
+            className="pl-9"
+          />
+        </div>
+        
+        <Select value={filterDiscipline} onValueChange={setFilterDiscipline}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Discipline" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Disciplines</SelectItem>
+            {disciplines.map(d => (
+              <SelectItem key={d} value={d}>{d}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        
+        <Select value={filterFrequency} onValueChange={setFilterFrequency}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Frequency" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Frequencies</SelectItem>
+            {frequencies.map(f => (
+              <SelectItem key={f} value={f}>{f}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      
+      {/* Tasks Table */}
+      {allTasks.length === 0 ? (
         <div className="card p-12 text-center">
           <Upload className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-700">No Imported Plans Yet</h3>
+          <h3 className="text-lg font-medium text-gray-700">No Imported Tasks Yet</h3>
           <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto">
             Import your existing maintenance plans, PM schedules, or OEM documentation to extract and manage maintenance tasks.
           </p>
@@ -229,174 +312,76 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Sessions List */}
-          <div className="card">
-            <div className="p-4 border-b">
-              <h3 className="font-medium">Import Sessions</h3>
-            </div>
-            <ScrollArea className="h-[500px]">
-              <div className="p-2 space-y-2">
-                {sessions.map((session) => (
-                  <div
-                    key={session.session_id}
-                    className={`border rounded-lg p-3 cursor-pointer transition-colors ${
-                      selectedSession?.session_id === session.session_id
-                        ? 'border-purple-500 bg-purple-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    onClick={() => setSelectedSession(session)}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                          <span className="font-medium truncate">{session.file_name || 'Unnamed Import'}</span>
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {formatDate(session.created_at)}
-                        </div>
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Equipment</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Task</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Task Type</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Discipline</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Frequency</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredTasks.map((task, idx) => (
+                  <tr key={task.id || idx} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <div className="text-sm font-medium text-gray-900">
+                        {task.equipment_name || task.equipment_type || '-'}
                       </div>
-                      <div className="flex items-center gap-2">
-                        {getStatusBadge(session.status)}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedSession(session);
-                            }}>
-                              <Eye className="h-4 w-4 mr-2" /> View Tasks
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (window.confirm('Delete this import session?')) {
-                                  deleteSessionMutation.mutate(session.session_id);
-                                }
-                              }}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                      <span>{session.extracted_tasks?.length || session.stats?.total_tasks || 0} tasks</span>
-                      {session.stats?.accepted > 0 && (
-                        <span className="text-green-600">{session.stats.accepted} accepted</span>
+                      {task.equipment_tag && (
+                        <div className="text-xs text-gray-500">{task.equipment_tag}</div>
                       )}
-                      {session.stats?.rejected > 0 && (
-                        <span className="text-red-600">{session.stats.rejected} rejected</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="text-sm font-medium text-gray-900">{task.task_name}</div>
+                      {task.description && (
+                        <div className="text-xs text-gray-500 truncate max-w-xs" title={task.description}>
+                          {task.description}
+                        </div>
                       )}
-                    </div>
-                  </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {getTaskTypeBadge(task.task_type)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {getDisciplineBadge(task.discipline)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {getFrequencyBadge(task.frequency)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {task.review_status ? (
+                        <Badge variant="outline" className={`text-xs ${
+                          task.review_status === 'accepted' ? 'bg-green-100 text-green-700' :
+                          task.review_status === 'rejected' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {task.review_status}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs bg-yellow-100 text-yellow-700">
+                          pending
+                        </Badge>
+                      )}
+                    </td>
+                  </tr>
                 ))}
-              </div>
-            </ScrollArea>
+              </tbody>
+            </table>
           </div>
           
-          {/* Selected Session Tasks */}
-          <div className="card">
-            <div className="p-4 border-b">
-              <h3 className="font-medium">
-                {selectedSession ? `Tasks from ${selectedSession.file_name || 'Import'}` : 'Select a Session'}
-              </h3>
+          {filteredTasks.length === 0 && allTasks.length > 0 && (
+            <div className="text-center py-8 text-gray-500">
+              No tasks match your filters
             </div>
-            {selectedSession ? (
-              <ScrollArea className="h-[500px]">
-                <div className="p-2 space-y-2">
-                  {(selectedSession.extracted_tasks || []).map((task) => (
-                    <div key={task.id} className="border rounded-lg">
-                      <div 
-                        className="p-3 cursor-pointer hover:bg-gray-50"
-                        onClick={() => toggleTaskExpand(task.id)}
-                      >
-                        <div className="flex items-start gap-2">
-                          {expandedTasks.has(task.id) ? (
-                            <ChevronDown className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium">{task.task_name}</div>
-                            <div className="flex items-center gap-2 mt-1">
-                              {task.review_status && (
-                                <Badge variant="outline" className={`text-xs ${
-                                  task.review_status === 'accepted' ? 'bg-green-100 text-green-700' :
-                                  task.review_status === 'rejected' ? 'bg-red-100 text-red-700' :
-                                  'bg-gray-100 text-gray-700'
-                                }`}>
-                                  {task.review_status}
-                                </Badge>
-                              )}
-                              {task.frequency && (
-                                <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">
-                                  {task.frequency}
-                                </Badge>
-                              )}
-                              {task.task_type && (
-                                <Badge variant="outline" className="text-xs">
-                                  {task.task_type}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      {expandedTasks.has(task.id) && (
-                        <div className="px-9 pb-3 border-t bg-gray-50">
-                          <div className="pt-3 space-y-2 text-sm">
-                            {task.description && (
-                              <div>
-                                <span className="font-medium text-gray-500">Description:</span>
-                                <p className="text-gray-700 mt-0.5">{task.description}</p>
-                              </div>
-                            )}
-                            {task.matched_failure_mode_name && (
-                              <div>
-                                <span className="font-medium text-gray-500">Matched Failure Mode:</span>
-                                <p className="text-gray-700 mt-0.5">{task.matched_failure_mode_name}</p>
-                              </div>
-                            )}
-                            {task.estimated_duration && (
-                              <div>
-                                <span className="font-medium text-gray-500">Duration:</span>
-                                <span className="text-gray-700 ml-2">{task.estimated_duration} hours</span>
-                              </div>
-                            )}
-                            {task.confidence && (
-                              <div>
-                                <span className="font-medium text-gray-500">AI Confidence:</span>
-                                <span className="text-gray-700 ml-2">{Math.round(task.confidence * 100)}%</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {(!selectedSession.extracted_tasks || selectedSession.extracted_tasks.length === 0) && (
-                    <div className="text-center text-gray-500 py-8">
-                      No tasks in this session
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-            ) : (
-              <div className="flex items-center justify-center h-[500px] text-gray-500">
-                <div className="text-center">
-                  <Eye className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                  <p>Select a session to view its tasks</p>
-                </div>
-              </div>
-            )}
+          )}
+          
+          <div className="px-4 py-3 border-t bg-gray-50 text-sm text-gray-500">
+            Showing {filteredTasks.length} of {allTasks.length} tasks
           </div>
         </div>
       )}
