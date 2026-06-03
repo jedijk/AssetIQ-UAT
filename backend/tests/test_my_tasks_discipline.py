@@ -3,7 +3,7 @@ import os
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://asset-pm-extract.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://tag-dash-flex.preview.emergentagent.com").rstrip("/")
 EMAIL = "jedijk@gmail.com"
 PASSWORD = "Jaap8019@"
 

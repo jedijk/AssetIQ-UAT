@@ -2267,12 +2267,16 @@ Respond in JSON format:
         nodes = await nodes_cursor.to_list(20000)
         
         by_tag = {}
+        by_tag_normalized = {}  # Tags with "-" removed for matching handwritten tags
         by_name_exact = {}
         all_names = []  # for fuzzy
         for n in nodes:
             tag = (n.get("tag") or "").strip()
             if tag:
                 by_tag[tag.upper()] = n
+                # Also store a normalized version without dashes for fuzzy tag matching
+                tag_normalized = tag.upper().replace("-", "")
+                by_tag_normalized[tag_normalized] = n
             name = (n.get("name") or "").strip()
             if name:
                 by_name_exact[name.lower()] = n
@@ -2300,19 +2304,43 @@ Respond in JSON format:
                         "confidence": 100,
                     }
                 else:
-                    # If the tag column contains multiple tokens (e.g. "P-1001, P-1002"),
-                    # try each token individually.
-                    for token in self._extract_tag_refs(tag_field):
-                        hit = by_tag.get(token.upper())
-                        if hit:
-                            match = {
-                                "equipment_id": hit.get("id"),
-                                "tag": hit.get("tag"),
-                                "name": hit.get("name"),
-                                "match_type": "tag_exact",
-                                "confidence": 100,
-                            }
-                            break
+                    # Try normalized match (without dashes) for handwritten tags
+                    tag_normalized = tag_field.upper().replace("-", "")
+                    hit = by_tag_normalized.get(tag_normalized)
+                    if hit:
+                        match = {
+                            "equipment_id": hit.get("id"),
+                            "tag": hit.get("tag"),
+                            "name": hit.get("name"),
+                            "match_type": "tag_normalized",
+                            "confidence": 95,  # Slightly lower confidence for normalized match
+                        }
+                    else:
+                        # If the tag column contains multiple tokens (e.g. "P-1001, P-1002"),
+                        # try each token individually.
+                        for token in self._extract_tag_refs(tag_field):
+                            hit = by_tag.get(token.upper())
+                            if hit:
+                                match = {
+                                    "equipment_id": hit.get("id"),
+                                    "tag": hit.get("tag"),
+                                    "name": hit.get("name"),
+                                    "match_type": "tag_exact",
+                                    "confidence": 100,
+                                }
+                                break
+                            # Also try normalized match for each token
+                            token_normalized = token.upper().replace("-", "")
+                            hit = by_tag_normalized.get(token_normalized)
+                            if hit:
+                                match = {
+                                    "equipment_id": hit.get("id"),
+                                    "tag": hit.get("tag"),
+                                    "name": hit.get("name"),
+                                    "match_type": "tag_normalized",
+                                    "confidence": 95,
+                                }
+                                break
             
             # Priority 2: description fuzzy match
             if not match:

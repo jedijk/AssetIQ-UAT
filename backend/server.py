@@ -234,7 +234,7 @@ BASE_ORIGINS = [
     "https://asset-iq-uat.vercel.app",
     "https://assetiq-uat.vercel.app",
     # Preview/Development
-    "https://asset-pm-extract.preview.emergentagent.com",
+    "https://tag-dash-flex.preview.emergentagent.com",
     "http://localhost:3000",
     "http://localhost:5000",
 ]

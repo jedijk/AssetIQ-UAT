@@ -10,7 +10,7 @@ import json
 from typing import Dict, Any, List
 
 # Backend URL from environment
-BACKEND_URL = "https://asset-pm-extract.preview.emergentagent.com/api"
+BACKEND_URL = "https://tag-dash-flex.preview.emergentagent.com/api"
 
 # Test credentials
 TEST_EMAIL = "jedijk@gmail.com"
