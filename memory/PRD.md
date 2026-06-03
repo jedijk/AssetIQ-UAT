@@ -7,6 +7,13 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Chat — Cancel button on "Here is what I understood" (VERIFIED)**:
+  - Added a red Cancel button next to Yes / Revise on the `issue_confirm` summary card.
+  - Calls existing `POST /api/chat/cancel` which resets the conversation state and posts "Cancelled. What would you like to report?" (auto-translated to NL when the chat is in Dutch). Invalidates `chatHistory` + `threats` queries.
+
+- [Feb 2026] **Chat — auto-skip on close: only when Skip is the active option (VERIFIED)**:
+  - Tightened `handleCloseWithAutoSkip` to fire only when the last assistant message is in `awaiting_context` AND no competing prompt is shown (`issue_confirm`, equipment suggestions, failure-mode suggestions, multi-match). Otherwise the close is plain — no signal sent.
+
 - [Feb 2026] **Chat — hide the literal "skip" signal from history (VERIFIED)**:
   - When the chat sends `skip` to advance the conversation (auto-skip on close, 60s timer, or the Skip button), the user bubble showing the word "skip" is now filtered from the rendered history. The word remains a backend signal but never appears as user-visible content.
 

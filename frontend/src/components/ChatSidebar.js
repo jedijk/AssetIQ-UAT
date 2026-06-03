@@ -89,15 +89,33 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
   
   /**
    * Auto-skip on close: when the user closes the chat window while the assistant
-   * is awaiting more context, fire a "skip" message in the background so the
-   * conversation is finalized rather than left in limbo. Then close the sidebar.
+   * is awaiting more context AND the Skip button is the active option, fire a
+   * "skip" message in the background so the conversation is finalized rather
+   * than left in limbo. Otherwise just close.
    */
   const handleCloseWithAutoSkip = () => {
     const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant");
+    
+    // Skip button is only visible when:
+    //   1) the message is in awaiting_context state, AND
+    //   2) no competing interactive prompt is shown (issue_confirm, equipment
+    //      suggestions, failure-mode input, etc.). Otherwise the user has a
+    //      Yes/Revise/Select choice and we must NOT silently skip.
     const isAwaitingContext = lastAssistantMsg?.chat_state === "awaiting_context"
       || lastAssistantMsg?.awaiting_context_for_threat;
+    const hasIssueConfirm = lastAssistantMsg?.question_type === "issue_confirm"
+      && lastAssistantMsg?.issue_summary;
+    const hasEquipmentSuggestions = (lastAssistantMsg?.equipment_suggestions || []).length > 0;
+    const hasFailureModeSuggestions = (lastAssistantMsg?.failure_mode_suggestions || []).length > 0;
+    const hasMultipleMatches = (lastAssistantMsg?.matches || []).length > 0;
     
-    if (isAwaitingContext && !contextSkipInFlightRef.current) {
+    const skipIsTheOption = isAwaitingContext
+      && !hasIssueConfirm
+      && !hasEquipmentSuggestions
+      && !hasFailureModeSuggestions
+      && !hasMultipleMatches;
+    
+    if (skipIsTheOption && !contextSkipInFlightRef.current) {
       contextSkipInFlightRef.current = true;
       if (autoSkipTimerRef.current) {
         clearInterval(autoSkipTimerRef.current);
@@ -664,6 +682,26 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
                         data-testid="issue-confirm-revise-btn"
                       >
                         {isNl ? "Aanpassen" : "Revise"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            setIsSending(true);
+                            await chatAPI.cancelFlow();
+                            queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
+                            queryClient.invalidateQueries({ queryKey: ["threats"] });
+                          } catch (e) {
+                            toast.error("Cancel failed");
+                          } finally {
+                            setIsSending(false);
+                          }
+                        }}
+                        disabled={isSending}
+                        className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white border border-red-300 text-red-600 text-sm font-medium hover:bg-red-50 disabled:opacity-50 transition-colors"
+                        data-testid="issue-confirm-cancel-btn"
+                      >
+                        {isNl ? "Annuleren" : "Cancel"}
                       </button>
                     </div>
                   )}
