@@ -69,6 +69,9 @@ const ACTION_CONFIG = {
 // Suggestion card component
 const SuggestionCard = ({ suggestion, onApply, onReject, isApplying }) => {
   const [expanded, setExpanded] = useState(false);
+  const [selectedTaskToReplace, setSelectedTaskToReplace] = useState(null); // null = add new, index = replace
+  const [mergeMode, setMergeMode] = useState("replace"); // "replace" or "add"
+  
   const recommendation = suggestion.recommendation || {};
   const action = recommendation.action || "keep_custom";
   const config = ACTION_CONFIG[action] || ACTION_CONFIG.keep_custom;
@@ -77,6 +80,19 @@ const SuggestionCard = ({ suggestion, onApply, onReject, isApplying }) => {
   const isApplied = suggestion.status === "applied";
   const equipmentMatch = suggestion.equipment_match;
   const similarFMs = suggestion.similar_failure_modes || [];
+  
+  // Get target failure mode's existing actions
+  const targetFm = similarFMs.find(fm => fm.id === recommendation.target_failure_mode_id);
+  const existingActions = targetFm?.recommended_actions || [];
+  
+  // Handle apply with replace/add mode
+  const handleApplyClick = (e) => {
+    e.stopPropagation();
+    onApply(suggestion.task_id, recommendation, {
+      mode: mergeMode,
+      replaceIndex: mergeMode === "replace" ? selectedTaskToReplace : null
+    });
+  };
   
   return (
     <div className={`border rounded-lg overflow-hidden transition-all ${
@@ -99,7 +115,7 @@ const SuggestionCard = ({ suggestion, onApply, onReject, isApplying }) => {
           
           {/* Task info */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <Badge variant="outline" className="text-xs">
                 {suggestion.equipment_tag || "No Tag"}
               </Badge>
@@ -117,6 +133,15 @@ const SuggestionCard = ({ suggestion, onApply, onReject, isApplying }) => {
             <p className="text-sm text-slate-700 line-clamp-2">
               {suggestion.task_description}
             </p>
+            
+            {/* Show target failure mode name for merge/new_task actions */}
+            {(action === "merge" || action === "new_task") && recommendation.target_failure_mode && (
+              <div className="mt-1 text-xs text-blue-600 flex items-center gap-1">
+                <ArrowRight className="w-3 h-3" />
+                <span>→ {recommendation.target_failure_mode.failure_mode}</span>
+              </div>
+            )}
+            
             <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
               <span className="flex items-center gap-1">
                 <Wrench className="w-3 h-3" />
@@ -151,11 +176,8 @@ const SuggestionCard = ({ suggestion, onApply, onReject, isApplying }) => {
               <Button
                 size="sm"
                 className="bg-blue-600 hover:bg-blue-700"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onApply(suggestion.task_id, recommendation);
-                }}
-                disabled={isApplying}
+                onClick={handleApplyClick}
+                disabled={isApplying || (mergeMode === "replace" && selectedTaskToReplace === null && (action === "merge" || action === "new_task") && existingActions.length > 0)}
               >
                 {isApplying ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -231,7 +253,7 @@ const SuggestionCard = ({ suggestion, onApply, onReject, isApplying }) => {
                 <div>
                   <h4 className="text-xs font-medium text-slate-500 mb-2 flex items-center gap-1">
                     <Target className="w-3 h-3" />
-                    Target Failure Mode
+                    {action === "merge" ? "Merge Into This Failure Mode" : "Add Task To This Failure Mode"}
                   </h4>
                   <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
                     <div className="font-medium text-sm text-blue-700">
@@ -240,6 +262,47 @@ const SuggestionCard = ({ suggestion, onApply, onReject, isApplying }) => {
                     <div className="text-xs text-blue-600 mt-1">
                       Equipment: {recommendation.target_failure_mode.equipment} | 
                       Category: {recommendation.target_failure_mode.category}
+                    </div>
+                    
+                    {/* Show existing actions in the target failure mode */}
+                    {(() => {
+                      // Find the full FM data from similarFMs to get recommended_actions
+                      const fullFm = similarFMs.find(fm => fm.id === recommendation.target_failure_mode_id);
+                      const actions = fullFm?.recommended_actions || [];
+                      if (actions.length > 0) {
+                        return (
+                          <div className="mt-3 pt-3 border-t border-blue-200">
+                            <div className="text-xs font-medium text-blue-700 mb-2">
+                              Existing Tasks/Actions ({actions.length}):
+                            </div>
+                            <ul className="space-y-1 text-xs text-blue-600 max-h-24 overflow-y-auto">
+                              {actions.slice(0, 5).map((action, idx) => (
+                                <li key={idx} className="flex items-start gap-1">
+                                  <span className="text-blue-400 mt-0.5">•</span>
+                                  <span className="line-clamp-2">
+                                    {typeof action === 'string' ? action : action?.description || action?.action || JSON.stringify(action)}
+                                  </span>
+                                </li>
+                              ))}
+                              {actions.length > 5 && (
+                                <li className="text-blue-400 italic">...and {actions.length - 5} more</li>
+                              )}
+                            </ul>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                    
+                    {/* Show what will be added */}
+                    <div className="mt-3 pt-3 border-t border-blue-200">
+                      <div className="text-xs font-medium text-green-700 mb-1">
+                        ✓ Will add this task:
+                      </div>
+                      <div className="text-xs text-green-600 bg-green-50 p-2 rounded border border-green-200">
+                        {suggestion.task_description}
+                        {suggestion.frequency && <span className="text-green-500"> (Frequency: {suggestion.frequency})</span>}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -355,13 +418,14 @@ export const AIReviewModal = ({ isOpen, onClose, sessionId, onComplete }) => {
       
       if (result.success) {
         // Update local state
+        const replacedSuffix = result.mode === "replaced" ? " (replaced existing task)" : " (added as new task)";
         setSuggestions(prev => prev.map(s => 
-          s.task_id === taskId ? { ...s, status: "applied" } : s
+          s.task_id === taskId ? { ...s, status: "applied", apply_mode: result.mode } : s
         ));
         updateStats(suggestions.map(s => 
           s.task_id === taskId ? { ...s, status: "applied" } : s
         ));
-        toast.success(result.message);
+        toast.success((result.message || "Suggestion applied") + (result.mode ? replacedSuffix : ""));
       } else {
         toast.error(result.message || "Failed to apply suggestion");
       }
@@ -401,7 +465,10 @@ export const AIReviewModal = ({ isOpen, onClose, sessionId, onComplete }) => {
     setReviewing(true);
     try {
       const result = await pmImportAPI.applyAllSuggestions(sessionId);
-      toast.success(`Applied ${result.applied} suggestions, ${result.skipped} skipped`);
+      const breakdown = (result.replaced || result.added)
+        ? ` (${result.replaced || 0} replaced, ${result.added || 0} added)`
+        : "";
+      toast.success(`Applied ${result.applied} suggestions${breakdown}, ${result.skipped} skipped`);
       await loadReviewResults();
     } catch (error) {
       console.error("Apply all failed:", error);

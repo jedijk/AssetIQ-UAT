@@ -976,7 +976,7 @@ async def apply_all_suggestions(
         raise HTTPException(status_code=404, detail="Session not found")
     
     suggestions = session.get("ai_review_suggestions", [])
-    results = {"applied": 0, "failed": 0, "skipped": 0, "details": []}
+    results = {"applied": 0, "failed": 0, "skipped": 0, "replaced": 0, "added": 0, "details": []}
     
     for suggestion in suggestions:
         if suggestion.get("status") == "applied":
@@ -1000,6 +1000,10 @@ async def apply_all_suggestions(
             
             if result.get("success"):
                 results["applied"] += 1
+                if result.get("mode") == "replaced":
+                    results["replaced"] += 1
+                elif result.get("mode") == "added":
+                    results["added"] += 1
             else:
                 results["failed"] += 1
             

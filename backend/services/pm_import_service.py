@@ -3056,6 +3056,132 @@ Respond with a JSON object:
                 "confidence": 40
             }
     
+    @staticmethod
+    def _normalize_action_text(value: Any) -> str:
+        """Normalize an action (string OR dict) into a comparable lowercased string.
+
+        Strips the "(Frequency: ...)" suffix added by PM import, removes punctuation,
+        and collapses whitespace so similar tasks match regardless of formatting.
+        """
+        if value is None:
+            return ""
+        if isinstance(value, dict):
+            text = value.get("action") or value.get("description") or value.get("name") or ""
+        else:
+            text = str(value)
+        text = re.sub(r"\(\s*frequency\s*:.*?\)", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"[^a-z0-9\s]", " ", text.lower())
+        text = re.sub(r"\s+", " ", text).strip()
+        return text
+
+    @classmethod
+    def _find_similar_action_index(
+        cls,
+        new_action_text: str,
+        existing_actions: List[Any],
+        threshold: float = 0.6,
+    ) -> Tuple[int, float]:
+        """Find the index of the most similar existing action.
+
+        Returns (index, ratio). index = -1 if nothing crosses the threshold.
+        Uses difflib SequenceMatcher on the normalized text — good enough for
+        catching near-duplicates like "Inspect bearings" vs "Inspect the bearings".
+        """
+        from difflib import SequenceMatcher
+
+        target = cls._normalize_action_text(new_action_text)
+        if not target:
+            return -1, 0.0
+
+        best_idx, best_ratio = -1, 0.0
+        for idx, existing in enumerate(existing_actions or []):
+            candidate = cls._normalize_action_text(existing)
+            if not candidate:
+                continue
+            ratio = SequenceMatcher(None, target, candidate).ratio()
+            # Also treat full-substring containment as a strong match.
+            if target in candidate or candidate in target:
+                ratio = max(ratio, 0.85)
+            if ratio > best_ratio:
+                best_ratio, best_idx = ratio, idx
+
+        if best_ratio >= threshold:
+            return best_idx, best_ratio
+        return -1, best_ratio
+
+    async def _apply_task_to_failure_mode(
+        self,
+        target_failure_mode_id: str,
+        action_text: str,
+        updated_by: str,
+        change_reason: str,
+    ) -> Dict[str, Any]:
+        """Replace a similar existing task in a failure mode's recommended_actions,
+        otherwise append it. Version history captures the previous state (acts as a
+        soft archive of replaced tasks).
+
+        Returns {success, message, mode: "replaced"|"added", replaced_index}.
+        """
+        from bson import ObjectId
+        from services.failure_modes_service import FailureModesService
+
+        # Look up the failure mode — accept legacy "id" string or Mongo "_id".
+        fm_doc = None
+        if target_failure_mode_id:
+            fm_doc = await self.failure_modes_collection.find_one({"id": target_failure_mode_id})
+            if not fm_doc and ObjectId.is_valid(target_failure_mode_id):
+                fm_doc = await self.failure_modes_collection.find_one(
+                    {"_id": ObjectId(target_failure_mode_id)}
+                )
+
+        if not fm_doc:
+            return {
+                "success": False,
+                "message": f"Failure mode {target_failure_mode_id} not found",
+                "mode": None,
+                "replaced_index": None,
+            }
+
+        existing_actions = list(fm_doc.get("recommended_actions") or [])
+        match_idx, ratio = self._find_similar_action_index(action_text, existing_actions)
+
+        if match_idx >= 0:
+            new_actions = list(existing_actions)
+            new_actions[match_idx] = action_text
+            mode = "replaced"
+            message = f"Replaced existing task (similarity {ratio:.0%})"
+        else:
+            new_actions = existing_actions + [action_text]
+            mode = "added"
+            message = "Added as new task"
+
+        # Use FailureModesService.update so version history is recorded — this is
+        # the "soft archive" of the previous recommended_actions list.
+        fm_service = FailureModesService(self.db)
+        mode_id_str = str(fm_doc["_id"])
+        updated = await fm_service.update(
+            mode_id_str,
+            {"recommended_actions": new_actions},
+            updated_by=updated_by,
+            change_reason=change_reason,
+        )
+
+        if not updated:
+            return {
+                "success": False,
+                "message": "Failed to update failure mode",
+                "mode": None,
+                "replaced_index": None,
+            }
+
+        return {
+            "success": True,
+            "message": message,
+            "mode": mode,
+            "replaced_index": match_idx if match_idx >= 0 else None,
+            "failure_mode_id": mode_id_str,
+        }
+
     async def apply_ai_suggestion(
         self, 
         session_id: str, 
@@ -3069,8 +3195,10 @@ Respond with a JSON object:
         
         Actions:
         - "merge": Merge task into existing failure mode's recommended_actions
+          (replaces a similar existing task when one exists, else appends).
         - "new_failure_mode": Create new failure mode with this task
-        - "new_task": Add task under existing failure mode
+        - "new_task": Add task under existing failure mode (same replace-or-add logic
+          as merge).
         - "keep_custom": Mark as custom (stays in session)
         - "reject": Reject suggestion (stays as accepted task)
         """
@@ -3089,47 +3217,24 @@ Respond with a JSON object:
         suggestion = next((s for s in suggestions if s.get("task_id") == task_id), None)
         
         result = {"task_id": task_id, "action": action, "success": False}
+        updated_by = session.get("created_by") or "PM Import AI Review"
         
         if action == "merge" and target_failure_mode_id:
-            # Add task to existing failure mode's recommended_actions
-            from bson import ObjectId
-            
             task_description = task.get("task_description") or task.get("original_task") or ""
             frequency = task.get("frequency") or ""
             action_text = f"{task_description} (Frequency: {frequency})" if frequency else task_description
             
-            # Try to find failure mode by id field first, then by _id (ObjectId)
-            query = {"id": target_failure_mode_id}
-            fm_exists = await self.failure_modes_collection.find_one(query)
-            
-            if not fm_exists:
-                # Try with ObjectId
-                try:
-                    query = {"_id": ObjectId(target_failure_mode_id)}
-                    fm_exists = await self.failure_modes_collection.find_one(query)
-                except:
-                    pass
-            
-            if not fm_exists:
-                result["message"] = f"Failure mode {target_failure_mode_id} not found"
-                return result
-            
-            update_result = await self.failure_modes_collection.update_one(
-                query,
-                {
-                    "$addToSet": {"recommended_actions": action_text},
-                    "$set": {"updated_at": datetime.now(timezone.utc)}
-                }
+            apply_res = await self._apply_task_to_failure_mode(
+                target_failure_mode_id=target_failure_mode_id,
+                action_text=action_text,
+                updated_by=updated_by,
+                change_reason=f"PM Import AI Review — merge task {task_id}",
             )
-            
-            if update_result.modified_count > 0 or update_result.matched_count > 0:
-                result["success"] = True
-                result["message"] = f"Task merged into failure mode"
-                # Mark task as imported
-                task["import_status"] = "merged"
-                task["target_failure_mode_id"] = target_failure_mode_id
-            else:
-                result["message"] = "Failed to update failure mode"
+            result.update(apply_res)
+            if apply_res["success"]:
+                task["import_status"] = "merged" if apply_res["mode"] == "added" else "replaced"
+                task["target_failure_mode_id"] = apply_res.get("failure_mode_id") or target_failure_mode_id
+                task["apply_mode"] = apply_res["mode"]
         
         elif action == "new_failure_mode":
             # Create new failure mode
@@ -3169,43 +3274,24 @@ Respond with a JSON object:
                 result["message"] = "Failed to create failure mode"
         
         elif action == "new_task":
-            # Add as new task under existing failure mode (same as merge for now)
+            # Add as new task under existing failure mode — uses same replace-or-add
+            # logic as "merge" so duplicates don't accumulate.
             if target_failure_mode_id:
-                from bson import ObjectId
-                
                 task_description = task.get("task_description") or task.get("original_task") or ""
                 frequency = task.get("frequency") or ""
                 action_text = f"{task_description} (Frequency: {frequency})" if frequency else task_description
-                
-                # Try to find failure mode by id field first, then by _id (ObjectId)
-                query = {"id": target_failure_mode_id}
-                fm_exists = await self.failure_modes_collection.find_one(query)
-                
-                if not fm_exists:
-                    try:
-                        query = {"_id": ObjectId(target_failure_mode_id)}
-                        fm_exists = await self.failure_modes_collection.find_one(query)
-                    except:
-                        pass
-                
-                if not fm_exists:
-                    result["message"] = f"Failure mode {target_failure_mode_id} not found"
-                else:
-                    update_result = await self.failure_modes_collection.update_one(
-                        query,
-                        {
-                            "$addToSet": {"recommended_actions": action_text},
-                            "$set": {"updated_at": datetime.now(timezone.utc)}
-                        }
-                    )
-                    
-                    if update_result.modified_count > 0 or update_result.matched_count > 0:
-                        result["success"] = True
-                        result["message"] = f"New task added to failure mode"
-                        task["import_status"] = "new_task"
-                        task["target_failure_mode_id"] = target_failure_mode_id
-                    else:
-                        result["message"] = "Failed to add task to failure mode"
+
+                apply_res = await self._apply_task_to_failure_mode(
+                    target_failure_mode_id=target_failure_mode_id,
+                    action_text=action_text,
+                    updated_by=updated_by,
+                    change_reason=f"PM Import AI Review — new task {task_id}",
+                )
+                result.update(apply_res)
+                if apply_res["success"]:
+                    task["import_status"] = "new_task" if apply_res["mode"] == "added" else "replaced"
+                    task["target_failure_mode_id"] = apply_res.get("failure_mode_id") or target_failure_mode_id
+                    task["apply_mode"] = apply_res["mode"]
             else:
                 result["message"] = "No target failure mode specified"
         

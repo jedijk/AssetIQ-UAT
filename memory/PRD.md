@@ -7,6 +7,14 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **PM Import AI Review — Replace-or-Add behavior (VERIFIED)**:
+  - When applying an AI suggestion that "merges" / "new_task"s a PM task into an existing failure mode, the backend now checks `recommended_actions` for a similar task and **replaces** it in-place; otherwise it appends as a new task. Prevents accumulating near-duplicates like "Inspect bearings" + "Inspect the bearings (Frequency: Monthly)".
+  - Similarity = difflib `SequenceMatcher` ratio ≥ 0.6 on normalized text (lowercased, punctuation stripped, "(Frequency: …)" suffix removed). Substring containment forces ratio to ≥ 0.85.
+  - The replaced state is preserved through `FailureModesService.update()` which writes a version snapshot to `failure_mode_versions` (soft archive — recoverable via existing rollback endpoint).
+  - `POST /api/pm-import/session/{sid}/task/{tid}/apply-suggestion` now returns `mode: "replaced"|"added"` and `replaced_index`. `apply-all-suggestions` returns `replaced` + `added` counts. Frontend toast surfaces the breakdown.
+  - Files: `services/pm_import_service.py` (`_normalize_action_text`, `_find_similar_action_index`, `_apply_task_to_failure_mode`), `routes/pm_import.py`, `components/library/AIReviewModal.jsx`.
+
+
 - [Feb 2026] **PM Import Service refactor — FM coupling REMOVED, AI enrichment ADDED (VERIFIED)**:
   - Per the AssetIQ functional spec, PM Import is now scoped to: import → enrich → standardize → match equipment → review → write to `pm_tasks`. Zero failure-mode / FMEA dependencies.
   - **Removed**: `_match_with_library`, `_match_equipment_types`, `library_failure_mode_ids`, `ai_only_failure_modes`, `approved_failure_mode_ids`, `library_match`, `equipment_type_match`, `/lookup/failure-modes`, `/lookup/equipment-types`, the Equipment Type chip and Failure Modes chip + multi-select dialog.
