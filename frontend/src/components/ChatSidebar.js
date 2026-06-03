@@ -66,6 +66,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
   const contextSkipDeadlineMsRef = useRef(null);
   const contextSkipTrackedMessageIdRef = useRef(null);
   const contextSkipInFlightRef = useRef(false);
+  /** Timestamp (ms) of the most recent "skip" fired from ANY source — manual button, 60s timer, or close handler. */
+  const lastSkipFiredAtRef = useRef(0);
   const queryClient = useQueryClient();
 
   // Pre-fill message when equipment is provided
@@ -115,8 +117,14 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
       && !hasFailureModeSuggestions
       && !hasMultipleMatches;
     
-    if (skipIsTheOption && !contextSkipInFlightRef.current) {
+    // 5-second cooldown: if a skip was already fired (manual button, timer, etc.)
+    // very recently, don't fire another one. Prevents race conditions where
+    // `messages` hasn't yet refetched after the previous skip's "Got it!" reply.
+    const recentlyFired = Date.now() - lastSkipFiredAtRef.current < 5000;
+    
+    if (skipIsTheOption && !contextSkipInFlightRef.current && !recentlyFired) {
       contextSkipInFlightRef.current = true;
+      lastSkipFiredAtRef.current = Date.now();
       if (autoSkipTimerRef.current) {
         clearInterval(autoSkipTimerRef.current);
         autoSkipTimerRef.current = null;
@@ -178,6 +186,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
     const fireAutoSkip = () => {
       if (contextSkipInFlightRef.current) return;
       contextSkipInFlightRef.current = true;
+      lastSkipFiredAtRef.current = Date.now();
       clearTimer();
       setAutoSkipCountdown(null);
       setIsSending(true);
@@ -627,6 +636,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
                         clearInterval(autoSkipTimerRef.current);
                       }
                       setAutoSkipCountdown(null);
+                      lastSkipFiredAtRef.current = Date.now();
                       sendMutation.mutate({ content: "skip", image: null });
                     }}
                     disabled={isSending}
@@ -744,6 +754,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null }) => {
                     clearInterval(autoSkipTimerRef.current);
                   }
                   setAutoSkipCountdown(null);
+                  lastSkipFiredAtRef.current = Date.now();
                   sendMutation.mutate({ content: "skip", image: null });
                 }}
                 disabled={isSending}

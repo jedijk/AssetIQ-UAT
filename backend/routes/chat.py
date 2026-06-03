@@ -907,6 +907,25 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
         ChatState.AWAITING_FAILURE_MODE,
         ChatState.AWAITING_NEW_FAILURE_MODE,
     }
+    
+    # Stale control signals — when in INITIAL state, ignore command words like
+    # "skip", "cancel", "yes", "no", "revise", "ok". These usually mean an earlier
+    # auto-skip/double-click fired after the active context had already ended.
+    # Without this guard the bot treats e.g. "skip" as a new observation.
+    if state == ChatState.INITIAL and not image_base64:
+        ignored_commands = {
+            "skip", "cancel", "yes", "y", "no", "n", "ok", "okay",
+            "revise", "ja", "nee", "klopt", "akkoord",
+        }
+        if content.strip().lower() in ignored_commands:
+            reply = (
+                "Wat wilt u melden?"
+                if ui_is_nl
+                else "What would you like to report?"
+            )
+            await _store_assistant_msg(user_id, reply, chat_state=ChatState.INITIAL)
+            return ChatResponse(message=reply, detected_language=detected_lang)
+    
     if state == ChatState.INITIAL and not in_flow and not image_base64:
         intent = await classify_user_intent(content, session_id)
         if intent.get("is_data_query") and intent.get("confidence", 0) > 0.6:

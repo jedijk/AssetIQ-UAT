@@ -7,6 +7,12 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Chat — fix: "skip" being processed as a new observation (VERIFIED)**:
+  - Bug: When the chat was in INITIAL state, sending "skip" (from auto-skip-on-close, the 60-second timer, or a manual click after the conversation ended) caused the AI to start a new issue_confirm flow with "skip" as the parsed issue ("Here's what I understood: skip").
+  - **Backend guard** (`/api/chat/send`): in INITIAL state, command words (`skip`, `cancel`, `yes`, `no`, `ok`, `okay`, `revise`, `ja`, `nee`, `klopt`, `akkoord`) are ignored and bounce back "What would you like to report?" instead of being parsed as observations.
+  - **Frontend cooldown** (`ChatSidebar.js`): a `lastSkipFiredAtRef` 5-second cooldown is shared across all skip sources (auto-close handler, 60s timer, manual Skip / Done buttons) preventing race conditions where the close handler fires another skip before the message list has refetched.
+  - Verified via curl: "skip"/"yes"/"no"/"cancel"/"ok" → "What would you like to report?" (no issue_confirm); real text → normal flow.
+
 - [Feb 2026] **Chat — Cancel button on "Here is what I understood" (VERIFIED)**:
   - Added a red Cancel button next to Yes / Revise on the `issue_confirm` summary card.
   - Calls existing `POST /api/chat/cancel` which resets the conversation state and posts "Cancelled. What would you like to report?" (auto-translated to NL when the chat is in Dutch). Invalidates `chatHistory` + `threats` queries.
