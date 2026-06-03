@@ -515,10 +515,14 @@ const PMHierarchyChip = ({ task, onClick }) => {
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+      className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 border-dashed max-w-[200px]"
+      title={`Unmatched — click to map. Raw: ${task.equipment_tag || task.equipment_description || '—'}`}
       data-testid={`pm-hierarchy-unmatched-${task.task_id}`}
     >
-      Unmatched
+      <span className="truncate">
+        {task.equipment_tag || task.equipment_description || 'Unmatched'}
+      </span>
+      <span className="opacity-60 flex-shrink-0">(unmatched)</span>
     </button>
   );
 };
