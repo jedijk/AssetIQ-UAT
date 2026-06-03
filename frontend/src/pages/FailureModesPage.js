@@ -51,6 +51,13 @@ import {
   Languages,
   Upload,
   Sparkles,
+  FileText,
+  Eye,
+  RefreshCw,
+  MoreVertical,
+  ChevronDown,
+  Loader2,
+  ClipboardList,
 } from "lucide-react";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -67,8 +74,16 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../components/ui/dialog";
+import { ScrollArea } from "../components/ui/scroll-area";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 import { toast } from "sonner";
 import api, { equipmentHierarchyAPI, failureModesAPI, getErrorMessage } from "../lib/api";
+import { pmImportAPI } from "../lib/apis/pmImport";
 import MaintenanceStrategyTab from "../components/library/MaintenanceStrategyTab";
 import BackButton from "../components/BackButton";
 
@@ -83,6 +98,311 @@ import AIImproveFailureMode from "../components/library/AIImproveFailureMode";
 import BulkImproveFailureModes from "../components/library/BulkImproveFailureModes";
 import AIReviewActionDisciplines from "../components/library/AIReviewActionDisciplines";
 import AIFindSimilarFailureModes from "../components/library/AIFindSimilarFailureModes";
+
+// Custom PM Import Tab Component
+const CustomPMImportTab = ({ onOpenImportWizard }) => {
+  const { t } = useLanguage();
+  const queryClient = useQueryClient();
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [expandedTasks, setExpandedTasks] = useState(new Set());
+  
+  // Fetch all PM import sessions
+  const { data: sessionsData, isLoading, error, refetch } = useQuery({
+    queryKey: ['pm-import-sessions'],
+    queryFn: () => pmImportAPI.listSessions(100, 0),
+  });
+  
+  // Delete session mutation
+  const deleteSessionMutation = useMutation({
+    mutationFn: (sessionId) => pmImportAPI.deleteSession(sessionId),
+    onSuccess: () => {
+      toast.success('Import session deleted');
+      queryClient.invalidateQueries(['pm-import-sessions']);
+      setSelectedSession(null);
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete: ${error.message}`);
+    },
+  });
+  
+  const sessions = sessionsData?.sessions || [];
+  
+  const formatDate = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    return new Date(dateStr).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+  
+  const getStatusBadge = (status) => {
+    const statusConfig = {
+      completed: { color: 'bg-green-100 text-green-700', label: 'Completed' },
+      processing: { color: 'bg-blue-100 text-blue-700', label: 'Processing' },
+      pending: { color: 'bg-yellow-100 text-yellow-700', label: 'Pending' },
+      failed: { color: 'bg-red-100 text-red-700', label: 'Failed' },
+    };
+    const config = statusConfig[status] || statusConfig.pending;
+    return <Badge variant="outline" className={`${config.color} text-xs`}>{config.label}</Badge>;
+  };
+  
+  const toggleTaskExpand = (taskId) => {
+    setExpandedTasks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(taskId)) {
+        newSet.delete(taskId);
+      } else {
+        newSet.add(taskId);
+      }
+      return newSet;
+    });
+  };
+  
+  // Count stats
+  const totalSessions = sessions.length;
+  const totalTasks = sessions.reduce((sum, s) => sum + (s.extracted_tasks?.length || s.stats?.total_tasks || 0), 0);
+  const acceptedTasks = sessions.reduce((sum, s) => sum + (s.stats?.accepted || 0), 0);
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+  
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <ClipboardList className="h-5 w-5 text-purple-600" />
+            {t("library.customPmImport") || "Custom PM Import"}
+          </h2>
+          <p className="text-sm text-gray-500 mt-1">
+            {t("library.customPmImportDesc") || "View and manage imported maintenance plans"}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button onClick={onOpenImportWizard}>
+            <Upload className="h-4 w-4 mr-2" />
+            Import PM Plan
+          </Button>
+        </div>
+      </div>
+      
+      {/* Stats Cards */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="card p-4">
+          <div className="text-2xl font-bold text-gray-900">{totalSessions}</div>
+          <div className="text-sm text-gray-500">Import Sessions</div>
+        </div>
+        <div className="card p-4">
+          <div className="text-2xl font-bold text-purple-600">{totalTasks}</div>
+          <div className="text-sm text-gray-500">Total Tasks Extracted</div>
+        </div>
+        <div className="card p-4">
+          <div className="text-2xl font-bold text-green-600">{acceptedTasks}</div>
+          <div className="text-sm text-gray-500">Tasks Accepted</div>
+        </div>
+      </div>
+      
+      {/* Sessions List */}
+      {sessions.length === 0 ? (
+        <div className="card p-12 text-center">
+          <Upload className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-700">No Imported Plans Yet</h3>
+          <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto">
+            Import your existing maintenance plans, PM schedules, or OEM documentation to extract and manage maintenance tasks.
+          </p>
+          <Button className="mt-4" onClick={onOpenImportWizard}>
+            <Upload className="h-4 w-4 mr-2" />
+            Import Your First Plan
+          </Button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Sessions List */}
+          <div className="card">
+            <div className="p-4 border-b">
+              <h3 className="font-medium">Import Sessions</h3>
+            </div>
+            <ScrollArea className="h-[500px]">
+              <div className="p-2 space-y-2">
+                {sessions.map((session) => (
+                  <div
+                    key={session.session_id}
+                    className={`border rounded-lg p-3 cursor-pointer transition-colors ${
+                      selectedSession?.session_id === session.session_id
+                        ? 'border-purple-500 bg-purple-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => setSelectedSession(session)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                          <span className="font-medium truncate">{session.file_name || 'Unnamed Import'}</span>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {formatDate(session.created_at)}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(session.status)}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedSession(session);
+                            }}>
+                              <Eye className="h-4 w-4 mr-2" /> View Tasks
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm('Delete this import session?')) {
+                                  deleteSessionMutation.mutate(session.session_id);
+                                }
+                              }}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                      <span>{session.extracted_tasks?.length || session.stats?.total_tasks || 0} tasks</span>
+                      {session.stats?.accepted > 0 && (
+                        <span className="text-green-600">{session.stats.accepted} accepted</span>
+                      )}
+                      {session.stats?.rejected > 0 && (
+                        <span className="text-red-600">{session.stats.rejected} rejected</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+          
+          {/* Selected Session Tasks */}
+          <div className="card">
+            <div className="p-4 border-b">
+              <h3 className="font-medium">
+                {selectedSession ? `Tasks from ${selectedSession.file_name || 'Import'}` : 'Select a Session'}
+              </h3>
+            </div>
+            {selectedSession ? (
+              <ScrollArea className="h-[500px]">
+                <div className="p-2 space-y-2">
+                  {(selectedSession.extracted_tasks || []).map((task) => (
+                    <div key={task.id} className="border rounded-lg">
+                      <div 
+                        className="p-3 cursor-pointer hover:bg-gray-50"
+                        onClick={() => toggleTaskExpand(task.id)}
+                      >
+                        <div className="flex items-start gap-2">
+                          {expandedTasks.has(task.id) ? (
+                            <ChevronDown className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium">{task.task_name}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              {task.review_status && (
+                                <Badge variant="outline" className={`text-xs ${
+                                  task.review_status === 'accepted' ? 'bg-green-100 text-green-700' :
+                                  task.review_status === 'rejected' ? 'bg-red-100 text-red-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {task.review_status}
+                                </Badge>
+                              )}
+                              {task.frequency && (
+                                <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">
+                                  {task.frequency}
+                                </Badge>
+                              )}
+                              {task.task_type && (
+                                <Badge variant="outline" className="text-xs">
+                                  {task.task_type}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      {expandedTasks.has(task.id) && (
+                        <div className="px-9 pb-3 border-t bg-gray-50">
+                          <div className="pt-3 space-y-2 text-sm">
+                            {task.description && (
+                              <div>
+                                <span className="font-medium text-gray-500">Description:</span>
+                                <p className="text-gray-700 mt-0.5">{task.description}</p>
+                              </div>
+                            )}
+                            {task.matched_failure_mode_name && (
+                              <div>
+                                <span className="font-medium text-gray-500">Matched Failure Mode:</span>
+                                <p className="text-gray-700 mt-0.5">{task.matched_failure_mode_name}</p>
+                              </div>
+                            )}
+                            {task.estimated_duration && (
+                              <div>
+                                <span className="font-medium text-gray-500">Duration:</span>
+                                <span className="text-gray-700 ml-2">{task.estimated_duration} hours</span>
+                              </div>
+                            )}
+                            {task.confidence && (
+                              <div>
+                                <span className="font-medium text-gray-500">AI Confidence:</span>
+                                <span className="text-gray-700 ml-2">{Math.round(task.confidence * 100)}%</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {(!selectedSession.extracted_tasks || selectedSession.extracted_tasks.length === 0) && (
+                    <div className="text-center text-gray-500 py-8">
+                      No tasks in this session
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            ) : (
+              <div className="flex items-center justify-center h-[500px] text-gray-500">
+                <div className="text-center">
+                  <Eye className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                  <p>Select a session to view its tasks</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const disciplineIcons = {
   Rotating: Cog,
@@ -857,13 +1177,17 @@ const FailureModesPage = () => {
       
       {/* Main Tabs */}
       <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
-        <TabsList className="grid w-full max-w-2xl grid-cols-4">
+        <TabsList className="grid w-full max-w-3xl grid-cols-5">
           <TabsTrigger value="failure-modes">{t("library.failureModes")}</TabsTrigger>
           <TabsTrigger value="libraries">{t("library.equipmentTypes")}</TabsTrigger>
           <TabsTrigger value="maintenance" data-testid="maintenance-strategies-tab">{t("library.maintenance")}</TabsTrigger>
           <TabsTrigger value="schedule" className="flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5" />
             {t("maintenance.maintenanceScheduleTitle")}
+          </TabsTrigger>
+          <TabsTrigger value="pm-import" className="flex items-center gap-1.5">
+            <Upload className="w-3.5 h-3.5" />
+            {t("library.customPmImport") || "PM Import"}
           </TabsTrigger>
         </TabsList>
 
@@ -1433,6 +1757,13 @@ const FailureModesPage = () => {
           <div className="card h-full overflow-auto p-4">
             <MaintenanceScheduleManager equipmentType={null} />
           </div>
+        </TabsContent>
+        
+        {/* Custom PM Import Tab */}
+        <TabsContent value="pm-import" className="space-y-4">
+          <CustomPMImportTab 
+            onOpenImportWizard={() => setIsPMImportOpen(true)}
+          />
         </TabsContent>
       </Tabs>
 

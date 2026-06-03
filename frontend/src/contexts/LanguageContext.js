@@ -843,6 +843,8 @@ const en = {
     updatedDescription: "description",
     updatedTag: "tag",
     updatedEquipmentType: "equipment type",
+    customPmImport: "PM Import",
+    customPmImportDesc: "View and manage imported maintenance plans",
   },
 
   // Disciplines (used across library, equipment types, failure modes)
@@ -2806,6 +2808,8 @@ const nl = {
     updatedDescription: "beschrijving",
     updatedTag: "tag",
     updatedEquipmentType: "apparatuurtype",
+    customPmImport: "PM Import",
+    customPmImportDesc: "Bekijk en beheer geïmporteerde onderhoudsplannen",
   },
 
   // Disciplines (used across library, equipment types, failure modes)
