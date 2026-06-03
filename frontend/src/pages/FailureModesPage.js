@@ -1519,15 +1519,15 @@ const FailureModesPage = () => {
       
       {/* Main Tabs */}
       <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
-        <TabsList className="grid w-full max-w-3xl grid-cols-5">
+        <TabsList className="inline-flex w-auto max-w-full overflow-x-auto">
           <TabsTrigger value="failure-modes">{t("library.failureModes")}</TabsTrigger>
           <TabsTrigger value="libraries">{t("library.equipmentTypes")}</TabsTrigger>
           <TabsTrigger value="maintenance" data-testid="maintenance-strategies-tab">{t("library.maintenance")}</TabsTrigger>
-          <TabsTrigger value="schedule" className="flex items-center gap-1.5">
+          <TabsTrigger value="schedule" className="flex items-center gap-1.5 whitespace-nowrap">
             <Calendar className="w-3.5 h-3.5" />
             {t("maintenance.maintenanceScheduleTitle")}
           </TabsTrigger>
-          <TabsTrigger value="pm-import" className="flex items-center gap-1.5">
+          <TabsTrigger value="pm-import" className="flex items-center gap-1.5 whitespace-nowrap">
             <Upload className="w-3.5 h-3.5" />
             {t("library.customPmImport") || "PM Import"}
           </TabsTrigger>

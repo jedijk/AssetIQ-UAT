@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { pmImportAPI } from "../../lib/apis/pmImport";
 import { toast } from "sonner";
@@ -937,6 +938,7 @@ const TaskRow = ({ task, onAccept, onReject, onSelectMatch, onApproveNewFM, onSe
 export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState(1); // 1: Upload, 2: Processing, 3: Review, 4: Import Summary
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -1057,7 +1059,16 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
         // Check if done
         if (sess.status === "ready_for_review") {
           clearInterval(pollingRef.current);
-          setStep(3);
+          const taskCount = sess.stats?.total_tasks || sess.tasks_extracted?.length || 0;
+          toast.success(`${taskCount} tasks imported. Review them in the PM Import tab.`);
+          if (onClose) {
+            onClose();
+          } else {
+            setStep(1);
+          }
+          if (queryClient) {
+            queryClient.invalidateQueries({ queryKey: ["pm-import-tasks"] });
+          }
         } else if (sess.status === "error") {
           clearInterval(pollingRef.current);
           toast.error(sess.error_message || "Processing failed");

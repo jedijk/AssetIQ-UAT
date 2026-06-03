@@ -1020,100 +1020,172 @@ class PMImportService:
         return tasks
     
     async def _parse_excel(self, content: bytes) -> List[Dict[str, Any]]:
-        """Parse Excel file and extract maintenance tasks."""
+        """
+        Parse Excel file per the PM Import Extraction Engine spec.
+        
+        Rules:
+        - Column A is the ONLY authoritative source for equipment tags.
+        - Merged cells are resolved (master value applied to every cell in the merge).
+        - Worksheet is analyzed as a complete table, not row-by-row.
+        - Blank Column A rows are treated as continuations of the previous active task block.
+        - When N tags share the same task block (merged or grouped), one record per tag is emitted.
+        """
         import openpyxl
         
         wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
         rows = []
         
-        # Keywords to identify the main task/description column
-        task_column_keywords = ["task", "description", "activity", "action", "work", "maintenance", "taak", "beschrijving", "activiteit"]
-        equipment_column_keywords = ["equipment", "component", "asset", "machine", "apparaat", "onderdeel"]
-        frequency_column_keywords = ["frequency", "interval", "schedule", "frequentie", "periode"]
-        duration_column_keywords = ["duration", "estimated time", "estimated_time", "time", "duur", "tijd", "minutes", "hours"]
+        # Keywords used to auto-detect non-tag columns by header name. Column A is ALWAYS the tag column.
+        task_column_keywords = ["task", "description", "activity", "action", "work", "maintenance",
+                                "taak", "beschrijving", "activiteit", "werkzaamheden", "instructie"]
+        description_column_keywords = ["equipment", "component", "asset", "machine", "name",
+                                       "apparaat", "onderdeel", "omschrijving", "naam"]
+        frequency_column_keywords = ["frequency", "interval", "schedule", "frequentie", "periode",
+                                     "freq", "cycle"]
+        duration_column_keywords = ["duration", "estimated time", "estimated_time", "time",
+                                    "duur", "tijd", "minutes", "hours", "minuten", "uren"]
         
         for sheet in wb.worksheets:
-            # Try to find header row
-            header_row = None
+            # Build merged-cell lookup: for each (row, col) inside a merge, store the master value
+            merged_master = {}
+            for merged_range in sheet.merged_cells.ranges:
+                min_row, min_col = merged_range.min_row, merged_range.min_col
+                master_value = sheet.cell(row=min_row, column=min_col).value
+                for r in range(merged_range.min_row, merged_range.max_row + 1):
+                    for c in range(merged_range.min_col, merged_range.max_col + 1):
+                        merged_master[(r, c)] = master_value
+            
+            def cell_value(row_idx: int, col_idx: int):
+                """Resolve a cell, returning the merged-master value if applicable."""
+                key = (row_idx, col_idx + 1)  # openpyxl is 1-indexed
+                if key in merged_master:
+                    return merged_master[key]
+                # Direct value (col_idx is 0-based input → openpyxl is 1-based)
+                return sheet.cell(row=row_idx, column=col_idx + 1).value
+            
+            max_row = sheet.max_row or 0
+            max_col = sheet.max_column or 0
+            if max_row < 2 or max_col < 1:
+                continue
+            
+            # Detect header row (first 10 rows): the row where Column A AND any other column have header-like text
+            header_row_idx = None
             headers = []
             task_col_idx = None
-            equipment_col_idx = None
+            description_col_idx = None
             frequency_col_idx = None
             duration_col_idx = None
             
-            for row_idx, row in enumerate(sheet.iter_rows(max_row=10, values_only=True), 1):
-                if row and any(cell for cell in row if cell):
-                    # Check if this looks like a header
-                    row_text = " ".join(str(c).lower() for c in row if c)
-                    if any(kw in row_text for kw in ["task", "maintenance", "description", "activity", "action", "equipment", "component"]):
-                        header_row = row_idx
-                        headers = [str(c).strip().lower() if c else f"col_{i}" for i, c in enumerate(row)]
-                        
-                        # Find key columns
-                        for i, h in enumerate(headers):
-                            h_lower = h.lower()
-                            if any(kw in h_lower for kw in task_column_keywords) and task_col_idx is None:
-                                task_col_idx = i
-                            if any(kw in h_lower for kw in equipment_column_keywords) and equipment_col_idx is None:
-                                equipment_col_idx = i
-                            if any(kw in h_lower for kw in frequency_column_keywords) and frequency_col_idx is None:
-                                frequency_col_idx = i
-                            if any(kw in h_lower for kw in duration_column_keywords) and duration_col_idx is None:
-                                duration_col_idx = i
-                        break
+            for r in range(1, min(11, max_row + 1)):
+                row_values = [cell_value(r, c) for c in range(max_col)]
+                if not any(v for v in row_values):
+                    continue
+                row_text_lower = " ".join(str(v).lower() for v in row_values if v)
+                if any(kw in row_text_lower for kw in
+                       ["task", "description", "tag", "equipment", "frequency", "frequentie",
+                        "taak", "apparaat", "onderdeel", "naam", "instructie"]):
+                    header_row_idx = r
+                    headers = [str(v).strip() if v else f"col_{i}" for i, v in enumerate(row_values)]
+                    for i, h in enumerate(headers):
+                        h_lower = h.lower()
+                        if i == 0:
+                            continue  # Column A is always the tag column
+                        if task_col_idx is None and any(kw in h_lower for kw in task_column_keywords):
+                            task_col_idx = i
+                        elif description_col_idx is None and any(kw in h_lower for kw in description_column_keywords):
+                            description_col_idx = i
+                        elif frequency_col_idx is None and any(kw in h_lower for kw in frequency_column_keywords):
+                            frequency_col_idx = i
+                        elif duration_col_idx is None and any(kw in h_lower for kw in duration_column_keywords):
+                            duration_col_idx = i
+                    break
             
-            if not header_row:
-                header_row = 1
-                first_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True), None)
-                headers = [str(c).strip().lower() if c else f"col_{i}" for i, c in enumerate(first_row)] if first_row else []
+            if header_row_idx is None:
+                header_row_idx = 1
+                first_row = [cell_value(1, c) for c in range(max_col)]
+                headers = [str(v).strip() if v else f"col_{i}" for i, v in enumerate(first_row)]
             
-            # If no task column found, use first column with substantial text
-            if task_col_idx is None:
-                task_col_idx = 0
+            # Fallback: if no task column was detected, pick column B (index 1) as task description
+            if task_col_idx is None and max_col >= 2:
+                task_col_idx = 1
             
-            # Extract data rows
-            for row in sheet.iter_rows(min_row=header_row + 1, values_only=True):
-                if not any(cell for cell in row if cell):
+            # ------ Walk the data rows building one record per non-empty Column A ------
+            current_record = None
+            for r in range(header_row_idx + 1, max_row + 1):
+                tag_val = cell_value(r, 0)  # Column A
+                tag_str = str(tag_val).strip() if tag_val is not None else ""
+                
+                # Skip totally empty rows
+                row_values = [cell_value(r, c) for c in range(max_col)]
+                if not any(v for v in row_values) and not tag_str:
                     continue
                 
-                row_data = {}
-                
-                # Get the main task text (clean, without delimiters)
-                task_text = ""
-                if task_col_idx is not None and task_col_idx < len(row) and row[task_col_idx]:
-                    task_text = str(row[task_col_idx]).strip()
-                
-                # If task text is empty, try to find the longest text cell
-                if not task_text:
-                    for cell in row:
-                        if cell and len(str(cell).strip()) > len(task_text):
-                            task_text = str(cell).strip()
-                
-                if not task_text or len(task_text) < 5:
-                    continue
-                
-                row_data["_task_text"] = task_text
-                row_data["_raw_text"] = task_text  # Use clean task text as raw_text
-                
-                # Extract equipment if available
-                if equipment_col_idx is not None and equipment_col_idx < len(row) and row[equipment_col_idx]:
-                    row_data["_equipment"] = str(row[equipment_col_idx]).strip()
-                
-                # Extract frequency if available
-                if frequency_col_idx is not None and frequency_col_idx < len(row) and row[frequency_col_idx]:
-                    row_data["_frequency"] = str(row[frequency_col_idx]).strip()
-                
-                # Extract duration / estimated time if available
-                if duration_col_idx is not None and duration_col_idx < len(row) and row[duration_col_idx]:
-                    row_data["duration"] = str(row[duration_col_idx]).strip()
-                
-                # Store all column data for reference
-                for idx, cell in enumerate(row):
-                    if cell is not None:
-                        header = headers[idx] if idx < len(headers) else f"col_{idx}"
-                        row_data[header] = str(cell).strip()
-                
-                rows.append(row_data)
+                if tag_str:
+                    # New equipment tag → start a new record
+                    task_text = ""
+                    if task_col_idx is not None and task_col_idx < max_col:
+                        tv = cell_value(r, task_col_idx)
+                        if tv:
+                            task_text = str(tv).strip()
+                    
+                    description_text = ""
+                    if description_col_idx is not None and description_col_idx < max_col:
+                        dv = cell_value(r, description_col_idx)
+                        if dv:
+                            description_text = str(dv).strip()
+                    
+                    freq_text = ""
+                    if frequency_col_idx is not None and frequency_col_idx < max_col:
+                        fv = cell_value(r, frequency_col_idx)
+                        if fv:
+                            freq_text = str(fv).strip()
+                    
+                    duration_text = ""
+                    if duration_col_idx is not None and duration_col_idx < max_col:
+                        dv = cell_value(r, duration_col_idx)
+                        if dv:
+                            duration_text = str(dv).strip()
+                    
+                    # If task description is still empty, pick the longest non-tag cell on this row
+                    if not task_text:
+                        candidates = [(c, cell_value(r, c)) for c in range(max_col) if c != 0]
+                        candidates = [(c, str(v).strip()) for c, v in candidates if v]
+                        if candidates:
+                            task_text = max(candidates, key=lambda x: len(x[1]))[1]
+                    
+                    current_record = {
+                        "_tag": tag_str,           # Column A — authoritative
+                        "_task_text": task_text,
+                        "_description": description_text,
+                        "_frequency": freq_text,
+                        "_duration": duration_text,
+                        "_raw_text": task_text,
+                        "_sheet": sheet.title,
+                        "_row": r,
+                    }
+                    # Attach all column data for reference
+                    for i, v in enumerate(row_values):
+                        if v is not None:
+                            header = headers[i] if i < len(headers) else f"col_{i}"
+                            current_record[header] = str(v).strip()
+                    
+                    rows.append(current_record)
+                else:
+                    # Column A is empty → continuation of the active task block.
+                    # Append any non-empty cell content to the current task description.
+                    if current_record is None:
+                        continue
+                    continuation_parts = []
+                    for c in range(max_col):
+                        v = cell_value(r, c)
+                        if v:
+                            continuation_parts.append(str(v).strip())
+                    if continuation_parts:
+                        extra = " | ".join(continuation_parts)
+                        current_record["_task_text"] = (
+                            (current_record.get("_task_text") or "") + " — " + extra
+                        ).strip(" —")
+                        current_record["_raw_text"] = current_record["_task_text"]
         
         return rows
     
