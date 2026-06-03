@@ -654,14 +654,17 @@ async def update_failure_mode(
             
             # Trigger auto-translation in background when content changes
             # NOTE: Use the failure_mode NAME as the entity_id (matches frontend lookup).
-            if any([data.failure_mode, data.description, data.potential_effects, 
+            if any([data.failure_mode, data.potential_effects, 
                     data.potential_causes, data.recommended_actions]):
                 fm_data_for_translation = {
                     "name": result.get("failure_mode", ""),
-                    "description": result.get("description", ""),
+                    "description": result.get("mechanism", ""),  # Use mechanism as description
                     "effects": result.get("potential_effects", ""),
                     "causes": result.get("potential_causes", ""),
-                    "recommended_actions": ", ".join(result.get("recommended_actions", [])) if result.get("recommended_actions") else "",
+                    "recommended_actions": ", ".join(
+                        [str(a) if isinstance(a, str) else a.get("description", str(a)) if isinstance(a, dict) else str(a) 
+                         for a in (result.get("recommended_actions") or [])]
+                    ),
                 }
                 background_tasks.add_task(
                     auto_translate_failure_mode,
