@@ -347,10 +347,9 @@ class PMImportService:
         """
         Enrich tasks with equipment/tag impact information.
 
-        Adds per-task fields:
-        - equipment_tag_refs: extracted tag strings from task text/component
-        - equipment_matches: matched equipment nodes (id/tag/name/level)
-        - equipment_unmatched_tags: extracted tags that didn't match any node
+        Runs the same matchers used during upload (`_match_equipment_to_hierarchy`,
+        `_match_equipment_types`) so the data shown in the review screen is consistent
+        with the data the new PM Import table reads.
 
         Adds session fields:
         - equipment_impact_summary
@@ -366,27 +365,14 @@ class PMImportService:
             return session
 
         # Only recompute if we haven't done it yet, or if tasks changed since last compute.
-        # We keep this heuristic simple (count + updated_at).
         prev = session.get("equipment_impact_summary") or {}
         if prev.get("tasks_count") == len(tasks) and session.get("equipment_impact_updated_at"):
             session["_id"] = str(session["_id"])
             return session
 
-        equipment_nodes = await self._load_accessible_equipment_nodes(current_user)
-        tag_to_node = {}
-        for n in equipment_nodes:
-            tag = (n.get("tag") or "").strip()
-            if tag:
-                tag_to_node[tag.upper()] = {
-                    "id": n.get("id"),
-                    "tag": n.get("tag"),
-                    "name": n.get("name"),
-                    "level": n.get("level"),
-                }
-
-        matched_task_count = 0
-        unmatched_tag_total = 0
-        matched_tag_total = 0
+        # Use the SAME matchers as the upload pipeline so review and listing stay in sync.
+        tasks = await self._match_equipment_to_hierarchy(tasks)
+        tasks = await self._match_equipment_types(tasks)
 
         # Failure mode import impact preview (what will change)
         try:
@@ -395,41 +381,14 @@ class PMImportService:
         except Exception:
             fm_service = None
 
+        matched_task_count = 0
+        unmatched_tag_total = 0
+        matched_tag_total = 0
         for task in tasks:
-            raw = " ".join(
-                [
-                    str(task.get("component") or ""),
-                    str(task.get("asset") or ""),
-                    str(task.get("original_task") or ""),
-                ]
-            )
-            refs = self._extract_tag_refs(raw)
-            matches = []
-            unmatched = []
-            for ref in refs:
-                hit = tag_to_node.get(ref.upper())
-                if hit:
-                    matches.append(hit)
-                    matched_tag_total += 1
-                else:
-                    unmatched.append(ref)
-                    unmatched_tag_total += 1
-
-            # De-dup matches by node id (same tag referenced multiple times)
-            seen = set()
-            uniq_matches = []
-            for m in matches:
-                mid = m.get("id")
-                if mid and mid not in seen:
-                    seen.add(mid)
-                    uniq_matches.append(m)
-
-            task["equipment_tag_refs"] = refs
-            task["equipment_matches"] = uniq_matches
-            task["equipment_unmatched_tags"] = unmatched
-            if uniq_matches:
+            if task.get("equipment_matches"):
                 matched_task_count += 1
-
+                matched_tag_total += len(task["equipment_matches"])
+            unmatched_tag_total += len(task.get("equipment_unmatched_tags") or [])
             if fm_service:
                 task["import_impact"] = await self._compute_import_impact_preview(task, fm_service)
 

@@ -7,6 +7,12 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **PM Import — bug fix: matchers were overwritten on review (VERIFIED)**:
+  - Root cause: `ensure_equipment_impacts` (called by review/get-session paths) was using its own legacy tag-only matcher and *overwrote* the rich hierarchy+type matches produced by `_process_file` during upload. End result: `equipment_matches: []` even though upload matched correctly.
+  - Fix: refactored `ensure_equipment_impacts` to call the same `_match_equipment_to_hierarchy` + `_match_equipment_types` methods used by the upload pipeline. Both code paths now stay consistent.
+  - Backfill: ran a one-time DB script across existing sessions — `Add pm.xlsx` now shows **11–12 / 19 hierarchy** and **2 / 19 equipment-type** matches (was 0/19 before fix).
+  - Verified live: Temperature Control Unit → `1F-3001-0126` + `Control Unit`; Electromotor → `3P-1005-0731`; Gearbox → `1F-3001-0123`; etc.
+
 - [Feb 2026] **PM Import — Hierarchy / Equipment Type / Failure Mode mapping (VERIFIED)**:
   - On upload, the pipeline now runs three matchers in addition to AI extraction:
     - `_match_equipment_to_hierarchy`: maps tasks to `equipment_nodes` by tag (exact) and by name (exact/partial).
