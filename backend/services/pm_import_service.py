@@ -22,6 +22,25 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 logger = logging.getLogger(__name__)
 
+
+def _sanitize_for_json(value: Any) -> Any:
+    """Recursively convert MongoDB / Python values to JSON-safe types."""
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    try:
+        from bson import ObjectId
+        if isinstance(value, ObjectId):
+            return str(value)
+    except ImportError:
+        pass
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(k): _sanitize_for_json(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_sanitize_for_json(v) for v in value]
+    return str(value)
+
 # Tag-like equipment identifier extraction (best-effort).
 # Examples: P-101, HX-201, 1F-3001, 1F-3001-0129
 TAG_REGEX = re.compile(
@@ -2575,8 +2594,34 @@ Respond in JSON format:
         suggestions = []
         
         for task in accepted_tasks:
-            suggestion = await self._generate_task_suggestion(task)
-            suggestions.append(suggestion)
+            try:
+                suggestion = await self._generate_task_suggestion(task)
+                suggestions.append(_sanitize_for_json(suggestion))
+            except Exception as e:
+                logger.error(
+                    "AI review failed for task %s: %s",
+                    task.get("task_id"),
+                    e,
+                    exc_info=True,
+                )
+                suggestions.append(_sanitize_for_json({
+                    "task_id": task.get("task_id"),
+                    "equipment_tag": task.get("equipment_tag") or task.get("asset") or "",
+                    "task_description": task.get("task_description") or task.get("original_task") or "",
+                    "discipline": task.get("discipline") or "Mechanical",
+                    "frequency": task.get("frequency") or "",
+                    "task_type": task.get("task_type") or "PM",
+                    "equipment_match": None,
+                    "similar_failure_modes": [],
+                    "recommendation": {
+                        "action": "keep_custom",
+                        "target_failure_mode_id": None,
+                        "reasoning": f"AI review could not complete for this task: {e}",
+                        "confidence": 0,
+                    },
+                    "status": "pending",
+                    "error": str(e),
+                }))
         
         # Store suggestions in session
         await self.sessions_collection.update_one(
@@ -2633,7 +2678,10 @@ Respond in JSON format:
             "frequency": frequency,
             "task_type": task_type,
             "equipment_match": equipment_match,
-            "similar_failure_modes": similar_failure_modes[:5],  # Top 5
+            "similar_failure_modes": [
+                self._summarize_failure_mode_for_review(fm)
+                for fm in similar_failure_modes[:5]
+            ],
             "recommendation": recommendation,
             "status": "pending"  # pending, accepted, rejected
         }
@@ -2733,8 +2781,6 @@ Respond in JSON format:
     
     async def _build_equipment_match(self, equipment_node: Dict, partial: bool = False) -> Dict[str, Any]:
         """Build equipment match response with type details."""
-        from iso14224_models import EQUIPMENT_TYPES
-        
         equipment_type = None
         equipment_type_id = equipment_node.get("equipment_type_id")
         
@@ -2747,16 +2793,20 @@ Respond in JSON format:
             
             # If not found in custom, check ISO14224 standard types
             if not equipment_type:
-                iso_type = next(
-                    (t for t in EQUIPMENT_TYPES if t.get("id") == equipment_type_id),
-                    None
-                )
-                if iso_type:
-                    equipment_type = {
-                        "id": iso_type.get("id"),
-                        "name": iso_type.get("name"),
-                        "category": iso_type.get("category")
-                    }
+                try:
+                    from iso14224_models import EQUIPMENT_TYPES
+                    iso_type = next(
+                        (t for t in EQUIPMENT_TYPES if t.get("id") == equipment_type_id),
+                        None
+                    )
+                    if iso_type:
+                        equipment_type = {
+                            "id": iso_type.get("id"),
+                            "name": iso_type.get("name"),
+                            "category": iso_type.get("category")
+                        }
+                except Exception as e:
+                    logger.warning("Could not load ISO equipment types for match: %s", e)
         
         result = {
             "matched": True,
@@ -2868,13 +2918,13 @@ Respond in JSON format:
                     break
             
             # Equipment type match - BIG bonus
-            if equipment_type_id and equipment_type_id in fm.get("equipment_type_ids", []):
+            fm_type_ids = [str(t) for t in fm.get("equipment_type_ids", [])]
+            if equipment_type_id and str(equipment_type_id) in fm_type_ids:
                 score += 50  # Strong equipment type match
             
             # Partial equipment type match (e.g., task for motor, FM for electric equipment)
-            fm_type_ids = fm.get("equipment_type_ids", [])
             if equipment_type_id:
-                eq_base = equipment_type_id.split('_')[0] if '_' in equipment_type_id else equipment_type_id
+                eq_base = str(equipment_type_id).split('_')[0] if '_' in str(equipment_type_id) else str(equipment_type_id)
                 for fm_type in fm_type_ids:
                     if eq_base in fm_type or fm_type.split('_')[0] == eq_base:
                         score += 25
@@ -2898,7 +2948,7 @@ Respond in JSON format:
         similar_failure_modes: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """Use AI to generate a recommendation for the task."""
-        from emergentintegrations.llm.openai import LlmChat
+        from services.openai_service import chat_completion
         import os
         import json
         
@@ -2997,17 +3047,21 @@ Respond with a JSON object:
                 # Return default recommendation without AI
                 return self._default_recommendation(similar_failure_modes, task)
             
-            # Use LlmChat with required parameters
-            import uuid
-            session_id = str(uuid.uuid4())
-            system_message = "You are an expert in industrial equipment maintenance and failure mode analysis. Respond only with valid JSON."
-            
-            llm = LlmChat(
-                api_key=api_key,
-                session_id=session_id,
-                system_message=system_message
-            ).with_model("gpt-4o-mini")
-            response = await llm.send_message(prompt)
+            system_message = (
+                "You are an expert in industrial equipment maintenance and failure mode analysis. "
+                "Respond only with valid JSON."
+            )
+            if api_key and not os.environ.get("OPENAI_API_KEY"):
+                os.environ["OPENAI_API_KEY"] = api_key
+            response = await chat_completion(
+                messages=[
+                    {"role": "system", "content": system_message},
+                    {"role": "user", "content": prompt},
+                ],
+                model="gpt-4o-mini",
+                temperature=0.2,
+                response_format={"type": "json_object"},
+            )
             
             # Parse JSON response
             response_text = response.strip()
@@ -3021,9 +3075,11 @@ Respond with a JSON object:
             
             # Validate and enrich recommendation
             if recommendation.get("action") in ["merge", "new_task"] and recommendation.get("target_failure_mode_id"):
+                target_id = str(recommendation["target_failure_mode_id"])
+                recommendation["target_failure_mode_id"] = target_id
                 # Find the target failure mode details
                 target_fm = next(
-                    (fm for fm in similar_failure_modes if fm.get("id") == recommendation["target_failure_mode_id"]),
+                    (fm for fm in similar_failure_modes if str(fm.get("id")) == target_id),
                     None
                 )
                 if target_fm:
@@ -3082,6 +3138,24 @@ Respond with a JSON object:
             else:
                 texts.append(str(action))
         return texts
+
+    def _summarize_failure_mode_for_review(self, fm: Dict[str, Any]) -> Dict[str, Any]:
+        """Lean, JSON-safe failure mode summary for AI review responses."""
+        fm_id = fm.get("id")
+        if fm_id is not None:
+            fm_id = str(fm_id)
+        return {
+            "id": fm_id,
+            "failure_mode": fm.get("failure_mode"),
+            "equipment": fm.get("equipment"),
+            "category": fm.get("category"),
+            "mechanism": fm.get("mechanism"),
+            "similarity_score": fm.get("similarity_score", 0),
+            "rpn": fm.get("rpn"),
+            "recommended_actions": self._action_texts_from_fm_actions(
+                fm.get("recommended_actions") or []
+            ),
+        }
 
     def _resolve_replace_action_index(
         self,
@@ -3161,7 +3235,10 @@ Respond with a JSON object:
         if not target_id:
             return enriched
 
-        target_fm = next((fm for fm in similar_failure_modes if fm.get("id") == target_id), None)
+        target_fm = next(
+            (fm for fm in similar_failure_modes if str(fm.get("id")) == str(target_id)),
+            None,
+        )
         existing_actions = (target_fm or {}).get("recommended_actions") or []
         action_texts = self._action_texts_from_fm_actions(existing_actions)
 

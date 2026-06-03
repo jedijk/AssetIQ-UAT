@@ -430,7 +430,12 @@ export const AIReviewModal = ({ isOpen, onClose, sessionId, onComplete }) => {
       toast.success(`AI review completed for ${result.total_reviewed} tasks`);
     } catch (error) {
       console.error("AI review failed:", error);
-      toast.error("AI review failed. Please try again.");
+      const detail = error?.response?.data?.detail;
+      toast.error(
+        typeof detail === "string" && detail
+          ? detail
+          : "AI review failed. Please try again."
+      );
     } finally {
       setReviewing(false);
     }
