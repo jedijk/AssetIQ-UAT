@@ -1830,18 +1830,18 @@ Respond in JSON format:
                 all_names.append((name.lower(), n))
         
         for task in tasks:
-            haystack_for_tags = " ".join([
-                str(task.get("equipment_tag") or task.get("asset") or ""),
-                str(task.get("equipment_description") or task.get("component") or ""),
-                str(task.get("task_description") or task.get("original_task") or ""),
-            ])
-            tag_refs = self._extract_tag_refs(haystack_for_tags)
+            # Priority 1: tag exact match — ONLY use the explicit Tag column from the
+            # upload (`equipment_tag` / `asset`). We deliberately do NOT mine the
+            # description or task text for tag-like patterns.
+            tag_field = (
+                str(task.get("equipment_tag") or task.get("asset") or "").strip()
+            )
             
             match = None
             
-            # Priority 1: tag exact match
-            for ref in tag_refs:
-                hit = by_tag.get(ref.upper())
+            if tag_field:
+                # Try exact tag match (single token or the whole field)
+                hit = by_tag.get(tag_field.upper())
                 if hit:
                     match = {
                         "equipment_id": hit.get("id"),
@@ -1850,7 +1850,20 @@ Respond in JSON format:
                         "match_type": "tag_exact",
                         "confidence": 100,
                     }
-                    break
+                else:
+                    # If the tag column contains multiple tokens (e.g. "P-1001, P-1002"),
+                    # try each token individually.
+                    for token in self._extract_tag_refs(tag_field):
+                        hit = by_tag.get(token.upper())
+                        if hit:
+                            match = {
+                                "equipment_id": hit.get("id"),
+                                "tag": hit.get("tag"),
+                                "name": hit.get("name"),
+                                "match_type": "tag_exact",
+                                "confidence": 100,
+                            }
+                            break
             
             # Priority 2: description fuzzy match
             if not match:
