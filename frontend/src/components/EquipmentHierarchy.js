@@ -287,9 +287,11 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
 
   // Get equipment type name
   const getEquipmentTypeName = () => {
-    if (!node.equipment_type) return null;
-    const eqType = equipmentTypes?.find(et => et.id === node.equipment_type);
-    return eqType?.name || node.equipment_type;
+    // Check both equipment_type_id and equipment_type fields
+    const typeId = node.equipment_type_id || node.equipment_type;
+    if (!typeId) return null;
+    const eqType = equipmentTypes?.find(et => et.id === typeId);
+    return eqType?.name || node.equipment_type_name || typeId;
   };
 
   // Get discipline display name
@@ -298,9 +300,15 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
       mechanical: { label: t ? t("library.mechanical") : "Mechanical", color: "bg-blue-100 text-blue-700" },
       electrical: { label: t ? t("library.electrical") : "Electrical", color: "bg-yellow-100 text-yellow-700" },
       instrumentation: { label: t ? t("library.instrumentation") : "Instrumentation", color: "bg-purple-100 text-purple-700" },
-      process: { label: t ? t("library.process") : "Process", color: "bg-green-100 text-green-700" }
+      process: { label: t ? t("library.process") : "Process", color: "bg-green-100 text-green-700" },
+      laboratory: { label: t ? t("library.laboratory") : "Laboratory", color: "bg-cyan-100 text-cyan-700" },
     };
-    return disciplines[node.discipline] || null;
+    // Check if discipline exists directly or in node data
+    const disc = node.discipline;
+    if (disc && disciplines[disc]) {
+      return disciplines[disc];
+    }
+    return null;
   };
 
   // Get criticality details
