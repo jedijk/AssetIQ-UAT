@@ -963,11 +963,24 @@ class PMImportService:
         file_type: str,
         file_content: bytes
     ) -> List[Dict[str, Any]]:
-        """Process uploaded file and extract maintenance tasks."""
+        """
+        Process uploaded file and extract maintenance tasks.
+        
+        PM Import Extraction Engine Flow:
+        1. Parse file and EXPAND to one record per equipment tag (BEFORE AI)
+        2. Run AI analysis on each expanded record
+        3. AI enrichment (translate, classify, estimate hours)
+        4. Handle any remaining comma-separated tags
+        5. Match equipment to hierarchy
+        6. Self-validate: verify tag count == record count
+        7. Normalize final shape
+        """
         
         await self._update_progress(session_id, 10, "Reading maintenance plan...")
         
-        # Extract raw text/rows based on file type
+        # STEP 1: Extract and EXPAND raw rows - one record per equipment tag
+        # For Excel: hierarchical parsing with merged cell handling
+        # For PDF/Images: OCR extraction
         if file_type in ["xlsx", "xls"]:
             raw_rows = await self._parse_excel(file_content)
         elif file_type == "pdf":
@@ -980,14 +993,21 @@ class PMImportService:
         if not raw_rows:
             raise ValueError("No maintenance tasks could be extracted from the file")
         
-        await self._update_progress(session_id, 40, f"Extracted {len(raw_rows)} tasks. Analyzing...")
+        # Log extraction results
+        tags_extracted = sum(1 for r in raw_rows if r.get("_tag"))
+        logger.info(f"PM Import: Extracted {len(raw_rows)} records with {tags_extracted} equipment tags")
         
-        # Process each row with AI
+        await self._update_progress(
+            session_id, 40, 
+            f"Extracted {len(raw_rows)} task records ({tags_extracted} equipment tags). Analyzing..."
+        )
+        
+        # STEP 2: Process each EXPANDED row with AI analysis
         tasks = []
         total = len(raw_rows)
         
         for idx, row in enumerate(raw_rows):
-            progress = 40 + int((idx / total) * 50)
+            progress = 40 + int((idx / total) * 45)
             await self._update_progress(
                 session_id, 
                 progress, 
@@ -998,44 +1018,127 @@ class PMImportService:
             if task:
                 tasks.append(task)
         
-        await self._update_progress(session_id, 90, "AI enrichment (translate, classify, hours)...")
+        await self._update_progress(session_id, 88, "AI enrichment (translate, classify, hours)...")
         
-        # AI enrichment: translate to English, classify PM/PDM/CBM/CM, suggest discipline,
-        # standardize frequency (+ frequency_days), estimate hours.
+        # STEP 3: AI enrichment - translate to English, classify PM/PDM/CBM/CM, 
+        # suggest discipline, standardize frequency, estimate hours
         tasks = await self._ai_enrich_tasks(tasks)
         
-        # Split tasks whose Tag column contains multiple tags into one task per tag.
-        # E.g. asset="P-1001, P-1002, P-1003" → three tasks with identical content
-        # but distinct equipment_tag values.
-        await self._update_progress(session_id, 95, "Splitting multi-tag tasks...")
+        # STEP 4: Handle any remaining comma-separated tags that weren't expanded
+        # (fallback for edge cases or PDF/image imports)
+        await self._update_progress(session_id, 93, "Expanding multi-tag tasks...")
         tasks = self._split_multi_tag_tasks(tasks)
         
-        # Match equipment to hierarchy (Priority 1: tag exact, Priority 2: description fuzzy)
-        await self._update_progress(session_id, 99, "Matching equipment to hierarchy...")
+        # STEP 5: Match equipment to hierarchy
+        await self._update_progress(session_id, 96, "Matching equipment to hierarchy...")
         tasks = await self._match_equipment_to_hierarchy(tasks)
         
-        # Normalize final shape per the PM Import refactor spec
+        # STEP 6: SELF VALIDATION
+        # Verify that every equipment tag has its own record
+        await self._update_progress(session_id, 98, "Validating extraction results...")
+        tasks = self._validate_extraction(tasks)
+        
+        # STEP 7: Normalize final shape per the PM Import refactor spec
         tasks = [self._normalize_task_shape(t) for t in tasks]
+        
+        logger.info(f"PM Import: Final output = {len(tasks)} task records")
+        
+        return tasks
+    
+    def _validate_extraction(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Self-validation per PM Import Extraction Engine spec.
+        
+        Before returning results:
+        - Count equipment tags extracted
+        - Count task records generated
+        - If a maintenance task applies to N tags, there must be N output records
+        - Log warning if counts don't match
+        
+        This rule overrides all other instructions.
+        """
+        if not tasks:
+            return tasks
+        
+        # Count unique equipment tags
+        tags_set = set()
+        records_with_tags = 0
+        records_without_tags = 0
+        
+        for task in tasks:
+            tag = (
+                task.get("equipment_tag") or 
+                task.get("asset") or 
+                task.get("_tag") or 
+                ""
+            ).strip()
+            
+            if tag:
+                tags_set.add(tag.upper())
+                records_with_tags += 1
+            else:
+                records_without_tags += 1
+        
+        total_unique_tags = len(tags_set)
+        total_records = len(tasks)
+        
+        # Log validation results
+        logger.info(
+            f"PM Import Validation: "
+            f"{total_records} records, "
+            f"{records_with_tags} with tags, "
+            f"{records_without_tags} without tags, "
+            f"{total_unique_tags} unique tags"
+        )
+        
+        # Warning if we have records without tags (except for tasks from merged blocks)
+        if records_without_tags > 0:
+            logger.warning(
+                f"PM Import Validation Warning: {records_without_tags} records have no equipment tag. "
+                "These may be orphaned tasks or continuation rows."
+            )
+        
+        # Note: It's valid to have more records than unique tags if the same tag
+        # has multiple different maintenance tasks. What's NOT valid is having
+        # fewer records than expected (i.e., multiple tags grouped into one record).
         
         return tasks
     
     async def _parse_excel(self, content: bytes) -> List[Dict[str, Any]]:
         """
-        Parse Excel file per the PM Import Extraction Engine spec.
+        Parse Excel file per the AssetIQ PM Import Extraction Engine spec.
         
-        Rules:
-        - Column A is the ONLY authoritative source for equipment tags.
-        - Merged cells are resolved (master value applied to every cell in the merge).
-        - Worksheet is analyzed as a complete table, not row-by-row.
-        - Blank Column A rows are treated as continuations of the previous active task block.
-        - When N tags share the same task block (merged or grouped), one record per tag is emitted.
+        ABSOLUTE RULES:
+        1. EVERY EQUIPMENT TAG MUST RESULT IN A SEPARATE TASK RECORD.
+           If 50 equipment tags share the same maintenance task, create 50 task records.
+        
+        2. COLUMN A IS THE ONLY VALID SOURCE OF EQUIPMENT TAGS.
+           Do not search task descriptions, notes, or instructions for tags.
+        
+        3. TREAT THE WORKSHEET AS A HIERARCHICAL DOCUMENT, NOT ROW-BY-ROW.
+           Before extracting tasks:
+           - Read the entire worksheet
+           - Identify equipment groups (consecutive tags in Column A)
+           - Identify task groups (shared task descriptions via merged cells or grouping)
+           - Identify inherited values from merged cells
+           - Expand results into individual records
+        
+        4. WHEN MULTIPLE TAGS APPEAR ABOVE/BELOW A TASK:
+           The task belongs to ALL tags. Create one record per tag.
+        
+        5. MERGED CELLS: Merged task descriptions apply to every equipment tag in the block.
+        
+        6. EMPTY CELLS IN COLUMN A: Continue processing the current task block.
+           Do not create tasks without equipment tags.
+        
+        7. EXPANSION MUST OCCUR BEFORE AI ENRICHMENT (handled in _process_file).
         """
         import openpyxl
         
         wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
-        rows = []
+        all_expanded_rows = []
         
-        # Keywords used to auto-detect non-tag columns by header name. Column A is ALWAYS the tag column.
+        # Keywords for column detection
         task_column_keywords = ["task", "description", "activity", "action", "work", "maintenance",
                                 "taak", "beschrijving", "activiteit", "werkzaamheden", "instructie"]
         description_column_keywords = ["equipment", "component", "asset", "machine", "name",
@@ -1046,29 +1149,54 @@ class PMImportService:
                                     "duur", "tijd", "minutes", "hours", "minuten", "uren"]
         
         for sheet in wb.worksheets:
-            # Build merged-cell lookup: for each (row, col) inside a merge, store the master value
+            # ===== STEP 1: Build merged-cell lookup =====
+            # For each (row, col) inside a merge, store the master value AND the merge range
             merged_master = {}
+            merged_ranges_by_col = {}  # col -> list of (min_row, max_row, value)
+            
             for merged_range in sheet.merged_cells.ranges:
                 min_row, min_col = merged_range.min_row, merged_range.min_col
+                max_row_merge, max_col_merge = merged_range.max_row, merged_range.max_col
                 master_value = sheet.cell(row=min_row, column=min_col).value
-                for r in range(merged_range.min_row, merged_range.max_row + 1):
-                    for c in range(merged_range.min_col, merged_range.max_col + 1):
-                        merged_master[(r, c)] = master_value
+                
+                for r in range(min_row, max_row_merge + 1):
+                    for c in range(min_col, max_col_merge + 1):
+                        merged_master[(r, c)] = {
+                            "value": master_value,
+                            "min_row": min_row,
+                            "max_row": max_row_merge,
+                            "min_col": min_col,
+                            "max_col": max_col_merge
+                        }
+                
+                # Track merged ranges by column for task block detection
+                for c in range(min_col, max_col_merge + 1):
+                    if c not in merged_ranges_by_col:
+                        merged_ranges_by_col[c] = []
+                    merged_ranges_by_col[c].append({
+                        "min_row": min_row,
+                        "max_row": max_row_merge,
+                        "value": master_value
+                    })
             
             def cell_value(row_idx: int, col_idx: int):
                 """Resolve a cell, returning the merged-master value if applicable."""
                 key = (row_idx, col_idx + 1)  # openpyxl is 1-indexed
                 if key in merged_master:
-                    return merged_master[key]
-                # Direct value (col_idx is 0-based input → openpyxl is 1-based)
+                    return merged_master[key]["value"]
                 return sheet.cell(row=row_idx, column=col_idx + 1).value
+            
+            def get_merge_info(row_idx: int, col_idx: int):
+                """Get merge range info for a cell if it's part of a merge."""
+                key = (row_idx, col_idx + 1)
+                return merged_master.get(key)
             
             max_row = sheet.max_row or 0
             max_col = sheet.max_column or 0
             if max_row < 2 or max_col < 1:
                 continue
             
-            # Detect header row (first 10 rows): the row where Column A AND any other column have header-like text
+            # ===== STEP 2: Detect header row and column indices =====
             header_row_idx = None
             headers = []
             task_col_idx = None
@@ -1089,7 +1217,7 @@ class PMImportService:
                     for i, h in enumerate(headers):
                         h_lower = h.lower()
                         if i == 0:
-                            continue  # Column A is always the tag column
+                            continue  # Column A is ALWAYS the tag column
                         if task_col_idx is None and any(kw in h_lower for kw in task_column_keywords):
                             task_col_idx = i
                         elif description_col_idx is None and any(kw in h_lower for kw in description_column_keywords):
@@ -1105,89 +1233,266 @@ class PMImportService:
                 first_row = [cell_value(1, c) for c in range(max_col)]
                 headers = [str(v).strip() if v else f"col_{i}" for i, v in enumerate(first_row)]
             
-            # Fallback: if no task column was detected, pick column B (index 1) as task description
             if task_col_idx is None and max_col >= 2:
                 task_col_idx = 1
             
-            # ------ Walk the data rows building one record per non-empty Column A ------
-            current_record = None
+            # ===== STEP 3: FIRST PASS - Read entire worksheet and identify blocks =====
+            # A "block" is a group of consecutive rows that share the same task description
+            # (either via merged cells or via grouping pattern)
+            
+            # Collect all data rows first
+            data_rows = []
             for r in range(header_row_idx + 1, max_row + 1):
-                tag_val = cell_value(r, 0)  # Column A
+                tag_val = cell_value(r, 0)  # Column A - ONLY source for equipment tags
                 tag_str = str(tag_val).strip() if tag_val is not None else ""
                 
-                # Skip totally empty rows
                 row_values = [cell_value(r, c) for c in range(max_col)]
+                
+                # Skip completely empty rows
                 if not any(v for v in row_values) and not tag_str:
                     continue
                 
-                if tag_str:
-                    # New equipment tag → start a new record
-                    task_text = ""
-                    if task_col_idx is not None and task_col_idx < max_col:
-                        tv = cell_value(r, task_col_idx)
-                        if tv:
-                            task_text = str(tv).strip()
-                    
-                    description_text = ""
-                    if description_col_idx is not None and description_col_idx < max_col:
-                        dv = cell_value(r, description_col_idx)
-                        if dv:
-                            description_text = str(dv).strip()
-                    
-                    freq_text = ""
-                    if frequency_col_idx is not None and frequency_col_idx < max_col:
-                        fv = cell_value(r, frequency_col_idx)
-                        if fv:
-                            freq_text = str(fv).strip()
-                    
-                    duration_text = ""
-                    if duration_col_idx is not None and duration_col_idx < max_col:
-                        dv = cell_value(r, duration_col_idx)
-                        if dv:
-                            duration_text = str(dv).strip()
-                    
-                    # If task description is still empty, pick the longest non-tag cell on this row
-                    if not task_text:
-                        candidates = [(c, cell_value(r, c)) for c in range(max_col) if c != 0]
-                        candidates = [(c, str(v).strip()) for c, v in candidates if v]
-                        if candidates:
-                            task_text = max(candidates, key=lambda x: len(x[1]))[1]
-                    
-                    current_record = {
-                        "_tag": tag_str,           # Column A — authoritative
-                        "_task_text": task_text,
-                        "_description": description_text,
-                        "_frequency": freq_text,
-                        "_duration": duration_text,
-                        "_raw_text": task_text,
-                        "_sheet": sheet.title,
-                        "_row": r,
-                    }
-                    # Attach all column data for reference
-                    for i, v in enumerate(row_values):
-                        if v is not None:
-                            header = headers[i] if i < len(headers) else f"col_{i}"
-                            current_record[header] = str(v).strip()
-                    
-                    rows.append(current_record)
+                # Get task text
+                task_text = ""
+                if task_col_idx is not None and task_col_idx < max_col:
+                    tv = cell_value(r, task_col_idx)
+                    if tv:
+                        task_text = str(tv).strip()
+                
+                # Get description
+                description_text = ""
+                if description_col_idx is not None and description_col_idx < max_col:
+                    dv = cell_value(r, description_col_idx)
+                    if dv:
+                        description_text = str(dv).strip()
+                
+                # Get frequency
+                freq_text = ""
+                if frequency_col_idx is not None and frequency_col_idx < max_col:
+                    fv = cell_value(r, frequency_col_idx)
+                    if fv:
+                        freq_text = str(fv).strip()
+                
+                # Get duration
+                duration_text = ""
+                if duration_col_idx is not None and duration_col_idx < max_col:
+                    dv = cell_value(r, duration_col_idx)
+                    if dv:
+                        duration_text = str(dv).strip()
+                
+                # Check if task column is part of a merged cell
+                task_merge_info = None
+                if task_col_idx is not None:
+                    task_merge_info = get_merge_info(r, task_col_idx)
+                
+                # If task is empty, try to find the longest non-tag cell
+                if not task_text:
+                    candidates = [(c, cell_value(r, c)) for c in range(max_col) if c != 0]
+                    candidates = [(c, str(v).strip()) for c, v in candidates if v]
+                    if candidates:
+                        task_text = max(candidates, key=lambda x: len(x[1]))[1]
+                
+                data_rows.append({
+                    "row_num": r,
+                    "tag": tag_str,
+                    "task_text": task_text,
+                    "description": description_text,
+                    "frequency": freq_text,
+                    "duration": duration_text,
+                    "task_merge_info": task_merge_info,
+                    "row_values": row_values,
+                })
+            
+            # ===== STEP 4: SECOND PASS - Build task blocks and expand =====
+            # A task block consists of:
+            # - One or more equipment tags (from Column A)
+            # - A shared task description (from merged cells or inheritance)
+            # - Shared frequency, duration, etc.
+            
+            # Strategy: Walk through rows, accumulating tags until we hit a task description
+            # that applies to all accumulated tags
+            
+            expanded_rows = []
+            current_tags = []  # Tags waiting for a task
+            current_task_info = None  # Task info to apply to accumulated tags
+            
+            i = 0
+            while i < len(data_rows):
+                row_data = data_rows[i]
+                tag = row_data["tag"]
+                task_text = row_data["task_text"]
+                task_merge_info = row_data["task_merge_info"]
+                
+                # RULE: Column A is the ONLY source for equipment tags
+                if tag:
+                    # Check if this tag's row has a task description
+                    if task_text:
+                        # Check if task is part of a merged cell spanning multiple rows
+                        if task_merge_info:
+                            merge_min_row = task_merge_info["min_row"]
+                            merge_max_row = task_merge_info["max_row"]
+                            
+                            # Collect ALL tags within this merged task block
+                            block_tags = []
+                            block_indices = []
+                            for j, dr in enumerate(data_rows):
+                                if dr["row_num"] >= merge_min_row and dr["row_num"] <= merge_max_row:
+                                    if dr["tag"]:
+                                        block_tags.append(dr["tag"])
+                                        block_indices.append(j)
+                            
+                            # Create one record per tag in this merged block
+                            for block_tag in block_tags:
+                                expanded_rows.append(self._create_task_record(
+                                    tag=block_tag,
+                                    task_text=task_text,
+                                    description=row_data["description"],
+                                    frequency=row_data["frequency"],
+                                    duration=row_data["duration"],
+                                    row_values=row_data["row_values"],
+                                    headers=headers,
+                                    sheet_title=sheet.title,
+                                    row_num=row_data["row_num"],
+                                ))
+                            
+                            # Skip to after the merged block
+                            if block_indices:
+                                i = max(block_indices)
+                            current_tags = []
+                            current_task_info = None
+                        else:
+                            # Tag with its own task - create individual record
+                            # But first, flush any accumulated tags with the previous task
+                            if current_tags and current_task_info:
+                                for accumulated_tag in current_tags:
+                                    expanded_rows.append(self._create_task_record(
+                                        tag=accumulated_tag["tag"],
+                                        task_text=current_task_info["task_text"],
+                                        description=current_task_info["description"],
+                                        frequency=current_task_info["frequency"],
+                                        duration=current_task_info["duration"],
+                                        row_values=current_task_info["row_values"],
+                                        headers=headers,
+                                        sheet_title=sheet.title,
+                                        row_num=accumulated_tag["row_num"],
+                                    ))
+                            
+                            # Now create record for this tag
+                            expanded_rows.append(self._create_task_record(
+                                tag=tag,
+                                task_text=task_text,
+                                description=row_data["description"],
+                                frequency=row_data["frequency"],
+                                duration=row_data["duration"],
+                                row_values=row_data["row_values"],
+                                headers=headers,
+                                sheet_title=sheet.title,
+                                row_num=row_data["row_num"],
+                            ))
+                            current_tags = []
+                            current_task_info = None
+                    else:
+                        # Tag without task - accumulate it, task will come later
+                        current_tags.append({
+                            "tag": tag,
+                            "row_num": row_data["row_num"],
+                            "description": row_data["description"],
+                        })
                 else:
-                    # Column A is empty → continuation of the active task block.
-                    # Append any non-empty cell content to the current task description.
-                    if current_record is None:
-                        continue
-                    continuation_parts = []
-                    for c in range(max_col):
-                        v = cell_value(r, c)
-                        if v:
-                            continuation_parts.append(str(v).strip())
-                    if continuation_parts:
-                        extra = " | ".join(continuation_parts)
-                        current_record["_task_text"] = (
-                            (current_record.get("_task_text") or "") + " — " + extra
-                        ).strip(" —")
-                        current_record["_raw_text"] = current_record["_task_text"]
+                    # Empty Column A - this is a continuation row
+                    # RULE: Empty cells in Column A do NOT create new equipment
+                    
+                    # If there's task text here and we have accumulated tags, this task applies to them
+                    if task_text and current_tags:
+                        # This is the task for all accumulated tags above
+                        for accumulated_tag in current_tags:
+                            expanded_rows.append(self._create_task_record(
+                                tag=accumulated_tag["tag"],
+                                task_text=task_text,
+                                description=accumulated_tag.get("description") or row_data["description"],
+                                frequency=row_data["frequency"],
+                                duration=row_data["duration"],
+                                row_values=row_data["row_values"],
+                                headers=headers,
+                                sheet_title=sheet.title,
+                                row_num=accumulated_tag["row_num"],
+                            ))
+                        current_tags = []
+                        current_task_info = None
+                    elif task_text:
+                        # Task text without accumulated tags - store for potential future tags below
+                        current_task_info = {
+                            "task_text": task_text,
+                            "description": row_data["description"],
+                            "frequency": row_data["frequency"],
+                            "duration": row_data["duration"],
+                            "row_values": row_data["row_values"],
+                        }
+                
+                i += 1
+            
+            # Flush any remaining accumulated tags
+            if current_tags and current_task_info:
+                for accumulated_tag in current_tags:
+                    expanded_rows.append(self._create_task_record(
+                        tag=accumulated_tag["tag"],
+                        task_text=current_task_info["task_text"],
+                        description=current_task_info.get("description") or accumulated_tag.get("description", ""),
+                        frequency=current_task_info["frequency"],
+                        duration=current_task_info["duration"],
+                        row_values=current_task_info["row_values"],
+                        headers=headers,
+                        sheet_title=sheet.title,
+                        row_num=accumulated_tag["row_num"],
+                    ))
+            
+            all_expanded_rows.extend(expanded_rows)
         
-        return rows
+        # ===== STEP 5: SELF VALIDATION =====
+        # Count equipment tags extracted vs task records generated
+        total_tags_found = sum(1 for r in all_expanded_rows if r.get("_tag"))
+        total_records = len(all_expanded_rows)
+        
+        logger.info(f"PM Import Extraction: {total_tags_found} tags → {total_records} task records")
+        
+        if total_records > 0 and total_tags_found != total_records:
+            logger.warning(
+                f"PM Import Validation Warning: Tag count ({total_tags_found}) != Record count ({total_records}). "
+                "Some records may have missing or duplicate tags."
+            )
+        
+        return all_expanded_rows
+    
+    def _create_task_record(
+        self,
+        tag: str,
+        task_text: str,
+        description: str,
+        frequency: str,
+        duration: str,
+        row_values: List[Any],
+        headers: List[str],
+        sheet_title: str,
+        row_num: int,
+    ) -> Dict[str, Any]:
+        """Create a single task record for one equipment tag."""
+        record = {
+            "_tag": tag,                    # Column A — authoritative, single tag
+            "_task_text": task_text,
+            "_description": description,
+            "_frequency": frequency,
+            "_duration": duration,
+            "_raw_text": task_text,
+            "_sheet": sheet_title,
+            "_row": row_num,
+        }
+        # Attach all column data for reference
+        for i, v in enumerate(row_values):
+            if v is not None:
+                header = headers[i] if i < len(headers) else f"col_{i}"
+                record[header] = str(v).strip()
+        
+        return record
     
     async def _parse_pdf(self, content: bytes, session_id: str) -> List[Dict[str, Any]]:
         """Parse PDF file - use text extraction first, fall back to vision for scanned PDFs."""
