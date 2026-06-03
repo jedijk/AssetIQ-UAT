@@ -7,6 +7,16 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **PM Import — Hierarchy / Equipment Type / Failure Mode mapping (VERIFIED)**:
+  - On upload, the pipeline now runs three matchers in addition to AI extraction:
+    - `_match_equipment_to_hierarchy`: maps tasks to `equipment_nodes` by tag (exact) and by name (exact/partial).
+    - `_match_equipment_types`: maps to `custom_equipment_types` library (exact/partial name match).
+    - `_match_with_library` (existing): hardened — also writes `library_failure_mode_ids` (strict, score ≥ 80) and `ai_only_failure_modes` (pending approval).
+  - 3 new columns in PM Import table: **Hierarchy Tag**, **Equipment Type**, **Failure Modes**. Matched cells show coloured chips; unmatched cells show amber "Unmatched" button.
+  - Click any chip to open a unified search dialog (`PMMappingDialog`) for manual override. FM dialog is multi-select (library-only, strict).
+  - New endpoints: `PATCH /api/pm-import/session/{sid}/task/{tid}/mapping`, `GET /api/pm-import/lookup/equipment`, `…/equipment-types`, `…/failure-modes`.
+  - **Verified live**: Brabender → 1T-2001 + Brabender type + 2 lib FMs; Wet Scrubber → 1F-3001-0123 + Wet Scrubber type + 1 lib FM; XYZ-Unknown → Unmatched (correctly).
+
 - [Feb 2026] **PM Import — Task Type mapped to PM/CM/PDM (VERIFIED)**:
   - Task Type column now renders the **action_type** (PM, CM, PDM) with color-coded badges (green/red/purple) instead of the granular sub-type (Inspection/Lubrication/etc.).
   - Edit dialog: Task Type is now a Select with three options (PM — Preventive, CM — Corrective, PDM — Predictive).

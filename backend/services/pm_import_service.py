@@ -1059,6 +1059,14 @@ class PMImportService:
         # Match with existing library
         tasks = await self._match_with_library(tasks)
         
+        # Match equipment types from the Equipment Type Library
+        await self._update_progress(session_id, 97, "Matching equipment types...")
+        tasks = await self._match_equipment_types(tasks)
+        
+        # Match equipment to hierarchy nodes (tag-based + name-based)
+        await self._update_progress(session_id, 99, "Matching equipment to hierarchy...")
+        tasks = await self._match_equipment_to_hierarchy(tasks)
+        
         return tasks
     
     async def _parse_excel(self, content: bytes) -> List[Dict[str, Any]]:
@@ -1773,6 +1781,166 @@ Respond in JSON format:
                 task["library_match"] = {
                     "status": "new_proposed"
                 }
+            
+            # Strict FM library coupling: store only library-backed FM IDs
+            task["library_failure_mode_ids"] = [
+                m["id"] for m in matches if m.get("score", 0) >= 80
+            ]
+            # Track AI-only (non-library) suggestions separately for approval
+            ai_fms = []
+            matched_names_lower = {m.get("name", "").lower() for m in matches}
+            for fm_name in task.get("suggested_failure_modes", []):
+                name = fm_name if isinstance(fm_name, str) else fm_name.get("name", str(fm_name))
+                if name.lower() not in matched_names_lower and name.lower() not in fm_by_name:
+                    ai_fms.append(name)
+            task["ai_only_failure_modes"] = ai_fms
+        
+        return tasks
+    
+    async def _match_equipment_types(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Match each task's component/asset/task text against the Equipment Type Library
+        (`custom_equipment_types` collection). Populates `equipment_type_match` per task:
+            {id, name, discipline, match_type: 'exact'|'partial', score}
+        or None when no match.
+        """
+        types_cursor = self.db.custom_equipment_types.find({})
+        equipment_types = await types_cursor.to_list(500)
+        
+        if not equipment_types:
+            for task in tasks:
+                task["equipment_type_match"] = None
+            return tasks
+        
+        # Pre-index by lowercase name
+        by_name = {}
+        for et in equipment_types:
+            name = (et.get("name") or "").strip().lower()
+            if name:
+                by_name[name] = et
+        
+        for task in tasks:
+            haystack = " ".join([
+                str(task.get("component") or ""),
+                str(task.get("asset") or ""),
+                str(task.get("original_task") or ""),
+            ]).lower()
+            
+            best = None
+            
+            # 1. Exact full-name token match (most reliable)
+            for name, et in by_name.items():
+                # word boundary check
+                if f" {name} " in f" {haystack} " or haystack.startswith(name + " ") or haystack.endswith(" " + name) or haystack == name:
+                    best = {"id": et.get("id"), "name": et.get("name"),
+                            "discipline": et.get("discipline"),
+                            "match_type": "exact", "score": 100}
+                    break
+            
+            # 2. Partial substring match
+            if not best:
+                for name, et in by_name.items():
+                    if len(name) >= 5 and name in haystack:
+                        best = {"id": et.get("id"), "name": et.get("name"),
+                                "discipline": et.get("discipline"),
+                                "match_type": "partial", "score": 70}
+                        break
+            
+            task["equipment_type_match"] = best
+        
+        return tasks
+    
+    async def _match_equipment_to_hierarchy(self, tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Match each task's component/asset/task text against the Equipment Hierarchy
+        (`equipment_nodes` collection) by tag AND by name.
+        
+        Populates per task:
+            equipment_matches: [{id, tag, name, level}]  (de-duplicated)
+            equipment_tag_refs: [str]                    (raw tag tokens extracted)
+            equipment_unmatched_tags: [str]              (tags that did not match any node)
+        """
+        nodes_cursor = self.db.equipment_nodes.find({})
+        nodes = await nodes_cursor.to_list(20000)
+        
+        # Build lookup maps
+        by_tag = {}
+        by_name = {}
+        for n in nodes:
+            tag = (n.get("tag") or "").strip()
+            if tag:
+                by_tag[tag.upper()] = n
+            name = (n.get("name") or "").strip()
+            if name:
+                by_name[name.lower()] = n
+        
+        for task in tasks:
+            raw_text = " ".join([
+                str(task.get("component") or ""),
+                str(task.get("asset") or ""),
+                str(task.get("original_task") or ""),
+            ])
+            tag_refs = self._extract_tag_refs(raw_text)
+            
+            matches = []
+            unmatched = []
+            seen_ids = set()
+            
+            # Tag-based match
+            for ref in tag_refs:
+                hit = by_tag.get(ref.upper())
+                if hit and hit.get("id") not in seen_ids:
+                    seen_ids.add(hit.get("id"))
+                    matches.append({
+                        "id": hit.get("id"),
+                        "tag": hit.get("tag"),
+                        "name": hit.get("name"),
+                        "level": hit.get("level"),
+                        "match_type": "tag",
+                    })
+                elif not hit:
+                    unmatched.append(ref)
+            
+            # Name-based fuzzy match on component/asset (only if no tag match yet)
+            if not matches:
+                candidates = [
+                    str(task.get("component") or "").strip().lower(),
+                    str(task.get("asset") or "").strip().lower(),
+                ]
+                for cand in candidates:
+                    if not cand or len(cand) < 3:
+                        continue
+                    if cand in by_name:
+                        hit = by_name[cand]
+                        if hit.get("id") not in seen_ids:
+                            seen_ids.add(hit.get("id"))
+                            matches.append({
+                                "id": hit.get("id"),
+                                "tag": hit.get("tag"),
+                                "name": hit.get("name"),
+                                "level": hit.get("level"),
+                                "match_type": "name_exact",
+                            })
+                            break
+                    # partial contains match
+                    for name_lower, n in by_name.items():
+                        if len(name_lower) >= 4 and (cand in name_lower or name_lower in cand):
+                            if n.get("id") not in seen_ids:
+                                seen_ids.add(n.get("id"))
+                                matches.append({
+                                    "id": n.get("id"),
+                                    "tag": n.get("tag"),
+                                    "name": n.get("name"),
+                                    "level": n.get("level"),
+                                    "match_type": "name_partial",
+                                })
+                                break
+                    if matches:
+                        break
+            
+            task["equipment_tag_refs"] = tag_refs
+            task["equipment_matches"] = matches
+            task["equipment_unmatched_tags"] = unmatched
         
         return tasks
     

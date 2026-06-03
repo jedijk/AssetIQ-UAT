@@ -300,6 +300,173 @@ async def delete_task(
     return {"success": True, "stats": result["stats"]}
 
 
+class TaskMappingRequest(BaseModel):
+    """Request model for manually mapping a task to hierarchy / type / failure modes."""
+    equipment_id: Optional[str] = None
+    equipment_type_id: Optional[str] = None
+    failure_mode_ids: Optional[List[str]] = None
+
+
+@router.patch("/session/{session_id}/task/{task_id}/mapping")
+async def update_task_mapping(
+    session_id: str,
+    task_id: str,
+    body: TaskMappingRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Manually map an imported task to an equipment hierarchy node, equipment type,
+    and/or library failure modes (for tasks whose automatic match is empty/wrong).
+    """
+    
+    session = await db.pm_import_sessions.find_one({"session_id": session_id})
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    tasks = session.get("tasks_extracted", [])
+    matched = False
+    
+    for task in tasks:
+        if task.get("task_id") != task_id:
+            continue
+        matched = True
+        
+        # Equipment hierarchy override
+        if body.equipment_id is not None:
+            node = await db.equipment_nodes.find_one({"id": body.equipment_id})
+            if not node:
+                raise HTTPException(status_code=400, detail="Equipment node not found")
+            task["manual_equipment_id"] = body.equipment_id
+            task["equipment_matches"] = [{
+                "id": node.get("id"),
+                "tag": node.get("tag"),
+                "name": node.get("name"),
+                "level": node.get("level"),
+                "match_type": "manual",
+            }]
+            task["equipment_unmatched_tags"] = []
+        
+        # Equipment type override
+        if body.equipment_type_id is not None:
+            et = await db.custom_equipment_types.find_one({"id": body.equipment_type_id})
+            if not et:
+                raise HTTPException(status_code=400, detail="Equipment type not found")
+            task["manual_equipment_type_id"] = body.equipment_type_id
+            task["equipment_type_match"] = {
+                "id": et.get("id"),
+                "name": et.get("name"),
+                "discipline": et.get("discipline"),
+                "match_type": "manual",
+                "score": 100,
+            }
+        
+        # Failure mode library overrides (strict — only library IDs accepted)
+        if body.failure_mode_ids is not None:
+            valid_ids = []
+            for fm_id in body.failure_mode_ids:
+                fm = await db.failure_modes.find_one({"id": fm_id})
+                if not fm:
+                    # try _id lookup
+                    try:
+                        from bson import ObjectId
+                        fm = await db.failure_modes.find_one({"_id": ObjectId(fm_id)})
+                    except Exception:
+                        fm = None
+                if fm:
+                    valid_ids.append(fm_id)
+            task["library_failure_mode_ids"] = valid_ids
+            task["approved_failure_mode_ids"] = valid_ids
+        
+        task["updated_at"] = datetime.now(timezone.utc).isoformat()
+        break
+    
+    if not matched:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    await db.pm_import_sessions.update_one(
+        {"session_id": session_id},
+        {"$set": {
+            "tasks_extracted": tasks,
+            "updated_at": datetime.now(timezone.utc),
+        }}
+    )
+    
+    return {"success": True}
+
+
+@router.get("/lookup/equipment")
+async def lookup_equipment(
+    q: Optional[str] = None,
+    limit: int = 50,
+    current_user: dict = Depends(get_current_user)
+):
+    """Search equipment hierarchy nodes by tag or name (for manual mapping dropdown)."""
+    query = {}
+    if q:
+        query = {"$or": [
+            {"tag": {"$regex": q, "$options": "i"}},
+            {"name": {"$regex": q, "$options": "i"}},
+        ]}
+    cursor = db.equipment_nodes.find(query).limit(limit)
+    items = []
+    async for n in cursor:
+        items.append({
+            "id": n.get("id"),
+            "tag": n.get("tag"),
+            "name": n.get("name"),
+            "level": n.get("level"),
+        })
+    return {"items": items}
+
+
+@router.get("/lookup/equipment-types")
+async def lookup_equipment_types(
+    q: Optional[str] = None,
+    limit: int = 100,
+    current_user: dict = Depends(get_current_user)
+):
+    """Search equipment types library (for manual mapping dropdown)."""
+    query = {}
+    if q:
+        query = {"name": {"$regex": q, "$options": "i"}}
+    cursor = db.custom_equipment_types.find(query).limit(limit)
+    items = []
+    async for et in cursor:
+        items.append({
+            "id": et.get("id"),
+            "name": et.get("name"),
+            "discipline": et.get("discipline"),
+            "category": et.get("category"),
+        })
+    return {"items": items}
+
+
+@router.get("/lookup/failure-modes")
+async def lookup_failure_modes(
+    q: Optional[str] = None,
+    limit: int = 100,
+    current_user: dict = Depends(get_current_user)
+):
+    """Search Failure Mode Library entries (for strict mapping dropdown)."""
+    query = {}
+    if q:
+        query = {"$or": [
+            {"failure_mode": {"$regex": q, "$options": "i"}},
+            {"equipment": {"$regex": q, "$options": "i"}},
+        ]}
+    cursor = db.failure_modes.find(query).limit(limit)
+    items = []
+    async for fm in cursor:
+        fm_id = fm.get("id") or str(fm.get("_id"))
+        items.append({
+            "id": fm_id,
+            "failure_mode": fm.get("failure_mode"),
+            "equipment": fm.get("equipment"),
+            "category": fm.get("category"),
+        })
+    return {"items": items}
+
+
 @router.post("/session/{session_id}/task/{task_id}/select-match")
 async def select_match(
     session_id: str,
@@ -698,6 +865,20 @@ async def list_all_tasks(
                 "frequency": task.get("frequency") or "",
                 "review_status": task.get("review_status") or "pending",
                 "confidence_score": task.get("confidence_score"),
+                # === MAPPING DATA ===
+                # Hierarchy node matches (from equipment_nodes collection)
+                "equipment_matches": task.get("equipment_matches") or [],
+                "equipment_unmatched_tags": task.get("equipment_unmatched_tags") or [],
+                # Manual hierarchy override
+                "manual_equipment_id": task.get("manual_equipment_id"),
+                # Equipment Type match (from custom_equipment_types library)
+                "equipment_type_match": task.get("equipment_type_match"),
+                "manual_equipment_type_id": task.get("manual_equipment_type_id"),
+                # Failure Mode Library (strict)
+                "library_failure_mode_ids": task.get("library_failure_mode_ids") or [],
+                "ai_only_failure_modes": task.get("ai_only_failure_modes") or [],
+                "library_match": task.get("library_match") or {},
+                "approved_failure_mode_ids": task.get("approved_failure_mode_ids") or [],
             })
     
     return {

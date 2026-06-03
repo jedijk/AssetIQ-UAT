@@ -78,6 +78,38 @@ export const pmImportAPI = {
   },
 
   /**
+   * Manually map a task to equipment hierarchy node / type / library failure modes.
+   */
+  updateMapping: async (sessionId, taskId, payload) => {
+    const response = await api.patch(`/pm-import/session/${sessionId}/task/${taskId}/mapping`, payload);
+    return response.data;
+  },
+
+  /**
+   * Search equipment hierarchy nodes.
+   */
+  lookupEquipment: async (q = '') => {
+    const response = await api.get(`/pm-import/lookup/equipment`, { params: { q, limit: 50 } });
+    return response.data.items || [];
+  },
+
+  /**
+   * Search equipment type library.
+   */
+  lookupEquipmentTypes: async (q = '') => {
+    const response = await api.get(`/pm-import/lookup/equipment-types`, { params: { q, limit: 100 } });
+    return response.data.items || [];
+  },
+
+  /**
+   * Search failure mode library.
+   */
+  lookupFailureModes: async (q = '') => {
+    const response = await api.get(`/pm-import/lookup/failure-modes`, { params: { q, limit: 100 } });
+    return response.data.items || [];
+  },
+
+  /**
    * Bulk actions on tasks
    * @param {string} sessionId 
    * @param {string} action - "accept", "reject", or "accept_high_confidence"
