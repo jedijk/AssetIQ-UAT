@@ -2779,26 +2779,15 @@ Respond in JSON format:
     ) -> List[Dict[str, Any]]:
         """Find similar failure modes from the library."""
         
-        # Build search query
-        query = {}
-        
-        # If we have equipment_type_id, prioritize those
-        if equipment_type_id:
-            query["$or"] = [
-                {"equipment_type_ids": equipment_type_id},
-                {"equipment_type_ids": {"$exists": False}},
-                {"equipment_type_ids": []}
-            ]
-        
-        # Get failure modes
+        # Get all failure modes (we'll score them all)
         cursor = self.failure_modes_collection.find(
-            query,
+            {},
             {"_id": 0, "id": 1, "failure_mode": 1, "equipment": 1, "category": 1, 
              "mechanism": 1, "detection_methods": 1, "severity": 1, "occurrence": 1,
              "detectability": 1, "rpn": 1, "recommended_actions": 1, "equipment_type_ids": 1}
-        ).limit(100)
+        ).limit(500)
         
-        failure_modes = await cursor.to_list(length=100)
+        failure_modes = await cursor.to_list(length=500)
         
         if not failure_modes:
             return []
@@ -2807,33 +2796,77 @@ Respond in JSON format:
         task_lower = task_description.lower()
         task_words = set(task_lower.split())
         
+        # Extract key terms from task (words > 3 chars, excluding common words)
+        stop_words = {'the', 'and', 'for', 'that', 'with', 'from', 'this', 'have', 'been', 'will', 'system', 'systems'}
+        key_terms = {w for w in task_words if len(w) > 3 and w not in stop_words}
+        
+        # Map common task verbs to failure mode concepts
+        task_to_fm_mapping = {
+            'clean': ['cooling', 'contamination', 'fouling', 'blockage', 'clogging', 'dirt', 'debris', 'filter'],
+            'lubricate': ['lubrication', 'bearing', 'wear', 'friction', 'oil', 'grease'],
+            'inspect': ['inspection', 'visual', 'check', 'monitor'],
+            'calibrate': ['calibration', 'accuracy', 'drift', 'sensor', 'instrument'],
+            'replace': ['wear', 'fatigue', 'degradation', 'life'],
+            'cooling': ['overheat', 'thermal', 'temperature', 'fan', 'heat'],
+            'motor': ['overload', 'burnout', 'winding', 'rotor', 'stator', 'phase', 'electric'],
+            'bearing': ['vibration', 'noise', 'wear', 'lubrication', 'alignment'],
+            'pump': ['cavitation', 'seal', 'impeller', 'flow', 'pressure'],
+            'valve': ['leak', 'seat', 'stem', 'actuator', 'stuck'],
+        }
+        
         scored_modes = []
         for fm in failure_modes:
             score = 0
-            fm_text = f"{fm.get('failure_mode', '')} {fm.get('mechanism', '')} {fm.get('equipment', '')}".lower()
+            
+            fm_name = (fm.get('failure_mode') or '').lower()
+            fm_mechanism = (fm.get('mechanism') or '').lower()
+            fm_equipment = (fm.get('equipment') or '').lower()
+            fm_text = f"{fm_name} {fm_mechanism} {fm_equipment}"
             fm_words = set(fm_text.split())
             
-            # Word overlap score
-            common_words = task_words & fm_words
-            score += len(common_words) * 10
+            # Direct word overlap (high value)
+            common_words = key_terms & fm_words
+            score += len(common_words) * 15
             
-            # Check if any recommended action matches
+            # Check task-to-FM concept mapping
+            for task_term, fm_concepts in task_to_fm_mapping.items():
+                if task_term in task_lower:
+                    for concept in fm_concepts:
+                        if concept in fm_text:
+                            score += 25  # Strong conceptual match
+                            break
+            
+            # Check if any recommended action matches task terms
             for action in fm.get("recommended_actions", []):
-                action_lower = action.lower() if isinstance(action, str) else ""
-                if any(word in action_lower for word in task_words if len(word) > 3):
-                    score += 15
-                    break
+                if isinstance(action, dict):
+                    action_text = (action.get('description') or action.get('action') or '').lower()
+                else:
+                    action_text = str(action).lower()
+                
+                # Check for key term matches in actions
+                matching_terms = sum(1 for term in key_terms if term in action_text)
+                if matching_terms > 0:
+                    score += matching_terms * 20  # Actions are highly relevant
             
             # Check detection methods
             for method in fm.get("detection_methods", []):
                 method_lower = method.lower() if isinstance(method, str) else ""
-                if any(word in method_lower for word in task_words if len(word) > 3):
+                if any(term in method_lower for term in key_terms):
                     score += 10
                     break
             
-            # Equipment type match bonus
+            # Equipment type match - BIG bonus
             if equipment_type_id and equipment_type_id in fm.get("equipment_type_ids", []):
-                score += 20
+                score += 50  # Strong equipment type match
+            
+            # Partial equipment type match (e.g., task for motor, FM for electric equipment)
+            fm_type_ids = fm.get("equipment_type_ids", [])
+            if equipment_type_id:
+                eq_base = equipment_type_id.split('_')[0] if '_' in equipment_type_id else equipment_type_id
+                for fm_type in fm_type_ids:
+                    if eq_base in fm_type or fm_type.split('_')[0] == eq_base:
+                        score += 25
+                        break
             
             if score > 0:
                 scored_modes.append({
@@ -2967,8 +3000,21 @@ Respond with a JSON object:
     
     def _default_recommendation(self, similar_failure_modes: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Generate default recommendation without AI."""
-        if similar_failure_modes and similar_failure_modes[0].get("similarity_score", 0) > 30:
+        if similar_failure_modes and similar_failure_modes[0].get("similarity_score", 0) >= 25:
             best_match = similar_failure_modes[0]
+            score = best_match.get("similarity_score", 0)
+            
+            # Determine confidence based on score
+            if score >= 75:
+                confidence = 85
+                reasoning = f"Strong match with '{best_match.get('failure_mode')}' (equipment type match)"
+            elif score >= 50:
+                confidence = 70
+                reasoning = f"Good match with '{best_match.get('failure_mode')}'"
+            else:
+                confidence = 55
+                reasoning = f"Possible match with '{best_match.get('failure_mode')}' - review recommended"
+            
             return {
                 "action": "merge",
                 "target_failure_mode_id": best_match.get("id"),
@@ -2978,16 +3024,16 @@ Respond with a JSON object:
                     "equipment": best_match.get("equipment"),
                     "category": best_match.get("category")
                 },
-                "reasoning": f"High similarity match found with '{best_match.get('failure_mode')}'",
+                "reasoning": reasoning,
                 "suggested_failure_mode_name": None,
                 "suggested_equipment_type": None,
-                "confidence": 60
+                "confidence": confidence
             }
         else:
             return {
                 "action": "keep_custom",
                 "target_failure_mode_id": None,
-                "reasoning": "No strong match found. Recommend keeping as custom task.",
+                "reasoning": "No strong match found in failure mode library. Consider creating a new failure mode or keeping as custom task.",
                 "suggested_failure_mode_name": None,
                 "suggested_equipment_type": None,
                 "confidence": 40
