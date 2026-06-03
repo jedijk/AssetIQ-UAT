@@ -2963,8 +2963,16 @@ Respond with a JSON object:
                 # Return default recommendation without AI
                 return self._default_recommendation(similar_failure_modes)
             
-            # Use LlmChat with the correct API
-            llm = LlmChat(api_key=api_key).with_model("gpt-4o-mini")
+            # Use LlmChat with required parameters
+            import uuid
+            session_id = str(uuid.uuid4())
+            system_message = "You are an expert in industrial equipment maintenance and failure mode analysis. Respond only with valid JSON."
+            
+            llm = LlmChat(
+                api_key=api_key,
+                session_id=session_id,
+                system_message=system_message
+            ).with_model("gpt-4o-mini")
             response = await llm.send_message(prompt)
             
             # Parse JSON response
