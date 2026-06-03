@@ -1000,7 +1000,8 @@ async def apply_all_suggestions(
                 session_id=session_id,
                 task_id=suggestion.get("task_id"),
                 action=action,
-                target_failure_mode_id=recommendation.get("target_failure_mode_id")
+                target_failure_mode_id=recommendation.get("target_failure_mode_id"),
+                replace_action_index=recommendation.get("replace_action_index"),
             )
             
             if result.get("success"):

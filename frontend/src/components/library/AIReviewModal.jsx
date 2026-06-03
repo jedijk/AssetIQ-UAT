@@ -69,11 +69,16 @@ const ACTION_CONFIG = {
 // Suggestion card component
 const SuggestionCard = ({ suggestion, onApply, onReject, isApplying }) => {
   const [expanded, setExpanded] = useState(false);
-  const [selectedTaskToReplace, setSelectedTaskToReplace] = useState(null); // null = add new, index = replace
-  const [mergeMode, setMergeMode] = useState("replace"); // "replace" or "add"
-  
   const recommendation = suggestion.recommendation || {};
   const action = recommendation.action || "keep_custom";
+  const aiReplaceIdx = typeof recommendation.replace_action_index === "number"
+    ? recommendation.replace_action_index
+    : null;
+  const [selectedTaskToReplace, setSelectedTaskToReplace] = useState(aiReplaceIdx);
+  const [mergeMode, setMergeMode] = useState(
+    aiReplaceIdx !== null || recommendation.already_exists ? "replace" : "add"
+  );
+  
   const config = ACTION_CONFIG[action] || ACTION_CONFIG.keep_custom;
   const ActionIcon = config.icon;
   
@@ -88,9 +93,10 @@ const SuggestionCard = ({ suggestion, onApply, onReject, isApplying }) => {
   // Handle apply with replace/add mode
   const handleApplyClick = (e) => {
     e.stopPropagation();
-    onApply(suggestion.task_id, recommendation, {
-      mode: mergeMode,
-      replaceIndex: mergeMode === "replace" ? selectedTaskToReplace : null
+    const replaceIndex = mergeMode === "replace" ? selectedTaskToReplace : null;
+    onApply(suggestion.task_id, {
+      ...recommendation,
+      replace_action_index: replaceIndex ?? recommendation.replace_action_index ?? null,
     });
   };
   
@@ -177,7 +183,13 @@ const SuggestionCard = ({ suggestion, onApply, onReject, isApplying }) => {
                 size="sm"
                 className="bg-blue-600 hover:bg-blue-700"
                 onClick={handleApplyClick}
-                disabled={isApplying || (mergeMode === "replace" && selectedTaskToReplace === null && (action === "merge" || action === "new_task") && existingActions.length > 0)}
+                disabled={isApplying || (
+                  mergeMode === "replace"
+                  && selectedTaskToReplace === null
+                  && recommendation.replace_action_index == null
+                  && (action === "merge" || action === "new_task")
+                  && existingActions.length > 0
+                )}
               >
                 {isApplying ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -319,9 +331,11 @@ const SuggestionCard = ({ suggestion, onApply, onReject, isApplying }) => {
                     {/* Show what will be added/replaced */}
                     <div className="mt-3 pt-3 border-t border-blue-200">
                       <div className="text-xs font-medium text-green-700 mb-1">
-                        {typeof recommendation.replace_action_index === "number"
-                          ? "↻ Will replace with this task:"
-                          : "✓ Will add this task:"}
+                        {recommendation.already_exists
+                          ? "↻ Will reuse existing task (no duplicate):"
+                          : typeof recommendation.replace_action_index === "number"
+                            ? "↻ Will replace with this task:"
+                            : "✓ Will add this task:"}
                       </div>
                       <div className="text-xs text-green-600 bg-green-50 p-2 rounded border border-green-200">
                         {suggestion.task_description}
@@ -444,15 +458,20 @@ export const AIReviewModal = ({ isOpen, onClose, sessionId, onComplete }) => {
       });
       
       if (result.success) {
-        // Update local state
-        const replacedSuffix = result.mode === "replaced" ? " (replaced existing task)" : " (added as new task)";
+        const modeSuffix = result.mode === "replaced"
+          ? " (replaced existing task)"
+          : result.mode === "existing"
+            ? " (reused existing task)"
+            : result.mode === "added"
+              ? " (added as new task)"
+              : "";
         setSuggestions(prev => prev.map(s => 
           s.task_id === taskId ? { ...s, status: "applied", apply_mode: result.mode } : s
         ));
         updateStats(suggestions.map(s => 
           s.task_id === taskId ? { ...s, status: "applied" } : s
         ));
-        toast.success((result.message || "Suggestion applied") + (result.mode ? replacedSuffix : ""));
+        toast.success((result.message || "Suggestion applied") + modeSuffix);
       } else {
         toast.error(result.message || "Failed to apply suggestion");
       }

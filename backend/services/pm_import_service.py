@@ -2621,6 +2621,9 @@ Respond in JSON format:
             equipment_match=equipment_match,
             similar_failure_modes=similar_failure_modes
         )
+        recommendation = self._enrich_recommendation(
+            recommendation, task, similar_failure_modes
+        )
         
         return {
             "task_id": task_id,
@@ -2992,7 +2995,7 @@ Respond with a JSON object:
             api_key = os.environ.get("EMERGENT_LLM_KEY") or os.environ.get("OPENAI_API_KEY")
             if not api_key:
                 # Return default recommendation without AI
-                return self._default_recommendation(similar_failure_modes)
+                return self._default_recommendation(similar_failure_modes, task)
             
             # Use LlmChat with required parameters
             import uuid
@@ -3030,6 +3033,14 @@ Respond with a JSON object:
                         "equipment": target_fm.get("equipment"),
                         "category": target_fm.get("category")
                     }
+                    if not target_actions_list:
+                        for a in target_fm.get("recommended_actions") or []:
+                            if isinstance(a, dict):
+                                target_actions_list.append(
+                                    a.get("description") or a.get("action") or a.get("name") or str(a)
+                                )
+                            else:
+                                target_actions_list.append(str(a))
 
             # Normalize the replace_action_index — accept 1-based int, validate against
             # the target FM's actions, and attach the resolved text for the frontend.
@@ -3053,9 +3064,139 @@ Respond with a JSON object:
             
         except Exception as e:
             logger.error(f"AI recommendation error: {e}")
-            return self._default_recommendation(similar_failure_modes)
+            return self._default_recommendation(similar_failure_modes, task)
     
-    def _default_recommendation(self, similar_failure_modes: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _build_action_text_from_task(self, task: Dict[str, Any]) -> str:
+        """Build the recommended_actions entry text for a PM import task."""
+        task_description = task.get("task_description") or task.get("original_task") or ""
+        frequency = task.get("frequency") or ""
+        return f"{task_description} (Frequency: {frequency})" if frequency else task_description
+
+    def _action_texts_from_fm_actions(self, actions: List[Any]) -> List[str]:
+        texts: List[str] = []
+        for action in actions or []:
+            if isinstance(action, dict):
+                texts.append(
+                    action.get("description") or action.get("action") or action.get("name") or str(action)
+                )
+            else:
+                texts.append(str(action))
+        return texts
+
+    def _resolve_replace_action_index(
+        self,
+        action_text: str,
+        existing_actions: List[Any],
+        preferred_index: Optional[int] = None,
+    ) -> Tuple[Optional[int], str]:
+        """Pick an existing action to update, or decide to add new.
+
+        Returns (index, mode) where mode is 'existing' | 'replace' | 'add'.
+        """
+        target_norm = self._normalize_action_text(action_text)
+        if target_norm:
+            for idx, existing in enumerate(existing_actions or []):
+                if self._normalize_action_text(existing) == target_norm:
+                    return idx, "existing"
+
+        if (
+            preferred_index is not None
+            and isinstance(preferred_index, int)
+            and 0 <= preferred_index < len(existing_actions or [])
+        ):
+            return preferred_index, "replace"
+
+        match_idx, _ratio = self._find_similar_action_index(action_text, existing_actions or [])
+        if match_idx >= 0:
+            return match_idx, "replace"
+
+        return None, "add"
+
+    def _enrich_recommendation(
+        self,
+        recommendation: Dict[str, Any],
+        task: Dict[str, Any],
+        similar_failure_modes: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Prefer updating/reusing existing FM tasks before adding new ones."""
+        if not recommendation:
+            return recommendation
+
+        action_text = self._build_action_text_from_task(task)
+        enriched = dict(recommendation)
+
+        # If AI suggested a new FM but we have a reasonable library match, merge instead.
+        if enriched.get("action") == "new_failure_mode" and similar_failure_modes:
+            best = similar_failure_modes[0]
+            if best.get("similarity_score", 0) >= 25:
+                enriched["action"] = "merge"
+                enriched["target_failure_mode_id"] = best.get("id")
+                enriched["target_failure_mode"] = {
+                    "id": best.get("id"),
+                    "failure_mode": best.get("failure_mode"),
+                    "equipment": best.get("equipment"),
+                    "category": best.get("category"),
+                }
+                enriched.setdefault(
+                    "reasoning",
+                    f"Matched existing failure mode '{best.get('failure_mode')}' — will update or reuse an existing task before adding.",
+                )
+
+        action = enriched.get("action")
+        if action not in ("merge", "new_task"):
+            return enriched
+
+        target_id = enriched.get("target_failure_mode_id")
+        if not target_id and similar_failure_modes:
+            best = similar_failure_modes[0]
+            target_id = best.get("id")
+            enriched["target_failure_mode_id"] = target_id
+            enriched["target_failure_mode"] = {
+                "id": best.get("id"),
+                "failure_mode": best.get("failure_mode"),
+                "equipment": best.get("equipment"),
+                "category": best.get("category"),
+            }
+
+        if not target_id:
+            return enriched
+
+        target_fm = next((fm for fm in similar_failure_modes if fm.get("id") == target_id), None)
+        existing_actions = (target_fm or {}).get("recommended_actions") or []
+        action_texts = self._action_texts_from_fm_actions(existing_actions)
+
+        preferred = enriched.get("replace_action_index")
+        if preferred is not None and not isinstance(preferred, int):
+            try:
+                preferred = int(preferred)
+            except (TypeError, ValueError):
+                preferred = None
+
+        replace_idx, mode = self._resolve_replace_action_index(
+            action_text, existing_actions, preferred
+        )
+
+        if mode == "existing":
+            enriched["replace_action_index"] = replace_idx
+            enriched["already_exists"] = True
+            enriched["replace_action_text"] = action_texts[replace_idx] if replace_idx is not None else None
+        elif mode == "replace" and replace_idx is not None:
+            enriched["replace_action_index"] = replace_idx
+            enriched["already_exists"] = False
+            enriched["replace_action_text"] = action_texts[replace_idx]
+        else:
+            enriched["replace_action_index"] = None
+            enriched["already_exists"] = False
+            enriched["replace_action_text"] = None
+
+        enriched["target_actions_list"] = action_texts
+        return enriched
+
+    def _default_recommendation(
+        self,
+        similar_failure_modes: List[Dict[str, Any]],
+        task: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """Generate default recommendation without AI."""
         if similar_failure_modes and similar_failure_modes[0].get("similarity_score", 0) >= 25:
             best_match = similar_failure_modes[0]
@@ -3072,7 +3213,7 @@ Respond with a JSON object:
                 confidence = 55
                 reasoning = f"Possible match with '{best_match.get('failure_mode')}' - review recommended"
             
-            return {
+            recommendation = {
                 "action": "merge",
                 "target_failure_mode_id": best_match.get("id"),
                 "target_failure_mode": {
@@ -3086,6 +3227,9 @@ Respond with a JSON object:
                 "suggested_equipment_type": None,
                 "confidence": confidence
             }
+            if task:
+                return self._enrich_recommendation(recommendation, task, similar_failure_modes)
+            return recommendation
         else:
             return {
                 "action": "keep_custom",
@@ -3119,7 +3263,7 @@ Respond with a JSON object:
         cls,
         new_action_text: str,
         existing_actions: List[Any],
-        threshold: float = 0.6,
+        threshold: float = 0.55,
     ) -> Tuple[int, float]:
         """Find the index of the most similar existing action.
 
@@ -3189,6 +3333,19 @@ Respond with a JSON object:
             }
 
         existing_actions = list(fm_doc.get("recommended_actions") or [])
+
+        # Exact duplicate — reuse existing task without modifying the failure mode.
+        target_norm = self._normalize_action_text(action_text)
+        if target_norm:
+            for idx, existing in enumerate(existing_actions):
+                if self._normalize_action_text(existing) == target_norm:
+                    return {
+                        "success": True,
+                        "message": "Task already exists on this failure mode — reusing existing entry",
+                        "mode": "existing",
+                        "replaced_index": idx,
+                        "failure_mode_id": str(fm_doc["_id"]),
+                    }
 
         # Prefer the AI-chosen replacement index if it's in bounds.
         match_idx = -1
@@ -3292,56 +3449,99 @@ Respond with a JSON object:
             task_description = task.get("task_description") or task.get("original_task") or ""
             frequency = task.get("frequency") or ""
             action_text = f"{task_description} (Frequency: {frequency})" if frequency else task_description
-            
-            apply_res = await self._apply_task_to_failure_mode(
-                target_failure_mode_id=target_failure_mode_id,
-                action_text=action_text,
-                updated_by=updated_by,
-                change_reason=f"PM Import AI Review — merge task {task_id}",
-                replace_action_index=replace_action_index,
-            )
-            result.update(apply_res)
-            if apply_res["success"]:
-                task["import_status"] = "merged" if apply_res["mode"] == "added" else "replaced"
-                task["target_failure_mode_id"] = apply_res.get("failure_mode_id") or target_failure_mode_id
-                task["apply_mode"] = apply_res["mode"]
+
+            if suggestion and (suggestion.get("recommendation") or {}).get("already_exists"):
+                result["success"] = True
+                result["message"] = "Task already linked — reusing existing failure mode action"
+                result["mode"] = "existing"
+                task["import_status"] = "existing"
+                task["target_failure_mode_id"] = target_failure_mode_id
+            else:
+                apply_res = await self._apply_task_to_failure_mode(
+                    target_failure_mode_id=target_failure_mode_id,
+                    action_text=action_text,
+                    updated_by=updated_by,
+                    change_reason=f"PM Import AI Review — merge task {task_id}",
+                    replace_action_index=replace_action_index,
+                )
+                result.update(apply_res)
+                if apply_res["success"]:
+                    task["import_status"] = (
+                        "merged" if apply_res["mode"] == "added"
+                        else "existing" if apply_res["mode"] == "existing"
+                        else "replaced"
+                    )
+                    task["target_failure_mode_id"] = apply_res.get("failure_mode_id") or target_failure_mode_id
+                    task["apply_mode"] = apply_res["mode"]
         
         elif action == "new_failure_mode":
-            # Create new failure mode
+            # Create new failure mode — but prefer merge when a library match exists.
             fm_service = FailureModesService(self.db)
             
             task_description = task.get("task_description") or task.get("original_task") or ""
             equipment_tag = task.get("equipment_tag") or ""
             discipline = task.get("discipline") or "Mechanical"
             frequency = task.get("frequency") or ""
+            action_text = f"{task_description} (Frequency: {frequency})" if frequency else task_description
             
             new_fm = new_failure_mode_data or {}
             fm_name = new_fm.get("failure_mode") or f"Custom - {task_description[:50]}"
-            
-            fm_data = {
-                "failure_mode": fm_name,
-                "equipment": new_fm.get("equipment") or equipment_tag,
-                "category": new_fm.get("category") or discipline,
-                "mechanism": new_fm.get("mechanism") or "To be determined",
-                "severity": new_fm.get("severity", 5),
-                "occurrence": new_fm.get("occurrence", 5),
-                "detectability": new_fm.get("detectability", 5),
-                "recommended_actions": [f"{task_description} (Frequency: {frequency})" if frequency else task_description],
-                "detection_methods": task.get("detection_methods", []),
-                "failure_mode_type": "customer_specific",
-                "source": "pm_import"
-            }
-            
-            created_fm = await fm_service.create(fm_data, created_by=session.get("created_by", "system"))
-            
-            if created_fm:
-                result["success"] = True
-                result["message"] = f"New failure mode created: {fm_name}"
-                result["failure_mode_id"] = created_fm.get("id")
-                task["import_status"] = "new_failure_mode"
-                task["target_failure_mode_id"] = created_fm.get("id")
+
+            # Try existing FM by name first
+            existing = await fm_service.find_by_name(fm_name)
+            merge_target_id = existing.get("id") if existing else None
+
+            # Fall back to top similar FM from the AI review suggestion
+            if not merge_target_id and suggestion:
+                similar = suggestion.get("similar_failure_modes") or []
+                if similar and similar[0].get("similarity_score", 0) >= 25:
+                    merge_target_id = similar[0].get("id")
+
+            if merge_target_id:
+                apply_res = await self._apply_task_to_failure_mode(
+                    target_failure_mode_id=merge_target_id,
+                    action_text=action_text,
+                    updated_by=updated_by,
+                    change_reason=f"PM Import AI Review — merged instead of new FM for task {task_id}",
+                    replace_action_index=replace_action_index,
+                )
+                result.update(apply_res)
+                if apply_res["success"]:
+                    task["import_status"] = (
+                        "merged" if apply_res["mode"] == "added"
+                        else "existing" if apply_res["mode"] == "existing"
+                        else "replaced"
+                    )
+                    task["target_failure_mode_id"] = apply_res.get("failure_mode_id") or merge_target_id
+                    task["apply_mode"] = apply_res["mode"]
+                    result["message"] = (
+                        f"Linked to existing failure mode instead of creating new: {fm_name}"
+                    )
             else:
-                result["message"] = "Failed to create failure mode"
+                fm_data = {
+                    "failure_mode": fm_name,
+                    "equipment": new_fm.get("equipment") or equipment_tag,
+                    "category": new_fm.get("category") or discipline,
+                    "mechanism": new_fm.get("mechanism") or "To be determined",
+                    "severity": new_fm.get("severity", 5),
+                    "occurrence": new_fm.get("occurrence", 5),
+                    "detectability": new_fm.get("detectability", 5),
+                    "recommended_actions": [action_text],
+                    "detection_methods": task.get("detection_methods", []),
+                    "failure_mode_type": "customer_specific",
+                    "source": "pm_import"
+                }
+                
+                created_fm = await fm_service.create(fm_data, created_by=session.get("created_by", "system"))
+                
+                if created_fm:
+                    result["success"] = True
+                    result["message"] = f"New failure mode created: {fm_name}"
+                    result["failure_mode_id"] = created_fm.get("id")
+                    task["import_status"] = "new_failure_mode"
+                    task["target_failure_mode_id"] = created_fm.get("id")
+                else:
+                    result["message"] = "Failed to create failure mode"
         
         elif action == "new_task":
             # Add as new task under existing failure mode — uses same replace-or-add
@@ -3360,7 +3560,11 @@ Respond with a JSON object:
                 )
                 result.update(apply_res)
                 if apply_res["success"]:
-                    task["import_status"] = "new_task" if apply_res["mode"] == "added" else "replaced"
+                    task["import_status"] = (
+                        "new_task" if apply_res["mode"] == "added"
+                        else "existing" if apply_res["mode"] == "existing"
+                        else "replaced"
+                    )
                     task["target_failure_mode_id"] = apply_res.get("failure_mode_id") or target_failure_mode_id
                     task["apply_mode"] = apply_res["mode"]
             else:
