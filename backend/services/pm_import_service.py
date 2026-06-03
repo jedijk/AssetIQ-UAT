@@ -25,7 +25,17 @@ logger = logging.getLogger(__name__)
 
 def _sanitize_for_json(value: Any) -> Any:
     """Recursively convert MongoDB / Python values to JSON-safe types."""
-    if value is None or isinstance(value, (bool, int, float, str)):
+    import math
+
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            return None
+        return value
+    if isinstance(value, str):
         return value
     try:
         from bson import ObjectId
@@ -35,9 +45,17 @@ def _sanitize_for_json(value: Any) -> Any:
         pass
     if isinstance(value, datetime):
         return value.isoformat()
+    try:
+        from datetime import date
+        if isinstance(value, date):
+            return value.isoformat()
+    except ImportError:
+        pass
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
     if isinstance(value, dict):
         return {str(k): _sanitize_for_json(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, (list, tuple, set)):
         return [_sanitize_for_json(v) for v in value]
     return str(value)
 
@@ -2586,7 +2604,10 @@ Respond in JSON format:
             raise ValueError(f"Session {session_id} not found")
         
         tasks = session.get("tasks_extracted", [])
-        accepted_tasks = [t for t in tasks if t.get("review_status") == "accepted"]
+        accepted_tasks = [
+            t for t in tasks
+            if t.get("review_status") in ("accepted", "edited")
+        ]
         
         if not accepted_tasks:
             return {"suggestions": [], "total_reviewed": 0, "message": "No accepted tasks to review"}
@@ -2624,20 +2645,28 @@ Respond in JSON format:
                 }))
         
         # Store suggestions in session
-        await self.sessions_collection.update_one(
-            {"session_id": session_id},
-            {"$set": {
-                "ai_review_suggestions": suggestions,
-                "ai_review_status": "completed",
-                "updated_at": datetime.now(timezone.utc)
-            }}
-        )
-        
-        return {
+        try:
+            await self.sessions_collection.update_one(
+                {"session_id": session_id},
+                {"$set": {
+                    "ai_review_suggestions": suggestions,
+                    "ai_review_status": "completed",
+                    "updated_at": datetime.now(timezone.utc)
+                }}
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to persist AI review suggestions for session %s: %s",
+                session_id,
+                e,
+                exc_info=True,
+            )
+
+        return _sanitize_for_json({
             "suggestions": suggestions,
             "total_reviewed": len(accepted_tasks),
             "message": f"AI review completed for {len(accepted_tasks)} tasks"
-        }
+        })
     
     async def _generate_task_suggestion(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """Generate AI suggestion for a single task."""
@@ -2670,7 +2699,7 @@ Respond in JSON format:
             recommendation, task, similar_failure_modes
         )
         
-        return {
+        return _sanitize_for_json({
             "task_id": task_id,
             "equipment_tag": equipment_tag,
             "task_description": task_description,
@@ -2684,7 +2713,7 @@ Respond in JSON format:
             ],
             "recommendation": recommendation,
             "status": "pending"  # pending, accepted, rejected
-        }
+        })
     
     async def _match_equipment_by_tag(self, tag: str) -> Optional[Dict[str, Any]]:
         """Match equipment tag to equipment_nodes and get equipment_type_id."""
@@ -2693,6 +2722,7 @@ Respond in JSON format:
         
         # Normalize the tag - remove common variations
         tag_normalized = tag.strip()
+        tag_escaped = re.escape(tag_normalized)
         # Also create a version without hyphens for fuzzy matching
         tag_no_hyphens = tag_normalized.replace("-", "").replace(" ", "").lower()
         
@@ -2701,9 +2731,9 @@ Respond in JSON format:
         # Try exact match first on tag field
         equipment_node = await self.db.equipment_nodes.find_one(
             {"$or": [
-                {"tag": {"$regex": f"^{tag_normalized}$", "$options": "i"}},
-                {"id": {"$regex": f"^{tag_normalized}$", "$options": "i"}},
-                {"name": {"$regex": f"^{tag_normalized}$", "$options": "i"}}
+                {"tag": {"$regex": f"^{tag_escaped}$", "$options": "i"}},
+                {"id": {"$regex": f"^{tag_escaped}$", "$options": "i"}},
+                {"name": {"$regex": f"^{tag_escaped}$", "$options": "i"}}
             ]},
             {"_id": 0, "id": 1, "tag": 1, "name": 1, "equipment_type_id": 1, "level": 1}
         )
@@ -2813,7 +2843,7 @@ Respond in JSON format:
             "equipment_id": equipment_node.get("id"),
             "equipment_tag": equipment_node.get("tag") or equipment_node.get("id"),
             "equipment_name": equipment_node.get("name"),
-            "equipment_type_id": equipment_type_id,
+            "equipment_type_id": str(equipment_type_id) if equipment_type_id is not None else None,
             "equipment_type_name": equipment_type.get("name") if equipment_type else None,
             "equipment_type_category": equipment_type.get("category") if equipment_type else None,
             "level": equipment_node.get("level")
@@ -2848,11 +2878,14 @@ Respond in JSON format:
         
         # Normalize IDs - use 'id' field if present, otherwise convert _id to string
         for fm in failure_modes:
-            if not fm.get('id') and fm.get('_id'):
-                fm['id'] = str(fm['_id'])
+            if fm.get("id") is not None:
+                fm["id"] = str(fm.get("id"))
+            elif fm.get("_id"):
+                fm["id"] = str(fm["_id"])
             # Remove _id from response to avoid serialization issues
-            if '_id' in fm:
-                del fm['_id']
+            if "_id" in fm:
+                del fm["_id"]
+            fm["equipment_type_ids"] = [str(t) for t in fm.get("equipment_type_ids", [])]
         
         # Score each failure mode based on text similarity
         task_lower = task_description.lower()
@@ -2901,9 +2934,15 @@ Respond in JSON format:
             # Check if any recommended action matches task terms
             for action in fm.get("recommended_actions", []):
                 if isinstance(action, dict):
-                    action_text = (action.get('description') or action.get('action') or '').lower()
+                    raw_action = (
+                        action.get("description")
+                        or action.get("action")
+                        or action.get("name")
+                        or ""
+                    )
                 else:
-                    action_text = str(action).lower()
+                    raw_action = action
+                action_text = str(raw_action).lower()
                 
                 # Check for key term matches in actions
                 matching_terms = sum(1 for term in key_terms if term in action_text)
@@ -2912,7 +2951,7 @@ Respond in JSON format:
             
             # Check detection methods
             for method in fm.get("detection_methods", []):
-                method_lower = method.lower() if isinstance(method, str) else ""
+                method_lower = str(method).lower() if method is not None else ""
                 if any(term in method_lower for term in key_terms):
                     score += 10
                     break
@@ -3051,8 +3090,6 @@ Respond with a JSON object:
                 "You are an expert in industrial equipment maintenance and failure mode analysis. "
                 "Respond only with valid JSON."
             )
-            if api_key and not os.environ.get("OPENAI_API_KEY"):
-                os.environ["OPENAI_API_KEY"] = api_key
             response = await chat_completion(
                 messages=[
                     {"role": "system", "content": system_message},
@@ -3061,6 +3098,7 @@ Respond with a JSON object:
                 model="gpt-4o-mini",
                 temperature=0.2,
                 response_format={"type": "json_object"},
+                api_key=api_key,
             )
             
             # Parse JSON response

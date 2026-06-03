@@ -41,6 +41,7 @@ async def chat_completion(
     temperature: float = 0.7,
     max_tokens: Optional[int] = None,
     response_format: Optional[Dict] = None,
+    api_key: Optional[str] = None,
 ) -> str:
     """
     Send a chat completion request to OpenAI.
@@ -56,7 +57,10 @@ async def chat_completion(
         The assistant's response text
     """
     try:
-        client = get_openai_client()
+        key = api_key or os.environ.get("OPENAI_API_KEY") or os.environ.get("EMERGENT_LLM_KEY")
+        if not key:
+            raise ValueError("OPENAI_API_KEY not configured in environment")
+        client = OpenAI(api_key=key)
         actual_model = get_model_name(model)
         
         kwargs = {
