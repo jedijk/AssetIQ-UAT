@@ -1358,15 +1358,6 @@ const FailureModesPage = () => {
                 {isExporting ? (t("common.exporting") || "Exporting...") : (t("library.exportExcel") || "Export Excel")}
               </Button>
               <Button
-                onClick={() => setIsPMImportOpen(true)}
-                variant="outline"
-                className="h-11 border-blue-200 text-blue-700 hover:bg-blue-50"
-                data-testid="import-pm-plan-btn"
-              >
-                <Upload className="w-4 h-4 mr-1" />
-                Import PM Plan
-              </Button>
-              <Button
                 onClick={() => setIsAINewFmOpen(true)}
                 variant="outline"
                 className={`h-11 border-purple-200 text-purple-700 hover:bg-purple-50 ${canUseAITools ? "" : "hidden"}`}
