@@ -1,10 +1,13 @@
 """
 Maintenance strategy v2 — program/scheduled-task propagation helpers.
 """
+import logging
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from database import db
+
+logger = logging.getLogger(__name__)
 
 # ============= Strategy → Program Propagation =============
 
@@ -410,6 +413,27 @@ def _bump_version(current_version: str) -> str:
         return "1.1"
 
 
+async def _sync_maintenance_programs_v2(
+    equipment_type_id: str,
+    user_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Regenerate maintenance_programs_v2 for all equipment of this type."""
+    from services.maintenance_program_service import MaintenanceProgramService
+
+    try:
+        return await MaintenanceProgramService.sync_programs_for_equipment_type(
+            equipment_type_id,
+            user_id=user_id,
+        )
+    except Exception as exc:
+        logger.exception(
+            "Maintenance program v2 sync failed for equipment type %s: %s",
+            equipment_type_id,
+            exc,
+        )
+        return {"programs_regenerated": 0, "equipment_ids": [], "errors": [{"error": str(exc)}]}
+
+
 async def _bump_strategy_version(
     strategy: dict,
     changes: list,
@@ -428,13 +452,15 @@ async def _bump_strategy_version(
         "updated_by": user_id,
         "changes": changes,
     }
+    equipment_type_id = strategy["equipment_type_id"]
     await db.equipment_type_strategies.update_one(
-        {"equipment_type_id": strategy["equipment_type_id"]},
+        {"equipment_type_id": equipment_type_id},
         {
             "$set": {"version": new_version, "updated_at": now},
             "$push": {"version_history": entry},
         },
     )
+    await _sync_maintenance_programs_v2(equipment_type_id, user_id=user_id)
     return new_version
 
 

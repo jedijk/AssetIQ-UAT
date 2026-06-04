@@ -49,6 +49,7 @@ from routes.maintenance_strategy_v2.propagation import (
     _describe_fm_change,
     _bump_version,
     _bump_strategy_version,
+    _sync_maintenance_programs_v2,
 )
 from routes.maintenance_strategy_v2.strategy_helpers import (
     calculate_frequency_for_criticality,
@@ -388,6 +389,13 @@ async def update_equipment_type_strategy(
         {"equipment_type_id": equipment_type_id},
         {"_id": 0}
     )
+
+    programs_v2_sync = await _sync_maintenance_programs_v2(
+        equipment_type_id,
+        user_id=current_user.get("id") or current_user.get("user_id"),
+    )
+    if updated is not None and isinstance(updated, dict):
+        updated["programs_v2_sync"] = programs_v2_sync
     
     return updated
 
@@ -614,6 +622,11 @@ async def sync_equipment_type_strategy(
             "new_version": new_version
         }
     )
+
+    programs_v2_sync = await _sync_maintenance_programs_v2(
+        equipment_type_id,
+        user_id=current_user.get("id") or current_user.get("user_id"),
+    )
     
     return {
         "message": "Strategy synced with library",
@@ -623,7 +636,8 @@ async def sync_equipment_type_strategy(
         "updated_failure_modes": len(updated_fms),
         "total_failure_modes": total_fms,
         "total_tasks": len(all_tasks),
-        "new_version": new_version
+        "new_version": new_version,
+        "programs_v2_sync": programs_v2_sync,
     }
 
 

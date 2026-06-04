@@ -537,6 +537,67 @@ class MaintenanceProgramService:
         
         return new_version
     
+    @staticmethod
+    async def sync_programs_for_equipment_type(
+        equipment_type_id: str,
+        user_id: Optional[str] = None,
+        preserve_overrides: bool = True,
+        preserve_manual_tasks: bool = True,
+        preserve_imported_tasks: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Regenerate all maintenance programs (v2) for an equipment type after strategy changes.
+        Preserves manual/imported tasks and overridden strategy tasks by default.
+        """
+        programs = await db.maintenance_programs_v2.find(
+            {"equipment_type_id": equipment_type_id},
+            {"equipment_id": 1, "_id": 0},
+        ).to_list(500)
+
+        regenerated: List[str] = []
+        errors: List[Dict[str, str]] = []
+
+        for prog in programs:
+            equipment_id = prog.get("equipment_id")
+            if not equipment_id:
+                continue
+            try:
+                await MaintenanceProgramService.regenerate_program(
+                    equipment_id=equipment_id,
+                    preserve_overrides=preserve_overrides,
+                    preserve_manual_tasks=preserve_manual_tasks,
+                    preserve_imported_tasks=preserve_imported_tasks,
+                    user_id=user_id,
+                )
+                regenerated.append(equipment_id)
+            except ValueError as exc:
+                errors.append({"equipment_id": equipment_id, "error": str(exc)})
+            except Exception as exc:
+                logger.exception(
+                    "Failed to sync maintenance program for %s after strategy change: %s",
+                    equipment_id,
+                    exc,
+                )
+                errors.append({"equipment_id": equipment_id, "error": str(exc)})
+
+        if regenerated:
+            await MaintenanceProgramService._log_audit(
+                action="sync_programs_from_strategy",
+                equipment_id=equipment_type_id,
+                user_id=user_id,
+                details={
+                    "equipment_type_id": equipment_type_id,
+                    "programs_regenerated": len(regenerated),
+                    "errors": len(errors),
+                },
+            )
+
+        return {
+            "programs_regenerated": len(regenerated),
+            "equipment_ids": regenerated,
+            "errors": errors,
+        }
+
     # ============= Program Regeneration =============
     
     @staticmethod
