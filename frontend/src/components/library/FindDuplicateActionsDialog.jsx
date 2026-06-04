@@ -5,6 +5,8 @@ import {
   AlertTriangle,
   GitMerge,
   CheckCircle,
+  Sparkles,
+  Zap,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -34,6 +36,13 @@ export default function FindDuplicateActionsDialog({
   const [stats, setStats] = useState(null);
   const [selected, setSelected] = useState({});
   const [merging, setMerging] = useState(false);
+  const [scanMode, setScanMode] = useState("ai");
+
+  const scanParams = () => ({
+    use_ai: scanMode === "ai",
+    ratio_threshold: 0.58,
+    jaccard_threshold: 0.35,
+  });
 
   const handleClose = () => {
     setPhase("idle");
@@ -79,9 +88,7 @@ export default function FindDuplicateActionsDialog({
   };
 
   const refreshResults = async () => {
-    const data = await failureModesAPI.findDuplicateActions({
-      ratio_threshold: 0.85,
-    });
+    const data = await failureModesAPI.findDuplicateActions(scanParams());
     applyScanData(data, false);
   };
 
@@ -93,9 +100,7 @@ export default function FindDuplicateActionsDialog({
     setPhase("running");
     setSelected({});
     try {
-      const data = await failureModesAPI.findDuplicateActions({
-        ratio_threshold: 0.85,
-      });
+      const data = await failureModesAPI.findDuplicateActions(scanParams());
       applyScanData(data, true);
       setPhase("done");
     } catch (err) {
@@ -182,8 +187,9 @@ export default function FindDuplicateActionsDialog({
             Find Duplicate Actions
           </DialogTitle>
           <DialogDescription>
-            Scans recommended actions for duplicates and suggests merging them into
-            one action (keeps type, discipline, and the most complete text).
+            AI scan (default) compares maintenance intent in context — not just
+            matching words. Fast scan uses relaxed text similarity only. Merge
+            suggestions keep type, discipline, and the most complete action.
           </DialogDescription>
         </DialogHeader>
 
@@ -192,15 +198,51 @@ export default function FindDuplicateActionsDialog({
             <p className="text-sm text-slate-600">
               Will scan recommended actions across {failureModes.length} failure
               mode{failureModes.length === 1 ? "" : "s"}.
+              {scanMode === "ai" && (
+                <span className="block mt-1 text-slate-500">
+                  AI review may take a few minutes on large libraries.
+                </span>
+              )}
             </p>
+            <div className="flex flex-wrap gap-2 justify-center">
+              <Button
+                variant={scanMode === "ai" ? "default" : "outline"}
+                onClick={() => setScanMode("ai")}
+                className={scanMode === "ai" ? "bg-purple-600 hover:bg-purple-700" : ""}
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                AI scan
+              </Button>
+              <Button
+                variant={scanMode === "lexical" ? "default" : "outline"}
+                onClick={() => setScanMode("lexical")}
+                className={scanMode === "lexical" ? "bg-amber-600 hover:bg-amber-700" : ""}
+              >
+                <Zap className="w-4 h-4 mr-2" />
+                Fast scan
+              </Button>
+            </div>
             <Button
               onClick={runScan}
-              className="bg-amber-600 hover:bg-amber-700"
+              className={
+                scanMode === "ai"
+                  ? "bg-purple-600 hover:bg-purple-700"
+                  : "bg-amber-600 hover:bg-amber-700"
+              }
               disabled={failureModes.length === 0}
               data-testid="run-find-duplicate-actions-btn"
             >
-              <ClipboardList className="w-4 h-4 mr-2" />
-              Scan for duplicate actions
+              {scanMode === "ai" ? (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Run AI scan
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4 mr-2" />
+                  Run fast scan
+                </>
+              )}
             </Button>
           </div>
         )}
@@ -208,7 +250,11 @@ export default function FindDuplicateActionsDialog({
         {phase === "running" && (
           <div className="flex flex-col items-center py-10 gap-3 flex-shrink-0">
             <Loader2 className="w-8 h-8 animate-spin text-amber-600" />
-            <p className="text-sm text-slate-600">Scanning recommended actions…</p>
+            <p className="text-sm text-slate-600">
+              {scanMode === "ai"
+                ? "AI is reviewing actions for the same maintenance task…"
+                : "Scanning recommended actions (text similarity)…"}
+            </p>
           </div>
         )}
 
@@ -221,6 +267,13 @@ export default function FindDuplicateActionsDialog({
                   {stats.duplicate_group_count === 1 ? "" : "s"} in{" "}
                   {stats.failure_modes_with_duplicates} failure mode
                   {stats.failure_modes_with_duplicates === 1 ? "" : "s"}
+                  {stats.scan_method === "ai" && stats.ai_errors > 0 && (
+                    <span className="text-amber-700">
+                      {" "}
+                      ({stats.ai_errors} AI fallback
+                      {stats.ai_errors === 1 ? "" : "s"} to text match)
+                    </span>
+                  )}
                 </span>
               )}
               <div className="flex gap-2 ml-auto">
@@ -293,11 +346,27 @@ export default function FindDuplicateActionsDialog({
                                 className="mt-1"
                               />
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs text-amber-800 mb-2 flex items-center gap-1">
+                                <p className="text-xs text-amber-800 mb-2 flex flex-wrap items-center gap-1">
                                   <AlertTriangle className="w-3 h-3 shrink-0" />
-                                  {group.avg_similarity_score}% similar — merge into action #
-                                  {(keepIdx ?? 0) + 1}
+                                  {group.detection_method === "ai" ? (
+                                    <Badge className="text-[10px] bg-purple-100 text-purple-800">
+                                      AI
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="text-[10px] bg-amber-100 text-amber-900">
+                                      Text
+                                    </Badge>
+                                  )}
+                                  {group.avg_similarity_score != null && (
+                                    <span>{group.avg_similarity_score}% text match</span>
+                                  )}
+                                  <span>— merge into #{ (keepIdx ?? 0) + 1}</span>
                                 </p>
+                                {group.reason && (
+                                  <p className="text-xs text-slate-600 italic mb-2">
+                                    {group.reason}
+                                  </p>
+                                )}
                                 <ul className="space-y-1 mb-2">
                                   {(group.members || []).map((m) => (
                                     <li

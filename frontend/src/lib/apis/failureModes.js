@@ -83,18 +83,20 @@ export const failureModesAPI = {
     return response.data;
   },
 
-  /** Library-wide batch scan for duplicate groups (lexical, no AI). */
+  /** Library-wide batch scan for duplicate failure mode groups. */
   scanSimilar: async (body = {}) => {
+    const useAi = body.use_ai !== false;
     const response = await api.post("/failure-modes/find-similar", body, {
-      timeout: 120000,
+      timeout: useAi ? 300000 : 120000,
     });
     return response.data;
   },
 
   /** Scan duplicate recommended_actions inside each failure mode. */
   findDuplicateActions: async (body = {}) => {
+    const useAi = body.use_ai !== false;
     const response = await api.post("/failure-modes/find-duplicate-actions", body, {
-      timeout: 120000,
+      timeout: useAi ? 300000 : 120000,
     });
     return response.data;
   },

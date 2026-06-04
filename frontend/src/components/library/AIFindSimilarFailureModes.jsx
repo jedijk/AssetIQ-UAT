@@ -21,7 +21,6 @@ import {
   DialogFooter,
 } from "../ui/dialog";
 import { toast } from "sonner";
-import { aiApi } from "../../lib/apiClient";
 import { failureModesAPI } from "../../lib/apis/failureModes";
 
 /**
@@ -35,7 +34,7 @@ export default function AIFindSimilarFailureModes({
   failureModes = [],
   onApplied,
 }) {
-  const [scanMode, setScanMode] = useState("lexical"); // lexical | ai
+  const [scanMode, setScanMode] = useState("ai"); // lexical | ai
   const [phase, setPhase] = useState("idle"); // idle | running | done
   const [scanned, setScanned] = useState(0);
   const [totalEts, setTotalEts] = useState(0);
@@ -78,7 +77,7 @@ export default function AIFindSimilarFailureModes({
         (g.avg_similarity_score != null
           ? `Avg similarity ${g.avg_similarity_score}%`
           : ""),
-      scan_source: "lexical",
+      scan_source: g.detection_method || "lexical",
       selected: false,
     }));
 
@@ -94,7 +93,7 @@ export default function AIFindSimilarFailureModes({
     setGroups([]);
 
     try {
-      const data = await failureModesAPI.scanSimilar({});
+      const data = await failureModesAPI.scanSimilar({ use_ai: false });
       const collected = mapLexicalGroups("library", "All failure modes", data?.groups);
       setGroups(collected);
       setScanned(1);
@@ -128,82 +127,28 @@ export default function AIFindSimilarFailureModes({
     setScanned(0);
     setErrorCount(0);
     setGroups([]);
+    setTotalEts(1);
 
-    const collected = [];
     try {
-      const lexical = await failureModesAPI.scanSimilar({});
-      if (lexical?.fuzzy_clustering_skipped) {
+      const data = await failureModesAPI.scanSimilar({ use_ai: true });
+      if (data?.fuzzy_clustering_skipped) {
         toast.info(
-          "Large library: fuzzy pre-filter skipped; using exact-name matches for AI review.",
+          "Large library: fuzzy pre-filter skipped; AI uses exact-name clusters only.",
         );
       }
-      const clusters = (lexical?.groups || []).filter(
-        (g) => (g.member_ids || []).length >= 2,
-      );
-      if (!clusters.length) {
-        setPhase("done");
-        toast.info("No similar groups found for AI review.");
+      if (data?.ai_errors) {
+        setErrorCount(data.ai_errors);
+      }
+      const collected = mapLexicalGroups("library", "All failure modes", data?.groups);
+      setGroups(collected);
+      setScanned(1);
+      setPhase("done");
+      if (!collected.length) {
+        toast.info("No similar failure mode groups found.");
         return;
       }
-
-      setTotalEts(clusters.length);
-      for (let i = 0; i < clusters.length; i++) {
-        if (cancelRef.current) break;
-        const memberIds = clusters[i].member_ids || [];
-        const fms = memberIds
-          .map((id) => {
-            const fm = fmById.get(id);
-            return fm ? { id, failure_mode: fm.failure_mode } : null;
-          })
-          .filter(Boolean);
-        if (fms.length < 2) {
-          setScanned((s) => s + 1);
-          continue;
-        }
-        try {
-          const resp = await aiApi.post("/ai-suggestions/find-similar-failure-modes", {
-            equipment_type_id: `cluster-${i}`,
-            equipment_type_name: "Similar group",
-            failure_modes: fms,
-          });
-          const aiGroups = (resp?.data?.groups || []).map((g) => ({
-            et_id: "library",
-            et_name: "All failure modes",
-            member_ids: g.member_ids,
-            canonical_name: g.canonical_name || clusters[i].suggested_canonical_name || "",
-            reason: g.reason || clusters[i].reason || "",
-            scan_source: "ai",
-            selected: false,
-          }));
-          if (aiGroups.length) {
-            collected.push(...aiGroups);
-            setGroups((prev) => [...prev, ...aiGroups]);
-          } else {
-            collected.push(
-              ...mapLexicalGroups("library", "All failure modes", [clusters[i]]),
-            );
-            setGroups((prev) => [
-              ...prev,
-              ...mapLexicalGroups("library", "All failure modes", [clusters[i]]),
-            ]);
-          }
-        } catch (err) {
-          console.error("AI cluster review failed", i, err);
-          setErrorCount((e) => e + 1);
-          collected.push(
-            ...mapLexicalGroups("library", "All failure modes", [clusters[i]]),
-          );
-          setGroups((prev) => [
-            ...prev,
-            ...mapLexicalGroups("library", "All failure modes", [clusters[i]]),
-          ]);
-        }
-        setScanned((s) => s + 1);
-      }
-
-      setPhase("done");
       toast.success(
-        `AI scan complete — ${collected.length} candidate group(s) from ${clusters.length} cluster(s).`,
+        `AI scan complete — ${collected.length} candidate group(s) across the library.`,
       );
     } catch (err) {
       console.error("Library AI scan failed", err);
@@ -353,9 +298,9 @@ export default function AIFindSimilarFailureModes({
             Find Similar Failure Modes
           </DialogTitle>
           <DialogDescription>
-            Scans the entire failure mode library by name similarity. Equipment type
-            is not used — e.g. two &quot;Bearing Failure&quot; rows on different equipment
-            are grouped together. Review each group before merging.
+            Scans the entire failure mode library. Equipment type is not used —
+            e.g. &quot;Bearing Failure&quot; and &quot;Drive Bearing Failure&quot; on different equipment
+            can be grouped as the same phenomenon. Review each group before merging.
           </DialogDescription>
         </DialogHeader>
 
@@ -379,8 +324,8 @@ export default function AIFindSimilarFailureModes({
               </p>
               <p className="text-sm text-slate-500 mt-1">
                 {scanMode === "ai"
-                  ? "Uses gpt-4o-mini on the full library (may take longer on large libraries)."
-                  : "Fast lexical scan across all failure modes. Usually completes in seconds."}
+                  ? "Uses AI with relaxed name matching (e.g. Bearing Failure ≈ Drive Bearing Failure). May take a few minutes on large libraries."
+                  : "Fast text-only scan. Catches exact and near-exact names; may miss wording variants AI would group."}
               </p>
             </div>
             <div className="flex flex-wrap gap-2 justify-center">
