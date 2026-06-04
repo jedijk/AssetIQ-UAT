@@ -365,9 +365,12 @@ const FailureModeStrategyRow = ({
   const fmNameMap = useFailureModeNameMap();
   const taskNameMap = useMaintenanceTaskTemplateMap();
   const translatedFmName = fmNameMap[String(fmStrategy.failure_mode_name || "").trim().toLowerCase()] || fmStrategy.failure_mode_name;
-  const linkedTasks = taskTemplates?.filter((tt) => 
-    fmStrategy.task_ids?.includes(tt.id)
-  ) || [];
+  const linkedTasks = taskTemplates?.filter((tt) => {
+    const fmId = String(fmStrategy.failure_mode_id ?? "");
+    const ids = (fmStrategy.task_ids || []).map(String);
+    const linkedByFm = (tt.failure_mode_ids || []).map(String).includes(fmId);
+    return ids.includes(String(tt.id)) || linkedByFm;
+  }) || [];
   
   // RPN data
   const rpn = fmStrategy.rpn || (fmStrategy.severity || 5) * (fmStrategy.occurrence || 5) * (fmStrategy.detectability || 5);
@@ -1303,6 +1306,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
         .join(", ");
       toast.success(msg);
       queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
+      queryClient.invalidateQueries({ queryKey: ["maint-task-template-batch"] });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to sync with library");

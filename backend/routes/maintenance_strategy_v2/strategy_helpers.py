@@ -2,9 +2,12 @@
 Maintenance strategy v2 — shared helper functions.
 """
 from datetime import datetime, timezone
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 import uuid
 import logging
+from difflib import SequenceMatcher
+
+from bson import ObjectId
 
 from database import db
 from models.maintenance_strategy_v2 import (
@@ -32,17 +35,75 @@ def calculate_frequency_for_criticality(
 
 
 async def get_failure_modes_for_equipment_type(equipment_type_id: str, equipment_type_name: str) -> List[Dict]:
-    """Get all failure modes linked to an equipment type"""
-    # Query failure modes from database
+    """Get all failure modes linked to an equipment type."""
     query = {
         "$or": [
             {"equipment_type_ids": equipment_type_id},
-            {"equipment_type": {"$regex": equipment_type_name, "$options": "i"}}
+            {"equipment": {"$regex": equipment_type_name, "$options": "i"}},
         ]
     }
-    
-    failure_modes = await db.failure_modes.find(query, {"_id": 0}).to_list(100)
+
+    docs = await db.failure_modes.find(query).to_list(500)
+    failure_modes: List[Dict[str, Any]] = []
+    for doc in docs:
+        fm = dict(doc)
+        if not fm.get("id"):
+            if fm.get("_id") is not None:
+                fm["id"] = str(fm["_id"])
+            elif fm.get("legacy_id") is not None:
+                fm["id"] = str(fm["legacy_id"])
+        fm.pop("_id", None)
+        failure_modes.append(fm)
     return failure_modes
+
+
+async def lookup_library_failure_mode(
+    failure_mode_id: Optional[str],
+    failure_mode_name: Optional[str],
+) -> Optional[Dict[str, Any]]:
+    """Resolve a library failure mode by strategy id and/or name."""
+    clauses: List[Dict[str, Any]] = []
+    if failure_mode_name:
+        clauses.append({"failure_mode": failure_mode_name})
+    if failure_mode_id:
+        fid = str(failure_mode_id)
+        clauses.append({"id": fid})
+        clauses.append({"id": failure_mode_id})
+        if ObjectId.is_valid(fid):
+            clauses.append({"_id": ObjectId(fid)})
+        try:
+            clauses.append({"legacy_id": int(fid)})
+        except (TypeError, ValueError):
+            pass
+    if not clauses:
+        return None
+
+    doc = await db.failure_modes.find_one({"$or": clauses})
+    if not doc:
+        return None
+    fm = dict(doc)
+    if not fm.get("id"):
+        if fm.get("_id") is not None:
+            fm["id"] = str(fm["_id"])
+        elif fm.get("legacy_id") is not None:
+            fm["id"] = str(fm["legacy_id"])
+    fm.pop("_id", None)
+    return fm
+
+
+def _action_text_from_fm_action(action: Any) -> str:
+    if isinstance(action, dict):
+        return (
+            (action.get("description") or action.get("action") or action.get("name") or "")
+            .strip()
+        )
+    return str(action or "").strip()
+
+
+def _norm_task_name(text: Any) -> str:
+    from services.pm_import_service import PMImportService
+
+    return PMImportService._normalize_action_text(text)
 
 
 def map_detection_methods(failure_mode: Dict) -> List[str]:
@@ -188,7 +249,9 @@ def generate_default_tasks_for_failure_mode(
     recommended_actions = failure_mode.get("recommended_actions", [])
     
     for idx, action in enumerate(recommended_actions[:5]):  # Limit to 5 tasks per FM
-        action_text = action.get("action", action) if isinstance(action, dict) else str(action)
+        action_text = _action_text_from_fm_action(action)
+        if not action_text:
+            continue
         stored_action_type = action.get("action_type", "PM") if isinstance(action, dict) else "PM"
         discipline = action.get("discipline", None) if isinstance(action, dict) else None
         
@@ -281,7 +344,7 @@ def refresh_failure_mode_strategy_from_library(
     Update strategy FM metadata and linked task template content from the library FM.
     Preserves existing task template IDs where possible so programs stay linked.
     """
-    fm_id = fm_strategy.get("failure_mode_id") or library_fm.get("id")
+    fm_id = str(fm_strategy.get("failure_mode_id") or library_fm.get("id") or "")
     strategy_type_str = fm_strategy.get("strategy_type") or "preventive"
     try:
         strategy_type = MaintenanceStrategyType(strategy_type_str)
@@ -298,15 +361,53 @@ def refresh_failure_mode_strategy_from_library(
     old_ids = [str(tid) for tid in (fm_strategy.get("task_ids") or []) if tid]
     new_ids: List[str] = []
     refreshed = 0
+    used_tids: set = set()
 
-    for i, gen in enumerate(generated_dicts):
+    def _candidate_task_ids() -> List[str]:
+        seen: set = set()
+        ordered: List[str] = []
+        for tid in old_ids:
+            if tid in by_id and tid not in seen:
+                seen.add(tid)
+                ordered.append(tid)
+        for t in task_templates:
+            tid = str(t.get("id") or "")
+            if not tid or tid in seen:
+                continue
+            fm_ids = {str(x) for x in (t.get("failure_mode_ids") or [])}
+            if fm_id and fm_id in fm_ids:
+                seen.add(tid)
+                ordered.append(tid)
+        return ordered
+
+    candidates = _candidate_task_ids()
+
+    for gen in generated_dicts:
         if gen.get("task_type") and hasattr(gen["task_type"], "value"):
             gen["task_type"] = gen["task_type"].value
         if gen.get("frequency_matrix") and hasattr(gen["frequency_matrix"], "model_dump"):
             gen["frequency_matrix"] = gen["frequency_matrix"].model_dump()
 
-        if i < len(old_ids) and old_ids[i] in by_id:
-            tid = old_ids[i]
+        gen_norm = _norm_task_name(gen.get("name"))
+        matched_tid: Optional[str] = None
+        for tid in candidates:
+            if tid in used_tids or tid not in by_id:
+                continue
+            if _norm_task_name(by_id[tid].get("name")) == gen_norm and gen_norm:
+                matched_tid = tid
+                break
+        if not matched_tid:
+            for tid in candidates:
+                if tid in used_tids or tid not in by_id:
+                    continue
+                existing_norm = _norm_task_name(by_id[tid].get("name"))
+                if existing_norm and gen_norm:
+                    if SequenceMatcher(None, existing_norm, gen_norm).ratio() >= 0.82:
+                        matched_tid = tid
+                        break
+
+        if matched_tid:
+            tid = matched_tid
             existing = by_id[tid]
             for key in (
                 "name",
@@ -321,6 +422,7 @@ def refresh_failure_mode_strategy_from_library(
             if gen.get("frequency_matrix"):
                 existing["frequency_matrix"] = gen["frequency_matrix"]
             new_ids.append(tid)
+            used_tids.add(tid)
             refreshed += 1
         else:
             task_templates.append(gen)
@@ -328,14 +430,13 @@ def refresh_failure_mode_strategy_from_library(
             if tid:
                 by_id[tid] = gen
                 new_ids.append(tid)
+                used_tids.add(tid)
                 refreshed += 1
 
-    for extra_tid in old_ids[len(generated_dicts) :]:
-        if extra_tid in by_id:
-            task_templates[:] = [
-                t for t in task_templates if str(t.get("id")) != extra_tid
-            ]
-            del by_id[extra_tid]
+    for tid in old_ids:
+        if tid not in used_tids and tid in by_id:
+            task_templates[:] = [t for t in task_templates if str(t.get("id")) != tid]
+            del by_id[tid]
 
     fm_strategy["task_ids"] = new_ids
     fm_strategy["fm_version"] = library_fm.get("version") or 1

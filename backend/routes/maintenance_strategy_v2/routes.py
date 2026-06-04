@@ -59,6 +59,7 @@ from routes.maintenance_strategy_v2.strategy_helpers import (
     determine_action_type_from_text,
     generate_default_tasks_for_failure_mode,
     refresh_failure_mode_strategy_from_library,
+    lookup_library_failure_mode,
     log_strategy_audit,
 )
 
@@ -129,13 +130,7 @@ async def get_equipment_type_strategy(
         fm_name = fm_strategy.get("failure_mode_name")
         
         # Search for the failure mode in the library
-        library_fm = await db.failure_modes.find_one(
-            {"$or": [
-                {"id": fm_id},
-                {"failure_mode": fm_name}
-            ]},
-            {"potential_effects": 1, "version": 1, "updated_at": 1, "_id": 0}
-        )
+        library_fm = await lookup_library_failure_mode(fm_id, fm_name)
         
         if library_fm:
             # Check if potential_effects is missing or empty
@@ -499,6 +494,24 @@ async def sync_equipment_type_strategy(
     updated_fms = []
     tasks_refreshed = 0
     refreshed_task_templates: List[Dict[str, Any]] = []
+    refreshed_fm_keys: set = set()
+
+    async def _apply_library_fm_refresh(existing_fm: Dict[str, Any], library_fm: Dict[str, Any]) -> None:
+        nonlocal tasks_refreshed, existing_tasks, refreshed_task_templates
+        _, existing_tasks, n = refresh_failure_mode_strategy_from_library(
+            library_fm, existing_fm, existing_tasks
+        )
+        tasks_refreshed += n
+        updated_fms.append(library_fm.get("failure_mode") or existing_fm.get("failure_mode_name") or "")
+        key = str(existing_fm.get("failure_mode_id") or existing_fm.get("failure_mode_name") or "")
+        refreshed_fm_keys.add(key)
+        for tid in existing_fm.get("task_ids") or []:
+            task = next(
+                (t for t in existing_tasks if str(t.get("id")) == str(tid)),
+                None,
+            )
+            if task:
+                refreshed_task_templates.append(task)
     
     for fm in library_failure_modes:
         fm_id = fm.get("id", str(uuid.uuid4()))
@@ -514,18 +527,7 @@ async def sync_equipment_type_strategy(
             for existing_fm in existing_fm_strategies:
                 if existing_fm.get("failure_mode_id") == fm_id or existing_fm.get("failure_mode_name") == fm_name:
                     if existing_fm.get("fm_version", 1) < fm_version:
-                        _, existing_tasks, n = refresh_failure_mode_strategy_from_library(
-                            fm, existing_fm, existing_tasks
-                        )
-                        tasks_refreshed += n
-                        updated_fms.append(fm_name)
-                        for tid in existing_fm.get("task_ids") or []:
-                            task = next(
-                                (t for t in existing_tasks if str(t.get("id")) == str(tid)),
-                                None,
-                            )
-                            if task:
-                                refreshed_task_templates.append(task)
+                        await _apply_library_fm_refresh(existing_fm, fm)
                     break
             continue
         
@@ -573,6 +575,21 @@ async def sync_equipment_type_strategy(
             enabled=True
         )
         new_fm_strategies.append(fm_strategy)
+
+    # Refresh strategy FMs that have newer library versions but were not in the ET query
+    for existing_fm in existing_fm_strategies:
+        key = str(existing_fm.get("failure_mode_id") or existing_fm.get("failure_mode_name") or "")
+        if key in refreshed_fm_keys:
+            continue
+        library_fm = await lookup_library_failure_mode(
+            existing_fm.get("failure_mode_id"),
+            existing_fm.get("failure_mode_name"),
+        )
+        if not library_fm:
+            continue
+        library_version = library_fm.get("version") or 1
+        if existing_fm.get("fm_version", 1) < library_version:
+            await _apply_library_fm_refresh(existing_fm, library_fm)
     
     # Merge: existing + new
     all_fm_strategies = existing_fm_strategies + [fm.model_dump() for fm in new_fm_strategies]
