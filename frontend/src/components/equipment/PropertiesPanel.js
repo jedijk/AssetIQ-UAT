@@ -599,6 +599,11 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
     }
   }, [isEditing]);
 
+  const criticalityScore = useMemo(
+    () => (node ? computeCriticalityScore(node.criticality) : null),
+    [node, node?.criticality]
+  );
+
   if (!node) return (
     <div className="flex flex-col items-center justify-center h-full p-6 text-center">
       <Settings className="w-12 h-12 text-slate-300 mb-3" />
@@ -610,10 +615,6 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
   const levelLabel = getEquipmentLevelLabel(t, node.level) || t("equipment.unknownLevel");
   const LevelIcon = config.icon;
   const critColors = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
-  const criticalityScore = useMemo(
-    () => computeCriticalityScore(node.criticality),
-    [node.criticality]
-  );
   
   const handleSave = () => { onUpdate(node.id, { name: editName, description: editDesc, tag: editTag }); setIsEditing(false); };
   const startEdit = () => { setEditName(node.name); setEditDesc(node.description || ""); setEditTag(node.tag || ""); setIsEditing(true); };
