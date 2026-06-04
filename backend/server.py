@@ -294,6 +294,9 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             or "/maintenance-programs" in request.url.path
             or "/failure-modes/find-duplicate-actions" in request.url.path
             or "/failure-modes/find-similar" in request.url.path
+            or "/ril/copilot" in request.url.path
+            or "/ril/predictions" in request.url.path
+            or "/ril/correlations/find" in request.url.path
         ):
             request_timeout = self.long_timeout
         else:

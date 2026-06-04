@@ -802,3 +802,275 @@ agent_communication:
     message: "Implemented PM Import Extraction Engine enhancements per the AssetIQ spec. Key changes: (1) Enhanced _parse_excel to treat worksheets as hierarchical documents, not row-by-row. (2) Column A is the ONLY source for equipment tags. (3) EVERY equipment tag now results in a separate task record - if 50 tags share the same task, 50 records are created. (4) Proper merged cell handling - merged task descriptions apply to all equipment tags in the block. (5) Tags above/below tasks are properly associated. (6) Expansion happens BEFORE AI enrichment. (7) Added self-validation to verify tag count == record count. Please test the PM Import upload endpoint with an Excel file containing multiple equipment tags sharing tasks."
   - agent: "testing"
     message: "PM IMPORT EXTRACTION ENGINE BUG FIX COMPLETE - ALL TESTS PASSING (10/10). Re-tested after main agent applied equipment_tag field fix. Found SECOND BUG: Scenario 4 parsing issue where HX-401 (tag without task) followed by HX-402 (tag with task) resulted in HX-401 being lost. Root cause: Line 1366 condition required both current_tags AND current_task_info to be truthy, but current_task_info was None. FIXED by modifying logic to flush accumulated tags with CURRENT row's task when encountering a tag with a task. Final test results: ✅ 10 tags → 10 task records (expected 10). ✅ All expected tags present: 17XA001141, 17XA001142, 17XA001143, 17XA001144, P-101, P-102, M-201, V-301, HX-401, HX-402. ✅ Equipment_tag field correctly populated in all records (NOT replaced with component categories). ✅ Scenario 1 (merged cell): 4 tags → 4 records. ✅ Scenario 2 (empty Column A): 2 tags → 2 records. ✅ Scenario 4 (tag without task + tag with task): 2 tags → 2 records. ✅ Self-validation logs: '10 records, 10 with tags, 0 without tags, 10 unique tags'. ✅ No comma-separated tags in output. Hierarchical document processing working correctly. PM Import Extraction Engine is production-ready."
+
+
+
+# Reliability Intelligence Layer (RIL) - Phase 1 MVP
+
+user_problem_statement: "Implement RIL (Reliability Intelligence Layer) Phase 1 MVP - Transform AssetIQ from maintenance management to reliability intelligence platform"
+
+backend:
+  - task: "RIL Models - Core Data Structures"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/models/ril.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Created comprehensive models: ReliabilityCase (core container), RILObservation (unified observations), Reading (sensor data), Correlation (multi-source), Alert (with triage), Prediction (failure forecasting), StrategyRecommendation. Includes enums for sources, severity, priority, status, etc."
+
+  - task: "RIL Observation Ingestion API"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/routes/ril/observations.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented POST /api/ril/observations and GET /api/ril/observations. Supports sources: manual, operator_rounds, vision_ai, investigation, pm_import, external_system, historian_alert, condition_monitoring, scada, dcs, vibration_system, thermal_monitoring, oil_analysis, ultrasonic, corrosion_monitoring."
+
+  - task: "RIL Reading Ingestion API"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/routes/ril/readings.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented POST /api/ril/readings (single), POST /api/ril/readings/bulk (batch), GET /api/ril/readings. Auto-creates alerts when thresholds exceeded. Supports process historians, SCADA, DCS, vibration, thermal, oil analysis, ultrasonic, corrosion monitoring."
+
+  - task: "RIL Intelligent Alert Triage API"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/routes/ril/alerts.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented POST /api/ril/alerts (with auto-triage), GET /api/ril/alerts, PATCH /api/ril/alerts/{id}. Triage evaluates: asset criticality, failure mode severity, source confidence, historical behavior. Outputs: priority (P1-P4), response time, recommended owner, suggested actions."
+
+  - task: "RIL Multi-Source Correlation API"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/routes/ril/correlations.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented POST /api/ril/correlations/find (analyze correlations), GET /api/ril/correlations. Features: event correlation, pattern matching, timeline reconstruction, source confidence weighting, contradiction detection. Outputs: correlation score, confidence, corroborating evidence, suggested root causes."
+
+  - task: "RIL Reliability Cases API"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/routes/ril/cases.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented full CRUD: POST /api/ril/cases, GET /api/ril/cases, GET /api/ril/cases/{id}, PATCH /api/ril/cases/{id}. Plus linking endpoints: link-observation, link-alert, link-investigation. Auto-generates case numbers (RC-YYYY-NNNN), calculates risk assessment, tracks status history."
+
+  - task: "RIL Predictions API"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/routes/ril/predictions.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented GET /api/ril/predictions, POST /api/ril/predictions/generate/{equipment_id}, GET /api/ril/predictions/equipment/{id}, GET /api/ril/predictions/at-risk. Outputs: failure probability, confidence, RUL (remaining useful life), estimated failure date, recommended actions."
+
+  - task: "RIL Reliability Copilot API"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/routes/ril/copilot.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented POST /api/ril/copilot/query (natural language queries), GET /api/ril/copilot/suggestions. Uses GPT-4o for intent classification and response generation. Supports queries like 'Why is P-104 high risk?', 'What changed this week?', 'Which assets need attention today?'"
+
+  - task: "RIL Dashboard API"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/routes/ril/dashboard.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented GET /api/ril/dashboard/stats (main stats), GET /api/ril/dashboard/executive (KPIs: reliability score, risk exposure), GET /api/ril/dashboard/intelligence (correlations, emerging risks, fleet insights), GET /api/ril/dashboard/data-quality (source coverage, freshness)."
+
+  - task: "RIL Service Layer"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/services/ril_service.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented RILService with: create_observation, get_observations, ingest_reading, ingest_readings_bulk, create_alert, triage_alert, find_correlations, create_reliability_case, generate_prediction, get_dashboard_stats. Includes risk scoring, threshold checking, auto-alert creation."
+
+  - task: "RIL Copilot Service Layer"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/services/ril_copilot_service.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented ReliabilityCopilotService with: process_query, _classify_intent, _gather_data, _extract_equipment_from_query, _generate_response. Supports intents: risk_analysis, changes_summary, equipment_details, attention_required, predictions, cases_summary, alerts_summary, general_summary."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "RIL Observation Ingestion API"
+    - "RIL Alert Triage API"
+    - "RIL Reliability Cases API"
+    - "RIL Dashboard API"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Implemented RIL (Reliability Intelligence Layer) Phase 1 MVP backend. Created 30 new API endpoints under /api/ril/*. Core features: (1) Unified Observation Intelligence - aggregate observations from all sources into common model, (2) Reading Ingestion - continuous data streams from external systems, (3) Intelligent Alert Triage - auto-classify and prioritize alerts (P1-P4), (4) Multi-Source Correlation - identify relationships between observations, (5) Reliability Case Management - single container for reliability issues, (6) Predictive Failure Engine - failure probability and RUL predictions, (7) Reliability Copilot - natural language AI interface, (8) Dashboard APIs - executive KPIs and intelligence views. Please test the backend APIs."
+
+# Reliability Intelligence Layer (RIL) Backend Testing
+
+user_problem_statement: "Test the Reliability Intelligence Layer (RIL) backend APIs"
+
+backend:
+  - task: "RIL Observations API"
+    implemented: true
+    working: true
+    file: "/app/backend/routes/ril/observations.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: All Observations API endpoints working correctly. (1) POST /api/ril/observations successfully creates observation with source, equipment_id, title, severity. Risk score is calculated correctly (63.75 for high severity observation). (2) GET /api/ril/observations successfully lists observations with total count. Created observation found in list. (3) GET /api/ril/observations with filters (equipment_id, severity) working correctly. All 3 endpoints tested and passing."
+
+  - task: "RIL Readings API"
+    implemented: true
+    working: false
+    file: "/app/backend/routes/ril/readings.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "TESTED: Readings API partially working. (1) POST /api/ril/readings successfully ingests single reading with source_system, source_tag, value, unit, timestamp. Alert creation working (is_alarm=True when value exceeds threshold). (2) POST /api/ril/readings/bulk successfully ingests multiple readings. (3) GET /api/ril/readings FAILING with 500 error - MongoDB ObjectId serialization issue. Error: 'Unable to serialize unknown type: <class 'bson.objectid.ObjectId'>'. Root cause: Endpoint returns raw MongoDB documents containing _id field with ObjectId type that Pydantic cannot serialize. FIX REQUIRED: Convert MongoDB documents to proper format by removing _id field or converting ObjectId to string before returning."
+
+  - task: "RIL Alerts API"
+    implemented: true
+    working: false
+    file: "/app/backend/routes/ril/alerts.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "TESTED: Alerts API partially working. (1) POST /api/ril/alerts successfully creates alert with auto-triage. Triage result includes priority (P3 correctly assigned), suggested_actions (2 actions), reasoning. Priority format correct (P1-P4). (2) GET /api/ril/alerts successfully lists alerts with triage information included. (3) PATCH /api/ril/alerts/{id} FAILING with 500 error - MongoDB ObjectId serialization issue. Error: 'Unable to serialize unknown type: <class 'bson.objectid.ObjectId'>'. Root cause: Update endpoint returns raw MongoDB document. FIX REQUIRED: Convert MongoDB document to proper format before returning."
+
+  - task: "RIL Correlations API"
+    implemented: true
+    working: true
+    file: "/app/backend/routes/ril/correlations.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: All Correlations API endpoints working correctly. (1) POST /api/ril/correlations/find successfully finds correlations in time window (24 hours). Found 1 correlation with correlation_id. (2) GET /api/ril/correlations successfully lists correlations with total count. All 2 endpoints tested and passing."
+
+  - task: "RIL Reliability Cases API"
+    implemented: true
+    working: false
+    file: "/app/backend/routes/ril/cases.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "TESTED: Reliability Cases API partially working. (1) POST /api/ril/cases successfully creates case with title, equipment_id. Auto-generated case_number format correct (RC-2026-0001). Risk assessment calculated and included. Observation and alert IDs linked correctly. (2) GET /api/ril/cases successfully lists cases with total count. (3) GET /api/ril/cases/{id} FAILING with 500 error - MongoDB ObjectId serialization issue. Error: 'Unable to serialize unknown type: <class 'bson.objectid.ObjectId'>'. Root cause: Endpoint returns raw MongoDB documents for linked observations/alerts. (4) PATCH /api/ril/cases/{id} successfully updates case status (in_progress), priority (P1), resolution_summary. FIX REQUIRED: Convert MongoDB documents to proper format in get_case endpoint."
+
+  - task: "RIL Predictions API"
+    implemented: true
+    working: false
+    file: "/app/backend/routes/ril/predictions.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "TESTED: Predictions API partially working. (1) POST /api/ril/predictions/generate/{equipment_id} FAILING with 500 error. Likely missing equipment data or service configuration issue. (2) GET /api/ril/predictions successfully lists predictions (0 predictions found as generation failed). (3) GET /api/ril/predictions/at-risk successfully returns equipment at risk list (0 found). FIX REQUIRED: Investigate prediction generation service - may need equipment type data, failure mode library, or AI service configuration."
+
+  - task: "RIL Dashboard API"
+    implemented: true
+    working: false
+    file: "/app/backend/routes/ril/dashboard.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "TESTED: Dashboard API partially working. (1) GET /api/ril/dashboard/stats successfully returns main stats: open_cases=1, alerts_7d=2, observations_7d=1. All stats valid. (2) GET /api/ril/dashboard/executive successfully returns executive KPIs: reliability_score=79.0 (valid 0-100 range), risk_exposure=0, predicted_failures=0, cases_by_status breakdown. Trends calculated correctly. (3) GET /api/ril/dashboard/intelligence FAILING with 500 error - MongoDB ObjectId serialization issue. Error: 'Unable to serialize unknown type: <class 'bson.objectid.ObjectId'>'. Root cause: Endpoint returns raw MongoDB documents for correlations and emerging_risks. (4) GET /api/ril/dashboard/data-quality successfully returns source_coverage, data_freshness, equipment_coverage (100%). FIX REQUIRED: Convert MongoDB documents to proper format in intelligence dashboard endpoint."
+
+metadata:
+  created_by: "testing_agent"
+  version: "1.0"
+  test_sequence: 11
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "RIL Observations API"
+    - "RIL Readings API"
+    - "RIL Alerts API"
+    - "RIL Correlations API"
+    - "RIL Reliability Cases API"
+    - "RIL Predictions API"
+    - "RIL Dashboard API"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "testing"
+    message: "RIL BACKEND TESTING COMPLETE - 21/26 TESTS PASSED (81% success rate). CRITICAL VERIFICATIONS PASSED: (1) Observations have risk_score calculated correctly. (2) Alerts have triage_result with priority P1-P4 assigned correctly. (3) Cases have auto-generated case_number in format RC-YYYY-NNNN. (4) Cases have risk_assessment calculated. (5) Dashboard stats return valid numbers. (6) Reliability score valid (0-100 range). WORKING ENDPOINTS: Observations (create, list, filter), Readings (ingest single, bulk), Alerts (create with auto-triage, list), Correlations (find, list), Cases (create, list, update), Predictions (list, at-risk), Dashboard (stats, executive, data-quality). FAILING ENDPOINTS (5): (1) GET /api/ril/readings - MongoDB ObjectId serialization error. (2) PATCH /api/ril/alerts/{id} - MongoDB ObjectId serialization error. (3) GET /api/ril/cases/{id} - MongoDB ObjectId serialization error. (4) POST /api/ril/predictions/generate/{equipment_id} - Service error (likely missing data). (5) GET /api/ril/dashboard/intelligence - MongoDB ObjectId serialization error. ROOT CAUSE: Failing endpoints return raw MongoDB documents containing _id field with ObjectId type that Pydantic cannot serialize. FIX: Convert MongoDB documents by removing _id field or converting ObjectId to string before returning. Core RIL functionality is working correctly - the failures are technical serialization issues, not business logic problems."
+
