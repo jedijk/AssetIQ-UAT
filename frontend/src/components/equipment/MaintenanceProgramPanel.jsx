@@ -340,6 +340,14 @@ const TaskRow = ({ task, onEdit, onDelete, onToggleActive, isExpanded, onToggleE
               <div className="text-xs font-medium text-gray-500 mb-1">Skill Required</div>
               <div className="text-sm capitalize">{task.skill_requirement?.replace('_', ' ') || 'Technician'}</div>
             </div>
+            {(task.pm_import_task_type || task.task_type) && (
+              <div>
+                <div className="text-xs font-medium text-gray-500 mb-1">Type</div>
+                <div className="text-sm uppercase">
+                  {task.pm_import_task_type || task.task_type}
+                </div>
+              </div>
+            )}
             {task.discipline && (
               <div>
                 <div className="text-xs font-medium text-gray-500 mb-1">Discipline</div>

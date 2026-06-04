@@ -509,8 +509,7 @@ class PMImportService:
             target_id = library_match.get("matched_id")
             scenario = "existing_match"
 
-        action_type = task.get("action_type") or "PM"
-        discipline = task.get("discipline") or "Maintenance"
+        action_type, discipline = self._resolve_task_type_and_discipline(task)
         estimated_time = task.get("estimated_time") or ""
         desc = task.get("existing_control") or task.get("original_task") or ""
         freq = task.get("frequency")
@@ -526,14 +525,9 @@ class PMImportService:
                 for a in actions
             )
 
-            new_action = {
-                "description": desc,
-                "action_type": action_type,
-                "discipline": discipline,
-                "source": "PM Import",
-                "frequency": freq,
-                "estimated_time": estimated_time,
-            }
+            new_action = self._build_recommended_action_from_task(
+                task, source="PM Import"
+            )
 
             changes = []
             if not action_exists:
@@ -577,14 +571,7 @@ class PMImportService:
 
             equipment = approved.get("equipment") or task.get("component") or "General Equipment"
             category = approved.get("category") or self._determine_category(task)
-            new_action = {
-                "description": desc,
-                "action_type": action_type,
-                "discipline": discipline,
-                "source": "PM Import",
-                "frequency": freq,
-                "estimated_time": estimated_time,
-            }
+            new_action = self._build_recommended_action_from_task(task, source="PM Import")
 
             return {
                 "action": "create_new",
@@ -816,9 +803,11 @@ class PMImportService:
                     continue
                 
                 # Create the approved new failure mode
-                action_type = task.get("action_type") or "PM"
-                discipline = task.get("discipline") or "Maintenance"
+                action_type, discipline = self._resolve_task_type_and_discipline(task)
                 estimated_time = task.get("estimated_time") or ""
+                action_entry = self._build_recommended_action_from_task(task, source="PM Import")
+                action_entry["imported_from"] = session.get("file_name")
+                action_entry["imported_at"] = now.isoformat()
                 
                 new_fm_data = {
                     "category": approved_fm.get("category") or self._determine_category(task),
@@ -828,16 +817,7 @@ class PMImportService:
                     "severity": approved_fm.get("severity", 5),
                     "occurrence": approved_fm.get("occurrence", 5),
                     "detectability": approved_fm.get("detectability", 5),
-                    "recommended_actions": [{
-                        "description": task.get("existing_control") or task.get("original_task"),
-                        "action_type": action_type,
-                        "discipline": discipline,
-                        "source": "PM Import",
-                        "frequency": task.get("frequency"),
-                        "estimated_time": estimated_time,
-                        "imported_from": session.get("file_name"),
-                        "imported_at": now.isoformat()
-                    }],
+                    "recommended_actions": [action_entry],
                     "failure_mode_type": "customer_specific",
                     "source": "pm_import",
                     "potential_causes": task.get("failure_mechanisms", []),
@@ -941,28 +921,27 @@ class PMImportService:
         if not existing_fm:
             return None
         
-        action_type = task.get("action_type") or "PM"
-        discipline = task.get("discipline") or "Maintenance"
+        action_type, discipline = self._resolve_task_type_and_discipline(task)
         estimated_time = task.get("estimated_time") or ""
         
         # Add the PM task as a recommended action if not already present
         actions = existing_fm.get("recommended_actions", [])
-        new_action = {
-            "description": task.get("existing_control") or task.get("original_task"),
-            "action_type": action_type,
-            "discipline": discipline,
-            "source": "PM Import",
-            "frequency": task.get("frequency"),
-            "estimated_time": estimated_time,
-            "imported_from": file_name,
-            "imported_at": now.isoformat()
-        }
-        
-        # Check if similar action exists
-        action_exists = any(
-            a.get("description", "").lower() == new_action["description"].lower()
-            for a in actions if isinstance(a, dict)
+        new_action = self._build_recommended_action_from_task(
+            task, source="PM Import"
         )
+        new_action["imported_from"] = file_name
+        new_action["imported_at"] = now.isoformat()
+        desc_key = (new_action.get("description") or "").lower()
+        
+        # Check if similar action exists — refresh type/discipline if it does
+        action_exists = False
+        for idx, a in enumerate(actions):
+            if not isinstance(a, dict):
+                continue
+            if (a.get("description") or "").lower() == desc_key:
+                actions[idx] = self._merge_action_metadata(a, new_action)
+                action_exists = True
+                break
         
         if not action_exists:
             actions.append(new_action)
@@ -3236,6 +3215,35 @@ Respond with a JSON object:
         """Build the recommended_actions description text for a PM import task."""
         return self._build_recommended_action_from_task(task).get("description", "")
 
+    @staticmethod
+    def _resolve_task_type_and_discipline(task: Dict[str, Any]) -> Tuple[str, str]:
+        """Canonical PM import task type (PM/PDM/CBM/CM) and discipline for FM actions."""
+        raw_type = (task.get("task_type") or task.get("action_type") or "PM")
+        if isinstance(raw_type, str):
+            raw_type = raw_type.upper().strip()
+        else:
+            raw_type = "PM"
+        allowed_types = {"PM", "PDM", "CBM", "CM"}
+        action_type = raw_type if raw_type in allowed_types else "PM"
+        discipline = (task.get("discipline") or "Mechanical").strip() or "Mechanical"
+        return action_type, discipline
+
+    def _merge_action_metadata(
+        self,
+        existing: Any,
+        action_entry: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Merge PM import type/discipline (and related fields) into an FM recommended action."""
+        if isinstance(existing, dict):
+            merged = dict(existing)
+            merged.update(action_entry)
+        else:
+            merged = dict(action_entry)
+        merged["action_type"] = action_entry.get("action_type") or merged.get("action_type") or "PM"
+        merged["task_type"] = action_entry.get("task_type") or merged.get("task_type") or merged["action_type"]
+        merged["discipline"] = action_entry.get("discipline") or merged.get("discipline") or "Mechanical"
+        return merged
+
     def _build_recommended_action_from_task(
         self,
         task: Dict[str, Any],
@@ -3250,11 +3258,7 @@ Respond with a JSON object:
             else task_description
         )
 
-        raw_type = (task.get("task_type") or task.get("action_type") or "PM").upper().strip()
-        allowed_types = {"PM", "PDM", "CBM", "CM"}
-        action_type = raw_type if raw_type in allowed_types else "PM"
-
-        discipline = task.get("discipline") or "Mechanical"
+        action_type, discipline = self._resolve_task_type_and_discipline(task)
 
         estimated_minutes = None
         try:
@@ -3277,6 +3281,7 @@ Respond with a JSON object:
         action: Dict[str, Any] = {
             "description": description,
             "action_type": action_type,
+            "task_type": action_type,
             "discipline": discipline,
             "source": source,
         }
@@ -3597,18 +3602,24 @@ Respond with a JSON object:
 
         existing_actions = list(fm_doc.get("recommended_actions") or [])
 
-        # Exact duplicate — reuse existing task without modifying the failure mode.
+        # Exact duplicate — refresh type/discipline (and related metadata) on the slot.
         target_norm = self._normalize_action_text(action_text)
         if target_norm:
             for idx, existing in enumerate(existing_actions):
                 if self._normalize_action_text(existing) == target_norm:
-                    return {
-                        "success": True,
-                        "message": "Task already exists on this failure mode — reusing existing entry",
-                        "mode": "existing",
-                        "replaced_index": idx,
-                        "failure_mode_id": str(fm_doc["_id"]),
-                    }
+                    new_actions = list(existing_actions)
+                    new_actions[idx] = self._merge_action_metadata(existing, action_entry)
+                    return await self._persist_failure_mode_actions(
+                        fm_doc,
+                        new_actions,
+                        updated_by,
+                        change_reason,
+                        mode="replaced",
+                        message="Updated existing task with type and discipline from PM import",
+                        match_idx=idx,
+                        ratio=1.0,
+                        replace_action_index=replace_action_index,
+                    )
 
         if force_add:
             new_actions = existing_actions + [action_entry]
@@ -3632,13 +3643,9 @@ Respond with a JSON object:
 
         if match_idx >= 0:
             new_actions = list(existing_actions)
-            existing = existing_actions[match_idx]
-            if isinstance(existing, dict):
-                merged = dict(existing)
-                merged.update(action_entry)
-                new_actions[match_idx] = merged
-            else:
-                new_actions[match_idx] = action_entry
+            new_actions[match_idx] = self._merge_action_metadata(
+                existing_actions[match_idx], action_entry
+            )
             mode = "replaced"
             message = (
                 "Replaced existing task (AI-selected)"
@@ -3819,12 +3826,27 @@ Respond with a JSON object:
             action_entry = self._build_recommended_action_from_task(task)
 
             if suggestion and (suggestion.get("recommendation") or {}).get("already_exists"):
-                result["success"] = True
-                result["message"] = "Task already linked — reusing existing failure mode action"
-                result["mode"] = "existing"
-                self._mark_task_implemented(task, target_failure_mode_id, "existing")
-                if task.get("review_status") == "accepted":
-                    task["review_status"] = "implemented"
+                apply_res = await self._apply_task_to_failure_mode(
+                    target_failure_mode_id=target_failure_mode_id,
+                    action_entry=action_entry,
+                    updated_by=updated_by,
+                    change_reason=f"PM Import AI Review — refresh existing task {task_id}",
+                    replace_action_index=replace_action_index,
+                )
+                result.update(apply_res)
+                if apply_res.get("success"):
+                    self._mark_task_implemented(
+                        task,
+                        apply_res.get("failure_mode_id") or target_failure_mode_id,
+                        apply_res.get("mode") or "existing",
+                        replace_action_index=apply_res.get("replaced_index"),
+                    )
+                    if task.get("review_status") == "accepted":
+                        task["review_status"] = "implemented"
+                    result["message"] = (
+                        apply_res.get("message")
+                        or "Updated existing failure mode task with type and discipline"
+                    )
             else:
                 apply_res = await self._apply_task_to_failure_mode(
                     target_failure_mode_id=target_failure_mode_id,

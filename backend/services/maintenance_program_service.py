@@ -1185,11 +1185,13 @@ Only include tasks that would genuinely improve reliability and are not redundan
             or pm_task.get("task_name")
             or "Imported PM Task"
         )
-        task_type = (pm_task.get("task_type") or "PM").lower()
+        raw_type = (pm_task.get("task_type") or pm_task.get("action_type") or "PM")
+        task_type = str(raw_type).lower().strip()
         category = MaintenanceProgramService.TASK_TYPE_TO_CATEGORY.get(
             task_type,
             TaskCategory.PREVENTIVE_MAINTENANCE,
         )
+        discipline = (pm_task.get("discipline") or "Mechanical").strip() or "Mechanical"
         frequency = MaintenanceProgramService._normalize_pm_import_frequency(
             pm_task.get("frequency")
         )
@@ -1207,7 +1209,7 @@ Only include tasks that would genuinely improve reliability and are not redundan
             estimated_duration_hours=float(estimated_hours) if estimated_hours else 1.0,
             task_category=category,
             task_source=TaskSource.CUSTOMER_IMPORTED,
-            discipline=pm_task.get("discipline"),
+            discipline=discipline,
             traceability=TaskTraceability(
                 import_session_id=session_id,
                 import_source_file=session.get("file_name"),
@@ -1221,6 +1223,8 @@ Only include tasks that would genuinely improve reliability and are not redundan
         program_task["traceability"]["pm_import_task_id"] = pm_ref
         program_task["is_pm_import_pending"] = True
         program_task["pm_import_review_status"] = review_status
+        program_task["task_type"] = task_type
+        program_task["pm_import_task_type"] = str(raw_type).upper()
         return program_task
 
     @staticmethod
@@ -1327,6 +1331,29 @@ Only include tasks that would genuinely improve reliability and are not redundan
             tr = pm_task_dict.get("traceability") or {}
             pm_ref = tr.get("pm_import_task_id")
             if pm_ref and pm_ref in existing_refs:
+                for i, existing in enumerate(merged_tasks):
+                    etr = (existing.get("traceability") or {})
+                    if etr.get("pm_import_task_id") != pm_ref:
+                        continue
+                    merged_tasks[i] = {
+                        **existing,
+                        "task_category": pm_task_dict.get("task_category", existing.get("task_category")),
+                        "discipline": pm_task_dict.get("discipline") or existing.get("discipline"),
+                        "task_type": pm_task_dict.get("task_type", existing.get("task_type")),
+                        "pm_import_task_type": pm_task_dict.get(
+                            "pm_import_task_type", existing.get("pm_import_task_type")
+                        ),
+                        "pm_import_review_status": pm_task_dict.get(
+                            "pm_import_review_status", existing.get("pm_import_review_status")
+                        ),
+                        "frequency": pm_task_dict.get("frequency", existing.get("frequency")),
+                        "frequency_days": pm_task_dict.get(
+                            "frequency_days", existing.get("frequency_days")
+                        ),
+                        "estimated_duration_hours": pm_task_dict.get(
+                            "estimated_duration_hours", existing.get("estimated_duration_hours")
+                        ),
+                    }
                 continue
             title_key = (pm_task_dict.get("task_title") or "").strip().lower()
             if title_key and title_key in existing_titles:
