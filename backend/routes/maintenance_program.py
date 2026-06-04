@@ -157,36 +157,43 @@ async def get_maintenance_program(
     Get the maintenance program for a specific equipment item.
     Returns program details including all tasks.
     """
-    program = await db.maintenance_programs_v2.find_one(
+    stored_program = await db.maintenance_programs_v2.find_one(
         {"equipment_id": equipment_id},
         {"_id": 0}
     )
-    
+
+    user_id = current_user.get("id", current_user.get("email", "unknown"))
+    program, has_stored_program, pm_added = (
+        await MaintenanceProgramService.enrich_program_response_with_pm_import(
+            stored_program,
+            equipment_id,
+            user_id=user_id,
+        )
+    )
+
     if not program:
-        # Return structure indicating no program exists
         return {
             "program": None,
             "exists": False,
-            "equipment_id": equipment_id
+            "equipment_id": equipment_id,
+            "pm_import_tasks_included": 0,
         }
-    
+
     # Enrich with equipment info if needed
     equipment = await db.equipment_nodes.find_one(
         {"id": equipment_id},
         {"_id": 0, "name": 1, "tag": 1, "criticality": 1, "equipment_type_name": 1}
     )
-    
+
     if equipment:
-        # Update criticality if changed
         if equipment.get("criticality"):
             crit = equipment["criticality"]
             if isinstance(crit, dict):
                 program["criticality_level"] = crit.get("level", "low").lower()
                 program["criticality_score"] = crit.get("risk_score")
-    
-    # Check if strategy has updates available
+
     strategy_update_available = False
-    if program.get("equipment_type_id"):
+    if has_stored_program and program.get("equipment_type_id"):
         strategy = await db.equipment_type_strategies.find_one(
             {"equipment_type_id": program["equipment_type_id"]},
             {"version": 1, "_id": 0}
@@ -195,12 +202,14 @@ async def get_maintenance_program(
             current_sync_version = program.get("source_strategy_version", "0.0")
             latest_version = strategy.get("version", "1.0")
             strategy_update_available = current_sync_version != latest_version
-    
+
     return {
         "program": program,
-        "exists": True,
+        "exists": has_stored_program,
         "equipment_id": equipment_id,
-        "strategy_update_available": strategy_update_available
+        "strategy_update_available": strategy_update_available,
+        "pm_import_tasks_included": pm_added,
+        "has_tasks": len(program.get("tasks") or []) > 0,
     }
 
 

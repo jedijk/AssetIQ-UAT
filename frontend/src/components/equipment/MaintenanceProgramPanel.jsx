@@ -138,6 +138,11 @@ const TaskRow = ({ task, onEdit, onDelete, onToggleActive, isExpanded, onToggleE
             {task.is_overridden && (
               <Badge variant="outline" className="bg-orange-50 text-orange-600 text-xs">Overridden</Badge>
             )}
+            {task.is_pm_import_pending && (
+              <Badge variant="outline" className="bg-purple-50 text-purple-700 text-xs">
+                PM Import{task.pm_import_review_status ? ` · ${task.pm_import_review_status}` : ''}
+              </Badge>
+            )}
           </div>
           <div className="text-xs text-gray-500 mt-0.5 truncate">
             {task.task_description || 'No description'}
@@ -169,20 +174,28 @@ const TaskRow = ({ task, onEdit, onDelete, onToggleActive, isExpanded, onToggleE
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEdit(task)}>
-                <Edit className="h-4 w-4 mr-2" /> Edit Task
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onToggleActive(task)}>
-                {task.is_active ? (
-                  <><Pause className="h-4 w-4 mr-2" /> Deactivate</>
-                ) : (
-                  <><Play className="h-4 w-4 mr-2" /> Activate</>
-                )}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onDelete(task)} className="text-red-600">
-                <Trash2 className="h-4 w-4 mr-2" /> Delete Task
-              </DropdownMenuItem>
+              {task.is_pm_import_pending ? (
+                <DropdownMenuItem disabled className="text-xs text-gray-500">
+                  Manage in Library → PM Import
+                </DropdownMenuItem>
+              ) : (
+                <>
+                  <DropdownMenuItem onClick={() => onEdit(task)}>
+                    <Edit className="h-4 w-4 mr-2" /> Edit Task
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onToggleActive(task)}>
+                    {task.is_active ? (
+                      <><Pause className="h-4 w-4 mr-2" /> Deactivate</>
+                    ) : (
+                      <><Play className="h-4 w-4 mr-2" /> Activate</>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onDelete(task)} className="text-red-600">
+                    <Trash2 className="h-4 w-4 mr-2" /> Delete Task
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -809,6 +822,10 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
   
   // Handle task operations
   const handleDeleteTask = (task) => {
+    if (task.is_pm_import_pending) {
+      toast.info('This task comes from Custom PM Import. Edit or remove it in Library → PM Import.');
+      return;
+    }
     if (window.confirm(`Delete task "${task.task_title}"?`)) {
       deleteTaskMutation.mutate(task.id);
     }
@@ -828,8 +845,12 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
     );
   }
   
-  // No program exists yet
-  if (!programData?.exists) {
+  const hasTaskList =
+    programData?.has_tasks ||
+    (programData?.program?.tasks?.length ?? 0) > 0;
+
+  // No stored program and no PM Import tasks for this equipment
+  if (!programData?.exists && !hasTaskList) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center h-64 gap-4">
@@ -856,6 +877,7 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
   }
   
   const program = programData.program;
+  const pmImportOnly = !programData?.exists && hasTaskList;
   
   return (
     <div className="space-y-4">
@@ -865,9 +887,14 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
           <ClipboardList className="h-6 w-6 text-blue-600" />
           <div>
             <h2 className="text-lg font-semibold">{program.program_name}</h2>
-            <div className="flex items-center gap-2 mt-0.5">
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <StatusBadge status={program.status} />
               <span className="text-xs text-gray-500">v{program.version}</span>
+              {pmImportOnly && (
+                <Badge variant="outline" className="bg-purple-50 text-purple-700 text-xs">
+                  Includes Custom PM Import tasks
+                </Badge>
+              )}
               {programData.strategy_update_available && (
                 <Badge variant="outline" className="bg-amber-50 text-amber-600 text-xs">
                   Strategy Update Available
@@ -878,6 +905,8 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
         </div>
         
         <div className="flex items-center gap-2">
+          {!pmImportOnly && (
+            <>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -908,11 +937,28 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
               <TooltipContent>Regenerate from Strategy</TooltipContent>
             </Tooltip>
           </TooltipProvider>
+            </>
+          )}
           
-          <Button onClick={() => setShowAddDialog(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Task
-          </Button>
+          {!pmImportOnly && (
+            <Button onClick={() => setShowAddDialog(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Task
+            </Button>
+          )}
+          {pmImportOnly && (
+            <Button
+              variant="outline"
+              onClick={() => createProgramMutation.mutate()}
+              disabled={createProgramMutation.isPending}
+            >
+              {createProgramMutation.isPending ? (
+                <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Creating...</>
+              ) : (
+                <><Plus className="h-4 w-4 mr-2" /> Create Program</>
+              )}
+            </Button>
+          )}
         </div>
       </div>
       
