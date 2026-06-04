@@ -440,6 +440,12 @@ class FindSimilarFailureModesScanRequest(BaseModel):
     cross_equipment_ratio_threshold: float = 0.88
 
 
+class FindDuplicateActionsScanRequest(BaseModel):
+    failure_mode_id: Optional[str] = None
+    ratio_threshold: float = 0.85
+    limit_results: int = 500
+
+
 class MergeFailureModesRequest(BaseModel):
     winner_id: Optional[str] = None
     loser_ids: List[str] = []
@@ -892,6 +898,23 @@ async def scan_similar_failure_modes(
         )
     except Exception as e:
         logger.error(f"Error scanning similar failure modes: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/failure-modes/find-duplicate-actions")
+async def scan_duplicate_actions_in_failure_modes(
+    request: FindDuplicateActionsScanRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Scan recommended_actions for duplicates within each failure mode."""
+    try:
+        return await failure_modes_service.scan_duplicate_actions(
+            failure_mode_id=request.failure_mode_id,
+            ratio_threshold=request.ratio_threshold,
+            limit_results=request.limit_results,
+        )
+    except Exception as e:
+        logger.error(f"Error scanning duplicate actions: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

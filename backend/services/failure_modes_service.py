@@ -1057,6 +1057,165 @@ class FailureModesService:
             "fuzzy_clustering_skipped": not run_fuzzy,
         }
 
+    @staticmethod
+    def _normalize_action_text(value: Any) -> str:
+        from services.pm_import_service import PMImportService
+
+        return PMImportService._normalize_action_text(value)
+
+    @staticmethod
+    def _action_display_label(action: Any, index: int) -> str:
+        if isinstance(action, dict):
+            return (
+                action.get("description")
+                or action.get("action")
+                or action.get("name")
+                or f"Action {index + 1}"
+            )
+        if action:
+            return str(action)
+        return f"Action {index + 1}"
+
+    @classmethod
+    def _cluster_duplicate_action_indices(
+        cls,
+        actions: List[Any],
+        ratio_threshold: float = 0.85,
+    ) -> List[List[int]]:
+        """Single-link clusters of duplicate recommended actions within one failure mode."""
+        n = len(actions or [])
+        if n < 2:
+            return []
+
+        parent = list(range(n))
+
+        def find(x: int) -> int:
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        def union(a: int, b: int) -> None:
+            ra, rb = find(a), find(b)
+            if ra != rb:
+                parent[ra] = rb
+
+        norms = [cls._normalize_action_text(a) for a in actions]
+        for i in range(n):
+            for j in range(i + 1, n):
+                if norms[i] and norms[i] == norms[j]:
+                    union(i, j)
+                    continue
+                if not norms[i] or not norms[j]:
+                    continue
+                ratio = SequenceMatcher(None, norms[i], norms[j]).ratio()
+                if ratio >= ratio_threshold:
+                    union(i, j)
+
+        cluster_map: Dict[int, List[int]] = {}
+        for i in range(n):
+            cluster_map.setdefault(find(i), []).append(i)
+        return [sorted(idxs) for idxs in cluster_map.values() if len(idxs) >= 2]
+
+    async def scan_duplicate_actions(
+        self,
+        failure_mode_id: Optional[str] = None,
+        ratio_threshold: float = 0.85,
+        limit_results: int = 500,
+    ) -> Dict[str, Any]:
+        """Find duplicate recommended_actions within each failure mode (library-wide scan)."""
+        query: Dict[str, Any] = {}
+        if failure_mode_id:
+            id_query = self._build_id_query(failure_mode_id)
+            if id_query:
+                query = id_query
+
+        cursor = self.collection.find(
+            query,
+            {
+                "_id": 1,
+                "id": 1,
+                "failure_mode": 1,
+                "equipment": 1,
+                "recommended_actions": 1,
+            },
+        ).sort("failure_mode", 1)
+
+        results: List[Dict[str, Any]] = []
+        total_actions_scanned = 0
+        failure_modes_scanned = 0
+
+        async for doc in cursor:
+            failure_modes_scanned += 1
+            fm_id = str(doc.get("id") or doc["_id"])
+            actions = doc.get("recommended_actions") or []
+            if len(actions) < 2:
+                continue
+            total_actions_scanned += len(actions)
+
+            duplicate_groups: List[Dict[str, Any]] = []
+            for indices in self._cluster_duplicate_action_indices(
+                actions, ratio_threshold=ratio_threshold
+            ):
+                members = []
+                pair_ratios: List[float] = []
+                for idx in indices:
+                    action = actions[idx]
+                    members.append({
+                        "index": idx,
+                        "label": self._action_display_label(action, idx),
+                        "action_type": (
+                            action.get("action_type") or action.get("task_type")
+                            if isinstance(action, dict)
+                            else None
+                        ),
+                        "discipline": (
+                            action.get("discipline") if isinstance(action, dict) else None
+                        ),
+                    })
+                for i in range(len(indices)):
+                    for j in range(i + 1, len(indices)):
+                        ni = self._normalize_action_text(actions[indices[i]])
+                        nj = self._normalize_action_text(actions[indices[j]])
+                        if ni and nj:
+                            pair_ratios.append(SequenceMatcher(None, ni, nj).ratio())
+                avg_ratio = (
+                    round(sum(pair_ratios) / len(pair_ratios) * 100, 1)
+                    if pair_ratios
+                    else 100.0
+                )
+                duplicate_groups.append({
+                    "action_indices": indices,
+                    "members": members,
+                    "avg_similarity_score": avg_ratio,
+                    "reason": "Duplicate or near-duplicate recommended action text",
+                })
+
+            if duplicate_groups:
+                results.append({
+                    "failure_mode_id": fm_id,
+                    "failure_mode": doc.get("failure_mode") or "",
+                    "equipment": doc.get("equipment") or "",
+                    "action_count": len(actions),
+                    "duplicate_groups": duplicate_groups,
+                    "duplicate_group_count": len(duplicate_groups),
+                })
+                if len(results) >= limit_results:
+                    break
+
+        duplicate_action_count = sum(
+            len(r.get("duplicate_groups") or []) for r in results
+        )
+        return {
+            "failure_mode_id": failure_mode_id,
+            "ratio_threshold": ratio_threshold,
+            "failure_modes_scanned": failure_modes_scanned,
+            "total_actions_scanned": total_actions_scanned,
+            "failure_modes_with_duplicates": len(results),
+            "duplicate_group_count": duplicate_action_count,
+            "results": results,
+        }
+
     async def _resolve_fm_doc(self, mode_id: str) -> Optional[Dict[str, Any]]:
         query = self._build_id_query(mode_id)
         if not query:

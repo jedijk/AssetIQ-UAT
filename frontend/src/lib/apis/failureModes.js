@@ -91,6 +91,14 @@ export const failureModesAPI = {
     return response.data;
   },
 
+  /** Scan duplicate recommended_actions inside each failure mode. */
+  findDuplicateActions: async (body = {}) => {
+    const response = await api.post("/failure-modes/find-duplicate-actions", body, {
+      timeout: 120000,
+    });
+    return response.data;
+  },
+
   /**
    * Merge losers into winner. Pass dry_run: true to preview.
    * Supports winner_id + loser_ids or primary_id + merge_id.

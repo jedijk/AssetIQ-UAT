@@ -100,6 +100,7 @@ import AIImproveFailureMode from "../components/library/AIImproveFailureMode";
 import BulkImproveFailureModes from "../components/library/BulkImproveFailureModes";
 import AIReviewActionDisciplines from "../components/library/AIReviewActionDisciplines";
 import AIFindSimilarFailureModes from "../components/library/AIFindSimilarFailureModes";
+import FindDuplicateActionsDialog from "../components/library/FindDuplicateActionsDialog";
 import { AIReviewModal } from "../components/library/AIReviewModal";
 import PMApplyFailureModeDialog from "../components/library/PMApplyFailureModeDialog";
 
@@ -990,6 +991,7 @@ const FailureModesPage = () => {
   const [isBulkImproveOpen, setIsBulkImproveOpen] = useState(false); // Bulk improve all visible
   const [isReviewDisciplinesOpen, setIsReviewDisciplinesOpen] = useState(false); // AI review action disciplines
   const [isFindSimilarOpen, setIsFindSimilarOpen] = useState(false); // AI find similar failure modes
+  const [isFindDuplicateActionsOpen, setIsFindDuplicateActionsOpen] = useState(false);
   
   // Failure mode dialog state
   const [isFmDialogOpen, setIsFmDialogOpen] = useState(false);
@@ -1884,10 +1886,21 @@ const FailureModesPage = () => {
                 className={`h-11 border-purple-200 text-purple-700 hover:bg-purple-50 ${canUseAITools ? "" : "hidden"}`}
                 data-testid="find-similar-fm-btn"
                 disabled={failureModes.length === 0}
-                title="Find similar failure modes per equipment type and merge them"
+                title="Find similar failure modes across the library and merge them"
               >
                 <Sparkles className="w-4 h-4 mr-1" />
                 Find Similar
+              </Button>
+              <Button
+                onClick={() => setIsFindDuplicateActionsOpen(true)}
+                variant="outline"
+                className="h-11 border-amber-200 text-amber-800 hover:bg-amber-50"
+                data-testid="find-duplicate-actions-btn"
+                disabled={failureModes.length === 0}
+                title="Find duplicate recommended actions inside failure modes"
+              >
+                <ClipboardList className="w-4 h-4 mr-1" />
+                Duplicate Actions
               </Button>
               <Button
                 onClick={() => { setEditingFm(null); resetFmForm(); setIsFmDialogOpen(true); }}
@@ -3104,6 +3117,16 @@ const FailureModesPage = () => {
         equipmentTypes={equipmentTypes}
         onApplied={() => {
           queryClient.invalidateQueries({ queryKey: ["failureModes"] });
+        }}
+      />
+
+      <FindDuplicateActionsDialog
+        open={isFindDuplicateActionsOpen}
+        onClose={() => setIsFindDuplicateActionsOpen(false)}
+        failureModes={failureModes}
+        onSelectFailureMode={(fmId) => {
+          const fm = failureModes.find((f) => f.id === fmId);
+          if (fm) setSelectedFm(fm);
         }}
       />
     </div>
