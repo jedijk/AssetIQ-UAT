@@ -32,6 +32,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger
 } from '../ui/dropdown-menu';
 import { CRITICALITY_CONFIG } from '../maintenance/constants';
+import { computeCriticalityScore } from '../../lib/criticalityScore';
 
 const STRATEGY_BAND_STYLES = {
   low: 'bg-green-50 text-green-700 border-green-200',
@@ -45,9 +46,24 @@ const strategyBandLabel = (t, band) => {
   return t('maintenance.criticalityLow');
 };
 
+const displayCriticalityScore = (program) => {
+  const fromDims = computeCriticalityScore({
+    safety_impact: program.safety_impact ?? program.criticality?.safety_impact,
+    production_impact: program.production_impact ?? program.criticality?.production_impact,
+    environmental_impact: program.environmental_impact ?? program.criticality?.environmental_impact,
+    reputation_impact: program.reputation_impact ?? program.criticality?.reputation_impact,
+  });
+  if (fromDims != null) return fromDims;
+  const stored = program.criticality_score;
+  if (stored == null) return null;
+  if (stored <= 100) return Math.round(stored);
+  return Math.min(100, Math.round(stored / 3.5));
+};
+
 const ProgramCriticalityBanner = ({ program, strategyUpdateAvailable, t }) => {
   const equipmentLevel = program.equipment_criticality_level || program.criticality_level;
   const strategyBand = program.strategy_criticality_band;
+  const criticalityScore = displayCriticalityScore(program);
   const equipConfig = equipmentLevel ? CRITICALITY_CONFIG[equipmentLevel] : null;
   const EquipIcon = equipConfig?.icon;
   const appliedVersion = program.applied_strategy_version || program.source_strategy_version;
@@ -70,9 +86,9 @@ const ProgramCriticalityBanner = ({ program, strategyUpdateAvailable, t }) => {
               {EquipIcon && <EquipIcon className="h-3 w-3" />}
               {equipConfig?.label || equipmentLevel.replace(/_/g, ' ')}
             </Badge>
-            {program.criticality_score != null && (
+            {criticalityScore != null && (
               <span className="text-xs text-slate-600">
-                {program.criticality_score}/100
+                {criticalityScore}/100
               </span>
             )}
           </div>

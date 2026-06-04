@@ -18,7 +18,7 @@ from typing import Optional, List, Dict, Any, Tuple
 
 from database import db
 from routes.maintenance_scheduler._shared import normalize_program_criticality
-from services.criticality_score import compute_criticality_score
+from services.criticality_score import compute_criticality_score, resolve_equipment_criticality_score
 from models.maintenance_program import (
     MaintenanceProgram,
     MaintenanceProgramTask,
@@ -46,14 +46,7 @@ def _criticality_fields_from_equipment(equipment: Optional[Dict[str, Any]]) -> D
     crit = equipment["criticality"]
     if isinstance(crit, dict):
         level = (crit.get("level") or "low").lower()
-        score = crit.get("risk_score")
-        if score is None:
-            score = compute_criticality_score(
-                crit.get("safety_impact", 0) or 0,
-                crit.get("production_impact", 0) or 0,
-                crit.get("environmental_impact", 0) or 0,
-                crit.get("reputation_impact", 0) or 0,
-            )
+        score = resolve_equipment_criticality_score(crit)
         return {"criticality_level": level, "criticality_score": score}
     if isinstance(crit, str):
         return {"criticality_level": crit.lower()}
@@ -130,12 +123,7 @@ class MaintenanceProgramService:
         if equipment_crit:
             if isinstance(equipment_crit, dict):
                 equipment_criticality_level = (equipment_crit.get("level") or "low").lower()
-                criticality_score = equipment_crit.get("risk_score") or compute_criticality_score(
-                    equipment_crit.get("safety_impact", 0) or 0,
-                    equipment_crit.get("production_impact", 0) or 0,
-                    equipment_crit.get("environmental_impact", 0) or 0,
-                    equipment_crit.get("reputation_impact", 0) or 0,
-                )
+                criticality_score = resolve_equipment_criticality_score(equipment_crit)
             elif isinstance(equipment_crit, str):
                 equipment_criticality_level = equipment_crit.lower()
         strategy_criticality_band = normalize_program_criticality(equipment_crit or equipment_criticality_level)
@@ -1306,20 +1294,31 @@ Only include tasks that would genuinely improve reliability and are not redundan
 
         if crit and isinstance(crit, dict):
             equipment_level = (crit.get("level") or equipment_level or "low").lower()
-            score = crit.get("risk_score")
+            score = resolve_equipment_criticality_score(crit)
             if score is None:
-                score = compute_criticality_score(
-                    crit.get("safety_impact", 0) or 0,
-                    crit.get("production_impact", 0) or 0,
-                    crit.get("environmental_impact", 0) or 0,
-                    crit.get("reputation_impact", 0) or 0,
-                )
+                score = program.get("criticality_score")
+                if score is not None and float(score) > 100:
+                    score = min(100, round(float(score) / 3.5))
         elif crit and isinstance(crit, str):
             equipment_level = crit.lower()
 
         strategy_band = normalize_program_criticality(crit or equipment_level)
         latest_version = strategy.get("version", "1.0") if strategy else None
         applied_version = program.get("source_strategy_version")
+
+        # Repair legacy raw risk_score (e.g. 240) on the equipment record when viewed
+        equipment_id = program.get("equipment_id")
+        if equipment_id and crit and isinstance(crit, dict) and score is not None:
+            stored = crit.get("risk_score")
+            try:
+                needs_repair = stored is None or int(round(float(stored))) != int(score)
+            except (TypeError, ValueError):
+                needs_repair = True
+            if needs_repair:
+                await db.equipment_nodes.update_one(
+                    {"id": equipment_id},
+                    {"$set": {"criticality.risk_score": score}},
+                )
 
         program["equipment_criticality_level"] = equipment_level
         program["strategy_criticality_band"] = strategy_band
