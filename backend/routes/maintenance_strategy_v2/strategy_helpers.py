@@ -245,10 +245,12 @@ def generate_default_tasks_for_failure_mode(
     fm_name = failure_mode.get("failure_mode", failure_mode.get("name", "Unknown"))
     fm_id = failure_mode.get("id", str(uuid.uuid4()))
     
-    # Recommended actions from failure mode
-    recommended_actions = failure_mode.get("recommended_actions", [])
-    
-    for idx, action in enumerate(recommended_actions[:5]):  # Limit to 5 tasks per FM
+    # Recommended actions from failure mode (sync all; cap prevents runaway FM records)
+    recommended_actions = failure_mode.get("recommended_actions", []) or []
+    max_tasks = 100
+    task_idx = 0
+
+    for action in recommended_actions[:max_tasks]:
         action_text = _action_text_from_fm_action(action)
         if not action_text:
             continue
@@ -294,7 +296,7 @@ def generate_default_tasks_for_failure_mode(
             )
         
         task = MaintenanceTaskTemplate(
-            id=f"task_{fm_id}_{idx}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
+            id=f"task_{fm_id}_{task_idx}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
             name=action_text[:100] if len(action_text) > 100 else action_text,
             description=f"Task for: {fm_name}",
             task_type=task_type,
@@ -305,6 +307,7 @@ def generate_default_tasks_for_failure_mode(
             source="template"
         )
         tasks.append(task)
+        task_idx += 1
     
     # If no recommended actions, create default inspection task
     if not tasks:
