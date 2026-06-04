@@ -20,6 +20,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Failure Modes"])
 
 
+def _require_owner(current_user: dict) -> None:
+    if current_user.get("role") != "owner":
+        raise HTTPException(status_code=403, detail="Owner access required")
+
+
 # Helper functions for fallback data
 def get_all_categories():
     """Get unique categories from static library."""
@@ -920,7 +925,8 @@ async def scan_duplicate_actions_in_failure_modes(
     request: FindDuplicateActionsScanRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Scan recommended_actions for duplicates within each failure mode."""
+    """Scan recommended_actions for duplicates within each failure mode (owner only)."""
+    _require_owner(current_user)
     try:
         return await failure_modes_service.scan_duplicate_actions(
             failure_mode_id=request.failure_mode_id,
@@ -941,7 +947,8 @@ async def merge_duplicate_actions(
     request: MergeDuplicateActionsRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Merge duplicate recommended actions within one failure mode into a single action."""
+    """Merge duplicate recommended actions within one failure mode into a single action (owner only)."""
+    _require_owner(current_user)
     updated_by = current_user.get("id") or current_user.get("user_id") or current_user.get("email") or "user"
     try:
         return await failure_modes_service.merge_duplicate_action_group(

@@ -914,6 +914,7 @@ const FailureModesPage = () => {
   // New Types, and the Not-improved-yet filter) are gated by the
   // `library_ai_tools` permission so owners can hide them from junior roles.
   const canUseAITools = hasPermission("library_ai_tools", "read");
+  const isOwner = user?.role === "owner";
   const [searchParams, setSearchParams] = useSearchParams();
   
   const isMobile = useIsMobile();
@@ -1894,10 +1895,10 @@ const FailureModesPage = () => {
               <Button
                 onClick={() => setIsFindDuplicateActionsOpen(true)}
                 variant="outline"
-                className="h-11 border-amber-200 text-amber-800 hover:bg-amber-50"
+                className={`h-11 border-amber-200 text-amber-800 hover:bg-amber-50 ${isOwner ? "" : "hidden"}`}
                 data-testid="find-duplicate-actions-btn"
                 disabled={failureModes.length === 0}
-                title="Find duplicate recommended actions inside failure modes"
+                title="Find duplicate recommended actions inside failure modes (owner only)"
               >
                 <ClipboardList className="w-4 h-4 mr-1" />
                 Duplicate Actions
@@ -3120,18 +3121,20 @@ const FailureModesPage = () => {
         }}
       />
 
-      <FindDuplicateActionsDialog
-        open={isFindDuplicateActionsOpen}
-        onClose={() => setIsFindDuplicateActionsOpen(false)}
-        failureModes={failureModes}
-        onSelectFailureMode={(fmId) => {
-          const fm = failureModes.find((f) => f.id === fmId);
-          if (fm) setSelectedFm(fm);
-        }}
-        onApplied={() => {
-          queryClient.invalidateQueries({ queryKey: ["failureModes"] });
-        }}
-      />
+      {isOwner && (
+        <FindDuplicateActionsDialog
+          open={isFindDuplicateActionsOpen}
+          onClose={() => setIsFindDuplicateActionsOpen(false)}
+          failureModes={failureModes}
+          onSelectFailureMode={(fmId) => {
+            const fm = failureModes.find((f) => f.id === fmId);
+            if (fm) setSelectedFm(fm);
+          }}
+          onApplied={() => {
+            queryClient.invalidateQueries({ queryKey: ["failureModes"] });
+          }}
+        />
+      )}
     </div>
   );
 };
