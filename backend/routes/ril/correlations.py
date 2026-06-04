@@ -123,4 +123,3 @@ async def get_correlation(
         "observations": observations,
         "alerts": alerts
     }
-    }
