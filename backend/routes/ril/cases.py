@@ -114,17 +114,21 @@ async def get_case(
     observations = []
     if case.observation_ids:
         async for obs in db.ril_observations.find({"id": {"$in": case.observation_ids}}):
+            obs.pop('_id', None)  # Remove MongoDB ObjectId
             observations.append(obs)
     
     alerts = []
     if case.alert_ids:
         async for alert in db.ril_alerts.find({"id": {"$in": case.alert_ids}}):
+            alert.pop('_id', None)  # Remove MongoDB ObjectId
             alerts.append(alert)
     
     # Get equipment details
     equipment = None
     if case.equipment_id:
         equipment = await db.equipment_nodes.find_one({"id": case.equipment_id})
+        if equipment:
+            equipment.pop('_id', None)  # Remove MongoDB ObjectId
     
     return {
         "case": case.dict(),

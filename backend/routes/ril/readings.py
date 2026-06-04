@@ -111,6 +111,7 @@ async def list_readings(
     
     readings = []
     async for doc in cursor:
+        doc.pop('_id', None)  # Remove MongoDB ObjectId
         readings.append(doc)
     
     return {

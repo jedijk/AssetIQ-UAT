@@ -129,6 +129,7 @@ async def get_equipment_prediction(
     })
     
     if doc:
+        doc.pop('_id', None)  # Remove MongoDB ObjectId
         return {"prediction": doc, "cached": True}
     
     # Generate new prediction
@@ -173,6 +174,7 @@ async def get_equipment_at_risk(
     
     at_risk = []
     async for doc in db.ril_predictions.aggregate(pipeline):
+        doc.pop('_id', None)  # Remove MongoDB ObjectId
         at_risk.append(doc)
     
     return {

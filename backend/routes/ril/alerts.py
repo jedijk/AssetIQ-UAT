@@ -108,6 +108,7 @@ async def get_alert(
     if not doc:
         raise HTTPException(status_code=404, detail="Alert not found")
     
+    doc.pop('_id', None)  # Remove MongoDB ObjectId
     return {"alert": doc}
 
 
@@ -143,6 +144,8 @@ async def update_alert(
         raise HTTPException(status_code=404, detail="Alert not found")
     
     updated = await db.ril_alerts.find_one({"id": alert_id})
+    if updated:
+        updated.pop('_id', None)  # Remove MongoDB ObjectId
     
     return {
         "success": True,

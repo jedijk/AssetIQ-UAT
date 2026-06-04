@@ -104,4 +104,5 @@ async def get_observation(
     if not doc:
         raise HTTPException(status_code=404, detail="Observation not found")
     
+    doc.pop('_id', None)  # Remove MongoDB ObjectId
     return {"observation": doc}

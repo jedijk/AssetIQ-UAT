@@ -166,6 +166,7 @@ async def get_intelligence_dashboard(
     async for doc in db.ril_correlations.find(
         {"owner_id": owner_id, "is_active": True}
     ).sort("created_at", -1).limit(5):
+        doc.pop('_id', None)  # Remove MongoDB ObjectId
         correlations.append(doc)
     
     # Emerging risks (recent high-severity observations)
@@ -176,6 +177,7 @@ async def get_intelligence_dashboard(
         "severity": {"$in": ["critical", "high"]},
         "created_at": {"$gte": seven_days_ago}
     }).sort("risk_score", -1).limit(5):
+        doc.pop('_id', None)  # Remove MongoDB ObjectId
         emerging_risks.append(doc)
     
     # Fleet insights (equipment type statistics)
@@ -199,6 +201,7 @@ async def get_intelligence_dashboard(
         "owner_id": owner_id,
         "status": "pending"
     }).sort("created_at", -1).limit(5):
+        doc.pop('_id', None)  # Remove MongoDB ObjectId
         recommendations.append(doc)
     
     return {

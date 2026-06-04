@@ -103,19 +103,24 @@ async def get_correlation(
     if not doc:
         raise HTTPException(status_code=404, detail="Correlation not found")
     
+    doc.pop('_id', None)  # Remove MongoDB ObjectId
+    
     # Fetch related observations and alerts
     observations = []
     if doc.get("observation_ids"):
         async for obs in db.ril_observations.find({"id": {"$in": doc["observation_ids"]}}):
+            obs.pop('_id', None)  # Remove MongoDB ObjectId
             observations.append(obs)
     
     alerts = []
     if doc.get("alert_ids"):
         async for alert in db.ril_alerts.find({"id": {"$in": doc["alert_ids"]}}):
+            alert.pop('_id', None)  # Remove MongoDB ObjectId
             alerts.append(alert)
     
     return {
         "correlation": doc,
         "observations": observations,
         "alerts": alerts
+    }
     }
