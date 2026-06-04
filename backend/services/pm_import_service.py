@@ -3530,6 +3530,21 @@ Respond with a JSON object:
             return best_idx, best_ratio
         return -1, best_ratio
 
+    @staticmethod
+    def _mark_task_implemented(
+        task: Dict[str, Any],
+        failure_mode_id: str,
+        apply_mode: str,
+        replace_action_index: Optional[int] = None,
+    ) -> None:
+        """Record that a PM Import task was applied to the failure mode library."""
+        task["import_status"] = "implemented"
+        task["target_failure_mode_id"] = failure_mode_id
+        task["apply_mode"] = apply_mode
+        task["implemented_at"] = datetime.now(timezone.utc).isoformat()
+        if replace_action_index is not None:
+            task["replaced_action_index"] = replace_action_index
+
     async def _apply_task_to_failure_mode(
         self,
         target_failure_mode_id: str,
@@ -3537,6 +3552,7 @@ Respond with a JSON object:
         updated_by: str,
         change_reason: str,
         replace_action_index: Optional[int] = None,
+        force_add: bool = False,
     ) -> Dict[str, Any]:
         """Replace a similar existing task in a failure mode's recommended_actions,
         otherwise append it. Version history captures the previous state (acts as a
@@ -3594,6 +3610,13 @@ Respond with a JSON object:
                         "failure_mode_id": str(fm_doc["_id"]),
                     }
 
+        if force_add:
+            new_actions = existing_actions + [action_entry]
+            return await self._persist_failure_mode_actions(
+                fm_doc, new_actions, updated_by, change_reason,
+                mode="added", match_idx=-1, ratio=0.0, replace_action_index=replace_action_index,
+            )
+
         # Prefer the AI-chosen replacement index if it's in bounds.
         match_idx = -1
         ratio = 0.0
@@ -3627,8 +3650,35 @@ Respond with a JSON object:
             mode = "added"
             message = "Added as new task"
 
-        # Use FailureModesService.update so version history is recorded — this is
-        # the "soft archive" of the previous recommended_actions list.
+        return await self._persist_failure_mode_actions(
+            fm_doc,
+            new_actions,
+            updated_by,
+            change_reason,
+            mode=mode,
+            message=message,
+            match_idx=match_idx,
+            ratio=ratio,
+            replace_action_index=replace_action_index,
+        )
+
+    async def _persist_failure_mode_actions(
+        self,
+        fm_doc: Dict[str, Any],
+        new_actions: List[Any],
+        updated_by: str,
+        change_reason: str,
+        mode: str,
+        message: Optional[str] = None,
+        match_idx: int = -1,
+        ratio: float = 0.0,
+        replace_action_index: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        from services.failure_modes_service import FailureModesService
+
+        if message is None:
+            message = "Added as new task" if mode == "added" else "Updated failure mode task"
+
         fm_service = FailureModesService(self.db)
         mode_id_str = str(fm_doc["_id"])
         updated = await fm_service.update(
@@ -3653,6 +3703,73 @@ Respond with a JSON object:
             "replaced_index": match_idx if match_idx >= 0 else None,
             "failure_mode_id": mode_id_str,
         }
+
+    async def apply_task_to_failure_mode(
+        self,
+        session_id: str,
+        task_id: str,
+        target_failure_mode_id: str,
+        placement_mode: str = "add",
+        replace_action_index: Optional[int] = None,
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Apply a Custom PM Import task to a failure mode (manual, from the import list).
+        placement_mode: 'add' appends a new recommended action; 'replace' updates a slot.
+        """
+        session = await self.sessions_collection.find_one({"session_id": session_id})
+        if not session:
+            raise ValueError(f"Session {session_id} not found")
+
+        tasks = session.get("tasks_extracted", [])
+        task = next((t for t in tasks if t.get("task_id") == task_id), None)
+        if not task:
+            raise ValueError(f"Task {task_id} not found in session")
+
+        if task.get("review_status") not in ("accepted", "implemented"):
+            return {
+                "success": False,
+                "message": "Task must be accepted before applying to a failure mode",
+                "mode": None,
+            }
+
+        action_entry = self._build_recommended_action_from_task(task)
+        updated_by = user_id or session.get("created_by") or "PM Import"
+        force_add = (placement_mode or "add").lower() == "add"
+        replace_idx = None if force_add else replace_action_index
+
+        apply_res = await self._apply_task_to_failure_mode(
+            target_failure_mode_id=target_failure_mode_id,
+            action_entry=action_entry,
+            updated_by=updated_by,
+            change_reason=f"PM Import — apply task {task_id} to failure mode",
+            replace_action_index=replace_idx,
+            force_add=force_add,
+        )
+
+        result = {"task_id": task_id, "success": apply_res.get("success", False), **apply_res}
+
+        if apply_res.get("success"):
+            self._mark_task_implemented(
+                task,
+                apply_res.get("failure_mode_id") or target_failure_mode_id,
+                apply_res.get("mode") or "added",
+                replace_action_index=apply_res.get("replaced_index"),
+            )
+            if task.get("review_status") == "accepted":
+                task["review_status"] = "implemented"
+
+        await self.sessions_collection.update_one(
+            {"session_id": session_id},
+            {
+                "$set": {
+                    "tasks_extracted": tasks,
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            },
+        )
+
+        return result
 
     async def apply_ai_suggestion(
         self, 
@@ -3705,8 +3822,9 @@ Respond with a JSON object:
                 result["success"] = True
                 result["message"] = "Task already linked — reusing existing failure mode action"
                 result["mode"] = "existing"
-                task["import_status"] = "existing"
-                task["target_failure_mode_id"] = target_failure_mode_id
+                self._mark_task_implemented(task, target_failure_mode_id, "existing")
+                if task.get("review_status") == "accepted":
+                    task["review_status"] = "implemented"
             else:
                 apply_res = await self._apply_task_to_failure_mode(
                     target_failure_mode_id=target_failure_mode_id,
@@ -3717,13 +3835,14 @@ Respond with a JSON object:
                 )
                 result.update(apply_res)
                 if apply_res["success"]:
-                    task["import_status"] = (
-                        "merged" if apply_res["mode"] == "added"
-                        else "existing" if apply_res["mode"] == "existing"
-                        else "replaced"
+                    self._mark_task_implemented(
+                        task,
+                        apply_res.get("failure_mode_id") or target_failure_mode_id,
+                        apply_res.get("mode") or "added",
+                        replace_action_index=apply_res.get("replaced_index"),
                     )
-                    task["target_failure_mode_id"] = apply_res.get("failure_mode_id") or target_failure_mode_id
-                    task["apply_mode"] = apply_res["mode"]
+                    if task.get("review_status") == "accepted":
+                        task["review_status"] = "implemented"
         
         elif action == "new_failure_mode":
             # Create new failure mode — but prefer merge when a library match exists.
@@ -3757,13 +3876,14 @@ Respond with a JSON object:
                 )
                 result.update(apply_res)
                 if apply_res["success"]:
-                    task["import_status"] = (
-                        "merged" if apply_res["mode"] == "added"
-                        else "existing" if apply_res["mode"] == "existing"
-                        else "replaced"
+                    self._mark_task_implemented(
+                        task,
+                        apply_res.get("failure_mode_id") or merge_target_id,
+                        apply_res.get("mode") or "added",
+                        replace_action_index=apply_res.get("replaced_index"),
                     )
-                    task["target_failure_mode_id"] = apply_res.get("failure_mode_id") or merge_target_id
-                    task["apply_mode"] = apply_res["mode"]
+                    if task.get("review_status") == "accepted":
+                        task["review_status"] = "implemented"
                     result["message"] = (
                         f"Linked to existing failure mode instead of creating new: {fm_name}"
                     )
@@ -3788,8 +3908,11 @@ Respond with a JSON object:
                     result["success"] = True
                     result["message"] = f"New failure mode created: {fm_name}"
                     result["failure_mode_id"] = created_fm.get("id")
-                    task["import_status"] = "new_failure_mode"
-                    task["target_failure_mode_id"] = created_fm.get("id")
+                    self._mark_task_implemented(
+                        task, created_fm.get("id"), "new_failure_mode"
+                    )
+                    if task.get("review_status") == "accepted":
+                        task["review_status"] = "implemented"
                 else:
                     result["message"] = "Failed to create failure mode"
         
@@ -3808,13 +3931,14 @@ Respond with a JSON object:
                 )
                 result.update(apply_res)
                 if apply_res["success"]:
-                    task["import_status"] = (
-                        "new_task" if apply_res["mode"] == "added"
-                        else "existing" if apply_res["mode"] == "existing"
-                        else "replaced"
+                    self._mark_task_implemented(
+                        task,
+                        apply_res.get("failure_mode_id") or target_failure_mode_id,
+                        apply_res.get("mode") or "added",
+                        replace_action_index=apply_res.get("replaced_index"),
                     )
-                    task["target_failure_mode_id"] = apply_res.get("failure_mode_id") or target_failure_mode_id
-                    task["apply_mode"] = apply_res["mode"]
+                    if task.get("review_status") == "accepted":
+                        task["review_status"] = "implemented"
             else:
                 result["message"] = "No target failure mode specified"
         

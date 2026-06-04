@@ -59,6 +59,7 @@ import {
   Loader2,
   ClipboardList,
   Brain,
+  Target,
 } from "lucide-react";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -100,6 +101,7 @@ import BulkImproveFailureModes from "../components/library/BulkImproveFailureMod
 import AIReviewActionDisciplines from "../components/library/AIReviewActionDisciplines";
 import AIFindSimilarFailureModes from "../components/library/AIFindSimilarFailureModes";
 import { AIReviewModal } from "../components/library/AIReviewModal";
+import PMApplyFailureModeDialog from "../components/library/PMApplyFailureModeDialog";
 
 const getTaskEquipmentType = (task) => {
   const match = task?.equipment_match;
@@ -120,6 +122,7 @@ const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrategy }) 
   const [mappingTask, setMappingTask] = useState(null); // {task, mode: 'equipment'|'equipment-type'|'failure-modes'}
   const [showAIReview, setShowAIReview] = useState(false);
   const [selectedSessionForReview, setSelectedSessionForReview] = useState(null);
+  const [applyToFmTask, setApplyToFmTask] = useState(null);
   
   // Fetch all flattened tasks across all PM import sessions
   const { data: tasksData, isLoading, refetch } = useQuery({
@@ -255,6 +258,26 @@ const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrategy }) 
     return <Badge variant="outline" className="bg-blue-50 text-blue-700 text-xs">{frequency}</Badge>;
   };
   
+  const getImportStatusBadge = (task) => {
+    const status = task.import_status || task.review_status;
+    if (status === 'implemented' || task.import_status === 'implemented') {
+      const mode = task.apply_mode;
+      const label =
+        mode === 'replaced' ? 'Implemented (replaced)'
+        : mode === 'added' ? 'Implemented (added)'
+        : mode === 'existing' ? 'Implemented (existing)'
+        : 'Implemented';
+      return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 text-xs">{label}</Badge>;
+    }
+    if (task.review_status === 'accepted') {
+      return <Badge variant="outline" className="bg-green-50 text-green-700 text-xs">Accepted</Badge>;
+    }
+    if (task.review_status === 'rejected') {
+      return <Badge variant="outline" className="bg-red-50 text-red-700 text-xs">Rejected</Badge>;
+    }
+    return <Badge variant="outline" className="bg-gray-50 text-gray-600 text-xs">Pending</Badge>;
+  };
+
   const getTaskTypeBadge = (taskType) => {
     if (!taskType) return null;
     const normalized = String(taskType).toUpperCase();
@@ -409,6 +432,7 @@ const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrategy }) 
                   <th className="text-left px-3 py-3 text-xs font-medium text-gray-600">Equipment Description</th>
                   <th className="text-left px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Equipment Type</th>
                   <th className="text-left px-3 py-3 text-xs font-medium text-gray-600">Task Description</th>
+                  <th className="text-left px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Status</th>
                   <th className="text-left px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Type</th>
                   <th className="text-left px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Discipline</th>
                   <th className="text-left px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Frequency</th>
@@ -466,6 +490,9 @@ const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrategy }) 
                         </div>
                       )}
                     </td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      {getImportStatusBadge(task)}
+                    </td>
                     <td className="px-3 py-3">
                       {getTaskTypeBadge(task.task_type)}
                     </td>
@@ -483,9 +510,20 @@ const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrategy }) 
                         <Button
                           size="sm"
                           variant="ghost"
+                          className="h-7 px-2 text-purple-600 hover:bg-purple-50"
+                          title="Apply to failure mode"
+                          disabled={task.review_status !== 'accepted' && task.review_status !== 'implemented'}
+                          onClick={() => setApplyToFmTask(task)}
+                          data-testid={`pm-task-apply-fm-${task.task_id}`}
+                        >
+                          <Target className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           className="h-7 px-2 text-green-600 hover:bg-green-50"
                           title="Accept"
-                          disabled={task.review_status === 'accepted'}
+                          disabled={task.review_status === 'accepted' || task.review_status === 'implemented'}
                           onClick={() => acceptMutation.mutate(task)}
                           data-testid={`pm-task-accept-${task.task_id}`}
                         >
@@ -571,6 +609,12 @@ const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrategy }) 
         onComplete={() => {
           invalidateTasks();
         }}
+      />
+
+      <PMApplyFailureModeDialog
+        task={applyToFmTask}
+        onClose={() => setApplyToFmTask(null)}
+        onSuccess={() => invalidateTasks()}
       />
     </div>
   );

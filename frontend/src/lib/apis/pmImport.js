@@ -235,6 +235,17 @@ export const pmImportAPI = {
   },
 
   /**
+   * Apply task to a failure mode (replace or add recommended action).
+   */
+  applyToFailureMode: async (sessionId, taskId, data) => {
+    const response = await api.post(
+      `/pm-import/session/${sessionId}/task/${taskId}/apply-to-failure-mode`,
+      data
+    );
+    return response.data;
+  },
+
+  /**
    * Apply all AI suggestions for a session
    * @param {string} sessionId 
    */

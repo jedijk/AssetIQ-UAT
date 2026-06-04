@@ -76,6 +76,13 @@ class ApplySuggestionRequest(BaseModel):
     replace_action_index: Optional[int] = None
 
 
+class ApplyToFailureModeRequest(BaseModel):
+    """Apply a Custom PM Import task to a failure mode from the import list."""
+    target_failure_mode_id: str
+    placement_mode: str = "add"  # "add" | "replace"
+    replace_action_index: Optional[int] = None
+
+
 # Background task for processing
 async def process_pm_file_background(
     session_id: str,
@@ -882,6 +889,10 @@ async def list_all_tasks(
                 "confidence_score": task.get("confidence_score") or 50,
                 "equipment_match": equipment_match,
                 "review_status": task.get("review_status") or "pending",
+                "import_status": task.get("import_status") or "pending",
+                "target_failure_mode_id": task.get("target_failure_mode_id"),
+                "apply_mode": task.get("apply_mode"),
+                "implemented_at": task.get("implemented_at"),
                 "original_task": task.get("original_task") or "",
             })
 
@@ -941,6 +952,37 @@ async def get_ai_review_results(
         "suggestions": session.get("ai_review_suggestions", []),
         "status": session.get("ai_review_status", "not_started")
     }
+
+
+@router.post("/session/{session_id}/task/{task_id}/apply-to-failure-mode")
+async def apply_task_to_failure_mode(
+    session_id: str,
+    task_id: str,
+    request: ApplyToFailureModeRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Apply an accepted PM Import task to a failure mode.
+    Use placement_mode 'replace' with replace_action_index, or 'add' for a new action.
+    Marks the task as implemented in the session.
+    """
+    pm_service = PMImportService(db)
+    user_id = current_user.get("id") or current_user.get("user_id") or current_user.get("email")
+
+    try:
+        return await pm_service.apply_task_to_failure_mode(
+            session_id=session_id,
+            task_id=task_id,
+            target_failure_mode_id=request.target_failure_mode_id,
+            placement_mode=request.placement_mode,
+            replace_action_index=request.replace_action_index,
+            user_id=user_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Apply to failure mode error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to apply task: {str(e)}")
 
 
 @router.post("/session/{session_id}/task/{task_id}/apply-suggestion")

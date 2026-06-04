@@ -6,10 +6,12 @@ Includes versioning support for tracking changes and rollback capability.
 """
 
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple, Set
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
+from difflib import SequenceMatcher
 import logging
+import re
 import time
 
 logger = logging.getLogger(__name__)
@@ -652,6 +654,557 @@ class FailureModesService:
         }
         
         return result
+
+    # ============== SIMILARITY & MERGE ==============
+
+    _FM_SIM_STOPWORDS = {
+        "the", "a", "an", "of", "in", "on", "and", "or", "by", "to", "for",
+        "from", "with", "without", "due", "failure", "fault", "issue", "problem",
+    }
+
+    @staticmethod
+    def normalize_fm_text(value: Any) -> str:
+        """Normalize failure-mode names (and short text) for lexical comparison."""
+        if value is None:
+            return ""
+        text = str(value)
+        text = re.sub(r"[^a-z0-9\s]", " ", text.lower())
+        return re.sub(r"\s+", " ", text).strip()
+
+    @classmethod
+    def _fm_name_tokens(cls, name: str) -> Set[str]:
+        raw = cls.normalize_fm_text(name).split()
+        return {t for t in raw if t not in cls._FM_SIM_STOPWORDS and len(t) > 2}
+
+    @classmethod
+    def _token_jaccard(cls, a: Set[str], b: Set[str]) -> float:
+        if not a or not b:
+            return 0.0
+        return len(a & b) / len(a | b)
+
+    @classmethod
+    def score_similarity(cls, fm_a: Dict[str, Any], fm_b: Dict[str, Any]) -> Dict[str, Any]:
+        """Score how similar two failure modes are (0–100). Higher = more likely duplicate."""
+        if str(fm_a.get("id")) == str(fm_b.get("id")):
+            return {"score": 0, "name_ratio": 0.0, "token_jaccard": 0.0, "shared_equipment_types": []}
+
+        name_a = (fm_a.get("failure_mode") or "").strip()
+        name_b = (fm_b.get("failure_mode") or "").strip()
+        norm_a = cls.normalize_fm_text(name_a)
+        norm_b = cls.normalize_fm_text(name_b)
+
+        if norm_a and norm_a == norm_b:
+            name_ratio = 1.0
+            jacc = 1.0
+        else:
+            name_ratio = SequenceMatcher(None, norm_a, norm_b).ratio() if norm_a and norm_b else 0.0
+            jacc = cls._token_jaccard(cls._fm_name_tokens(name_a), cls._fm_name_tokens(name_b))
+
+        ets_a = {str(t) for t in (fm_a.get("equipment_type_ids") or [])}
+        ets_b = {str(t) for t in (fm_b.get("equipment_type_ids") or [])}
+        shared_ets = sorted(ets_a & ets_b)
+
+        score = max(name_ratio, jacc) * 70.0
+        if shared_ets:
+            score += 20.0
+        if (fm_a.get("category") or "").lower() == (fm_b.get("category") or "").lower() and fm_a.get("category"):
+            score += 5.0
+        if (fm_a.get("equipment") or "").lower() == (fm_b.get("equipment") or "").lower() and fm_a.get("equipment"):
+            score += 5.0
+
+        mech_a = cls.normalize_fm_text(fm_a.get("mechanism") or fm_a.get("iso14224_mechanism") or "")
+        mech_b = cls.normalize_fm_text(fm_b.get("mechanism") or fm_b.get("iso14224_mechanism") or "")
+        if mech_a and mech_b and mech_a != mech_b:
+            # Different ISO mechanisms — penalize (Wear ≠ Seizure)
+            mech_ratio = SequenceMatcher(None, mech_a, mech_b).ratio()
+            if mech_ratio < 0.65:
+                score *= 0.45
+
+        score = min(100.0, round(score, 1))
+        return {
+            "score": score,
+            "name_ratio": round(name_ratio, 3),
+            "token_jaccard": round(jacc, 3),
+            "shared_equipment_types": shared_ets,
+        }
+
+    @classmethod
+    def _cluster_by_name_similarity(
+        cls,
+        fms: List[Dict[str, Any]],
+        jaccard_threshold: float = 0.5,
+        ratio_threshold: float = 0.8,
+    ) -> List[List[Dict[str, Any]]]:
+        """Single-link clusters on failure_mode names (same thresholds as AI dedupe pre-filter)."""
+        n = len(fms)
+        if n < 2:
+            return []
+
+        parent = list(range(n))
+
+        def find(x: int) -> int:
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        def union(a: int, b: int) -> None:
+            ra, rb = find(a), find(b)
+            if ra != rb:
+                parent[ra] = rb
+
+        tokens_cache = [cls._fm_name_tokens(fm.get("failure_mode") or "") for fm in fms]
+        for i in range(n):
+            for j in range(i + 1, n):
+                norm_i = cls.normalize_fm_text(fms[i].get("failure_mode"))
+                norm_j = cls.normalize_fm_text(fms[j].get("failure_mode"))
+                if norm_i and norm_i == norm_j:
+                    union(i, j)
+                    continue
+                jacc = cls._token_jaccard(tokens_cache[i], tokens_cache[j])
+                ratio = SequenceMatcher(None, norm_i, norm_j).ratio() if norm_i and norm_j else 0.0
+                if jacc >= jaccard_threshold or ratio >= ratio_threshold:
+                    union(i, j)
+
+        cluster_map: Dict[int, List[Dict[str, Any]]] = {}
+        for i, fm in enumerate(fms):
+            cluster_map.setdefault(find(i), []).append(fm)
+        return [c for c in cluster_map.values() if len(c) >= 2]
+
+    @staticmethod
+    def _fm_completeness_score(doc: Dict[str, Any]) -> int:
+        effects = doc.get("potential_effects") or []
+        causes = doc.get("potential_causes") or []
+        if isinstance(effects, str):
+            effects = [effects]
+        if isinstance(causes, str):
+            causes = [causes]
+        return (
+            len(doc.get("recommended_actions") or []) * 3
+            + len(doc.get("keywords") or []) * 2
+            + len(effects)
+            + len(causes)
+            + (50 if doc.get("is_validated") else 0)
+            + int(doc.get("rpn") or 0)
+        )
+
+    async def find_similar(
+        self,
+        mode_id: str,
+        threshold: float = 55.0,
+        limit: int = 20,
+        require_shared_equipment_type: bool = True,
+    ) -> Dict[str, Any]:
+        """Find library failure modes similar to the given mode (lexical scoring)."""
+        target = await self.get_by_id(mode_id)
+        if not target:
+            return {"mode_id": mode_id, "candidates": [], "total": 0}
+
+        query: Dict[str, Any] = {}
+        if require_shared_equipment_type and target.get("equipment_type_ids"):
+            query["equipment_type_ids"] = {"$in": target["equipment_type_ids"]}
+
+        cursor = self.collection.find(query).sort("rpn", -1)
+        candidates = []
+        target_id = str(target["id"])
+        async for doc in cursor:
+            serialized = self._serialize(doc)
+            if str(serialized["id"]) == target_id:
+                continue
+            metrics = self.score_similarity(target, serialized)
+            if metrics["score"] >= threshold:
+                candidates.append({**serialized, **metrics})
+
+        candidates.sort(key=lambda x: (-x["score"], -x.get("rpn", 0)))
+        limited = candidates[: max(1, min(limit, 100))]
+        return {
+            "mode_id": target_id,
+            "failure_mode": target.get("failure_mode"),
+            "candidates": limited,
+            "total": len(limited),
+        }
+
+    async def scan_similar_groups(
+        self,
+        equipment_type_id: Optional[str] = None,
+        jaccard_threshold: float = 0.5,
+        ratio_threshold: float = 0.8,
+        min_score: float = 55.0,
+        limit_groups: int = 200,
+    ) -> Dict[str, Any]:
+        """Batch scan: cluster near-duplicate failure modes per equipment type (no AI)."""
+        query: Dict[str, Any] = {}
+        if equipment_type_id:
+            query["equipment_type_ids"] = equipment_type_id
+
+        cursor = self.collection.find(
+            query,
+            {
+                "_id": 1,
+                "failure_mode": 1,
+                "category": 1,
+                "equipment": 1,
+                "mechanism": 1,
+                "iso14224_mechanism": 1,
+                "rpn": 1,
+                "equipment_type_ids": 1,
+                "recommended_actions": 1,
+                "keywords": 1,
+                "potential_effects": 1,
+                "potential_causes": 1,
+                "is_validated": 1,
+            },
+        ).sort("rpn", -1)
+
+        all_fms: List[Dict[str, Any]] = []
+        async for doc in cursor:
+            all_fms.append(self._serialize(doc))
+
+        by_et: Dict[str, List[Dict[str, Any]]] = {}
+        for fm in all_fms:
+            et_ids = fm.get("equipment_type_ids") or []
+            if not et_ids:
+                by_et.setdefault("_unlinked", []).append(fm)
+                continue
+            for et_id in et_ids:
+                if equipment_type_id and str(et_id) != str(equipment_type_id):
+                    continue
+                by_et.setdefault(str(et_id), []).append(fm)
+
+        groups_out: List[Dict[str, Any]] = []
+        for et_id, et_fms in by_et.items():
+            if len(et_fms) < 2:
+                continue
+            seen_ids: Set[str] = set()
+            unique_fms = []
+            for fm in et_fms:
+                fid = str(fm["id"])
+                if fid in seen_ids:
+                    continue
+                seen_ids.add(fid)
+                unique_fms.append(fm)
+            if len(unique_fms) < 2:
+                continue
+
+            for cluster in self._cluster_by_name_similarity(
+                unique_fms, jaccard_threshold=jaccard_threshold, ratio_threshold=ratio_threshold
+            ):
+                if len(cluster) < 2:
+                    continue
+                pair_scores = []
+                for i in range(len(cluster)):
+                    for j in range(i + 1, len(cluster)):
+                        pair_scores.append(self.score_similarity(cluster[i], cluster[j])["score"])
+                avg_score = sum(pair_scores) / len(pair_scores) if pair_scores else 0.0
+                if avg_score < min_score:
+                    continue
+
+                best = max(cluster, key=self._fm_completeness_score)
+                names = [fm.get("failure_mode") for fm in cluster]
+                groups_out.append({
+                    "equipment_type_id": None if et_id == "_unlinked" else et_id,
+                    "member_ids": [str(fm["id"]) for fm in cluster],
+                    "member_names": names,
+                    "suggested_primary_id": str(best["id"]),
+                    "suggested_canonical_name": best.get("failure_mode"),
+                    "avg_similarity_score": round(avg_score, 1),
+                    "reason": "Lexical name similarity (token Jaccard / Levenshtein)",
+                })
+                if len(groups_out) >= limit_groups:
+                    break
+            if len(groups_out) >= limit_groups:
+                break
+
+        return {
+            "equipment_type_id": equipment_type_id,
+            "groups": groups_out,
+            "total_groups": len(groups_out),
+        }
+
+    async def _resolve_fm_doc(self, mode_id: str) -> Optional[Dict[str, Any]]:
+        query = self._build_id_query(mode_id)
+        if not query:
+            return None
+        return await self.collection.find_one(query)
+
+    async def _repoint_failure_mode_references(
+        self,
+        winner_id: str,
+        loser_ids: List[str],
+        winner_name: str,
+    ) -> Dict[str, int]:
+        """Update collections that store failure_mode_id / failure_mode_ids."""
+        loser_set = set(loser_ids)
+        counts: Dict[str, int] = {}
+        now = datetime.now(timezone.utc)
+
+        res = await self.db["equipment_failure_modes"].update_many(
+            {"failure_mode_id": {"$in": list(loser_set)}},
+            {"$set": {
+                "failure_mode_id": winner_id,
+                "failure_mode_name": winner_name,
+                "updated_at": now,
+            }},
+        )
+        counts["equipment_failure_modes"] = res.modified_count
+
+        res = await self.db["observations"].update_many(
+            {"failure_mode_id": {"$in": list(loser_set)}},
+            {"$set": {"failure_mode_id": winner_id, "updated_at": now}},
+        )
+        counts["observations"] = res.modified_count
+
+        collection_names = await self.db.list_collection_names()
+        for coll_name in ("task_templates", "maintenance_programs"):
+            if coll_name not in collection_names:
+                continue
+            res = await self.db[coll_name].update_many(
+                {"failure_mode_id": {"$in": list(loser_set)}},
+                {"$set": {"failure_mode_id": winner_id}},
+            )
+            counts[coll_name] = res.modified_count
+
+        # failure_mode_ids arrays on task templates / forms
+        for coll_name in ("task_templates", "form_templates", "form_definitions"):
+            if coll_name not in collection_names:
+                continue
+            modified = 0
+            async for doc in self.db[coll_name].find(
+                {"failure_mode_ids": {"$in": list(loser_set)}},
+                {"_id": 1, "failure_mode_ids": 1},
+            ):
+                old_ids = [str(x) for x in (doc.get("failure_mode_ids") or [])]
+                new_ids = []
+                seen = set()
+                for fid in old_ids:
+                    mapped = winner_id if fid in loser_set else fid
+                    if mapped in seen:
+                        continue
+                    seen.add(mapped)
+                    new_ids.append(mapped)
+                if winner_id not in seen:
+                    new_ids.append(winner_id)
+                await self.db[coll_name].update_one(
+                    {"_id": doc["_id"]},
+                    {"$set": {"failure_mode_ids": new_ids}},
+                )
+                modified += 1
+            counts[f"{coll_name}_arrays"] = modified
+
+        # Embedded strategies on equipment_type_strategies
+        strat_modified = 0
+        async for strat in self.db["equipment_type_strategies"].find({}):
+            fm_strategies = strat.get("failure_mode_strategies") or strat.get("failure_modes") or []
+            tasks = strat.get("task_templates") or strat.get("tasks") or []
+            changed = False
+            new_fm_strategies = []
+            seen_fm_ids: Set[str] = set()
+
+            for fm_s in fm_strategies:
+                fid = str(fm_s.get("failure_mode_id") or "")
+                if fid in loser_set:
+                    fm_s = {**fm_s, "failure_mode_id": winner_id, "failure_mode_name": winner_name}
+                    fid = winner_id
+                    changed = True
+                if fid and fid in seen_fm_ids:
+                    changed = True
+                    continue
+                if fid:
+                    seen_fm_ids.add(fid)
+                new_fm_strategies.append(fm_s)
+
+            new_tasks = []
+            for task in tasks:
+                t_ids = [str(x) for x in (task.get("failure_mode_ids") or [])]
+                if any(t in loser_set for t in t_ids):
+                    changed = True
+                    merged = []
+                    seen_t = set()
+                    for t in t_ids:
+                        m = winner_id if t in loser_set else t
+                        if m not in seen_t:
+                            seen_t.add(m)
+                            merged.append(m)
+                    if winner_id not in seen_t:
+                        merged.append(winner_id)
+                    task = {**task, "failure_mode_ids": merged}
+                new_tasks.append(task)
+
+            if changed:
+                update_doc: Dict[str, Any] = {"updated_at": now}
+                if fm_strategies:
+                    key = "failure_mode_strategies" if strat.get("failure_mode_strategies") is not None else "failure_modes"
+                    update_doc[key] = new_fm_strategies
+                if tasks:
+                    key = "task_templates" if strat.get("task_templates") is not None else "tasks"
+                    update_doc[key] = new_tasks
+                await self.db["equipment_type_strategies"].update_one(
+                    {"_id": strat["_id"]},
+                    {"$set": update_doc},
+                )
+                strat_modified += 1
+        counts["equipment_type_strategies"] = strat_modified
+
+        return counts
+
+    async def merge_failure_modes(
+        self,
+        winner_id: str,
+        loser_ids: List[str],
+        canonical_name: Optional[str] = None,
+        dry_run: bool = False,
+        merged_by: Optional[str] = None,
+        auto_pick_primary: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Merge loser failure modes into winner. Backs up losers to fm_merge_log unless dry_run.
+        Repoints failure_mode_id references when not dry_run.
+        """
+        loser_ids = [str(x).strip() for x in loser_ids if str(x).strip()]
+        winner_id = str(winner_id).strip()
+        if not winner_id or not loser_ids:
+            raise ValueError("winner_id and loser_ids are required")
+        if winner_id in loser_ids:
+            raise ValueError("winner_id cannot also be a loser")
+
+        if auto_pick_primary:
+            all_docs = []
+            for mid in [winner_id] + loser_ids:
+                doc = await self._resolve_fm_doc(mid)
+                if doc:
+                    all_docs.append(doc)
+            if len(all_docs) < 2:
+                raise LookupError("Need at least two failure modes to auto-pick primary")
+            winner_doc = max(all_docs, key=self._fm_completeness_score)
+            winner_id = str(winner_doc["_id"])
+            loser_ids = [str(d["_id"]) for d in all_docs if str(d["_id"]) != winner_id]
+        else:
+            winner_doc = await self._resolve_fm_doc(winner_id)
+            if not winner_doc:
+                raise LookupError("Winner failure mode not found")
+
+        loser_docs = []
+        for lid in loser_ids:
+            doc = await self._resolve_fm_doc(lid)
+            if doc and doc["_id"] != winner_doc["_id"]:
+                loser_docs.append(doc)
+
+        if not loser_docs:
+            raise LookupError("No valid loser failure modes found")
+
+        def _dedup(items, key=lambda x: x):
+            seen, out = set(), []
+            for it in items or []:
+                k = key(it)
+                if k in seen:
+                    continue
+                seen.add(k)
+                out.append(it)
+            return out
+
+        def _action_key(a):
+            if isinstance(a, str):
+                return self.normalize_fm_text(a)
+            if isinstance(a, dict):
+                return self.normalize_fm_text(
+                    a.get("action") or a.get("description") or ""
+                )
+            return self.normalize_fm_text(str(a))
+
+        def _str_key(v):
+            return self.normalize_fm_text(v) if isinstance(v, str) else self.normalize_fm_text(str(v))
+
+        merged_ets = _dedup(
+            list(winner_doc.get("equipment_type_ids") or [])
+            + [eid for ld in loser_docs for eid in (ld.get("equipment_type_ids") or [])]
+        )
+        merged_kw = _dedup(
+            list(winner_doc.get("keywords") or [])
+            + [k for ld in loser_docs for k in (ld.get("keywords") or [])],
+            key=_str_key,
+        )
+        merged_actions = _dedup(
+            list(winner_doc.get("recommended_actions") or [])
+            + [a for ld in loser_docs for a in (ld.get("recommended_actions") or [])],
+            key=_action_key,
+        )
+        merged_effects = _dedup(
+            list(winner_doc.get("potential_effects") or [])
+            + [e for ld in loser_docs for e in (ld.get("potential_effects") or [])],
+            key=_str_key,
+        )
+        merged_causes = _dedup(
+            list(winner_doc.get("potential_causes") or [])
+            + [c for ld in loser_docs for c in (ld.get("potential_causes") or [])],
+            key=_str_key,
+        )
+
+        final_name = (canonical_name or "").strip() or winner_doc.get("failure_mode")
+        update_fields = {
+            "equipment_type_ids": merged_ets,
+            "keywords": merged_kw,
+            "recommended_actions": merged_actions,
+            "potential_effects": merged_effects,
+            "potential_causes": merged_causes,
+            "updated_at": datetime.now(timezone.utc),
+            "version": (winner_doc.get("version") or 1) + 1,
+        }
+        if canonical_name:
+            update_fields["failure_mode"] = canonical_name.strip()
+
+        winner_id_str = str(winner_doc["_id"])
+        loser_id_strs = [str(ld["_id"]) for ld in loser_docs]
+
+        preview = {
+            "dry_run": dry_run,
+            "winner_id": winner_id_str,
+            "loser_ids": loser_id_strs,
+            "canonical_name": final_name,
+            "update_fields": update_fields,
+            "losers_to_delete": [
+                {"id": lid, "failure_mode": ld.get("failure_mode")} for lid, ld in zip(loser_id_strs, loser_docs)
+            ],
+        }
+
+        if dry_run:
+            return preview
+
+        await self._save_version(
+            winner_doc,
+            updated_by=merged_by or "merge",
+            change_reason="Pre-merge snapshot",
+        )
+
+        await self.db["fm_merge_log"].insert_one({
+            "merged_at": datetime.now(timezone.utc),
+            "merged_by": merged_by,
+            "winner_id": winner_id_str,
+            "winner_failure_mode": final_name,
+            "previous_winner_name": winner_doc.get("failure_mode"),
+            "losers": [
+                {**{k: v for k, v in ld.items() if k != "_id"}, "_mongo_id": str(ld["_id"])}
+                for ld in loser_docs
+            ],
+        })
+
+        await self.collection.update_one({"_id": winner_doc["_id"]}, {"$set": update_fields})
+        deleted = 0
+        for ld in loser_docs:
+            await self._save_version(ld, updated_by=merged_by or "merge", change_reason="Merged into " + winner_id_str)
+            res = await self.collection.delete_one({"_id": ld["_id"]})
+            deleted += res.deleted_count
+
+        repoint_counts = await self._repoint_failure_mode_references(
+            winner_id_str, loser_id_strs, final_name
+        )
+        _invalidate_cache()
+
+        return {
+            **preview,
+            "dry_run": False,
+            "deleted_count": deleted,
+            "repoint_counts": repoint_counts,
+        }
 
 
 # ============== UTILITY FUNCTIONS (for backward compatibility) ==============

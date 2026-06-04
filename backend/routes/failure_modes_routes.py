@@ -1,7 +1,7 @@
 """
 Failure Modes routes.
 """
-from fastapi import APIRouter, Depends, HTTPException, Body, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import List, Optional, Any
@@ -349,6 +349,27 @@ async def get_failure_mode_by_id(mode_id: str):
     raise HTTPException(status_code=404, detail="Failure mode not found")
 
 
+@router.get("/failure-modes/{mode_id}/similar")
+async def get_similar_failure_modes(
+    mode_id: str,
+    threshold: float = 55.0,
+    limit: int = 20,
+    require_shared_equipment_type: bool = True,
+    current_user: dict = Depends(get_current_user),
+):
+    """Lexical similarity search for near-duplicate failure modes (no AI)."""
+    try:
+        return await failure_modes_service.find_similar(
+            mode_id,
+            threshold=threshold,
+            limit=limit,
+            require_shared_equipment_type=require_shared_equipment_type,
+        )
+    except Exception as e:
+        logger.error(f"Error finding similar failure modes for {mode_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Failure Mode CRUD Models
 class FailureModeCreate(BaseModel):
     category: str
@@ -406,6 +427,24 @@ class FailureModeValidation(BaseModel):
     validated_by_name: str
     validated_by_position: str
     validated_by_id: Optional[str] = None
+
+
+class FindSimilarFailureModesScanRequest(BaseModel):
+    equipment_type_id: Optional[str] = None
+    jaccard_threshold: float = 0.5
+    ratio_threshold: float = 0.8
+    min_score: float = 55.0
+    limit_groups: int = 200
+
+
+class MergeFailureModesRequest(BaseModel):
+    winner_id: Optional[str] = None
+    loser_ids: List[str] = []
+    primary_id: Optional[str] = None
+    merge_id: Optional[str] = None
+    canonical_name: Optional[str] = None
+    dry_run: bool = False
+    auto_pick_primary: bool = False
 
 
 def auto_link_equipment_types(equipment_name: str) -> List[str]:
@@ -831,147 +870,74 @@ async def unvalidate_failure_mode(
         raise HTTPException(status_code=404, detail="Failure mode not found")
 
 
-@router.post("/failure-modes/merge")
-async def merge_failure_modes(
-    payload: dict = Body(...),
+@router.post("/failure-modes/find-similar")
+async def scan_similar_failure_modes(
+    request: FindSimilarFailureModesScanRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Merge N "loser" failure modes into a single "winner" failure mode.
-
-    Used by the AI similarity-review tool to consolidate near-duplicate
-    failure modes (e.g. "Bearing Failure" + "Bearing Damage" on a pump).
-    Always backs up loser docs to `fm_merge_log` before deleting.
-
-    Body: {"winner_id": "...", "loser_ids": ["...", "..."], "canonical_name": "..."}
-    """
-    from bson import ObjectId
-
-    winner_id = (payload.get("winner_id") or "").strip()
-    loser_ids = [str(x).strip() for x in (payload.get("loser_ids") or []) if str(x).strip()]
-    canonical_name = (payload.get("canonical_name") or "").strip()
-
-    if not winner_id or not loser_ids:
-        raise HTTPException(status_code=400, detail="winner_id and loser_ids are required")
-    if winner_id in loser_ids:
-        raise HTTPException(status_code=400, detail="winner_id cannot also be a loser")
-
-    def _id_query(mid: str):
-        if ObjectId.is_valid(mid):
-            return {"_id": ObjectId(mid)}
-        try:
-            return {"legacy_id": int(mid)}
-        except ValueError:
-            return None
-
-    win_q = _id_query(winner_id)
-    if not win_q:
-        raise HTTPException(status_code=400, detail=f"Invalid winner_id: {winner_id}")
-
-    winner = await db.failure_modes.find_one(win_q)
-    if not winner:
-        raise HTTPException(status_code=404, detail="Winner failure mode not found")
-
-    loser_docs = []
-    for lid in loser_ids:
-        q = _id_query(lid)
-        if not q:
-            continue
-        doc = await db.failure_modes.find_one(q)
-        if doc and doc["_id"] != winner["_id"]:
-            loser_docs.append(doc)
-
-    if not loser_docs:
-        raise HTTPException(status_code=404, detail="No valid loser failure modes found")
-
-    # Helper: dedupe-preserving union
-    def _dedup(items, key=lambda x: x):
-        seen, out = set(), []
-        for it in items or []:
-            k = key(it)
-            if k in seen:
-                continue
-            seen.add(k)
-            out.append(it)
-        return out
-
-    def _action_key(a):
-        if isinstance(a, str):
-            return a.strip().lower()
-        if isinstance(a, dict):
-            return (a.get("action") or a.get("description") or "").strip().lower()
-        return str(a)
-
-    def _str_key(v):
-        return (v or "").strip().lower() if isinstance(v, str) else str(v)
-
-    merged_ets = _dedup(
-        list(winner.get("equipment_type_ids") or [])
-        + [eid for ld in loser_docs for eid in (ld.get("equipment_type_ids") or [])]
-    )
-    merged_kw = _dedup(
-        list(winner.get("keywords") or [])
-        + [k for ld in loser_docs for k in (ld.get("keywords") or [])],
-        key=_str_key,
-    )
-    merged_actions = _dedup(
-        list(winner.get("recommended_actions") or [])
-        + [a for ld in loser_docs for a in (ld.get("recommended_actions") or [])],
-        key=_action_key,
-    )
-    merged_effects = _dedup(
-        list(winner.get("potential_effects") or [])
-        + [e for ld in loser_docs for e in (ld.get("potential_effects") or [])],
-        key=_str_key,
-    )
-    merged_causes = _dedup(
-        list(winner.get("potential_causes") or [])
-        + [c for ld in loser_docs for c in (ld.get("potential_causes") or [])],
-        key=_str_key,
-    )
-
-    update_fields = {
-        "equipment_type_ids": merged_ets,
-        "keywords": merged_kw,
-        "recommended_actions": merged_actions,
-        "potential_effects": merged_effects,
-        "potential_causes": merged_causes,
-        "updated_at": datetime.now(timezone.utc),
-        "version": (winner.get("version") or 1) + 1,
-    }
-    if canonical_name:
-        update_fields["failure_mode"] = canonical_name
-
-    # Backup losers first — small audit collection so the merge can be undone manually.
-    await db.fm_merge_log.insert_one({
-        "merged_at": datetime.now(timezone.utc),
-        "merged_by": current_user.get("id") or current_user.get("user_id"),
-        "winner_id": str(winner["_id"]),
-        "winner_failure_mode": canonical_name or winner.get("failure_mode"),
-        "previous_winner_name": winner.get("failure_mode"),
-        "losers": [
-            {**{k: v for k, v in ld.items() if k != "_id"}, "_mongo_id": str(ld["_id"])}
-            for ld in loser_docs
-        ],
-    })
-
-    await db.failure_modes.update_one({"_id": winner["_id"]}, {"$set": update_fields})
-    deleted = 0
-    for ld in loser_docs:
-        res = await db.failure_modes.delete_one({"_id": ld["_id"]})
-        deleted += res.deleted_count
-
-    # Invalidate FM list cache so the next GET refetches.
+    """Batch scan for near-duplicate failure modes per equipment type (lexical, no AI)."""
     try:
-        from services.failure_modes_service import _invalidate_cache
-        _invalidate_cache()
-    except Exception:
-        pass
+        return await failure_modes_service.scan_similar_groups(
+            equipment_type_id=request.equipment_type_id,
+            jaccard_threshold=request.jaccard_threshold,
+            ratio_threshold=request.ratio_threshold,
+            min_score=request.min_score,
+            limit_groups=request.limit_groups,
+        )
+    except Exception as e:
+        logger.error(f"Error scanning similar failure modes: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
-    return {
-        "winner_id": str(winner["_id"]),
-        "deleted_count": deleted,
-        "canonical_name": canonical_name or winner.get("failure_mode"),
-    }
+
+@router.post("/failure-modes/merge")
+async def merge_failure_modes(
+    request: MergeFailureModesRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Merge loser failure modes into a winner. Use dry_run=true to preview only.
+
+    Accepts winner_id + loser_ids (existing AI UI) or primary_id + merge_id for a pair.
+    Set auto_pick_primary=true to choose the most complete record as winner.
+    """
+    winner_id = (request.winner_id or request.primary_id or "").strip()
+    loser_ids = list(request.loser_ids or [])
+    if request.merge_id:
+        loser_ids.append(request.merge_id.strip())
+    loser_ids = [str(x).strip() for x in loser_ids if str(x).strip()]
+
+    if not winner_id and request.auto_pick_primary and loser_ids:
+        winner_id = loser_ids[0]
+    if not winner_id or not loser_ids:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide winner_id (or primary_id) and loser_ids (or merge_id)",
+        )
+
+    merged_by = current_user.get("id") or current_user.get("user_id") or current_user.get("email")
+    try:
+        result = await failure_modes_service.merge_failure_modes(
+            winner_id=winner_id,
+            loser_ids=loser_ids,
+            canonical_name=request.canonical_name,
+            dry_run=request.dry_run,
+            merged_by=merged_by,
+            auto_pick_primary=request.auto_pick_primary,
+        )
+        if request.dry_run:
+            return result
+        return {
+            "winner_id": result["winner_id"],
+            "deleted_count": result.get("deleted_count", 0),
+            "canonical_name": result.get("canonical_name"),
+            "repoint_counts": result.get("repoint_counts", {}),
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error merging failure modes: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/failure-modes/{mode_id}")

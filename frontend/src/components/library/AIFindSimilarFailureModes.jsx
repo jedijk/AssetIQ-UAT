@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Loader2,
   Sparkles,
+  Zap,
   CheckCircle,
   X,
   AlertTriangle,
@@ -21,6 +22,7 @@ import {
 } from "../ui/dialog";
 import { toast } from "sonner";
 import api from "../../lib/api";
+import { failureModesAPI } from "../../lib/apis/failureModes";
 
 /**
  * Scans all equipment types in the FM library, asks the AI to identify
@@ -34,6 +36,7 @@ export default function AIFindSimilarFailureModes({
   equipmentTypes = [],
   onApplied,
 }) {
+  const [scanMode, setScanMode] = useState("lexical"); // lexical | ai
   const [phase, setPhase] = useState("idle"); // idle | running | done
   const [scanned, setScanned] = useState(0);
   const [totalEts, setTotalEts] = useState(0);
@@ -82,7 +85,58 @@ export default function AIFindSimilarFailureModes({
     }
   }, [open, fmsByEt]);
 
-  const runScan = async () => {
+  const mapLexicalGroups = (etId, etName, groups) =>
+    (groups || []).map((g) => ({
+      et_id: etId,
+      et_name: etName,
+      member_ids: g.member_ids || [],
+      canonical_name: g.suggested_canonical_name || g.member_names?.[0] || "",
+      reason:
+        g.reason ||
+        (g.avg_similarity_score != null
+          ? `Avg similarity ${g.avg_similarity_score}%`
+          : ""),
+      scan_source: "lexical",
+      selected: false,
+    }));
+
+  const runLexicalScan = async () => {
+    cancelRef.current = false;
+    setPhase("running");
+    setScanned(0);
+    setErrorCount(0);
+    setGroups([]);
+
+    const ets = [...fmsByEt.entries()].filter(([, arr]) => (arr?.length || 0) >= 2);
+    const collected = [];
+
+    for (let i = 0; i < ets.length; i++) {
+      if (cancelRef.current) break;
+      const [etId] = ets[i];
+      const etName = etById.get(etId)?.name || etId;
+      try {
+        const data = await failureModesAPI.scanSimilar({
+          equipment_type_id: etId,
+        });
+        const newGroups = mapLexicalGroups(etId, etName, data?.groups);
+        if (newGroups.length) {
+          collected.push(...newGroups);
+          setGroups((prev) => [...prev, ...newGroups]);
+        }
+      } catch (err) {
+        console.error("Lexical ET scan failed", etId, err);
+        setErrorCount((e) => e + 1);
+      }
+      setScanned((s) => s + 1);
+    }
+
+    setPhase("done");
+    toast.success(
+      `Fast scan complete — found ${collected.length} candidate group(s) across ${ets.length} equipment type(s).`,
+    );
+  };
+
+  const runAiScan = async () => {
     cancelRef.current = false;
     setPhase("running");
     setScanned(0);
@@ -108,7 +162,8 @@ export default function AIFindSimilarFailureModes({
           member_ids: g.member_ids,
           canonical_name: g.canonical_name || "",
           reason: g.reason || "",
-          selected: false, // user opts in per group
+          scan_source: "ai",
+          selected: false,
         }));
         if (newGroups.length) {
           collected.push(...newGroups);
@@ -123,9 +178,11 @@ export default function AIFindSimilarFailureModes({
 
     setPhase("done");
     toast.success(
-      `Scan complete — found ${collected.length} candidate group(s) across ${ets.length} equipment type(s).`,
+      `AI scan complete — found ${collected.length} candidate group(s) across ${ets.length} equipment type(s).`,
     );
   };
+
+  const runScan = () => (scanMode === "ai" ? runAiScan() : runLexicalScan());
 
   const cancel = () => {
     cancelRef.current = true;
@@ -195,7 +252,7 @@ export default function AIFindSimilarFailureModes({
       }
       const losers = memberFms.filter((fm) => fm.id !== winner.id);
       try {
-        await api.post("/failure-modes/merge", {
+        await failureModesAPI.merge({
           winner_id: winner.id,
           loser_ids: losers.map((l) => l.id),
           canonical_name: g.canonical_name || winner.failure_mode,
@@ -257,39 +314,86 @@ export default function AIFindSimilarFailureModes({
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-purple-600" />
-            Find Similar Failure Modes (AI)
+            {scanMode === "ai" ? (
+              <Sparkles className="w-5 h-5 text-purple-600" />
+            ) : (
+              <Zap className="w-5 h-5 text-amber-600" />
+            )}
+            Find Similar Failure Modes
           </DialogTitle>
           <DialogDescription>
             Scans each equipment type for near-duplicate failure modes (e.g.
-            "Bearing Failure" + "Bearing Damage"). Different ISO 14224 mechanisms
-            (Wear vs Seizure vs Fatigue) are kept separate. Review each
-            suggestion before merging.
+            &quot;Bearing Failure&quot; + &quot;Bearing Damage&quot;). Different ISO 14224
+            mechanisms (Wear vs Seizure) are penalized in the fast scan. Review each
+            group before merging — nothing is merged automatically.
           </DialogDescription>
         </DialogHeader>
 
         {/* Idle state */}
         {phase === "idle" && (
           <div className="flex flex-col items-center justify-center py-8 px-4 text-center gap-3">
-            <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center">
-              <Sparkles className="w-7 h-7 text-purple-600" />
+            <div
+              className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
+                scanMode === "ai" ? "bg-purple-100" : "bg-amber-100"
+              }`}
+            >
+              {scanMode === "ai" ? (
+                <Sparkles className="w-7 h-7 text-purple-600" />
+              ) : (
+                <Zap className="w-7 h-7 text-amber-600" />
+              )}
             </div>
             <div>
               <p className="font-semibold text-slate-800">
                 Will scan {totalEts} equipment type{totalEts === 1 ? "" : "s"} that have 2+ failure modes
               </p>
               <p className="text-sm text-slate-500 mt-1">
-                Estimated time: ~{Math.max(20, totalEts * 2)}s. Uses gpt-4o-mini.
+                {scanMode === "ai"
+                  ? `Estimated time: ~${Math.max(20, totalEts * 2)}s. Uses gpt-4o-mini.`
+                  : "Fast lexical scan (name tokens + similarity). Usually completes in seconds."}
               </p>
+            </div>
+            <div className="flex flex-wrap gap-2 justify-center">
+              <Button
+                variant={scanMode === "lexical" ? "default" : "outline"}
+                onClick={() => setScanMode("lexical")}
+                className={scanMode === "lexical" ? "bg-amber-600 hover:bg-amber-700" : ""}
+                data-testid="find-similar-mode-lexical"
+              >
+                <Zap className="w-4 h-4 mr-2" />
+                Fast scan
+              </Button>
+              <Button
+                variant={scanMode === "ai" ? "default" : "outline"}
+                onClick={() => setScanMode("ai")}
+                className={scanMode === "ai" ? "bg-purple-600 hover:bg-purple-700" : ""}
+                data-testid="find-similar-mode-ai"
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                AI scan
+              </Button>
             </div>
             <Button
               onClick={runScan}
-              className="bg-purple-600 hover:bg-purple-700"
+              className={
+                scanMode === "ai"
+                  ? "bg-purple-600 hover:bg-purple-700"
+                  : "bg-amber-600 hover:bg-amber-700"
+              }
               disabled={totalEts === 0}
               data-testid="run-find-similar-fm-btn"
             >
-              <Sparkles className="w-4 h-4 mr-2" />
-              Run AI Scan
+              {scanMode === "ai" ? (
+                <>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Run AI Scan
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4 mr-2" />
+                  Run Fast Scan
+                </>
+              )}
             </Button>
           </div>
         )}
@@ -419,7 +523,7 @@ export default function AIFindSimilarFailureModes({
                                 {/* AI reason */}
                                 {g.reason && (
                                   <p className="text-xs text-slate-500 italic mt-2">
-                                    AI: {g.reason}
+                                    {g.scan_source === "ai" ? "AI" : "Match"}: {g.reason}
                                   </p>
                                 )}
                               </div>

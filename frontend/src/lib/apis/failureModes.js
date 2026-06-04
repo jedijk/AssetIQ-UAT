@@ -67,5 +67,35 @@ export const failureModesAPI = {
     const response = await api.get("/failure-modes/counts-by-equipment-type");
     return response.data;
   },
+
+  /** Lexical similarity candidates for one failure mode (no AI). */
+  findSimilar: async (id, params = {}) => {
+    const searchParams = new URLSearchParams();
+    if (params.threshold != null) searchParams.append("threshold", params.threshold);
+    if (params.limit != null) searchParams.append("limit", params.limit);
+    if (params.require_shared_equipment_type != null) {
+      searchParams.append("require_shared_equipment_type", params.require_shared_equipment_type);
+    }
+    const qs = searchParams.toString();
+    const response = await api.get(
+      `/failure-modes/${id}/similar${qs ? `?${qs}` : ""}`,
+    );
+    return response.data;
+  },
+
+  /** Batch scan for duplicate groups per equipment type (lexical, no AI). */
+  scanSimilar: async (body = {}) => {
+    const response = await api.post("/failure-modes/find-similar", body);
+    return response.data;
+  },
+
+  /**
+   * Merge losers into winner. Pass dry_run: true to preview.
+   * Supports winner_id + loser_ids or primary_id + merge_id.
+   */
+  merge: async (body) => {
+    const response = await api.post("/failure-modes/merge", body);
+    return response.data;
+  },
 };
 
