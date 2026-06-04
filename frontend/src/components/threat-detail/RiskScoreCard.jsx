@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { AlertTriangle, X } from "lucide-react";
 import { useLanguage } from "../../contexts/LanguageContext";
+import { computeCriticalityScore } from "../../lib/criticalityScore";
 
 export const RiskScoreCard = ({ threat, rpnValue, linkedFMEAData, linkedCriticalityData }) => {
   const { t } = useLanguage();
@@ -41,12 +42,23 @@ export const RiskScoreCard = ({ threat, rpnValue, linkedFMEAData, linkedCritical
 
   // Criticality from linked data
   const critData = linkedCriticalityData || threat.criticality_data;
-  const critSafety = critData?.safety || critData?.Safety || 3;
-  const critProduction = critData?.production || critData?.Production || 3;
-  const critEnvironmental = critData?.environmental || critData?.Environmental || 3;
-  const critReputation = critData?.reputation || critData?.Reputation || 3;
+  const critFallback = {
+    safety_impact: 3,
+    production_impact: 3,
+    environmental_impact: 3,
+    reputation_impact: 3,
+  };
+  const critSafety =
+    critData?.safety_impact ?? critData?.safety ?? critData?.Safety ?? critFallback.safety_impact;
+  const critProduction =
+    critData?.production_impact ?? critData?.production ?? critData?.Production ?? critFallback.production_impact;
+  const critEnvironmental =
+    critData?.environmental_impact ?? critData?.environmental ?? critData?.Environmental ?? critFallback.environmental_impact;
+  const critReputation =
+    critData?.reputation_impact ?? critData?.reputation ?? critData?.Reputation ?? critFallback.reputation_impact;
 
-  const criticalityScore = Math.round((critSafety * 25 + critProduction * 20 + critEnvironmental * 15 + critReputation * 10) / 3.5);
+  const criticalityScore =
+    computeCriticalityScore(critData ?? critFallback) ?? 0;
   const finalScore = Math.round((criticalityScore * 0.75) + (likelihoodScore * 0.25));
 
   return (

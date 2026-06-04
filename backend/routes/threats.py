@@ -11,6 +11,7 @@ from auth import get_current_user
 from models.api_models import ThreatResponse, ThreatUpdate
 from failure_modes import FAILURE_MODES_LIBRARY
 from services.threat_score_service import calculate_rank, update_all_ranks, recalculate_threat_scores_for_asset, recalculate_threat_scores_for_failure_mode, propagate_risk_to_linked_entities
+from services.criticality_score import compute_criticality_score
 from services.cache_service import cache
 from utils.auto_translate import translate_observation
 from investigation_models import (
@@ -423,13 +424,9 @@ async def recalculate_all_threat_scores(
                 environmental_impact = crit.get("environmental_impact", 0) or 0
                 reputation_impact = crit.get("reputation_impact", 0) or 0
                 
-                criticality_score = (
-                    (safety_impact * 25) + 
-                    (production_impact * 20) + 
-                    (environmental_impact * 15) + 
-                    (reputation_impact * 10)
-                ) / 3.5
-                criticality_score = min(100, int(criticality_score))
+                criticality_score = compute_criticality_score(
+                    safety_impact, production_impact, environmental_impact, reputation_impact
+                )
                 
                 criticality_data = {
                     "safety_impact": safety_impact,
@@ -564,14 +561,9 @@ async def get_threat(
             environmental_impact = criticality.get("environmental_impact", 0) or 0
             reputation_impact = criticality.get("reputation_impact", 0) or 0
             
-            # Calculate criticality score
-            calc_criticality_score = (
-                (safety_impact * 25) + 
-                (production_impact * 20) + 
-                (environmental_impact * 15) + 
-                (reputation_impact * 10)
-            ) / 3.5
-            calc_criticality_score = min(100, int(calc_criticality_score))
+            calc_criticality_score = compute_criticality_score(
+                safety_impact, production_impact, environmental_impact, reputation_impact
+            )
             
             if calc_criticality_score != new_criticality_score:
                 new_criticality_score = calc_criticality_score
@@ -852,20 +844,13 @@ async def link_threat_to_equipment(
     # Get criticality data from the node
     criticality = node.get("criticality")
     
-    # Calculate 4-Dimension Criticality Score using weighted formula
-    # Formula: (Safety×25 + Production×20 + Environmental×15 + Reputation×10) / 3.5
     safety_impact = criticality.get("safety_impact", 0) or 0 if criticality else 0
     production_impact = criticality.get("production_impact", 0) or 0 if criticality else 0
     environmental_impact = criticality.get("environmental_impact", 0) or 0 if criticality else 0
     reputation_impact = criticality.get("reputation_impact", 0) or 0 if criticality else 0
-    
-    criticality_score = (
-        (safety_impact * 25) + 
-        (production_impact * 20) + 
-        (environmental_impact * 15) + 
-        (reputation_impact * 10)
-    ) / 3.5
-    criticality_score = min(100, int(criticality_score))
+    criticality_score = compute_criticality_score(
+        safety_impact, production_impact, environmental_impact, reputation_impact
+    )
     
     criticality_level = criticality.get("level", "low") if criticality else "low"
     criticality_data = {
@@ -1007,13 +992,9 @@ async def link_threat_to_failure_mode(
         environmental_impact = criticality_data.get("environmental_impact", 0) or 0
         reputation_impact = criticality_data.get("reputation_impact", 0) or 0
         
-        criticality_score = (
-            (safety_impact * 25) + 
-            (production_impact * 20) + 
-            (environmental_impact * 15) + 
-            (reputation_impact * 10)
-        ) / 3.5
-        criticality_score = min(100, int(criticality_score))
+        criticality_score = compute_criticality_score(
+            safety_impact, production_impact, environmental_impact, reputation_impact
+        )
     
     # NEW METHODOLOGY: Risk Score = (Criticality × 0.75) + (FMEA × 0.25)
     final_risk_score = int((criticality_score * 0.75) + (fmea_score * 0.25))

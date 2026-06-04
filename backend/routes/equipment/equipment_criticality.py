@@ -8,6 +8,7 @@ from database import db, installation_filter
 from auth import get_current_user
 from services.threat_score_service import recalculate_threat_scores_for_asset
 from services.cache_service import invalidate_equipment_related
+from services.criticality_score import compute_criticality_score
 from iso14224_models import ISOLevel, ISO_LEVEL_ORDER, Discipline, CriticalityAssignment
 
 logger = logging.getLogger(__name__)
@@ -85,14 +86,9 @@ async def assign_criticality(
         "downtime_days": assignment.downtime_days or 0,
     }
     
-    # Calculate risk score
-    risk_score = (
-        (safety * 25) +
-        (production * 20) +
-        (environmental * 15) +
-        (reputation * 10)
+    criticality_data["risk_score"] = compute_criticality_score(
+        safety, production, environmental, reputation
     )
-    criticality_data["risk_score"] = round(risk_score, 2)
     
     await db.equipment_nodes.update_one(
         {"id": node_id},

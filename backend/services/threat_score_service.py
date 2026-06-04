@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from database import db
 from failure_modes import FAILURE_MODES_LIBRARY
 from models.risk_settings import DEFAULT_RISK_SETTINGS
+from services.criticality_score import compute_criticality_score
 
 logger = logging.getLogger(__name__)
 
@@ -101,13 +102,9 @@ async def recalculate_threat_scores_for_asset(asset_name: str, user_id: str, new
         environmental_impact = new_criticality.get("environmental_impact", 0) or 0
         reputation_impact = new_criticality.get("reputation_impact", 0) or 0
 
-        criticality_score = (
-            (safety_impact * 25) +
-            (production_impact * 20) +
-            (environmental_impact * 15) +
-            (reputation_impact * 10)
-        ) / 3.5
-        criticality_score = min(100, int(criticality_score))
+        criticality_score = compute_criticality_score(
+            safety_impact, production_impact, environmental_impact, reputation_impact
+        )
 
         max_impact = max(safety_impact, production_impact, environmental_impact, reputation_impact)
         if max_impact >= 5:
@@ -307,13 +304,9 @@ async def recalculate_threat_scores_for_failure_mode(failure_mode_name: str, new
             environmental_impact = criticality_data.get("environmental_impact", 0) or 0
             reputation_impact = criticality_data.get("reputation_impact", 0) or 0
 
-            criticality_score = (
-                (safety_impact * 25) +
-                (production_impact * 20) +
-                (environmental_impact * 15) +
-                (reputation_impact * 10)
-            ) / 3.5
-            criticality_score = min(100, int(criticality_score))
+            criticality_score = compute_criticality_score(
+                safety_impact, production_impact, environmental_impact, reputation_impact
+            )
 
         # Use installation-specific settings
         final_risk_score, risk_level = calculate_risk_score(criticality_score, new_fmea_score, risk_settings)

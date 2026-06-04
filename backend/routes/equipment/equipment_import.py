@@ -15,6 +15,7 @@ from iso14224_models import (
     UnstructuredItemCreate, ParseEquipmentListRequest, AssignToHierarchyRequest,
     is_valid_parent_child, get_valid_child_levels,
 )
+from services.criticality_score import compute_criticality_score
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -321,8 +322,6 @@ def calculate_criticality_from_excel(safety: int, production: int, environmental
         level = "low"
         color = "#22C55E"
     
-    risk_score = (safety * 25) + (production * 20) + (environmental * 15) + (reputation * 10)
-    
     return {
         "safety_impact": safety,
         "production_impact": production,
@@ -331,7 +330,9 @@ def calculate_criticality_from_excel(safety: int, production: int, environmental
         "level": level,
         "color": color,
         "max_impact": max_impact,
-        "risk_score": round(risk_score, 2)
+        "risk_score": compute_criticality_score(
+            safety, production, environmental, reputation
+        ),
     }
 
 

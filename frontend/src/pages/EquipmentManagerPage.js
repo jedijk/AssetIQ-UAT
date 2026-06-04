@@ -38,6 +38,7 @@ import ProcessImportWizard from "../components/equipment/ProcessImportWizard";
 import { AIEquipmentTypeMappingSuggestions } from "../components/equipment/AIEquipmentTypeMappingSuggestions";
 import MaintenanceProgramPanel from "../components/equipment/MaintenanceProgramPanel";
 import { getEquipmentLevelLabel, getEquipmentLevelDescription } from "../lib/equipmentLevelLabels";
+import { computeCriticalityScore } from "../lib/criticalityScore";
 
 const EQUIPMENT_ICONS = { droplets: Droplets, wind: Wind, cog: Cog, thermometer: Thermometer, box: Box, "circle-dot": CircleDot, zap: Zap, gauge: Gauge, cpu: Cpu, pipette: Pipette, flame: Flame };
 const ICON_OPTIONS = ["droplets", "wind", "cog", "thermometer", "box", "circle-dot", "zap", "gauge", "cpu", "pipette", "flame"];
@@ -808,7 +809,12 @@ export default function EquipmentManagerPage() {
       color = "#EAB308";
     }
 
-    const riskScore = (safety * 25) + (production * 20) + (environmental * 15) + (reputation * 10);
+    const riskScore = computeCriticalityScore({
+      safety_impact: safety,
+      production_impact: production,
+      environmental_impact: environmental,
+      reputation_impact: reputation,
+    });
     return {
       safety_impact: safety,
       production_impact: production,
@@ -817,7 +823,7 @@ export default function EquipmentManagerPage() {
       level,
       color,
       max_impact: maxImpact,
-      risk_score: Math.round(riskScore * 100) / 100,
+      risk_score: riskScore ?? 0,
       profile_id: assignment?.profile_id ?? null,
       fatality_risk: assignment?.fatality_risk ?? 0,
       production_loss_per_day: assignment?.production_loss_per_day ?? 0,

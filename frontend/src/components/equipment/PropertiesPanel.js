@@ -22,6 +22,7 @@ import { QRCodeDialog } from "./QRCodeDialog";
 import { DocumentViewer } from "../DocumentViewer";
 import { getBackendUrl } from "../../lib/apiConfig";
 import { getEquipmentLevelLabel } from "../../lib/equipmentLevelLabels";
+import { computeCriticalityScore } from "../../lib/criticalityScore";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
 import MaintenanceProgramPanel from "./MaintenanceProgramPanel";
 
@@ -609,6 +610,10 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
   const levelLabel = getEquipmentLevelLabel(t, node.level) || t("equipment.unknownLevel");
   const LevelIcon = config.icon;
   const critColors = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
+  const criticalityScore = useMemo(
+    () => computeCriticalityScore(node.criticality),
+    [node.criticality]
+  );
   
   const handleSave = () => { onUpdate(node.id, { name: editName, description: editDesc, tag: editTag }); setIsEditing(false); };
   const startEdit = () => { setEditName(node.name); setEditDesc(node.description || ""); setEditTag(node.tag || ""); setIsEditing(true); };
@@ -903,17 +908,12 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
                 onClick={(level) => onAssignCriticality(node.id, { ...node.criticality, reputation_impact: node.criticality?.reputation_impact === level ? null : level })}
               />
               
-              {(node.criticality?.safety_impact || node.criticality?.production_impact || node.criticality?.environmental_impact || node.criticality?.reputation_impact) && (
+              {criticalityScore != null && (
                 <div className="pt-2 border-t border-slate-200 mt-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-slate-700">{t("equipment.criticalityScore")}</span>
                     <span className="text-sm font-bold text-slate-800">
-                      {Math.max(
-                        node.criticality?.safety_impact || 0,
-                        node.criticality?.production_impact || 0,
-                        node.criticality?.environmental_impact || 0,
-                        node.criticality?.reputation_impact || 0
-                      )}/5
+                      {criticalityScore}/100
                     </span>
                   </div>
                 </div>

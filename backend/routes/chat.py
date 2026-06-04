@@ -237,7 +237,8 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
         p = criticality.get("production_impact", 0) or 0
         e = criticality.get("environmental_impact", 0) or 0
         r = criticality.get("reputation_impact", 0) or 0
-        criticality_score = min(100, int(((s * 25) + (p * 20) + (e * 15) + (r * 10)) / 3.5))
+        from services.criticality_score import compute_criticality_score
+        criticality_score = compute_criticality_score(s, p, e, r)
 
     risk_settings = await get_risk_settings_for_installation(installation_id)
     final_risk_score, risk_level = calculate_risk_score(criticality_score, fmea_score, risk_settings)

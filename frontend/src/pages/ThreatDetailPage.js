@@ -6,6 +6,7 @@ import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useEquipmentNodeNameMap, useEquipmentTypeNameMap, useFailureModeNameMap } from "../hooks/useTranslatedEntities";
 import { formatDate, formatTime, formatDateTime } from "../lib/dateUtils";
+import { computeCriticalityScore } from "../lib/criticalityScore";
 import SearchableCombobox from "../components/SearchableCombobox";
 import EquipmentTimeline from "../components/EquipmentTimeline";
 import { DISCIPLINES } from "../constants/disciplines";
@@ -895,15 +896,10 @@ const ThreatDetailPage = () => {
             ? Math.round((linkedFmData.severity * linkedFmData.occurrence * linkedFmData.detectability) / 10)
             : (threat.fmea_score || threat.base_risk_score || 50);
           
-          // Criticality Score = (Safety×25 + Production×20 + Environmental×15 + Reputation×10) / 3.5
-          const criticalityScore = linkedCriticalityData
-            ? Math.round((
-                (linkedCriticalityData.safety_impact || 0) * 25 +
-                (linkedCriticalityData.production_impact || 0) * 20 +
-                (linkedCriticalityData.environmental_impact || 0) * 15 +
-                (linkedCriticalityData.reputation_impact || 0) * 10
-              ) / 3.5)
-            : (threat.criticality_score || 0);
+          const criticalityScore =
+            computeCriticalityScore(linkedCriticalityData) ??
+            threat.criticality_score ??
+            0;
           
           // Final Score = (Criticality × 0.75) + (Likelihood × 0.25)
           const calculatedScore = Math.round((criticalityScore * 0.75) + (fmBaseScore * 0.25));

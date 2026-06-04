@@ -44,6 +44,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { DocumentViewer } from "./DocumentViewer";
 import { getBackendUrl } from "../lib/apiConfig";
 import { getEquipmentLevelLabel } from "../lib/equipmentLevelLabels";
+import { computeCriticalityScore, getCriticalityDimensions } from "../lib/criticalityScore";
 import MaintenanceProgramPanel from "./equipment/MaintenanceProgramPanel";
 
 // ISO 14224 Level Configuration
@@ -343,20 +344,12 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
 
   // Get criticality details
   const getCriticalityDetails = () => {
-    if (!node.criticality) return null;
+    const dims = getCriticalityDimensions(node.criticality);
+    if (!dims) return null;
+    const { safety, production, environmental, reputation } = dims;
+    const riskScore = computeCriticalityScore(node.criticality);
+    if (riskScore == null) return null;
     const crit = node.criticality;
-    const safety = crit.safety_impact || 0;
-    const production = crit.production_impact || 0;
-    const environmental = crit.environmental_impact || 0;
-    const reputation = crit.reputation_impact || 0;
-    const hasDimensions = safety || production || environmental || reputation;
-    const riskScore =
-      crit.risk_score != null
-        ? Number(crit.risk_score)
-        : hasDimensions
-          ? Math.round(safety * 25 + production * 20 + environmental * 15 + reputation * 10)
-          : null;
-    if (!hasDimensions && riskScore == null) return null;
     return {
       level: crit.level,
       safety,
