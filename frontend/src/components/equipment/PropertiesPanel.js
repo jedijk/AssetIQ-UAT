@@ -906,7 +906,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
               {(node.criticality?.safety_impact || node.criticality?.production_impact || node.criticality?.environmental_impact || node.criticality?.reputation_impact) && (
                 <div className="pt-2 border-t border-slate-200 mt-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-700">{t("equipment.overallCriticality")}</span>
+                    <span className="text-xs font-semibold text-slate-700">{t("equipment.criticalityScore")}</span>
                     <span className="text-sm font-bold text-slate-800">
                       {Math.max(
                         node.criticality?.safety_impact || 0,

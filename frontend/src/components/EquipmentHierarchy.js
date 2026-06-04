@@ -345,13 +345,28 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
   const getCriticalityDetails = () => {
     if (!node.criticality) return null;
     const crit = node.criticality;
+    const safety = crit.safety_impact || 0;
+    const production = crit.production_impact || 0;
+    const environmental = crit.environmental_impact || 0;
+    const reputation = crit.reputation_impact || 0;
+    const hasDimensions = safety || production || environmental || reputation;
+    const riskScore =
+      crit.risk_score != null
+        ? Number(crit.risk_score)
+        : hasDimensions
+          ? Math.round(safety * 25 + production * 20 + environmental * 15 + reputation * 10)
+          : null;
+    if (!hasDimensions && riskScore == null) return null;
     return {
       level: crit.level,
-      safety: crit.safety_impact || 0,
-      production: crit.production_impact || 0,
-      environmental: crit.environmental_impact || 0,
-      reputation: crit.reputation_impact || 0,
-      maxImpact: crit.max_impact || Math.max(crit.safety_impact || 0, crit.production_impact || 0, crit.environmental_impact || 0, crit.reputation_impact || 0)
+      safety,
+      production,
+      environmental,
+      reputation,
+      maxImpact:
+        crit.max_impact ||
+        Math.max(safety, production, environmental, reputation),
+      riskScore,
     };
   };
   
@@ -655,28 +670,56 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
 
           <div>
             <label className="text-xs text-slate-500 block mb-1">Criticality</label>
-            {getCriticalityDetails() ? (
-              <div className="grid grid-cols-4 gap-1 mt-1">
-                {[
-                  { icon: Shield, color: "red", val: getCriticalityDetails().safety },
-                  { icon: Cog, color: "orange", val: getCriticalityDetails().production },
-                  { icon: Leaf, color: "green", val: getCriticalityDetails().environmental },
-                  { icon: Star, color: "purple", val: getCriticalityDetails().reputation },
-                ].map(({ icon: CIcon, color, val }) => (
-                  <div key={color} className="text-center flex flex-col items-center gap-0.5">
-                    <CIcon className={`w-3.5 h-3.5 text-${color}-500`} />
-                    <div className="flex gap-px">
-                      {[1,2,3,4,5].map(i => (
-                        <div key={i} className={`w-1.5 h-3 rounded-sm ${i <= val ? `bg-${color}-500` : "bg-slate-200"}`} />
-                      ))}
-                    </div>
-                    <span className="text-[10px] text-slate-500">{val}</span>
+            {(() => {
+              const critDetails = getCriticalityDetails();
+              if (!critDetails) {
+                return (
+                  <span className="text-sm text-slate-400 italic">No criticality assigned</span>
+                );
+              }
+              return (
+                <>
+                  <div className="grid grid-cols-4 gap-1 mt-1">
+                    {[
+                      { icon: Shield, color: "red", val: critDetails.safety },
+                      { icon: Cog, color: "orange", val: critDetails.production },
+                      { icon: Leaf, color: "green", val: critDetails.environmental },
+                      { icon: Star, color: "purple", val: critDetails.reputation },
+                    ].map(({ icon: CIcon, color, val }) => (
+                      <div key={color} className="text-center flex flex-col items-center gap-0.5">
+                        <CIcon className={`w-3.5 h-3.5 text-${color}-500`} />
+                        <div className="flex gap-px">
+                          {[1, 2, 3, 4, 5].map((i) => (
+                            <div
+                              key={i}
+                              className={`w-1.5 h-3 rounded-sm ${i <= val ? `bg-${color}-500` : "bg-slate-200"}`}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-[10px] text-slate-500">{val}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <span className="text-sm text-slate-400 italic">No criticality assigned</span>
-            )}
+                  {critDetails.riskScore != null && (
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100">
+                      <span className="text-xs font-semibold text-slate-700">
+                        {t?.("equipment.criticalityScore") || "Criticality Score"}
+                      </span>
+                      <div className="text-right">
+                        <span className="text-sm font-bold text-slate-800">
+                          {Math.round(critDetails.riskScore)}/100
+                        </span>
+                        {critDetails.level && (
+                          <p className="text-[10px] text-slate-500 capitalize">
+                            {String(critDetails.level).replace(/_/g, " ")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           {translatedDescription && (
