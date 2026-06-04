@@ -48,6 +48,27 @@ def frequency_to_days(frequency: str) -> int:
     return _FREQUENCY_DAYS.get(frequency, 30)
 
 
+def normalize_program_criticality(raw) -> str:
+    """
+    Map equipment / RPN criticality labels to program CriticalityLevel (high|medium|low).
+    Unknown values default to low (longest interval).
+    """
+    if raw is None:
+        return "low"
+    if isinstance(raw, dict):
+        level = raw.get("level") or raw.get("value") or raw.get("rating")
+        if level is not None:
+            raw = level
+    label = str(raw).strip().lower().replace(" ", "_")
+    if label in ("high", "medium", "low"):
+        return label
+    if label in ("critical", "very_high", "severe", "urgent"):
+        return "high"
+    if label in ("moderate", "normal", "average"):
+        return "medium"
+    return "low"
+
+
 def get_planning_horizon(criticality: str) -> int:
     """Get planning horizon days based on criticality."""
     return _PLANNING_HORIZON.get(criticality, 14)

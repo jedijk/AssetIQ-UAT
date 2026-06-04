@@ -4,18 +4,21 @@ Equipment Maintenance Programs:
 - List programs (with filters)
 - Programs summary per equipment type
 """
+import logging
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional
 
 from database import db
+
+logger = logging.getLogger(__name__)
 from auth import get_current_user
 from models.maintenance_scheduler import (
     EquipmentMaintenanceProgram,
     CriticalityLevel,
     ApplyStrategyRequest,
 )
-from ._shared import frequency_to_days
+from ._shared import frequency_to_days, normalize_program_criticality
 
 router = APIRouter()
 
@@ -30,6 +33,27 @@ async def apply_strategy_to_equipment(
     Apply maintenance strategy to selected equipment.
     Creates maintenance program records for each equipment-task combination.
     """
+    try:
+        return await _apply_strategy_to_equipment_impl(
+            equipment_type_id, request, current_user
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(
+            "apply_strategy failed for equipment_type_id=%s", equipment_type_id
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to apply strategy: {exc}",
+        ) from exc
+
+
+async def _apply_strategy_to_equipment_impl(
+    equipment_type_id: str,
+    request: ApplyStrategyRequest,
+    current_user: dict,
+):
     strategy = await db.equipment_type_strategies.find_one({
         "equipment_type_id": equipment_type_id
     })
@@ -52,8 +76,6 @@ async def apply_strategy_to_equipment(
     failure_mode_strategies = strategy.get("failure_mode_strategies", [])
 
     # Build reverse map: task_template_id -> first FM-strategy that references it.
-    # This is the source of truth — each strategy mints its own FM-strategy ids
-    # distinct from the library FM ids stored inside task.failure_mode_ids.
     task_to_fm = {}
     for fm in failure_mode_strategies:
         for tid in (fm.get("task_ids") or []):
@@ -67,17 +89,8 @@ async def apply_strategy_to_equipment(
         equipment_name = equipment.get("name")
         equipment_tag = equipment.get("tag")
 
-        # Equipment criticality may be a dict {level: ...} or a string.
-        # When criticality is not assessed yet, treat the equipment as LOW
-        # so it receives the most conservative (longest-interval) frequency.
-        equip_criticality = "low"
-        if equipment.get("criticality"):
-            crit = equipment["criticality"]
-            if isinstance(crit, dict):
-                level = crit.get("level")
-                equip_criticality = level.lower() if level else "low"
-            elif isinstance(crit, str):
-                equip_criticality = crit.lower()
+        # Equipment criticality may be a dict, RPN label, or ISO score object.
+        equip_criticality = normalize_program_criticality(equipment.get("criticality"))
 
         for task in task_templates:
             if not task.get("is_mandatory", True):

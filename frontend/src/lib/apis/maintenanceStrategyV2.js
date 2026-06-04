@@ -176,8 +176,15 @@ export const maintenanceStrategyV2API = {
    * Get version history for a strategy
    */
   getVersionHistory: async (equipmentTypeId) => {
-    const response = await api.get(`/maintenance-strategies-v2/${equipmentTypeId}/version-history`);
-    return response.data;
+    try {
+      const response = await api.get(`/maintenance-strategies-v2/${equipmentTypeId}/version-history`);
+      return response.data;
+    } catch (err) {
+      if (err.response?.status === 404) {
+        return { current_version: "1.0", version_history: [], exists: false };
+      }
+      throw err;
+    }
   },
 
   /**

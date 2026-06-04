@@ -1164,7 +1164,10 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   });
 
   const strategy = strategyData?.strategy;
-  const hasStrategy = strategyData?.exists;
+  const hasStrategy =
+    strategyData?.exists === true &&
+    strategyData?.equipment_type_id === equipmentTypeId &&
+    !!strategy;
 
   // Affected equipment query
   const { data: affectedEquipmentData, isLoading: affectedEquipmentLoading } = useQuery({
@@ -1178,6 +1181,8 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
     queryKey: ["maintenance-strategy-v2-history", equipmentTypeId],
     queryFn: () => maintenanceStrategyV2API.getVersionHistory(equipmentTypeId),
     enabled: !!equipmentTypeId && hasStrategy,
+    retry: false,
+    staleTime: 30_000,
   });
 
   // ============= Mutations =============

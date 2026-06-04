@@ -658,11 +658,17 @@ async def get_strategy_version_history(
     )
     
     if not strategy:
-        raise HTTPException(status_code=404, detail="Strategy not found")
+        # Align with GET /{equipment_type_id} — no strategy yet is not an error for the UI
+        return {
+            "current_version": "1.0",
+            "version_history": [],
+            "exists": False,
+        }
     
     return {
         "current_version": strategy.get("version", "1.0"),
-        "version_history": strategy.get("version_history", [])
+        "version_history": strategy.get("version_history", []),
+        "exists": True,
     }
 
 
