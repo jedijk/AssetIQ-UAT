@@ -571,7 +571,7 @@ const de = {
     title: "Bibliothek",
     failureModes: "Fehlermodi",
     equipmentTypes: "Anlagentypen",
-    maintenance: "Wartung",
+    maintenance: "Wartungsstrategie",
     totalModes: "Gesamte Modi",
     categories: "Kategorien",
     searchPlaceholder: "Fehlermodi suchen...",

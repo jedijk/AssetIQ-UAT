@@ -1291,7 +1291,17 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const syncStrategyMutation = useMutation({
     mutationFn: () => maintenanceStrategyV2API.syncStrategy(equipmentTypeId),
     onSuccess: (data) => {
-      toast.success(`Synced with library: ${data.new_failure_modes_added} new failure modes, ${data.new_tasks_added} new tasks added`);
+      const refreshed = data.tasks_refreshed || 0;
+      const msg = [
+        `Synced with library: ${data.new_failure_modes_added || 0} new failure modes`,
+        `${data.new_tasks_added || 0} new tasks`,
+        data.updated_failure_modes
+          ? `${data.updated_failure_modes} FM(s) updated${refreshed ? `, ${refreshed} task(s) refreshed` : ""}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(", ");
+      toast.success(msg);
       queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
     },
     onError: (err) => {

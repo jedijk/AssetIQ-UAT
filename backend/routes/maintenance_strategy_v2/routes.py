@@ -58,6 +58,7 @@ from routes.maintenance_strategy_v2.strategy_helpers import (
     determine_strategy_type,
     determine_action_type_from_text,
     generate_default_tasks_for_failure_mode,
+    refresh_failure_mode_strategy_from_library,
     log_strategy_audit,
 )
 
@@ -467,7 +468,8 @@ async def sync_equipment_type_strategy(
     - Keeps all existing task templates
     - Only adds NEW failure modes from the library
     - Only adds NEW tasks for the new failure modes
-    - Updates version info for existing failure modes if they have been updated in library
+    - When a library failure mode has a newer version, refreshes FM metadata and
+      linked task template content (name, description, type, discipline, frequencies)
     """
     # Get existing strategy
     existing_strategy = await db.equipment_type_strategies.find_one({
@@ -495,6 +497,8 @@ async def sync_equipment_type_strategy(
     new_fm_strategies = []
     new_tasks = []
     updated_fms = []
+    tasks_refreshed = 0
+    refreshed_task_templates: List[Dict[str, Any]] = []
     
     for fm in library_failure_modes:
         fm_id = fm.get("id", str(uuid.uuid4()))
@@ -510,14 +514,18 @@ async def sync_equipment_type_strategy(
             for existing_fm in existing_fm_strategies:
                 if existing_fm.get("failure_mode_id") == fm_id or existing_fm.get("failure_mode_name") == fm_name:
                     if existing_fm.get("fm_version", 1) < fm_version:
-                        # Update version tracking and potential effects
-                        existing_fm["fm_version"] = fm_version
-                        existing_fm["fm_updated_at"] = fm_updated_at
-                        potential_effects = fm.get("potential_effects", [])
-                        if isinstance(potential_effects, str):
-                            potential_effects = [potential_effects] if potential_effects else []
-                        existing_fm["potential_effects"] = potential_effects
+                        _, existing_tasks, n = refresh_failure_mode_strategy_from_library(
+                            fm, existing_fm, existing_tasks
+                        )
+                        tasks_refreshed += n
                         updated_fms.append(fm_name)
+                        for tid in existing_fm.get("task_ids") or []:
+                            task = next(
+                                (t for t in existing_tasks if str(t.get("id")) == str(tid)),
+                                None,
+                            )
+                            if task:
+                                refreshed_task_templates.append(task)
                     break
             continue
         
@@ -589,7 +597,11 @@ async def sync_equipment_type_strategy(
         "changed_at": datetime.utcnow().isoformat(),
         "changed_by": current_user.get("user_id"),
         "change_type": "sync",
-        "change_summary": f"Synced with library: Added {len(new_fm_strategies)} new failure modes, {len(new_tasks)} new tasks. Updated {len(updated_fms)} existing FMs."
+        "change_summary": (
+            f"Synced with library: Added {len(new_fm_strategies)} new failure modes, "
+            f"{len(new_tasks)} new tasks. Updated {len(updated_fms)} existing FMs "
+            f"({tasks_refreshed} task templates refreshed)."
+        )
     }
     
     # Update the strategy
@@ -619,9 +631,18 @@ async def sync_equipment_type_strategy(
             "new_failure_modes": len(new_fm_strategies),
             "new_tasks": len(new_tasks),
             "updated_fms": len(updated_fms),
-            "new_version": new_version
-        }
+            "tasks_refreshed": tasks_refreshed,
+            "new_version": new_version,
+        },
     )
+
+    seen_task_ids: set = set()
+    for task in refreshed_task_templates:
+        tid = task.get("id")
+        if not tid or tid in seen_task_ids:
+            continue
+        seen_task_ids.add(tid)
+        await _sync_metadata_to_open_scheduled_tasks(equipment_type_id, task)
 
     programs_v2_sync = await _sync_maintenance_programs_v2(
         equipment_type_id,
@@ -634,6 +655,7 @@ async def sync_equipment_type_strategy(
         "new_failure_modes_added": len(new_fm_strategies),
         "new_tasks_added": len(new_tasks),
         "updated_failure_modes": len(updated_fms),
+        "tasks_refreshed": tasks_refreshed,
         "total_failure_modes": total_fms,
         "total_tasks": len(all_tasks),
         "new_version": new_version,

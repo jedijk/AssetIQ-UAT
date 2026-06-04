@@ -2,7 +2,7 @@
 Maintenance strategy v2 — shared helper functions.
 """
 from datetime import datetime, timezone
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 import uuid
 import logging
 
@@ -264,6 +264,109 @@ def generate_default_tasks_for_failure_mode(
         tasks.append(task)
     
     return tasks
+
+
+def _task_template_to_dict(task: Any) -> Dict[str, Any]:
+    if hasattr(task, "model_dump"):
+        return task.model_dump()
+    return dict(task)
+
+
+def refresh_failure_mode_strategy_from_library(
+    library_fm: Dict[str, Any],
+    fm_strategy: Dict[str, Any],
+    task_templates: List[Dict[str, Any]],
+) -> Tuple[Dict[str, Any], List[Dict[str, Any]], int]:
+    """
+    Update strategy FM metadata and linked task template content from the library FM.
+    Preserves existing task template IDs where possible so programs stay linked.
+    """
+    fm_id = fm_strategy.get("failure_mode_id") or library_fm.get("id")
+    strategy_type_str = fm_strategy.get("strategy_type") or "preventive"
+    try:
+        strategy_type = MaintenanceStrategyType(strategy_type_str)
+    except ValueError:
+        strategy_type = determine_strategy_type(library_fm)
+
+    detection_methods = fm_strategy.get("detection_methods") or map_detection_methods(library_fm)
+    generated = generate_default_tasks_for_failure_mode(
+        library_fm, strategy_type, detection_methods
+    )
+    generated_dicts = [_task_template_to_dict(t) for t in generated]
+
+    by_id = {str(t.get("id")): t for t in task_templates if t.get("id")}
+    old_ids = [str(tid) for tid in (fm_strategy.get("task_ids") or []) if tid]
+    new_ids: List[str] = []
+    refreshed = 0
+
+    for i, gen in enumerate(generated_dicts):
+        if gen.get("task_type") and hasattr(gen["task_type"], "value"):
+            gen["task_type"] = gen["task_type"].value
+        if gen.get("frequency_matrix") and hasattr(gen["frequency_matrix"], "model_dump"):
+            gen["frequency_matrix"] = gen["frequency_matrix"].model_dump()
+
+        if i < len(old_ids) and old_ids[i] in by_id:
+            tid = old_ids[i]
+            existing = by_id[tid]
+            for key in (
+                "name",
+                "description",
+                "task_type",
+                "discipline",
+                "detection_methods",
+                "failure_mode_ids",
+            ):
+                if gen.get(key) is not None:
+                    existing[key] = gen[key]
+            if gen.get("frequency_matrix"):
+                existing["frequency_matrix"] = gen["frequency_matrix"]
+            new_ids.append(tid)
+            refreshed += 1
+        else:
+            task_templates.append(gen)
+            tid = str(gen.get("id"))
+            if tid:
+                by_id[tid] = gen
+                new_ids.append(tid)
+                refreshed += 1
+
+    for extra_tid in old_ids[len(generated_dicts) :]:
+        if extra_tid in by_id:
+            task_templates[:] = [
+                t for t in task_templates if str(t.get("id")) != extra_tid
+            ]
+            del by_id[extra_tid]
+
+    fm_strategy["task_ids"] = new_ids
+    fm_strategy["fm_version"] = library_fm.get("version") or 1
+    updated_at = library_fm.get("updated_at")
+    fm_strategy["fm_updated_at"] = str(updated_at) if updated_at else fm_strategy.get("fm_updated_at")
+
+    potential_effects = library_fm.get("potential_effects", [])
+    if isinstance(potential_effects, str):
+        potential_effects = [potential_effects] if potential_effects else []
+    fm_strategy["potential_effects"] = potential_effects
+
+    severity = library_fm.get("severity", fm_strategy.get("severity", 5))
+    occurrence = library_fm.get("occurrence", fm_strategy.get("occurrence", 5))
+    detectability = library_fm.get("detectability", fm_strategy.get("detectability", 5))
+    rpn = library_fm.get("rpn", severity * occurrence * detectability)
+    fm_strategy["severity"] = severity
+    fm_strategy["occurrence"] = occurrence
+    fm_strategy["detectability"] = detectability
+    fm_strategy["rpn"] = rpn
+
+    if rpn >= 250:
+        risk_level = "critical"
+    elif rpn >= 180:
+        risk_level = "high"
+    elif rpn >= 100:
+        risk_level = "medium"
+    else:
+        risk_level = "low"
+    fm_strategy["risk_if_unaddressed"] = risk_level
+
+    return fm_strategy, task_templates, refreshed
 
 
 async def log_strategy_audit(
