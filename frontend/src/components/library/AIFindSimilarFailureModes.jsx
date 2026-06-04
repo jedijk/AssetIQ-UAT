@@ -89,6 +89,7 @@ export default function AIFindSimilarFailureModes({
     (groups || []).map((g) => ({
       et_id: etId,
       et_name: etName,
+      cross_equipment: !!g.cross_equipment,
       member_ids: g.member_ids || [],
       canonical_name: g.suggested_canonical_name || g.member_names?.[0] || "",
       reason:
@@ -130,9 +131,26 @@ export default function AIFindSimilarFailureModes({
       setScanned((s) => s + 1);
     }
 
+    try {
+      const crossData = await failureModesAPI.scanSimilar({
+        only_cross_equipment: true,
+      });
+      const crossGroups = mapLexicalGroups(
+        "__cross__",
+        "Across equipment types",
+        crossData?.groups,
+      );
+      if (crossGroups.length) {
+        collected.push(...crossGroups);
+        setGroups((prev) => [...prev, ...crossGroups]);
+      }
+    } catch (err) {
+      console.error("Cross-equipment scan failed", err);
+    }
+
     setPhase("done");
     toast.success(
-      `Fast scan complete — found ${collected.length} candidate group(s) across ${ets.length} equipment type(s).`,
+      `Fast scan complete — found ${collected.length} candidate group(s) (incl. cross-equipment duplicates).`,
     );
   };
 
@@ -176,9 +194,26 @@ export default function AIFindSimilarFailureModes({
       setScanned((s) => s + 1);
     }
 
+    try {
+      const crossData = await failureModesAPI.scanSimilar({
+        only_cross_equipment: true,
+      });
+      const crossGroups = mapLexicalGroups(
+        "__cross__",
+        "Across equipment types",
+        crossData?.groups,
+      );
+      if (crossGroups.length) {
+        collected.push(...crossGroups);
+        setGroups((prev) => [...prev, ...crossGroups]);
+      }
+    } catch (err) {
+      console.error("Cross-equipment scan failed", err);
+    }
+
     setPhase("done");
     toast.success(
-      `AI scan complete — found ${collected.length} candidate group(s) across ${ets.length} equipment type(s).`,
+      `AI scan complete — found ${collected.length} candidate group(s) (incl. cross-equipment).`,
     );
   };
 
@@ -322,10 +357,9 @@ export default function AIFindSimilarFailureModes({
             Find Similar Failure Modes
           </DialogTitle>
           <DialogDescription>
-            Scans each equipment type for near-duplicate failure modes (e.g.
-            &quot;Bearing Failure&quot; + &quot;Bearing Damage&quot;). Different ISO 14224
-            mechanisms (Wear vs Seizure) are penalized in the fast scan. Review each
-            group before merging — nothing is merged automatically.
+            Fast scan finds duplicates within each equipment type and the same
+            title across types (e.g. two &quot;Bearing Failure&quot; on Screw Compressor
+            and DC Motor). AI scan uses GPT per equipment type. Review before merging.
           </DialogDescription>
         </DialogHeader>
 
@@ -514,7 +548,8 @@ export default function AIFindSimilarFailureModes({
                                         RPN {(fm.severity || 0) * (fm.occurrence || 0) * (fm.detectability || 0)}
                                       </Badge>
                                       <span className="text-slate-400">
-                                        · {fm.recommended_actions?.length || 0} actions ·{" "}
+                                        · {fm.equipment || "—"} ·{" "}
+                                        {fm.recommended_actions?.length || 0} actions ·{" "}
                                         {fm.keywords?.length || 0} keywords
                                       </span>
                                     </div>

@@ -1910,7 +1910,8 @@ async def find_similar_failure_modes(request: FindSimilarFailureModesRequest):
             a_name = (fms[i].failure_mode or "").strip().lower()
             b_name = (fms[j].failure_mode or "").strip().lower()
             if a_name == b_name:
-                continue  # exact dups handled elsewhere
+                union(i, j)
+                continue
             jacc = _sim_jaccard(tokens_cache[i], tokens_cache[j])
             ratio = _sim_ratio(fms[i].failure_mode, fms[j].failure_mode)
             if jacc >= 0.5 or ratio >= 0.8:

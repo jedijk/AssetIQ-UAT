@@ -435,6 +435,9 @@ class FindSimilarFailureModesScanRequest(BaseModel):
     ratio_threshold: float = 0.8
     min_score: float = 55.0
     limit_groups: int = 200
+    include_cross_equipment: bool = True
+    only_cross_equipment: bool = False
+    cross_equipment_ratio_threshold: float = 0.88
 
 
 class MergeFailureModesRequest(BaseModel):
@@ -883,6 +886,9 @@ async def scan_similar_failure_modes(
             ratio_threshold=request.ratio_threshold,
             min_score=request.min_score,
             limit_groups=request.limit_groups,
+            include_cross_equipment=request.include_cross_equipment,
+            only_cross_equipment=request.only_cross_equipment,
+            cross_equipment_ratio_threshold=request.cross_equipment_ratio_threshold,
         )
     except Exception as e:
         logger.error(f"Error scanning similar failure modes: {e}")

@@ -705,6 +705,9 @@ class FailureModesService:
         shared_ets = sorted(ets_a & ets_b)
 
         score = max(name_ratio, jacc) * 70.0
+        if norm_a and norm_a == norm_b:
+            # Same title on different equipment types (e.g. two "Bearing Failure" rows)
+            score += 15.0
         if shared_ets:
             score += 20.0
         if (fm_a.get("category") or "").lower() == (fm_b.get("category") or "").lower() and fm_a.get("category"):
@@ -824,6 +827,145 @@ class FailureModesService:
             "total": len(limited),
         }
 
+    @staticmethod
+    def _group_member_key(member_ids: List[str]) -> frozenset:
+        return frozenset(str(x) for x in member_ids)
+
+    def _append_group_if_new(
+        self,
+        groups_out: List[Dict[str, Any]],
+        seen_keys: Set[frozenset],
+        payload: Dict[str, Any],
+        limit_groups: int,
+    ) -> bool:
+        """Append group when member set is new. Returns False when limit reached."""
+        key = self._group_member_key(payload.get("member_ids") or [])
+        if len(key) < 2 or key in seen_keys:
+            return len(groups_out) < limit_groups
+        seen_keys.add(key)
+        groups_out.append(payload)
+        return len(groups_out) < limit_groups
+
+    def _members_span_equipment_types(self, cluster: List[Dict[str, Any]]) -> bool:
+        """True when at least two members are linked to different equipment types."""
+        if len(cluster) < 2:
+            return False
+        for i in range(len(cluster)):
+            ets_i = {str(t) for t in (cluster[i].get("equipment_type_ids") or [])}
+            for j in range(i + 1, len(cluster)):
+                ets_j = {str(t) for t in (cluster[j].get("equipment_type_ids") or [])}
+                if not ets_i or not ets_j or not (ets_i & ets_j):
+                    return True
+        return False
+
+    def _cross_equipment_duplicate_groups(
+        self,
+        all_fms: List[Dict[str, Any]],
+        min_score: float,
+        cross_ratio_threshold: float,
+        seen_keys: Set[frozenset],
+        groups_out: List[Dict[str, Any]],
+        limit_groups: int,
+    ) -> None:
+        """Find duplicates that only appear when comparing across equipment types."""
+        by_norm: Dict[str, List[Dict[str, Any]]] = {}
+        for fm in all_fms:
+            norm = self.normalize_fm_text(fm.get("failure_mode"))
+            if not norm:
+                continue
+            by_norm.setdefault(norm, []).append(fm)
+
+        for norm, members in by_norm.items():
+            if len(groups_out) >= limit_groups:
+                return
+            unique: List[Dict[str, Any]] = []
+            seen_ids: Set[str] = set()
+            for fm in members:
+                fid = str(fm["id"])
+                if fid in seen_ids:
+                    continue
+                seen_ids.add(fid)
+                unique.append(fm)
+            if len(unique) < 2 or not self._members_span_equipment_types(unique):
+                continue
+            pair_scores = []
+            for i in range(len(unique)):
+                for j in range(i + 1, len(unique)):
+                    pair_scores.append(self.score_similarity(unique[i], unique[j])["score"])
+            avg_score = sum(pair_scores) / len(pair_scores) if pair_scores else 100.0
+            if avg_score < min_score:
+                continue
+            best = max(unique, key=self._fm_completeness_score)
+            labels = sorted(
+                {(fm.get("equipment") or "").strip() for fm in unique if (fm.get("equipment") or "").strip()}
+            )
+            self._append_group_if_new(
+                groups_out,
+                seen_keys,
+                {
+                    "equipment_type_id": None,
+                    "cross_equipment": True,
+                    "member_ids": [str(fm["id"]) for fm in unique],
+                    "member_names": [fm.get("failure_mode") for fm in unique],
+                    "equipment_labels": labels,
+                    "suggested_primary_id": str(best["id"]),
+                    "suggested_canonical_name": best.get("failure_mode"),
+                    "avg_similarity_score": round(avg_score, 1),
+                    "reason": f"Identical name across {len(unique)} record(s) on different equipment",
+                },
+                limit_groups,
+            )
+
+        # Similar names across equipment (e.g. Bearing Failure + Drive Bearing Failure)
+        deduped: List[Dict[str, Any]] = []
+        seen_ids: Set[str] = set()
+        for fm in all_fms:
+            fid = str(fm["id"])
+            if fid in seen_ids:
+                continue
+            seen_ids.add(fid)
+            deduped.append(fm)
+
+        for cluster in self._cluster_by_name_similarity(
+            deduped,
+            jaccard_threshold=0.5,
+            ratio_threshold=cross_ratio_threshold,
+        ):
+            if len(groups_out) >= limit_groups:
+                return
+            if len(cluster) < 2 or not self._members_span_equipment_types(cluster):
+                continue
+            norms = {self.normalize_fm_text(fm.get("failure_mode")) for fm in cluster}
+            if len(norms) == 1:
+                continue  # already covered by exact-name pass
+            pair_scores = []
+            for i in range(len(cluster)):
+                for j in range(i + 1, len(cluster)):
+                    pair_scores.append(self.score_similarity(cluster[i], cluster[j])["score"])
+            avg_score = sum(pair_scores) / len(pair_scores) if pair_scores else 0.0
+            if avg_score < min_score:
+                continue
+            best = max(cluster, key=self._fm_completeness_score)
+            labels = sorted(
+                {(fm.get("equipment") or "").strip() for fm in cluster if (fm.get("equipment") or "").strip()}
+            )
+            self._append_group_if_new(
+                groups_out,
+                seen_keys,
+                {
+                    "equipment_type_id": None,
+                    "cross_equipment": True,
+                    "member_ids": [str(fm["id"]) for fm in cluster],
+                    "member_names": [fm.get("failure_mode") for fm in cluster],
+                    "equipment_labels": labels,
+                    "suggested_primary_id": str(best["id"]),
+                    "suggested_canonical_name": best.get("failure_mode"),
+                    "avg_similarity_score": round(avg_score, 1),
+                    "reason": "Similar name across different equipment types",
+                },
+                limit_groups,
+            )
+
     async def scan_similar_groups(
         self,
         equipment_type_id: Optional[str] = None,
@@ -831,6 +973,9 @@ class FailureModesService:
         ratio_threshold: float = 0.8,
         min_score: float = 55.0,
         limit_groups: int = 200,
+        include_cross_equipment: bool = True,
+        only_cross_equipment: bool = False,
+        cross_equipment_ratio_threshold: float = 0.88,
     ) -> Dict[str, Any]:
         """Batch scan: cluster near-duplicate failure modes per equipment type (no AI)."""
         query: Dict[str, Any] = {}
@@ -860,6 +1005,23 @@ class FailureModesService:
         async for doc in cursor:
             all_fms.append(self._serialize(doc))
 
+        if only_cross_equipment:
+            groups_out: List[Dict[str, Any]] = []
+            seen_group_keys: Set[frozenset] = set()
+            self._cross_equipment_duplicate_groups(
+                all_fms,
+                min_score=min_score,
+                cross_ratio_threshold=cross_equipment_ratio_threshold,
+                seen_keys=seen_group_keys,
+                groups_out=groups_out,
+                limit_groups=limit_groups,
+            )
+            return {
+                "equipment_type_id": equipment_type_id,
+                "groups": groups_out,
+                "total_groups": len(groups_out),
+            }
+
         by_et: Dict[str, List[Dict[str, Any]]] = {}
         for fm in all_fms:
             et_ids = fm.get("equipment_type_ids") or []
@@ -872,6 +1034,8 @@ class FailureModesService:
                 by_et.setdefault(str(et_id), []).append(fm)
 
         groups_out: List[Dict[str, Any]] = []
+        seen_group_keys: Set[frozenset] = set()
+
         for et_id, et_fms in by_et.items():
             if len(et_fms) < 2:
                 continue
@@ -901,19 +1065,35 @@ class FailureModesService:
 
                 best = max(cluster, key=self._fm_completeness_score)
                 names = [fm.get("failure_mode") for fm in cluster]
-                groups_out.append({
-                    "equipment_type_id": None if et_id == "_unlinked" else et_id,
-                    "member_ids": [str(fm["id"]) for fm in cluster],
-                    "member_names": names,
-                    "suggested_primary_id": str(best["id"]),
-                    "suggested_canonical_name": best.get("failure_mode"),
-                    "avg_similarity_score": round(avg_score, 1),
-                    "reason": "Lexical name similarity (token Jaccard / Levenshtein)",
-                })
+                self._append_group_if_new(
+                    groups_out,
+                    seen_group_keys,
+                    {
+                        "equipment_type_id": None if et_id == "_unlinked" else et_id,
+                        "cross_equipment": False,
+                        "member_ids": [str(fm["id"]) for fm in cluster],
+                        "member_names": names,
+                        "suggested_primary_id": str(best["id"]),
+                        "suggested_canonical_name": best.get("failure_mode"),
+                        "avg_similarity_score": round(avg_score, 1),
+                        "reason": "Lexical name similarity (token Jaccard / Levenshtein)",
+                    },
+                    limit_groups,
+                )
                 if len(groups_out) >= limit_groups:
                     break
             if len(groups_out) >= limit_groups:
                 break
+
+        if include_cross_equipment and not equipment_type_id:
+            self._cross_equipment_duplicate_groups(
+                all_fms,
+                min_score=min_score,
+                cross_ratio_threshold=cross_equipment_ratio_threshold,
+                seen_keys=seen_group_keys,
+                groups_out=groups_out,
+                limit_groups=limit_groups,
+            )
 
         return {
             "equipment_type_id": equipment_type_id,
