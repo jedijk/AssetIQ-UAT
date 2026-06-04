@@ -354,7 +354,7 @@ async def get_similar_failure_modes(
     mode_id: str,
     threshold: float = 55.0,
     limit: int = 20,
-    require_shared_equipment_type: bool = True,
+    require_shared_equipment_type: bool = False,
     current_user: dict = Depends(get_current_user),
 ):
     """Lexical similarity search for near-duplicate failure modes (no AI)."""
@@ -878,7 +878,7 @@ async def scan_similar_failure_modes(
     request: FindSimilarFailureModesScanRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Batch scan for near-duplicate failure modes per equipment type (lexical, no AI)."""
+    """Batch scan for near-duplicate failure modes across the full library (lexical, no AI)."""
     try:
         return await failure_modes_service.scan_similar_groups(
             equipment_type_id=request.equipment_type_id,

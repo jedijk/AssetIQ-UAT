@@ -1874,8 +1874,9 @@ class FindSimilarFailureModesResponse(BaseModel):
 
 @router.post("/find-similar-failure-modes", response_model=FindSimilarFailureModesResponse)
 async def find_similar_failure_modes(request: FindSimilarFailureModesRequest):
-    """Identify groups of near-duplicate failure modes within ONE equipment type.
+    """Identify groups of near-duplicate failure modes in the submitted set (library-wide).
 
+    Equipment type is not used for clustering — pass all failure modes to scan the library.
     Pipeline:
     1. Build single-link clusters via Jaccard ≥0.5 OR Levenshtein ≥0.8 on names.
     2. For each cluster ≥2 members, ask GPT to confirm which sub-groups are

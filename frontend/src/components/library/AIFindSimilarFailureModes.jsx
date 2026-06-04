@@ -33,7 +33,6 @@ export default function AIFindSimilarFailureModes({
   open,
   onClose,
   failureModes = [],
-  equipmentTypes = [],
   onApplied,
 }) {
   const [scanMode, setScanMode] = useState("lexical"); // lexical | ai
@@ -53,24 +52,8 @@ export default function AIFindSimilarFailureModes({
     return m;
   }, [failureModes]);
 
-  const etById = useMemo(() => {
-    const m = new Map();
-    (equipmentTypes || []).forEach((et) => m.set(et.id, et));
-    return m;
-  }, [equipmentTypes]);
-
-  // Group FMs by equipment_type_id (frontend builds the per-ET payload so the
-  // backend doesn't have to re-load the library each call)
-  const fmsByEt = useMemo(() => {
-    const map = new Map();
-    (failureModes || []).forEach((fm) => {
-      (fm.equipment_type_ids || []).forEach((eid) => {
-        if (!map.has(eid)) map.set(eid, []);
-        map.get(eid).push({ id: fm.id, failure_mode: fm.failure_mode });
-      });
-    });
-    return map;
-  }, [failureModes]);
+  const libraryFmCount = (failureModes || []).length;
+  const canScanLibrary = libraryFmCount >= 2;
 
   useEffect(() => {
     if (open) {
@@ -79,11 +62,9 @@ export default function AIFindSimilarFailureModes({
       setScanned(0);
       setErrorCount(0);
       setGroups([]);
-      setTotalEts(
-        [...fmsByEt.values()].filter((arr) => (arr?.length || 0) >= 2).length,
-      );
+      setTotalEts(1);
     }
-  }, [open, fmsByEt]);
+  }, [open]);
 
   const mapLexicalGroups = (etId, etName, groups) =>
     (groups || []).map((g) => ({
@@ -102,119 +83,76 @@ export default function AIFindSimilarFailureModes({
     }));
 
   const runLexicalScan = async () => {
+    if (!canScanLibrary) {
+      toast.error("Need at least 2 failure modes in the library to scan.");
+      return;
+    }
     cancelRef.current = false;
     setPhase("running");
     setScanned(0);
     setErrorCount(0);
     setGroups([]);
 
-    const ets = [...fmsByEt.entries()].filter(([, arr]) => (arr?.length || 0) >= 2);
-    const collected = [];
-
-    for (let i = 0; i < ets.length; i++) {
-      if (cancelRef.current) break;
-      const [etId] = ets[i];
-      const etName = etById.get(etId)?.name || etId;
-      try {
-        const data = await failureModesAPI.scanSimilar({
-          equipment_type_id: etId,
-        });
-        const newGroups = mapLexicalGroups(etId, etName, data?.groups);
-        if (newGroups.length) {
-          collected.push(...newGroups);
-          setGroups((prev) => [...prev, ...newGroups]);
-        }
-      } catch (err) {
-        console.error("Lexical ET scan failed", etId, err);
-        setErrorCount((e) => e + 1);
-      }
-      setScanned((s) => s + 1);
-    }
-
     try {
-      const crossData = await failureModesAPI.scanSimilar({
-        only_cross_equipment: true,
-      });
-      const crossGroups = mapLexicalGroups(
-        "__cross__",
-        "Across equipment types",
-        crossData?.groups,
+      const data = await failureModesAPI.scanSimilar({});
+      const collected = mapLexicalGroups("library", "All failure modes", data?.groups);
+      setGroups(collected);
+      setScanned(1);
+      setPhase("done");
+      toast.success(
+        `Fast scan complete — found ${collected.length} candidate group(s) across the library.`,
       );
-      if (crossGroups.length) {
-        collected.push(...crossGroups);
-        setGroups((prev) => [...prev, ...crossGroups]);
-      }
     } catch (err) {
-      console.error("Cross-equipment scan failed", err);
+      console.error("Library-wide scan failed", err);
+      setErrorCount(1);
+      setPhase("done");
+      toast.error("Failed to scan failure modes");
     }
-
-    setPhase("done");
-    toast.success(
-      `Fast scan complete — found ${collected.length} candidate group(s) (incl. cross-equipment duplicates).`,
-    );
   };
 
   const runAiScan = async () => {
+    if (!canScanLibrary) {
+      toast.error("Need at least 2 failure modes in the library to scan.");
+      return;
+    }
     cancelRef.current = false;
     setPhase("running");
     setScanned(0);
     setErrorCount(0);
     setGroups([]);
 
-    const ets = [...fmsByEt.entries()].filter(([, arr]) => (arr?.length || 0) >= 2);
-    const collected = [];
-
-    for (let i = 0; i < ets.length; i++) {
-      if (cancelRef.current) break;
-      const [etId, fms] = ets[i];
-      const etName = etById.get(etId)?.name || etId;
-      try {
-        const resp = await api.post("/ai-suggestions/find-similar-failure-modes", {
-          equipment_type_id: etId,
-          equipment_type_name: etName,
-          failure_modes: fms,
-        });
-        const newGroups = (resp?.data?.groups || []).map((g) => ({
-          et_id: etId,
-          et_name: etName,
-          member_ids: g.member_ids,
-          canonical_name: g.canonical_name || "",
-          reason: g.reason || "",
-          scan_source: "ai",
-          selected: false,
-        }));
-        if (newGroups.length) {
-          collected.push(...newGroups);
-          setGroups((prev) => [...prev, ...newGroups]);
-        }
-      } catch (err) {
-        console.error("ET scan failed", etId, err);
-        setErrorCount((e) => e + 1);
-      }
-      setScanned((s) => s + 1);
-    }
+    const allFms = (failureModes || []).map((fm) => ({
+      id: fm.id,
+      failure_mode: fm.failure_mode,
+    }));
 
     try {
-      const crossData = await failureModesAPI.scanSimilar({
-        only_cross_equipment: true,
+      const resp = await api.post("/ai-suggestions/find-similar-failure-modes", {
+        equipment_type_id: "library",
+        equipment_type_name: "All failure modes",
+        failure_modes: allFms,
       });
-      const crossGroups = mapLexicalGroups(
-        "__cross__",
-        "Across equipment types",
-        crossData?.groups,
+      const collected = (resp?.data?.groups || []).map((g) => ({
+        et_id: "library",
+        et_name: "All failure modes",
+        member_ids: g.member_ids,
+        canonical_name: g.canonical_name || "",
+        reason: g.reason || "",
+        scan_source: "ai",
+        selected: false,
+      }));
+      setGroups(collected);
+      setScanned(1);
+      setPhase("done");
+      toast.success(
+        `AI scan complete — found ${collected.length} candidate group(s) across the library.`,
       );
-      if (crossGroups.length) {
-        collected.push(...crossGroups);
-        setGroups((prev) => [...prev, ...crossGroups]);
-      }
     } catch (err) {
-      console.error("Cross-equipment scan failed", err);
+      console.error("Library AI scan failed", err);
+      setErrorCount(1);
+      setPhase("done");
+      toast.error("AI scan failed. Try Fast scan or a smaller library.");
     }
-
-    setPhase("done");
-    toast.success(
-      `AI scan complete — found ${collected.length} candidate group(s) (incl. cross-equipment).`,
-    );
   };
 
   const runScan = () => (scanMode === "ai" ? runAiScan() : runLexicalScan());
@@ -357,9 +295,9 @@ export default function AIFindSimilarFailureModes({
             Find Similar Failure Modes
           </DialogTitle>
           <DialogDescription>
-            Fast scan finds duplicates within each equipment type and the same
-            title across types (e.g. two &quot;Bearing Failure&quot; on Screw Compressor
-            and DC Motor). AI scan uses GPT per equipment type. Review before merging.
+            Scans the entire failure mode library by name similarity. Equipment type
+            is not used — e.g. two &quot;Bearing Failure&quot; rows on different equipment
+            are grouped together. Review each group before merging.
           </DialogDescription>
         </DialogHeader>
 
@@ -379,12 +317,12 @@ export default function AIFindSimilarFailureModes({
             </div>
             <div>
               <p className="font-semibold text-slate-800">
-                Will scan {totalEts} equipment type{totalEts === 1 ? "" : "s"} that have 2+ failure modes
+                Will scan {libraryFmCount} failure mode{libraryFmCount === 1 ? "" : "s"} in the library
               </p>
               <p className="text-sm text-slate-500 mt-1">
                 {scanMode === "ai"
-                  ? `Estimated time: ~${Math.max(20, totalEts * 2)}s. Uses gpt-4o-mini.`
-                  : "Fast lexical scan (name tokens + similarity). Usually completes in seconds."}
+                  ? "Uses gpt-4o-mini on the full library (may take longer on large libraries)."
+                  : "Fast lexical scan across all failure modes. Usually completes in seconds."}
               </p>
             </div>
             <div className="flex flex-wrap gap-2 justify-center">
@@ -414,7 +352,7 @@ export default function AIFindSimilarFailureModes({
                   ? "bg-purple-600 hover:bg-purple-700"
                   : "bg-amber-600 hover:bg-amber-700"
               }
-              disabled={totalEts === 0}
+              disabled={!canScanLibrary}
               data-testid="run-find-similar-fm-btn"
             >
               {scanMode === "ai" ? (
@@ -437,7 +375,7 @@ export default function AIFindSimilarFailureModes({
           <div className="flex flex-col items-center justify-center py-6 px-4 gap-3">
             <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
             <p className="text-sm text-slate-700">
-              Scanning {scanned} / {totalEts} equipment types... found {groups.length} group(s) so far
+              Scanning library ({libraryFmCount} failure modes)... found {groups.length} group(s)
             </p>
             <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
               <div
@@ -445,10 +383,10 @@ export default function AIFindSimilarFailureModes({
                 style={{ width: `${progressPct}%` }}
               />
             </div>
-            {errorCount > 0 && (
+                {errorCount > 0 && (
               <p className="text-xs text-red-600 flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" />
-                {errorCount} equipment type(s) failed (kept unchanged)
+                Scan failed — try again or use Fast scan
               </p>
             )}
             <Button variant="outline" size="sm" onClick={cancel}>
@@ -465,7 +403,7 @@ export default function AIFindSimilarFailureModes({
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-4 h-4 text-green-600" />
                 <span className="text-sm font-medium text-slate-700">
-                  {groups.length} candidate group(s) across {groupsByEt.length} equipment type(s)
+                  {groups.length} candidate group(s) in the library
                 </span>
               </div>
               <div className="flex items-center gap-2 ml-auto">
