@@ -196,7 +196,7 @@ async def get_maintenance_program(
             {"version": 1, "_id": 0}
         )
 
-    program = MaintenanceProgramService.enrich_criticality_context(
+    program = await MaintenanceProgramService.enrich_criticality_context(
         program, equipment=equipment, strategy=strategy
     )
 

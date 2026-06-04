@@ -1282,7 +1282,7 @@ Only include tasks that would genuinely improve reliability and are not redundan
         return program, has_stored_program, added
 
     @staticmethod
-    def enrich_criticality_context(
+    async def enrich_criticality_context(
         program: Dict[str, Any],
         equipment: Optional[Dict[str, Any]] = None,
         strategy: Optional[Dict[str, Any]] = None,
