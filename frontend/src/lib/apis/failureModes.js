@@ -99,6 +99,11 @@ export const failureModesAPI = {
     return response.data;
   },
 
+  mergeDuplicateActions: async (body) => {
+    const response = await api.post("/failure-modes/merge-duplicate-actions", body);
+    return response.data;
+  },
+
   /**
    * Merge losers into winner. Pass dry_run: true to preview.
    * Supports winner_id + loser_ids or primary_id + merge_id.

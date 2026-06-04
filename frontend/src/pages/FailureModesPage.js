@@ -3128,6 +3128,9 @@ const FailureModesPage = () => {
           const fm = failureModes.find((f) => f.id === fmId);
           if (fm) setSelectedFm(fm);
         }}
+        onApplied={() => {
+          queryClient.invalidateQueries({ queryKey: ["failureModes"] });
+        }}
       />
     </div>
   );

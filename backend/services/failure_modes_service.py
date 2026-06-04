@@ -1117,6 +1117,119 @@ class FailureModesService:
             cluster_map.setdefault(find(i), []).append(i)
         return [sorted(idxs) for idxs in cluster_map.values() if len(idxs) >= 2]
 
+    @staticmethod
+    def _action_completeness_score(action: Any) -> int:
+        if not isinstance(action, dict):
+            return len(str(action or ""))
+        return (
+            len(action.get("description") or action.get("action") or action.get("name") or "")
+            + (15 if action.get("discipline") else 0)
+            + (15 if action.get("action_type") or action.get("task_type") else 0)
+            + (10 if action.get("estimated_minutes") else 0)
+            + (5 if action.get("frequency") else 0)
+            + (5 if action.get("estimated_time") else 0)
+        )
+
+    @staticmethod
+    def _merge_action_dict(keep: Any, other: Any) -> Dict[str, Any]:
+        if isinstance(keep, dict):
+            merged: Dict[str, Any] = dict(keep)
+        else:
+            merged = {"description": str(keep)}
+        if isinstance(other, dict):
+            for key, val in other.items():
+                if val is None or val == "":
+                    continue
+                if not merged.get(key):
+                    merged[key] = val
+            action_type = other.get("action_type") or other.get("task_type")
+            if action_type:
+                merged["action_type"] = action_type
+                merged["task_type"] = action_type
+            if other.get("discipline"):
+                merged["discipline"] = other["discipline"]
+        return merged
+
+    def _build_duplicate_group_suggestion(
+        self, actions: List[Any], indices: List[int]
+    ) -> Dict[str, Any]:
+        keep_index = max(indices, key=lambda i: self._action_completeness_score(actions[i]))
+        remove_indices = [i for i in indices if i != keep_index]
+        merged = actions[keep_index]
+        for ri in remove_indices:
+            merged = self._merge_action_dict(merged, actions[ri])
+        return {
+            "suggested_keep_index": keep_index,
+            "suggested_remove_indices": remove_indices,
+            "merged_action_preview": {
+                "label": self._action_display_label(merged, keep_index),
+                "action_type": (
+                    merged.get("action_type") or merged.get("task_type")
+                    if isinstance(merged, dict)
+                    else None
+                ),
+                "discipline": merged.get("discipline") if isinstance(merged, dict) else None,
+            },
+        }
+
+    async def merge_duplicate_action_group(
+        self,
+        failure_mode_id: str,
+        keep_index: int,
+        remove_indices: List[int],
+        updated_by: str = "Duplicate action merge",
+    ) -> Dict[str, Any]:
+        """Merge duplicate recommended actions into one slot; remove the rest."""
+        doc = await self._resolve_fm_doc(failure_mode_id)
+        if not doc:
+            raise LookupError(f"Failure mode {failure_mode_id} not found")
+
+        actions = list(doc.get("recommended_actions") or [])
+        n = len(actions)
+        if n < 2:
+            raise ValueError("Failure mode has fewer than 2 actions")
+
+        if keep_index < 0 or keep_index >= n:
+            raise ValueError(f"keep_index {keep_index} out of range")
+
+        remove_set = {int(i) for i in remove_indices if int(i) != keep_index}
+        remove_set = {i for i in remove_set if 0 <= i < n}
+        if not remove_set:
+            raise ValueError("Provide at least one remove_index different from keep_index")
+
+        merged_action = actions[keep_index]
+        for ri in sorted(remove_set):
+            merged_action = self._merge_action_dict(merged_action, actions[ri])
+
+        new_actions: List[Any] = []
+        for i, action in enumerate(actions):
+            if i in remove_set:
+                continue
+            if i == keep_index:
+                new_actions.append(merged_action)
+            else:
+                new_actions.append(action)
+
+        mode_id_str = str(doc.get("id") or doc["_id"])
+        updated = await self.update(
+            mode_id_str,
+            {"recommended_actions": new_actions},
+            updated_by=updated_by,
+            change_reason="Merged duplicate recommended actions",
+        )
+        if not updated:
+            raise RuntimeError("Failed to update failure mode")
+
+        return {
+            "success": True,
+            "failure_mode_id": mode_id_str,
+            "keep_index": keep_index,
+            "removed_indices": sorted(remove_set),
+            "actions_before": n,
+            "actions_after": len(new_actions),
+            "merged_action_preview": self._action_display_label(merged_action, keep_index),
+        }
+
     async def scan_duplicate_actions(
         self,
         failure_mode_id: Optional[str] = None,
@@ -1184,11 +1297,13 @@ class FailureModesService:
                     if pair_ratios
                     else 100.0
                 )
+                suggestion = self._build_duplicate_group_suggestion(actions, indices)
                 duplicate_groups.append({
                     "action_indices": indices,
                     "members": members,
                     "avg_similarity_score": avg_ratio,
                     "reason": "Duplicate or near-duplicate recommended action text",
+                    **suggestion,
                 })
 
             if duplicate_groups:

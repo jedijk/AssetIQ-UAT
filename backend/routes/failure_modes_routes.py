@@ -446,6 +446,12 @@ class FindDuplicateActionsScanRequest(BaseModel):
     limit_results: int = 500
 
 
+class MergeDuplicateActionsRequest(BaseModel):
+    failure_mode_id: str
+    keep_index: int
+    remove_indices: List[int] = []
+
+
 class MergeFailureModesRequest(BaseModel):
     winner_id: Optional[str] = None
     loser_ids: List[str] = []
@@ -915,6 +921,29 @@ async def scan_duplicate_actions_in_failure_modes(
         )
     except Exception as e:
         logger.error(f"Error scanning duplicate actions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/failure-modes/merge-duplicate-actions")
+async def merge_duplicate_actions(
+    request: MergeDuplicateActionsRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Merge duplicate recommended actions within one failure mode into a single action."""
+    updated_by = current_user.get("id") or current_user.get("user_id") or current_user.get("email") or "user"
+    try:
+        return await failure_modes_service.merge_duplicate_action_group(
+            failure_mode_id=request.failure_mode_id,
+            keep_index=request.keep_index,
+            remove_indices=request.remove_indices,
+            updated_by=str(updated_by),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error merging duplicate actions: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
