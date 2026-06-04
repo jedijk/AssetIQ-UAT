@@ -46,6 +46,52 @@ const CRITICALITY_DIMENSIONS = [
   { key: "reputation", icon: Award, label: "Reputation", color: "text-purple-600" },
 ];
 
+const CriticalityLogicInfo = ({ t }) => (
+  <Card className="mb-4 border-purple-200 bg-purple-50/80">
+    <CardContent className="p-4 sm:p-5">
+      <div className="flex items-start gap-3">
+        <Info className="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" />
+        <div className="text-sm text-slate-700 space-y-3 min-w-0">
+          <div>
+            <p className="font-semibold text-slate-800">{t("definitions.criticalityLogicTitle")}</p>
+            <p className="mt-1 text-slate-600">{t("definitions.criticalityLogicIntro")}</p>
+          </div>
+          <div>
+            <p className="font-medium text-slate-800">{t("definitions.criticalityLogicStep1Title")}</p>
+            <p className="mt-0.5 text-slate-600">{t("definitions.criticalityLogicStep1")}</p>
+          </div>
+          <div>
+            <p className="font-medium text-slate-800">{t("definitions.criticalityLogicStep2Title")}</p>
+            <p className="mt-0.5 text-slate-600">{t("definitions.criticalityLogicScore")}</p>
+            <p className="mt-1 text-xs font-mono text-purple-900 bg-white/60 rounded px-2 py-1 inline-block">
+              {t("definitions.criticalityLogicScoreFormula")}
+            </p>
+            <p className="mt-2 text-slate-600">{t("definitions.criticalityLogicLevelIntro")}</p>
+            <ul className="mt-1 list-disc list-inside text-slate-600 space-y-0.5">
+              <li>{t("definitions.criticalityLogicLevelSafety")}</li>
+              <li>{t("definitions.criticalityLogicLevelProduction")}</li>
+              <li>{t("definitions.criticalityLogicLevelMedium")}</li>
+              <li>{t("definitions.criticalityLogicLevelLow")}</li>
+            </ul>
+          </div>
+          <div>
+            <p className="font-medium text-slate-800">{t("definitions.criticalityLogicStep3Title")}</p>
+            <p className="mt-0.5 text-slate-600">{t("definitions.criticalityLogicStep3")}</p>
+            <ul className="mt-1 list-disc list-inside text-slate-600 space-y-0.5">
+              <li>{t("definitions.criticalityLogicBandHigh")}</li>
+              <li>{t("definitions.criticalityLogicBandMedium")}</li>
+              <li>{t("definitions.criticalityLogicBandLow")}</li>
+            </ul>
+          </div>
+          <p className="text-xs text-slate-500 border-t border-purple-200/80 pt-2">
+            {t("definitions.criticalityLogicNote")}
+          </p>
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+);
+
 // Criticality Table Component (multi-dimensional)
 const CriticalityTable = ({ data, isEditing, onUpdateRow, t }) => {
   const [editingRow, setEditingRow] = useState(null);
@@ -760,7 +806,8 @@ export default function DefinitionsPage() {
                   </CardTitle>
                   <CardDescription className="text-xs sm:text-sm">{t("definitions.criticalityDesc") || "Define criticality levels across dimensions."}</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
+                  <CriticalityLogicInfo t={t} />
                   <CriticalityTable
                     data={localCriticality}
                     isEditing={isEditing}

@@ -17,6 +17,8 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any, Tuple
 
 from database import db
+from routes.maintenance_scheduler._shared import normalize_program_criticality
+from services.criticality_score import compute_criticality_score
 from models.maintenance_program import (
     MaintenanceProgram,
     MaintenanceProgramTask,
@@ -35,6 +37,27 @@ from models.maintenance_program import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _criticality_fields_from_equipment(equipment: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Derive stored program criticality fields from equipment node."""
+    if not equipment or not equipment.get("criticality"):
+        return {}
+    crit = equipment["criticality"]
+    if isinstance(crit, dict):
+        level = (crit.get("level") or "low").lower()
+        score = crit.get("risk_score")
+        if score is None:
+            score = compute_criticality_score(
+                crit.get("safety_impact", 0) or 0,
+                crit.get("production_impact", 0) or 0,
+                crit.get("environmental_impact", 0) or 0,
+                crit.get("reputation_impact", 0) or 0,
+            )
+        return {"criticality_level": level, "criticality_score": score}
+    if isinstance(crit, str):
+        return {"criticality_level": crit.lower()}
+    return {}
 
 
 class MaintenanceProgramService:
@@ -101,16 +124,21 @@ class MaintenanceProgramService:
         if not equipment:
             raise ValueError(f"Equipment not found: {equipment_id}")
         
-        # Get criticality
-        criticality_level = "low"
+        equipment_crit = equipment.get("criticality")
+        equipment_criticality_level = "low"
         criticality_score = None
-        if equipment.get("criticality"):
-            crit = equipment["criticality"]
-            if isinstance(crit, dict):
-                criticality_level = crit.get("level", "low").lower()
-                criticality_score = crit.get("risk_score")
-            elif isinstance(crit, str):
-                criticality_level = crit.lower()
+        if equipment_crit:
+            if isinstance(equipment_crit, dict):
+                equipment_criticality_level = (equipment_crit.get("level") or "low").lower()
+                criticality_score = equipment_crit.get("risk_score") or compute_criticality_score(
+                    equipment_crit.get("safety_impact", 0) or 0,
+                    equipment_crit.get("production_impact", 0) or 0,
+                    equipment_crit.get("environmental_impact", 0) or 0,
+                    equipment_crit.get("reputation_impact", 0) or 0,
+                )
+            elif isinstance(equipment_crit, str):
+                equipment_criticality_level = equipment_crit.lower()
+        strategy_criticality_band = normalize_program_criticality(equipment_crit or equipment_criticality_level)
         
         # Create new program
         program = MaintenanceProgram(
@@ -121,7 +149,7 @@ class MaintenanceProgramService:
             equipment_tag=equipment.get("tag"),
             equipment_type_id=equipment.get("equipment_type_id"),
             equipment_type_name=equipment.get("equipment_type_name"),
-            criticality_level=criticality_level,
+            criticality_level=equipment_criticality_level,
             criticality_score=criticality_score,
             status=ProgramStatus.DRAFT,
             created_by=user_id,
@@ -132,11 +160,17 @@ class MaintenanceProgramService:
             tasks = await MaintenanceProgramService.generate_tasks_from_strategy(
                 equipment_type_id=equipment.get("equipment_type_id"),
                 equipment_id=equipment_id,
-                criticality_level=criticality_level,
+                criticality_level=strategy_criticality_band,
                 user_id=user_id
             )
             program.tasks = tasks
             program.source_strategy_id = equipment.get("equipment_type_id")
+            strategy_doc = await db.equipment_type_strategies.find_one(
+                {"equipment_type_id": equipment.get("equipment_type_id")},
+                {"version": 1, "_id": 0},
+            )
+            if strategy_doc:
+                program.source_strategy_version = strategy_doc.get("version", "1.0")
             program.last_strategy_sync = datetime.utcnow().isoformat()
         
         # Calculate statistics
@@ -205,9 +239,10 @@ class MaintenanceProgramService:
             if task_type in ("reactive", "corrective"):
                 continue
             
-            # Get frequency based on criticality
+            # Get frequency based on strategy band (low / medium / high)
+            strategy_band = normalize_program_criticality(criticality_level)
             freq_matrix = template.get("frequency_matrix", {})
-            frequency_str = freq_matrix.get(criticality_level, "monthly")
+            frequency_str = freq_matrix.get(strategy_band, "monthly")
             
             try:
                 frequency = TaskFrequency(frequency_str)
@@ -403,6 +438,9 @@ class MaintenanceProgramService:
         
         # Bump version
         new_version = MaintenanceProgramService._bump_version(program.get("version", "1.0"))
+
+        program["tasks"] = tasks
+        MaintenanceProgramService._recalculate_program_task_stats(program)
         
         # Update program
         await db.maintenance_programs_v2.update_one(
@@ -411,7 +449,13 @@ class MaintenanceProgramService:
                 "$set": {
                     "tasks": tasks,
                     "version": new_version,
-                    "updated_at": datetime.utcnow().isoformat()
+                    "updated_at": datetime.utcnow().isoformat(),
+                    "total_tasks": program["total_tasks"],
+                    "active_tasks": program["active_tasks"],
+                    "strategy_tasks": program["strategy_tasks"],
+                    "imported_tasks": program["imported_tasks"],
+                    "ai_tasks": program["ai_tasks"],
+                    "manual_tasks": program["manual_tasks"],
                 },
                 "$push": {
                     "version_history": ProgramVersionEntry(
@@ -536,6 +580,26 @@ class MaintenanceProgramService:
         
         if not strategy:
             raise ValueError(f"No strategy found for equipment type: {equipment_type_id}")
+
+        equipment = await db.equipment_nodes.find_one(
+            {"id": equipment_id},
+            {"_id": 0, "criticality": 1},
+        )
+        strategy_band = normalize_program_criticality(
+            equipment.get("criticality") if equipment else program.criticality_level
+        )
+
+        inactive_strategy_templates = set()
+        for task in program.tasks:
+            task_dict = task.model_dump() if hasattr(task, "model_dump") else task
+            if task_dict.get("task_source") != TaskSource.STRATEGY_GENERATED.value:
+                continue
+            if task_dict.get("is_active", True):
+                continue
+            traceability = task_dict.get("traceability") or {}
+            template_id = traceability.get("task_template_id")
+            if template_id:
+                inactive_strategy_templates.add(template_id)
         
         # Collect preserved tasks
         preserved_tasks = []
@@ -571,7 +635,7 @@ class MaintenanceProgramService:
         new_strategy_tasks = await MaintenanceProgramService.generate_tasks_from_strategy(
             equipment_type_id=equipment_type_id,
             equipment_id=equipment_id,
-            criticality_level=program.criticality_level or "low",
+            criticality_level=strategy_band,
             user_id=user_id
         )
         
@@ -611,6 +675,8 @@ class MaintenanceProgramService:
             if not override_found:
                 # Add new strategy task
                 task_dict = new_task.model_dump()
+                if template_id in inactive_strategy_templates:
+                    task_dict["is_active"] = False
                 final_tasks.append(task_dict)
                 preview.tasks_to_add.append({
                     "task_title": task_dict.get("task_title"),
@@ -651,7 +717,8 @@ class MaintenanceProgramService:
             "version": new_version,
             "source_strategy_version": strategy.get("version", "1.0"),
             "last_strategy_sync": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
+            "updated_at": datetime.utcnow().isoformat(),
+            **_criticality_fields_from_equipment(equipment),
         }
         
         # Calculate new statistics
@@ -1225,6 +1292,41 @@ Only include tasks that would genuinely improve reliability and are not redundan
         program["tasks"] = merged_tasks
         MaintenanceProgramService._recalculate_program_task_stats(program)
         return program, has_stored_program, added
+
+    @staticmethod
+    def enrich_criticality_context(
+        program: Dict[str, Any],
+        equipment: Optional[Dict[str, Any]] = None,
+        strategy: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Attach equipment criticality, strategy frequency band, and strategy versions for API/UI."""
+        crit = (equipment or {}).get("criticality")
+        equipment_level = (program.get("criticality_level") or "low").lower()
+        score = program.get("criticality_score")
+
+        if crit and isinstance(crit, dict):
+            equipment_level = (crit.get("level") or equipment_level or "low").lower()
+            score = crit.get("risk_score")
+            if score is None:
+                score = compute_criticality_score(
+                    crit.get("safety_impact", 0) or 0,
+                    crit.get("production_impact", 0) or 0,
+                    crit.get("environmental_impact", 0) or 0,
+                    crit.get("reputation_impact", 0) or 0,
+                )
+        elif crit and isinstance(crit, str):
+            equipment_level = crit.lower()
+
+        strategy_band = normalize_program_criticality(crit or equipment_level)
+        latest_version = strategy.get("version", "1.0") if strategy else None
+        applied_version = program.get("source_strategy_version")
+
+        program["equipment_criticality_level"] = equipment_level
+        program["strategy_criticality_band"] = strategy_band
+        program["criticality_score"] = score
+        program["latest_strategy_version"] = latest_version
+        program["applied_strategy_version"] = applied_version
+        return program
 
     # ============= Utility Methods =============
     

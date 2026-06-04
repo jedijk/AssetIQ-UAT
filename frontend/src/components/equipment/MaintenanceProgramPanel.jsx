@@ -26,10 +26,97 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { ScrollArea } from '../ui/scroll-area';
+import { Switch } from '../ui/switch';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger
 } from '../ui/dropdown-menu';
+import { CRITICALITY_CONFIG } from '../maintenance/constants';
+
+const STRATEGY_BAND_STYLES = {
+  low: 'bg-green-50 text-green-700 border-green-200',
+  medium: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+  high: 'bg-red-50 text-red-700 border-red-200',
+};
+
+const strategyBandLabel = (t, band) => {
+  if (band === 'high') return t('maintenance.criticalityHigh');
+  if (band === 'medium') return t('maintenance.criticalityMedium');
+  return t('maintenance.criticalityLow');
+};
+
+const ProgramCriticalityBanner = ({ program, strategyUpdateAvailable, t }) => {
+  const equipmentLevel = program.equipment_criticality_level || program.criticality_level;
+  const strategyBand = program.strategy_criticality_band;
+  const equipConfig = equipmentLevel ? CRITICALITY_CONFIG[equipmentLevel] : null;
+  const EquipIcon = equipConfig?.icon;
+  const appliedVersion = program.applied_strategy_version || program.source_strategy_version;
+  const latestVersion = program.latest_strategy_version;
+  const versionForHint = appliedVersion || latestVersion || '—';
+  const bandLabel = strategyBand ? strategyBandLabel(t, strategyBand) : null;
+
+  if (!equipmentLevel && !strategyBand) return null;
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        {equipmentLevel && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-slate-500">{t('equipment.programEquipmentCriticality')}:</span>
+            <Badge
+              variant="outline"
+              className={`text-xs gap-1 ${equipConfig?.bgColor || ''} ${equipConfig?.textColor || ''} ${equipConfig?.borderColor || ''}`}
+            >
+              {EquipIcon && <EquipIcon className="h-3 w-3" />}
+              {equipConfig?.label || equipmentLevel.replace(/_/g, ' ')}
+            </Badge>
+            {program.criticality_score != null && (
+              <span className="text-xs text-slate-600">
+                {program.criticality_score}/100
+              </span>
+            )}
+          </div>
+        )}
+        {strategyBand && (
+          <>
+            <span className="text-slate-300 hidden sm:inline">→</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-slate-500">{t('equipment.programStrategyBand')}:</span>
+              <Badge variant="outline" className={`text-xs ${STRATEGY_BAND_STYLES[strategyBand] || ''}`}>
+                {bandLabel || strategyBand}
+              </Badge>
+            </div>
+          </>
+        )}
+        {(appliedVersion || latestVersion) && (
+          <div className="flex items-center gap-1.5 text-xs text-slate-600">
+            <span className="text-slate-500">{t('equipment.programStrategyVersion')}:</span>
+            {appliedVersion && (
+              <span>
+                {t('equipment.programStrategyVersionApplied')} v{appliedVersion}
+              </span>
+            )}
+            {latestVersion && latestVersion !== appliedVersion && (
+              <span className={strategyUpdateAvailable ? 'text-amber-600 font-medium' : ''}>
+                · {t('equipment.programStrategyVersionLatest')} v{latestVersion}
+              </span>
+            )}
+            {!appliedVersion && latestVersion && (
+              <span>v{latestVersion}</span>
+            )}
+          </div>
+        )}
+      </div>
+      {strategyBand && (
+        <p className="text-xs text-slate-500 mt-1.5">
+          {t('equipment.programCriticalityUsedHint')
+            .replace('{band}', bandLabel || strategyBand)
+            .replace('{version}', versionForHint)}
+        </p>
+      )}
+    </div>
+  );
+};
 
 // Task source icons and colors
 const SOURCE_CONFIG = {
@@ -105,12 +192,13 @@ const SourceBadge = ({ source }) => {
 };
 
 // Task row component
-const TaskRow = ({ task, onEdit, onDelete, onToggleActive, isExpanded, onToggleExpand }) => {
+const TaskRow = ({ task, onEdit, onDelete, onToggleActive, isExpanded, onToggleExpand, canToggle }) => {
   const categoryConfig = CATEGORY_CONFIG[task.task_category] || CATEGORY_CONFIG.preventive_maintenance;
   const CategoryIcon = categoryConfig.icon;
+  const isActive = task.is_active !== false;
   
   return (
-    <div className={`border rounded-lg mb-2 ${!task.is_active ? 'opacity-60' : ''}`}>
+    <div className={`border rounded-lg mb-2 ${!isActive ? 'opacity-60' : ''}`}>
       {/* Main row */}
       <div 
         className="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50"
@@ -125,16 +213,21 @@ const TaskRow = ({ task, onEdit, onDelete, onToggleActive, isExpanded, onToggleE
         </div>
         
         <div className="flex-shrink-0">
-          <div className={`p-2 rounded-lg ${task.is_active ? 'bg-blue-50' : 'bg-gray-50'}`}>
-            <CategoryIcon className={`h-4 w-4 ${task.is_active ? 'text-blue-600' : 'text-gray-400'}`} />
+          <div className={`p-2 rounded-lg ${isActive ? 'bg-blue-50' : 'bg-gray-50'}`}>
+            <CategoryIcon className={`h-4 w-4 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
           </div>
         </div>
         
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className={`font-medium truncate ${!task.is_active ? 'line-through text-gray-400' : ''}`}>
+            <span className={`font-medium truncate ${!isActive ? 'line-through text-gray-400' : ''}`}>
               {task.task_title}
             </span>
+            {!isActive && (
+              <Badge variant="outline" className="bg-slate-100 text-slate-600 text-xs">
+                Disabled
+              </Badge>
+            )}
             {task.is_overridden && (
               <Badge variant="outline" className="bg-orange-50 text-orange-600 text-xs">Overridden</Badge>
             )}
@@ -166,7 +259,23 @@ const TaskRow = ({ task, onEdit, onDelete, onToggleActive, isExpanded, onToggleE
           </Badge>
         </div>
         
-        <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          {canToggle && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-1.5">
+                    <Switch
+                      checked={isActive}
+                      onCheckedChange={() => onToggleActive(task, isActive)}
+                      aria-label={isActive ? 'Disable task' : 'Enable task'}
+                    />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>{isActive ? 'Disable task' : 'Enable task'}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -183,13 +292,15 @@ const TaskRow = ({ task, onEdit, onDelete, onToggleActive, isExpanded, onToggleE
                   <DropdownMenuItem onClick={() => onEdit(task)}>
                     <Edit className="h-4 w-4 mr-2" /> Edit Task
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => onToggleActive(task)}>
-                    {task.is_active ? (
-                      <><Pause className="h-4 w-4 mr-2" /> Deactivate</>
-                    ) : (
-                      <><Play className="h-4 w-4 mr-2" /> Activate</>
-                    )}
-                  </DropdownMenuItem>
+                  {canToggle && (
+                    <DropdownMenuItem onClick={() => onToggleActive(task, isActive)}>
+                      {isActive ? (
+                        <><Pause className="h-4 w-4 mr-2" /> Disable task</>
+                      ) : (
+                        <><Play className="h-4 w-4 mr-2" /> Enable task</>
+                      )}
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => onDelete(task)} className="text-red-600">
                     <Trash2 className="h-4 w-4 mr-2" /> Delete Task
@@ -481,7 +592,7 @@ const EditTaskDialog = ({ open, onClose, task, equipmentId, onSuccess }) => {
         estimated_duration_hours: task.estimated_duration_hours,
         task_category: task.task_category,
         priority: task.priority,
-        is_active: task.is_active,
+        is_active: task.is_active !== false,
       });
       setOverrideReason('');
     }
@@ -611,6 +722,17 @@ const EditTaskDialog = ({ open, onClose, task, equipmentId, onSuccess }) => {
             </div>
           </div>
           
+          <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
+            <div>
+              <Label className="text-sm">Task enabled</Label>
+              <p className="text-xs text-slate-500">Disabled tasks stay in the program but are not active.</p>
+            </div>
+            <Switch
+              checked={formData.is_active}
+              onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, is_active: checked }))}
+            />
+          </div>
+
           {isStrategyTask && (
             <div>
               <Label>Override Reason</Label>
@@ -709,6 +831,7 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [showDisabledTasks, setShowDisabledTasks] = useState(true);
   
   // Fetch program
   const { data: programData, isLoading: isLoadingProgram, error: programError } = useQuery({
@@ -743,17 +866,18 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
     },
   });
   
+  const canMutateTasks = Boolean(programData?.exists);
+
   // Toggle task active mutation
   const toggleActiveMutation = useMutation({
-    mutationFn: (task) => maintenanceProgramAPI.updateTask(equipmentId, task.id, { 
-      is_active: !task.is_active 
-    }),
-    onSuccess: () => {
-      toast.success('Task updated');
+    mutationFn: ({ task, wasActive }) =>
+      maintenanceProgramAPI.updateTask(equipmentId, task.id, { is_active: !wasActive }),
+    onSuccess: (_data, { wasActive }) => {
+      toast.success(wasActive ? 'Task disabled' : 'Task enabled');
       queryClient.invalidateQueries(['maintenance-program', equipmentId]);
     },
     onError: (error) => {
-      toast.error(`Failed to update task: ${error.message}`);
+      toast.error(error.response?.data?.detail || error.message || 'Failed to update task');
     },
   });
   
@@ -784,6 +908,10 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
       tasks = tasks.filter(t => t.task_source === sourceFilter);
     }
     
+    if (!showDisabledTasks) {
+      tasks = tasks.filter((t) => t.is_active !== false);
+    }
+
     // Apply search
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -795,7 +923,7 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
     }
     
     return tasks;
-  }, [programData?.program?.tasks, sourceFilter, searchTerm]);
+  }, [programData?.program?.tasks, sourceFilter, searchTerm, showDisabledTasks]);
   
   // Stats from program
   const stats = programData?.program ? {
@@ -881,6 +1009,12 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
   
   return (
     <div className="space-y-4">
+      <ProgramCriticalityBanner
+        program={program}
+        strategyUpdateAvailable={programData.strategy_update_available}
+        t={t}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -1017,6 +1151,17 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
             <SelectItem value="manual">Manual</SelectItem>
           </SelectContent>
         </Select>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <Switch
+            id="show-disabled-tasks"
+            checked={showDisabledTasks}
+            onCheckedChange={setShowDisabledTasks}
+          />
+          <Label htmlFor="show-disabled-tasks" className="text-xs text-gray-600 cursor-pointer">
+            Show disabled
+          </Label>
+        </div>
       </div>
       
       {/* Tasks List */}
@@ -1044,7 +1189,8 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
                   onToggleExpand={() => toggleExpand(task.id)}
                   onEdit={setEditingTask}
                   onDelete={handleDeleteTask}
-                  onToggleActive={(t) => toggleActiveMutation.mutate(t)}
+                  canToggle={canMutateTasks && !task.is_pm_import_pending}
+                  onToggleActive={(t, wasActive) => toggleActiveMutation.mutate({ task: t, wasActive })}
                 />
               ))}
             </div>

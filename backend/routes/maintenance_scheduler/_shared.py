@@ -62,7 +62,14 @@ def normalize_program_criticality(raw) -> str:
     label = str(raw).strip().lower().replace(" ", "_")
     if label in ("high", "medium", "low"):
         return label
-    if label in ("critical", "very_high", "severe", "urgent"):
+    if label in (
+        "critical",
+        "very_high",
+        "severe",
+        "urgent",
+        "safety_critical",
+        "production_critical",
+    ):
         return "high"
     if label in ("moderate", "normal", "average"):
         return "medium"

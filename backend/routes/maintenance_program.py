@@ -38,6 +38,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/maintenance-programs", tags=["Maintenance Programs"])
 
 
+def _current_user_id(current_user: dict) -> str:
+    return current_user.get("id") or current_user.get("user_id") or current_user.get("email", "unknown")
+
+
 # ============= Program CRUD =============
 
 @router.get("")
@@ -179,29 +183,28 @@ async def get_maintenance_program(
             "pm_import_tasks_included": 0,
         }
 
-    # Enrich with equipment info if needed
     equipment = await db.equipment_nodes.find_one(
         {"id": equipment_id},
-        {"_id": 0, "name": 1, "tag": 1, "criticality": 1, "equipment_type_name": 1}
+        {"_id": 0, "name": 1, "tag": 1, "criticality": 1, "equipment_type_name": 1, "equipment_type_id": 1}
     )
 
-    if equipment:
-        if equipment.get("criticality"):
-            crit = equipment["criticality"]
-            if isinstance(crit, dict):
-                program["criticality_level"] = crit.get("level", "low").lower()
-                program["criticality_score"] = crit.get("risk_score")
-
-    strategy_update_available = False
-    if has_stored_program and program.get("equipment_type_id"):
+    strategy = None
+    equipment_type_id = program.get("equipment_type_id") or (equipment or {}).get("equipment_type_id")
+    if equipment_type_id:
         strategy = await db.equipment_type_strategies.find_one(
-            {"equipment_type_id": program["equipment_type_id"]},
+            {"equipment_type_id": equipment_type_id},
             {"version": 1, "_id": 0}
         )
-        if strategy:
-            current_sync_version = program.get("source_strategy_version", "0.0")
-            latest_version = strategy.get("version", "1.0")
-            strategy_update_available = current_sync_version != latest_version
+
+    program = MaintenanceProgramService.enrich_criticality_context(
+        program, equipment=equipment, strategy=strategy
+    )
+
+    strategy_update_available = False
+    if strategy:
+        current_sync_version = program.get("applied_strategy_version") or program.get("source_strategy_version", "0.0")
+        latest_version = program.get("latest_strategy_version", "1.0")
+        strategy_update_available = current_sync_version != latest_version
 
     return {
         "program": program,
@@ -238,7 +241,7 @@ async def create_maintenance_program(
         program = await MaintenanceProgramService.get_or_create_program(
             equipment_id=equipment_id,
             generate_from_strategy=request.generate_from_strategy,
-            user_id=current_user.get("user_id")
+            user_id=_current_user_id(current_user)
         )
         
         # Generate AI recommendations if requested
@@ -247,7 +250,7 @@ async def create_maintenance_program(
             try:
                 ai_recommendations = await MaintenanceProgramService.generate_ai_recommendations(
                     equipment_id=equipment_id,
-                    user_id=current_user.get("user_id")
+                    user_id=_current_user_id(current_user)
                 )
             except Exception as e:
                 logger.warning(f"AI recommendations failed: {e}")
@@ -288,7 +291,7 @@ async def delete_maintenance_program(
     await MaintenanceProgramService._log_audit(
         action="delete_program",
         equipment_id=equipment_id,
-        user_id=current_user.get("user_id")
+        user_id=_current_user_id(current_user)
     )
     
     return {
@@ -365,7 +368,7 @@ async def add_task(
             acceptance_criteria=request.acceptance_criteria,
             tools_required=request.tools_required,
             spare_parts=request.spare_parts,
-            user_id=current_user.get("user_id")
+            user_id=_current_user_id(current_user)
         )
         
         return {
@@ -425,7 +428,7 @@ async def update_task(
             task_id=task_id,
             updates=updates,
             override_reason=request.override_reason,
-            user_id=current_user.get("user_id")
+            user_id=_current_user_id(current_user)
         )
         
         return {
@@ -451,7 +454,7 @@ async def delete_task(
         new_version = await MaintenanceProgramService.delete_task(
             equipment_id=equipment_id,
             task_id=task_id,
-            user_id=current_user.get("user_id")
+            user_id=_current_user_id(current_user)
         )
         
         return {
@@ -488,7 +491,7 @@ async def regenerate_program(
             preserve_manual_tasks=request.preserve_manual_tasks,
             preserve_imported_tasks=request.preserve_imported_tasks,
             preview_only=request.preview_only,
-            user_id=current_user.get("user_id")
+            user_id=_current_user_id(current_user)
         )
         
         if request.preview_only:
@@ -521,7 +524,7 @@ async def import_tasks(
             equipment_id=equipment_id,
             import_session_id=request.import_session_id,
             task_ids=request.task_ids,
-            user_id=current_user.get("user_id")
+            user_id=_current_user_id(current_user)
         )
         
         return {
@@ -550,7 +553,7 @@ async def generate_ai_recommendations(
             include_failure_history=request.include_failure_history,
             include_industry_standards=request.include_industry_standards,
             max_recommendations=request.max_recommendations,
-            user_id=current_user.get("user_id")
+            user_id=_current_user_id(current_user)
         )
         
         return {
@@ -581,7 +584,7 @@ async def accept_ai_recommendation(
         result_task, new_version = await MaintenanceProgramService.accept_ai_recommendation(
             equipment_id=equipment_id,
             task=task_obj,
-            user_id=current_user.get("user_id")
+            user_id=_current_user_id(current_user)
         )
         
         return {
@@ -655,7 +658,7 @@ async def approve_program(
     await MaintenanceProgramService._log_audit(
         action=f"program_{request.approval_status.value}",
         equipment_id=equipment_id,
-        user_id=current_user.get("user_id"),
+        user_id=_current_user_id(current_user),
         details={"comments": request.comments}
     )
     
@@ -737,7 +740,7 @@ async def bulk_generate_programs(
             program = await MaintenanceProgramService.get_or_create_program(
                 equipment_id=equipment_id,
                 generate_from_strategy=generate_from_strategy,
-                user_id=current_user.get("user_id")
+                user_id=_current_user_id(current_user)
             )
             results["created"].append({
                 "equipment_id": equipment_id,
@@ -786,7 +789,7 @@ async def bulk_regenerate_programs(
                 equipment_id=equipment_id,
                 preserve_overrides=preserve_overrides,
                 preserve_manual_tasks=preserve_manual_tasks,
-                user_id=current_user.get("user_id")
+                user_id=_current_user_id(current_user)
             )
             results["regenerated"].append({
                 "equipment_id": equipment_id,
