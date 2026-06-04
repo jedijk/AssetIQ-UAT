@@ -96,6 +96,8 @@ const MaintenanceStrategyTab = ({
   filterLinkedToEquipment = true,
   onFilterLinkedToEquipmentChange,
   inUseEquipmentTypeIds = new Set(),
+  initialEquipmentTypeId = null,
+  onInitialEquipmentTypeConsumed,
 }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -190,6 +192,25 @@ const MaintenanceStrategyTab = ({
       setSelectedType(null);
     }
   }, [filterLinkedToEquipment, selectedType, inUseEquipmentTypeIds]);
+
+  // Deep-link / PM Import: pre-select equipment type for strategy view
+  useEffect(() => {
+    if (!initialEquipmentTypeId || typesLoading) return;
+    const types = translatedEquipmentTypes || [];
+    const match = types.find(
+      (type) => String(type.id) === String(initialEquipmentTypeId)
+    );
+    if (match) {
+      setSelectedType(match);
+      setSidebarCollapsed(false);
+      onInitialEquipmentTypeConsumed?.();
+    }
+  }, [
+    initialEquipmentTypeId,
+    typesLoading,
+    translatedEquipmentTypes,
+    onInitialEquipmentTypeConsumed,
+  ]);
 
   // Handle view in FMEA
   const handleViewInFMEA = (failureModeName) => {

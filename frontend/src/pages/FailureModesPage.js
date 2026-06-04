@@ -101,8 +101,16 @@ import AIReviewActionDisciplines from "../components/library/AIReviewActionDisci
 import AIFindSimilarFailureModes from "../components/library/AIFindSimilarFailureModes";
 import { AIReviewModal } from "../components/library/AIReviewModal";
 
+const getTaskEquipmentType = (task) => {
+  const match = task?.equipment_match;
+  return {
+    id: match?.equipment_type_id || task?.equipment_type_id || null,
+    name: task?.equipment_type_name || match?.equipment_type_name || null,
+  };
+};
+
 // Custom PM Import Tab Component
-const CustomPMImportTab = ({ onOpenImportWizard }) => {
+const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrategy }) => {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
@@ -137,15 +145,6 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
     mutationFn: (task) => pmImportAPI.deleteTask(task.session_id, task.task_id),
     onSuccess: () => { toast.success('Task deleted'); invalidateTasks(); },
     onError: (e) => toast.error(`Delete failed: ${e?.message || 'error'}`),
-  });
-  
-  const deleteAllMutation = useMutation({
-    mutationFn: () => pmImportAPI.deleteAllTasks(),
-    onSuccess: (data) => { 
-      toast.success(`Deleted ${data.deleted_tasks} tasks across ${data.sessions_cleared} sessions`);
-      invalidateTasks();
-    },
-    onError: (e) => toast.error(`Delete all failed: ${e?.message || 'error'}`),
   });
   
   const updateMutation = useMutation({
@@ -212,7 +211,12 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
           task.task?.toLowerCase().includes(term) ||
           task.equipment?.toLowerCase().includes(term) ||
           task.description?.toLowerCase().includes(term) ||
-          task.discipline?.toLowerCase().includes(term);
+          task.discipline?.toLowerCase().includes(term) ||
+          task.equipment_tag?.toLowerCase().includes(term) ||
+          task.equipment_description?.toLowerCase().includes(term) ||
+          task.task_description?.toLowerCase().includes(term) ||
+          task.equipment_type_name?.toLowerCase().includes(term) ||
+          task.equipment_match?.equipment_type_name?.toLowerCase().includes(term);
         if (!matchesSearch) return false;
       }
       
@@ -322,21 +326,6 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
-            disabled={totalTasks === 0 || deleteAllMutation.isPending}
-            onClick={() => {
-              if (window.confirm(`Permanently delete ALL ${totalTasks} imported tasks?\n\nThis cannot be undone.`)) {
-                deleteAllMutation.mutate();
-              }
-            }}
-            data-testid="pm-delete-all-btn"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete All
-          </Button>
           <Button onClick={onOpenImportWizard}>
             <Upload className="h-4 w-4 mr-2" />
             Import PM Plan
@@ -418,6 +407,7 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
                 <tr>
                   <th className="text-left px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Equipment Tag</th>
                   <th className="text-left px-3 py-3 text-xs font-medium text-gray-600">Equipment Description</th>
+                  <th className="text-left px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Equipment Type</th>
                   <th className="text-left px-3 py-3 text-xs font-medium text-gray-600">Task Description</th>
                   <th className="text-left px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Type</th>
                   <th className="text-left px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Discipline</th>
@@ -439,6 +429,32 @@ const CustomPMImportTab = ({ onOpenImportWizard }) => {
                       <div className="text-sm text-gray-700 truncate" title={task.equipment_description}>
                         {task.equipment_match?.name || task.equipment_description || '-'}
                       </div>
+                    </td>
+                    <td className="px-3 py-3 max-w-[160px]">
+                      {(() => {
+                        const { id: typeId, name: typeName } = getTaskEquipmentType(task);
+                        if (typeId && typeName && onOpenEquipmentTypeStrategy) {
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => onOpenEquipmentTypeStrategy(typeId)}
+                              className="text-sm text-blue-700 hover:text-blue-900 hover:underline truncate text-left max-w-full"
+                              title={`${t("library.openEquipmentTypeStrategy")} (${typeName})`}
+                              data-testid={`pm-task-equipment-type-${task.task_id}`}
+                            >
+                              {typeName}
+                            </button>
+                          );
+                        }
+                        return (
+                          <div
+                            className="text-sm text-gray-700 truncate"
+                            title={typeName || undefined}
+                          >
+                            {typeName || '-'}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-3 py-3 max-w-[280px]">
                       <div className="text-sm font-medium text-gray-900 truncate" title={task.task_description}>
@@ -865,6 +881,9 @@ const FailureModesPage = () => {
   const [hideAIImproved, setHideAIImproved] = useState(false); // filter out FMs already improved by AI
   const [mainTab, setMainTab] = useState(() => searchParams.get("tab") || "failure-modes");
   const [libraryTab, setLibraryTab] = useState("equipment");
+  const [strategyEquipmentTypeId, setStrategyEquipmentTypeId] = useState(
+    () => searchParams.get("equipment_type_id") || null
+  );
   
   const FAILURE_MODE_TYPE_OPTIONS = useMemo(() => [
     { value: "all", label: t("library.fmTypeAll") },
@@ -889,17 +908,28 @@ const FailureModesPage = () => {
     { value: "PDM", label: t("library.actionPdm"), color: "bg-purple-100 text-purple-700" },
   ], [t]);
   
-  // Handle URL parameter changes (e.g., from Maintenance Strategy FMEA links)
+  // Handle URL parameter changes (e.g., from Maintenance Strategy FMEA links, PM Import)
   useEffect(() => {
     const tabParam = searchParams.get("tab");
     const searchParam = searchParams.get("search");
+    const equipmentTypeIdParam = searchParams.get("equipment_type_id");
     if (tabParam) setMainTab(tabParam);
     if (searchParam) setSearchQuery(searchParam);
-    // Clear URL params after applying them
-    if (tabParam || searchParam) {
+    if (equipmentTypeIdParam) {
+      setStrategyEquipmentTypeId(equipmentTypeIdParam);
+      setFilterLinkedToEquipment(false);
+    }
+    if (tabParam || searchParam || equipmentTypeIdParam) {
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, setSearchParams]);
+
+  const openEquipmentTypeStrategy = useCallback((equipmentTypeId) => {
+    if (!equipmentTypeId) return;
+    setFilterLinkedToEquipment(false);
+    setStrategyEquipmentTypeId(String(equipmentTypeId));
+    setMainTab("maintenance");
+  }, []);
   
   // Equipment type dialog state
   const [isTypeDialogOpen, setIsTypeDialogOpen] = useState(false);
@@ -2153,6 +2183,8 @@ const FailureModesPage = () => {
               filterLinkedToEquipment={filterLinkedToEquipment}
               onFilterLinkedToEquipmentChange={setFilterLinkedToEquipment}
               inUseEquipmentTypeIds={inUseEquipmentTypeIds}
+              initialEquipmentTypeId={strategyEquipmentTypeId}
+              onInitialEquipmentTypeConsumed={() => setStrategyEquipmentTypeId(null)}
             />
           </div>
         </TabsContent>
@@ -2166,8 +2198,9 @@ const FailureModesPage = () => {
         
         {/* Custom PM Import Tab */}
         <TabsContent value="pm-import" className="space-y-4">
-          <CustomPMImportTab 
+          <CustomPMImportTab
             onOpenImportWizard={() => setIsPMImportOpen(true)}
+            onOpenEquipmentTypeStrategy={openEquipmentTypeStrategy}
           />
         </TabsContent>
       </Tabs>

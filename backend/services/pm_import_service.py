@@ -2465,8 +2465,78 @@ Respond in JSON format:
             # Preserve canonical equipment_tag / equipment_description fields
             task["equipment_tag"] = task.get("equipment_tag") or task.get("asset") or ""
             task["equipment_description"] = task.get("equipment_description") or task.get("component") or ""
+
+        type_map = await self._load_equipment_type_name_map()
+        node_by_id = {n.get("id"): n for n in nodes if n.get("id")}
+        for task in tasks:
+            em = task.get("equipment_match")
+            if em:
+                node = node_by_id.get(em.get("equipment_id"))
+                self._apply_equipment_type_to_match(em, node, type_map)
         
         return tasks
+
+    async def _load_equipment_type_name_map(self) -> Dict[str, str]:
+        """Map equipment_type_id -> display name (ISO + custom types)."""
+        type_map: Dict[str, str] = {}
+        try:
+            from iso14224_models import EQUIPMENT_TYPES
+            for t in EQUIPMENT_TYPES:
+                tid = t.get("id")
+                if tid:
+                    type_map[str(tid)] = t.get("name") or ""
+        except Exception as e:
+            logger.warning("Could not load ISO equipment types for map: %s", e)
+
+        cursor = self.db.custom_equipment_types.find({}, {"_id": 0, "id": 1, "name": 1})
+        async for doc in cursor:
+            tid = doc.get("id")
+            if tid:
+                type_map[str(tid)] = doc.get("name") or type_map.get(str(tid), "")
+        return type_map
+
+    def _apply_equipment_type_to_match(
+        self,
+        match: Optional[Dict[str, Any]],
+        node: Optional[Dict[str, Any]],
+        type_map: Dict[str, str],
+    ) -> Optional[Dict[str, Any]]:
+        """Attach equipment_type_id/name to a hierarchy equipment_match record."""
+        if not match or not node:
+            return match
+        type_id = node.get("equipment_type_id")
+        if type_id is None:
+            return match
+        type_id_str = str(type_id)
+        if not match.get("equipment_type_id"):
+            match["equipment_type_id"] = type_id_str
+        if not match.get("equipment_type_name"):
+            match["equipment_type_name"] = type_map.get(type_id_str)
+        return match
+
+    async def enrich_task_rows_equipment_types(self, task_rows: List[Dict[str, Any]]) -> None:
+        """Fill equipment_type_name on nested equipment_match for list/display APIs."""
+        equipment_ids = set()
+        for row in task_rows:
+            em = row.get("equipment_match")
+            if em and em.get("equipment_id") and not em.get("equipment_type_name"):
+                equipment_ids.add(em["equipment_id"])
+        if not equipment_ids:
+            return
+
+        nodes = await self.db.equipment_nodes.find(
+            {"id": {"$in": list(equipment_ids)}},
+            {"_id": 0, "id": 1, "equipment_type_id": 1},
+        ).to_list(length=len(equipment_ids))
+        type_map = await self._load_equipment_type_name_map()
+        node_by_id = {n["id"]: n for n in nodes if n.get("id")}
+        for row in task_rows:
+            em = row.get("equipment_match")
+            if em and em.get("equipment_id"):
+                self._apply_equipment_type_to_match(
+                    em, node_by_id.get(em["equipment_id"]), type_map
+                )
+                row["equipment_type_name"] = em.get("equipment_type_name") or ""
     
     @staticmethod
     def _token_overlap_score(a: str, b: str) -> float:

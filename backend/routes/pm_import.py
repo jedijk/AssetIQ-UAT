@@ -366,13 +366,19 @@ async def update_task_mapping(
             node = await db.equipment_nodes.find_one({"id": body.equipment_id})
             if not node:
                 raise HTTPException(status_code=400, detail="Equipment node not found")
-            task["equipment_match"] = {
-                "equipment_id": node.get("id"),
-                "tag": node.get("tag"),
-                "name": node.get("name"),
-                "match_type": "manual",
-                "confidence": 100,
-            }
+            pm_service = PMImportService(db)
+            type_map = await pm_service._load_equipment_type_name_map()
+            task["equipment_match"] = pm_service._apply_equipment_type_to_match(
+                {
+                    "equipment_id": node.get("id"),
+                    "tag": node.get("tag"),
+                    "name": node.get("name"),
+                    "match_type": "manual",
+                    "confidence": 100,
+                },
+                node,
+                type_map,
+            )
             # Also propagate tag/description so the row reads cleanly
             if node.get("tag"):
                 task["equipment_tag"] = node.get("tag")
@@ -841,6 +847,7 @@ async def list_all_tasks(
     """
     
     user_id = current_user.get("id", current_user.get("email", "unknown"))
+    pm_service = PMImportService(db)
     
     cursor = db.pm_import_sessions.find(
         {"created_by": user_id}
@@ -856,6 +863,7 @@ async def list_all_tasks(
         created_at_iso = created_at.isoformat() if created_at else None
         
         for task in session.get("tasks_extracted", []) or []:
+            equipment_match = task.get("equipment_match")
             tasks.append({
                 "task_id": task.get("task_id"),
                 "session_id": session_id,
@@ -864,6 +872,7 @@ async def list_all_tasks(
                 # ===== PM Import refactor shape =====
                 "equipment_tag": task.get("equipment_tag") or task.get("asset") or "",
                 "equipment_description": task.get("equipment_description") or task.get("component") or "",
+                "equipment_type_name": (equipment_match or {}).get("equipment_type_name") or "",
                 "task_description": task.get("task_description") or task.get("original_task") or "",
                 "task_type": task.get("task_type") or "PM",
                 "discipline": task.get("discipline") or "Mechanical",
@@ -871,10 +880,12 @@ async def list_all_tasks(
                 "frequency_days": task.get("frequency_days"),
                 "estimated_hours": task.get("estimated_hours") or 0.5,
                 "confidence_score": task.get("confidence_score") or 50,
-                "equipment_match": task.get("equipment_match"),
+                "equipment_match": equipment_match,
                 "review_status": task.get("review_status") or "pending",
                 "original_task": task.get("original_task") or "",
             })
+
+    await pm_service.enrich_task_rows_equipment_types(tasks)
     
     return {
         "tasks": tasks,

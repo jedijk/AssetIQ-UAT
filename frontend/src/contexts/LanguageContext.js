@@ -845,6 +845,7 @@ const en = {
     updatedEquipmentType: "equipment type",
     customPmImport: "PM Import",
     customPmImportDesc: "View and manage imported maintenance plans",
+    openEquipmentTypeStrategy: "Open maintenance strategy for this equipment type",
   },
 
   // Disciplines (used across library, equipment types, failure modes)
@@ -2810,6 +2811,7 @@ const nl = {
     updatedEquipmentType: "apparatuurtype",
     customPmImport: "PM Import",
     customPmImportDesc: "Bekijk en beheer geïmporteerde onderhoudsplannen",
+    openEquipmentTypeStrategy: "Open onderhoudsstrategie voor dit apparatuurtype",
   },
 
   // Disciplines (used across library, equipment types, failure modes)
