@@ -68,6 +68,11 @@ const SettingsTranslationsPage = lazy(() => import("./pages/SettingsTranslations
 const SettingsAuditLogPage = lazy(() => import("./pages/SettingsAuditLogPage"));
 const GranulometryPage = lazy(() => import("./pages/GranulometryPage"));
 
+// RIL (Reliability Intelligence Layer) Pages
+const RILDashboardPage = lazy(() => import("./pages/RILDashboardPage"));
+const RILCasesPage = lazy(() => import("./pages/RILCasesPage"));
+const RILCaseDetailPage = lazy(() => import("./pages/RILCaseDetailPage"));
+
 function RouteFallback() {
   return (
     <AppShell />
@@ -434,6 +439,11 @@ function App() {
                 <Route path="labels" element={<Navigate to="/settings/labels" replace />} />
                 <Route path="decision-engine" element={<Suspense fallback={<RouteFallback />}><UnderDevelopmentPage /></Suspense>} />
                 <Route path="feedback" element={<Suspense fallback={<RouteFallback />}><FeedbackPage /></Suspense>} />
+                
+                {/* Reliability Intelligence Layer (RIL) Routes */}
+                <Route path="reliability" element={<Suspense fallback={<RouteFallback />}><RILDashboardPage /></Suspense>} />
+                <Route path="reliability/cases" element={<Suspense fallback={<RouteFallback />}><RILCasesPage /></Suspense>} />
+                <Route path="reliability/cases/:id" element={<Suspense fallback={<RouteFallback />}><RILCaseDetailPage /></Suspense>} />
                 
                 {/* Settings Layout with nested routes */}
                 <Route path="settings" element={<Suspense fallback={<RouteFallback />}><SettingsPage /></Suspense>}>
