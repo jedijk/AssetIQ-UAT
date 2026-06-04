@@ -10,7 +10,7 @@ import json
 from typing import Dict, Any, List
 
 # Backend URL from environment
-BACKEND_URL = "https://discipline-mapper-1.preview.emergentagent.com/api"
+BACKEND_URL = "https://asset-predict-3.preview.emergentagent.com/api"
 
 # Test credentials
 TEST_EMAIL = "jedijk@gmail.com"
