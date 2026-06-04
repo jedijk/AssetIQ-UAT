@@ -114,19 +114,42 @@ export default function FindDuplicateActionsDialog({
     }
   };
 
-  const mergeOneGroup = async (row, group) => {
-    const keep = group.suggested_keep_index;
-    const remove =
+  const groupMergePayload = (group) => {
+    const keep = Number(group.suggested_keep_index);
+    const remove = (
       group.suggested_remove_indices ||
-      (group.action_indices || []).filter((i) => i !== keep);
-    if (keep == null || !remove?.length) {
+      (group.action_indices || []).filter((i) => Number(i) !== keep)
+    )
+      .map((i) => Number(i))
+      .filter((i) => Number.isInteger(i) && i >= 0 && i !== keep);
+    if (!Number.isInteger(keep) || keep < 0 || !remove.length) {
+      return null;
+    }
+    return { keep_index: keep, remove_indices: remove };
+  };
+
+  const mergeOneGroup = async (row, group) => {
+    const payload = groupMergePayload(group);
+    if (!payload) {
       toast.error("No merge suggestion for this group");
       return false;
     }
     const result = await failureModesAPI.mergeDuplicateActions({
       failure_mode_id: row.failure_mode_id,
-      keep_index: keep,
-      remove_indices: remove,
+      ...payload,
+    });
+    return result?.success;
+  };
+
+  const mergeGroupsForFailureMode = async (row, groups) => {
+    const payloads = groups.map((g) => groupMergePayload(g)).filter(Boolean);
+    if (!payloads.length) {
+      toast.error("No valid merge suggestions for this failure mode");
+      return false;
+    }
+    const result = await failureModesAPI.mergeDuplicateActions({
+      failure_mode_id: row.failure_mode_id,
+      groups: payloads,
     });
     return result?.success;
   };
@@ -141,7 +164,10 @@ export default function FindDuplicateActionsDialog({
         await refreshResults();
       }
     } catch (err) {
-      toast.error(err?.response?.data?.detail || "Merge failed");
+      const detail = err?.response?.data?.detail;
+      toast.error(
+        typeof detail === "string" ? detail : detail?.msg || "Merge failed",
+      );
     } finally {
       setMerging(false);
     }
@@ -156,12 +182,31 @@ export default function FindDuplicateActionsDialog({
     setMerging(true);
     let ok = 0;
     let fail = 0;
-    for (const { row, group, gi } of toMerge) {
+    const byFm = new Map();
+    for (const item of toMerge) {
+      const id = item.row.failure_mode_id;
+      if (!byFm.has(id)) byFm.set(id, { row: item.row, groups: [] });
+      byFm.get(id).groups.push(item.group);
+    }
+    for (const { row, groups } of byFm.values()) {
       try {
-        if (await mergeOneGroup(row, group)) ok += 1;
-        else fail += 1;
-      } catch {
-        fail += 1;
+        if (groups.length === 1) {
+          if (await mergeOneGroup(row, groups[0])) ok += 1;
+          else fail += 1;
+        } else if (await mergeGroupsForFailureMode(row, groups)) {
+          ok += groups.length;
+        } else {
+          fail += groups.length;
+        }
+      } catch (err) {
+        fail += groups.length;
+        const detail = err?.response?.data?.detail;
+        console.warn("merge batch failed", detail || err);
+        toast.error(
+          typeof detail === "string"
+            ? `${row.failure_mode}: ${detail}`
+            : `Merge failed on "${row.failure_mode}"`,
+        );
       }
     }
     setMerging(false);

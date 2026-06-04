@@ -458,10 +458,16 @@ class FindDuplicateActionsScanRequest(BaseModel):
     limit_results: int = 500
 
 
+class MergeDuplicateActionGroupItem(BaseModel):
+    keep_index: int
+    remove_indices: List[int] = Field(default_factory=list)
+
+
 class MergeDuplicateActionsRequest(BaseModel):
     failure_mode_id: str
-    keep_index: int
-    remove_indices: List[int] = []
+    keep_index: Optional[int] = None
+    remove_indices: List[int] = Field(default_factory=list)
+    groups: Optional[List[MergeDuplicateActionGroupItem]] = None
 
 
 class MergeFailureModesRequest(BaseModel):
@@ -953,6 +959,14 @@ async def merge_duplicate_actions(
     _require_owner(current_user)
     updated_by = current_user.get("id") or current_user.get("user_id") or current_user.get("email") or "user"
     try:
+        if request.groups:
+            return await failure_modes_service.merge_duplicate_action_groups(
+                failure_mode_id=request.failure_mode_id,
+                groups=[g.model_dump() for g in request.groups],
+                updated_by=str(updated_by),
+            )
+        if request.keep_index is None:
+            raise HTTPException(status_code=400, detail="keep_index or groups is required")
         return await failure_modes_service.merge_duplicate_action_group(
             failure_mode_id=request.failure_mode_id,
             keep_index=request.keep_index,

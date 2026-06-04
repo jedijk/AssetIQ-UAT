@@ -1760,14 +1760,16 @@ class FailureModesService:
             },
         }
 
-    async def merge_duplicate_action_group(
+    async def merge_duplicate_action_groups(
         self,
         failure_mode_id: str,
-        keep_index: int,
-        remove_indices: List[int],
+        groups: List[Dict[str, Any]],
         updated_by: str = "Duplicate action merge",
     ) -> Dict[str, Any]:
-        """Merge duplicate recommended actions into one slot; remove the rest."""
+        """Apply multiple duplicate-action merges on one failure mode in a single update."""
+        if not groups:
+            raise ValueError("No merge groups provided")
+
         doc = await self._resolve_fm_doc(failure_mode_id)
         if not doc:
             raise LookupError(f"Failure mode {failure_mode_id} not found")
@@ -1777,26 +1779,50 @@ class FailureModesService:
         if n < 2:
             raise ValueError("Failure mode has fewer than 2 actions")
 
-        if keep_index < 0 or keep_index >= n:
-            raise ValueError(f"keep_index {keep_index} out of range")
+        to_delete: Set[int] = set()
+        keep_indices: Set[int] = set()
+        merged_groups: List[Dict[str, Any]] = []
 
-        remove_set = {int(i) for i in remove_indices if int(i) != keep_index}
-        remove_set = {i for i in remove_set if 0 <= i < n}
-        if not remove_set:
-            raise ValueError("Provide at least one remove_index different from keep_index")
+        for g in groups:
+            try:
+                keep = int(g["keep_index"])
+            except (TypeError, ValueError, KeyError):
+                raise ValueError("Each group requires a numeric keep_index") from None
+            if keep < 0 or keep >= n:
+                raise ValueError(f"keep_index {keep} out of range (0–{n - 1})")
+            if keep in to_delete:
+                raise ValueError(
+                    f"keep_index {keep} was already removed by another selected group — "
+                    "merge groups separately or re-run the scan"
+                )
+            remove_set: Set[int] = set()
+            for raw in g.get("remove_indices") or []:
+                try:
+                    ri = int(raw)
+                except (TypeError, ValueError):
+                    continue
+                if ri == keep or ri < 0 or ri >= n:
+                    continue
+                remove_set.add(ri)
+            if not remove_set:
+                raise ValueError(
+                    f"Group at keep_index {keep} has no valid remove indices"
+                )
+            merged_action = actions[keep]
+            for ri in sorted(remove_set):
+                merged_action = self._merge_action_dict(merged_action, actions[ri])
+                to_delete.add(ri)
+            actions[keep] = merged_action
+            keep_indices.add(keep)
+            to_delete.discard(keep)
+            merged_groups.append({
+                "keep_index": keep,
+                "removed_indices": sorted(remove_set),
+            })
 
-        merged_action = actions[keep_index]
-        for ri in sorted(remove_set):
-            merged_action = self._merge_action_dict(merged_action, actions[ri])
-
-        new_actions: List[Any] = []
-        for i, action in enumerate(actions):
-            if i in remove_set:
-                continue
-            if i == keep_index:
-                new_actions.append(merged_action)
-            else:
-                new_actions.append(action)
+        new_actions = [a for i, a in enumerate(actions) if i not in to_delete]
+        if len(new_actions) >= n:
+            raise ValueError("Merge would not remove any actions")
 
         mode_id_str = str(doc.get("id") or doc["_id"])
         updated = await self.update(
@@ -1811,12 +1837,25 @@ class FailureModesService:
         return {
             "success": True,
             "failure_mode_id": mode_id_str,
-            "keep_index": keep_index,
-            "removed_indices": sorted(remove_set),
+            "groups_merged": len(merged_groups),
+            "merged_groups": merged_groups,
             "actions_before": n,
             "actions_after": len(new_actions),
-            "merged_action_preview": self._action_display_label(merged_action, keep_index),
         }
+
+    async def merge_duplicate_action_group(
+        self,
+        failure_mode_id: str,
+        keep_index: int,
+        remove_indices: List[int],
+        updated_by: str = "Duplicate action merge",
+    ) -> Dict[str, Any]:
+        """Merge duplicate recommended actions into one slot; remove the rest."""
+        return await self.merge_duplicate_action_groups(
+            failure_mode_id,
+            groups=[{"keep_index": keep_index, "remove_indices": remove_indices}],
+            updated_by=updated_by,
+        )
 
     async def scan_duplicate_actions(
         self,
