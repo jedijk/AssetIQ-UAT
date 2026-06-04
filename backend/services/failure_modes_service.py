@@ -763,12 +763,46 @@ class FailureModesService:
             "shared_equipment_types": shared_ets,
         }
 
+    # Defaults for library-wide "find similar" (tighter than duplicate-actions scan).
+    SIMILAR_FM_JACCARD = 0.45
+    SIMILAR_FM_RATIO = 0.72
+    SIMILAR_FM_MIN_SCORE = 52.0
+    SIMILAR_FM_AI_MIN_CONFIDENCE = 72.0
+
+    @classmethod
+    def _fm_names_similar_pair(
+        cls,
+        fm_a: Dict[str, Any],
+        fm_b: Dict[str, Any],
+        jaccard_threshold: float,
+        ratio_threshold: float,
+        *,
+        strict_pairing: bool = False,
+    ) -> bool:
+        name_a = (fm_a.get("failure_mode") or "").strip()
+        name_b = (fm_b.get("failure_mode") or "").strip()
+        norm_a = cls.normalize_fm_text(name_a)
+        norm_b = cls.normalize_fm_text(name_b)
+        if norm_a and norm_a == norm_b:
+            return True
+        jacc = cls._token_jaccard(
+            cls._fm_name_tokens(name_a), cls._fm_name_tokens(name_b)
+        )
+        ratio = (
+            SequenceMatcher(None, norm_a, norm_b).ratio() if norm_a and norm_b else 0.0
+        )
+        if strict_pairing:
+            return (ratio >= ratio_threshold and jacc >= jaccard_threshold) or ratio >= 0.86
+        return jacc >= jaccard_threshold or ratio >= ratio_threshold
+
     @classmethod
     def _cluster_by_name_similarity(
         cls,
         fms: List[Dict[str, Any]],
         jaccard_threshold: float = 0.5,
         ratio_threshold: float = 0.8,
+        *,
+        strict_pairing: bool = False,
     ) -> List[List[Dict[str, Any]]]:
         """Single-link clusters on failure_mode names (same thresholds as AI dedupe pre-filter)."""
         n = len(fms)
@@ -788,17 +822,15 @@ class FailureModesService:
             if ra != rb:
                 parent[ra] = rb
 
-        tokens_cache = [cls._fm_name_tokens(fm.get("failure_mode") or "") for fm in fms]
         for i in range(n):
             for j in range(i + 1, n):
-                norm_i = cls.normalize_fm_text(fms[i].get("failure_mode"))
-                norm_j = cls.normalize_fm_text(fms[j].get("failure_mode"))
-                if norm_i and norm_i == norm_j:
-                    union(i, j)
-                    continue
-                jacc = cls._token_jaccard(tokens_cache[i], tokens_cache[j])
-                ratio = SequenceMatcher(None, norm_i, norm_j).ratio() if norm_i and norm_j else 0.0
-                if jacc >= jaccard_threshold or ratio >= ratio_threshold:
+                if cls._fm_names_similar_pair(
+                    fms[i],
+                    fms[j],
+                    jaccard_threshold,
+                    ratio_threshold,
+                    strict_pairing=strict_pairing,
+                ):
                     union(i, j)
 
         cluster_map: Dict[int, List[Dict[str, Any]]] = {}
@@ -913,6 +945,45 @@ class FailureModesService:
             "ai_confidence": confidence,
         }
 
+    @classmethod
+    def _similar_fm_members_coherent(
+        cls,
+        members: List[Dict[str, Any]],
+        *,
+        min_score: float = 0,
+    ) -> bool:
+        """Every pair in a proposed group must look like a plausible duplicate."""
+        if len(members) < 2:
+            return False
+        min_score = min_score or cls.SIMILAR_FM_MIN_SCORE
+        for i in range(len(members)):
+            for j in range(i + 1, len(members)):
+                sim = cls.score_similarity(members[i], members[j])
+                if sim["score"] < min_score:
+                    return False
+        return True
+
+    @classmethod
+    def _cluster_has_similar_pair(
+        cls,
+        cluster: List[Dict[str, Any]],
+        jaccard_threshold: float,
+        ratio_threshold: float,
+        *,
+        strict_pairing: bool = True,
+    ) -> bool:
+        for i in range(len(cluster)):
+            for j in range(i + 1, len(cluster)):
+                if cls._fm_names_similar_pair(
+                    cluster[i],
+                    cluster[j],
+                    jaccard_threshold,
+                    ratio_threshold,
+                    strict_pairing=strict_pairing,
+                ):
+                    return True
+        return False
+
     async def _ai_confirm_similar_failure_mode_cluster(
         self,
         cluster: List[Dict[str, Any]],
@@ -943,20 +1014,21 @@ class FailureModesService:
 
         sys_prompt = (
             "You are a reliability engineer reviewing a failure-modes library. "
-            "Group failure modes that describe THE SAME underlying failure phenomenon, "
-            "even on different equipment or with different wording (e.g. 'Bearing Failure' "
-            "and 'Drive Bearing Failure' are usually the same). Equipment type is NOT "
-            "relevant. Do NOT merge different ISO 14224 mechanisms (Wear ≠ Seizure ≠ "
-            "Fatigue; Leak ≠ Rupture). When in doubt on mechanism, keep SEPARATE. "
-            "Return strict JSON only."
+            "Only group failure modes that are CLEAR duplicates or trivial rewordings of "
+            "the SAME failure (e.g. 'Bearing Failure' vs 'Drive Bearing Failure' when both "
+            "mean generic bearing failure). Do NOT group related failures that share a "
+            "word but differ in phenomenon (e.g. 'Bearing Failure' ≠ 'Bearing Wear', "
+            "'Seal Leak' ≠ 'Bearing Failure'). Equipment type is irrelevant. Different "
+            "ISO 14224 mechanisms must stay separate (Wear ≠ Seizure ≠ Fatigue). When "
+            "unsure, return no group for those ids. Return strict JSON only."
         )
         user_msg = (
             "Candidate failure modes:\n"
             f"{json.dumps(items, indent=2)}\n\n"
             'Return JSON: {"groups": [{"member_ids": ["..."], "canonical_name": "...", '
             '"reason": "<= 20 words", "confidence": 0-100}]}. '
-            "Only groups with 2+ ids. Each id in at most one group. "
-            "Use the clearest ISO-aligned name as canonical_name."
+            "Only groups with 2+ ids you are confident are duplicates (confidence ≥ 75). "
+            "Each id in at most one group. Omit borderline cases."
         )
 
         client = AsyncOpenAI(api_key=api_key)
@@ -998,13 +1070,17 @@ class FailureModesService:
                     member_ids.append(mid)
             if len(member_ids) < 2:
                 continue
-            used.update(member_ids)
             members = [by_id[mid] for mid in member_ids]
+            if not self._similar_fm_members_coherent(members):
+                continue
             conf = g.get("confidence")
             try:
                 confidence = float(conf) if conf is not None else None
             except (TypeError, ValueError):
                 confidence = None
+            if confidence is not None and confidence < self.SIMILAR_FM_AI_MIN_CONFIDENCE:
+                continue
+            used.update(member_ids)
             reason = (g.get("reason") or "AI: same failure phenomenon").strip()[:240]
             canonical = (g.get("canonical_name") or "").strip()
             payload = self._format_similar_fm_group(
@@ -1082,6 +1158,7 @@ class FailureModesService:
             deduped,
             jaccard_threshold=jaccard_threshold,
             ratio_threshold=ratio_threshold,
+            strict_pairing=True,
         ):
             if len(groups_out) >= limit_groups:
                 return
@@ -1111,9 +1188,9 @@ class FailureModesService:
     async def scan_similar_groups(
         self,
         equipment_type_id: Optional[str] = None,
-        jaccard_threshold: float = 0.35,
-        ratio_threshold: float = 0.58,
-        min_score: float = 45.0,
+        jaccard_threshold: float = SIMILAR_FM_JACCARD,
+        ratio_threshold: float = SIMILAR_FM_RATIO,
+        min_score: float = SIMILAR_FM_MIN_SCORE,
         limit_groups: int = 200,
         include_cross_equipment: bool = True,
         only_cross_equipment: bool = False,
@@ -1176,6 +1253,7 @@ class FailureModesService:
                 deduped,
                 jaccard_threshold=jaccard_threshold,
                 ratio_threshold=fuzzy_ratio,
+                strict_pairing=True,
             )
             # Exact-name groups not caught by fuzzy-only clustering
             by_norm: Dict[str, List[Dict[str, Any]]] = {}
@@ -1204,55 +1282,33 @@ class FailureModesService:
                         unique.append(fm)
                 if len(unique) < 2:
                     continue
+                if not self._cluster_has_similar_pair(
+                    unique,
+                    jaccard_threshold,
+                    fuzzy_ratio,
+                    strict_pairing=True,
+                ):
+                    continue
+                clusters_for_ai = [unique]
+                if len(unique) > 12:
+                    clusters_for_ai = self._cluster_by_name_similarity(
+                        unique,
+                        jaccard_threshold=jaccard_threshold,
+                        ratio_threshold=fuzzy_ratio,
+                        strict_pairing=True,
+                    )
                 try:
-                    before = len(groups_out)
-                    for g in await self._ai_confirm_similar_failure_mode_cluster(unique):
-                        self._append_group_if_new(
-                            groups_out, seen_group_keys, g, limit_groups
-                        )
-                    ai_clusters_processed += 1
-                    if len(groups_out) == before:
-                        pair_scores = []
-                        for i in range(len(unique)):
-                            for j in range(i + 1, len(unique)):
-                                pair_scores.append(
-                                    self.score_similarity(unique[i], unique[j])["score"]
-                                )
-                        avg_score = (
-                            sum(pair_scores) / len(pair_scores) if pair_scores else 0
-                        )
-                        if avg_score >= min_score:
+                    for sub in clusters_for_ai:
+                        if len(sub) < 2:
+                            continue
+                        for g in await self._ai_confirm_similar_failure_mode_cluster(sub):
                             self._append_group_if_new(
-                                groups_out,
-                                seen_group_keys,
-                                self._format_similar_fm_group(
-                                    unique,
-                                    reason="Similar name (AI found no duplicate subset)",
-                                    detection_method="lexical",
-                                ),
-                                limit_groups,
+                                groups_out, seen_group_keys, g, limit_groups
                             )
+                    ai_clusters_processed += 1
                 except Exception as e:
                     logger.warning("AI similar-FM cluster failed: %s", e)
                     ai_errors += 1
-                    pair_scores = []
-                    for i in range(len(unique)):
-                        for j in range(i + 1, len(unique)):
-                            pair_scores.append(
-                                self.score_similarity(unique[i], unique[j])["score"]
-                            )
-                    avg_score = sum(pair_scores) / len(pair_scores) if pair_scores else 0
-                    if avg_score >= min_score:
-                        self._append_group_if_new(
-                            groups_out,
-                            seen_group_keys,
-                            self._format_similar_fm_group(
-                                unique,
-                                reason="Similar name (AI unavailable, text match)",
-                                detection_method="lexical",
-                            ),
-                            limit_groups,
-                        )
 
         if not use_ai or not groups_out:
             self._library_wide_similar_groups(
@@ -1309,14 +1365,64 @@ class FailureModesService:
             return 0.0
         return len(ta & tb) / len(ta | tb)
 
+    ACTION_DUP_JACCARD = 0.48
+    ACTION_DUP_RATIO = 0.75
+    ACTION_DUP_AI_MIN_CONFIDENCE = 75.0
+
+    @classmethod
+    def _actions_similar_pair(
+        cls,
+        action_a: Any,
+        action_b: Any,
+        ratio_threshold: float,
+        jaccard_threshold: float,
+        *,
+        strict_pairing: bool = False,
+    ) -> bool:
+        norm_a = cls._normalize_action_text(action_a)
+        norm_b = cls._normalize_action_text(action_b)
+        if norm_a and norm_a == norm_b:
+            return True
+        if not norm_a or not norm_b:
+            return False
+        ratio = SequenceMatcher(None, norm_a, norm_b).ratio()
+        jacc = cls._action_token_jaccard(action_a, action_b)
+        if strict_pairing:
+            return (ratio >= ratio_threshold and jacc >= jaccard_threshold) or ratio >= 0.88
+        return ratio >= ratio_threshold or jacc >= jaccard_threshold
+
+    @classmethod
+    def _action_indices_coherent(
+        cls,
+        actions: List[Any],
+        indices: List[int],
+        ratio_threshold: float,
+        jaccard_threshold: float,
+    ) -> bool:
+        if len(indices) < 2:
+            return False
+        for i in range(len(indices)):
+            for j in range(i + 1, len(indices)):
+                if not cls._actions_similar_pair(
+                    actions[indices[i]],
+                    actions[indices[j]],
+                    ratio_threshold,
+                    jaccard_threshold,
+                    strict_pairing=True,
+                ):
+                    return False
+        return True
+
     @classmethod
     def _cluster_duplicate_action_indices(
         cls,
         actions: List[Any],
-        ratio_threshold: float = 0.58,
-        jaccard_threshold: float = 0.35,
+        ratio_threshold: float = ACTION_DUP_RATIO,
+        jaccard_threshold: float = ACTION_DUP_JACCARD,
+        *,
+        strict_pairing: bool = True,
     ) -> List[List[int]]:
-        """Single-link clusters of near-duplicate recommended actions (relaxed lexical)."""
+        """Single-link clusters of near-duplicate recommended actions."""
         n = len(actions or [])
         if n < 2:
             return []
@@ -1334,17 +1440,15 @@ class FailureModesService:
             if ra != rb:
                 parent[ra] = rb
 
-        norms = [cls._normalize_action_text(a) for a in actions]
         for i in range(n):
             for j in range(i + 1, n):
-                if norms[i] and norms[i] == norms[j]:
-                    union(i, j)
-                    continue
-                if not norms[i] or not norms[j]:
-                    continue
-                ratio = SequenceMatcher(None, norms[i], norms[j]).ratio()
-                jacc = cls._action_token_jaccard(actions[i], actions[j])
-                if ratio >= ratio_threshold or jacc >= jaccard_threshold:
+                if cls._actions_similar_pair(
+                    actions[i],
+                    actions[j],
+                    ratio_threshold,
+                    jaccard_threshold,
+                    strict_pairing=strict_pairing,
+                ):
                     union(i, j)
 
         cluster_map: Dict[int, List[int]] = {}
@@ -1398,25 +1502,19 @@ class FailureModesService:
             **suggestion,
         }
 
-    async def _ai_find_duplicate_action_groups(
+    async def _ai_confirm_duplicate_action_cluster(
         self,
         failure_mode_name: str,
         equipment: str,
         actions: List[Any],
+        indices: List[int],
     ) -> List[Dict[str, Any]]:
-        """Use GPT to find semantically duplicate actions (same maintenance intent)."""
+        """GPT confirms a small lexical cluster of duplicate actions."""
         import json
         import os
         from openai import AsyncOpenAI, RateLimitError
 
-        if len(actions) < 2:
-            return []
-        if len(actions) > 30:
-            logger.info(
-                "Skipping AI duplicate-action scan for %s: %s actions (max 30)",
-                failure_mode_name,
-                len(actions),
-            )
+        if len(indices) < 2 or len(indices) > 12:
             return []
 
         api_key = os.environ.get("OPENAI_API_KEY")
@@ -1424,11 +1522,12 @@ class FailureModesService:
             raise RuntimeError("OPENAI_API_KEY not configured")
 
         payload = []
-        for idx, action in enumerate(actions):
-            label = self._action_display_label(action, idx)
+        for local_idx, action_idx in enumerate(indices):
+            action = actions[action_idx]
             payload.append({
-                "index": idx,
-                "description": label[:400],
+                "index": local_idx,
+                "action_index": action_idx,
+                "description": self._action_display_label(action, action_idx)[:400],
                 "action_type": (
                     action.get("action_type") or action.get("task_type")
                     if isinstance(action, dict)
@@ -1440,21 +1539,20 @@ class FailureModesService:
             })
 
         sys_prompt = (
-            "You are a maintenance reliability engineer. Group recommended_actions that "
-            "describe the SAME maintenance task (same intent and scope), even when wording "
-            "differs. Consider equipment context. DO NOT group different tasks: inspect vs "
-            "replace/repair, lubrication vs overhaul, cleaning vs calibration, preventive "
-            "check vs corrective fix. Similar frequency does not matter if the core task "
-            "differs. Return strict JSON only."
+            "You are a maintenance reliability engineer. Only group actions that are "
+            "CLEAR duplicates (same maintenance task and scope). DO NOT group inspect "
+            "vs replace/repair, lubrication vs overhaul, cleaning vs calibration, or "
+            "tasks that differ in action_type/discipline. When unsure, return no groups. "
+            "Return strict JSON only."
         )
         user_msg = (
             f"Failure mode: {failure_mode_name}\n"
             f"Equipment: {equipment or '—'}\n\n"
-            f"Actions:\n{json.dumps(payload, indent=2)}\n\n"
-            'Return JSON: {"groups": [{"member_indices": [0, 2], "keep_index": 0, '
+            f"Candidate actions:\n{json.dumps(payload, indent=2)}\n\n"
+            'Return JSON: {"groups": [{"member_indices": [0, 1], "keep_index": 0, '
             '"reason": "<= 20 words", "confidence": 0-100}]}. '
-            "Only include groups with 2+ indices. Each index in at most one group. "
-            "keep_index must be the best/most complete action to retain."
+            "Only groups with 2+ local indices you are confident are duplicates "
+            "(confidence ≥ 75). Each local index in at most one group."
         )
 
         client = AsyncOpenAI(api_key=api_key)
@@ -1468,7 +1566,7 @@ class FailureModesService:
                         {"role": "user", "content": user_msg},
                     ],
                     temperature=0,
-                    max_tokens=1200,
+                    max_tokens=800,
                     seed=42,
                     response_format={"type": "json_object"},
                 )
@@ -1483,42 +1581,59 @@ class FailureModesService:
         if not data:
             return []
 
+        local_to_action = {i: indices[i] for i in range(len(indices))}
         groups_out: List[Dict[str, Any]] = []
-        valid = set(range(len(actions)))
         used: Set[int] = set()
         for g in data.get("groups") or []:
             if not isinstance(g, dict):
                 continue
             raw_indices = g.get("member_indices") or g.get("action_indices") or []
-            indices = []
+            mapped: List[int] = []
             for raw in raw_indices:
                 try:
-                    vi = int(raw)
+                    local_i = int(raw)
                 except (TypeError, ValueError):
                     continue
-                if vi in valid and vi not in used:
-                    indices.append(vi)
-            indices = sorted(indices)
-            if len(indices) < 2:
+                action_i = local_to_action.get(local_i)
+                if action_i is not None and action_i not in used:
+                    mapped.append(action_i)
+            mapped = sorted(set(mapped))
+            if len(mapped) < 2:
                 continue
-            keep = g.get("keep_index")
-            keep_index = int(keep) if keep is not None and int(keep) in indices else indices[0]
-            used.update(indices)
+            if not self._action_indices_coherent(
+                actions,
+                mapped,
+                self.ACTION_DUP_RATIO,
+                self.ACTION_DUP_JACCARD,
+            ):
+                continue
             conf = g.get("confidence")
             try:
                 confidence = float(conf) if conf is not None else None
             except (TypeError, ValueError):
                 confidence = None
+            if confidence is not None and confidence < self.ACTION_DUP_AI_MIN_CONFIDENCE:
+                continue
+            keep = g.get("keep_index")
+            try:
+                keep_local = int(keep) if keep is not None else 0
+            except (TypeError, ValueError):
+                keep_local = 0
+            keep_index = local_to_action.get(keep_local, mapped[0])
+            if keep_index not in mapped:
+                keep_index = mapped[0]
+            used.update(mapped)
             reason = (g.get("reason") or "AI: same maintenance task").strip()[:240]
-            groups_out.append(
-                self._format_action_group(
-                    actions,
-                    indices,
-                    reason=reason,
-                    detection_method="ai",
-                    confidence=confidence,
-                )
+            group = self._format_action_group(
+                actions,
+                mapped,
+                reason=reason,
+                detection_method="ai",
+                confidence=confidence,
             )
+            group["suggested_keep_index"] = keep_index
+            group["suggested_remove_indices"] = [i for i in mapped if i != keep_index]
+            groups_out.append(group)
         return groups_out
 
     @staticmethod
@@ -1637,10 +1752,11 @@ class FailureModesService:
     async def scan_duplicate_actions(
         self,
         failure_mode_id: Optional[str] = None,
-        ratio_threshold: float = 0.58,
-        jaccard_threshold: float = 0.35,
+        ratio_threshold: float = ACTION_DUP_RATIO,
+        jaccard_threshold: float = ACTION_DUP_JACCARD,
         use_ai: bool = True,
-        ai_max_failure_modes: int = 120,
+        ai_max_failure_modes: int = 50,
+        ai_max_clusters_per_fm: int = 3,
         limit_results: int = 500,
     ) -> Dict[str, Any]:
         """Find duplicate recommended_actions within each failure mode (library-wide scan)."""
@@ -1679,32 +1795,54 @@ class FailureModesService:
             fm_name = doc.get("failure_mode") or ""
             equipment = doc.get("equipment") or ""
 
-            if use_ai and ai_failure_modes_processed < ai_max_failure_modes:
-                try:
-                    ai_groups = await self._ai_find_duplicate_action_groups(
-                        fm_name, equipment, actions
-                    )
-                    ai_failure_modes_processed += 1
-                    duplicate_groups.extend(ai_groups)
-                except Exception as e:
-                    logger.warning(
-                        "AI duplicate-action scan failed for %s: %s",
-                        fm_name,
-                        e,
-                    )
-                    ai_errors += 1
+            lexical_clusters = self._cluster_duplicate_action_indices(
+                actions,
+                ratio_threshold=ratio_threshold,
+                jaccard_threshold=jaccard_threshold,
+                strict_pairing=True,
+            )
+            if not lexical_clusters:
+                continue
 
-            if not duplicate_groups:
-                for indices in self._cluster_duplicate_action_indices(
-                    actions,
-                    ratio_threshold=ratio_threshold,
-                    jaccard_threshold=jaccard_threshold,
-                ):
+            fm_ai_failed = False
+            if use_ai and ai_failure_modes_processed < ai_max_failure_modes:
+                ai_failure_modes_processed += 1
+                clusters_reviewed = 0
+                for indices in lexical_clusters:
+                    if clusters_reviewed >= ai_max_clusters_per_fm:
+                        break
+                    if len(indices) < 2 or len(indices) > 12:
+                        continue
+                    clusters_reviewed += 1
+                    try:
+                        confirmed = await self._ai_confirm_duplicate_action_cluster(
+                            fm_name, equipment, actions, indices
+                        )
+                        duplicate_groups.extend(confirmed)
+                    except Exception as e:
+                        logger.warning(
+                            "AI duplicate-action cluster failed for %s: %s",
+                            fm_name,
+                            e,
+                        )
+                        ai_errors += 1
+                        fm_ai_failed = True
+
+            if not duplicate_groups and (not use_ai or fm_ai_failed):
+                for indices in lexical_clusters:
+                    if not self._action_indices_coherent(
+                        actions, indices, ratio_threshold, jaccard_threshold
+                    ):
+                        continue
                     duplicate_groups.append(
                         self._format_action_group(
                             actions,
                             indices,
-                            reason="Similar wording (lexical match)",
+                            reason=(
+                                "Similar wording (strict lexical match)"
+                                if not use_ai
+                                else "Similar wording (AI unavailable, strict match)"
+                            ),
                             detection_method="lexical",
                         )
                     )

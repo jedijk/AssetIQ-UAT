@@ -292,6 +292,8 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             or "/ai-insights" in request.url.path
             or "/auth/" in request.url.path
             or "/maintenance-programs" in request.url.path
+            or request.url.path.endswith("/failure-modes/find-duplicate-actions")
+            or request.url.path.endswith("/failure-modes/find-similar")
         ):
             request_timeout = self.long_timeout
         else:
@@ -317,7 +319,7 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
                 pass
             return resp
 
-app.add_middleware(TimeoutMiddleware, timeout=25.0, long_timeout=120.0)
+app.add_middleware(TimeoutMiddleware, timeout=25.0, long_timeout=300.0)
 
 # Add GZip compression for responses > 500 bytes
 app.add_middleware(GZipMiddleware, minimum_size=500)

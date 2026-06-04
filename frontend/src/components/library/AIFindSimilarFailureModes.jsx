@@ -93,7 +93,12 @@ export default function AIFindSimilarFailureModes({
     setGroups([]);
 
     try {
-      const data = await failureModesAPI.scanSimilar({ use_ai: false });
+      const data = await failureModesAPI.scanSimilar({
+        use_ai: false,
+        jaccard_threshold: 0.45,
+        ratio_threshold: 0.72,
+        min_score: 52,
+      });
       const collected = mapLexicalGroups("library", "All failure modes", data?.groups);
       setGroups(collected);
       setScanned(1);
@@ -130,7 +135,12 @@ export default function AIFindSimilarFailureModes({
     setTotalEts(1);
 
     try {
-      const data = await failureModesAPI.scanSimilar({ use_ai: true });
+      const data = await failureModesAPI.scanSimilar({
+        use_ai: true,
+        jaccard_threshold: 0.45,
+        ratio_threshold: 0.72,
+        min_score: 52,
+      });
       if (data?.fuzzy_clustering_skipped) {
         toast.info(
           "Large library: fuzzy pre-filter skipped; AI uses exact-name clusters only.",
@@ -324,8 +334,8 @@ export default function AIFindSimilarFailureModes({
               </p>
               <p className="text-sm text-slate-500 mt-1">
                 {scanMode === "ai"
-                  ? "Uses AI with relaxed name matching (e.g. Bearing Failure ≈ Drive Bearing Failure). May take a few minutes on large libraries."
-                  : "Fast text-only scan. Catches exact and near-exact names; may miss wording variants AI would group."}
+                  ? "Uses AI on tight name matches only (clear duplicates such as Bearing Failure vs Drive Bearing Failure). Skips borderline pairs."
+                  : "Text-only scan with the same stricter matching rules. Usually faster; no AI review."}
               </p>
             </div>
             <div className="flex flex-wrap gap-2 justify-center">

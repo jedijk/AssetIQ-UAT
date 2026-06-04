@@ -1915,7 +1915,7 @@ async def find_similar_failure_modes(request: FindSimilarFailureModesRequest):
                 continue
             jacc = _sim_jaccard(tokens_cache[i], tokens_cache[j])
             ratio = _sim_ratio(fms[i].failure_mode, fms[j].failure_mode)
-            if jacc >= 0.35 or ratio >= 0.58:
+            if (jacc >= 0.45 and ratio >= 0.72) or ratio >= 0.86:
                 union(i, j)
 
     cluster_map: Dict[int, List[SimilarFmItem]] = {}
@@ -1939,12 +1939,10 @@ async def find_similar_failure_modes(request: FindSimilarFailureModesRequest):
 
     sys_prompt = (
         "You are a reliability engineer reviewing a failure-modes library. "
-        "Group failure modes that describe THE SAME underlying failure phenomenon, "
-        "even on different equipment or with different wording (e.g. 'Bearing Failure' "
-        "and 'Drive Bearing Failure' are usually the same). Equipment type is NOT "
-        "relevant. Do NOT merge different ISO 14224 mechanisms (Wear ≠ Seizure ≠ "
-        "Fatigue; Leak ≠ Rupture). When in doubt on mechanism, keep SEPARATE. "
-        "Output STRICT JSON."
+        "Only group CLEAR duplicates or trivial rewordings of the SAME failure. "
+        "Do NOT group related failures that share a component word but differ in "
+        "phenomenon. Equipment type is irrelevant. Different ISO 14224 mechanisms "
+        "must stay separate. When unsure, keep SEPARATE. Output STRICT JSON."
     )
 
     for cluster in candidate_clusters:

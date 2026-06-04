@@ -431,9 +431,9 @@ class FailureModeValidation(BaseModel):
 
 class FindSimilarFailureModesScanRequest(BaseModel):
     equipment_type_id: Optional[str] = None
-    jaccard_threshold: float = 0.35
-    ratio_threshold: float = 0.58
-    min_score: float = 45.0
+    jaccard_threshold: float = 0.45
+    ratio_threshold: float = 0.72
+    min_score: float = 52.0
     limit_groups: int = 200
     include_cross_equipment: bool = True
     only_cross_equipment: bool = False
@@ -444,10 +444,11 @@ class FindSimilarFailureModesScanRequest(BaseModel):
 
 class FindDuplicateActionsScanRequest(BaseModel):
     failure_mode_id: Optional[str] = None
-    ratio_threshold: float = 0.58
-    jaccard_threshold: float = 0.35
+    ratio_threshold: float = 0.75
+    jaccard_threshold: float = 0.48
     use_ai: bool = True
-    ai_max_failure_modes: int = 120
+    ai_max_failure_modes: int = 50
+    ai_max_clusters_per_fm: int = 3
     limit_results: int = 500
 
 
@@ -927,6 +928,7 @@ async def scan_duplicate_actions_in_failure_modes(
             jaccard_threshold=request.jaccard_threshold,
             use_ai=request.use_ai,
             ai_max_failure_modes=request.ai_max_failure_modes,
+            ai_max_clusters_per_fm=request.ai_max_clusters_per_fm,
             limit_results=request.limit_results,
         )
     except Exception as e:

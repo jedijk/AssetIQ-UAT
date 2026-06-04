@@ -40,8 +40,10 @@ export default function FindDuplicateActionsDialog({
 
   const scanParams = () => ({
     use_ai: scanMode === "ai",
-    ratio_threshold: 0.58,
-    jaccard_threshold: 0.35,
+    ratio_threshold: 0.75,
+    jaccard_threshold: 0.48,
+    ai_max_failure_modes: 50,
+    ai_max_clusters_per_fm: 3,
   });
 
   const handleClose = () => {
@@ -200,7 +202,7 @@ export default function FindDuplicateActionsDialog({
               mode{failureModes.length === 1 ? "" : "s"}.
               {scanMode === "ai" && (
                 <span className="block mt-1 text-slate-500">
-                  AI review may take a few minutes on large libraries.
+                  AI confirms only strict text matches (clear duplicates). Usually faster than a full-library GPT pass.
                 </span>
               )}
             </p>
@@ -252,8 +254,8 @@ export default function FindDuplicateActionsDialog({
             <Loader2 className="w-8 h-8 animate-spin text-amber-600" />
             <p className="text-sm text-slate-600">
               {scanMode === "ai"
-                ? "AI is reviewing actions for the same maintenance task…"
-                : "Scanning recommended actions (text similarity)…"}
+                ? "AI is confirming strict duplicate action candidates…"
+                : "Scanning recommended actions (strict text similarity)…"}
             </p>
           </div>
         )}
