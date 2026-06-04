@@ -83,9 +83,11 @@ export const failureModesAPI = {
     return response.data;
   },
 
-  /** Batch scan for duplicate groups per equipment type (lexical, no AI). */
+  /** Library-wide batch scan for duplicate groups (lexical, no AI). */
   scanSimilar: async (body = {}) => {
-    const response = await api.post("/failure-modes/find-similar", body);
+    const response = await api.post("/failure-modes/find-similar", body, {
+      timeout: 120000,
+    });
     return response.data;
   },
 

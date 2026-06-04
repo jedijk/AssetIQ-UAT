@@ -655,6 +655,31 @@ class FailureModesService:
         
         return result
 
+    def _serialize_similarity_candidate(self, doc: Dict) -> Dict[str, Any]:
+        """Lean FM shape for library-wide similarity scan (tolerates partial Mongo docs)."""
+        doc_id = doc.get("id") or doc.get("_id")
+        severity = int(doc.get("severity") or 1)
+        occurrence = int(doc.get("occurrence") or 1)
+        detectability = int(doc.get("detectability") or 1)
+        rpn = doc.get("rpn")
+        if rpn is None:
+            rpn = severity * occurrence * detectability
+        return {
+            "id": str(doc_id),
+            "failure_mode": doc.get("failure_mode") or "",
+            "category": doc.get("category"),
+            "equipment": doc.get("equipment"),
+            "mechanism": doc.get("mechanism"),
+            "iso14224_mechanism": doc.get("iso14224_mechanism"),
+            "rpn": rpn,
+            "equipment_type_ids": doc.get("equipment_type_ids") or [],
+            "recommended_actions": doc.get("recommended_actions") or [],
+            "keywords": doc.get("keywords") or [],
+            "potential_effects": doc.get("potential_effects") or [],
+            "potential_causes": doc.get("potential_causes") or [],
+            "is_validated": bool(doc.get("is_validated", False)),
+        }
+
     # ============== SIMILARITY & MERGE ==============
 
     _FM_SIM_STOPWORDS = {
@@ -855,6 +880,7 @@ class FailureModesService:
         seen_keys: Set[frozenset],
         groups_out: List[Dict[str, Any]],
         limit_groups: int,
+        run_fuzzy_cluster: bool = True,
     ) -> None:
         """Find near-duplicate failure modes across the full library (equipment type ignored)."""
         by_norm: Dict[str, List[Dict[str, Any]]] = {}
@@ -870,8 +896,8 @@ class FailureModesService:
             unique: List[Dict[str, Any]] = []
             seen_ids: Set[str] = set()
             for fm in members:
-                fid = str(fm["id"])
-                if fid in seen_ids:
+                fid = str(fm.get("id") or "")
+                if not fid or fid in seen_ids:
                     continue
                 seen_ids.add(fid)
                 unique.append(fm)
@@ -906,12 +932,15 @@ class FailureModesService:
                 limit_groups,
             )
 
-        # Similar names across equipment (e.g. Bearing Failure + Drive Bearing Failure)
+        if not run_fuzzy_cluster:
+            return
+
+        # Similar names (e.g. Bearing Failure + Drive Bearing Failure)
         deduped: List[Dict[str, Any]] = []
         seen_ids: Set[str] = set()
         for fm in all_fms:
-            fid = str(fm["id"])
-            if fid in seen_ids:
+            fid = str(fm.get("id") or "")
+            if not fid or fid in seen_ids:
                 continue
             seen_ids.add(fid)
             deduped.append(fm)
@@ -996,7 +1025,7 @@ class FailureModesService:
 
         all_fms: List[Dict[str, Any]] = []
         async for doc in cursor:
-            all_fms.append(self._serialize(doc))
+            all_fms.append(self._serialize_similarity_candidate(doc))
 
         groups_out: List[Dict[str, Any]] = []
         seen_group_keys: Set[frozenset] = set()
@@ -1005,6 +1034,9 @@ class FailureModesService:
             if only_cross_equipment and cross_equipment_ratio_threshold
             else ratio_threshold
         )
+        # Fuzzy clustering is O(n²); skip on very large libraries (exact-name pass still runs).
+        max_fuzzy_cluster = 1200
+        run_fuzzy = len(all_fms) <= max_fuzzy_cluster
         self._library_wide_similar_groups(
             all_fms,
             min_score=min_score,
@@ -1013,6 +1045,7 @@ class FailureModesService:
             seen_keys=seen_group_keys,
             groups_out=groups_out,
             limit_groups=limit_groups,
+            run_fuzzy_cluster=run_fuzzy,
         )
 
         return {
@@ -1020,6 +1053,8 @@ class FailureModesService:
             "equipment_type_id": None,
             "groups": groups_out,
             "total_groups": len(groups_out),
+            "failure_modes_scanned": len(all_fms),
+            "fuzzy_clustering_skipped": not run_fuzzy,
         }
 
     async def _resolve_fm_doc(self, mode_id: str) -> Optional[Dict[str, Any]]:

@@ -21,7 +21,7 @@ import {
   DialogFooter,
 } from "../ui/dialog";
 import { toast } from "sonner";
-import api from "../../lib/api";
+import { aiApi } from "../../lib/apiClient";
 import { failureModesAPI } from "../../lib/apis/failureModes";
 
 /**
@@ -99,14 +99,22 @@ export default function AIFindSimilarFailureModes({
       setGroups(collected);
       setScanned(1);
       setPhase("done");
+      const suffix = data?.fuzzy_clustering_skipped
+        ? " (exact-name matches only; library is large)"
+        : "";
       toast.success(
-        `Fast scan complete — found ${collected.length} candidate group(s) across the library.`,
+        `Fast scan complete — found ${collected.length} candidate group(s) across the library.${suffix}`,
       );
     } catch (err) {
       console.error("Library-wide scan failed", err);
       setErrorCount(1);
       setPhase("done");
-      toast.error("Failed to scan failure modes");
+      const detail = err?.response?.data?.detail;
+      toast.error(
+        typeof detail === "string" && detail
+          ? detail
+          : "Failed to scan failure modes",
+      );
     }
   };
 
@@ -121,37 +129,87 @@ export default function AIFindSimilarFailureModes({
     setErrorCount(0);
     setGroups([]);
 
-    const allFms = (failureModes || []).map((fm) => ({
-      id: fm.id,
-      failure_mode: fm.failure_mode,
-    }));
-
+    const collected = [];
     try {
-      const resp = await api.post("/ai-suggestions/find-similar-failure-modes", {
-        equipment_type_id: "library",
-        equipment_type_name: "All failure modes",
-        failure_modes: allFms,
-      });
-      const collected = (resp?.data?.groups || []).map((g) => ({
-        et_id: "library",
-        et_name: "All failure modes",
-        member_ids: g.member_ids,
-        canonical_name: g.canonical_name || "",
-        reason: g.reason || "",
-        scan_source: "ai",
-        selected: false,
-      }));
-      setGroups(collected);
-      setScanned(1);
+      const lexical = await failureModesAPI.scanSimilar({});
+      if (lexical?.fuzzy_clustering_skipped) {
+        toast.info(
+          "Large library: fuzzy pre-filter skipped; using exact-name matches for AI review.",
+        );
+      }
+      const clusters = (lexical?.groups || []).filter(
+        (g) => (g.member_ids || []).length >= 2,
+      );
+      if (!clusters.length) {
+        setPhase("done");
+        toast.info("No similar groups found for AI review.");
+        return;
+      }
+
+      setTotalEts(clusters.length);
+      for (let i = 0; i < clusters.length; i++) {
+        if (cancelRef.current) break;
+        const memberIds = clusters[i].member_ids || [];
+        const fms = memberIds
+          .map((id) => {
+            const fm = fmById.get(id);
+            return fm ? { id, failure_mode: fm.failure_mode } : null;
+          })
+          .filter(Boolean);
+        if (fms.length < 2) {
+          setScanned((s) => s + 1);
+          continue;
+        }
+        try {
+          const resp = await aiApi.post("/ai-suggestions/find-similar-failure-modes", {
+            equipment_type_id: `cluster-${i}`,
+            equipment_type_name: "Similar group",
+            failure_modes: fms,
+          });
+          const aiGroups = (resp?.data?.groups || []).map((g) => ({
+            et_id: "library",
+            et_name: "All failure modes",
+            member_ids: g.member_ids,
+            canonical_name: g.canonical_name || clusters[i].suggested_canonical_name || "",
+            reason: g.reason || clusters[i].reason || "",
+            scan_source: "ai",
+            selected: false,
+          }));
+          if (aiGroups.length) {
+            collected.push(...aiGroups);
+            setGroups((prev) => [...prev, ...aiGroups]);
+          } else {
+            collected.push(
+              ...mapLexicalGroups("library", "All failure modes", [clusters[i]]),
+            );
+            setGroups((prev) => [
+              ...prev,
+              ...mapLexicalGroups("library", "All failure modes", [clusters[i]]),
+            ]);
+          }
+        } catch (err) {
+          console.error("AI cluster review failed", i, err);
+          setErrorCount((e) => e + 1);
+          collected.push(
+            ...mapLexicalGroups("library", "All failure modes", [clusters[i]]),
+          );
+          setGroups((prev) => [
+            ...prev,
+            ...mapLexicalGroups("library", "All failure modes", [clusters[i]]),
+          ]);
+        }
+        setScanned((s) => s + 1);
+      }
+
       setPhase("done");
       toast.success(
-        `AI scan complete — found ${collected.length} candidate group(s) across the library.`,
+        `AI scan complete — ${collected.length} candidate group(s) from ${clusters.length} cluster(s).`,
       );
     } catch (err) {
       console.error("Library AI scan failed", err);
       setErrorCount(1);
       setPhase("done");
-      toast.error("AI scan failed. Try Fast scan or a smaller library.");
+      toast.error(err?.response?.data?.detail || "AI scan failed. Try Fast scan.");
     }
   };
 
