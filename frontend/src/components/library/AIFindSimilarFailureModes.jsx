@@ -140,6 +140,8 @@ export default function AIFindSimilarFailureModes({
         jaccard_threshold: 0.45,
         ratio_threshold: 0.72,
         min_score: 52,
+        ai_max_clusters: 30,
+        ai_time_budget_seconds: 55,
       });
       if (data?.fuzzy_clustering_skipped) {
         toast.info(
@@ -148,6 +150,11 @@ export default function AIFindSimilarFailureModes({
       }
       if (data?.ai_errors) {
         setErrorCount(data.ai_errors);
+      }
+      if (data?.scan_truncated) {
+        toast.info(
+          "Scan stopped early to avoid a timeout — showing partial results. Run Fast scan or scan again for more.",
+        );
       }
       const collected = mapLexicalGroups("library", "All failure modes", data?.groups);
       setGroups(collected);
@@ -164,7 +171,15 @@ export default function AIFindSimilarFailureModes({
       console.error("Library AI scan failed", err);
       setErrorCount(1);
       setPhase("done");
-      toast.error(err?.response?.data?.detail || "AI scan failed. Try Fast scan.");
+      const status = err?.response?.status;
+      if (status === 504) {
+        toast.error(
+          "Scan timed out on the server. Try Fast scan, or redeploy the latest backend (find-similar needs a longer server timeout).",
+          { duration: 10000 },
+        );
+      } else {
+        toast.error(err?.response?.data?.detail || "AI scan failed. Try Fast scan.");
+      }
     }
   };
 

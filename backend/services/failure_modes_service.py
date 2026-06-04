@@ -1196,7 +1196,8 @@ class FailureModesService:
         only_cross_equipment: bool = False,
         cross_equipment_ratio_threshold: float = 0.88,
         use_ai: bool = True,
-        ai_max_clusters: int = 150,
+        ai_max_clusters: int = 30,
+        ai_time_budget_seconds: float = 55.0,
     ) -> Dict[str, Any]:
         """Batch scan: cluster near-duplicate failure modes across the full library.
 
@@ -1248,6 +1249,12 @@ class FailureModesService:
             deduped.append(fm)
 
         loose_clusters: List[List[Dict[str, Any]]] = []
+        by_norm: Dict[str, List[Dict[str, Any]]] = {}
+        for fm in deduped:
+            norm = self.normalize_fm_text(fm.get("failure_mode"))
+            if norm:
+                by_norm.setdefault(norm, []).append(fm)
+
         if run_fuzzy:
             loose_clusters = self._cluster_by_name_similarity(
                 deduped,
@@ -1255,32 +1262,66 @@ class FailureModesService:
                 ratio_threshold=fuzzy_ratio,
                 strict_pairing=True,
             )
-            # Exact-name groups not caught by fuzzy-only clustering
-            by_norm: Dict[str, List[Dict[str, Any]]] = {}
-            for fm in deduped:
-                norm = self.normalize_fm_text(fm.get("failure_mode"))
-                if norm:
-                    by_norm.setdefault(norm, []).append(fm)
-            for members in by_norm.values():
-                if len(members) >= 2:
-                    loose_clusters.append(members)
+
+        seen_cluster_keys: Set[frozenset] = set()
+        deduped_clusters: List[List[Dict[str, Any]]] = []
+
+        def _add_cluster(cluster: List[Dict[str, Any]]) -> None:
+            unique_fms: List[Dict[str, Any]] = []
+            s: Set[str] = set()
+            for fm in cluster:
+                fid = str(fm.get("id") or "")
+                if fid and fid not in s:
+                    s.add(fid)
+                    unique_fms.append(fm)
+            if len(unique_fms) < 2:
+                return
+            key = frozenset(s)
+            if key in seen_cluster_keys:
+                return
+            seen_cluster_keys.add(key)
+            deduped_clusters.append(unique_fms)
+
+        for members in by_norm.values():
+            _add_cluster(members)
+        for cluster in loose_clusters:
+            _add_cluster(cluster)
 
         ai_clusters_processed = 0
+        ai_calls = 0
         ai_errors = 0
-        if use_ai and loose_clusters:
-            for cluster in loose_clusters:
+        scan_truncated = False
+        ai_started = time.monotonic()
+
+        if use_ai and deduped_clusters:
+            ai_subtasks: List[List[Dict[str, Any]]] = []
+            for unique in deduped_clusters:
                 if len(groups_out) >= limit_groups:
                     break
-                if ai_clusters_processed >= ai_max_clusters:
-                    break
-                unique = []
-                s: Set[str] = set()
-                for fm in cluster:
-                    fid = str(fm.get("id") or "")
-                    if fid and fid not in s:
-                        s.add(fid)
-                        unique.append(fm)
-                if len(unique) < 2:
+                norms = {
+                    self.normalize_fm_text(fm.get("failure_mode")) for fm in unique
+                }
+                if len(norms) == 1:
+                    pair_scores = []
+                    for i in range(len(unique)):
+                        for j in range(i + 1, len(unique)):
+                            pair_scores.append(
+                                self.score_similarity(unique[i], unique[j])["score"]
+                            )
+                    avg_score = (
+                        sum(pair_scores) / len(pair_scores) if pair_scores else 100.0
+                    )
+                    if avg_score >= min_score:
+                        self._append_group_if_new(
+                            groups_out,
+                            seen_group_keys,
+                            self._format_similar_fm_group(
+                                unique,
+                                reason=f"Identical name ({len(unique)} records, any equipment)",
+                                detection_method="lexical",
+                            ),
+                            limit_groups,
+                        )
                     continue
                 if not self._cluster_has_similar_pair(
                     unique,
@@ -1289,26 +1330,52 @@ class FailureModesService:
                     strict_pairing=True,
                 ):
                     continue
-                clusters_for_ai = [unique]
+                subs = [unique]
                 if len(unique) > 12:
-                    clusters_for_ai = self._cluster_by_name_similarity(
+                    subs = self._cluster_by_name_similarity(
                         unique,
                         jaccard_threshold=jaccard_threshold,
                         ratio_threshold=fuzzy_ratio,
                         strict_pairing=True,
                     )
-                try:
-                    for sub in clusters_for_ai:
-                        if len(sub) < 2:
-                            continue
-                        for g in await self._ai_confirm_similar_failure_mode_cluster(sub):
-                            self._append_group_if_new(
-                                groups_out, seen_group_keys, g, limit_groups
-                            )
-                    ai_clusters_processed += 1
-                except Exception as e:
-                    logger.warning("AI similar-FM cluster failed: %s", e)
-                    ai_errors += 1
+                for sub in subs:
+                    if len(sub) >= 2:
+                        ai_subtasks.append(sub)
+
+            sem = asyncio.Semaphore(5)
+
+            async def _confirm_sub(sub: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+                async with sem:
+                    return await self._ai_confirm_similar_failure_mode_cluster(sub)
+
+            idx = 0
+            while idx < len(ai_subtasks):
+                if len(groups_out) >= limit_groups:
+                    scan_truncated = True
+                    break
+                if ai_clusters_processed >= ai_max_clusters:
+                    scan_truncated = True
+                    break
+                if time.monotonic() - ai_started > ai_time_budget_seconds:
+                    scan_truncated = True
+                    break
+                batch = ai_subtasks[idx : idx + 5]
+                idx += len(batch)
+                results = await asyncio.gather(
+                    *[_confirm_sub(sub) for sub in batch],
+                    return_exceptions=True,
+                )
+                for sub, result in zip(batch, results):
+                    ai_calls += 1
+                    if isinstance(result, Exception):
+                        logger.warning("AI similar-FM cluster failed: %s", result)
+                        ai_errors += 1
+                        continue
+                    for g in result:
+                        self._append_group_if_new(
+                            groups_out, seen_group_keys, g, limit_groups
+                        )
+                ai_clusters_processed += len(batch)
 
         if not use_ai or not groups_out:
             self._library_wide_similar_groups(
@@ -1331,7 +1398,9 @@ class FailureModesService:
             "failure_modes_scanned": len(all_fms),
             "fuzzy_clustering_skipped": not run_fuzzy,
             "ai_clusters_processed": ai_clusters_processed,
+            "ai_calls": ai_calls,
             "ai_errors": ai_errors,
+            "scan_truncated": scan_truncated,
         }
 
     @staticmethod

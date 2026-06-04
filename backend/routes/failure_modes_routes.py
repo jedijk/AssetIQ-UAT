@@ -444,7 +444,8 @@ class FindSimilarFailureModesScanRequest(BaseModel):
     only_cross_equipment: bool = False
     cross_equipment_ratio_threshold: float = 0.88
     use_ai: bool = True
-    ai_max_clusters: int = 150
+    ai_max_clusters: int = 30
+    ai_time_budget_seconds: float = 55.0
 
 
 class FindDuplicateActionsScanRequest(BaseModel):
@@ -914,6 +915,7 @@ async def scan_similar_failure_modes(
             cross_equipment_ratio_threshold=request.cross_equipment_ratio_threshold,
             use_ai=request.use_ai,
             ai_max_clusters=request.ai_max_clusters,
+            ai_time_budget_seconds=request.ai_time_budget_seconds,
         )
     except Exception as e:
         logger.error(f"Error scanning similar failure modes: {e}")

@@ -292,8 +292,8 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             or "/ai-insights" in request.url.path
             or "/auth/" in request.url.path
             or "/maintenance-programs" in request.url.path
-            or request.url.path.endswith("/failure-modes/find-duplicate-actions")
-            or request.url.path.endswith("/failure-modes/find-similar")
+            or "/failure-modes/find-duplicate-actions" in request.url.path
+            or "/failure-modes/find-similar" in request.url.path
         ):
             request_timeout = self.long_timeout
         else:
