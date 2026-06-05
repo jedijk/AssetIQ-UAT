@@ -649,7 +649,7 @@ const IntelligenceMapTab = () => {
                   title="Programs"
                   count={stats?.maintenance_programs?.count}
                   subtitle="Active"
-                  relationship={`${stats?.equipment?.with_strategy || 0} equipment affected`}
+                  relationship={`${stats?.equipment?.with_strategy_applied || 0} equipment affected`}
                   onClick={navigateToPrograms}
                   color="indigo"
                   isLoading={statsLoading}
@@ -659,9 +659,9 @@ const IntelligenceMapTab = () => {
                 <FlowCard
                   icon={Building2}
                   title="Equipment"
-                  count={stats?.equipment?.with_strategy}
-                  subtitle="Affected by Strategy"
-                  relationship={`${stats?.equipment?.count || 0} total assets`}
+                  count={stats?.equipment?.with_strategy_applied}
+                  subtitle="Strategy Applied"
+                  relationship={`${stats?.equipment?.with_strategy_applied || 0} of ${stats?.equipment?.with_strategy || 0} eligible`}
                   onClick={navigateToEquipment}
                   color="amber"
                   isLoading={statsLoading}
@@ -671,9 +671,9 @@ const IntelligenceMapTab = () => {
                 <FlowCard
                   icon={Calendar}
                   title="Schedules"
-                  count={stats?.schedules?.count}
+                  count={stats?.schedules?.for_applied}
                   subtitle="Active Frequencies"
-                  relationship={`Create ${stats?.planned_work?.count || 0} Planned Tasks`}
+                  relationship={`Create ${stats?.planned_work?.for_applied || 0} Planned Tasks`}
                   onClick={navigateToSchedules}
                   color="teal"
                   isLoading={statsLoading}
@@ -683,7 +683,7 @@ const IntelligenceMapTab = () => {
                 <FlowCard
                   icon={CheckSquare}
                   title="Planned Work"
-                  count={stats?.planned_work?.count}
+                  count={stats?.planned_work?.for_applied}
                   subtitle="Tasks"
                   onClick={navigateToPlannedWork}
                   color="slate"

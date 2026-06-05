@@ -221,6 +221,16 @@ async def get_intelligence_map_stats(
             schedule_query["equipment_id"] = equipment_id
             
         schedules_count = await db.scheduled_tasks.count_documents(schedule_query)
+
+        # Scoped count: only schedules tied to equipment that has a strategy ACTUALLY applied.
+        # This is what the Intelligence Flow chain shows (Strategy → Programs → Equipment → Schedules).
+        if equipment_ids_with_strategy_applied:
+            schedules_for_applied_count = await db.scheduled_tasks.count_documents({
+                **schedule_query,
+                "equipment_id": {"$in": list(equipment_ids_with_strategy_applied)},
+            })
+        else:
+            schedules_for_applied_count = 0
         
         # Count schedules by status
         schedule_status_pipeline = [
@@ -247,6 +257,15 @@ async def get_intelligence_map_stats(
             "status": {"$nin": ["completed", "cancelled"]},
         }
         planned_work_count = await db.scheduled_tasks.count_documents(planned_work_query)
+
+        # Scoped count: planned work for equipment with strategy actually applied.
+        if equipment_ids_with_strategy_applied:
+            planned_work_for_applied_count = await db.scheduled_tasks.count_documents({
+                **planned_work_query,
+                "equipment_id": {"$in": list(equipment_ids_with_strategy_applied)},
+            })
+        else:
+            planned_work_for_applied_count = 0
         
         # ========== PM IMPORTS (Accepted tasks without failure mode linkage) ==========
         # Count accepted tasks from pm_import_sessions.tasks_extracted that don't have failure_mode_id
@@ -338,12 +357,14 @@ async def get_intelligence_map_stats(
             },
             "schedules": {
                 "count": schedules_count,
+                "for_applied": schedules_for_applied_count,
                 "by_status": schedule_by_status,
                 "missing_frequency": schedules_missing_freq,
                 "label": "Schedules"
             },
             "planned_work": {
                 "count": planned_work_count,
+                "for_applied": planned_work_for_applied_count,
                 "label": "Planned Work"
             },
             
@@ -374,17 +395,17 @@ async def get_intelligence_map_stats(
                 "programs_to_equipment": {
                     "source": "maintenance_programs",
                     "target": "equipment",
-                    "value": equipment_with_strategy_count  # Equipment affected by strategies
+                    "value": equipment_with_strategy_applied_count  # Equipment with strategy actually applied
                 },
                 "equipment_to_schedules": {
                     "source": "equipment",
                     "target": "schedules",
-                    "value": schedules_count
+                    "value": schedules_for_applied_count
                 },
                 "schedules_to_work": {
                     "source": "schedules",
                     "target": "planned_work",
-                    "value": planned_work_count
+                    "value": planned_work_for_applied_count
                 },
                 # PM Import flow (accepted tasks not connected to failure modes)
                 "pm_to_programs": {

@@ -7,6 +7,16 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Intelligence Map flow cards — corrected counts (VERIFIED)**:
+  - **Equipment card** now shows `with_strategy_applied` (equipment that ACTUALLY have a maintenance program with strategy_tasks > 0) instead of `with_strategy` (all equipment of types that have a strategy). Subtitle changed from "Affected by Strategy" → "Strategy Applied", relationship now reads "X of Y eligible".
+  - **Schedules card** now uses `schedules.for_applied` — scheduled_tasks scoped to equipment with strategy actually applied — instead of the global scheduled_tasks count (which previously summed every equipment type including those without strategies).
+  - **Planned Work card** same fix: now uses `planned_work.for_applied` (active scheduled tasks for applied-strategy equipment only).
+  - **Sankey relationships** `programs_to_equipment`, `equipment_to_schedules`, `schedules_to_work` now use the applied-scoped values so the flow width matches the chain semantics.
+  - Backend (`routes/intelligence_map.py`): added `schedules_for_applied_count` and `planned_work_for_applied_count` aggregations filtered by `equipment_id ∈ equipment_ids_with_strategy_applied`. Exposed as `schedules.for_applied` and `planned_work.for_applied`.
+  - Frontend (`components/library/IntelligenceMapTab.jsx`): switched the 3 cards' `count` props and updated the "Programs" subtitle relationship to count `with_strategy_applied`.
+  - Verified via API: previously Equipment=11/Schedules=3088/PlannedWork=896 (global). Now Equipment=1/Schedules=1368/PlannedWork=104 (scoped to the one equipment that has the strategy applied).
+  - Files: `/app/backend/routes/intelligence_map.py`, `/app/frontend/src/components/library/IntelligenceMapTab.jsx`.
+
 - [Feb 2026] **Apply Strategy — destructive-action confirmation step (VERIFIED)**:
   - When the user has deselected one or more equipment in the Apply Strategy dialog and clicks "Apply Strategy", an amber-styled `AlertDialog` now appears asking them to confirm the removal of those programs/scheduled tasks. Lists each deselected equipment by name + tag, shows total counts, and warns "This action cannot be undone."
   - If no equipment was deselected, the confirmation is skipped and Apply proceeds directly.
