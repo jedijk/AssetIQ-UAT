@@ -4,7 +4,7 @@
  * Provides a visual representation of how AssetIQ transforms reliability
  * knowledge into maintenance execution.
  * 
- * Flow: Failure Modes → Strategies → Equipment Types → Equipment → 
+ * Flow: Failure Modes → Equipment Types → Equipment → 
  *       Maintenance Programs → Schedules → Planned Work
  * 
  * Secondary Flow (PM Imports):
@@ -21,22 +21,17 @@ import {
   HelpCircle,
   ChevronRight,
   AlertTriangle,
-  Cog,
   Building2,
-  Wrench,
   ClipboardList,
   Calendar,
   CheckSquare,
   Upload,
   Filter,
   Sparkles,
-  TrendingUp,
   Activity,
   Target,
   Loader2,
   ArrowRight,
-  Info,
-  Gauge,
   Shield,
   BarChart3,
   Layers,
@@ -215,10 +210,9 @@ const SankeyDiagram = ({ data, isLoading }) => {
   const sankeyData = useMemo(() => {
     if (!data || isLoading) return null;
 
-    // Define nodes
+    // Define nodes (without strategies - direct FM to Equipment Types flow)
     const nodes = [
       { id: "failure_modes", name: "Failure Modes", color: "#3B82F6" },
-      { id: "strategies", name: "Strategies", color: "#8B5CF6" },
       { id: "equipment_types", name: "Equipment Types", color: "#10B981" },
       { id: "equipment", name: "Equipment", color: "#F59E0B" },
       { id: "maintenance_programs", name: "Programs", color: "#6366F1" },
@@ -231,46 +225,39 @@ const SankeyDiagram = ({ data, isLoading }) => {
     const relationships = data.relationships || {};
     const links = [];
 
-    // Main flow
-    if (relationships.fm_to_strategies?.value > 0) {
+    // Main flow: Failure Modes → Equipment Types → Equipment → Programs → Schedules → Planned Work
+    if (relationships.fm_to_equipment_types?.value > 0) {
       links.push({
         source: 0, // failure_modes
-        target: 1, // strategies
-        value: relationships.fm_to_strategies.value,
-      });
-    }
-    if (relationships.strategies_to_equipment_types?.value > 0) {
-      links.push({
-        source: 1, // strategies
-        target: 2, // equipment_types
-        value: relationships.strategies_to_equipment_types.value,
+        target: 1, // equipment_types
+        value: relationships.fm_to_equipment_types.value,
       });
     }
     if (relationships.equipment_types_to_equipment?.value > 0) {
       links.push({
-        source: 2, // equipment_types
-        target: 3, // equipment
+        source: 1, // equipment_types
+        target: 2, // equipment
         value: relationships.equipment_types_to_equipment.value,
       });
     }
     if (relationships.equipment_to_programs?.value > 0) {
       links.push({
-        source: 3, // equipment
-        target: 4, // maintenance_programs
+        source: 2, // equipment
+        target: 3, // maintenance_programs
         value: relationships.equipment_to_programs.value,
       });
     }
     if (relationships.programs_to_schedules?.value > 0) {
       links.push({
-        source: 4, // maintenance_programs
-        target: 5, // schedules
+        source: 3, // maintenance_programs
+        target: 4, // schedules
         value: relationships.programs_to_schedules.value,
       });
     }
     if (relationships.schedules_to_work?.value > 0) {
       links.push({
-        source: 5, // schedules
-        target: 6, // planned_work
+        source: 4, // schedules
+        target: 5, // planned_work
         value: relationships.schedules_to_work.value,
       });
     }
@@ -278,8 +265,8 @@ const SankeyDiagram = ({ data, isLoading }) => {
     // PM Import flow (secondary - purple)
     if (relationships.pm_to_programs?.value > 0) {
       links.push({
-        source: 7, // pm_imports
-        target: 4, // maintenance_programs
+        source: 6, // pm_imports (index 6 in new array without strategies)
+        target: 3, // maintenance_programs (index 3)
         value: relationships.pm_to_programs.value,
         isPmFlow: true,
       });
@@ -287,14 +274,13 @@ const SankeyDiagram = ({ data, isLoading }) => {
 
     // Add minimum values for visibility if all zeros
     if (links.length === 0) {
-      // Create placeholder links for visualization
+      // Create placeholder links for visualization (updated indices)
       links.push(
-        { source: 0, target: 1, value: 1 },
-        { source: 1, target: 2, value: 1 },
-        { source: 2, target: 3, value: 1 },
-        { source: 3, target: 4, value: 1 },
-        { source: 4, target: 5, value: 1 },
-        { source: 5, target: 6, value: 1 },
+        { source: 0, target: 1, value: 1 },  // FM → Equipment Types
+        { source: 1, target: 2, value: 1 },  // Equipment Types → Equipment
+        { source: 2, target: 3, value: 1 },  // Equipment → Programs
+        { source: 3, target: 4, value: 1 },  // Programs → Schedules
+        { source: 4, target: 5, value: 1 },  // Schedules → Planned Work
       );
     }
 
@@ -613,31 +599,19 @@ const IntelligenceMapTab = () => {
                   title="Failure Modes"
                   count={stats?.failure_modes?.count}
                   subtitle="Active Library"
-                  relationship={`Connected to ${stats?.failure_modes?.connected_equipment_types || 0} Equipment Types`}
+                  relationship={`Connected to ${stats?.equipment_types?.with_fm_in_use || 0} Equipment Types in use`}
                   onClick={navigateToFailureModes}
                   color="blue"
                   isLoading={statsLoading}
                 />
-                <FlowArrow value={stats?.relationships?.fm_to_strategies?.value} />
-                
-                <FlowCard
-                  icon={Cog}
-                  title="Strategies"
-                  count={stats?.strategies?.failure_mode_strategies}
-                  subtitle={`${stats?.strategies?.task_templates || 0} Task Templates`}
-                  relationship={`Generated from ${stats?.failure_modes?.count || 0} Failure Modes`}
-                  onClick={navigateToStrategies}
-                  color="purple"
-                  isLoading={statsLoading}
-                />
-                <FlowArrow value={stats?.relationships?.strategies_to_equipment_types?.value} />
+                <FlowArrow value={stats?.relationships?.fm_to_equipment_types?.value} />
                 
                 <FlowCard
                   icon={Layers}
                   title="Equipment Types"
-                  count={stats?.equipment_types?.count}
-                  subtitle="Templates"
-                  relationship={`Applied to ${stats?.equipment?.count || 0} Equipment`}
+                  count={stats?.equipment_types?.in_use}
+                  subtitle="In Use"
+                  relationship={`${stats?.equipment_types?.count || 0} in library, ${stats?.equipment_types?.with_fm_in_use || 0} with FM`}
                   onClick={navigateToEquipmentTypes}
                   color="green"
                   isLoading={statsLoading}

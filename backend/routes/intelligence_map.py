@@ -80,7 +80,8 @@ async def get_intelligence_map_stats(
         
         # Count unique equipment types with failure modes
         fm_equipment_types = await db.failure_modes.distinct("equipment_type_id", fm_query)
-        fm_equipment_types_count = len([et for et in fm_equipment_types if et])
+        fm_equipment_types_set = set([et for et in fm_equipment_types if et])
+        fm_equipment_types_count = len(fm_equipment_types_set)
         
         # ========== EQUIPMENT TYPES ==========
         et_query = {}
@@ -88,6 +89,17 @@ async def get_intelligence_map_stats(
             et_query["id"] = equipment_type_id
             
         equipment_types_count = await db.equipment_types.count_documents(et_query)
+        
+        # Get equipment types that are actually used in equipment
+        equipment_types_in_use = await db.equipment_nodes.distinct("equipment_type_id", {
+            "equipment_type_id": {"$ne": None, "$exists": True}
+        })
+        equipment_types_in_use_set = set([et for et in equipment_types_in_use if et])
+        
+        # Count equipment types that have failure modes AND are used in equipment
+        # This shows how many equipment types with FM knowledge are actually deployed
+        equipment_types_with_fm_in_use = fm_equipment_types_set.intersection(equipment_types_in_use_set)
+        equipment_types_with_fm_in_use_count = len(equipment_types_with_fm_in_use)
         
         # ========== STRATEGIES (Equipment Type Strategies) ==========
         strategy_query = {}
@@ -293,6 +305,8 @@ async def get_intelligence_map_stats(
             "equipment_types": {
                 "count": equipment_types_count,
                 "with_strategies": strategies_count,
+                "with_fm_in_use": equipment_types_with_fm_in_use_count,  # Equipment types with FM that are used in equipment
+                "in_use": len(equipment_types_in_use_set),  # Total equipment types actually used
                 "label": "Equipment Types"
             },
             "equipment": {
@@ -329,15 +343,10 @@ async def get_intelligence_map_stats(
             
             # Relationships (for Sankey diagram)
             "relationships": {
-                "fm_to_strategies": {
+                "fm_to_equipment_types": {
                     "source": "failure_modes",
-                    "target": "strategies",
-                    "value": total_fm_strategies
-                },
-                "strategies_to_equipment_types": {
-                    "source": "strategies",
                     "target": "equipment_types",
-                    "value": strategies_count
+                    "value": len(equipment_types_in_use_set)  # Equipment types in use
                 },
                 "equipment_types_to_equipment": {
                     "source": "equipment_types",
