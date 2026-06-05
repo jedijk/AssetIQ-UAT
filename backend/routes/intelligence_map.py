@@ -222,13 +222,20 @@ async def get_intelligence_map_stats(
             
         schedules_count = await db.scheduled_tasks.count_documents(schedule_query)
 
-        # Scoped count: only schedules tied to equipment that has a strategy ACTUALLY applied.
-        # This is what the Intelligence Flow chain shows (Strategy → Programs → Equipment → Schedules).
+        # Scoped count: number of TASKS (program task templates) that have a schedule
+        # — i.e. active tasks across maintenance programs whose strategy is actually applied.
+        # Each such task has a frequency, so it counts as one "schedule".
         if equipment_ids_with_strategy_applied:
-            schedules_for_applied_count = await db.scheduled_tasks.count_documents({
-                **schedule_query,
-                "equipment_id": {"$in": list(equipment_ids_with_strategy_applied)},
-            })
+            applied_programs_agg = await db.maintenance_programs_v2.aggregate([
+                {"$match": {"equipment_id": {"$in": list(equipment_ids_with_strategy_applied)}}},
+                {"$group": {
+                    "_id": None,
+                    "active_tasks": {"$sum": {"$ifNull": ["$active_tasks", 0]}},
+                }},
+            ]).to_list(1)
+            schedules_for_applied_count = (
+                applied_programs_agg[0]["active_tasks"] if applied_programs_agg else 0
+            )
         else:
             schedules_for_applied_count = 0
         

@@ -7,6 +7,12 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Intelligence Map "Schedules" KPI — counts tasks with a schedule (VERIFIED)**:
+  - Schedules card now counts **active task templates that have a schedule (frequency)** across maintenance programs whose strategy is actually applied — not the rows in `scheduled_tasks` collection (which is the time-horizon expansion).
+  - Backend: `schedules_for_applied_count` now aggregates `$sum: $active_tasks` on `maintenance_programs_v2` filtered to `equipment_id ∈ equipment_ids_with_strategy_applied`.
+  - Verified via API: chain now reads coherently as **Strategies: 1 → Programs: 1 → Equipment: 1 (applied) → Schedules: 1 (active frequencies) → Planned Work: 104 (tasks)**.
+  - Files: `/app/backend/routes/intelligence_map.py`.
+
 - [Feb 2026] **Intelligence Map flow cards — corrected counts (VERIFIED)**:
   - **Equipment card** now shows `with_strategy_applied` (equipment that ACTUALLY have a maintenance program with strategy_tasks > 0) instead of `with_strategy` (all equipment of types that have a strategy). Subtitle changed from "Affected by Strategy" → "Strategy Applied", relationship now reads "X of Y eligible".
   - **Schedules card** now uses `schedules.for_applied` — scheduled_tasks scoped to equipment with strategy actually applied — instead of the global scheduled_tasks count (which previously summed every equipment type including those without strategies).
