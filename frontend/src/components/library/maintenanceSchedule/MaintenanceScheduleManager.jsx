@@ -20,6 +20,7 @@ import {
   X,
   Check,
   ChevronsUpDown,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "../../ui/card";
@@ -202,20 +203,38 @@ export function MaintenanceScheduleManager({ equipmentType }) {
   // ============= Mutations =============
 
   const runSchedulerMutation = useMutation({
-    mutationFn: async (params) => {
-      // Always cleanup orphans first so stale tasks (from deleted strategies)
-      // disappear before regenerating future occurrences.
-      await maintenanceSchedulerAPI.cleanupOrphans();
-      return await maintenanceSchedulerAPI.runScheduler(params);
-    },
+    mutationFn: (params) => maintenanceSchedulerAPI.runScheduler(params),
     onSuccess: (data) => {
       toast.success(
         `${t("maintenance.schedulerCompleted")} ${data.tasks_created} ${t("maintenance.tasksCreatedSuffix")}`,
       );
-      queryClient.invalidateQueries(["maintenance-scheduler"]);
+      queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || t("maintenance.failedRunScheduler"));
+    },
+  });
+
+  const clearOrphanScheduleMutation = useMutation({
+    mutationFn: () =>
+      maintenanceSchedulerAPI.cleanupOrphans(
+        equipmentTypeId ? { equipment_type_id: equipmentTypeId } : {},
+      ),
+    onSuccess: (data) => {
+      const removed = data?.scheduled_tasks_removed ?? 0;
+      const programs = data?.programs_removed ?? 0;
+      toast.success(
+        removed > 0 || programs > 0
+          ? t("maintenance.clearOrphanScheduleSuccess")
+              .replace("{removed}", removed)
+              .replace("{programs}", programs)
+          : t("maintenance.clearOrphanScheduleEmpty"),
+      );
+      queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] });
+      queryClient.invalidateQueries({ queryKey: ["maintenance-program"] });
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.detail || t("maintenance.clearOrphanScheduleFailed"));
     },
   });
 
@@ -332,6 +351,15 @@ export function MaintenanceScheduleManager({ equipmentType }) {
     runSchedulerMutation.mutate({ equipment_type_id: equipmentTypeId });
   };
 
+  const handleClearOrphanSchedule = () => {
+    const scope = isGlobalView
+      ? t("maintenance.clearOrphanScheduleConfirmAll")
+      : t("maintenance.clearOrphanScheduleConfirmType").replace("{name}", equipmentTypeName);
+    if (window.confirm(scope)) {
+      clearOrphanScheduleMutation.mutate();
+    }
+  };
+
   const handleTaskClick = (task) => {
     setSelectedTask(task);
   };
@@ -381,6 +409,30 @@ export function MaintenanceScheduleManager({ equipmentType }) {
               </TooltipTrigger>
               <TooltipContent>
                 <p className="text-xs">AI-optimised assignments &amp; planned dates with reasoning</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleClearOrphanSchedule}
+                  disabled={clearOrphanScheduleMutation.isPending}
+                  className="border-red-200 text-red-700 hover:bg-red-50"
+                  data-testid="clear-orphan-schedule-btn"
+                >
+                  {clearOrphanScheduleMutation.isPending ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-3.5 h-3.5 mr-1" />
+                  )}
+                  {t("maintenance.clearOrphanSchedule")}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p className="text-xs">{t("maintenance.clearOrphanScheduleHint")}</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

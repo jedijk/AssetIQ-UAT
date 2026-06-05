@@ -215,6 +215,11 @@ class RunSchedulerRequest(BaseModel):
     planning_horizon_days: Optional[int] = None  # Override default planning horizon
 
 
+class CleanupOrphansRequest(BaseModel):
+    """Request to remove scheduled tasks/programs with no backing strategy."""
+    equipment_type_id: Optional[str] = None
+
+
 class UpdateTaskStatusRequest(BaseModel):
     """Request to update a scheduled task"""
     status: Optional[TaskStatus] = None

@@ -46,8 +46,8 @@ export const maintenanceSchedulerAPI = {
    * Cleanup orphan scheduled tasks (whose program no longer exists)
    * and orphan maintenance_programs (whose strategy was removed).
    */
-  cleanupOrphans: async () => {
-    const response = await api.post('/maintenance-scheduler/cleanup-orphans');
+  cleanupOrphans: async (params = {}) => {
+    const response = await api.post('/maintenance-scheduler/cleanup-orphans', params);
     return response.data;
   },
 

@@ -12,6 +12,7 @@ from models.maintenance_scheduler import (
     ScheduledTask,
     TaskStatus,
     RunSchedulerRequest,
+    CleanupOrphansRequest,
 )
 from ._shared import calculate_priority
 
@@ -124,33 +125,73 @@ async def schedule_programs_for_equipment(equipment_ids: List[str], horizon_days
 
 @router.post("/cleanup-orphans")
 async def cleanup_orphan_scheduled_tasks(
+    request: CleanupOrphansRequest = None,
     current_user: dict = Depends(get_current_user),
 ):
     """
     Remove scheduled_tasks whose maintenance_program no longer exists,
     AND maintenance_programs whose equipment_type has no strategy.
-    Used to clean up data left over from older deletes that did not cascade.
+    Optionally scoped to a single equipment type.
     """
     from services.maintenance_scheduler_sync import cleanup_schedules_without_strategy
 
-    # Step 1: existing programs (keep these and their tasks)
-    all_prog_ids = set()
-    async for p in db.maintenance_programs.find({}, {"id": 1}):
-        all_prog_ids.add(p["id"])
+    if request is None:
+        request = CleanupOrphansRequest()
 
-    sched_res = await db.scheduled_tasks.delete_many({
-        "maintenance_program_id": {"$nin": list(all_prog_ids), "$ne": None},
-    })
+    equipment_type_id = request.equipment_type_id
+    orphan_tasks_removed = 0
 
-    strategy_cleanup = await cleanup_schedules_without_strategy()
+    if equipment_type_id:
+        scoped_program_ids = {
+            p["id"]
+            async for p in db.maintenance_programs.find(
+                {"equipment_type_id": equipment_type_id},
+                {"id": 1, "_id": 0},
+            )
+            if p.get("id")
+        }
+        equipment_ids = {
+            eq["id"]
+            async for eq in db.equipment_nodes.find(
+                {"equipment_type_id": equipment_type_id},
+                {"id": 1, "_id": 0},
+            )
+            if eq.get("id")
+        }
+        scope_filters: List[dict] = [{"strategy_id": equipment_type_id}]
+        if equipment_ids:
+            scope_filters.append({"equipment_id": {"$in": list(equipment_ids)}})
+
+        orphan_filter: dict = {
+            "maintenance_program_id": {"$nin": list(scoped_program_ids), "$ne": None},
+            "$or": scope_filters,
+        }
+        sched_res = await db.scheduled_tasks.delete_many(orphan_filter)
+        orphan_tasks_removed = sched_res.deleted_count
+    else:
+        all_prog_ids = set()
+        async for p in db.maintenance_programs.find({}, {"id": 1}):
+            all_prog_ids.add(p["id"])
+
+        sched_res = await db.scheduled_tasks.delete_many({
+            "maintenance_program_id": {"$nin": list(all_prog_ids), "$ne": None},
+        })
+        orphan_tasks_removed = sched_res.deleted_count
+
+    strategy_cleanup = await cleanup_schedules_without_strategy(
+        equipment_type_id=equipment_type_id,
+    )
 
     return {
-        "scheduled_tasks_removed": sched_res.deleted_count + strategy_cleanup.get(
+        "message": "Schedule cleanup completed",
+        "equipment_type_id": equipment_type_id,
+        "scheduled_tasks_removed": orphan_tasks_removed + strategy_cleanup.get(
             "scheduled_tasks_deleted", 0
         ),
         "programs_removed": strategy_cleanup.get("programs_deleted", 0),
         "v2_programs_removed": strategy_cleanup.get("v2_programs_deleted", 0),
         "equipment_types_cleaned": strategy_cleanup.get("equipment_types_cleaned", 0),
+        "strategy_cleanup": strategy_cleanup,
     }
 
 
