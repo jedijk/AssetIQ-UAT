@@ -458,7 +458,19 @@ const IntelligenceMapTab = () => {
 
   // Navigation handlers
   const navigateToFailureModes = () => navigate("/library?tab=failure-modes");
-  const navigateToStrategies = () => navigate("/library?tab=maintenance");
+  const navigateToStrategies = () => {
+    // Navigate to Maintenance Strategy tab with equipment type filter if available
+    const equipmentTypeIds = stats?.strategies?.equipment_type_ids || [];
+    if (equipmentTypeIds.length === 1) {
+      // If only one equipment type has strategy, filter directly to it
+      navigate(`/library?tab=maintenance&equipment_type_id=${equipmentTypeIds[0]}`);
+    } else if (equipmentTypeIds.length > 1) {
+      // If multiple, just go to the tab (could add multi-select filter in future)
+      navigate(`/library?tab=maintenance&equipment_type_id=${equipmentTypeIds[0]}`);
+    } else {
+      navigate("/library?tab=maintenance");
+    }
+  };
   const navigateToEquipmentTypes = () => navigate("/library?tab=libraries");
   const navigateToEquipment = () => navigate("/equipment-manager");
   const navigateToPrograms = () => navigate("/library?tab=schedule");

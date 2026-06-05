@@ -297,6 +297,7 @@ async def get_intelligence_map_stats(
             "strategies": {
                 "count": strategies_count,
                 "task_templates": total_task_templates,
+                "equipment_type_ids": list(strategy_equipment_types_set),  # Equipment type IDs that have strategies
                 "label": "Strategies"
             },
             "equipment_types": {
