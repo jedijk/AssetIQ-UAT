@@ -99,3 +99,15 @@ def calculate_priority(criticality: str, days_until_due: int, is_overdue: bool) 
     if days_until_due <= 3:
         return TaskPriority.MEDIUM
     return TaskPriority.LOW
+
+
+async def ensure_imported_pm_tasks_scheduled(
+    equipment_type_id: Optional[str] = None,
+) -> None:
+    """Sync accepted Custom PM Import program tasks into the scheduler."""
+    from services.maintenance_program_service import MaintenanceProgramService
+
+    await MaintenanceProgramService.sync_imported_program_tasks_to_scheduler(
+        equipment_type_id=equipment_type_id,
+        schedule=True,
+    )

@@ -13,12 +13,8 @@ from database import db
 
 logger = logging.getLogger(__name__)
 from auth import get_current_user
-from models.maintenance_scheduler import (
-    EquipmentMaintenanceProgram,
-    CriticalityLevel,
-    ApplyStrategyRequest,
-)
-from ._shared import frequency_to_days, normalize_program_criticality
+from models.maintenance_scheduler import ApplyStrategyRequest
+from services.maintenance_scheduler_sync import refresh_equipment_schedule
 
 router = APIRouter()
 
@@ -73,100 +69,13 @@ async def _apply_strategy_to_equipment_impl(
         raise HTTPException(status_code=404, detail="No matching equipment found")
 
     task_templates = strategy.get("task_templates", [])
-    failure_mode_strategies = strategy.get("failure_mode_strategies", [])
-
-    # Build reverse map: task_template_id -> first FM-strategy that references it.
-    task_to_fm = {}
-    for fm in failure_mode_strategies:
-        for tid in (fm.get("task_ids") or []):
-            task_to_fm.setdefault(tid, fm)
-
-    programs_created = []
-    today = datetime.utcnow().date().isoformat()
-
-    for equipment in equipment_list:
-        equipment_id = equipment.get("id")
-        equipment_name = equipment.get("name")
-        equipment_tag = equipment.get("tag")
-
-        # Equipment criticality may be a dict, RPN label, or ISO score object.
-        equip_criticality = normalize_program_criticality(equipment.get("criticality"))
-
-        for task in task_templates:
-            if not task.get("is_mandatory", True):
-                continue
-
-            task_type = task.get("task_type", "preventive")
-            # CM / Corrective / Reactive tasks are triggered on failure, not
-            # scheduled. They never become maintenance programs.
-            if task_type in ("reactive", "corrective"):
-                continue
-
-            task_id = task.get("id")
-            task_name = task.get("name")
-
-            freq_matrix = task.get("frequency_matrix", {})
-            frequency = freq_matrix.get(equip_criticality, "monthly")
-
-            fm_name = None
-            fm_id = None
-            fm_for_task = task_to_fm.get(task_id)
-            if fm_for_task:
-                fm_id = fm_for_task.get("failure_mode_id")
-                fm_name = fm_for_task.get("failure_mode_name")
-
-            existing = await db.maintenance_programs.find_one({
-                "equipment_id": equipment_id,
-                "task_template_id": task_id,
-            })
-
-            if existing:
-                await db.maintenance_programs.update_one(
-                    {"_id": existing["_id"]},
-                    {"$set": {
-                        "strategy_version": strategy.get("version", "1.0"),
-                        "frequency": frequency,
-                        "frequency_days": frequency_to_days(frequency),
-                        "criticality": equip_criticality,
-                        "is_active": True,
-                        "failure_mode_id": fm_id,
-                        "failure_mode_name": fm_name,
-                        "updated_at": datetime.utcnow().isoformat(),
-                    }},
-                )
-            else:
-                program = EquipmentMaintenanceProgram(
-                    equipment_id=equipment_id,
-                    equipment_name=equipment_name,
-                    equipment_tag=equipment_tag,
-                    equipment_type_id=equipment_type_id,
-                    equipment_type_name=strategy.get("equipment_type_name", ""),
-                    task_template_id=task_id,
-                    task_name=task_name,
-                    task_description=task.get("description"),
-                    task_type=task_type,
-                    frequency=frequency,
-                    frequency_days=frequency_to_days(frequency),
-                    criticality=CriticalityLevel(equip_criticality),
-                    estimated_duration_hours=task.get("duration_hours", 1.0),
-                    next_due_date=today,
-                    strategy_id=strategy.get("equipment_type_id"),
-                    strategy_version=strategy.get("version", "1.0"),
-                    failure_mode_id=fm_id,
-                    failure_mode_name=fm_name,
-                    discipline=task.get("discipline"),
-                    skills_required=task.get("skills_required", []),
-                )
-
-                await db.maintenance_programs.insert_one(program.model_dump())
-                programs_created.append(program.id)
-
-    # Ensure Equipment Manager programs (maintenance_programs_v2) exist per tag.
-    from services.maintenance_program_service import MaintenanceProgramService
 
     user_id = current_user.get("id") or current_user.get("user_id")
     strategy_version = strategy.get("version", "1.0")
     equipment_ids = [e.get("id") for e in equipment_list if e.get("id")]
+
+    from services.maintenance_program_service import MaintenanceProgramService
+
     v2_sync = await MaintenanceProgramService.ensure_programs_for_equipment_ids(
         equipment_ids=equipment_ids,
         strategy_version=strategy_version,
@@ -176,22 +85,26 @@ async def _apply_strategy_to_equipment_impl(
     v2_programs_regenerated = v2_sync.get("programs_regenerated", 0)
     v2_errors = v2_sync.get("errors", [])
 
-    # Resync active state for all programs of this equipment type so disabled
-    # FMs / non-mandatory tasks immediately propagate to the newly-created ones.
+    scheduled_count = 0
+    programs_created_count = 0
+    pm_import_synced = 0
+    for equipment in equipment_list:
+        refresh = await refresh_equipment_schedule(
+            equipment.get("id"),
+            user_id=user_id,
+        )
+        scheduled_count += refresh.get("scheduled_tasks_created", 0)
+        programs_created_count += refresh.get("strategy_programs_created", 0)
+        pm_import_synced += refresh.get("pm_import_programs_synced", 0)
+
     from routes.maintenance_strategy_v2 import _resync_programs_with_strategy
     resync = await _resync_programs_with_strategy(equipment_type_id)
-
-    # Auto-generate scheduled task occurrences for the just-applied programs
-    # so the calendar/Gantt shows recurring tasks immediately (no manual
-    # "Run Scheduler" needed).
-    from routes.maintenance_scheduler.scheduler import schedule_programs_for_equipment
-    scheduled_count = await schedule_programs_for_equipment(request.equipment_ids)
 
     return {
         "message": f"Strategy applied to {len(equipment_list)} equipment",
         "equipment_count": len(equipment_list),
-        "programs_created": len(programs_created),
-        "programs_updated": len(equipment_list) * len(task_templates) - len(programs_created),
+        "programs_created": programs_created_count,
+        "programs_updated": len(equipment_list) * len(task_templates) - programs_created_count,
         "scheduled_tasks_created": scheduled_count,
         "programs_deactivated_on_resync": resync["programs_deactivated"],
         "equipment_manager_programs_created": v2_programs_created,
@@ -201,6 +114,7 @@ async def _apply_strategy_to_equipment_impl(
             v2_sync.get("equipment_ids_created", [])
             + v2_sync.get("equipment_ids_regenerated", [])
         ),
+        "pm_import_programs_synced": pm_import_synced,
     }
 
 

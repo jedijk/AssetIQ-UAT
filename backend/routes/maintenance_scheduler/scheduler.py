@@ -81,6 +81,8 @@ async def schedule_program(program: dict, horizon_days: int = DEFAULT_HORIZON_DA
                 strategy_version=program.get("strategy_version"),
                 failure_mode_id=program.get("failure_mode_id"),
                 failure_mode_name=program.get("failure_mode_name"),
+                task_source=program.get("task_source"),
+                pm_import_task_id=program.get("pm_import_task_id"),
             )
             await db.scheduled_tasks.insert_one(task.model_dump())
             created_ids.append(task.id)
@@ -174,6 +176,13 @@ async def run_scheduler(
     """
     if request is None:
         request = RunSchedulerRequest()
+
+    from services.maintenance_program_service import MaintenanceProgramService
+
+    await MaintenanceProgramService.sync_imported_program_tasks_to_scheduler(
+        equipment_type_id=request.equipment_type_id,
+        schedule=False,
+    )
 
     query = {"is_active": True}
     if request.equipment_type_id:

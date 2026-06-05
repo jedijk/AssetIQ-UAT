@@ -871,7 +871,8 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
     }),
     onSuccess: () => {
       toast.success('Maintenance program created');
-      queryClient.invalidateQueries(['maintenance-program', equipmentId]);
+      queryClient.invalidateQueries({ queryKey: ['maintenance-program', equipmentId] });
+      queryClient.invalidateQueries({ queryKey: ['maintenance-scheduler'] });
     },
     onError: (error) => {
       toast.error(`Failed to create program: ${error.message}`);
@@ -902,7 +903,8 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
     mutationFn: (taskId) => maintenanceProgramAPI.deleteTask(equipmentId, taskId),
     onSuccess: () => {
       toast.success('Task deleted');
-      queryClient.invalidateQueries(['maintenance-program', equipmentId]);
+      queryClient.invalidateQueries({ queryKey: ['maintenance-program', equipmentId] });
+      queryClient.invalidateQueries({ queryKey: ['maintenance-scheduler'] });
     },
     onError: (error) => {
       toast.error(`Failed to delete task: ${error.message}`);
@@ -917,7 +919,8 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
       maintenanceProgramAPI.updateTask(equipmentId, task.id, { is_active: !wasActive }),
     onSuccess: (_data, { wasActive }) => {
       toast.success(wasActive ? 'Task disabled' : 'Task enabled');
-      queryClient.invalidateQueries(['maintenance-program', equipmentId]);
+      queryClient.invalidateQueries({ queryKey: ['maintenance-program', equipmentId] });
+      queryClient.invalidateQueries({ queryKey: ['maintenance-scheduler'] });
     },
     onError: (error) => {
       toast.error(error.response?.data?.detail || error.message || 'Failed to update task');
@@ -933,7 +936,8 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
     onSuccess: (response) => {
       const changes = response.changes || {};
       toast.success(`Program regenerated: ${changes.tasks_to_add?.length || 0} added, ${changes.tasks_to_remove?.length || 0} removed`);
-      queryClient.invalidateQueries(['maintenance-program', equipmentId]);
+      queryClient.invalidateQueries({ queryKey: ['maintenance-program', equipmentId] });
+      queryClient.invalidateQueries({ queryKey: ['maintenance-scheduler'] });
     },
     onError: (error) => {
       toast.error(`Failed to regenerate: ${error.message}`);
@@ -1003,7 +1007,8 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
   };
   
   const handleTaskSuccess = () => {
-    queryClient.invalidateQueries(['maintenance-program', equipmentId]);
+    queryClient.invalidateQueries({ queryKey: ['maintenance-program', equipmentId] });
+    queryClient.invalidateQueries({ queryKey: ['maintenance-scheduler'] });
   };
   
   if (isLoadingProgram) {
@@ -1115,30 +1120,29 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
             </Tooltip>
           </TooltipProvider>
 
-          {programData?.exists && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const ok = window.confirm(
-                        'Delete this maintenance program? This will cancel any open scheduled tasks for this equipment.',
-                      );
-                      if (ok) deleteProgramMutation.mutate();
-                    }}
-                    disabled={deleteProgramMutation.isPending}
-                    className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
-                  >
-                    <Trash2 className={`h-4 w-4 ${deleteProgramMutation.isPending ? 'animate-spin' : ''}`} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Delete Program</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
             </>
+          )}
+
+          {programData?.exists && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const ok = window.confirm(
+                  'Delete this maintenance program? Open scheduled tasks for this equipment will be cancelled.',
+                );
+                if (ok) deleteProgramMutation.mutate();
+              }}
+              disabled={deleteProgramMutation.isPending}
+              className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+            >
+              {deleteProgramMutation.isPending ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Delete Program
+            </Button>
           )}
           
           {!pmImportOnly && (

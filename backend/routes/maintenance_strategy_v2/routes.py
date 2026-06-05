@@ -665,7 +665,7 @@ async def sync_equipment_type_strategy(
         equipment_type_id,
         user_id=current_user.get("id") or current_user.get("user_id"),
     )
-    
+
     return {
         "message": "Strategy synced with library",
         "equipment_type_id": equipment_type_id,

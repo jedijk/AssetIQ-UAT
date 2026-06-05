@@ -62,6 +62,11 @@ export function TaskListView({ tasks, isLoading, onTaskClick, onStatusChange }) 
                         {task.equipment_tag}
                       </Badge>
                     )}
+                    {task.task_source === "customer_imported" && (
+                      <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200">
+                        PM Import
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </div>

@@ -421,7 +421,7 @@ async def _sync_maintenance_programs_v2(
     from services.maintenance_program_service import MaintenanceProgramService
 
     try:
-        return await MaintenanceProgramService.sync_programs_for_equipment_type(
+        result = await MaintenanceProgramService.sync_programs_for_equipment_type(
             equipment_type_id,
             user_id=user_id,
         )
@@ -432,6 +432,24 @@ async def _sync_maintenance_programs_v2(
             exc,
         )
         return {"programs_regenerated": 0, "equipment_ids": [], "errors": [{"error": str(exc)}]}
+
+    try:
+        from services.maintenance_scheduler_sync import refresh_equipment_type_schedules
+
+        schedule_refresh = await refresh_equipment_type_schedules(
+            equipment_type_id,
+            user_id=user_id,
+        )
+        result["schedule_refresh"] = schedule_refresh
+    except Exception as exc:
+        logger.exception(
+            "Schedule refresh failed after v2 sync for equipment type %s: %s",
+            equipment_type_id,
+            exc,
+        )
+        result["schedule_refresh_error"] = str(exc)
+
+    return result
 
 
 async def _bump_strategy_version(

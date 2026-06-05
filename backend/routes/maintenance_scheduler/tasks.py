@@ -14,6 +14,7 @@ from models.maintenance_scheduler import (
     CompleteTaskRequest,
     DeferTaskRequest,
 )
+from ._shared import ensure_imported_pm_tasks_scheduled
 
 router = APIRouter()
 
@@ -35,6 +36,8 @@ async def get_scheduled_tasks(
     current_user: dict = Depends(get_current_user),
 ):
     """Get scheduled tasks with filtering."""
+    await ensure_imported_pm_tasks_scheduled(equipment_type_id)
+
     query = {}
 
     if status:
@@ -83,6 +86,8 @@ async def get_daily_planner(
     current_user: dict = Depends(get_current_user),
 ):
     """Get tasks for daily planner view."""
+    await ensure_imported_pm_tasks_scheduled()
+
     if not date:
         date = datetime.utcnow().date().isoformat()
 
@@ -124,6 +129,8 @@ async def get_weekly_planner(
     current_user: dict = Depends(get_current_user),
 ):
     """Get tasks for weekly planner view."""
+    await ensure_imported_pm_tasks_scheduled()
+
     if not start_date:
         today_date = datetime.utcnow().date()
         start = today_date - timedelta(days=today_date.weekday())

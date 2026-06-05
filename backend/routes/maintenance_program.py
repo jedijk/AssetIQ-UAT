@@ -33,6 +33,11 @@ from models.maintenance_program import (
     frequency_to_days,
 )
 from services.maintenance_program_service import MaintenanceProgramService
+from services.maintenance_scheduler_sync import (
+    clear_equipment_schedule_after_program_delete,
+    refresh_equipment_schedule,
+    refresh_equipment_type_schedules,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/maintenance-programs", tags=["Maintenance Programs"])
@@ -40,6 +45,20 @@ router = APIRouter(prefix="/maintenance-programs", tags=["Maintenance Programs"]
 
 def _current_user_id(current_user: dict) -> str:
     return current_user.get("id") or current_user.get("user_id") or current_user.get("email", "unknown")
+
+
+async def _refresh_equipment_schedule_after_change(
+    equipment_id: str,
+    current_user: dict,
+) -> Optional[Dict[str, Any]]:
+    try:
+        return await refresh_equipment_schedule(
+            equipment_id,
+            user_id=_current_user_id(current_user),
+        )
+    except Exception:
+        logger.exception("Failed to refresh maintenance schedule for %s", equipment_id)
+        return None
 
 
 # ============= Program CRUD =============
@@ -255,10 +274,15 @@ async def create_maintenance_program(
             except Exception as e:
                 logger.warning(f"AI recommendations failed: {e}")
         
+        schedule_refresh = await _refresh_equipment_schedule_after_change(
+            equipment_id, current_user
+        )
+
         return {
             "message": "Maintenance program created",
             "program": program.model_dump(),
-            "ai_recommendations": [r.model_dump() for r in ai_recommendations]
+            "ai_recommendations": [r.model_dump() for r in ai_recommendations],
+            "schedule_refresh": schedule_refresh,
         }
         
     except ValueError as e:
@@ -277,27 +301,23 @@ async def delete_maintenance_program(
     program = await db.maintenance_programs_v2.find_one({"equipment_id": equipment_id})
     if not program:
         raise HTTPException(status_code=404, detail="Maintenance program not found")
-    
-    # Cancel scheduled tasks
-    scheduled_result = await db.scheduled_tasks.update_many(
-        {"equipment_id": equipment_id, "status": {"$in": ["draft", "scheduled", "assigned"]}},
-        {"$set": {"status": "cancelled", "updated_at": datetime.utcnow().isoformat()}}
-    )
-    
-    # Delete program
+
+    schedule_refresh = await clear_equipment_schedule_after_program_delete(equipment_id)
+
     await db.maintenance_programs_v2.delete_one({"equipment_id": equipment_id})
-    
-    # Log audit
+
     await MaintenanceProgramService._log_audit(
         action="delete_program",
         equipment_id=equipment_id,
         user_id=_current_user_id(current_user)
     )
-    
+
     return {
         "message": "Maintenance program deleted",
         "equipment_id": equipment_id,
-        "scheduled_tasks_cancelled": scheduled_result.modified_count
+        "scheduled_tasks_cancelled": schedule_refresh.get("scheduled_tasks_cancelled", 0),
+        "legacy_programs_deactivated": schedule_refresh.get("legacy_programs_deactivated", 0),
+        "schedule_refresh": schedule_refresh,
     }
 
 
@@ -371,10 +391,15 @@ async def add_task(
             user_id=_current_user_id(current_user)
         )
         
+        schedule_refresh = await _refresh_equipment_schedule_after_change(
+            equipment_id, current_user
+        )
+
         return {
             "message": "Task added",
             "task": task.model_dump(),
-            "version": new_version
+            "version": new_version,
+            "schedule_refresh": schedule_refresh,
         }
         
     except ValueError as e:
@@ -431,10 +456,15 @@ async def update_task(
             user_id=_current_user_id(current_user)
         )
         
+        schedule_refresh = await _refresh_equipment_schedule_after_change(
+            equipment_id, current_user
+        )
+
         return {
             "message": "Task updated",
             "task": updated_task,
-            "version": new_version
+            "version": new_version,
+            "schedule_refresh": schedule_refresh,
         }
         
     except ValueError as e:
@@ -457,10 +487,15 @@ async def delete_task(
             user_id=_current_user_id(current_user)
         )
         
+        schedule_refresh = await _refresh_equipment_schedule_after_change(
+            equipment_id, current_user
+        )
+
         return {
             "message": "Task deleted",
             "task_id": task_id,
-            "version": new_version
+            "version": new_version,
+            "schedule_refresh": schedule_refresh,
         }
         
     except ValueError as e:
@@ -499,11 +534,16 @@ async def regenerate_program(
                 "message": "Regeneration preview",
                 "preview": preview.model_dump()
             }
+
+        schedule_refresh = await _refresh_equipment_schedule_after_change(
+            equipment_id, current_user
+        )
         
         return {
             "message": "Program regenerated",
             "program": program.model_dump(),
-            "changes": preview.model_dump()
+            "changes": preview.model_dump(),
+            "schedule_refresh": schedule_refresh,
         }
         
     except ValueError as e:
@@ -527,10 +567,15 @@ async def import_tasks(
             user_id=_current_user_id(current_user)
         )
         
+        schedule_refresh = await _refresh_equipment_schedule_after_change(
+            equipment_id, current_user
+        )
+
         return {
             "message": f"Imported {imported_count} tasks",
             "tasks_imported": imported_count,
-            "version": new_version
+            "version": new_version,
+            "schedule_refresh": schedule_refresh,
         }
         
     except ValueError as e:

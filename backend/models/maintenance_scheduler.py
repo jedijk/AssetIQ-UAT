@@ -116,6 +116,8 @@ class ScheduledTask(BaseModel):
     strategy_version: str
     failure_mode_id: Optional[str] = None
     failure_mode_name: Optional[str] = None
+    task_source: Optional[str] = None
+    pm_import_task_id: Optional[str] = None
     
     # Execution
     started_at: Optional[str] = None

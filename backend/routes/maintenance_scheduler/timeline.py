@@ -8,6 +8,7 @@ from typing import Optional
 from database import db
 from auth import get_current_user
 from models.maintenance_scheduler import TaskStatus
+from ._shared import ensure_imported_pm_tasks_scheduled
 
 router = APIRouter()
 
@@ -20,6 +21,8 @@ async def get_timeline(
     current_user: dict = Depends(get_current_user),
 ):
     """Get timeline view of scheduled tasks grouped by equipment."""
+    await ensure_imported_pm_tasks_scheduled(equipment_type_id)
+
     if not start_date:
         start_date = datetime.utcnow().date().isoformat()
     if not end_date:
