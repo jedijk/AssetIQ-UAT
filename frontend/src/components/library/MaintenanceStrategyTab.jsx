@@ -357,17 +357,36 @@ const MaintenanceStrategyTab = ({
           <div className="p-3 border-t bg-slate-50 text-xs text-slate-500">
             <div className="flex justify-between">
               <span>{filteredTypes.length} {t("maintenance.typesCount")}</span>
-              <span className="flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3 text-green-500" />
-                {strategiesInFilteredTypesCount} {t("maintenance.withStrategies")}
-              </span>
+              <button 
+                className="flex items-center gap-1 hover:text-purple-600 transition-colors cursor-pointer"
+                onClick={() => {
+                  if (showOnlyWithStrategy) {
+                    // Remove filter
+                    setSearchParams({ tab: "maintenance" }, { replace: true });
+                  } else {
+                    // Add filter
+                    setSearchParams({ tab: "maintenance", filter: "with_strategy" }, { replace: true });
+                  }
+                }}
+              >
+                <CheckCircle2 className={`w-3 h-3 ${showOnlyWithStrategy ? 'text-purple-500' : 'text-green-500'}`} />
+                <span className={showOnlyWithStrategy ? 'text-purple-600 font-medium' : ''}>
+                  {strategiesInFilteredTypesCount} {t("maintenance.withStrategies")}
+                </span>
+              </button>
             </div>
             {showOnlyWithStrategy && (
               <div className="text-purple-600 mt-1 flex items-center gap-1">
                 <Filter className="w-3 h-3" />
                 Showing only equipment types with strategies
+                <button 
+                  className="ml-auto text-slate-400 hover:text-slate-600"
+                  onClick={() => setSearchParams({ tab: "maintenance" }, { replace: true })}
+                >
+                  Clear
+                </button>
               </div>
-            )}
+            )}}
           </div>
         </div>
       )}
