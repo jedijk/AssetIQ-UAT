@@ -696,7 +696,7 @@ test_plan_translation:
 
 # Maintenance Program Module UI Testing
 
-user_problem_statement: "Test the Maintenance Program Module UI - TARGETED TEST focusing on finding equipment at the correct level"
+user_problem_statement: "Test the Maintenance Intelligence Map Dashboard - New tab in Library page"
 
 frontend:
   - task: "Maintenance Program Button Visibility Logic"
@@ -1113,3 +1113,65 @@ test_plan:
 agent_communication:
   - agent: "testing"
     message: "MAINTENANCE SCHEDULER CLEANUP-ORPHANS TESTING COMPLETE - ALL 5 TESTS PASSED (100%). Tested POST /api/maintenance-scheduler/cleanup-orphans endpoint with comprehensive test scenarios. KEY FINDINGS: (1) Basic cleanup works correctly - removed 783 scheduled tasks and 59 programs in first run, identified 11 missing strategy IDs. (2) Equipment type scoped cleanup works - successfully filtered cleanup to specific equipment type. (3) Orphan identification works correctly - finds programs/tasks whose strategy_id or equipment_type_id doesn't exist in equipment_type_strategies collection. (4) ALL task sources are cleaned up - code review confirmed task_source exclusion was removed (lines 575, 584 in maintenance_scheduler_sync.py), so customer_imported tasks are now included in cleanup as required. (5) Response structure is correct - returns all required fields (scheduled_tasks_removed, programs_removed, equipment_types_cleaned, missing_strategy_ids). (6) Second cleanup run removed 158 more tasks and 13 more programs, showing cleanup is idempotent and catches all orphans. FIX VERIFIED: The fix to ensure customer_imported tasks are cleaned up when their strategy no longer exists is working correctly. The code no longer filters by task_source when deleting orphan tasks, so ALL orphan items are removed regardless of their source. Endpoint is production-ready."
+
+
+user_problem_statement: "Test the new Intelligence Map API endpoints"
+
+backend:
+  - task: "Intelligence Map Stats API"
+    implemented: true
+    working: true
+    file: "/app/backend/routes/intelligence_map.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "INITIAL TEST FAILED: GET /api/intelligence-map/stats returned 500 error. Root cause: cache.set_stats() was being called with ttl=30 parameter, but the method signature doesn't accept ttl parameter (line 411 in intelligence_map.py). Error: 'TypeError: CacheService.set_stats() got an unexpected keyword argument ttl'. The TTL is fixed at cache level (STATS_CACHE_TTL = 60 seconds)."
+      - working: true
+        agent: "testing"
+        comment: "FIXED AND TESTED: Changed line 411 from 'cache.set_stats(cache_key, result, ttl=30)' to 'cache.set_stats(cache_key, result)'. All tests now passing (5/5). GET /api/intelligence-map/stats returns complete response with all required sections: failure_modes (count=483, connected_equipment_types=0), strategies (count=4, failure_mode_strategies=25, task_templates=118), equipment_types (count=0), equipment (count=242, with_type=211, with_coverage=0), maintenance_programs (count=0, total_tasks=0), schedules (count=2555, by_status={'scheduled': 727, 'cancelled': 1828}, missing_frequency=2555), planned_work (count=727), pm_imports (sessions=0, total_tasks=0, imported=0, accepted=0), relationships (7 relationships with source/target/value for Sankey diagram), insights (failure_mode_coverage=0%, strategy_density=0.1 per asset, pm_source_split=0% generated/0% imported, schedule_health=2555 missing frequency, schedule_compliance=0.0%), task_sources (strategy=0, imported=0, ai=0, manual=0). All response structure validation passed."
+
+  - task: "Intelligence Map Filters API"
+    implemented: true
+    working: true
+    file: "/app/backend/routes/intelligence_map.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: GET /api/intelligence-map/filters working correctly. Returns proper response structure with plants (1 plant: Tyromer), systems (6 systems including 'The Netherlands - Arnhem'), equipment_types (0 equipment types in equipment_types collection, but 59 unique equipment_type_ids found in equipment nodes). All response fields have correct structure with id, name fields. Plant structure includes id and name. System structure includes id, name, and parent_id. Equipment type structure includes id, name, and category."
+
+  - task: "Intelligence Map Filtering Parameters"
+    implemented: true
+    working: true
+    file: "/app/backend/routes/intelligence_map.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: All filtering parameters working correctly. (1) plant_id filter: Successfully filtered stats by plant_id=5fb4f269-191f-47d1-b190-e865a6430c7e, returned 228 equipment (vs 242 unfiltered). (2) equipment_type_id filter: Successfully filtered stats by equipment_type_id=motor_electric, returned 11 equipment with that type. (3) show_linked_only parameter: Successfully applied show_linked_only=true filter, returned 242 equipment. All filter combinations work correctly and return valid response structures."
+
+metadata:
+  created_by: "testing_agent"
+  version: "1.0"
+  test_sequence: 12
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Intelligence Map Stats API"
+    - "Intelligence Map Filters API"
+    - "Intelligence Map Filtering Parameters"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "testing"
+    message: "INTELLIGENCE MAP API TESTING COMPLETE - ALL 5 TESTS PASSED (100%). Tested both Intelligence Map endpoints as requested. CRITICAL BUG FOUND AND FIXED: GET /api/intelligence-map/stats was failing with 500 error due to cache.set_stats() being called with unsupported ttl parameter (line 411). Fixed by removing ttl=30 parameter - the cache uses default STATS_CACHE_TTL=60 seconds. ENDPOINTS TESTED: (1) GET /api/intelligence-map/filters - Returns plants (1), systems (6), equipment_types (0 in collection, but 59 unique types in equipment nodes). All response structures correct with id, name, parent_id, category fields. (2) GET /api/intelligence-map/stats - Returns complete aggregated statistics with all required sections: failure_modes, strategies, equipment_types, equipment, maintenance_programs, schedules, planned_work, pm_imports, relationships (for Sankey diagram), insights (KPIs), task_sources. All 11 required sections present with correct structure. (3) Filtering by plant_id - Works correctly, filtered from 242 to 228 equipment. (4) Filtering by equipment_type_id - Works correctly, returned 11 motor_electric equipment. (5) Filtering by show_linked_only - Works correctly. RESPONSE VALIDATION: All required fields verified: failure_modes (count, connected_equipment_types), strategies (count, failure_mode_strategies, task_templates), equipment (count, with_type, with_coverage), maintenance_programs (count, total_tasks), schedules (count, by_status, missing_frequency), planned_work (count), pm_imports (sessions, total_tasks, imported, accepted), relationships (7 relationships with source/target/value), insights (failure_mode_coverage, strategy_density, pm_source_split, schedule_health, schedule_compliance), task_sources (strategy, imported, ai, manual). All endpoints production-ready."

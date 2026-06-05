@@ -60,6 +60,7 @@ import {
   ClipboardList,
   Brain,
   Target,
+  Network,
 } from "lucide-react";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -103,6 +104,7 @@ import AIFindSimilarFailureModes from "../components/library/AIFindSimilarFailur
 import FindDuplicateActionsDialog from "../components/library/FindDuplicateActionsDialog";
 import { AIReviewModal } from "../components/library/AIReviewModal";
 import PMApplyFailureModeDialog from "../components/library/PMApplyFailureModeDialog";
+import IntelligenceMapTab from "../components/library/IntelligenceMapTab";
 
 const getTaskEquipmentType = (task) => {
   const match = task?.equipment_match;
@@ -1680,6 +1682,10 @@ const FailureModesPage = () => {
             <Upload className="w-3.5 h-3.5" />
             {t("library.customPmImport") || "PM Import"}
           </TabsTrigger>
+          <TabsTrigger value="intelligence-map" className="flex items-center gap-1.5 whitespace-nowrap">
+            <Network className="w-3.5 h-3.5" />
+            Intelligence Map
+          </TabsTrigger>
         </TabsList>
 
         {/* Failure Modes Tab */}
@@ -2260,6 +2266,11 @@ const FailureModesPage = () => {
             onOpenImportWizard={() => setIsPMImportOpen(true)}
             onOpenEquipmentTypeStrategy={openEquipmentTypeStrategy}
           />
+        </TabsContent>
+
+        {/* Intelligence Map Tab */}
+        <TabsContent value="intelligence-map" className="space-y-4">
+          <IntelligenceMapTab />
         </TabsContent>
       </Tabs>
 

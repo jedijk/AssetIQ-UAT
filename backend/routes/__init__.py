@@ -47,6 +47,7 @@ from routes.maintenance_scheduler import router as maintenance_scheduler_router
 from routes.translations import router as translations_router
 from routes.maintenance_program import router as maintenance_program_router
 from routes.ril import router as ril_router
+from routes.intelligence_map import router as intelligence_map_router
 
 all_routers = [
     auth_router,
@@ -95,4 +96,5 @@ all_routers = [
     translations_router,
     maintenance_program_router,
     ril_router,
+    intelligence_map_router,
 ]
