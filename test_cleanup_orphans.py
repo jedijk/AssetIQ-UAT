@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional
 import time
 
 # Configuration
-BASE_URL = "https://task-scheduler-fix.preview.emergentagent.com/api"
+BASE_URL = "https://asset-intelligence-21.preview.emergentagent.com/api"
 TEST_EMAIL = "jedijk@gmail.com"
 TEST_PASSWORD = "Jaap8019@"
 
