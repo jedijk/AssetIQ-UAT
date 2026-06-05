@@ -199,6 +199,22 @@ async def sync_v2_program_tasks_to_scheduler(
     active_v2_ids: Set[str] = set()
     today = datetime.utcnow().date().isoformat()
     equip_criticality = normalize_program_criticality(equipment.get("criticality"))
+    task_to_fms = build_task_to_failure_modes(strategy) if strategy else {}
+    template_by_id = {
+        t.get("id"): t for t in (strategy.get("task_templates") or []) if t.get("id")
+    } if strategy else {}
+
+    async def deactivate_legacy_for_template(template_id: str) -> None:
+        prog = await db.maintenance_programs.find_one(
+            {"equipment_id": equipment_id, "task_template_id": template_id},
+            {"id": 1, "_id": 0},
+        )
+        await db.maintenance_programs.update_many(
+            {"equipment_id": equipment_id, "task_template_id": template_id},
+            {"$set": {"is_active": False, "updated_at": datetime.utcnow().isoformat()}},
+        )
+        if prog:
+            await _cancel_open_scheduled_for_program_ids([prog["id"]])
 
     for task in program_v2.get("tasks") or []:
         v2_task_id = task.get("id")
@@ -216,19 +232,17 @@ async def sync_v2_program_tasks_to_scheduler(
             template_id = trace.get("task_template_id")
             if not template_id:
                 continue
-            active_v2_ids.add(v2_task_id)
-            if not is_active:
-                prog = await db.maintenance_programs.find_one(
-                    {"equipment_id": equipment_id, "task_template_id": template_id},
-                    {"id": 1, "_id": 0},
-                )
-                await db.maintenance_programs.update_many(
-                    {"equipment_id": equipment_id, "task_template_id": template_id},
-                    {"$set": {"is_active": False, "updated_at": datetime.utcnow().isoformat()}},
-                )
-                if prog:
-                    await _cancel_open_scheduled_for_program_ids([prog["id"]])
+
+            template = template_by_id.get(template_id)
+            strategy_active = bool(
+                template and is_strategy_task_active(template, task_to_fms=task_to_fms)
+            ) if strategy else False
+
+            if not strategy_active or not is_active:
+                await deactivate_legacy_for_template(template_id)
                 continue
+
+            active_v2_ids.add(v2_task_id)
 
             override_fields: Dict[str, Any] = {}
             if task.get("is_overridden"):
@@ -248,8 +262,6 @@ async def sync_v2_program_tasks_to_scheduler(
                     "is_active": True,
                     "updated_at": datetime.utcnow().isoformat(),
                 }
-            elif not is_active:
-                override_fields = {"is_active": False, "updated_at": datetime.utcnow().isoformat()}
 
             if override_fields:
                 await db.maintenance_programs.update_one(
@@ -529,6 +541,54 @@ async def _equipment_ids_for_type(equipment_type_id: str) -> Set[str]:
     return equipment_ids
 
 
+async def cleanup_scheduled_tasks_without_active_programs(
+    equipment_type_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Delete scheduled tasks for equipment that has no active maintenance programs."""
+    program_query: Dict[str, Any] = {"is_active": True}
+    if equipment_type_id:
+        program_query["equipment_type_id"] = equipment_type_id
+
+    equipped: Set[str] = set()
+    async for prog in db.maintenance_programs.find(program_query, {"equipment_id": 1, "_id": 0}):
+        if prog.get("equipment_id"):
+            equipped.add(prog["equipment_id"])
+
+    task_query: Dict[str, Any] = {}
+    equipment_without_programs: List[str] = []
+
+    if equipment_type_id:
+        type_equipment_ids = [
+            eq["id"]
+            async for eq in db.equipment_nodes.find(
+                {"equipment_type_id": equipment_type_id},
+                {"id": 1, "_id": 0},
+            )
+            if eq.get("id")
+        ]
+        equipment_without_programs = [
+            eid for eid in type_equipment_ids if eid not in equipped
+        ]
+        if not equipment_without_programs:
+            return {
+                "equipment_type_id": equipment_type_id,
+                "scheduled_tasks_deleted": 0,
+                "equipment_without_programs": [],
+            }
+        task_query["equipment_id"] = {"$in": equipment_without_programs}
+    elif equipped:
+        task_query["equipment_id"] = {"$nin": list(equipped)}
+    else:
+        task_query = {}
+
+    result = await db.scheduled_tasks.delete_many(task_query)
+    return {
+        "equipment_type_id": equipment_type_id,
+        "scheduled_tasks_deleted": result.deleted_count,
+        "equipment_without_programs": equipment_without_programs,
+    }
+
+
 async def cleanup_stale_strategy_schedules(
     equipment_type_id: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -600,6 +660,9 @@ async def cleanup_schedules_without_strategy(
     strategy no longer exists.
     """
     stale_cleanup = await cleanup_stale_strategy_schedules(equipment_type_id)
+    no_program_cleanup = await cleanup_scheduled_tasks_without_active_programs(
+        equipment_type_id,
+    )
 
     active_strategy_types = await _active_strategy_type_ids()
     scoped_equipment_ids: Optional[Set[str]] = None
@@ -717,7 +780,11 @@ async def cleanup_schedules_without_strategy(
     return {
         "equipment_type_id": equipment_type_id,
         "equipment_types_cleaned": len(missing_strategy_ids),
-        "scheduled_tasks_deleted": scheduled_tasks_deleted + stale_cleanup.get("scheduled_tasks_deleted", 0),
+        "scheduled_tasks_deleted": (
+            scheduled_tasks_deleted
+            + stale_cleanup.get("scheduled_tasks_deleted", 0)
+            + no_program_cleanup.get("scheduled_tasks_deleted", 0)
+        ),
         "programs_deleted": programs_deleted + stale_cleanup.get("programs_deleted", 0),
         "v2_programs_deleted": v2_programs_deleted,
         "missing_strategy_ids": sorted(missing_strategy_ids),
@@ -725,6 +792,7 @@ async def cleanup_schedules_without_strategy(
         "orphan_v2_program_ids": orphan_v2_program_ids,
         "stale_program_ids": stale_cleanup.get("stale_program_ids", []),
         "stale_cleanup": stale_cleanup,
+        "no_program_cleanup": no_program_cleanup,
     }
 
 
@@ -772,6 +840,14 @@ async def refresh_equipment_schedule(
     )
     scheduled_created = await schedule_programs_for_equipment([equipment_id])
 
+    active_program_count = await db.maintenance_programs.count_documents(
+        {"equipment_id": equipment_id, "is_active": True},
+    )
+    schedule_cleared = 0
+    if active_program_count == 0:
+        clear_result = await db.scheduled_tasks.delete_many({"equipment_id": equipment_id})
+        schedule_cleared = clear_result.deleted_count
+
     return {
         "equipment_id": equipment_id,
         "strategy_programs_created": created,
@@ -780,6 +856,7 @@ async def refresh_equipment_schedule(
         "v2_tasks_synced": v2_synced,
         "pm_import_programs_synced": pm_sync.get("programs_synced", 0),
         "scheduled_tasks_created": scheduled_created,
+        "scheduled_tasks_cleared_no_program": schedule_cleared,
     }
 
 

@@ -1021,6 +1021,19 @@ class MaintenanceProgramService:
         if not strategy:
             raise ValueError(f"No strategy found for equipment type: {equipment_type_id}")
 
+        task_to_fms = build_task_to_failure_modes(strategy)
+        template_by_id = {
+            t.get("id"): t for t in (strategy.get("task_templates") or []) if t.get("id")
+        }
+
+        def strategy_template_is_active(template_id: Optional[str]) -> bool:
+            if not template_id:
+                return False
+            template = template_by_id.get(template_id)
+            return bool(
+                template and is_strategy_task_active(template, task_to_fms=task_to_fms)
+            )
+
         equipment = await db.equipment_nodes.find_one(
             {"id": equipment_id},
             {"_id": 0, "criticality": 1},
@@ -1067,7 +1080,7 @@ class MaintenanceProgramService:
                 if is_overridden:
                     traceability = task.traceability if hasattr(task, 'traceability') else task.get("traceability", {})
                     template_id = traceability.get("task_template_id") if isinstance(traceability, dict) else getattr(traceability, 'task_template_id', None)
-                    if template_id:
+                    if template_id and strategy_template_is_active(template_id):
                         current_strategy_task_ids.add(template_id)
                         preserved_overrides.append(task)
         
@@ -1144,6 +1157,16 @@ class MaintenanceProgramService:
                     "task_title": task_dict.get("task_title"),
                     "id": task_dict.get("id")
                 })
+
+        filtered_final_tasks = []
+        for task_dict in final_tasks:
+            if task_dict.get("task_source") != TaskSource.STRATEGY_GENERATED.value:
+                filtered_final_tasks.append(task_dict)
+                continue
+            template_id = (task_dict.get("traceability") or {}).get("task_template_id")
+            if strategy_template_is_active(template_id):
+                filtered_final_tasks.append(task_dict)
+        final_tasks = filtered_final_tasks
         
         if preview_only:
             return program, preview

@@ -85,10 +85,34 @@ def program_is_schedulable(program: Dict[str, Any], active_strategy_type_ids: Se
 def build_task_to_failure_modes(strategy: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
     """Map strategy task template id -> failure mode strategies that reference it."""
     task_to_fms: Dict[str, List[Dict[str, Any]]] = {}
-    for fm in strategy.get("failure_mode_strategies") or []:
+    fms = strategy.get("failure_mode_strategies") or []
+    fm_by_id = {
+        str(fm.get("failure_mode_id")): fm
+        for fm in fms
+        if fm.get("failure_mode_id")
+    }
+
+    def _add(tid: str, fm: Dict[str, Any]) -> None:
+        if not tid:
+            return
+        bucket = task_to_fms.setdefault(tid, [])
+        if fm not in bucket:
+            bucket.append(fm)
+
+    for fm in fms:
         for tid in fm.get("task_ids") or []:
-            if tid:
-                task_to_fms.setdefault(tid, []).append(fm)
+            _add(str(tid), fm)
+
+    # Fallback when FM.task_ids drifted but task.failure_mode_ids still links the FM.
+    for task in strategy.get("task_templates") or []:
+        tid = str(task.get("id") or "")
+        if not tid:
+            continue
+        for fm_id in task.get("failure_mode_ids") or []:
+            fm = fm_by_id.get(str(fm_id))
+            if fm:
+                _add(tid, fm)
+
     return task_to_fms
 
 
@@ -121,5 +145,6 @@ def is_strategy_task_active(
 
     linked_fms = task_to_fms.get(task["id"], [])
     if not linked_fms:
+        # No FM linkage: standalone template (e.g. manually added).
         return True
     return any(fm.get("enabled") is not False for fm in linked_fms)

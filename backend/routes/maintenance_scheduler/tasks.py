@@ -14,7 +14,7 @@ from models.maintenance_scheduler import (
     CompleteTaskRequest,
     DeferTaskRequest,
 )
-from ._shared import ensure_imported_pm_tasks_scheduled, active_scheduler_program_ids, scope_query_to_program_ids
+from ._shared import ensure_imported_pm_tasks_scheduled, scope_scheduled_tasks_query
 
 router = APIRouter()
 
@@ -57,9 +57,7 @@ async def get_scheduled_tasks(
         else:
             query["due_date"] = {"$lte": to_date}
 
-    if equipment_type_id:
-        program_ids = await active_scheduler_program_ids(equipment_type_id)
-        scope_query_to_program_ids(query, program_ids)
+    await scope_scheduled_tasks_query(query, equipment_type_id)
 
     tasks = await db.scheduled_tasks.find(query, {"_id": 0}).sort("due_date", 1).to_list(1000)
 
@@ -90,22 +88,25 @@ async def get_daily_planner(
     today = datetime.utcnow().date().isoformat()
     tomorrow = (datetime.utcnow().date() + timedelta(days=1)).isoformat()
 
-    overdue_tasks = await db.scheduled_tasks.find({
-        "due_date": {"$lt": today},
+    base_query = {
         "status": {"$nin": [TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value]},
         "task_type": {"$nin": list(CORRECTIVE_TASK_TYPES)},
+    }
+    await scope_scheduled_tasks_query(base_query, None)
+
+    overdue_tasks = await db.scheduled_tasks.find({
+        **base_query,
+        "due_date": {"$lt": today},
     }, {"_id": 0}).sort("priority", -1).to_list(100)
 
     today_tasks = await db.scheduled_tasks.find({
+        **base_query,
         "due_date": today,
-        "status": {"$nin": [TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value]},
-        "task_type": {"$nin": list(CORRECTIVE_TASK_TYPES)},
     }, {"_id": 0}).sort("priority", -1).to_list(100)
 
     tomorrow_tasks = await db.scheduled_tasks.find({
+        **base_query,
         "due_date": tomorrow,
-        "status": {"$nin": [TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value]},
-        "task_type": {"$nin": list(CORRECTIVE_TASK_TYPES)},
     }, {"_id": 0}).sort("priority", -1).to_list(100)
 
     for task in overdue_tasks:
@@ -135,11 +136,14 @@ async def get_weekly_planner(
 
     end = start + timedelta(days=6)
 
-    tasks = await db.scheduled_tasks.find({
+    task_query = {
         "planned_date": {"$gte": start.isoformat(), "$lte": end.isoformat()},
         "status": {"$nin": [TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value]},
         "task_type": {"$nin": list(CORRECTIVE_TASK_TYPES)},
-    }, {"_id": 0}).to_list(500)
+    }
+    await scope_scheduled_tasks_query(task_query, None)
+
+    tasks = await db.scheduled_tasks.find(task_query, {"_id": 0}).to_list(500)
 
     days = {}
     for i in range(7):

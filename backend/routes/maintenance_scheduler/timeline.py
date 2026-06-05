@@ -8,7 +8,7 @@ from typing import Optional
 from database import db
 from auth import get_current_user
 from models.maintenance_scheduler import TaskStatus
-from ._shared import ensure_imported_pm_tasks_scheduled, active_scheduler_program_ids, scope_query_to_program_ids
+from ._shared import ensure_imported_pm_tasks_scheduled, scope_scheduled_tasks_query
 
 router = APIRouter()
 
@@ -34,9 +34,7 @@ async def get_timeline(
         "task_type": {"$nin": ["reactive", "corrective"]},
     }
 
-    if equipment_type_id:
-        program_ids = await active_scheduler_program_ids(equipment_type_id)
-        scope_query_to_program_ids(query, program_ids)
+    await scope_scheduled_tasks_query(query, equipment_type_id)
 
     tasks = await db.scheduled_tasks.find(query, {"_id": 0}).sort("due_date", 1).to_list(1000)
 

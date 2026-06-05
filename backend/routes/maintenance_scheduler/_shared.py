@@ -101,6 +101,42 @@ async def active_scheduler_program_ids(
     return [p["id"] for p in programs if p.get("id")]
 
 
+async def equipment_ids_with_active_programs(
+    equipment_type_id: Optional[str] = None,
+) -> List[str]:
+    """Equipment ids that have at least one active legacy maintenance program."""
+    query: Dict[str, object] = {"is_active": True}
+    if equipment_type_id:
+        query["equipment_type_id"] = equipment_type_id
+    ids: List[str] = []
+    seen = set()
+    async for prog in db.maintenance_programs.find(query, {"equipment_id": 1, "_id": 0}):
+        equipment_id = prog.get("equipment_id")
+        if equipment_id and equipment_id not in seen:
+            seen.add(equipment_id)
+            ids.append(equipment_id)
+    return ids
+
+
 def scope_query_to_program_ids(query: Dict, program_ids: List[str]) -> None:
     """Restrict a scheduled_tasks query to specific maintenance programs."""
     query["maintenance_program_id"] = {"$in": program_ids} if program_ids else {"$in": []}
+
+
+def scope_query_to_equipment_ids(query: Dict, equipment_ids: List[str]) -> None:
+    """Restrict a scheduled_tasks query to specific equipment ids."""
+    query["equipment_id"] = {"$in": equipment_ids} if equipment_ids else {"$in": []}
+
+
+async def scope_scheduled_tasks_query(
+    query: Dict,
+    equipment_type_id: Optional[str] = None,
+) -> None:
+    """
+    Only include scheduled tasks for equipment that has active maintenance programs,
+    and only via those active programs.
+    """
+    program_ids = await active_scheduler_program_ids(equipment_type_id)
+    equipped_ids = await equipment_ids_with_active_programs(equipment_type_id)
+    scope_query_to_program_ids(query, program_ids)
+    scope_query_to_equipment_ids(query, equipped_ids)

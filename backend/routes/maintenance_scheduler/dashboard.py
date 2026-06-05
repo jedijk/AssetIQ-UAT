@@ -8,7 +8,7 @@ from typing import Optional
 from database import db
 from auth import get_current_user
 from models.maintenance_scheduler import TaskStatus
-from ._shared import active_scheduler_program_ids, scope_query_to_program_ids
+from ._shared import scope_scheduled_tasks_query
 
 router = APIRouter()
 
@@ -23,9 +23,7 @@ async def get_scheduler_dashboard(
     week_end = (datetime.utcnow().date() + timedelta(days=7)).isoformat()
 
     base_query = {}
-    if equipment_type_id:
-        program_ids = await active_scheduler_program_ids(equipment_type_id)
-        scope_query_to_program_ids(base_query, program_ids)
+    await scope_scheduled_tasks_query(base_query, equipment_type_id)
 
     # Exclude reactive/corrective tasks — they're triggered on failure, not planned
     base_query["task_type"] = {"$nin": ["reactive", "corrective"]}
