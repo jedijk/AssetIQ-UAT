@@ -1024,55 +1024,47 @@ const Layout = () => {
 
             {/* Language Switcher - Compact, hidden in simple mode */}
             {!isOperatorActive && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 sm:h-7 sm:w-7 text-[10px] sm:text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-transform hover:scale-105 active:scale-95"
-                        data-testid="language-switcher"
-                      >
-                        <span className="font-medium">{language.toUpperCase()}</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-40" data-testid="language-switcher-menu">
-                      <DropdownMenuLabel className="text-xs">Language / Sprache</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        onClick={() => setLanguage("en")}
-                        className={`cursor-pointer ${language === "en" ? "bg-blue-50" : ""}`}
-                        data-testid="language-option-en"
-                      >
-                        <span className="mr-2">🇬🇧</span> English
-                        {language === "en" && <span className="ml-auto text-blue-600">✓</span>}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => setLanguage("nl")}
-                        className={`cursor-pointer ${language === "nl" ? "bg-blue-50" : ""}`}
-                        data-testid="language-option-nl"
-                      >
-                        <span className="mr-2">🇳🇱</span> Nederlands
-                        {language === "nl" && <span className="ml-auto text-blue-600">✓</span>}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => setLanguage("de")}
-                        className={`cursor-pointer ${language === "de" ? "bg-blue-50" : ""}`}
-                        data-testid="language-option-de"
-                      >
-                        <span className="mr-2">🇩🇪</span> Deutsch
-                        {language === "de" && <span className="ml-auto text-blue-600">✓</span>}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  <p>Change language</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 sm:h-7 sm:w-7 text-[10px] sm:text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-transform hover:scale-105 active:scale-95"
+                    data-testid="language-switcher"
+                    title="Change language"
+                  >
+                    <span className="font-medium">{language.toUpperCase()}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40" data-testid="language-switcher-menu">
+                  <DropdownMenuLabel className="text-xs">Language / Sprache</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={() => setLanguage("en")}
+                    className={`cursor-pointer ${language === "en" ? "bg-blue-50" : ""}`}
+                    data-testid="language-option-en"
+                  >
+                    <span className="mr-2">🇬🇧</span> English
+                    {language === "en" && <span className="ml-auto text-blue-600">✓</span>}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setLanguage("nl")}
+                    className={`cursor-pointer ${language === "nl" ? "bg-blue-50" : ""}`}
+                    data-testid="language-option-nl"
+                  >
+                    <span className="mr-2">🇳🇱</span> Nederlands
+                    {language === "nl" && <span className="ml-auto text-blue-600">✓</span>}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setLanguage("de")}
+                    className={`cursor-pointer ${language === "de" ? "bg-blue-50" : ""}`}
+                    data-testid="language-option-de"
+                  >
+                    <span className="mr-2">🇩🇪</span> Deutsch
+                    {language === "de" && <span className="ml-auto text-blue-600">✓</span>}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
 
             {/* Help Button */}
