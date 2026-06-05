@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from database import db
+from services.scheduler_helpers import program_is_strategy_backed
 
 logger = logging.getLogger(__name__)
 
@@ -275,15 +276,10 @@ async def _resync_programs_with_strategy(equipment_type_id: str):
     Re-derive `is_active` on every maintenance_program for this strategy and
     cancel any open scheduled_tasks for newly inactive programs.
 
-    A program is ACTIVE iff its task template:
-      - still exists in the strategy, AND
-      - is not toggled off (`is_mandatory != False`), AND
-      - either has no FM-strategy linking it OR at least one linking FM is enabled.
-
-    Tasks can be linked from multiple FM-strategies (FM-strategy.task_ids), so
-    disabling one FM does NOT deactivate the program if another enabled FM
-    still references the same task.
+    Uses the same active-task rules as the strategy UI and program generation.
     """
+    from services.scheduler_helpers import build_task_to_failure_modes, is_strategy_task_active
+
     strategy = await db.equipment_type_strategies.find_one(
         {"equipment_type_id": equipment_type_id}
     )
@@ -291,13 +287,12 @@ async def _resync_programs_with_strategy(equipment_type_id: str):
         return {"programs_activated": 0, "programs_deactivated": 0, "scheduled_tasks_cancelled": 0}
 
     tasks = strategy.get("task_templates", []) or []
-    fms = strategy.get("failure_mode_strategies", []) or []
-    task_by_id = {t.get("id"): t for t in tasks if t.get("id")}
-
-    task_to_fms: dict = {}
-    for fm in fms:
-        for tid in (fm.get("task_ids") or []):
-            task_to_fms.setdefault(tid, []).append(fm)
+    task_to_fms = build_task_to_failure_modes(strategy)
+    active_task_ids = {
+        t.get("id")
+        for t in tasks
+        if t.get("id") and is_strategy_task_active(t, task_to_fms=task_to_fms)
+    }
 
     programs = await db.maintenance_programs.find(
         {"equipment_type_id": equipment_type_id}
@@ -311,22 +306,11 @@ async def _resync_programs_with_strategy(equipment_type_id: str):
     program_ids_to_cancel_tasks = []
 
     for prog in programs:
-        tid = prog.get("task_template_id")
-        task = task_by_id.get(tid)
+        if not program_is_strategy_backed(prog):
+            continue
 
-        if not task:
-            new_active = False
-        elif task.get("is_mandatory") is False:
-            new_active = False
-        elif task.get("task_type") in ("reactive", "corrective"):
-            # CM tasks are triggered on failure, not scheduled
-            new_active = False
-        else:
-            linked_fms = task_to_fms.get(tid, [])
-            if not linked_fms:
-                new_active = True
-            else:
-                new_active = any(fm.get("enabled") is not False for fm in linked_fms)
+        tid = prog.get("task_template_id")
+        new_active = bool(tid and tid in active_task_ids)
 
         if prog.get("is_active") != new_active:
             if new_active:

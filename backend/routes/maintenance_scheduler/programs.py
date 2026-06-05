@@ -68,8 +68,6 @@ async def _apply_strategy_to_equipment_impl(
     if not equipment_list:
         raise HTTPException(status_code=404, detail="No matching equipment found")
 
-    task_templates = strategy.get("task_templates", [])
-
     user_id = current_user.get("id") or current_user.get("user_id")
     strategy_version = strategy.get("version", "1.0")
     equipment_ids = [e.get("id") for e in equipment_list if e.get("id")]
@@ -88,6 +86,10 @@ async def _apply_strategy_to_equipment_impl(
     scheduled_count = 0
     programs_created_count = 0
     pm_import_synced = 0
+
+    from routes.maintenance_strategy_v2 import _resync_programs_with_strategy
+    resync = await _resync_programs_with_strategy(equipment_type_id)
+
     for equipment in equipment_list:
         refresh = await refresh_equipment_schedule(
             equipment.get("id"),
@@ -96,15 +98,21 @@ async def _apply_strategy_to_equipment_impl(
         scheduled_count += refresh.get("scheduled_tasks_created", 0)
         programs_created_count += refresh.get("strategy_programs_created", 0)
         pm_import_synced += refresh.get("pm_import_programs_synced", 0)
+        resync["programs_deactivated"] += refresh.get("strategy_programs_deactivated", 0)
 
-    from routes.maintenance_strategy_v2 import _resync_programs_with_strategy
-    resync = await _resync_programs_with_strategy(equipment_type_id)
+    from services.scheduler_helpers import build_task_to_failure_modes, is_strategy_task_active
+    task_to_fms = build_task_to_failure_modes(strategy)
+    active_task_count = sum(
+        1
+        for task in (strategy.get("task_templates") or [])
+        if is_strategy_task_active(task, task_to_fms=task_to_fms)
+    )
 
     return {
         "message": f"Strategy applied to {len(equipment_list)} equipment",
         "equipment_count": len(equipment_list),
         "programs_created": programs_created_count,
-        "programs_updated": len(equipment_list) * len(task_templates) - programs_created_count,
+        "programs_updated": len(equipment_list) * active_task_count - programs_created_count,
         "scheduled_tasks_created": scheduled_count,
         "programs_deactivated_on_resync": resync["programs_deactivated"],
         "equipment_manager_programs_created": v2_programs_created,

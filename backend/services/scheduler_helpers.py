@@ -1,5 +1,5 @@
 """Pure scheduler helpers shared by routes and sync services (no route imports)."""
-from typing import Any, Dict, Set
+from typing import Any, Dict, List, Optional, Set
 
 STRATEGY_EXEMPT_TASK_SOURCES = frozenset(
     {
@@ -77,4 +77,49 @@ def program_is_schedulable(program: Dict[str, Any], active_strategy_type_ids: Se
     """Whether run-scheduler should generate occurrences for this program."""
     if not program_is_strategy_backed(program):
         return True
+    if not program.get("is_active", True):
+        return False
     return program_has_active_strategy(program, active_strategy_type_ids)
+
+
+def build_task_to_failure_modes(strategy: Dict[str, Any]) -> Dict[str, List[Dict[str, Any]]]:
+    """Map strategy task template id -> failure mode strategies that reference it."""
+    task_to_fms: Dict[str, List[Dict[str, Any]]] = {}
+    for fm in strategy.get("failure_mode_strategies") or []:
+        for tid in fm.get("task_ids") or []:
+            if tid:
+                task_to_fms.setdefault(tid, []).append(fm)
+    return task_to_fms
+
+
+def is_strategy_task_active(
+    task: Dict[str, Any],
+    failure_mode_strategies: Optional[List[Dict[str, Any]]] = None,
+    task_to_fms: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+) -> bool:
+    """
+    Whether a strategy task template should produce maintenance programs.
+
+    Matches the Maintenance Strategy UI:
+      - is_mandatory must not be False
+      - reactive/corrective tasks are excluded from scheduling
+      - standalone tasks (no FM linkage) are active when mandatory
+      - FM-linked tasks are active when at least one linked FM is enabled
+    """
+    if not task or not task.get("id"):
+        return False
+    if task.get("is_mandatory") is False:
+        return False
+    task_type = task.get("task_type", "preventive")
+    if task_type in ("reactive", "corrective"):
+        return False
+
+    if task_to_fms is None:
+        task_to_fms = build_task_to_failure_modes(
+            {"failure_mode_strategies": failure_mode_strategies or []}
+        )
+
+    linked_fms = task_to_fms.get(task["id"], [])
+    if not linked_fms:
+        return True
+    return any(fm.get("enabled") is not False for fm in linked_fms)

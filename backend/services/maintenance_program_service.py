@@ -19,6 +19,7 @@ from typing import Optional, List, Dict, Any, Tuple
 
 from database import db
 from routes.maintenance_scheduler._shared import normalize_program_criticality
+from services.scheduler_helpers import build_task_to_failure_modes, is_strategy_task_active
 from services.criticality_score import compute_criticality_score, resolve_equipment_criticality_score
 from models.maintenance_program import (
     MaintenanceProgram,
@@ -314,26 +315,13 @@ class MaintenanceProgramService:
         
         tasks = []
         task_templates = strategy.get("task_templates", [])
-        failure_mode_strategies = strategy.get("failure_mode_strategies", [])
-        
-        # Build reverse map: task_id -> failure modes
-        task_to_fms = {}
-        for fm in failure_mode_strategies:
-            for tid in fm.get("task_ids", []):
-                if tid not in task_to_fms:
-                    task_to_fms[tid] = []
-                task_to_fms[tid].append(fm)
-        
+        task_to_fms = build_task_to_failure_modes(strategy)
+
         for template in task_templates:
-            # Skip if not mandatory
-            if not template.get("is_mandatory", True):
+            if not is_strategy_task_active(template, task_to_fms=task_to_fms):
                 continue
-            
-            # Skip reactive/corrective tasks
+
             task_type = template.get("task_type", "preventive")
-            if task_type in ("reactive", "corrective"):
-                continue
-            
             # Get frequency based on strategy band (low / medium / high)
             strategy_band = normalize_program_criticality(criticality_level)
             freq_matrix = template.get("frequency_matrix", {})
@@ -344,11 +332,15 @@ class MaintenanceProgramService:
             except ValueError:
                 frequency = TaskFrequency.MONTHLY
             
-            # Get linked failure mode info
+            # Get linked failure mode info (prefer an enabled FM when multiple are linked)
             template_id = template.get("id")
             linked_fms = task_to_fms.get(template_id, [])
-            fm_id = linked_fms[0].get("failure_mode_id") if linked_fms else None
-            fm_name = linked_fms[0].get("failure_mode_name") if linked_fms else None
+            enabled_fm = next(
+                (fm for fm in linked_fms if fm.get("enabled") is not False),
+                linked_fms[0] if linked_fms else None,
+            )
+            fm_id = enabled_fm.get("failure_mode_id") if enabled_fm else None
+            fm_name = enabled_fm.get("failure_mode_name") if enabled_fm else None
             
             # Map task type to category
             category = MaintenanceProgramService.TASK_TYPE_TO_CATEGORY.get(

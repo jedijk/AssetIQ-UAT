@@ -11,7 +11,9 @@ from database import db
 from models.maintenance_program import TaskSource
 from models.maintenance_scheduler import CriticalityLevel, EquipmentMaintenanceProgram
 from services.scheduler_helpers import (
+    build_task_to_failure_modes,
     frequency_to_days,
+    is_strategy_task_active,
     normalize_program_criticality,
     program_has_active_strategy,
     program_is_strategy_backed,
@@ -26,51 +28,46 @@ _ACTIVE_STRATEGY_CACHE: Optional[Tuple[float, Set[str]]] = None
 _ACTIVE_STRATEGY_CACHE_TTL = 60.0
 
 
-def _build_task_to_fm(strategy: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
-    task_to_fm: Dict[str, Dict[str, Any]] = {}
-    for fm in strategy.get("failure_mode_strategies") or []:
-        for tid in fm.get("task_ids") or []:
-            task_to_fm.setdefault(tid, fm)
-    return task_to_fm
-
-
 async def sync_strategy_programs_for_equipment(
     equipment: Dict[str, Any],
     strategy: Dict[str, Any],
-    task_to_fm: Optional[Dict[str, Dict[str, Any]]] = None,
-) -> Tuple[int, int]:
-    """Upsert legacy maintenance_programs from strategy task templates for one equipment."""
+) -> Tuple[int, int, int]:
+    """Upsert legacy maintenance_programs from active strategy task templates for one equipment."""
     equipment_type_id = strategy.get("equipment_type_id") or equipment.get("equipment_type_id")
     equipment_id = equipment.get("id")
     if not equipment_id or not equipment_type_id:
-        return 0, 0
+        return 0, 0, 0
 
     task_templates = strategy.get("task_templates") or []
-    if task_to_fm is None:
-        task_to_fm = _build_task_to_fm(strategy)
+    task_to_fms = build_task_to_failure_modes(strategy)
 
     created = 0
     updated = 0
+    deactivated = 0
+    active_task_ids: Set[str] = set()
     today = datetime.utcnow().date().isoformat()
     equip_criticality = normalize_program_criticality(equipment.get("criticality"))
     strategy_version = strategy.get("version", "1.0")
 
     for task in task_templates:
-        if not task.get("is_mandatory", True):
-            continue
-        task_type = task.get("task_type", "preventive")
-        if task_type in ("reactive", "corrective"):
+        if not is_strategy_task_active(task, task_to_fms=task_to_fms):
             continue
 
         task_id = task.get("id")
         if not task_id:
             continue
+        active_task_ids.add(task_id)
 
+        task_type = task.get("task_type", "preventive")
         freq_matrix = task.get("frequency_matrix") or {}
         frequency = freq_matrix.get(equip_criticality, "monthly")
-        fm_for_task = task_to_fm.get(task_id)
-        fm_id = fm_for_task.get("failure_mode_id") if fm_for_task else None
-        fm_name = fm_for_task.get("failure_mode_name") if fm_for_task else None
+        linked_fms = task_to_fms.get(task_id, [])
+        enabled_fm = next(
+            (fm for fm in linked_fms if fm.get("enabled") is not False),
+            linked_fms[0] if linked_fms else None,
+        )
+        fm_id = enabled_fm.get("failure_mode_id") if enabled_fm else None
+        fm_name = enabled_fm.get("failure_mode_name") if enabled_fm else None
 
         existing = await db.maintenance_programs.find_one(
             {"equipment_id": equipment_id, "task_template_id": task_id},
@@ -132,7 +129,26 @@ async def sync_strategy_programs_for_equipment(
             await db.maintenance_programs.insert_one(doc)
             created += 1
 
-    return created, updated
+    async for prog in db.maintenance_programs.find(
+        {"equipment_id": equipment_id, "equipment_type_id": equipment_type_id},
+        {"id": 1, "task_template_id": 1, "is_active": 1, "_id": 1},
+    ):
+        if not program_is_strategy_backed(prog):
+            continue
+        template_id = prog.get("task_template_id")
+        if not template_id or template_id in active_task_ids:
+            continue
+        if not prog.get("is_active", True):
+            continue
+        await db.maintenance_programs.update_one(
+            {"_id": prog["_id"]},
+            {"$set": {"is_active": False, "updated_at": datetime.utcnow().isoformat()}},
+        )
+        if prog.get("id"):
+            await _cancel_open_scheduled_for_program_ids([prog["id"]])
+        deactivated += 1
+
+    return created, updated, deactivated
 
 
 async def _cancel_open_scheduled_for_program_ids(program_ids: List[str]) -> int:
@@ -681,9 +697,9 @@ async def refresh_equipment_schedule(
             {"_id": 0},
         )
 
-    created = updated = 0
+    created = updated = deactivated = 0
     if strategy:
-        created, updated = await sync_strategy_programs_for_equipment(equipment, strategy)
+        created, updated, deactivated = await sync_strategy_programs_for_equipment(equipment, strategy)
 
     v2_synced = await sync_v2_program_tasks_to_scheduler(equipment, strategy=strategy)
     pm_sync = await MaintenanceProgramService.sync_imported_program_tasks_to_scheduler(
@@ -697,6 +713,7 @@ async def refresh_equipment_schedule(
         "equipment_id": equipment_id,
         "strategy_programs_created": created,
         "strategy_programs_updated": updated,
+        "strategy_programs_deactivated": deactivated,
         "v2_tasks_synced": v2_synced,
         "pm_import_programs_synced": pm_sync.get("programs_synced", 0),
         "scheduled_tasks_created": scheduled_created,
