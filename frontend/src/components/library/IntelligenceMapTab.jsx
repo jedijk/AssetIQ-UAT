@@ -317,12 +317,29 @@ const SankeyDiagram = ({ data, isLoading }) => {
       ]);
 
     // Create a copy of data for sankey
+    // Filter out nodes that are not connected to any links
+    const connectedNodeIndices = new Set();
+    sankeyData.links.forEach(link => {
+      connectedNodeIndices.add(link.source);
+      connectedNodeIndices.add(link.target);
+    });
+    
+    const filteredNodes = sankeyData.nodes.filter((_, index) => connectedNodeIndices.has(index));
+    
+    // If no nodes are connected, return null to show "no data" message
+    if (filteredNodes.length === 0) return null;
+    
     const graph = {
-      nodes: sankeyData.nodes.map(d => ({ ...d })),
+      nodes: filteredNodes.map(d => ({ ...d })),
       links: sankeyData.links.map(d => ({ ...d })),
     };
 
-    return sankeyGenerator(graph);
+    try {
+      return sankeyGenerator(graph);
+    } catch (error) {
+      console.error("Sankey layout error:", error);
+      return null;
+    }
   }, [sankeyData, dimensions]);
 
   if (isLoading) {
@@ -416,20 +433,20 @@ const IntelligenceMapTab = () => {
   const navigate = useNavigate();
   
   // Filter state
-  const [plantId, setPlantId] = useState("");
-  const [systemId, setSystemId] = useState("");
-  const [equipmentTypeId, setEquipmentTypeId] = useState("");
-  const [equipmentId, setEquipmentId] = useState("");
+  const [plantId, setPlantId] = useState("all");
+  const [systemId, setSystemId] = useState("all");
+  const [equipmentTypeId, setEquipmentTypeId] = useState("all");
+  const [equipmentId, setEquipmentId] = useState("all");
   const [showLinkedOnly, setShowLinkedOnly] = useState(false);
 
   // Fetch stats
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery({
     queryKey: ["intelligence-map-stats", plantId, systemId, equipmentTypeId, equipmentId, showLinkedOnly],
     queryFn: () => intelligenceMapAPI.getStats({
-      plantId: plantId || undefined,
-      systemId: systemId || undefined,
-      equipmentTypeId: equipmentTypeId || undefined,
-      equipmentId: equipmentId || undefined,
+      plantId: plantId !== "all" ? plantId : undefined,
+      systemId: systemId !== "all" ? systemId : undefined,
+      equipmentTypeId: equipmentTypeId !== "all" ? equipmentTypeId : undefined,
+      equipmentId: equipmentId !== "all" ? equipmentId : undefined,
       showLinkedOnly,
     }),
     staleTime: 30000, // 30 seconds
@@ -519,7 +536,7 @@ const IntelligenceMapTab = () => {
                 <SelectValue placeholder="All Plants" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Plants</SelectItem>
+                <SelectItem value="all">All Plants</SelectItem>
                 {filters?.plants?.map((plant) => (
                   <SelectItem key={plant.id} value={plant.id}>
                     {plant.name}
@@ -534,9 +551,9 @@ const IntelligenceMapTab = () => {
                 <SelectValue placeholder="All Systems" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Systems</SelectItem>
+                <SelectItem value="all">All Systems</SelectItem>
                 {filters?.systems
-                  ?.filter(s => !plantId || s.parent_id === plantId)
+                  ?.filter(s => plantId === "all" || s.parent_id === plantId)
                   ?.map((system) => (
                     <SelectItem key={system.id} value={system.id}>
                       {system.name}
@@ -551,7 +568,7 @@ const IntelligenceMapTab = () => {
                 <SelectValue placeholder="All Equipment Types" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Equipment Types</SelectItem>
+                <SelectItem value="all">All Equipment Types</SelectItem>
                 {filters?.equipment_types?.map((et) => (
                   <SelectItem key={et.id} value={et.id}>
                     {et.name}
