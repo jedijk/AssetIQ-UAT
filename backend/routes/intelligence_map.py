@@ -101,24 +101,23 @@ async def get_intelligence_map_stats(
         equipment_types_with_fm_in_use = fm_equipment_types_set.intersection(equipment_types_in_use_set)
         equipment_types_with_fm_in_use_count = len(equipment_types_with_fm_in_use)
         
-        # ========== STRATEGIES (Equipment Type Strategies) ==========
+        # ========== STRATEGIES (Maintenance Strategies) ==========
+        # Use maintenance_strategies collection (what Maintenance Strategy tab shows)
         strategy_query = {}
         if equipment_type_id:
             strategy_query["equipment_type_id"] = equipment_type_id
             
-        strategies_count = await db.equipment_type_strategies.count_documents(strategy_query)
+        strategies_count = await db.maintenance_strategies.count_documents(strategy_query)
         
-        # Count total failure mode strategies and task templates
+        # Count task templates from maintenance strategies
         strategy_pipeline = [
             {"$match": strategy_query},
             {"$group": {
                 "_id": None,
-                "total_fm_strategies": {"$sum": {"$size": {"$ifNull": ["$failure_mode_strategies", []]}}},
                 "total_task_templates": {"$sum": {"$size": {"$ifNull": ["$task_templates", []]}}}
             }}
         ]
-        strategy_agg = await db.equipment_type_strategies.aggregate(strategy_pipeline).to_list(1)
-        total_fm_strategies = strategy_agg[0]["total_fm_strategies"] if strategy_agg else 0
+        strategy_agg = await db.maintenance_strategies.aggregate(strategy_pipeline).to_list(1)
         total_task_templates = strategy_agg[0]["total_task_templates"] if strategy_agg else 0
         
         # ========== EQUIPMENT ==========
@@ -270,7 +269,7 @@ async def get_intelligence_map_stats(
             covered_equipment = 0
         
         # Strategy Density: Total strategies per asset
-        strategy_density = round(total_fm_strategies / equipment_count, 1) if equipment_count > 0 else 0
+        strategy_density = round(strategies_count / equipment_count, 1) if equipment_count > 0 else 0
         
         # PM Source Split: Generated vs Imported
         total_pm_tasks = program_stats.get("total_tasks", 0)
@@ -298,7 +297,6 @@ async def get_intelligence_map_stats(
             },
             "strategies": {
                 "count": strategies_count,
-                "failure_mode_strategies": total_fm_strategies,
                 "task_templates": total_task_templates,
                 "label": "Strategies"
             },
