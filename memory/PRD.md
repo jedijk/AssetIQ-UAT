@@ -7,6 +7,13 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Apply Strategy — remove programs & schedules for DESELECTED equipment (VERIFIED)**:
+  - When a user unticks equipment in the Apply Strategy dialog and confirms, the backend now also **removes** the `maintenance_programs`, `maintenance_programs_v2`, and `scheduled_tasks` records for any equipment of that type that was deselected. The dialog now acts as the single source of truth for strategy coverage.
+  - Backend (`routes/maintenance_scheduler/programs.py` `_apply_strategy_to_equipment_impl`): computes `deselected_equipment_ids = (all equipment_nodes of this type) − (request.equipment_ids)`, then `delete_many` on the 3 collections scoped by `equipment_type_id`. The response surfaces `deselected_equipment_count`, `deselected_programs_removed`, `deselected_v2_programs_removed`, `deselected_scheduled_tasks_removed`.
+  - Frontend toast (`MaintenanceScheduleManager.jsx`) appends `· removed N program(s) and M scheduled task(s) from K deselected equipment` when any deselections were processed.
+  - Verified end-to-end via Playwright + direct MongoDB inspection on Radial Bearing strategy: opened dialog (11 pre-selected) → deselected 3 (1X-5003-0244, 1X-5004-0252, 1X-5005-0264) → Apply. Result: `maintenance_programs` dropped from 11→8 distinct equipment, `maintenance_programs_v2` 11→8, `scheduled_tasks` cleared. Re-applying with all 11 restored v2 programs to 11.
+  - Files: `/app/backend/routes/maintenance_scheduler/programs.py`, `/app/frontend/src/components/library/maintenanceSchedule/MaintenanceScheduleManager.jsx`.
+
 - [Feb 2026] **Apply Strategy dialog — auto pre-select all affected equipment (VERIFIED)**:
   - When the user clicks "Apply Strategy" in the Maintenance Schedule tab, all equipment of the strategy's equipment type are now pre-selected by default (e.g. 11 of 11). Users can still untick exceptions before confirming.
   - Implementation: `useEffect([open, affectedEquipment])` in `ApplyStrategyDialog.jsx` seeds `selectedEquipment` with every affected equipment id whenever the dialog opens. The "Select All" toggle automatically reflects as "Deselect All" since the count matches.

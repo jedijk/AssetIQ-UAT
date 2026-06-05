@@ -276,6 +276,9 @@ export function MaintenanceScheduleManager({ equipmentType }) {
         `${t("maintenance.strategyApplied")} ${data.programs_created} ${t("maintenance.programsCreatedSuffix")}` +
           (emCreated || emRegenerated
             ? ` (${emCreated} equipment programs created, ${emRegenerated} updated)`
+            : "") +
+          (data.deselected_equipment_count
+            ? ` · removed ${data.deselected_programs_removed + data.deselected_v2_programs_removed} program(s) and ${data.deselected_scheduled_tasks_removed} scheduled task(s) from ${data.deselected_equipment_count} deselected equipment`
             : ""),
       );
 

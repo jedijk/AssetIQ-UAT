@@ -72,6 +72,39 @@ async def _apply_strategy_to_equipment_impl(
     strategy_version = strategy.get("version", "1.0")
     equipment_ids = [e.get("id") for e in equipment_list if e.get("id")]
 
+    # ----- Cleanup: remove programs & scheduled tasks for DESELECTED equipment -----
+    # Any equipment of this equipment_type that is NOT in the current selection
+    # should have its previously-generated maintenance programs and scheduled tasks
+    # removed so the dialog acts as the single source of truth for strategy coverage.
+    all_type_equipment = await db.equipment_nodes.find(
+        {"equipment_type_id": equipment_type_id},
+        {"_id": 0, "id": 1},
+    ).to_list(2000)
+    all_type_equipment_ids = {e.get("id") for e in all_type_equipment if e.get("id")}
+    deselected_equipment_ids = list(all_type_equipment_ids - set(equipment_ids))
+
+    deselected_scheduled_tasks_removed = 0
+    deselected_programs_removed = 0
+    deselected_v2_programs_removed = 0
+    if deselected_equipment_ids:
+        sched_del = await db.scheduled_tasks.delete_many({
+            "equipment_id": {"$in": deselected_equipment_ids},
+            "equipment_type_id": equipment_type_id,
+        })
+        deselected_scheduled_tasks_removed = sched_del.deleted_count
+
+        prog_del = await db.maintenance_programs.delete_many({
+            "equipment_id": {"$in": deselected_equipment_ids},
+            "equipment_type_id": equipment_type_id,
+        })
+        deselected_programs_removed = prog_del.deleted_count
+
+        v2_del = await db.maintenance_programs_v2.delete_many({
+            "equipment_id": {"$in": deselected_equipment_ids},
+            "equipment_type_id": equipment_type_id,
+        })
+        deselected_v2_programs_removed = v2_del.deleted_count
+
     from services.maintenance_program_service import MaintenanceProgramService
 
     v2_sync = await MaintenanceProgramService.ensure_programs_for_equipment_ids(
@@ -123,6 +156,10 @@ async def _apply_strategy_to_equipment_impl(
             + v2_sync.get("equipment_ids_regenerated", [])
         ),
         "pm_import_programs_synced": pm_import_synced,
+        "deselected_equipment_count": len(deselected_equipment_ids),
+        "deselected_programs_removed": deselected_programs_removed,
+        "deselected_v2_programs_removed": deselected_v2_programs_removed,
+        "deselected_scheduled_tasks_removed": deselected_scheduled_tasks_removed,
     }
 
 
