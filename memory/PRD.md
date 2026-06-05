@@ -7,6 +7,14 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Apply Strategy — destructive-action confirmation step (VERIFIED)**:
+  - When the user has deselected one or more equipment in the Apply Strategy dialog and clicks "Apply Strategy", an amber-styled `AlertDialog` now appears asking them to confirm the removal of those programs/scheduled tasks. Lists each deselected equipment by name + tag, shows total counts, and warns "This action cannot be undone."
+  - If no equipment was deselected, the confirmation is skipped and Apply proceeds directly.
+  - Buttons: `Cancel` (returns to the selection dialog with state preserved) / `Yes, remove & apply` (amber button — proceeds with the apply request).
+  - Implementation: `useMemo` computes `deselectedEquipment = affectedEquipment − selectedEquipment`. `handleApplyClick` branches: deselected.length > 0 → `setConfirmOpen(true)`; else direct `onApply`.
+  - Verified via Playwright: deselect 2 of 11 Radial Bearing → click Apply → confirm dialog lists "Bearings 1X-5004-0252" + "Bearings 1X-5005-0264", says "2 equipment unchecked", "The remaining 9 equipment will have their maintenance programs created or refreshed". Cancel returns to main dialog with selection intact.
+  - Files: `/app/frontend/src/components/library/maintenanceSchedule/ApplyStrategyDialog.jsx`.
+
 - [Feb 2026] **Apply Strategy — remove programs & schedules for DESELECTED equipment (VERIFIED)**:
   - When a user unticks equipment in the Apply Strategy dialog and confirms, the backend now also **removes** the `maintenance_programs`, `maintenance_programs_v2`, and `scheduled_tasks` records for any equipment of that type that was deselected. The dialog now acts as the single source of truth for strategy coverage.
   - Backend (`routes/maintenance_scheduler/programs.py` `_apply_strategy_to_equipment_impl`): computes `deselected_equipment_ids = (all equipment_nodes of this type) − (request.equipment_ids)`, then `delete_many` on the 3 collections scoped by `equipment_type_id`. The response surfaces `deselected_equipment_count`, `deselected_programs_removed`, `deselected_v2_programs_removed`, `deselected_scheduled_tasks_removed`.
