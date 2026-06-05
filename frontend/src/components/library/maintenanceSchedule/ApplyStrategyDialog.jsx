@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Play, Loader2 } from "lucide-react";
 import { Button } from "../../ui/button";
 import { Label } from "../../ui/label";
@@ -25,6 +25,14 @@ export function ApplyStrategyDialog({
 }) {
   const { t } = useLanguage();
   const [selectedEquipment, setSelectedEquipment] = useState([]);
+
+  // Auto pre-select all affected equipment whenever the dialog opens
+  // or the affected equipment list changes. The user can then untick exceptions.
+  useEffect(() => {
+    if (open) {
+      setSelectedEquipment((affectedEquipment || []).map((e) => e.id));
+    }
+  }, [open, affectedEquipment]);
 
   const handleSelectAll = () => {
     if (selectedEquipment.length === affectedEquipment?.length) {

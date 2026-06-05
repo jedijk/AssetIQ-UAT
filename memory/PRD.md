@@ -7,6 +7,12 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Apply Strategy dialog — auto pre-select all affected equipment (VERIFIED)**:
+  - When the user clicks "Apply Strategy" in the Maintenance Schedule tab, all equipment of the strategy's equipment type are now pre-selected by default (e.g. 11 of 11). Users can still untick exceptions before confirming.
+  - Implementation: `useEffect([open, affectedEquipment])` in `ApplyStrategyDialog.jsx` seeds `selectedEquipment` with every affected equipment id whenever the dialog opens. The "Select All" toggle automatically reflects as "Deselect All" since the count matches.
+  - Verified via Playwright: opened the dialog for Radial Bearing → "11 of 11 equipment selected", Apply button enabled, all 11 bearings checked.
+  - Files: `/app/frontend/src/components/library/maintenanceSchedule/ApplyStrategyDialog.jsx`.
+
 - [Feb 2026] **PM Import AI Review — Semantic replace via LLM (VERIFIED)**:
   - The AI Review LLM now sees each candidate failure mode's FULL `recommended_actions` list (with 1-based indices) and explicitly picks `replace_action_index` — the existing action to overwrite — when it judges the new PM task semantically equivalent (e.g. "Lubricate input bearings with grease" → replaces "Improve lubrication"), else returns `null` to add a new action.
   - The stored suggestion carries `replace_action_index`, `replace_action_text`, and `target_actions_list`. The frontend renders the FM's existing actions with the to-be-replaced row highlighted in amber + strike-through, and the apply button reads "↻ Will replace with this task" vs "✓ Will add this task".
