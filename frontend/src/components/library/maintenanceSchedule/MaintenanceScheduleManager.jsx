@@ -223,16 +223,32 @@ export function MaintenanceScheduleManager({ equipmentType }) {
     onSuccess: async (data) => {
       const removed = data?.scheduled_tasks_removed ?? 0;
       const programs = data?.programs_removed ?? 0;
+      const v2Programs = data?.v2_programs_removed ?? 0;
+      const totalRemoved = removed + programs + v2Programs;
       toast.success(
-        removed > 0 || programs > 0
+        totalRemoved > 0
           ? t("maintenance.clearOrphanScheduleSuccess")
               .replace("{removed}", removed)
-              .replace("{programs}", programs)
+              .replace("{programs}", programs + v2Programs)
           : t("maintenance.clearOrphanScheduleEmpty"),
       );
-      await queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] });
-      await queryClient.refetchQueries({ queryKey: ["maintenance-scheduler"] });
-      queryClient.invalidateQueries({ queryKey: ["maintenance-program"] });
+      // Invalidate and refetch all maintenance scheduler related queries
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler-dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler-programs-summary"] }),
+        queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler-timeline"] }),
+        queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler-tasks"] }),
+        queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] }),
+        queryClient.invalidateQueries({ queryKey: ["maintenance-program"] }),
+        queryClient.invalidateQueries({ queryKey: ["maintenance-strategy-v2"] }),
+      ]);
+      // Force refetch to immediately update the UI
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["maintenance-scheduler-dashboard"] }),
+        queryClient.refetchQueries({ queryKey: ["maintenance-scheduler-programs-summary"] }),
+        queryClient.refetchQueries({ queryKey: ["maintenance-scheduler-timeline"] }),
+        queryClient.refetchQueries({ queryKey: ["maintenance-scheduler-tasks"] }),
+      ]);
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || t("maintenance.clearOrphanScheduleFailed"));

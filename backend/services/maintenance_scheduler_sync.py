@@ -600,14 +600,40 @@ async def cleanup_schedules_without_strategy(
         )
         programs_deleted = programs_result.deleted_count
 
+    # Also clean up maintenance_programs_v2 with missing strategies
+    v2_program_query: Dict[str, Any] = {}
+    if equipment_type_id:
+        v2_program_query["equipment_type_id"] = equipment_type_id
+    
+    orphan_v2_program_ids: List[str] = []
+    async for prog in db.maintenance_programs_v2.find(
+        v2_program_query,
+        {"id": 1, "equipment_type_id": 1, "_id": 0},
+    ):
+        eq_type = prog.get("equipment_type_id")
+        if eq_type and eq_type not in active_strategy_types:
+            prog_id = prog.get("id")
+            if prog_id:
+                orphan_v2_program_ids.append(prog_id)
+            if eq_type not in missing_strategy_ids:
+                missing_strategy_ids.add(eq_type)
+
+    v2_programs_deleted = 0
+    if orphan_v2_program_ids:
+        v2_result = await db.maintenance_programs_v2.delete_many(
+            {"id": {"$in": orphan_v2_program_ids}},
+        )
+        v2_programs_deleted = v2_result.deleted_count
+
     return {
         "equipment_type_id": equipment_type_id,
         "equipment_types_cleaned": len(missing_strategy_ids),
         "scheduled_tasks_deleted": scheduled_tasks_deleted,
         "programs_deleted": programs_deleted,
-        "v2_programs_deleted": 0,
+        "v2_programs_deleted": v2_programs_deleted,
         "missing_strategy_ids": sorted(missing_strategy_ids),
         "orphan_program_ids": orphan_program_ids,
+        "orphan_v2_program_ids": orphan_v2_program_ids,
     }
 
 
