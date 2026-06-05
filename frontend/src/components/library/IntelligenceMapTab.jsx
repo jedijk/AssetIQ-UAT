@@ -219,13 +219,13 @@ const SankeyDiagram = ({ data, isLoading }) => {
   const sankeyData = useMemo(() => {
     if (!data || isLoading) return null;
 
-    // Define nodes - Full flow: FM → Equipment Types → Strategies → Programs → Equipment → Schedules → Planned Work
+    // Define nodes - Full flow: FM → Equipment Types → Strategies → Programs → Schedules → Planned Work
+    // ("Equipment" was removed: it duplicates information already conveyed by Programs.)
     const nodes = [
       { id: "failure_modes", name: "Failure Modes", color: "#3B82F6" },
       { id: "equipment_types", name: "Equipment Types", color: "#10B981" },
       { id: "strategies", name: "Strategies", color: "#8B5CF6" },
       { id: "maintenance_programs", name: "Programs", color: "#6366F1" },
-      { id: "equipment", name: "Equipment", color: "#F59E0B" },
       { id: "schedules", name: "Schedules", color: "#14B8A6" },
       { id: "planned_work", name: "Planned Work", color: "#64748B" },
       { id: "pm_imports", name: "PM Imports", color: "#A855F7" },
@@ -258,17 +258,11 @@ const SankeyDiagram = ({ data, isLoading }) => {
       });
     }
     if (relationships.programs_to_equipment?.value > 0) {
+      // Direct programs → schedules now (equipment node removed)
       links.push({
         source: "maintenance_programs",
-        target: "equipment",
-        value: relationships.programs_to_equipment.value,
-      });
-    }
-    if (relationships.equipment_to_schedules?.value > 0) {
-      links.push({
-        source: "equipment",
         target: "schedules",
-        value: relationships.equipment_to_schedules.value,
+        value: data?.schedules?.for_applied || relationships.programs_to_equipment.value,
       });
     }
     if (relationships.schedules_to_work?.value > 0) {
@@ -296,8 +290,7 @@ const SankeyDiagram = ({ data, isLoading }) => {
         { source: "failure_modes", target: "equipment_types", value: 1 },
         { source: "equipment_types", target: "strategies", value: 1 },
         { source: "strategies", target: "maintenance_programs", value: 1 },
-        { source: "maintenance_programs", target: "equipment", value: 1 },
-        { source: "equipment", target: "schedules", value: 1 },
+        { source: "maintenance_programs", target: "schedules", value: 1 },
         { source: "schedules", target: "planned_work", value: 1 },
       );
     }
@@ -700,19 +693,7 @@ const IntelligenceMapTab = () => {
                   color="indigo"
                   isLoading={statsLoading}
                 />
-                <FlowArrow value={stats?.relationships?.programs_to_equipment?.value} />
-                
-                <FlowCard
-                  icon={Building2}
-                  title="Equipment"
-                  count={stats?.equipment?.with_active_program}
-                  subtitle="Active Program"
-                  relationship={`${stats?.equipment?.with_strategy_applied || 0} strategy · ${stats?.equipment?.with_pm_import || 0} PM import`}
-                  onClick={navigateToEquipment}
-                  color="amber"
-                  isLoading={statsLoading}
-                />
-                <FlowArrow value={stats?.relationships?.equipment_to_schedules?.value} />
+                <FlowArrow value={stats?.schedules?.for_applied} />
                 
                 <FlowCard
                   icon={Calendar}
