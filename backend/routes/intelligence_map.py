@@ -83,26 +83,34 @@ async def get_intelligence_map_stats(
             "equipment_type_id": {"$ne": None, "$exists": True}
         })
         equipment_types_in_use_set = set([et for et in equipment_types_in_use if et])
+        equipment_types_in_use_list = list(equipment_types_in_use_set)
         
         # ========== FAILURE MODES (only those linked to equipment types in use) ==========
-        fm_query = {}
+        # Failure modes use equipment_type_ids (array) not equipment_type_id
         if equipment_type_id:
-            fm_query["equipment_type_id"] = equipment_type_id
+            fm_query = {"equipment_type_ids": equipment_type_id}
         elif equipment_types_in_use_set:
             # Only count failure modes linked to equipment types actually in use
-            fm_query["equipment_type_id"] = {"$in": list(equipment_types_in_use_set)}
+            fm_query = {"equipment_type_ids": {"$elemMatch": {"$in": equipment_types_in_use_list}}}
+        else:
+            fm_query = {}
         
         failure_modes_count = await db.failure_modes.count_documents(fm_query)
         
-        # Count unique equipment types with failure modes (that are in use)
-        fm_equipment_types = await db.failure_modes.distinct("equipment_type_id", fm_query)
-        fm_equipment_types_set = set([et for et in fm_equipment_types if et])
+        # Get unique equipment types with failure modes (that are in use)
+        # Use aggregation to unwind equipment_type_ids and find intersection
+        fm_et_pipeline = [
+            {"$match": {"equipment_type_ids": {"$exists": True, "$ne": []}}},
+            {"$unwind": "$equipment_type_ids"},
+            {"$match": {"equipment_type_ids": {"$in": equipment_types_in_use_list}}},
+            {"$group": {"_id": "$equipment_type_ids"}}
+        ]
+        fm_et_result = await db.failure_modes.aggregate(fm_et_pipeline).to_list(1000)
+        fm_equipment_types_set = set([r["_id"] for r in fm_et_result if r["_id"]])
         fm_equipment_types_count = len(fm_equipment_types_set)
         
         # Count equipment types that have failure modes AND are used in equipment
-        # This shows how many equipment types with FM knowledge are actually deployed
-        equipment_types_with_fm_in_use = fm_equipment_types_set.intersection(equipment_types_in_use_set)
-        equipment_types_with_fm_in_use_count = len(equipment_types_with_fm_in_use)
+        equipment_types_with_fm_in_use_count = fm_equipment_types_count  # Same as above since we already filtered
         
         # ========== STRATEGIES (Maintenance Strategies) ==========
         # Use maintenance_strategies collection (what Maintenance Strategy tab shows)
@@ -256,11 +264,10 @@ async def get_intelligence_map_stats(
         
         # Failure Mode Coverage: Equipment with linked failure modes / Total equipment
         # This requires checking equipment that have equipment_type_id that has failure modes
-        equipment_types_with_fm = set(fm_equipment_types)
-        if equipment_types_with_fm and equipment_count > 0:
+        if fm_equipment_types_set and equipment_count > 0:
             covered_equipment = await db.equipment_nodes.count_documents({
                 **equipment_query,
-                "equipment_type_id": {"$in": list(equipment_types_with_fm)}
+                "equipment_type_id": {"$in": list(fm_equipment_types_set)}
             })
             failure_mode_coverage = round((covered_equipment / equipment_count) * 100, 1) if equipment_count > 0 else 0
         else:
