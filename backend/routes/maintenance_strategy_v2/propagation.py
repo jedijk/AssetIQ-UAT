@@ -296,9 +296,11 @@ async def _resync_programs_with_strategy(equipment_type_id: str):
     ).to_list(5000)
 
     now = datetime.now(timezone.utc).isoformat()
-    activated = 0
-    deactivated = 0
-    scheduled_cancelled = 0
+    
+    # Collect program IDs to activate/deactivate in bulk
+    programs_to_activate = []
+    programs_to_deactivate = []
+    program_ids_to_cancel_tasks = []
 
     for prog in programs:
         tid = prog.get("task_template_id")
@@ -319,28 +321,46 @@ async def _resync_programs_with_strategy(equipment_type_id: str):
                 new_active = any(fm.get("enabled") is not False for fm in linked_fms)
 
         if prog.get("is_active") != new_active:
-            await db.maintenance_programs.update_one(
-                {"_id": prog["_id"]},
-                {"$set": {"is_active": new_active, "updated_at": now}},
-            )
             if new_active:
-                activated += 1
+                programs_to_activate.append(prog["_id"])
             else:
-                deactivated += 1
+                programs_to_deactivate.append(prog["_id"])
+                if prog.get("id"):
+                    program_ids_to_cancel_tasks.append(prog["id"])
 
-            if not new_active:
-                r = await db.scheduled_tasks.update_many(
-                    {
-                        "maintenance_program_id": prog.get("id"),
-                        "status": {"$nin": ["completed", "cancelled"]},
-                    },
-                    {"$set": {
-                        "status": "cancelled",
-                        "notes": "Auto-cancelled: source task or failure mode disabled",
-                        "updated_at": now,
-                    }},
-                )
-                scheduled_cancelled += r.modified_count
+    # Bulk update programs - activate
+    activated = 0
+    if programs_to_activate:
+        result = await db.maintenance_programs.update_many(
+            {"_id": {"$in": programs_to_activate}},
+            {"$set": {"is_active": True, "updated_at": now}},
+        )
+        activated = result.modified_count
+
+    # Bulk update programs - deactivate
+    deactivated = 0
+    if programs_to_deactivate:
+        result = await db.maintenance_programs.update_many(
+            {"_id": {"$in": programs_to_deactivate}},
+            {"$set": {"is_active": False, "updated_at": now}},
+        )
+        deactivated = result.modified_count
+
+    # Bulk cancel scheduled tasks for deactivated programs
+    scheduled_cancelled = 0
+    if program_ids_to_cancel_tasks:
+        result = await db.scheduled_tasks.update_many(
+            {
+                "maintenance_program_id": {"$in": program_ids_to_cancel_tasks},
+                "status": {"$nin": ["completed", "cancelled"]},
+            },
+            {"$set": {
+                "status": "cancelled",
+                "notes": "Auto-cancelled: source task or failure mode disabled",
+                "updated_at": now,
+            }},
+        )
+        scheduled_cancelled = result.modified_count
 
     return {
         "programs_activated": activated,
