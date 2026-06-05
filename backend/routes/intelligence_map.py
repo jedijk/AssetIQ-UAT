@@ -219,42 +219,44 @@ async def get_intelligence_map_stats(
         }
         planned_work_count = await db.scheduled_tasks.count_documents(planned_work_query)
         
-        # ========== PM IMPORTS ==========
-        pm_import_query = {"user_id": user_id}
-        pm_sessions_count = await db.pm_import_sessions.count_documents(pm_import_query)
-        
-        # Count total imported tasks
+        # ========== PM IMPORTS (Accepted tasks without failure mode linkage) ==========
+        # Count accepted/imported tasks from maintenance programs that are NOT connected to failure modes
         pm_tasks_pipeline = [
-            {"$match": pm_import_query},
-            {"$group": {
-                "_id": None,
-                "total_tasks": {"$sum": {"$size": {"$ifNull": ["$tasks", []]}}},
-                "imported_count": {
-                    "$sum": {
-                        "$size": {
-                            "$filter": {
-                                "input": {"$ifNull": ["$tasks", []]},
-                                "as": "task",
-                                "cond": {"$eq": ["$$task.review_status", "imported"]}
-                            }
-                        }
-                    }
-                },
-                "accepted_count": {
-                    "$sum": {
-                        "$size": {
-                            "$filter": {
-                                "input": {"$ifNull": ["$tasks", []]},
-                                "as": "task",
-                                "cond": {"$eq": ["$$task.review_status", "accepted"]}
-                            }
-                        }
-                    }
-                }
-            }}
+            {"$unwind": "$tasks"},
+            {"$match": {
+                "tasks.task_source": "imported",
+                "$or": [
+                    {"tasks.traceability.failure_mode_id": None},
+                    {"tasks.traceability.failure_mode_id": {"$exists": False}},
+                    {"tasks.traceability.failure_mode_id": ""}
+                ]
+            }},
+            {"$count": "count"}
         ]
-        pm_tasks_agg = await db.pm_import_sessions.aggregate(pm_tasks_pipeline).to_list(1)
-        pm_stats = pm_tasks_agg[0] if pm_tasks_agg else {"total_tasks": 0, "imported_count": 0, "accepted_count": 0}
+        pm_imported_no_fm = await db.maintenance_programs_v2.aggregate(pm_tasks_pipeline).to_list(1)
+        pm_imported_no_fm_count = pm_imported_no_fm[0]["count"] if pm_imported_no_fm else 0
+        
+        # Also count from pm_import_sessions for accepted tasks without failure_mode
+        pm_sessions_pipeline = [
+            {"$unwind": {"path": "$tasks", "preserveNullAndEmptyArrays": False}},
+            {"$match": {
+                "tasks.review_status": "accepted",
+                "$or": [
+                    {"tasks.failure_mode_id": None},
+                    {"tasks.failure_mode_id": {"$exists": False}},
+                    {"tasks.failure_mode_id": ""}
+                ]
+            }},
+            {"$count": "count"}
+        ]
+        pm_sessions_accepted = await db.pm_import_sessions.aggregate(pm_sessions_pipeline).to_list(1)
+        pm_sessions_accepted_count = pm_sessions_accepted[0]["count"] if pm_sessions_accepted else 0
+        
+        # Total accepted PM tasks not connected to failure modes
+        pm_accepted_no_fm_total = pm_imported_no_fm_count + pm_sessions_accepted_count
+        
+        # Also get session count for reference
+        pm_sessions_count = await db.pm_import_sessions.count_documents({})
         
         # ========== CALCULATE KPIs ==========
         
@@ -333,12 +335,10 @@ async def get_intelligence_map_stats(
                 "label": "Planned Work"
             },
             
-            # Secondary flow (PM Imports)
+            # Secondary flow (PM Imports - accepted tasks not connected to failure modes)
             "pm_imports": {
                 "sessions": pm_sessions_count,
-                "total_tasks": pm_stats.get("total_tasks", 0),
-                "imported": pm_stats.get("imported_count", 0),
-                "accepted": pm_stats.get("accepted_count", 0),
+                "accepted_no_fm": pm_accepted_no_fm_total,  # Accepted PM tasks NOT connected to failure modes
                 "label": "PM Imports"
             },
             
@@ -374,11 +374,11 @@ async def get_intelligence_map_stats(
                     "target": "planned_work",
                     "value": planned_work_count
                 },
-                # PM Import flow
+                # PM Import flow (accepted tasks not connected to failure modes)
                 "pm_to_programs": {
                     "source": "pm_imports",
                     "target": "maintenance_programs",
-                    "value": pm_stats.get("imported_count", 0)
+                    "value": pm_accepted_no_fm_total
                 }
             },
             

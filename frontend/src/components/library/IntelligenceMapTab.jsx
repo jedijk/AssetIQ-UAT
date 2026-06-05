@@ -643,9 +643,9 @@ const IntelligenceMapTab = () => {
                 <FlowCard
                   icon={Building2}
                   title="Equipment"
-                  count={stats?.equipment?.count}
-                  subtitle="Assets"
-                  relationship={`${stats?.equipment?.with_type || 0} with assigned type`}
+                  count={stats?.equipment?.with_type}
+                  subtitle="With Type Assigned"
+                  relationship={`${stats?.equipment?.count || 0} total assets`}
                   onClick={navigateToEquipment}
                   color="amber"
                   isLoading={statsLoading}
@@ -697,7 +697,7 @@ const IntelligenceMapTab = () => {
                 PM Import Integration
               </CardTitle>
               <CardDescription className="text-xs">
-                Imported maintenance tasks integrate into the same execution workflow
+                Accepted PM tasks not connected to failure modes
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -705,9 +705,9 @@ const IntelligenceMapTab = () => {
                 <FlowCard
                   icon={Upload}
                   title="PM Imports"
-                  count={stats?.pm_imports?.total_tasks}
-                  subtitle={`${stats?.pm_imports?.sessions || 0} Sessions`}
-                  relationship={`${stats?.pm_imports?.imported || 0} imported to library`}
+                  count={stats?.pm_imports?.accepted_no_fm}
+                  subtitle="Without Failure Mode"
+                  relationship={`${stats?.pm_imports?.sessions || 0} import sessions`}
                   onClick={navigateToPMImport}
                   color="purple"
                   isLoading={statsLoading}
