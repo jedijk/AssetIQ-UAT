@@ -719,6 +719,43 @@ const IntelligenceMapTab = () => {
                   count={stats?.schedules?.for_applied}
                   subtitle="Active Frequencies"
                   relationship={`Create ${stats?.planned_work?.for_applied || 0} Planned Tasks`}
+                  tooltipContent={
+                    <div className="text-xs space-y-2 py-1 min-w-[200px]">
+                      <div className="font-semibold text-slate-700">
+                        Active Schedules Breakdown
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-1.5">
+                            <Cog className="w-3 h-3 text-teal-600" />
+                            <span className="text-slate-600">From Strategy</span>
+                          </div>
+                          <span className="font-semibold text-slate-900">
+                            {(stats?.schedules?.from_strategy || 0).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-1.5">
+                            <Upload className="w-3 h-3 text-teal-600" />
+                            <span className="text-slate-600">From PM Import</span>
+                          </div>
+                          <span className="font-semibold text-slate-900">
+                            {(stats?.schedules?.from_pm_import || 0).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="h-px bg-slate-200 my-1" />
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="text-slate-700 font-medium">Total Active</span>
+                          <span className="font-bold text-teal-700">
+                            {(stats?.schedules?.for_applied || 0).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-[10px] text-slate-500 pt-1 border-t border-slate-200">
+                        Click to open scheduled tasks
+                      </div>
+                    </div>
+                  }
                   onClick={navigateToSchedules}
                   color="teal"
                   isLoading={statsLoading}

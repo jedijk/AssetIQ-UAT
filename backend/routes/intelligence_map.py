@@ -407,6 +407,8 @@ async def get_intelligence_map_stats(
             "schedules": {
                 "count": schedules_count,
                 "for_applied": schedules_for_applied_count,
+                "from_strategy": strategy_active_tasks_total,
+                "from_pm_import": pm_tasks_active_count,
                 "by_status": schedule_by_status,
                 "missing_frequency": schedules_missing_freq,
                 "label": "Schedules"
