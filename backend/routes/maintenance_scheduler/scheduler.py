@@ -50,47 +50,67 @@ async def schedule_program(program: dict, horizon_days: int = DEFAULT_HORIZON_DA
     except (TypeError, ValueError):
         current_due = today
 
-    created_ids: List[str] = []
+    # Build the list of candidate due dates up-front, then do ONE existence query
+    # for all dates and ONE insert_many for the missing ones — replaces the old
+    # per-occurrence find_one + insert_one round-trips (was the dominant cost).
+    candidate_dates: List[str] = []
     occurrences = 0
-    last_created_iso: Optional[str] = None
     while current_due <= horizon_date_obj and occurrences < MAX_OCCURRENCES_PER_PROGRAM:
-        iso = current_due.isoformat()
-        existing_task = await db.scheduled_tasks.find_one({
-            "maintenance_program_id": program_id,
-            "due_date": iso,
-            "status": {"$nin": [TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value]},
-        })
-        if not existing_task:
-            days_until_due = (current_due - today).days
-            is_overdue = days_until_due < 0
-            priority = calculate_priority(criticality, days_until_due, is_overdue)
-
-            task = ScheduledTask(
-                equipment_id=program.get("equipment_id"),
-                equipment_name=program.get("equipment_name"),
-                equipment_tag=program.get("equipment_tag"),
-                task_name=program.get("task_name"),
-                task_description=program.get("task_description"),
-                task_type=program.get("task_type"),
-                due_date=iso,
-                planned_date=iso,
-                priority=priority,
-                status=TaskStatus.SCHEDULED,
-                estimated_hours=program.get("estimated_duration_hours", 1.0),
-                maintenance_program_id=program_id,
-                strategy_id=program.get("strategy_id"),
-                strategy_version=program.get("strategy_version"),
-                failure_mode_id=program.get("failure_mode_id"),
-                failure_mode_name=program.get("failure_mode_name"),
-                task_source=program.get("task_source"),
-                pm_import_task_id=program.get("pm_import_task_id"),
-            )
-            await db.scheduled_tasks.insert_one(task.model_dump())
-            created_ids.append(task.id)
-            last_created_iso = iso
-
+        candidate_dates.append(current_due.isoformat())
         occurrences += 1
         current_due = current_due + timedelta(days=freq_days)
+
+    if not candidate_dates:
+        return []
+
+    # Single batch existence check
+    existing_docs = await db.scheduled_tasks.find(
+        {
+            "maintenance_program_id": program_id,
+            "due_date": {"$in": candidate_dates},
+            "status": {"$nin": [TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value]},
+        },
+        {"_id": 0, "due_date": 1},
+    ).to_list(len(candidate_dates))
+    existing_dates = {d["due_date"] for d in existing_docs}
+
+    new_tasks = []
+    created_ids: List[str] = []
+    last_created_iso: Optional[str] = None
+    for iso in candidate_dates:
+        if iso in existing_dates:
+            continue
+        due_date_obj = datetime.fromisoformat(iso).date()
+        days_until_due = (due_date_obj - today).days
+        is_overdue = days_until_due < 0
+        priority = calculate_priority(criticality, days_until_due, is_overdue)
+
+        task = ScheduledTask(
+            equipment_id=program.get("equipment_id"),
+            equipment_name=program.get("equipment_name"),
+            equipment_tag=program.get("equipment_tag"),
+            task_name=program.get("task_name"),
+            task_description=program.get("task_description"),
+            task_type=program.get("task_type"),
+            due_date=iso,
+            planned_date=iso,
+            priority=priority,
+            status=TaskStatus.SCHEDULED,
+            estimated_hours=program.get("estimated_duration_hours", 1.0),
+            maintenance_program_id=program_id,
+            strategy_id=program.get("strategy_id"),
+            strategy_version=program.get("strategy_version"),
+            failure_mode_id=program.get("failure_mode_id"),
+            failure_mode_name=program.get("failure_mode_name"),
+            task_source=program.get("task_source"),
+            pm_import_task_id=program.get("pm_import_task_id"),
+        )
+        new_tasks.append(task.model_dump())
+        created_ids.append(task.id)
+        last_created_iso = iso
+
+    if new_tasks:
+        await db.scheduled_tasks.insert_many(new_tasks)
 
     if last_created_iso:
         await db.maintenance_programs.update_one(
@@ -112,15 +132,24 @@ async def schedule_programs_for_equipment_type(equipment_type_id: str, horizon_d
 
 
 async def schedule_programs_for_equipment(equipment_ids: List[str], horizon_days: int = DEFAULT_HORIZON_DAYS) -> int:
-    """Generate scheduled tasks for all active programs of given equipment ids."""
+    """Generate scheduled tasks for all active programs of given equipment ids.
+
+    Runs program-level scheduling concurrently with asyncio.gather — each
+    schedule_program is independent so the total time is bounded by the
+    slowest single program instead of the sum.
+    """
     if not equipment_ids:
         return 0
-    total = 0
-    cursor = db.maintenance_programs.find({"equipment_id": {"$in": equipment_ids}, "is_active": True})
-    async for program in cursor:
-        created = await schedule_program(program, horizon_days)
-        total += len(created)
-    return total
+    import asyncio as _asyncio
+    programs = await db.maintenance_programs.find(
+        {"equipment_id": {"$in": equipment_ids}, "is_active": True}
+    ).to_list(5000)
+    if not programs:
+        return 0
+    results = await _asyncio.gather(
+        *[schedule_program(p, horizon_days) for p in programs]
+    )
+    return sum(len(r) for r in results)
 
 
 @router.post("/cleanup-orphans")

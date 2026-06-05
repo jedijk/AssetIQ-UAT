@@ -297,6 +297,7 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
             or "/ril/copilot" in request.url.path
             or "/ril/predictions" in request.url.path
             or "/ril/correlations/find" in request.url.path
+            or "/apply-strategy" in request.url.path
         ):
             request_timeout = self.long_timeout
         else:

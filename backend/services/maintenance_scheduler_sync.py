@@ -811,8 +811,17 @@ async def filter_schedulable_programs(
 async def refresh_equipment_schedule(
     equipment_id: str,
     user_id: Optional[str] = None,
+    skip_scheduling: bool = False,
+    strategy: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Refresh scheduler programs + occurrences for a single equipment item."""
+    """Refresh scheduler programs + occurrences for a single equipment item.
+
+    When called as part of a batch (apply-strategy across many equipment),
+    callers can pass `skip_scheduling=True` to defer the (heavy) horizon
+    generation, then do ONE batched `schedule_programs_for_equipment(all_ids)`
+    call afterwards. They can also pass a pre-loaded `strategy` doc to avoid
+    re-fetching equipment_type_strategies on every call.
+    """
     from routes.maintenance_scheduler.scheduler import schedule_programs_for_equipment
     from services.maintenance_program_service import MaintenanceProgramService
 
@@ -821,8 +830,7 @@ async def refresh_equipment_schedule(
         return {"equipment_id": equipment_id, "skipped": True, "reason": "equipment_not_found"}
 
     equipment_type_id = equipment.get("equipment_type_id")
-    strategy = None
-    if equipment_type_id:
+    if strategy is None and equipment_type_id:
         strategy = await db.equipment_type_strategies.find_one(
             {"equipment_type_id": equipment_type_id},
             {"_id": 0},
@@ -838,7 +846,9 @@ async def refresh_equipment_schedule(
         user_id=user_id,
         schedule=False,
     )
-    scheduled_created = await schedule_programs_for_equipment([equipment_id])
+    scheduled_created = 0
+    if not skip_scheduling:
+        scheduled_created = await schedule_programs_for_equipment([equipment_id])
 
     active_program_count = await db.maintenance_programs.count_documents(
         {"equipment_id": equipment_id, "is_active": True},
