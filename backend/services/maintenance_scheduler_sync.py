@@ -9,7 +9,14 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from database import db
 from models.maintenance_program import TaskSource
 from models.maintenance_scheduler import CriticalityLevel, EquipmentMaintenanceProgram
-from services.scheduler_helpers import frequency_to_days, normalize_program_criticality
+from services.scheduler_helpers import (
+    frequency_to_days,
+    normalize_program_criticality,
+    program_has_active_strategy,
+    program_is_strategy_backed,
+    program_is_schedulable,
+    STRATEGY_EXEMPT_TASK_SOURCES,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -467,11 +474,8 @@ async def clear_equipment_type_schedule_after_strategy_delete(
     }
 
 
-async def cleanup_schedules_without_strategy(
-    equipment_type_id: Optional[str] = None,
-) -> Dict[str, Any]:
-    """Remove scheduler data for equipment types that no longer have a strategy."""
-    existing_strategy_types = {
+async def _active_strategy_type_ids() -> Set[str]:
+    return {
         doc["equipment_type_id"]
         async for doc in db.equipment_type_strategies.find(
             {},
@@ -479,43 +483,130 @@ async def cleanup_schedules_without_strategy(
         )
     }
 
-    types_to_clean: Set[str] = set()
+
+async def _equipment_ids_for_type(equipment_type_id: str) -> Set[str]:
+    equipment_ids: Set[str] = set()
+    async for eq in db.equipment_nodes.find(
+        {"equipment_type_id": equipment_type_id},
+        {"id": 1, "_id": 0},
+    ):
+        if eq.get("id"):
+            equipment_ids.add(eq["id"])
+    async for prog in db.maintenance_programs.find(
+        {"$or": [{"equipment_type_id": equipment_type_id}, {"strategy_id": equipment_type_id}]},
+        {"equipment_id": 1, "_id": 0},
+    ):
+        if prog.get("equipment_id"):
+            equipment_ids.add(prog["equipment_id"])
+    return equipment_ids
+
+
+async def cleanup_schedules_without_strategy(
+    equipment_type_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Remove strategy-backed programs/tasks whose equipment-type strategy no longer exists."""
+    active_strategy_types = await _active_strategy_type_ids()
+    scoped_equipment_ids: Optional[Set[str]] = None
     if equipment_type_id:
-        if equipment_type_id not in existing_strategy_types:
-            types_to_clean.add(equipment_type_id)
-    else:
-        async for prog in db.maintenance_programs.find(
-            {},
-            {"equipment_type_id": 1, "_id": 0},
-        ):
-            et_id = prog.get("equipment_type_id")
-            if et_id and et_id not in existing_strategy_types:
-                types_to_clean.add(et_id)
+        scoped_equipment_ids = await _equipment_ids_for_type(equipment_type_id)
 
-        async for task in db.scheduled_tasks.find(
-            {"status": OPEN_TASK_STATUSES},
-            {"strategy_id": 1, "_id": 0},
-        ):
-            strategy_id = task.get("strategy_id")
-            if strategy_id and strategy_id not in existing_strategy_types:
-                types_to_clean.add(strategy_id)
+    program_query: Dict[str, Any] = {}
+    if equipment_type_id:
+        program_query["$or"] = [
+            {"equipment_type_id": equipment_type_id},
+            {"strategy_id": equipment_type_id},
+        ]
 
-    totals: Dict[str, Any] = {
-        "equipment_types_cleaned": len(types_to_clean),
-        "scheduled_tasks_deleted": 0,
-        "programs_deleted": 0,
-        "v2_programs_deleted": 0,
-        "details": [],
+    orphan_program_ids: List[str] = []
+    missing_strategy_ids: Set[str] = set()
+
+    async for prog in db.maintenance_programs.find(
+        program_query,
+        {
+            "id": 1,
+            "strategy_id": 1,
+            "equipment_type_id": 1,
+            "task_source": 1,
+            "pm_import_task_id": 1,
+            "_id": 0,
+        },
+    ):
+        if not program_is_strategy_backed(prog):
+            continue
+        if program_has_active_strategy(prog, active_strategy_types):
+            continue
+        program_id = prog.get("id")
+        if program_id:
+            orphan_program_ids.append(program_id)
+        for key in ("strategy_id", "equipment_type_id"):
+            value = prog.get(key)
+            if value and value not in active_strategy_types:
+                missing_strategy_ids.add(value)
+
+    if equipment_type_id and equipment_type_id not in active_strategy_types:
+        missing_strategy_ids.add(equipment_type_id)
+
+    all_program_ids = {
+        p["id"]
+        async for p in db.maintenance_programs.find({}, {"id": 1, "_id": 0})
+        if p.get("id")
     }
 
-    for et_id in sorted(types_to_clean):
-        result = await clear_equipment_type_schedule_after_strategy_delete(et_id)
-        totals["scheduled_tasks_deleted"] += result.get("scheduled_tasks_deleted", 0)
-        totals["programs_deleted"] += result.get("programs_deleted", 0)
-        totals["v2_programs_deleted"] += result.get("v2_programs_deleted", 0)
-        totals["details"].append(result)
+    task_delete_filters: List[Dict[str, Any]] = []
+    if orphan_program_ids:
+        task_delete_filters.append({"maintenance_program_id": {"$in": orphan_program_ids}})
 
-    return totals
+    if missing_strategy_ids:
+        strategy_task_filter: Dict[str, Any] = {
+            "strategy_id": {"$in": list(missing_strategy_ids)},
+            "task_source": {"$nin": list(STRATEGY_EXEMPT_TASK_SOURCES)},
+        }
+        if scoped_equipment_ids:
+            strategy_task_filter["equipment_id"] = {"$in": list(scoped_equipment_ids)}
+        task_delete_filters.append(strategy_task_filter)
+
+    broken_program_filter: Dict[str, Any] = {
+        "maintenance_program_id": {"$nin": list(all_program_ids), "$ne": None},
+        "task_source": {"$nin": list(STRATEGY_EXEMPT_TASK_SOURCES)},
+    }
+    if scoped_equipment_ids:
+        broken_program_filter["equipment_id"] = {"$in": list(scoped_equipment_ids)}
+    task_delete_filters.append(broken_program_filter)
+
+    scheduled_tasks_deleted = 0
+    if task_delete_filters:
+        delete_query = task_delete_filters[0] if len(task_delete_filters) == 1 else {"$or": task_delete_filters}
+        scheduled_result = await db.scheduled_tasks.delete_many(delete_query)
+        scheduled_tasks_deleted = scheduled_result.deleted_count
+
+    programs_deleted = 0
+    if orphan_program_ids:
+        programs_result = await db.maintenance_programs.delete_many(
+            {"id": {"$in": orphan_program_ids}},
+        )
+        programs_deleted = programs_result.deleted_count
+
+    return {
+        "equipment_type_id": equipment_type_id,
+        "equipment_types_cleaned": len(missing_strategy_ids),
+        "scheduled_tasks_deleted": scheduled_tasks_deleted,
+        "programs_deleted": programs_deleted,
+        "v2_programs_deleted": 0,
+        "missing_strategy_ids": sorted(missing_strategy_ids),
+        "orphan_program_ids": orphan_program_ids,
+    }
+
+
+async def filter_schedulable_programs(
+    programs: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Keep only programs that may generate schedule occurrences."""
+    active_strategy_types = await _active_strategy_type_ids()
+    return [
+        program
+        for program in programs
+        if program_is_schedulable(program, active_strategy_types)
+    ]
 
 
 async def refresh_equipment_schedule(

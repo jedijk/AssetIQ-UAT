@@ -138,56 +138,14 @@ async def cleanup_orphan_scheduled_tasks(
     if request is None:
         request = CleanupOrphansRequest()
 
-    equipment_type_id = request.equipment_type_id
-    orphan_tasks_removed = 0
-
-    if equipment_type_id:
-        scoped_program_ids = {
-            p["id"]
-            async for p in db.maintenance_programs.find(
-                {"equipment_type_id": equipment_type_id},
-                {"id": 1, "_id": 0},
-            )
-            if p.get("id")
-        }
-        equipment_ids = {
-            eq["id"]
-            async for eq in db.equipment_nodes.find(
-                {"equipment_type_id": equipment_type_id},
-                {"id": 1, "_id": 0},
-            )
-            if eq.get("id")
-        }
-        scope_filters: List[dict] = [{"strategy_id": equipment_type_id}]
-        if equipment_ids:
-            scope_filters.append({"equipment_id": {"$in": list(equipment_ids)}})
-
-        orphan_filter: dict = {
-            "maintenance_program_id": {"$nin": list(scoped_program_ids), "$ne": None},
-            "$or": scope_filters,
-        }
-        sched_res = await db.scheduled_tasks.delete_many(orphan_filter)
-        orphan_tasks_removed = sched_res.deleted_count
-    else:
-        all_prog_ids = set()
-        async for p in db.maintenance_programs.find({}, {"id": 1}):
-            all_prog_ids.add(p["id"])
-
-        sched_res = await db.scheduled_tasks.delete_many({
-            "maintenance_program_id": {"$nin": list(all_prog_ids), "$ne": None},
-        })
-        orphan_tasks_removed = sched_res.deleted_count
-
     strategy_cleanup = await cleanup_schedules_without_strategy(
-        equipment_type_id=equipment_type_id,
+        equipment_type_id=request.equipment_type_id,
     )
 
     return {
         "message": "Schedule cleanup completed",
-        "equipment_type_id": equipment_type_id,
-        "scheduled_tasks_removed": orphan_tasks_removed + strategy_cleanup.get(
-            "scheduled_tasks_deleted", 0
-        ),
+        "equipment_type_id": request.equipment_type_id,
+        "scheduled_tasks_removed": strategy_cleanup.get("scheduled_tasks_deleted", 0),
         "programs_removed": strategy_cleanup.get("programs_deleted", 0),
         "v2_programs_removed": strategy_cleanup.get("v2_programs_deleted", 0),
         "equipment_types_cleaned": strategy_cleanup.get("equipment_types_cleaned", 0),
@@ -208,7 +166,10 @@ async def run_scheduler(
         request = RunSchedulerRequest()
 
     from services.maintenance_program_service import MaintenanceProgramService
-    from services.maintenance_scheduler_sync import cleanup_schedules_without_strategy
+    from services.maintenance_scheduler_sync import (
+        cleanup_schedules_without_strategy,
+        filter_schedulable_programs,
+    )
 
     strategy_cleanup = await cleanup_schedules_without_strategy(
         equipment_type_id=request.equipment_type_id,
@@ -224,16 +185,19 @@ async def run_scheduler(
         query["equipment_type_id"] = request.equipment_type_id
 
     programs = await db.maintenance_programs.find(query).to_list(5000)
+    schedulable_programs = await filter_schedulable_programs(programs)
+    programs_skipped = len(programs) - len(schedulable_programs)
 
     tasks_created = []
     horizon = request.planning_horizon_days or DEFAULT_HORIZON_DAYS
-    for program in programs:
+    for program in schedulable_programs:
         created_ids = await schedule_program(program, horizon)
         tasks_created.extend(created_ids)
 
     return {
         "message": "Scheduler run completed",
         "tasks_created": len(tasks_created),
-        "programs_reviewed": len(programs),
+        "programs_reviewed": len(schedulable_programs),
+        "programs_skipped_no_strategy": programs_skipped,
         "strategy_cleanup": strategy_cleanup,
     }

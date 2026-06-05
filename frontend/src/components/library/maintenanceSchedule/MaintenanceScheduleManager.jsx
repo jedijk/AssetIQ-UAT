@@ -220,7 +220,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
       maintenanceSchedulerAPI.cleanupOrphans(
         equipmentTypeId ? { equipment_type_id: equipmentTypeId } : {},
       ),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       const removed = data?.scheduled_tasks_removed ?? 0;
       const programs = data?.programs_removed ?? 0;
       toast.success(
@@ -230,7 +230,8 @@ export function MaintenanceScheduleManager({ equipmentType }) {
               .replace("{programs}", programs)
           : t("maintenance.clearOrphanScheduleEmpty"),
       );
-      queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] });
+      await queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] });
+      await queryClient.refetchQueries({ queryKey: ["maintenance-scheduler"] });
       queryClient.invalidateQueries({ queryKey: ["maintenance-program"] });
     },
     onError: (err) => {
