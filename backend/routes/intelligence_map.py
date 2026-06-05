@@ -184,6 +184,35 @@ async def get_intelligence_map_stats(
         ).to_list(1000)
         equipment_ids_with_strategy_applied = set([p.get("equipment_id") for p in programs_with_strategy if p.get("equipment_id")])
         equipment_with_strategy_applied_count = len(equipment_ids_with_strategy_applied)
+
+        # ========== EQUIPMENT WITH ACCEPTED PM IMPORT TASKS ==========
+        # Pull distinct equipment ids from accepted PM import tasks. These count as
+        # equipment with an active program too (PM import → program).
+        pm_equipment_pipeline = [
+            {"$unwind": "$tasks_extracted"},
+            {"$match": {
+                "tasks_extracted.review_status": "accepted",
+                "tasks_extracted.equipment_match.equipment_id": {"$ne": None},
+            }},
+            {"$group": {"_id": "$tasks_extracted.equipment_match.equipment_id"}},
+        ]
+        pm_equipment_result = await db.pm_import_sessions.aggregate(pm_equipment_pipeline).to_list(1000)
+        equipment_ids_with_pm_import = set(r["_id"] for r in pm_equipment_result if r.get("_id"))
+
+        # Count accepted PM tasks (each one is effectively an "active program" entry
+        # contributed by PM Import). Used to inflate the Programs / Schedules KPIs.
+        pm_tasks_active_count = await db.pm_import_sessions.aggregate([
+            {"$unwind": "$tasks_extracted"},
+            {"$match": {"tasks_extracted.review_status": "accepted"}},
+            {"$count": "c"},
+        ]).to_list(1)
+        pm_tasks_active_count = pm_tasks_active_count[0]["c"] if pm_tasks_active_count else 0
+
+        # Combined: equipment with any "active program" (strategy applied OR PM imported)
+        equipment_ids_with_active_program = (
+            equipment_ids_with_strategy_applied | equipment_ids_with_pm_import
+        )
+        equipment_with_active_program_count = len(equipment_ids_with_active_program)
         
         # ========== MAINTENANCE PROGRAMS ==========
         program_query = {}
@@ -193,6 +222,13 @@ async def get_intelligence_map_stats(
             program_query["equipment_id"] = equipment_id
             
         programs_count = await db.maintenance_programs_v2.count_documents(program_query)
+
+        # Active programs include both strategy-applied programs and PM Import-driven ones.
+        # When a program comes from PM Import, the v2 row may not exist yet — so we count
+        # the distinct equipment with PM imports as additional "active programs".
+        # programs_active = strategy programs + PM import equipment not already counted.
+        pm_only_equipment = equipment_ids_with_pm_import - equipment_ids_with_strategy_applied
+        programs_active_count = programs_count + len(pm_only_equipment)
         
         # Get program task statistics
         program_pipeline = [
@@ -223,8 +259,8 @@ async def get_intelligence_map_stats(
         schedules_count = await db.scheduled_tasks.count_documents(schedule_query)
 
         # Scoped count: number of TASKS (program task templates) that have a schedule
-        # — i.e. active tasks across maintenance programs whose strategy is actually applied.
-        # Each such task has a frequency, so it counts as one "schedule".
+        # — strategy-driven active tasks PLUS accepted PM import tasks
+        # (each PM import accepted task contributes one task with a schedule frequency).
         if equipment_ids_with_strategy_applied:
             applied_programs_agg = await db.maintenance_programs_v2.aggregate([
                 {"$match": {"equipment_id": {"$in": list(equipment_ids_with_strategy_applied)}}},
@@ -233,11 +269,12 @@ async def get_intelligence_map_stats(
                     "active_tasks": {"$sum": {"$ifNull": ["$active_tasks", 0]}},
                 }},
             ]).to_list(1)
-            schedules_for_applied_count = (
+            strategy_active_tasks_total = (
                 applied_programs_agg[0]["active_tasks"] if applied_programs_agg else 0
             )
         else:
-            schedules_for_applied_count = 0
+            strategy_active_tasks_total = 0
+        schedules_for_applied_count = strategy_active_tasks_total + pm_tasks_active_count
         
         # Count schedules by status
         schedule_status_pipeline = [
@@ -265,11 +302,12 @@ async def get_intelligence_map_stats(
         }
         planned_work_count = await db.scheduled_tasks.count_documents(planned_work_query)
 
-        # Scoped count: planned work for equipment with strategy actually applied.
-        if equipment_ids_with_strategy_applied:
+        # Scoped count: planned work for equipment with an active program
+        # (strategy applied OR PM imported).
+        if equipment_ids_with_active_program:
             planned_work_for_applied_count = await db.scheduled_tasks.count_documents({
                 **planned_work_query,
-                "equipment_id": {"$in": list(equipment_ids_with_strategy_applied)},
+                "equipment_id": {"$in": list(equipment_ids_with_active_program)},
             })
         else:
             planned_work_for_applied_count = 0
@@ -352,12 +390,16 @@ async def get_intelligence_map_stats(
                 "count": equipment_count,
                 "with_type": equipment_with_type_count,
                 "with_strategy": equipment_with_strategy_count,  # Equipment that could have strategy (equipment type has strategy)
-                "with_strategy_applied": equipment_with_strategy_applied_count,  # Equipment that actually have strategy applied
+                "with_strategy_applied": equipment_with_strategy_applied_count,  # Equipment with strategy applied
+                "with_pm_import": len(equipment_ids_with_pm_import),  # Equipment with accepted PM Import tasks
+                "with_active_program": equipment_with_active_program_count,  # Strategy applied OR PM imported
                 "with_coverage": covered_equipment,
                 "label": "Equipment"
             },
             "maintenance_programs": {
                 "count": programs_count,
+                "active": programs_active_count,  # Strategy programs + PM import driven equipment programs
+                "from_pm_import": len(pm_only_equipment),  # PM-only equipment (not also from strategy)
                 "total_tasks": program_stats.get("total_tasks", 0),
                 "active_tasks": program_stats.get("active_tasks", 0),
                 "label": "Maintenance Programs"
@@ -402,7 +444,7 @@ async def get_intelligence_map_stats(
                 "programs_to_equipment": {
                     "source": "maintenance_programs",
                     "target": "equipment",
-                    "value": equipment_with_strategy_applied_count  # Equipment with strategy actually applied
+                    "value": equipment_with_active_program_count  # Strategy applied OR PM imported
                 },
                 "equipment_to_schedules": {
                     "source": "equipment",

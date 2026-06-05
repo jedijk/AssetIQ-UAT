@@ -1674,6 +1674,10 @@ const FailureModesPage = () => {
       {/* Main Tabs */}
       <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
         <TabsList className="inline-flex w-auto max-w-full overflow-x-auto">
+          <TabsTrigger value="intelligence-map" className="flex items-center gap-1.5 whitespace-nowrap">
+            <Network className="w-3.5 h-3.5" />
+            Intelligence Map
+          </TabsTrigger>
           <TabsTrigger value="failure-modes">{t("library.failureModes")}</TabsTrigger>
           <TabsTrigger value="libraries">{t("library.equipmentTypes")}</TabsTrigger>
           <TabsTrigger value="maintenance" data-testid="maintenance-strategies-tab">{t("library.maintenance")}</TabsTrigger>
@@ -1684,10 +1688,6 @@ const FailureModesPage = () => {
           <TabsTrigger value="pm-import" className="flex items-center gap-1.5 whitespace-nowrap">
             <Upload className="w-3.5 h-3.5" />
             {t("library.customPmImport") || "PM Import"}
-          </TabsTrigger>
-          <TabsTrigger value="intelligence-map" className="flex items-center gap-1.5 whitespace-nowrap">
-            <Network className="w-3.5 h-3.5" />
-            Intelligence Map
           </TabsTrigger>
         </TabsList>
 

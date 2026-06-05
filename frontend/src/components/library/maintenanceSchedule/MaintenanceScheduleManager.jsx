@@ -20,7 +20,6 @@ import {
   X,
   Check,
   ChevronsUpDown,
-  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "../../ui/card";
@@ -238,32 +237,6 @@ export function MaintenanceScheduleManager({ equipmentType }) {
     },
   });
 
-  const clearOrphanScheduleMutation = useMutation({
-    mutationFn: () =>
-      maintenanceSchedulerAPI.cleanupOrphans(
-        equipmentTypeId ? { equipment_type_id: equipmentTypeId } : {},
-      ),
-    onSuccess: async (data) => {
-      const removed = data?.scheduled_tasks_removed ?? 0;
-      const programs = data?.programs_removed ?? 0;
-      const v2Programs = data?.v2_programs_removed ?? 0;
-      const totalRemoved = removed + programs + v2Programs;
-      toast.success(
-        totalRemoved > 0
-          ? t("maintenance.clearOrphanScheduleSuccess")
-              .replace("{removed}", removed)
-              .replace("{programs}", programs + v2Programs)
-          : t("maintenance.clearOrphanScheduleEmpty"),
-      );
-      await refreshMaintenanceSchedulerQueries(queryClient);
-      queryClient.invalidateQueries({ queryKey: ["maintenance-program"] });
-      queryClient.invalidateQueries({ queryKey: ["maintenance-strategy-v2"] });
-    },
-    onError: (err) => {
-      toast.error(err.response?.data?.detail || t("maintenance.clearOrphanScheduleFailed"));
-    },
-  });
-
   const applyStrategyMutation = useMutation({
     mutationFn: (equipmentIds) => maintenanceSchedulerAPI.applyStrategy(equipmentTypeId, equipmentIds),
     onSuccess: async (data, equipmentIds) => {
@@ -380,15 +353,6 @@ export function MaintenanceScheduleManager({ equipmentType }) {
     runSchedulerMutation.mutate({ equipment_type_id: equipmentTypeId });
   };
 
-  const handleClearOrphanSchedule = () => {
-    const scope = isGlobalView
-      ? t("maintenance.clearOrphanScheduleConfirmAll")
-      : t("maintenance.clearOrphanScheduleConfirmType").replace("{name}", equipmentTypeName);
-    if (window.confirm(scope)) {
-      clearOrphanScheduleMutation.mutate();
-    }
-  };
-
   const handleTaskClick = (task) => {
     setSelectedTask(task);
   };
@@ -438,30 +402,6 @@ export function MaintenanceScheduleManager({ equipmentType }) {
               </TooltipTrigger>
               <TooltipContent>
                 <p className="text-xs">AI-optimised assignments &amp; planned dates with reasoning</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleClearOrphanSchedule}
-                  disabled={clearOrphanScheduleMutation.isPending}
-                  className="border-red-200 text-red-700 hover:bg-red-50"
-                  data-testid="clear-orphan-schedule-btn"
-                >
-                  {clearOrphanScheduleMutation.isPending ? (
-                    <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-3.5 h-3.5 mr-1" />
-                  )}
-                  {t("maintenance.clearOrphanSchedule")}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="text-xs">{t("maintenance.clearOrphanScheduleHint")}</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

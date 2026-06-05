@@ -7,6 +7,21 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Library tabs — Intelligence Map moved to first position (VERIFIED)**:
+  - Tab order is now: Intelligence Map → Failure Modes → Equipment Types → Maintenance Strategy → Maintenance Schedule → PM Import. Default landing tab is still `failure-modes` (preserved by `useState(() => searchParams.get("tab") || "failure-modes")`).
+  - File: `/app/frontend/src/pages/FailureModesPage.js`.
+
+- [Feb 2026] **Intelligence Map — PM Import-driven programs now counted as Active (VERIFIED)**:
+  - "Programs Active" + "Equipment with Active Program" + "Schedules" + "Planned Work" KPIs now include programs/equipment driven by accepted PM Import tasks, not just strategy-applied programs.
+  - Backend: added `equipment_ids_with_pm_import` (distinct equipment with accepted PM tasks via `tasks_extracted.equipment_match.equipment_id`), `equipment_ids_with_active_program = strategy ∪ pm_import`, `programs_active_count`, `pm_tasks_active_count`. Schedules now sum strategy active tasks + accepted PM tasks. Planned Work filters by the combined equipment set. Sankey `programs_to_equipment` uses combined value.
+  - Frontend: Equipment card relationship now shows "X strategy · Y PM import"; Programs uses `maintenance_programs.active`; Equipment uses `with_active_program`.
+  - Verified via API: Programs Active=29 (2 strategy + 27 PM-only), Equipment=29, Schedules=35 (2 strategy + 33 PM), Planned Work=246.
+  - Files: `/app/backend/routes/intelligence_map.py`, `/app/frontend/src/components/library/IntelligenceMapTab.jsx`.
+
+- [Feb 2026] **Maintenance Schedule — Clear Orphan Schedule button removed (VERIFIED)**:
+  - Removed the destructive "Clear Orphan Schedule" button (and its mutation/handler) from the Maintenance Schedule header. The deletion of stale programs is now handled automatically by the Apply Strategy deselection flow.
+  - File: `/app/frontend/src/components/library/maintenanceSchedule/MaintenanceScheduleManager.jsx`.
+
 - [Feb 2026] **Apply Strategy dialog — pre-select only ACTIVE equipment (VERIFIED)**:
   - The dialog now opens with **only equipment that already has the strategy applied** pre-selected (the "active" subset), instead of selecting all 11 by default. Each active row gets a green "Active" badge so the user can see current coverage at a glance.
   - First-time apply fallback: if no equipment has the strategy applied yet (`applied_count == 0`), the dialog falls back to pre-selecting all so the user isn't stuck with an empty initial state.

@@ -647,9 +647,9 @@ const IntelligenceMapTab = () => {
                 <FlowCard
                   icon={ClipboardList}
                   title="Programs"
-                  count={stats?.maintenance_programs?.count}
+                  count={stats?.maintenance_programs?.active}
                   subtitle="Active"
-                  relationship={`${stats?.equipment?.with_strategy_applied || 0} equipment affected`}
+                  relationship={`${stats?.equipment?.with_active_program || 0} equipment affected`}
                   onClick={navigateToPrograms}
                   color="indigo"
                   isLoading={statsLoading}
@@ -659,9 +659,9 @@ const IntelligenceMapTab = () => {
                 <FlowCard
                   icon={Building2}
                   title="Equipment"
-                  count={stats?.equipment?.with_strategy_applied}
-                  subtitle="Strategy Applied"
-                  relationship={`${stats?.equipment?.with_strategy_applied || 0} of ${stats?.equipment?.with_strategy || 0} eligible`}
+                  count={stats?.equipment?.with_active_program}
+                  subtitle="Active Program"
+                  relationship={`${stats?.equipment?.with_strategy_applied || 0} strategy · ${stats?.equipment?.with_pm_import || 0} PM import`}
                   onClick={navigateToEquipment}
                   color="amber"
                   isLoading={statsLoading}
