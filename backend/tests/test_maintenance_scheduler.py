@@ -228,9 +228,8 @@ class TestTaskLifecycle:
 
 # -------- Strategy → Program Propagation (regression for "not saved + not in schedule") --------
 class TestStrategyPropagation:
-    def test_task_template_patch_propagates_to_programs(self, auth_headers):
-        """PATCH on a strategy task should sync name/duration/freq to all linked maintenance_programs."""
-        # Find a strategy that has programs
+    def test_task_template_patch_does_not_propagate_to_programs(self, auth_headers):
+        """PATCH on a strategy task updates the strategy only; programs stay unchanged until Apply Strategy."""
         progs_r = requests.get(
             f"{API}/maintenance-scheduler/programs",
             headers=auth_headers,
@@ -240,7 +239,6 @@ class TestStrategyPropagation:
         if not programs:
             pytest.skip("No maintenance programs to verify propagation against")
 
-        # Pick a program — capture its equipment_type_id and task_template_id
         prog = next((p for p in programs if p.get("task_template_id") and p.get("equipment_type_id")), None)
         if not prog:
             pytest.skip("No program with task_template_id found")
@@ -250,7 +248,6 @@ class TestStrategyPropagation:
         original_name = prog.get("task_name")
         original_duration = prog.get("estimated_duration_hours", 1.0)
 
-        # PATCH the task template with new name + duration + freq matrix
         new_name = f"{original_name} [TEST]"
         new_duration = 4.25
         patch = requests.patch(
@@ -265,10 +262,17 @@ class TestStrategyPropagation:
         )
         assert patch.status_code == 200, patch.text[:300]
         body = patch.json()
-        assert "programs_updated" in body, "patch response missing programs_updated"
-        assert body["programs_updated"] >= 1, f"expected at least 1 program updated, got {body}"
+        assert body.get("strategy_needs_apply") is True
 
-        # Verify program reflects the change
+        strategy_tasks = requests.get(
+            f"{API}/maintenance-strategies-v2/{etid}/tasks",
+            headers=auth_headers,
+            timeout=30,
+        ).json().get("task_templates", [])
+        updated_template = next((t for t in strategy_tasks if t.get("id") == tid), None)
+        assert updated_template is not None
+        assert updated_template.get("name") == new_name
+
         progs_after = requests.get(
             f"{API}/maintenance-scheduler/programs",
             headers=auth_headers,
@@ -276,10 +280,9 @@ class TestStrategyPropagation:
         ).json().get("programs", [])
         synced = next((p for p in progs_after if p.get("task_template_id") == tid), None)
         assert synced is not None
-        assert synced.get("task_name") == new_name, f"name not propagated: {synced.get('task_name')}"
-        assert synced.get("estimated_duration_hours") == new_duration, f"duration not propagated: {synced.get('estimated_duration_hours')}"
+        assert synced.get("task_name") == original_name, "program should not change on strategy edit"
+        assert synced.get("estimated_duration_hours") == original_duration
 
-        # Restore original values
         requests.patch(
             f"{API}/maintenance-strategies-v2/{etid}/tasks/{tid}",
             headers=auth_headers,
@@ -333,8 +336,8 @@ class TestStrategyPropagation:
         assert (s_after.get("strategy") or {}).get("version") == new_version
 
 
-    def test_task_template_patch_syncs_open_scheduled_tasks(self, auth_headers):
-        """PATCH on a strategy task should also sync metadata onto OPEN scheduled_tasks."""
+    def test_task_template_patch_does_not_sync_open_scheduled_tasks(self, auth_headers):
+        """PATCH on a strategy task should not sync metadata onto scheduled_tasks until Apply Strategy."""
         progs = requests.get(
             f"{API}/maintenance-scheduler/programs",
             headers=auth_headers,
@@ -357,23 +360,17 @@ class TestStrategyPropagation:
             timeout=30,
         )
         assert r.status_code == 200, r.text[:300]
-        body = r.json()
-        # `scheduled_tasks_synced` is informational; may be 0 if no scheduled tasks exist
-        assert "scheduled_tasks_synced" in body
+        assert r.json().get("strategy_needs_apply") is True
 
-        # If any scheduled tasks exist for this template, verify the rename propagated
         tasks_resp = requests.get(
             f"{API}/maintenance-scheduler/tasks?equipment_type_id={etid}",
             headers=auth_headers,
             timeout=30,
         ).json()
-        matching = [t for t in tasks_resp.get("tasks", []) if marker in (t.get("task_name") or "")]
-        if matching:
-            for t in matching:
-                assert t["task_name"] == marker
-                assert t["estimated_hours"] == 2.75
+        matching = [t for t in tasks_resp.get("tasks", []) if tid in (t.get("task_template_id") or "")]
+        for t in matching:
+            assert t.get("task_name") != marker, "scheduled tasks should not change on strategy edit"
 
-        # Restore
         requests.patch(
             f"{API}/maintenance-strategies-v2/{etid}/tasks/{tid}",
             headers=auth_headers,
@@ -381,9 +378,8 @@ class TestStrategyPropagation:
             timeout=30,
         )
 
-    def test_task_delete_cancels_open_scheduled_tasks(self, auth_headers):
-        """DELETE a strategy task should auto-cancel its open scheduled_tasks."""
-        # Find a strategy that has applied programs
+    def test_task_delete_does_not_cancel_open_scheduled_tasks(self, auth_headers):
+        """DELETE a strategy task removes it from the strategy only; schedule is unchanged until Apply Strategy."""
         progs = requests.get(
             f"{API}/maintenance-scheduler/programs",
             headers=auth_headers,
@@ -393,7 +389,6 @@ class TestStrategyPropagation:
             pytest.skip("No programs available")
         etid = progs[0]["equipment_type_id"]
 
-        # Add a throwaway task
         add_r = requests.post(
             f"{API}/maintenance-strategies-v2/{etid}/tasks",
             headers=auth_headers,
@@ -414,7 +409,6 @@ class TestStrategyPropagation:
         assert add_r.status_code == 200, add_r.text[:300]
         new_task_id = add_r.json().get("id")
 
-        # Apply strategy + run scheduler so scheduled_tasks get created
         equipment_ids = list({p["equipment_id"] for p in progs if p.get("equipment_type_id") == etid})[:3]
         requests.post(
             f"{API}/maintenance-scheduler/apply-strategy/{etid}",
@@ -429,7 +423,6 @@ class TestStrategyPropagation:
             timeout=30,
         )
 
-        # DELETE the task → expect cancellation cascade
         d = requests.delete(
             f"{API}/maintenance-strategies-v2/{etid}/tasks/{new_task_id}",
             headers=auth_headers,
@@ -437,18 +430,16 @@ class TestStrategyPropagation:
         )
         assert d.status_code == 200, d.text[:300]
         body = d.json()
-        assert "scheduled_tasks_cancelled" in body, body
-        # If any scheduled tasks existed for this template, they should be cancelled now
-        if body["scheduled_tasks_cancelled"] > 0:
-            tasks_resp = requests.get(
-                f"{API}/maintenance-scheduler/tasks?equipment_type_id={etid}&include_completed=true",
-                headers=auth_headers,
-                timeout=30,
-            ).json()
-            cancelled = [
-                t for t in tasks_resp.get("tasks", [])
-                if t.get("task_name") == "_PYTEST_DELETE_CASCADE_"
-            ]
-            assert cancelled
-            assert all(t["status"] == "cancelled" for t in cancelled)
+        assert body.get("strategy_needs_apply") is True
+
+        tasks_resp = requests.get(
+            f"{API}/maintenance-scheduler/tasks?equipment_type_id={etid}&include_completed=true",
+            headers=auth_headers,
+            timeout=30,
+        ).json()
+        still_open = [
+            t for t in tasks_resp.get("tasks", [])
+            if t.get("task_name") == "_PYTEST_DELETE_CASCADE_" and t.get("status") != "cancelled"
+        ]
+        assert still_open, "scheduled tasks should remain until Apply Strategy resyncs the schedule"
 

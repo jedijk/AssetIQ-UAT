@@ -1204,7 +1204,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const updateStrategyMutation = useMutation({
     mutationFn: (data) => maintenanceStrategyV2API.updateStrategy(equipmentTypeId, data),
     onSuccess: () => {
-      toast.success("Strategy updated");
+      toast.success(t("maintenance.strategySavedApplyHint"));
       queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
     },
     onError: (err) => {
@@ -1215,15 +1215,9 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const updateFMStrategyMutation = useMutation({
     mutationFn: ({ failureModeId, data }) =>
       maintenanceStrategyV2API.updateFailureModeStrategy(equipmentTypeId, failureModeId, data),
-    onSuccess: (data) => {
-      const toggled = data?.programs_toggled || 0;
-      toast.success(
-        toggled > 0
-          ? `Failure mode updated · ${toggled} program${toggled === 1 ? "" : "s"} synced`
-          : "Failure mode strategy updated"
-      );
+    onSuccess: () => {
+      toast.success(t("maintenance.strategySavedApplyHint"));
       queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
-      queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to update");
@@ -1233,7 +1227,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const addTaskMutation = useMutation({
     mutationFn: (data) => maintenanceStrategyV2API.addTaskTemplate(equipmentTypeId, data),
     onSuccess: () => {
-      toast.success("Task template added");
+      toast.success(t("maintenance.strategySavedApplyHint"));
       setTaskDialogOpen(false);
       setEditingTask(null);
       queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
@@ -1246,17 +1240,11 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const updateTaskMutation = useMutation({
     mutationFn: ({ taskId, data }) =>
       maintenanceStrategyV2API.updateTaskTemplate(equipmentTypeId, taskId, data),
-    onSuccess: (data) => {
-      const propagated = data?.programs_updated || 0;
-      toast.success(
-        propagated > 0
-          ? `Task updated · ${propagated} program${propagated === 1 ? "" : "s"} synced`
-          : "Task template updated"
-      );
+    onSuccess: () => {
+      toast.success(t("maintenance.strategySavedApplyHint"));
       setTaskDialogOpen(false);
       setEditingTask(null);
       queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
-      queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to update task");
@@ -1265,15 +1253,9 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
 
   const deleteTaskMutation = useMutation({
     mutationFn: (taskId) => maintenanceStrategyV2API.deleteTaskTemplate(equipmentTypeId, taskId),
-    onSuccess: (data) => {
-      const deactivated = data?.programs_deactivated || 0;
-      toast.success(
-        deactivated > 0
-          ? `Task deleted · ${deactivated} program${deactivated === 1 ? "" : "s"} deactivated`
-          : "Task template deleted"
-      );
+    onSuccess: () => {
+      toast.success(t("maintenance.strategySavedApplyHint"));
       queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
-      queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to delete task");
@@ -1307,6 +1289,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
         .filter(Boolean)
         .join(", ");
       toast.success(msg);
+      toast.info(t("maintenance.strategySavedApplyHint"));
       queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
       queryClient.invalidateQueries({ queryKey: ["maint-task-template-batch"] });
     },

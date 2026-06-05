@@ -34,23 +34,9 @@ from models.maintenance_strategy_v2 import (
 
 from services.maintenance_scheduler_sync import clear_equipment_type_schedule_after_strategy_delete
 from routes.maintenance_strategy_v2.propagation import (
-    _FREQUENCY_DAYS,
-    _propagate_task_template_to_programs,
-    _deactivate_programs_for_task,
-    _toggle_programs_for_failure_mode,
-    OPEN_TASK_STATUSES_FILTER,
-    _sync_metadata_to_open_scheduled_tasks,
-    _delete_open_scheduled_tasks_for_task,
-    _cancel_open_scheduled_tasks_for_task,
-    _cancel_open_scheduled_tasks_for_failure_mode,
-    _delete_open_scheduled_tasks_for_strategy,
-    _cancel_open_scheduled_tasks_for_strategy,
-    _resync_programs_with_strategy,
     _describe_task_change,
     _describe_fm_change,
-    _bump_version,
     _bump_strategy_version,
-    _sync_maintenance_programs_v2,
 )
 from routes.maintenance_strategy_v2.strategy_helpers import (
     calculate_frequency_for_criticality,
@@ -386,14 +372,9 @@ async def update_equipment_type_strategy(
         {"equipment_type_id": equipment_type_id},
         {"_id": 0}
     )
-
-    programs_v2_sync = await _sync_maintenance_programs_v2(
-        equipment_type_id,
-        user_id=current_user.get("id") or current_user.get("user_id"),
-    )
     if updated is not None and isinstance(updated, dict):
-        updated["programs_v2_sync"] = programs_v2_sync
-    
+        updated["strategy_needs_apply"] = True
+
     return updated
 
 
@@ -637,19 +618,6 @@ async def sync_equipment_type_strategy(
         },
     )
 
-    seen_task_ids: set = set()
-    for task in refreshed_task_templates:
-        tid = task.get("id")
-        if not tid or tid in seen_task_ids:
-            continue
-        seen_task_ids.add(tid)
-        await _sync_metadata_to_open_scheduled_tasks(equipment_type_id, task)
-
-    programs_v2_sync = await _sync_maintenance_programs_v2(
-        equipment_type_id,
-        user_id=current_user.get("id") or current_user.get("user_id"),
-    )
-
     return {
         "message": "Strategy synced with library",
         "equipment_type_id": equipment_type_id,
@@ -660,7 +628,7 @@ async def sync_equipment_type_strategy(
         "total_failure_modes": total_fms,
         "total_tasks": len(all_tasks),
         "new_version": new_version,
-        "programs_v2_sync": programs_v2_sync,
+        "strategy_needs_apply": True,
     }
 
 
@@ -802,24 +770,6 @@ async def update_failure_mode_strategy(
         }
     )
 
-    # Propagate enable/disable to maintenance_programs (legacy fm_id matching) +
-    # do a comprehensive resync from strategy truth so multi-FM tasks and
-    # is_mandatory toggles are all reflected on the schedule.
-    programs_toggled = 0
-    legacy_scheduled_cancelled = 0
-    if request.enabled is not None:
-        programs_toggled = await _toggle_programs_for_failure_mode(
-            equipment_type_id,
-            failure_mode_id,
-            request.enabled,
-        )
-        if request.enabled is False:
-            legacy_scheduled_cancelled = await _cancel_open_scheduled_tasks_for_failure_mode(
-                equipment_type_id, failure_mode_id,
-            )
-
-    resync = await _resync_programs_with_strategy(equipment_type_id)
-
     # Find the FM-strategy dict for a friendly description
     fm_dict = next(
         (fm for fm in fm_strategies if fm.get("failure_mode_id") == failure_mode_id),
@@ -837,11 +787,8 @@ async def update_failure_mode_strategy(
         "active_failure_modes": active_fms,
         "total_failure_modes": total_fms,
         "coverage_score": round(coverage_score, 1),
-        "programs_toggled": programs_toggled,
-        "programs_activated": resync["programs_activated"],
-        "programs_deactivated": resync["programs_deactivated"],
-        "scheduled_tasks_cancelled": legacy_scheduled_cancelled + resync["scheduled_tasks_cancelled"],
         "version": new_version,
+        "strategy_needs_apply": True,
     }
 
 
@@ -931,7 +878,7 @@ async def add_task_template(
         user_id=current_user.get("user_id"),
     )
 
-    return {**task_dict, "version": new_version}
+    return {**task_dict, "version": new_version, "strategy_needs_apply": True}
 
 
 @router.patch("/{equipment_type_id}/tasks/{task_id}")
@@ -942,15 +889,11 @@ async def update_task_template(
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user)
 ):
-    """Update a task template and propagate to existing maintenance_programs."""
-    import time
-    start_time = time.time()
-    
+    """Update a task template on the strategy document only (no schedule propagation)."""
     strategy = await db.equipment_type_strategies.find_one({
         "equipment_type_id": equipment_type_id
     })
-    logger.info(f"[TIMING] find_one strategy: {time.time() - start_time:.2f}s")
-    
+
     if not strategy:
         raise HTTPException(status_code=404, detail="Strategy not found")
     
@@ -975,7 +918,6 @@ async def update_task_template(
     if not updated:
         raise HTTPException(status_code=404, detail="Task template not found")
     
-    t1 = time.time()
     await db.equipment_type_strategies.update_one(
         {"equipment_type_id": equipment_type_id},
         {
@@ -985,38 +927,12 @@ async def update_task_template(
             }
         }
     )
-    logger.info(f"[TIMING] update_one strategy: {time.time() - t1:.2f}s")
 
-    # Bump strategy version with a human-readable change descriptor
-    t2 = time.time()
     new_version = await _bump_strategy_version(
         strategy,
         changes=[_describe_task_change(updated_task, list(updates.keys()))],
         user_id=current_user.get("user_id"),
     )
-    logger.info(f"[TIMING] _bump_strategy_version: {time.time() - t2:.2f}s")
-
-    # Propagate to all maintenance_programs that reference this task
-    t3 = time.time()
-    programs_updated = await _propagate_task_template_to_programs(
-        equipment_type_id, updated_task, new_version
-    )
-    logger.info(f"[TIMING] _propagate_task_template_to_programs: {time.time() - t3:.2f}s")
-
-    # Push metadata changes onto already-generated open scheduled_tasks
-    t4 = time.time()
-    scheduled_synced = await _sync_metadata_to_open_scheduled_tasks(
-        equipment_type_id, updated_task,
-    )
-    logger.info(f"[TIMING] _sync_metadata_to_open_scheduled_tasks: {time.time() - t4:.2f}s")
-
-    # If the toggle affects active state (is_mandatory) or linked FMs were
-    # changed, recompute every program's active state and cascade-cancel.
-    t5 = time.time()
-    resync = await _resync_programs_with_strategy(equipment_type_id)
-    logger.info(f"[TIMING] _resync_programs_with_strategy: {time.time() - t5:.2f}s")
-    
-    logger.info(f"[TIMING] TOTAL: {time.time() - start_time:.2f}s")
 
     # Auto-translate if name or description changed
     if any(k in updates for k in ["name", "description", "procedure_steps"]):
@@ -1037,11 +953,7 @@ async def update_task_template(
         "message": "Task template updated",
         "task_id": task_id,
         "version": new_version,
-        "programs_updated": programs_updated,
-        "scheduled_tasks_synced": scheduled_synced,
-        "programs_activated": resync["programs_activated"],
-        "programs_deactivated": resync["programs_deactivated"],
-        "scheduled_tasks_cancelled": resync["scheduled_tasks_cancelled"],
+        "strategy_needs_apply": True,
     }
 
 
@@ -1051,7 +963,7 @@ async def delete_task_template(
     task_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Delete a task template and deactivate any maintenance_programs that referenced it."""
+    """Delete a task template from the strategy document only (no schedule propagation)."""
     strategy = await db.equipment_type_strategies.find_one({
         "equipment_type_id": equipment_type_id
     })
@@ -1082,29 +994,11 @@ async def delete_task_template(
         user_id=current_user.get("user_id"),
     )
 
-    # Capture program ids before deleting so we can cleanup scheduled_tasks
-    program_ids = [
-        p["id"] async for p in db.maintenance_programs.find(
-            {"equipment_type_id": equipment_type_id, "task_template_id": task_id},
-            {"id": 1, "_id": 0},
-        )
-    ]
-    scheduled_deleted = 0
-    if program_ids:
-        sched_res = await db.scheduled_tasks.delete_many({
-            "maintenance_program_id": {"$in": program_ids},
-        })
-        scheduled_deleted = sched_res.deleted_count
-    progs_res = await db.maintenance_programs.delete_many(
-        {"equipment_type_id": equipment_type_id, "task_template_id": task_id},
-    )
-
     return {
         "message": "Task template deleted",
         "task_id": task_id,
         "version": new_version,
-        "programs_deleted": progs_res.deleted_count,
-        "scheduled_tasks_deleted": scheduled_deleted,
+        "strategy_needs_apply": True,
     }
 
 

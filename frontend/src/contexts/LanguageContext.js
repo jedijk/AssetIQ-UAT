@@ -1428,6 +1428,7 @@ const en = {
     // Schedule view
     maintenanceScheduleTitle: "Maintenance Schedule",
     applyStrategy: "Apply Strategy",
+    strategySavedApplyHint: "Saved. Use Apply Strategy on the maintenance schedule to update programs.",
     aiPlanner: "AI Planner",
     runScheduler: "Run Scheduler",
     clearOrphanSchedule: "Clear Orphan Schedule",
@@ -3426,6 +3427,7 @@ const nl = {
     // Schedule view
     maintenanceScheduleTitle: "Onderhoudsschema",
     applyStrategy: "Strategie toepassen",
+    strategySavedApplyHint: "Opgeslagen. Gebruik Strategie toepassen in het onderhoudsschema om programma's bij te werken.",
     aiPlanner: "AI-planner",
     runScheduler: "Planner uitvoeren",
     clearOrphanSchedule: "Wees schema wissen",

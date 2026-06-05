@@ -506,7 +506,6 @@ async def _bump_strategy_version(
             "$push": {"version_history": entry},
         },
     )
-    await _sync_maintenance_programs_v2(equipment_type_id, user_id=user_id)
     return new_version
 
 
