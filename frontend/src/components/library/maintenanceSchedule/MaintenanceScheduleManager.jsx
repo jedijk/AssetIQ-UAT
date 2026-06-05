@@ -221,18 +221,35 @@ export function MaintenanceScheduleManager({ equipmentType }) {
 
   const applyStrategyMutation = useMutation({
     mutationFn: (equipmentIds) => maintenanceSchedulerAPI.applyStrategy(equipmentTypeId, equipmentIds),
-    onSuccess: (data) => {
+    onSuccess: (data, equipmentIds) => {
       const emCreated = data.equipment_manager_programs_created ?? 0;
       const emRegenerated = data.equipment_manager_programs_regenerated ?? 0;
+      const emErrors = data.equipment_manager_program_errors ?? [];
+      const emEquipmentIds = data.equipment_manager_equipment_ids ?? equipmentIds ?? [];
+
       toast.success(
         `${t("maintenance.strategyApplied")} ${data.programs_created} ${t("maintenance.programsCreatedSuffix")}` +
           (emCreated || emRegenerated
             ? ` (${emCreated} equipment programs created, ${emRegenerated} updated)`
             : ""),
       );
+
+      if (emErrors.length > 0) {
+        toast.error(
+          `Equipment Manager program sync failed for ${emErrors.length} item(s). Open Equipment Manager and use Create Maintenance Program, or retry after deploy.`,
+        );
+      } else if (emCreated === 0 && emRegenerated === 0 && (equipmentIds?.length ?? 0) > 0) {
+        toast.warning(
+          "Scheduler programs updated but no Equipment Manager programs were synced. The server may need the latest backend deploy.",
+        );
+      }
+
       setApplyDialogOpen(false);
-      queryClient.invalidateQueries(["maintenance-scheduler"]);
-      queryClient.invalidateQueries(["maintenance-program"]);
+      queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] });
+      queryClient.invalidateQueries({ queryKey: ["maintenance-program"] });
+      emEquipmentIds.forEach((id) => {
+        queryClient.invalidateQueries({ queryKey: ["maintenance-program", id] });
+      });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || t("maintenance.failedApplyStrategy"));

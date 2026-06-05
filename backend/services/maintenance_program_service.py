@@ -10,6 +10,7 @@ Features:
 - Audit logging
 """
 
+import json
 import logging
 import uuid
 from enum import Enum
@@ -88,6 +89,11 @@ class MaintenanceProgramService:
         "one_time": "not_required",
         "one-time": "not_required",
     }
+
+    @staticmethod
+    def _program_to_db_document(program: MaintenanceProgram) -> Dict[str, Any]:
+        """BSON-safe dict for MongoDB inserts/updates."""
+        return json.loads(program.model_dump_json())
     
     # ============= Program Generation =============
     
@@ -174,7 +180,9 @@ class MaintenanceProgramService:
         ))
         
         # Save to database
-        await db.maintenance_programs_v2.insert_one(program.model_dump())
+        await db.maintenance_programs_v2.insert_one(
+            MaintenanceProgramService._program_to_db_document(program)
+        )
         
         # Log audit
         await MaintenanceProgramService._log_audit(
@@ -235,12 +243,55 @@ class MaintenanceProgramService:
         if activate:
             update_fields["status"] = ProgramStatus.ACTIVE.value
 
-        await db.maintenance_programs_v2.update_one(
+        result = await db.maintenance_programs_v2.update_one(
             {"equipment_id": equipment_id},
             {"$set": update_fields},
         )
+        if result.matched_count == 0:
+            raise ValueError(
+                f"Maintenance program v2 missing after ensure for equipment: {equipment_id}"
+            )
 
         return {"equipment_id": equipment_id, "action": action}
+
+    @staticmethod
+    async def ensure_programs_for_equipment_ids(
+        equipment_ids: List[str],
+        strategy_version: str,
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Ensure maintenance_programs_v2 exists for each equipment id."""
+        created: List[str] = []
+        regenerated: List[str] = []
+        errors: List[Dict[str, str]] = []
+
+        for equipment_id in equipment_ids:
+            if not equipment_id:
+                continue
+            try:
+                result = await MaintenanceProgramService.ensure_equipment_program_from_strategy(
+                    equipment_id=equipment_id,
+                    strategy_version=strategy_version,
+                    user_id=user_id,
+                )
+                if result.get("action") == "created":
+                    created.append(equipment_id)
+                else:
+                    regenerated.append(equipment_id)
+            except Exception as exc:
+                logger.exception(
+                    "Failed to ensure v2 maintenance program for equipment_id=%s",
+                    equipment_id,
+                )
+                errors.append({"equipment_id": equipment_id, "error": str(exc)})
+
+        return {
+            "programs_created": len(created),
+            "programs_regenerated": len(regenerated),
+            "equipment_ids_created": created,
+            "equipment_ids_regenerated": regenerated,
+            "errors": errors,
+        }
     
     @staticmethod
     async def generate_tasks_from_strategy(
@@ -603,8 +654,45 @@ class MaintenanceProgramService:
     ) -> Dict[str, Any]:
         """
         Regenerate all maintenance programs (v2) for an equipment type after strategy changes.
+        Creates missing programs for equipment of this type, then regenerates existing ones.
         Preserves manual/imported tasks and overridden strategy tasks by default.
         """
+        strategy = await db.equipment_type_strategies.find_one(
+            {"equipment_type_id": equipment_type_id},
+            {"version": 1, "_id": 0},
+        )
+        strategy_version = (strategy or {}).get("version", "1.0")
+
+        equipment_nodes = await db.equipment_nodes.find(
+            {"equipment_type_id": equipment_type_id},
+            {"id": 1, "_id": 0},
+        ).to_list(500)
+        equipment_ids = [node["id"] for node in equipment_nodes if node.get("id")]
+
+        created: List[str] = []
+        if equipment_ids:
+            existing_docs = await db.maintenance_programs_v2.find(
+                {"equipment_id": {"$in": equipment_ids}},
+                {"equipment_id": 1, "_id": 0},
+            ).to_list(len(equipment_ids))
+            existing_ids = {doc.get("equipment_id") for doc in existing_docs}
+            for equipment_id in equipment_ids:
+                if equipment_id in existing_ids:
+                    continue
+                try:
+                    await MaintenanceProgramService.ensure_equipment_program_from_strategy(
+                        equipment_id=equipment_id,
+                        strategy_version=strategy_version,
+                        user_id=user_id,
+                    )
+                    created.append(equipment_id)
+                except Exception as exc:
+                    logger.exception(
+                        "Failed to create maintenance program for %s: %s",
+                        equipment_id,
+                        exc,
+                    )
+
         programs = await db.maintenance_programs_v2.find(
             {"equipment_type_id": equipment_type_id},
             {"equipment_id": 1, "_id": 0},
@@ -649,7 +737,9 @@ class MaintenanceProgramService:
             )
 
         return {
+            "programs_created": len(created),
             "programs_regenerated": len(regenerated),
+            "equipment_ids_created": created,
             "equipment_ids": regenerated,
             "errors": errors,
         }

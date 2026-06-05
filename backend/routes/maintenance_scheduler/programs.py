@@ -166,28 +166,15 @@ async def _apply_strategy_to_equipment_impl(
 
     user_id = current_user.get("id") or current_user.get("user_id")
     strategy_version = strategy.get("version", "1.0")
-    v2_programs_created = 0
-    v2_programs_regenerated = 0
-    v2_errors = []
-
-    for equipment in equipment_list:
-        equipment_id = equipment.get("id")
-        try:
-            result = await MaintenanceProgramService.ensure_equipment_program_from_strategy(
-                equipment_id=equipment_id,
-                strategy_version=strategy_version,
-                user_id=user_id,
-            )
-            if result.get("action") == "created":
-                v2_programs_created += 1
-            else:
-                v2_programs_regenerated += 1
-        except Exception as exc:
-            logger.exception(
-                "Failed to ensure v2 maintenance program for equipment_id=%s",
-                equipment_id,
-            )
-            v2_errors.append({"equipment_id": equipment_id, "error": str(exc)})
+    equipment_ids = [e.get("id") for e in equipment_list if e.get("id")]
+    v2_sync = await MaintenanceProgramService.ensure_programs_for_equipment_ids(
+        equipment_ids=equipment_ids,
+        strategy_version=strategy_version,
+        user_id=user_id,
+    )
+    v2_programs_created = v2_sync.get("programs_created", 0)
+    v2_programs_regenerated = v2_sync.get("programs_regenerated", 0)
+    v2_errors = v2_sync.get("errors", [])
 
     # Resync active state for all programs of this equipment type so disabled
     # FMs / non-mandatory tasks immediately propagate to the newly-created ones.
@@ -210,6 +197,10 @@ async def _apply_strategy_to_equipment_impl(
         "equipment_manager_programs_created": v2_programs_created,
         "equipment_manager_programs_regenerated": v2_programs_regenerated,
         "equipment_manager_program_errors": v2_errors,
+        "equipment_manager_equipment_ids": (
+            v2_sync.get("equipment_ids_created", [])
+            + v2_sync.get("equipment_ids_regenerated", [])
+        ),
     }
 
 
