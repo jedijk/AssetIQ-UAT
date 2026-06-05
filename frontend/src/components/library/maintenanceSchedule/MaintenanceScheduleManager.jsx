@@ -133,6 +133,21 @@ export function MaintenanceScheduleManager({ equipmentType }) {
     enabled: !!equipmentTypeId,
   });
 
+  // For global view: fetch all equipment that could have strategies applied
+  const { data: allAffectedEquipmentData } = useQuery({
+    queryKey: ["maintenance-strategy-v2-all-affected-equipment"],
+    queryFn: () => maintenanceStrategyV2API.getAllAffectedEquipment(),
+    enabled: isGlobalView,
+  });
+
+  // Use appropriate affected equipment based on view
+  const effectiveAffectedEquipment = useMemo(() => {
+    if (equipmentTypeId) {
+      return affectedEquipmentData?.equipment || [];
+    }
+    return allAffectedEquipmentData?.equipment || [];
+  }, [equipmentTypeId, affectedEquipmentData, allAffectedEquipmentData]);
+
   const { data: techniciansData } = useQuery({
     queryKey: ["maintenance-scheduler-technicians"],
     queryFn: () => maintenanceSchedulerAPI.getTechnicians(),
@@ -704,7 +719,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
         onClose={() => setApplyDialogOpen(false)}
         equipmentTypeId={equipmentTypeId}
         equipmentTypeName={equipmentTypeName}
-        affectedEquipment={affectedEquipmentData?.equipment}
+        affectedEquipment={effectiveAffectedEquipment}
         onApply={(equipmentIds) => applyStrategyMutation.mutate(equipmentIds)}
         isApplying={applyStrategyMutation.isPending}
       />
