@@ -375,18 +375,6 @@ const MaintenanceStrategyTab = ({
                 </span>
               </button>
             </div>
-            {showOnlyWithStrategy && (
-              <div className="text-purple-600 mt-1 flex items-center gap-1">
-                <Filter className="w-3 h-3" />
-                Showing only equipment types with strategies
-                <button 
-                  className="ml-auto text-slate-400 hover:text-slate-600"
-                  onClick={() => setSearchParams({ tab: "maintenance" }, { replace: true })}
-                >
-                  Clear
-                </button>
-              </div>
-            )}}
           </div>
         </div>
       )}
