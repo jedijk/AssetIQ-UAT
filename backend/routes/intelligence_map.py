@@ -112,15 +112,15 @@ async def get_intelligence_map_stats(
         # Count equipment types that have failure modes AND are used in equipment
         equipment_types_with_fm_in_use_count = fm_equipment_types_count  # Same as above since we already filtered
         
-        # ========== STRATEGIES (Maintenance Strategies) ==========
-        # Use maintenance_strategies collection (what Maintenance Strategy tab shows)
+        # ========== STRATEGIES (Equipment Type Strategies) ==========
+        # Use equipment_type_strategies collection (what Maintenance Strategy tab shows)
         strategy_query = {}
         if equipment_type_id:
             strategy_query["equipment_type_id"] = equipment_type_id
             
-        strategies_count = await db.maintenance_strategies.count_documents(strategy_query)
+        strategies_count = await db.equipment_type_strategies.count_documents(strategy_query)
         
-        # Count task templates from maintenance strategies
+        # Count task templates from equipment type strategies
         strategy_pipeline = [
             {"$match": strategy_query},
             {"$group": {
@@ -128,7 +128,7 @@ async def get_intelligence_map_stats(
                 "total_task_templates": {"$sum": {"$size": {"$ifNull": ["$task_templates", []]}}}
             }}
         ]
-        strategy_agg = await db.maintenance_strategies.aggregate(strategy_pipeline).to_list(1)
+        strategy_agg = await db.equipment_type_strategies.aggregate(strategy_pipeline).to_list(1)
         total_task_templates = strategy_agg[0]["total_task_templates"] if strategy_agg else 0
         
         # ========== EQUIPMENT ==========
@@ -164,8 +164,8 @@ async def get_intelligence_map_stats(
         equipment_with_type_query = {**equipment_query, "equipment_type_id": {"$ne": None, "$exists": True}}
         equipment_with_type_count = await db.equipment_nodes.count_documents(equipment_with_type_query)
         
-        # Get equipment types that have strategies
-        strategy_equipment_types = await db.maintenance_strategies.distinct("equipment_type_id")
+        # Get equipment types that have strategies (from equipment_type_strategies)
+        strategy_equipment_types = await db.equipment_type_strategies.distinct("equipment_type_id")
         strategy_equipment_types_set = set([et for et in strategy_equipment_types if et])
         
         # Count equipment affected by strategies (equipment with equipment_type that has a strategy)
