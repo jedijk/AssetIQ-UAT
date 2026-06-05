@@ -326,18 +326,29 @@ const StrategyOverviewCard = ({ strategy, onToggleStrategy, isUpdating, affected
             <Tooltip>
               <TooltipTrigger asChild>
                 <div 
-                  className="text-center p-3 bg-blue-50 rounded-lg border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors"
+                  className="text-center p-3 bg-purple-50 rounded-lg border border-purple-100 cursor-pointer hover:bg-purple-100 transition-colors"
                   onClick={onShowAffectedEquipment}
                 >
-                  <div className="text-2xl font-bold text-blue-600">
-                    {data.affected_equipment_count || 0}
+                  <div className="flex items-baseline justify-center gap-1">
+                    <span className="text-2xl font-bold text-purple-600">
+                      {data.equipment_with_strategy_applied_count || 0}
+                    </span>
+                    <span className="text-sm text-slate-500">of {data.affected_equipment_count || 0}</span>
                   </div>
-                  <div className="text-xs text-slate-500">{t("maintenance.equipmentAffected")}</div>
+                  <div className="text-xs text-slate-500">Strategy Applied</div>
+                  {(data.affected_equipment_count || 0) > 0 && (
+                    <div className="mt-1 h-1 bg-purple-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-purple-500 rounded-full transition-all"
+                        style={{ width: `${((data.equipment_with_strategy_applied_count || 0) / (data.affected_equipment_count || 1)) * 100}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
                 <p className="text-xs">
-                  Click to view the list of equipment using this strategy.
+                  {data.equipment_with_strategy_applied_count || 0} equipment have this strategy applied. Click to view all {data.affected_equipment_count || 0} equipment that could use this strategy.
                 </p>
               </TooltipContent>
             </Tooltip>

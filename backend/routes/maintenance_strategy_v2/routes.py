@@ -163,6 +163,17 @@ async def get_equipment_type_strategy(
     })
     strategy["affected_equipment_count"] = affected_equipment_count
     
+    # Count equipment that actually have strategy applied (have maintenance program with strategy tasks)
+    programs_with_strategy = await db.maintenance_programs_v2.find(
+        {
+            "equipment_type_id": equipment_type_id,
+            "strategy_tasks": {"$gt": 0}
+        },
+        {"equipment_id": 1}
+    ).to_list(1000)
+    equipment_with_strategy_applied = len(set([p.get("equipment_id") for p in programs_with_strategy if p.get("equipment_id")]))
+    strategy["equipment_with_strategy_applied_count"] = equipment_with_strategy_applied
+    
     # Optionally update the database with the enriched data
     if needs_update or strategy.get("active_failure_modes") != active_fms:
         await db.equipment_type_strategies.update_one(
