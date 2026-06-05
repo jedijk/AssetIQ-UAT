@@ -1284,7 +1284,9 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
     mutationFn: () => maintenanceStrategyV2API.deleteStrategy(equipmentTypeId),
     onSuccess: () => {
       toast.success("Strategy deleted successfully");
-      queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
+      queryClient.invalidateQueries({ queryKey: ["maintenance-strategy-v2", equipmentTypeId] });
+      queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] });
+      queryClient.invalidateQueries({ queryKey: ["maintenance-program"] });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to delete strategy");

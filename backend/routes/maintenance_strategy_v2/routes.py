@@ -32,6 +32,7 @@ from models.maintenance_strategy_v2 import (
     TaskActivationState,
 )
 
+from services.maintenance_scheduler_sync import clear_equipment_type_schedule_after_strategy_delete
 from routes.maintenance_strategy_v2.propagation import (
     _FREQUENCY_DAYS,
     _propagate_task_template_to_programs,
@@ -403,41 +404,22 @@ async def delete_equipment_type_strategy(
 ):
     """
     Delete an equipment type strategy AND fully clean up:
-      - Hard-delete all open scheduled_tasks (so they disappear from the schedule view)
+      - Hard-delete all scheduled_tasks for this equipment type
       - Hard-delete all maintenance_programs linked to the strategy
-      - Completed scheduled_tasks remain in `maintenance_history` (preserved separately)
+      - Delete Equipment Manager (v2) programs for affected equipment
+      - Completed history is preserved separately in `maintenance_history`
     """
-    # Capture program ids BEFORE deleting them so we can clean up scheduled_tasks
-    program_ids = [
-        p["id"] async for p in db.maintenance_programs.find(
-            {"equipment_type_id": equipment_type_id},
-            {"id": 1, "_id": 0},
-        )
-    ]
+    schedule_refresh = await clear_equipment_type_schedule_after_strategy_delete(
+        equipment_type_id,
+    )
 
-    # Delete all scheduled tasks (open + completed) for those programs.
-    # Completed history is preserved separately in `maintenance_history`.
-    scheduled_deleted = 0
-    if program_ids:
-        scheduled_result = await db.scheduled_tasks.delete_many({
-            "maintenance_program_id": {"$in": program_ids},
-        })
-        scheduled_deleted = scheduled_result.deleted_count
-
-    # Delete the strategy itself
     result = await db.equipment_type_strategies.delete_one({
         "equipment_type_id": equipment_type_id
     })
 
-    if result.deleted_count == 0 and not program_ids:
+    if result.deleted_count == 0 and schedule_refresh.get("programs_deleted", 0) == 0:
         raise HTTPException(status_code=404, detail="Strategy not found")
 
-    # Hard-delete maintenance_programs — no orphan references should remain
-    progs_result = await db.maintenance_programs.delete_many(
-        {"equipment_type_id": equipment_type_id},
-    )
-
-    # Log audit
     await log_strategy_audit(
         action="delete_strategy",
         equipment_type_id=equipment_type_id,
@@ -447,8 +429,10 @@ async def delete_equipment_type_strategy(
     return {
         "message": "Strategy deleted",
         "equipment_type_id": equipment_type_id,
-        "programs_deleted": progs_result.deleted_count,
-        "scheduled_tasks_deleted": scheduled_deleted,
+        "programs_deleted": schedule_refresh.get("programs_deleted", 0),
+        "scheduled_tasks_deleted": schedule_refresh.get("scheduled_tasks_deleted", 0),
+        "v2_programs_deleted": schedule_refresh.get("v2_programs_deleted", 0),
+        "schedule_refresh": schedule_refresh,
     }
 
 

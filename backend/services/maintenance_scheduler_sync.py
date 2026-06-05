@@ -407,6 +407,117 @@ async def clear_equipment_schedule_after_program_delete(
     }
 
 
+async def clear_equipment_type_schedule_after_strategy_delete(
+    equipment_type_id: str,
+) -> Dict[str, Any]:
+    """Remove scheduler programs and scheduled tasks when an equipment-type strategy is deleted."""
+    equipment_ids: Set[str] = set()
+    async for eq in db.equipment_nodes.find(
+        {"equipment_type_id": equipment_type_id},
+        {"id": 1, "_id": 0},
+    ):
+        if eq.get("id"):
+            equipment_ids.add(eq["id"])
+
+    program_ids: List[str] = []
+    async for prog in db.maintenance_programs.find(
+        {"equipment_type_id": equipment_type_id},
+        {"id": 1, "equipment_id": 1, "_id": 0},
+    ):
+        if prog.get("id"):
+            program_ids.append(prog["id"])
+        if prog.get("equipment_id"):
+            equipment_ids.add(prog["equipment_id"])
+
+    async for prog in db.maintenance_programs_v2.find(
+        {"equipment_type_id": equipment_type_id},
+        {"equipment_id": 1, "_id": 0},
+    ):
+        if prog.get("equipment_id"):
+            equipment_ids.add(prog["equipment_id"])
+
+    scheduled_delete_filters: List[Dict[str, Any]] = [{"strategy_id": equipment_type_id}]
+    if program_ids:
+        scheduled_delete_filters.append({"maintenance_program_id": {"$in": program_ids}})
+    if equipment_ids:
+        scheduled_delete_filters.append({"equipment_id": {"$in": list(equipment_ids)}})
+
+    scheduled_deleted = 0
+    if scheduled_delete_filters:
+        scheduled_result = await db.scheduled_tasks.delete_many(
+            {"$or": scheduled_delete_filters},
+        )
+        scheduled_deleted = scheduled_result.deleted_count
+
+    programs_result = await db.maintenance_programs.delete_many(
+        {"equipment_type_id": equipment_type_id},
+    )
+
+    v2_delete_query: Dict[str, Any] = {"$or": [{"equipment_type_id": equipment_type_id}]}
+    if equipment_ids:
+        v2_delete_query["$or"].append({"equipment_id": {"$in": list(equipment_ids)}})
+    v2_result = await db.maintenance_programs_v2.delete_many(v2_delete_query)
+
+    return {
+        "equipment_type_id": equipment_type_id,
+        "equipment_ids_affected": len(equipment_ids),
+        "scheduled_tasks_deleted": scheduled_deleted,
+        "programs_deleted": programs_result.deleted_count,
+        "v2_programs_deleted": v2_result.deleted_count,
+    }
+
+
+async def cleanup_schedules_without_strategy(
+    equipment_type_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Remove scheduler data for equipment types that no longer have a strategy."""
+    existing_strategy_types = {
+        doc["equipment_type_id"]
+        async for doc in db.equipment_type_strategies.find(
+            {},
+            {"equipment_type_id": 1, "_id": 0},
+        )
+    }
+
+    types_to_clean: Set[str] = set()
+    if equipment_type_id:
+        if equipment_type_id not in existing_strategy_types:
+            types_to_clean.add(equipment_type_id)
+    else:
+        async for prog in db.maintenance_programs.find(
+            {},
+            {"equipment_type_id": 1, "_id": 0},
+        ):
+            et_id = prog.get("equipment_type_id")
+            if et_id and et_id not in existing_strategy_types:
+                types_to_clean.add(et_id)
+
+        async for task in db.scheduled_tasks.find(
+            {"status": OPEN_TASK_STATUSES},
+            {"strategy_id": 1, "_id": 0},
+        ):
+            strategy_id = task.get("strategy_id")
+            if strategy_id and strategy_id not in existing_strategy_types:
+                types_to_clean.add(strategy_id)
+
+    totals: Dict[str, Any] = {
+        "equipment_types_cleaned": len(types_to_clean),
+        "scheduled_tasks_deleted": 0,
+        "programs_deleted": 0,
+        "v2_programs_deleted": 0,
+        "details": [],
+    }
+
+    for et_id in sorted(types_to_clean):
+        result = await clear_equipment_type_schedule_after_strategy_delete(et_id)
+        totals["scheduled_tasks_deleted"] += result.get("scheduled_tasks_deleted", 0)
+        totals["programs_deleted"] += result.get("programs_deleted", 0)
+        totals["v2_programs_deleted"] += result.get("v2_programs_deleted", 0)
+        totals["details"].append(result)
+
+    return totals
+
+
 async def refresh_equipment_schedule(
     equipment_id: str,
     user_id: Optional[str] = None,
