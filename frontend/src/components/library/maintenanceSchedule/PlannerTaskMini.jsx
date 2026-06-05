@@ -17,12 +17,17 @@ export function PlannerTaskMini({ task, compact = false, onClick }) {
           {priorityCfg.label.charAt(0)}
         </Badge>
       </div>
-      {!compact && (
-        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500">
-          <span className="truncate">{task.equipment_name}</span>
+      <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500">
+        <span className="truncate">{task.equipment_name}</span>
+        {task.equipment_tag && (
+          <Badge variant="outline" className="text-[9px] font-mono px-1 py-0">
+            {task.equipment_tag}
+          </Badge>
+        )}
+        {!compact && (
           <span className="ml-auto whitespace-nowrap">{task.estimated_hours}h</span>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
