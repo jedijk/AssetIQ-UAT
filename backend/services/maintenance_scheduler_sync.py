@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 from database import db
 from models.maintenance_program import TaskSource
 from models.maintenance_scheduler import CriticalityLevel, EquipmentMaintenanceProgram
-from routes.maintenance_scheduler._shared import frequency_to_days, normalize_program_criticality
+from services.scheduler_helpers import frequency_to_days, normalize_program_criticality
 
 logger = logging.getLogger(__name__)
 
