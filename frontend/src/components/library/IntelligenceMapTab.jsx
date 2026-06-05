@@ -238,43 +238,43 @@ const SankeyDiagram = ({ data, isLoading }) => {
     // Main flow: Failure Modes → Equipment Types → Strategies → Programs → Equipment → Schedules → Planned Work
     if (relationships.fm_to_equipment_types?.value > 0) {
       links.push({
-        source: 0, // failure_modes
-        target: 1, // equipment_types
+        source: "failure_modes",
+        target: "equipment_types",
         value: relationships.fm_to_equipment_types.value,
       });
     }
     if (relationships.equipment_types_to_strategies?.value > 0) {
       links.push({
-        source: 1, // equipment_types
-        target: 2, // strategies
+        source: "equipment_types",
+        target: "strategies",
         value: relationships.equipment_types_to_strategies.value,
       });
     }
     if (relationships.strategies_to_programs?.value > 0) {
       links.push({
-        source: 2, // strategies
-        target: 3, // programs
+        source: "strategies",
+        target: "maintenance_programs",
         value: relationships.strategies_to_programs.value,
       });
     }
     if (relationships.programs_to_equipment?.value > 0) {
       links.push({
-        source: 3, // programs
-        target: 4, // equipment
+        source: "maintenance_programs",
+        target: "equipment",
         value: relationships.programs_to_equipment.value,
       });
     }
     if (relationships.equipment_to_schedules?.value > 0) {
       links.push({
-        source: 4, // equipment
-        target: 5, // schedules
+        source: "equipment",
+        target: "schedules",
         value: relationships.equipment_to_schedules.value,
       });
     }
     if (relationships.schedules_to_work?.value > 0) {
       links.push({
-        source: 5, // schedules
-        target: 6, // planned_work
+        source: "schedules",
+        target: "planned_work",
         value: relationships.schedules_to_work.value,
       });
     }
@@ -282,8 +282,8 @@ const SankeyDiagram = ({ data, isLoading }) => {
     // PM Import flow (secondary - purple)
     if (relationships.pm_to_programs?.value > 0) {
       links.push({
-        source: 7, // pm_imports
-        target: 3, // maintenance_programs
+        source: "pm_imports",
+        target: "maintenance_programs",
         value: relationships.pm_to_programs.value,
         isPmFlow: true,
       });
@@ -293,12 +293,12 @@ const SankeyDiagram = ({ data, isLoading }) => {
     if (links.length === 0) {
       // Create placeholder links for visualization
       links.push(
-        { source: 0, target: 1, value: 1 },  // FM → Equipment Types
-        { source: 1, target: 2, value: 1 },  // Equipment Types → Strategies
-        { source: 2, target: 3, value: 1 },  // Strategies → Programs
-        { source: 3, target: 4, value: 1 },  // Programs → Equipment
-        { source: 4, target: 5, value: 1 },  // Equipment → Schedules
-        { source: 5, target: 6, value: 1 },  // Schedules → Planned Work
+        { source: "failure_modes", target: "equipment_types", value: 1 },
+        { source: "equipment_types", target: "strategies", value: 1 },
+        { source: "strategies", target: "maintenance_programs", value: 1 },
+        { source: "maintenance_programs", target: "equipment", value: 1 },
+        { source: "equipment", target: "schedules", value: 1 },
+        { source: "schedules", target: "planned_work", value: 1 },
       );
     }
 
@@ -321,14 +321,15 @@ const SankeyDiagram = ({ data, isLoading }) => {
       ]);
 
     // Create a copy of data for sankey
-    // Filter out nodes that are not connected to any links
-    const connectedNodeIndices = new Set();
+    // Filter out nodes that are not connected to any links.
+    // Links are keyed by node `id` strings (matches `.nodeId(d => d.id)`).
+    const connectedNodeIds = new Set();
     sankeyData.links.forEach(link => {
-      connectedNodeIndices.add(link.source);
-      connectedNodeIndices.add(link.target);
+      connectedNodeIds.add(link.source);
+      connectedNodeIds.add(link.target);
     });
-    
-    const filteredNodes = sankeyData.nodes.filter((_, index) => connectedNodeIndices.has(index));
+
+    const filteredNodes = sankeyData.nodes.filter(n => connectedNodeIds.has(n.id));
     
     // If no nodes are connected, return null to show "no data" message
     if (filteredNodes.length === 0) return null;
