@@ -18,12 +18,15 @@ export function GanttBar({ task, startDate, dayPx, totalDays, onClick, onResched
   if (startIdx + durationDays < 0 || startIdx > totalDays) return null;
 
   const priorityCfg = priorityConfigMap[task.priority] || priorityConfigMap.medium;
+  const isImported =
+    task.task_source === "customer_imported" || !!task.pm_import_task_id;
 
   let barColor = "bg-blue-500";
   if (task.is_overdue) barColor = "bg-red-500";
   else if (task.status === "completed") barColor = "bg-green-500";
   else if (task.status === "in_progress") barColor = "bg-amber-500";
   else if (task.status === "assigned") barColor = "bg-purple-500";
+  else if (isImported) barColor = "bg-purple-500";
 
   const deltaDays = drag?.deltaDays || 0;
   const visibleLeft = (startIdx + deltaDays) * dayPx;

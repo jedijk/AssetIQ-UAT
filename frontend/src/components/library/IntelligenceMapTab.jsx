@@ -126,7 +126,14 @@ const FlowCard = ({
           </button>
         </TooltipTrigger>
         {(tooltipContent || relationship) && (
-          <TooltipContent side="bottom" className="max-w-xs">
+          <TooltipContent
+            side="bottom"
+            className={
+              tooltipContent
+                ? "max-w-xs bg-white text-slate-700 border border-slate-200 shadow-lg p-3"
+                : "max-w-xs"
+            }
+          >
             {tooltipContent || <p className="text-sm">{relationship}</p>}
           </TooltipContent>
         )}

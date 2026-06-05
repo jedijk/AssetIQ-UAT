@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { Calendar, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Card } from "../../ui/card";
 import { Button } from "../../ui/button";
+import { Badge } from "../../ui/badge";
 import { ScrollArea } from "../../ui/scroll-area";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import { getISOWeek } from "./ganttUtils";
@@ -46,6 +47,8 @@ export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedul
             equipment_id: equipment.equipment_id,
             _equipmentName: equipment.equipment_name,
             _equipmentTag: equipment.equipment_tag,
+            _isImported:
+              t.task_source === "customer_imported" || !!t.pm_import_task_id,
             occurrences: [],
           });
         }
@@ -223,9 +226,20 @@ export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedul
                 >
                   <div className="flex-1 min-w-0">
                     <div className="truncate font-medium text-slate-900">{r.task_name}</div>
-                    <div className="truncate text-[10px] text-slate-500">
-                      {r._equipmentName}
-                      {r._equipmentTag && ` · ${r._equipmentTag}`}
+                    <div className="truncate text-[10px] text-slate-500 flex items-center gap-1">
+                      <span className="truncate">
+                        {r._equipmentName}
+                        {r._equipmentTag && ` · ${r._equipmentTag}`}
+                      </span>
+                      {r._isImported && (
+                        <Badge
+                          variant="outline"
+                          className="text-[8px] px-1 py-0 bg-purple-50 text-purple-700 border-purple-200 font-medium uppercase tracking-wide"
+                          data-testid={`gantt-row-import-badge-${r.id}`}
+                        >
+                          Import
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </div>
