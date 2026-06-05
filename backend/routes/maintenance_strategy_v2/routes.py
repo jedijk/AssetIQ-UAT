@@ -943,9 +943,13 @@ async def update_task_template(
     current_user: dict = Depends(get_current_user)
 ):
     """Update a task template and propagate to existing maintenance_programs."""
+    import time
+    start_time = time.time()
+    
     strategy = await db.equipment_type_strategies.find_one({
         "equipment_type_id": equipment_type_id
     })
+    logger.info(f"[TIMING] find_one strategy: {time.time() - start_time:.2f}s")
     
     if not strategy:
         raise HTTPException(status_code=404, detail="Strategy not found")
@@ -971,6 +975,7 @@ async def update_task_template(
     if not updated:
         raise HTTPException(status_code=404, detail="Task template not found")
     
+    t1 = time.time()
     await db.equipment_type_strategies.update_one(
         {"equipment_type_id": equipment_type_id},
         {
@@ -980,27 +985,38 @@ async def update_task_template(
             }
         }
     )
+    logger.info(f"[TIMING] update_one strategy: {time.time() - t1:.2f}s")
 
     # Bump strategy version with a human-readable change descriptor
+    t2 = time.time()
     new_version = await _bump_strategy_version(
         strategy,
         changes=[_describe_task_change(updated_task, list(updates.keys()))],
         user_id=current_user.get("user_id"),
     )
+    logger.info(f"[TIMING] _bump_strategy_version: {time.time() - t2:.2f}s")
 
     # Propagate to all maintenance_programs that reference this task
+    t3 = time.time()
     programs_updated = await _propagate_task_template_to_programs(
         equipment_type_id, updated_task, new_version
     )
+    logger.info(f"[TIMING] _propagate_task_template_to_programs: {time.time() - t3:.2f}s")
 
     # Push metadata changes onto already-generated open scheduled_tasks
+    t4 = time.time()
     scheduled_synced = await _sync_metadata_to_open_scheduled_tasks(
         equipment_type_id, updated_task,
     )
+    logger.info(f"[TIMING] _sync_metadata_to_open_scheduled_tasks: {time.time() - t4:.2f}s")
 
     # If the toggle affects active state (is_mandatory) or linked FMs were
     # changed, recompute every program's active state and cascade-cancel.
+    t5 = time.time()
     resync = await _resync_programs_with_strategy(equipment_type_id)
+    logger.info(f"[TIMING] _resync_programs_with_strategy: {time.time() - t5:.2f}s")
+    
+    logger.info(f"[TIMING] TOTAL: {time.time() - start_time:.2f}s")
 
     # Auto-translate if name or description changed
     if any(k in updates for k in ["name", "description", "procedure_steps"]):

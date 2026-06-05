@@ -24,6 +24,8 @@ async def _propagate_task_template_to_programs(equipment_type_id: str, task_temp
     fields to all maintenance_programs that reference it. Frequency is
     re-derived per-program based on each equipment's criticality.
     """
+    from pymongo import UpdateOne
+    
     task_template_id = task_template.get("id")
     if not task_template_id:
         return 0
@@ -36,7 +38,11 @@ async def _propagate_task_template_to_programs(equipment_type_id: str, task_temp
         {"equipment_type_id": equipment_type_id, "task_template_id": task_template_id}
     ).to_list(5000)
 
-    updated = 0
+    if not programs:
+        return 0
+
+    # Build bulk operations
+    operations = []
     for prog in programs:
         criticality = prog.get("criticality") or "low"
         frequency = freq_matrix.get(criticality, prog.get("frequency", "monthly"))
@@ -54,14 +60,16 @@ async def _propagate_task_template_to_programs(equipment_type_id: str, task_temp
             "strategy_version": new_strategy_version,
             "updated_at": now,
         }
-        result = await db.maintenance_programs.update_one(
-            {"_id": prog["_id"]},
-            {"$set": set_fields},
+        operations.append(
+            UpdateOne({"_id": prog["_id"]}, {"$set": set_fields})
         )
-        if result.modified_count > 0:
-            updated += 1
 
-    return updated
+    # Execute all updates in a single bulk operation
+    if operations:
+        result = await db.maintenance_programs.bulk_write(operations, ordered=False)
+        return result.modified_count
+    
+    return 0
 
 
 async def _deactivate_programs_for_task(equipment_type_id: str, task_template_id: str):
