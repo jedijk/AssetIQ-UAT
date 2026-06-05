@@ -8,7 +8,7 @@ from typing import Optional
 from database import db
 from auth import get_current_user
 from models.maintenance_scheduler import TaskStatus
-from ._shared import ensure_imported_pm_tasks_scheduled
+from ._shared import ensure_imported_pm_tasks_scheduled, active_scheduler_program_ids, scope_query_to_program_ids
 
 router = APIRouter()
 
@@ -35,12 +35,8 @@ async def get_timeline(
     }
 
     if equipment_type_id:
-        programs = await db.maintenance_programs.find(
-            {"equipment_type_id": equipment_type_id},
-            {"id": 1},
-        ).to_list(1000)
-        program_ids = [p["id"] for p in programs]
-        query["maintenance_program_id"] = {"$in": program_ids}
+        program_ids = await active_scheduler_program_ids(equipment_type_id)
+        scope_query_to_program_ids(query, program_ids)
 
     tasks = await db.scheduled_tasks.find(query, {"_id": 0}).sort("due_date", 1).to_list(1000)
 

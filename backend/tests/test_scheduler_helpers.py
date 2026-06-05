@@ -1,5 +1,9 @@
 """Unit tests for shared scheduler/strategy active-task helpers."""
-from services.scheduler_helpers import build_task_to_failure_modes, is_strategy_task_active
+from services.scheduler_helpers import (
+    build_task_to_failure_modes,
+    is_strategy_task_active,
+    program_is_schedulable,
+)
 
 
 def test_standalone_mandatory_task_is_active():
@@ -38,3 +42,10 @@ def test_fm_linked_task_active_when_one_fm_enabled():
     task_to_fms = build_task_to_failure_modes(strategy)
     task = {"id": "t1", "is_mandatory": True, "task_type": "preventive"}
     assert is_strategy_task_active(task, task_to_fms=task_to_fms) is True
+
+
+def test_program_is_schedulable_requires_active_flag():
+    assert program_is_schedulable(
+        {"task_source": "strategy_generated", "strategy_id": "et1", "is_active": False},
+        {"et1"},
+    ) is False

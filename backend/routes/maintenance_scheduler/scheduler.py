@@ -129,8 +129,8 @@ async def cleanup_orphan_scheduled_tasks(
     current_user: dict = Depends(get_current_user),
 ):
     """
-    Remove scheduled_tasks whose maintenance_program no longer exists,
-    AND maintenance_programs whose equipment_type has no strategy.
+    Remove stale strategy schedule items, scheduled_tasks whose maintenance_program
+    no longer exists, and maintenance_programs whose equipment_type has no strategy.
     Optionally scoped to a single equipment type.
     """
     from services.maintenance_scheduler_sync import cleanup_schedules_without_strategy

@@ -529,17 +529,78 @@ async def _equipment_ids_for_type(equipment_type_id: str) -> Set[str]:
     return equipment_ids
 
 
+async def cleanup_stale_strategy_schedules(
+    equipment_type_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Remove strategy-backed programs and scheduled tasks that no longer match
+    active strategy tasks (disabled FM, is_mandatory off, deleted template, etc.).
+    """
+    from services.scheduler_helpers import build_task_to_failure_modes, is_strategy_task_active
+
+    strategy_query: Dict[str, Any] = {}
+    if equipment_type_id:
+        strategy_query["equipment_type_id"] = equipment_type_id
+
+    strategies = await db.equipment_type_strategies.find(strategy_query, {"_id": 0}).to_list(500)
+    stale_program_ids: List[str] = []
+
+    for strategy in strategies:
+        etid = strategy.get("equipment_type_id")
+        if not etid:
+            continue
+        task_to_fms = build_task_to_failure_modes(strategy)
+        active_task_ids = {
+            t.get("id")
+            for t in (strategy.get("task_templates") or [])
+            if t.get("id") and is_strategy_task_active(t, task_to_fms=task_to_fms)
+        }
+        program_query: Dict[str, Any] = {
+            "$or": [{"equipment_type_id": etid}, {"strategy_id": etid}],
+        }
+        async for prog in db.maintenance_programs.find(
+            program_query,
+            {"id": 1, "task_template_id": 1, "is_active": 1, "task_source": 1, "pm_import_task_id": 1, "_id": 0},
+        ):
+            if not program_is_strategy_backed(prog):
+                continue
+            template_id = prog.get("task_template_id")
+            is_stale = (
+                not template_id
+                or template_id not in active_task_ids
+                or not prog.get("is_active", True)
+            )
+            if is_stale and prog.get("id"):
+                stale_program_ids.append(prog["id"])
+
+    scheduled_tasks_deleted = 0
+    programs_deleted = 0
+    if stale_program_ids:
+        unique_ids = list(dict.fromkeys(stale_program_ids))
+        sched_result = await db.scheduled_tasks.delete_many(
+            {"maintenance_program_id": {"$in": unique_ids}},
+        )
+        scheduled_tasks_deleted = sched_result.deleted_count
+        prog_result = await db.maintenance_programs.delete_many({"id": {"$in": unique_ids}})
+        programs_deleted = prog_result.deleted_count
+
+    return {
+        "equipment_type_id": equipment_type_id,
+        "stale_program_ids": stale_program_ids,
+        "scheduled_tasks_deleted": scheduled_tasks_deleted,
+        "programs_deleted": programs_deleted,
+    }
+
+
 async def cleanup_schedules_without_strategy(
     equipment_type_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Remove programs/tasks whose equipment-type strategy no longer exists.
-    
-    This cleanup removes ALL orphaned items regardless of task_source:
-    - Programs with strategy_id/equipment_type_id that has no active strategy
-    - Scheduled tasks with strategy_id that has no active strategy
-    - Scheduled tasks referencing non-existent maintenance_programs
+    Remove stale strategy schedule items and programs/tasks whose equipment-type
+    strategy no longer exists.
     """
+    stale_cleanup = await cleanup_stale_strategy_schedules(equipment_type_id)
+
     active_strategy_types = await _active_strategy_type_ids()
     scoped_equipment_ids: Optional[Set[str]] = None
     if equipment_type_id:
@@ -656,12 +717,14 @@ async def cleanup_schedules_without_strategy(
     return {
         "equipment_type_id": equipment_type_id,
         "equipment_types_cleaned": len(missing_strategy_ids),
-        "scheduled_tasks_deleted": scheduled_tasks_deleted,
-        "programs_deleted": programs_deleted,
+        "scheduled_tasks_deleted": scheduled_tasks_deleted + stale_cleanup.get("scheduled_tasks_deleted", 0),
+        "programs_deleted": programs_deleted + stale_cleanup.get("programs_deleted", 0),
         "v2_programs_deleted": v2_programs_deleted,
         "missing_strategy_ids": sorted(missing_strategy_ids),
         "orphan_program_ids": orphan_program_ids,
         "orphan_v2_program_ids": orphan_v2_program_ids,
+        "stale_program_ids": stale_cleanup.get("stale_program_ids", []),
+        "stale_cleanup": stale_cleanup,
     }
 
 
