@@ -477,8 +477,9 @@ async def get_intelligence_map_stats(
                 },
                 "strategy_applied": {
                     "applied": equipment_with_strategy_applied_count,
-                    "total": equipment_with_strategy_count,
-                    "description": "Equipment with Strategy Applied"
+                    "total": equipment_count,
+                    "eligible": equipment_with_strategy_count,
+                    "description": "Equipment with Strategy Applied over all equipment"
                 },
                 "strategy_density": {
                     "value": strategy_density,

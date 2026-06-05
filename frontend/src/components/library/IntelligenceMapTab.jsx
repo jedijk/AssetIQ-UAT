@@ -854,7 +854,12 @@ const IntelligenceMapTab = () => {
                   <span className="text-xl font-bold text-purple-700">{strategyApplied.applied}</span>
                   <span className="text-sm text-slate-500">of {strategyApplied.total}</span>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">Equipment with strategy applied</p>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Across all equipment
+                  {strategyApplied.eligible > 0 && (
+                    <> · {strategyApplied.eligible} eligible</>
+                  )}
+                </p>
                 {strategyApplied.total > 0 && (
                   <Progress 
                     value={(strategyApplied.applied / strategyApplied.total) * 100} 
