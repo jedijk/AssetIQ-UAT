@@ -348,10 +348,15 @@ async def get_intelligence_map_stats(
                     "target": "equipment_types",
                     "value": len(equipment_types_in_use_set)  # Equipment types in use
                 },
-                "equipment_types_to_equipment": {
+                "equipment_types_to_strategies": {
                     "source": "equipment_types",
+                    "target": "strategies",
+                    "value": strategies_count  # Strategies created from equipment types
+                },
+                "strategies_to_equipment": {
+                    "source": "strategies",
                     "target": "equipment",
-                    "value": equipment_with_type_count
+                    "value": equipment_with_type_count  # Equipment with strategies applied
                 },
                 "equipment_to_programs": {
                     "source": "equipment",
