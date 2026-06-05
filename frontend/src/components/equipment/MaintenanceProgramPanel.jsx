@@ -877,6 +877,25 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
       toast.error(`Failed to create program: ${error.message}`);
     },
   });
+
+  // Delete program mutation
+  const deleteProgramMutation = useMutation({
+    mutationFn: () => maintenanceProgramAPI.deleteProgram(equipmentId),
+    onSuccess: (data) => {
+      const cancelled = data?.scheduled_tasks_cancelled ?? 0;
+      toast.success(
+        cancelled > 0
+          ? `Maintenance program deleted (${cancelled} scheduled task(s) cancelled)`
+          : 'Maintenance program deleted',
+      );
+      queryClient.invalidateQueries({ queryKey: ['maintenance-program', equipmentId] });
+      queryClient.invalidateQueries({ queryKey: ['maintenance-program'] });
+      queryClient.invalidateQueries({ queryKey: ['maintenance-scheduler'] });
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.detail || error.message || 'Failed to delete program');
+    },
+  });
   
   // Delete task mutation
   const deleteTaskMutation = useMutation({
@@ -1095,6 +1114,30 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
               <TooltipContent>Regenerate from Strategy</TooltipContent>
             </Tooltip>
           </TooltipProvider>
+
+          {programData?.exists && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const ok = window.confirm(
+                        'Delete this maintenance program? This will cancel any open scheduled tasks for this equipment.',
+                      );
+                      if (ok) deleteProgramMutation.mutate();
+                    }}
+                    disabled={deleteProgramMutation.isPending}
+                    className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                  >
+                    <Trash2 className={`h-4 w-4 ${deleteProgramMutation.isPending ? 'animate-spin' : ''}`} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Delete Program</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
             </>
           )}
           
