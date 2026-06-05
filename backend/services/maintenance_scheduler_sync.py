@@ -3,6 +3,7 @@ Sync maintenance strategy / program changes to the scheduler (maintenance_progra
 + scheduled_tasks) so equipment-type and all-equipment schedule views stay current.
 """
 import logging
+import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -21,6 +22,8 @@ from services.scheduler_helpers import (
 logger = logging.getLogger(__name__)
 
 OPEN_TASK_STATUSES = {"$nin": ["completed", "cancelled"]}
+_ACTIVE_STRATEGY_CACHE: Optional[Tuple[float, Set[str]]] = None
+_ACTIVE_STRATEGY_CACHE_TTL = 60.0
 
 
 def _build_task_to_fm(strategy: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
@@ -475,13 +478,22 @@ async def clear_equipment_type_schedule_after_strategy_delete(
 
 
 async def _active_strategy_type_ids() -> Set[str]:
-    return {
+    global _ACTIVE_STRATEGY_CACHE
+    now = time.monotonic()
+    if _ACTIVE_STRATEGY_CACHE is not None:
+        cached_at, cached_ids = _ACTIVE_STRATEGY_CACHE
+        if now - cached_at < _ACTIVE_STRATEGY_CACHE_TTL:
+            return cached_ids
+
+    ids = {
         doc["equipment_type_id"]
         async for doc in db.equipment_type_strategies.find(
             {},
             {"equipment_type_id": 1, "_id": 0},
         )
     }
+    _ACTIVE_STRATEGY_CACHE = (now, ids)
+    return ids
 
 
 async def _equipment_ids_for_type(equipment_type_id: str) -> Set[str]:

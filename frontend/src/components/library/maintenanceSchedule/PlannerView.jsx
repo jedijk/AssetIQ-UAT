@@ -22,16 +22,18 @@ export function PlannerView({ equipmentTypeId, onTaskClick, filteredEquipmentIds
 
   // ---- Daily uses dedicated endpoint (overdue / today / tomorrow buckets) ----
   const { data: dailyData, isLoading: dailyLoading } = useQuery({
-    queryKey: ["maintenance-scheduler-daily-planner"],
+    queryKey: ["maintenance-scheduler-daily-planner", equipmentTypeId || "all"],
     queryFn: () => maintenanceSchedulerAPI.getDailyPlanner(),
     enabled: horizon === "daily",
+    staleTime: 60_000,
   });
 
   // ---- Weekly uses dedicated endpoint (7-day grid with technicians) ----
   const { data: weeklyData, isLoading: weeklyLoading } = useQuery({
-    queryKey: ["maintenance-scheduler-weekly-planner"],
+    queryKey: ["maintenance-scheduler-weekly-planner", equipmentTypeId || "all"],
     queryFn: () => maintenanceSchedulerAPI.getWeeklyPlanner(),
     enabled: horizon === "weekly",
+    staleTime: 60_000,
   });
 
   // ---- 14-day & 90-day use /tasks with from/to + frontend grouping ----
@@ -52,6 +54,7 @@ export function PlannerView({ equipmentTypeId, onTaskClick, filteredEquipmentIds
         ...(equipmentTypeId ? { equipment_type_id: equipmentTypeId } : {}),
       }),
     enabled: horizon === "14" || horizon === "90",
+    staleTime: 60_000,
   });
 
   // Technician capacity for the look-ahead views

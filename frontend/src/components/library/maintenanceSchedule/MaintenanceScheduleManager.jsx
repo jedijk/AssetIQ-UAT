@@ -85,18 +85,21 @@ export function MaintenanceScheduleManager({ equipmentType }) {
   const equipmentTypeId = equipmentType?.id;
   const equipmentTypeName = equipmentType?.name || t("equipment.allEquipment");
   const isGlobalView = !equipmentTypeId;
+  const schedulerStaleTime = 60_000;
 
   // ============= Queries =============
 
   const { data: dashboard, isLoading: dashboardLoading } = useQuery({
     queryKey: ["maintenance-scheduler-dashboard", equipmentTypeId || "all"],
     queryFn: () => maintenanceSchedulerAPI.getDashboard(equipmentTypeId),
+    staleTime: schedulerStaleTime,
   });
 
   const { data: programsSummary, isLoading: programsLoading } = useQuery({
     queryKey: ["maintenance-scheduler-programs-summary", equipmentTypeId || "all"],
     queryFn: () => maintenanceSchedulerAPI.getProgramsSummary(equipmentTypeId),
     enabled: !!equipmentTypeId,
+    staleTime: schedulerStaleTime,
   });
 
   const { data: timeline, isLoading: timelineLoading, refetch: refetchTimeline } = useQuery({
@@ -112,11 +115,15 @@ export function MaintenanceScheduleManager({ equipmentType }) {
         ...(equipmentTypeId ? { equipment_type_id: equipmentTypeId } : {}),
       });
     },
+    enabled: activeTab === "timeline",
+    staleTime: schedulerStaleTime,
   });
 
   const { data: tasksData, isLoading: tasksLoading } = useQuery({
     queryKey: ["maintenance-scheduler-tasks", equipmentTypeId || "all"],
     queryFn: () => maintenanceSchedulerAPI.getTasks(equipmentTypeId ? { equipment_type_id: equipmentTypeId } : {}),
+    enabled: activeTab === "tasks",
+    staleTime: schedulerStaleTime,
   });
 
   const { data: affectedEquipmentData } = useQuery({
@@ -232,23 +239,9 @@ export function MaintenanceScheduleManager({ equipmentType }) {
               .replace("{programs}", programs + v2Programs)
           : t("maintenance.clearOrphanScheduleEmpty"),
       );
-      // Invalidate and refetch all maintenance scheduler related queries
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler-dashboard"] }),
-        queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler-programs-summary"] }),
-        queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler-timeline"] }),
-        queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler-tasks"] }),
-        queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] }),
-        queryClient.invalidateQueries({ queryKey: ["maintenance-program"] }),
-        queryClient.invalidateQueries({ queryKey: ["maintenance-strategy-v2"] }),
-      ]);
-      // Force refetch to immediately update the UI
-      await Promise.all([
-        queryClient.refetchQueries({ queryKey: ["maintenance-scheduler-dashboard"] }),
-        queryClient.refetchQueries({ queryKey: ["maintenance-scheduler-programs-summary"] }),
-        queryClient.refetchQueries({ queryKey: ["maintenance-scheduler-timeline"] }),
-        queryClient.refetchQueries({ queryKey: ["maintenance-scheduler-tasks"] }),
-      ]);
+      await queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] });
+      queryClient.invalidateQueries({ queryKey: ["maintenance-program"] });
+      queryClient.invalidateQueries({ queryKey: ["maintenance-strategy-v2"] });
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || t("maintenance.clearOrphanScheduleFailed"));
