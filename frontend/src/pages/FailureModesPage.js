@@ -961,13 +961,16 @@ const FailureModesPage = () => {
     const tabParam = searchParams.get("tab");
     const searchParam = searchParams.get("search");
     const equipmentTypeIdParam = searchParams.get("equipment_type_id");
+    const filterParam = searchParams.get("filter");
+    
     if (tabParam) setMainTab(tabParam);
     if (searchParam) setSearchQuery(searchParam);
     if (equipmentTypeIdParam) {
       setStrategyEquipmentTypeId(equipmentTypeIdParam);
       setFilterLinkedToEquipment(false);
     }
-    if (tabParam || searchParam || equipmentTypeIdParam) {
+    // Don't clear search params if filter is set (e.g., filter=with_strategy)
+    if ((tabParam || searchParam || equipmentTypeIdParam) && !filterParam) {
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, setSearchParams]);

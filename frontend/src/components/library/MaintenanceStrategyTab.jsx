@@ -107,6 +107,9 @@ const MaintenanceStrategyTab = ({
   const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [selectedType, setSelectedType] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  
+  // Check URL for "with_strategy" filter
+  const showOnlyWithStrategy = searchParams.get("filter") === "with_strategy";
 
   // Fetch equipment types (built-in + custom merged from backend)
   const { data: equipmentTypesData, isLoading: typesLoading } = useQuery({
@@ -126,7 +129,7 @@ const MaintenanceStrategyTab = ({
   const { equipmentTypes: translatedEquipmentTypes } = useTranslatedEquipmentTypes(equipmentTypesData || []);
 
   // Fetch all strategies to show which types have strategies
-  const { data: strategiesData } = useQuery({
+  const { data: strategiesData, isLoading: strategiesLoading } = useQuery({
     queryKey: ["maintenance-strategies-v2-list"],
     queryFn: () => maintenanceStrategyV2API.listStrategies(),
   });
@@ -148,7 +151,7 @@ const MaintenanceStrategyTab = ({
     return Array.from(set).sort();
   }, [translatedEquipmentTypes]);
 
-  // Filter equipment types (search, discipline, hierarchy-linked)
+  // Filter equipment types (search, discipline, hierarchy-linked, with-strategy)
   const filteredTypes = useMemo(() => {
     let types = translatedEquipmentTypes || [];
     
@@ -170,12 +173,17 @@ const MaintenanceStrategyTab = ({
       types = types.filter((t) => inUseEquipmentTypeIds.has(t.id));
     }
     
+    // Filter to show only equipment types with strategies (from URL param)
+    if (showOnlyWithStrategy && strategiesData) {
+      types = types.filter((t) => strategiesMap.has(t.id));
+    }
+    
     // Sort: custom first, then by name
     return types.sort((a, b) => {
       if (a.isCustom !== b.isCustom) return a.isCustom ? -1 : 1;
       return (a.name || "").localeCompare(b.name || "");
     });
-  }, [translatedEquipmentTypes, searchQuery, disciplineFilter, filterLinkedToEquipment, inUseEquipmentTypeIds]);
+  }, [translatedEquipmentTypes, searchQuery, disciplineFilter, filterLinkedToEquipment, inUseEquipmentTypeIds, showOnlyWithStrategy, strategiesMap, strategiesData]);
 
   const strategiesInFilteredTypesCount = useMemo(() => {
     if (!filterLinkedToEquipment) return strategiesMap.size;
@@ -192,6 +200,20 @@ const MaintenanceStrategyTab = ({
       setSelectedType(null);
     }
   }, [filterLinkedToEquipment, selectedType, inUseEquipmentTypeIds]);
+
+  // Auto-select first equipment type with strategy when "with_strategy" filter is active
+  useEffect(() => {
+    if (showOnlyWithStrategy && strategiesData) {
+      // If current selection doesn't have a strategy, or no selection, select first with strategy
+      if (!selectedType || !strategiesMap.has(selectedType.id)) {
+        const firstWithStrategy = filteredTypes.find(t => strategiesMap.has(t.id));
+        if (firstWithStrategy) {
+          setSelectedType(firstWithStrategy);
+          setSidebarCollapsed(false);
+        }
+      }
+    }
+  }, [showOnlyWithStrategy, selectedType, filteredTypes, strategiesData, strategiesMap]);
 
   // Deep-link / PM Import: pre-select equipment type for strategy view
   useEffect(() => {
@@ -340,6 +362,12 @@ const MaintenanceStrategyTab = ({
                 {strategiesInFilteredTypesCount} {t("maintenance.withStrategies")}
               </span>
             </div>
+            {showOnlyWithStrategy && (
+              <div className="text-purple-600 mt-1 flex items-center gap-1">
+                <Filter className="w-3 h-3" />
+                Showing only equipment types with strategies
+              </div>
+            )}
           </div>
         </div>
       )}
