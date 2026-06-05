@@ -56,6 +56,7 @@ const FlowCard = ({
   count, 
   subtitle, 
   relationship,
+  tooltipContent,
   onClick, 
   color = "blue",
   isLoading = false 
@@ -124,9 +125,9 @@ const FlowCard = ({
             </div>
           </button>
         </TooltipTrigger>
-        {relationship && (
+        {(tooltipContent || relationship) && (
           <TooltipContent side="bottom" className="max-w-xs">
-            <p className="text-sm">{relationship}</p>
+            {tooltipContent || <p className="text-sm">{relationship}</p>}
           </TooltipContent>
         )}
       </Tooltip>
@@ -650,6 +651,43 @@ const IntelligenceMapTab = () => {
                   count={stats?.maintenance_programs?.active}
                   subtitle="Active"
                   relationship={`${stats?.equipment?.with_active_program || 0} equipment affected`}
+                  tooltipContent={
+                    <div className="text-xs space-y-2 py-1 min-w-[200px]">
+                      <div className="font-semibold text-slate-700">
+                        Active Programs Breakdown
+                      </div>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-1.5">
+                            <Cog className="w-3 h-3 text-purple-600" />
+                            <span className="text-slate-600">From Strategy</span>
+                          </div>
+                          <span className="font-semibold text-slate-900">
+                            {(stats?.equipment?.with_strategy_applied || 0).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-1.5">
+                            <Upload className="w-3 h-3 text-purple-600" />
+                            <span className="text-slate-600">From PM Import</span>
+                          </div>
+                          <span className="font-semibold text-slate-900">
+                            {(stats?.maintenance_programs?.from_pm_import || 0).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="h-px bg-slate-200 my-1" />
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="text-slate-700 font-medium">Total Active</span>
+                          <span className="font-bold text-indigo-700">
+                            {(stats?.maintenance_programs?.active || 0).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-[10px] text-slate-500 pt-1 border-t border-slate-200">
+                        Click to open Maintenance Programs
+                      </div>
+                    </div>
+                  }
                   onClick={navigateToPrograms}
                   color="indigo"
                   isLoading={statsLoading}
