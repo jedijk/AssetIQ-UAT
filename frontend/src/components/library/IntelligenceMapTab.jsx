@@ -472,6 +472,7 @@ const IntelligenceMapTab = () => {
   // Calculate derived values
   const insights = stats?.insights || {};
   const failureModeCoverage = insights.failure_mode_coverage?.value || 0;
+  const strategyApplied = insights.strategy_applied || { applied: 0, total: 0 };
   const strategyDensity = insights.strategy_density?.value || 0;
   const pmSourceSplit = insights.pm_source_split || { generated: 0, imported: 0 };
   const scheduleHealth = insights.schedule_health?.missing_frequency || 0;
@@ -760,6 +761,25 @@ const IntelligenceMapTab = () => {
                 icon={Target}
                 color={failureModeCoverage >= 80 ? "green" : failureModeCoverage >= 50 ? "amber" : "red"}
               />
+
+              {/* Strategy Applied */}
+              <div className="p-3 rounded-lg border border-purple-200 bg-purple-50/50">
+                <div className="flex items-start justify-between mb-1">
+                  <span className="text-xs font-medium text-slate-600">Strategy Applied</span>
+                  <Cog className="w-4 h-4 text-purple-600" />
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-xl font-bold text-purple-700">{strategyApplied.applied}</span>
+                  <span className="text-sm text-slate-500">of {strategyApplied.total}</span>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">Equipment with strategy applied</p>
+                {strategyApplied.total > 0 && (
+                  <Progress 
+                    value={(strategyApplied.applied / strategyApplied.total) * 100} 
+                    className="h-1.5 mt-2 [&>div]:bg-purple-500" 
+                  />
+                )}
+              </div>
 
               {/* Strategy Density */}
               <InsightCard

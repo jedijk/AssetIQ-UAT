@@ -177,6 +177,14 @@ async def get_intelligence_map_stats(
         else:
             equipment_with_strategy_count = 0
         
+        # Count equipment that have strategy APPLIED (have maintenance program with strategy tasks)
+        programs_with_strategy = await db.maintenance_programs_v2.find(
+            {"strategy_tasks": {"$gt": 0}},
+            {"equipment_id": 1}
+        ).to_list(1000)
+        equipment_ids_with_strategy_applied = set([p.get("equipment_id") for p in programs_with_strategy if p.get("equipment_id")])
+        equipment_with_strategy_applied_count = len(equipment_ids_with_strategy_applied)
+        
         # ========== MAINTENANCE PROGRAMS ==========
         program_query = {}
         if equipment_type_id:
@@ -317,7 +325,8 @@ async def get_intelligence_map_stats(
             "equipment": {
                 "count": equipment_count,
                 "with_type": equipment_with_type_count,
-                "with_strategy": equipment_with_strategy_count,  # Equipment affected by a strategy
+                "with_strategy": equipment_with_strategy_count,  # Equipment that could have strategy (equipment type has strategy)
+                "with_strategy_applied": equipment_with_strategy_applied_count,  # Equipment that actually have strategy applied
                 "with_coverage": covered_equipment,
                 "label": "Equipment"
             },
@@ -393,6 +402,11 @@ async def get_intelligence_map_stats(
                     "description": "Equipment with linked Failure Modes",
                     "numerator": covered_equipment,
                     "denominator": equipment_count
+                },
+                "strategy_applied": {
+                    "applied": equipment_with_strategy_applied_count,
+                    "total": equipment_with_strategy_count,
+                    "description": "Equipment with Strategy Applied"
                 },
                 "strategy_density": {
                     "value": strategy_density,
