@@ -71,18 +71,6 @@ async def get_intelligence_map_stats(
         # Get user's installation filter data (for future use with permissions)
         _ = await installation_filter.get_user_installation_ids(current_user)
         
-        # ========== FAILURE MODES ==========
-        fm_query = {}
-        if equipment_type_id:
-            fm_query["equipment_type_id"] = equipment_type_id
-        
-        failure_modes_count = await db.failure_modes.count_documents(fm_query)
-        
-        # Count unique equipment types with failure modes
-        fm_equipment_types = await db.failure_modes.distinct("equipment_type_id", fm_query)
-        fm_equipment_types_set = set([et for et in fm_equipment_types if et])
-        fm_equipment_types_count = len(fm_equipment_types_set)
-        
         # ========== EQUIPMENT TYPES ==========
         et_query = {}
         if equipment_type_id:
@@ -95,6 +83,21 @@ async def get_intelligence_map_stats(
             "equipment_type_id": {"$ne": None, "$exists": True}
         })
         equipment_types_in_use_set = set([et for et in equipment_types_in_use if et])
+        
+        # ========== FAILURE MODES (only those linked to equipment types in use) ==========
+        fm_query = {}
+        if equipment_type_id:
+            fm_query["equipment_type_id"] = equipment_type_id
+        elif equipment_types_in_use_set:
+            # Only count failure modes linked to equipment types actually in use
+            fm_query["equipment_type_id"] = {"$in": list(equipment_types_in_use_set)}
+        
+        failure_modes_count = await db.failure_modes.count_documents(fm_query)
+        
+        # Count unique equipment types with failure modes (that are in use)
+        fm_equipment_types = await db.failure_modes.distinct("equipment_type_id", fm_query)
+        fm_equipment_types_set = set([et for et in fm_equipment_types if et])
+        fm_equipment_types_count = len(fm_equipment_types_set)
         
         # Count equipment types that have failure modes AND are used in equipment
         # This shows how many equipment types with FM knowledge are actually deployed
