@@ -845,30 +845,24 @@ const Layout = () => {
               onOpenChange={(open) => setOpenHeaderMenu(open ? "notifications" : null)}
             >
               <DropdownMenuTrigger asChild>
-                <motion.div
-                  whileHover={{ scale: 1.08 }}
-                  whileTap={{ scale: 0.92 }}
-                  transition={springPresets.snappy}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 sm:h-8 sm:w-8 text-slate-600 hover:text-slate-900 relative transition-transform hover:scale-105 active:scale-95"
+                  data-testid="notifications-button"
                 >
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 sm:h-8 sm:w-8 text-slate-600 hover:text-slate-900 relative"
-                    data-testid="notifications-button"
-                  >
-                    <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    {totalNotificationCount > 0 && !dismissedNotifications && (
-                      <motion.span 
-                        className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] sm:text-[9px] font-bold rounded-full min-w-[14px] sm:min-w-[16px] h-[14px] sm:h-[16px] flex items-center justify-center px-0.5"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={springPresets.bouncy}
-                      >
-                        {totalNotificationCount > 9 ? "9+" : totalNotificationCount}
-                      </motion.span>
-                    )}
-                  </Button>
-                </motion.div>
+                  <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  {totalNotificationCount > 0 && !dismissedNotifications && (
+                    <motion.span 
+                      className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] sm:text-[9px] font-bold rounded-full min-w-[14px] sm:min-w-[16px] h-[14px] sm:h-[16px] flex items-center justify-center px-0.5"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={springPresets.bouncy}
+                    >
+                      {totalNotificationCount > 9 ? "9+" : totalNotificationCount}
+                    </motion.span>
+                  )}
+                </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-80">
                 {/* New Feedback Section - Only for owner/admin/manager */}
@@ -1035,20 +1029,14 @@ const Layout = () => {
                 <TooltipTrigger asChild>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <motion.div
-                        whileHover={{ scale: 1.08 }}
-                        whileTap={{ scale: 0.92 }}
-                        transition={springPresets.snappy}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 sm:h-7 sm:w-7 text-[10px] sm:text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-transform hover:scale-105 active:scale-95"
+                        data-testid="language-switcher"
                       >
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 sm:h-7 sm:w-7 text-[10px] sm:text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                          data-testid="language-switcher"
-                        >
-                          <span className="font-medium">{language.toUpperCase()}</span>
-                        </Button>
-                      </motion.div>
+                        <span className="font-medium">{language.toUpperCase()}</span>
+                      </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-40" data-testid="language-switcher-menu">
                       <DropdownMenuLabel className="text-xs">Language / Sprache</DropdownMenuLabel>
@@ -1140,20 +1128,14 @@ const Layout = () => {
                 onOpenChange={(open) => setOpenHeaderMenu(open ? "settings" : null)}
               >
                 <DropdownMenuTrigger asChild>
-                  <motion.div
-                    whileHover={{ scale: 1.08, rotate: 15 }}
-                    whileTap={{ scale: 0.92 }}
-                    transition={springPresets.snappy}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 sm:h-8 sm:w-8 text-slate-600 hover:text-slate-900 transition-transform hover:scale-105 hover:rotate-12 active:scale-95"
+                    data-testid="settings-menu-button"
                   >
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 sm:h-8 sm:w-8 text-slate-600 hover:text-slate-900"
-                      data-testid="settings-menu-button"
-                    >
-                      <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                    </Button>
-                  </motion.div>
+                    <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52">
                   <DropdownMenuLabel className="text-xs">{t("nav.settings")}</DropdownMenuLabel>
@@ -1200,12 +1182,9 @@ const Layout = () => {
               onOpenChange={(open) => setOpenHeaderMenu(open ? "profile" : null)}
             >
               <DropdownMenuTrigger asChild>
-                <motion.button 
-                  className="flex items-center justify-center h-8 w-8 rounded-full overflow-hidden border-2 border-slate-200 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                <button 
+                  className="flex items-center justify-center h-8 w-8 rounded-full overflow-hidden border-2 border-slate-200 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-transform hover:scale-110 active:scale-95"
                   data-testid="user-avatar-button"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.95 }}
-                  transition={springPresets.snappy}
                 >
                   {avatarUrl ? (
                     <img
@@ -1218,7 +1197,7 @@ const Layout = () => {
                   <div className={`h-full w-full bg-gradient-to-br from-blue-500 to-indigo-600 items-center justify-center text-white font-semibold text-sm ${avatarUrl ? 'hidden' : 'flex'}`}>
                     {user?.name?.split(' ').map(n => n.charAt(0)).join('').toUpperCase().slice(0, 2) || "U"}
                   </div>
-                </motion.button>
+                </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
                 <div className="px-3 py-3 border-b border-slate-100">
