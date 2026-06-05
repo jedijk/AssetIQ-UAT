@@ -648,16 +648,32 @@ async def get_affected_equipment(
     equipment_type_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Get list of equipment affected by this strategy"""
-    # Find all equipment nodes that use this equipment type
+    """Get list of equipment affected by this strategy.
+
+    Each item carries `strategy_applied: bool` indicating whether this equipment
+    already has an active maintenance program with strategy tasks — used by the
+    Apply Strategy dialog to pre-select only the equipment that is currently
+    "active" (already covered).
+    """
     equipment_nodes = await db.equipment_nodes.find(
         {"equipment_type_id": equipment_type_id},
         {"_id": 0, "id": 1, "name": 1, "tag": 1, "level": 1, "location": 1, "parent_id": 1, "criticality": 1}
     ).to_list(500)
-    
+
+    applied_equipment_ids = set(
+        await db.maintenance_programs_v2.distinct(
+            "equipment_id",
+            {"equipment_type_id": equipment_type_id, "strategy_tasks": {"$gt": 0}},
+        )
+    )
+
+    for eq in equipment_nodes:
+        eq["strategy_applied"] = eq.get("id") in applied_equipment_ids
+
     return {
         "equipment": equipment_nodes,
         "total": len(equipment_nodes),
+        "applied_count": len(applied_equipment_ids),
         "equipment_type_id": equipment_type_id
     }
 

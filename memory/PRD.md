@@ -7,6 +7,14 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Apply Strategy dialog — pre-select only ACTIVE equipment (VERIFIED)**:
+  - The dialog now opens with **only equipment that already has the strategy applied** pre-selected (the "active" subset), instead of selecting all 11 by default. Each active row gets a green "Active" badge so the user can see current coverage at a glance.
+  - First-time apply fallback: if no equipment has the strategy applied yet (`applied_count == 0`), the dialog falls back to pre-selecting all so the user isn't stuck with an empty initial state.
+  - Backend: `GET /api/maintenance-strategies-v2/{equipment_type_id}/affected-equipment` now annotates each equipment item with `strategy_applied: bool` (driven by `maintenance_programs_v2.strategy_tasks > 0`) and adds `applied_count` to the response.
+  - Frontend: `ApplyStrategyDialog` `useEffect` seeds `selectedEquipment` with `appliedIds` when any exist; each row renders an "Active" badge based on `equip.strategy_applied`.
+  - Verified end-to-end: Radial Bearing dialog opened with `2 of 11 equipment selected` (1F-3001-0121, 1C-4002-0192 both pre-checked + "Active" badge visible). All other equipment unchecked.
+  - Files: `/app/backend/routes/maintenance_strategy_v2/routes.py`, `/app/frontend/src/components/library/maintenanceSchedule/ApplyStrategyDialog.jsx`.
+
 - [Feb 2026] **Intelligence Map "Schedules" KPI — counts tasks with a schedule (VERIFIED)**:
   - Schedules card now counts **active task templates that have a schedule (frequency)** across maintenance programs whose strategy is actually applied — not the rows in `scheduled_tasks` collection (which is the time-horizon expansion).
   - Backend: `schedules_for_applied_count` now aggregates `$sum: $active_tasks` on `maintenance_programs_v2` filtered to `equipment_id ∈ equipment_ids_with_strategy_applied`.

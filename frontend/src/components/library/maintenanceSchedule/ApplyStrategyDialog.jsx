@@ -37,11 +37,19 @@ export function ApplyStrategyDialog({
   const [selectedEquipment, setSelectedEquipment] = useState([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  // Auto pre-select all affected equipment whenever the dialog opens
-  // or the affected equipment list changes. The user can then untick exceptions.
+  // Auto pre-select equipment that already has the strategy applied (currently
+  // active coverage). If no equipment has it applied yet (first-time apply for
+  // this strategy), fall back to pre-selecting all so the user isn't stuck with
+  // an empty initial state.
   useEffect(() => {
     if (open) {
-      setSelectedEquipment((affectedEquipment || []).map((e) => e.id));
+      const list = affectedEquipment || [];
+      const appliedIds = list.filter((e) => e.strategy_applied).map((e) => e.id);
+      if (appliedIds.length > 0) {
+        setSelectedEquipment(appliedIds);
+      } else {
+        setSelectedEquipment(list.map((e) => e.id));
+      }
     }
   }, [open, affectedEquipment]);
 
@@ -124,11 +132,19 @@ export function ApplyStrategyDialog({
                     onChange={() => {}}
                     className="pointer-events-none"
                   />
-                  <div className="flex-1">
+                  <div className="flex-1 flex items-center gap-2">
                     <span className="text-sm font-medium">{equip.name}</span>
                     {equip.tag && (
-                      <Badge variant="outline" className="ml-2 text-xs font-mono">
+                      <Badge variant="outline" className="text-xs font-mono">
                         {equip.tag}
+                      </Badge>
+                    )}
+                    {equip.strategy_applied && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 ml-auto"
+                      >
+                        Active
                       </Badge>
                     )}
                   </div>
