@@ -156,6 +156,19 @@ async def get_intelligence_map_stats(
         equipment_with_type_query = {**equipment_query, "equipment_type_id": {"$ne": None, "$exists": True}}
         equipment_with_type_count = await db.equipment_nodes.count_documents(equipment_with_type_query)
         
+        # Get equipment types that have strategies
+        strategy_equipment_types = await db.maintenance_strategies.distinct("equipment_type_id")
+        strategy_equipment_types_set = set([et for et in strategy_equipment_types if et])
+        
+        # Count equipment affected by strategies (equipment with equipment_type that has a strategy)
+        if strategy_equipment_types_set:
+            equipment_with_strategy_count = await db.equipment_nodes.count_documents({
+                **equipment_query,
+                "equipment_type_id": {"$in": list(strategy_equipment_types_set)}
+            })
+        else:
+            equipment_with_strategy_count = 0
+        
         # ========== MAINTENANCE PROGRAMS ==========
         program_query = {}
         if equipment_type_id:
@@ -220,40 +233,21 @@ async def get_intelligence_map_stats(
         planned_work_count = await db.scheduled_tasks.count_documents(planned_work_query)
         
         # ========== PM IMPORTS (Accepted tasks without failure mode linkage) ==========
-        # Count accepted/imported tasks from maintenance programs that are NOT connected to failure modes
-        pm_tasks_pipeline = [
-            {"$unwind": "$tasks"},
-            {"$match": {
-                "tasks.task_source": "imported",
-                "$or": [
-                    {"tasks.traceability.failure_mode_id": None},
-                    {"tasks.traceability.failure_mode_id": {"$exists": False}},
-                    {"tasks.traceability.failure_mode_id": ""}
-                ]
-            }},
-            {"$count": "count"}
-        ]
-        pm_imported_no_fm = await db.maintenance_programs_v2.aggregate(pm_tasks_pipeline).to_list(1)
-        pm_imported_no_fm_count = pm_imported_no_fm[0]["count"] if pm_imported_no_fm else 0
-        
-        # Also count from pm_import_sessions for accepted tasks without failure_mode
+        # Count accepted tasks from pm_import_sessions.tasks_extracted that don't have failure_mode_id
         pm_sessions_pipeline = [
-            {"$unwind": {"path": "$tasks", "preserveNullAndEmptyArrays": False}},
+            {"$unwind": {"path": "$tasks_extracted", "preserveNullAndEmptyArrays": False}},
             {"$match": {
-                "tasks.review_status": "accepted",
+                "tasks_extracted.review_status": "accepted",
                 "$or": [
-                    {"tasks.failure_mode_id": None},
-                    {"tasks.failure_mode_id": {"$exists": False}},
-                    {"tasks.failure_mode_id": ""}
+                    {"tasks_extracted.failure_mode_id": None},
+                    {"tasks_extracted.failure_mode_id": {"$exists": False}},
+                    {"tasks_extracted.failure_mode_id": ""}
                 ]
             }},
             {"$count": "count"}
         ]
-        pm_sessions_accepted = await db.pm_import_sessions.aggregate(pm_sessions_pipeline).to_list(1)
-        pm_sessions_accepted_count = pm_sessions_accepted[0]["count"] if pm_sessions_accepted else 0
-        
-        # Total accepted PM tasks not connected to failure modes
-        pm_accepted_no_fm_total = pm_imported_no_fm_count + pm_sessions_accepted_count
+        pm_accepted_result = await db.pm_import_sessions.aggregate(pm_sessions_pipeline).to_list(1)
+        pm_accepted_no_fm_total = pm_accepted_result[0]["count"] if pm_accepted_result else 0
         
         # Also get session count for reference
         pm_sessions_count = await db.pm_import_sessions.count_documents({})
@@ -315,6 +309,7 @@ async def get_intelligence_map_stats(
             "equipment": {
                 "count": equipment_count,
                 "with_type": equipment_with_type_count,
+                "with_strategy": equipment_with_strategy_count,  # Equipment affected by a strategy
                 "with_coverage": covered_equipment,
                 "label": "Equipment"
             },
@@ -354,18 +349,18 @@ async def get_intelligence_map_stats(
                     "target": "strategies",
                     "value": strategies_count  # Strategies created from equipment types
                 },
-                "strategies_to_equipment": {
+                "strategies_to_programs": {
                     "source": "strategies",
-                    "target": "equipment",
-                    "value": equipment_with_type_count  # Equipment with strategies applied
-                },
-                "equipment_to_programs": {
-                    "source": "equipment",
                     "target": "maintenance_programs",
-                    "value": programs_count
+                    "value": programs_count  # Programs created from strategies
                 },
-                "programs_to_schedules": {
+                "programs_to_equipment": {
                     "source": "maintenance_programs",
+                    "target": "equipment",
+                    "value": equipment_with_strategy_count  # Equipment affected by strategies
+                },
+                "equipment_to_schedules": {
+                    "source": "equipment",
                     "target": "schedules",
                     "value": schedules_count
                 },

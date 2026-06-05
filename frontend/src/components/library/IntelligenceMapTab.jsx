@@ -211,13 +211,13 @@ const SankeyDiagram = ({ data, isLoading }) => {
   const sankeyData = useMemo(() => {
     if (!data || isLoading) return null;
 
-    // Define nodes - Full flow: FM → Equipment Types → Strategies → Equipment → Programs → Schedules → Planned Work
+    // Define nodes - Full flow: FM → Equipment Types → Strategies → Programs → Equipment → Schedules → Planned Work
     const nodes = [
       { id: "failure_modes", name: "Failure Modes", color: "#3B82F6" },
       { id: "equipment_types", name: "Equipment Types", color: "#10B981" },
       { id: "strategies", name: "Strategies", color: "#8B5CF6" },
-      { id: "equipment", name: "Equipment", color: "#F59E0B" },
       { id: "maintenance_programs", name: "Programs", color: "#6366F1" },
+      { id: "equipment", name: "Equipment", color: "#F59E0B" },
       { id: "schedules", name: "Schedules", color: "#14B8A6" },
       { id: "planned_work", name: "Planned Work", color: "#64748B" },
       { id: "pm_imports", name: "PM Imports", color: "#A855F7" },
@@ -227,7 +227,7 @@ const SankeyDiagram = ({ data, isLoading }) => {
     const relationships = data.relationships || {};
     const links = [];
 
-    // Main flow: Failure Modes → Equipment Types → Strategies → Equipment → Programs → Schedules → Planned Work
+    // Main flow: Failure Modes → Equipment Types → Strategies → Programs → Equipment → Schedules → Planned Work
     if (relationships.fm_to_equipment_types?.value > 0) {
       links.push({
         source: 0, // failure_modes
@@ -242,25 +242,25 @@ const SankeyDiagram = ({ data, isLoading }) => {
         value: relationships.equipment_types_to_strategies.value,
       });
     }
-    if (relationships.strategies_to_equipment?.value > 0) {
+    if (relationships.strategies_to_programs?.value > 0) {
       links.push({
         source: 2, // strategies
-        target: 3, // equipment
-        value: relationships.strategies_to_equipment.value,
+        target: 3, // programs
+        value: relationships.strategies_to_programs.value,
       });
     }
-    if (relationships.equipment_to_programs?.value > 0) {
+    if (relationships.programs_to_equipment?.value > 0) {
       links.push({
-        source: 3, // equipment
-        target: 4, // maintenance_programs
-        value: relationships.equipment_to_programs.value,
+        source: 3, // programs
+        target: 4, // equipment
+        value: relationships.programs_to_equipment.value,
       });
     }
-    if (relationships.programs_to_schedules?.value > 0) {
+    if (relationships.equipment_to_schedules?.value > 0) {
       links.push({
-        source: 4, // maintenance_programs
+        source: 4, // equipment
         target: 5, // schedules
-        value: relationships.programs_to_schedules.value,
+        value: relationships.equipment_to_schedules.value,
       });
     }
     if (relationships.schedules_to_work?.value > 0) {
@@ -275,7 +275,7 @@ const SankeyDiagram = ({ data, isLoading }) => {
     if (relationships.pm_to_programs?.value > 0) {
       links.push({
         source: 7, // pm_imports
-        target: 4, // maintenance_programs
+        target: 3, // maintenance_programs
         value: relationships.pm_to_programs.value,
         isPmFlow: true,
       });
@@ -287,9 +287,9 @@ const SankeyDiagram = ({ data, isLoading }) => {
       links.push(
         { source: 0, target: 1, value: 1 },  // FM → Equipment Types
         { source: 1, target: 2, value: 1 },  // Equipment Types → Strategies
-        { source: 2, target: 3, value: 1 },  // Strategies → Equipment
-        { source: 3, target: 4, value: 1 },  // Equipment → Programs
-        { source: 4, target: 5, value: 1 },  // Programs → Schedules
+        { source: 2, target: 3, value: 1 },  // Strategies → Programs
+        { source: 3, target: 4, value: 1 },  // Programs → Equipment
+        { source: 4, target: 5, value: 1 },  // Equipment → Schedules
         { source: 5, target: 6, value: 1 },  // Schedules → Planned Work
       );
     }
@@ -633,36 +633,36 @@ const IntelligenceMapTab = () => {
                   title="Strategies"
                   count={stats?.strategies?.count}
                   subtitle={`${stats?.strategies?.task_templates || 0} Task Templates`}
-                  relationship={`Applied to ${stats?.equipment?.with_type || 0} Equipment`}
+                  relationship={`${stats?.maintenance_programs?.count || 0} programs active`}
                   onClick={navigateToStrategies}
                   color="purple"
                   isLoading={statsLoading}
                 />
-                <FlowArrow value={stats?.relationships?.strategies_to_equipment?.value} />
-                
-                <FlowCard
-                  icon={Building2}
-                  title="Equipment"
-                  count={stats?.equipment?.with_type}
-                  subtitle="With Type Assigned"
-                  relationship={`${stats?.equipment?.count || 0} total assets`}
-                  onClick={navigateToEquipment}
-                  color="amber"
-                  isLoading={statsLoading}
-                />
-                <FlowArrow value={stats?.relationships?.equipment_to_programs?.value} />
+                <FlowArrow value={stats?.relationships?.strategies_to_programs?.value} />
                 
                 <FlowCard
                   icon={ClipboardList}
                   title="Programs"
                   count={stats?.maintenance_programs?.count}
-                  subtitle={`${stats?.maintenance_programs?.total_tasks || 0} Tasks`}
-                  relationship={`Generate ${stats?.schedules?.count || 0} Schedules`}
+                  subtitle="Active"
+                  relationship={`${stats?.equipment?.with_strategy || 0} equipment affected`}
                   onClick={navigateToPrograms}
                   color="indigo"
                   isLoading={statsLoading}
                 />
-                <FlowArrow value={stats?.relationships?.programs_to_schedules?.value} />
+                <FlowArrow value={stats?.relationships?.programs_to_equipment?.value} />
+                
+                <FlowCard
+                  icon={Building2}
+                  title="Equipment"
+                  count={stats?.equipment?.with_strategy}
+                  subtitle="Affected by Strategy"
+                  relationship={`${stats?.equipment?.count || 0} total assets`}
+                  onClick={navigateToEquipment}
+                  color="amber"
+                  isLoading={statsLoading}
+                />
+                <FlowArrow value={stats?.relationships?.equipment_to_schedules?.value} />
                 
                 <FlowCard
                   icon={Calendar}
