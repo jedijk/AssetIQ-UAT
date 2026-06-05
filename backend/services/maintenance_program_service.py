@@ -789,11 +789,21 @@ class MaintenanceProgramService:
         """
         Mirror accepted Custom PM Import tasks from maintenance_programs_v2 into
         legacy maintenance_programs so the scheduler can generate occurrences.
+        Only creates programs for equipment types that have an active strategy.
         """
         from models.maintenance_scheduler import (
             EquipmentMaintenanceProgram,
             CriticalityLevel,
         )
+
+        # Get active strategy IDs - only create programs for equipment with strategies
+        active_strategy_ids = {
+            doc["equipment_type_id"]
+            async for doc in db.equipment_type_strategies.find(
+                {},
+                {"equipment_type_id": 1, "_id": 0},
+            )
+        }
 
         if equipment_ids:
             target_ids = list(dict.fromkeys(e for e in equipment_ids if e))
@@ -826,6 +836,7 @@ class MaintenanceProgramService:
         synced_programs = 0
         scheduled_tasks = 0
         equipment_processed = 0
+        skipped_no_strategy = 0
 
         for equipment_id in target_ids:
             stored_program = await db.maintenance_programs_v2.find_one(
@@ -860,6 +871,12 @@ class MaintenanceProgramService:
                 },
             )
             if not equipment:
+                continue
+
+            # Skip equipment without active strategy - don't create orphan programs
+            equip_type_id = equipment.get("equipment_type_id")
+            if equip_type_id and equip_type_id not in active_strategy_ids:
+                skipped_no_strategy += 1
                 continue
 
             equipment_processed += 1
@@ -977,6 +994,7 @@ class MaintenanceProgramService:
             "equipment_processed": equipment_processed,
             "programs_synced": synced_programs,
             "scheduled_tasks_created": scheduled_tasks,
+            "skipped_no_strategy": skipped_no_strategy,
         }
 
     # ============= Program Regeneration =============
