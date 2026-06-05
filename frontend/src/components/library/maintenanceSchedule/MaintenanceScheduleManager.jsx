@@ -222,11 +222,17 @@ export function MaintenanceScheduleManager({ equipmentType }) {
   const applyStrategyMutation = useMutation({
     mutationFn: (equipmentIds) => maintenanceSchedulerAPI.applyStrategy(equipmentTypeId, equipmentIds),
     onSuccess: (data) => {
+      const emCreated = data.equipment_manager_programs_created ?? 0;
+      const emRegenerated = data.equipment_manager_programs_regenerated ?? 0;
       toast.success(
-        `${t("maintenance.strategyApplied")} ${data.programs_created} ${t("maintenance.programsCreatedSuffix")}`,
+        `${t("maintenance.strategyApplied")} ${data.programs_created} ${t("maintenance.programsCreatedSuffix")}` +
+          (emCreated || emRegenerated
+            ? ` (${emCreated} equipment programs created, ${emRegenerated} updated)`
+            : ""),
       );
       setApplyDialogOpen(false);
       queryClient.invalidateQueries(["maintenance-scheduler"]);
+      queryClient.invalidateQueries(["maintenance-program"]);
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || t("maintenance.failedApplyStrategy"));

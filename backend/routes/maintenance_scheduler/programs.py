@@ -161,6 +161,34 @@ async def _apply_strategy_to_equipment_impl(
                 await db.maintenance_programs.insert_one(program.model_dump())
                 programs_created.append(program.id)
 
+    # Ensure Equipment Manager programs (maintenance_programs_v2) exist per tag.
+    from services.maintenance_program_service import MaintenanceProgramService
+
+    user_id = current_user.get("id") or current_user.get("user_id")
+    strategy_version = strategy.get("version", "1.0")
+    v2_programs_created = 0
+    v2_programs_regenerated = 0
+    v2_errors = []
+
+    for equipment in equipment_list:
+        equipment_id = equipment.get("id")
+        try:
+            result = await MaintenanceProgramService.ensure_equipment_program_from_strategy(
+                equipment_id=equipment_id,
+                strategy_version=strategy_version,
+                user_id=user_id,
+            )
+            if result.get("action") == "created":
+                v2_programs_created += 1
+            else:
+                v2_programs_regenerated += 1
+        except Exception as exc:
+            logger.exception(
+                "Failed to ensure v2 maintenance program for equipment_id=%s",
+                equipment_id,
+            )
+            v2_errors.append({"equipment_id": equipment_id, "error": str(exc)})
+
     # Resync active state for all programs of this equipment type so disabled
     # FMs / non-mandatory tasks immediately propagate to the newly-created ones.
     from routes.maintenance_strategy_v2 import _resync_programs_with_strategy
@@ -179,6 +207,9 @@ async def _apply_strategy_to_equipment_impl(
         "programs_updated": len(equipment_list) * len(task_templates) - len(programs_created),
         "scheduled_tasks_created": scheduled_count,
         "programs_deactivated_on_resync": resync["programs_deactivated"],
+        "equipment_manager_programs_created": v2_programs_created,
+        "equipment_manager_programs_regenerated": v2_programs_regenerated,
+        "equipment_manager_program_errors": v2_errors,
     }
 
 

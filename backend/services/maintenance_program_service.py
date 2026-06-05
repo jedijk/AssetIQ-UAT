@@ -185,6 +185,62 @@ class MaintenanceProgramService:
         )
         
         return program
+
+    @staticmethod
+    async def ensure_equipment_program_from_strategy(
+        equipment_id: str,
+        strategy_version: str,
+        user_id: Optional[str] = None,
+        activate: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Ensure maintenance_programs_v2 exists for equipment after scheduler apply-strategy.
+        Creates a new program from strategy or regenerates an existing one.
+        """
+        existing = await db.maintenance_programs_v2.find_one(
+            {"equipment_id": equipment_id},
+            {"equipment_id": 1, "_id": 0},
+        )
+
+        if existing:
+            await MaintenanceProgramService.regenerate_program(
+                equipment_id=equipment_id,
+                preserve_overrides=True,
+                preserve_manual_tasks=True,
+                preserve_imported_tasks=True,
+                user_id=user_id,
+            )
+            action = "regenerated"
+        else:
+            await MaintenanceProgramService.get_or_create_program(
+                equipment_id=equipment_id,
+                generate_from_strategy=True,
+                user_id=user_id,
+            )
+            action = "created"
+
+        equipment = await db.equipment_nodes.find_one(
+            {"id": equipment_id},
+            {"_id": 0, "tag": 1, "name": 1},
+        )
+        update_fields: Dict[str, Any] = {
+            "applied_strategy_version": strategy_version,
+            "updated_at": datetime.utcnow().isoformat(),
+        }
+        if equipment:
+            if equipment.get("tag"):
+                update_fields["equipment_tag"] = equipment["tag"]
+            if equipment.get("name"):
+                update_fields["equipment_name"] = equipment["name"]
+        if activate:
+            update_fields["status"] = ProgramStatus.ACTIVE.value
+
+        await db.maintenance_programs_v2.update_one(
+            {"equipment_id": equipment_id},
+            {"$set": update_fields},
+        )
+
+        return {"equipment_id": equipment_id, "action": action}
     
     @staticmethod
     async def generate_tasks_from_strategy(
