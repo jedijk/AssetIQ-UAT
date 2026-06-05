@@ -504,7 +504,14 @@ async def _equipment_ids_for_type(equipment_type_id: str) -> Set[str]:
 async def cleanup_schedules_without_strategy(
     equipment_type_id: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Remove strategy-backed programs/tasks whose equipment-type strategy no longer exists."""
+    """
+    Remove programs/tasks whose equipment-type strategy no longer exists.
+    
+    This cleanup removes ALL orphaned items regardless of task_source:
+    - Programs with strategy_id/equipment_type_id that has no active strategy
+    - Scheduled tasks with strategy_id that has no active strategy
+    - Scheduled tasks referencing non-existent maintenance_programs
+    """
     active_strategy_types = await _active_strategy_type_ids()
     scoped_equipment_ids: Optional[Set[str]] = None
     if equipment_type_id:
@@ -520,6 +527,7 @@ async def cleanup_schedules_without_strategy(
     orphan_program_ids: List[str] = []
     missing_strategy_ids: Set[str] = set()
 
+    # Find ALL programs whose strategy no longer exists (regardless of task_source)
     async for prog in db.maintenance_programs.find(
         program_query,
         {
@@ -531,17 +539,19 @@ async def cleanup_schedules_without_strategy(
             "_id": 0,
         },
     ):
-        if not program_is_strategy_backed(prog):
-            continue
-        if program_has_active_strategy(prog, active_strategy_types):
-            continue
-        program_id = prog.get("id")
-        if program_id:
-            orphan_program_ids.append(program_id)
+        # Check if program has a strategy_id or equipment_type_id that no longer exists
+        has_missing_strategy = False
         for key in ("strategy_id", "equipment_type_id"):
             value = prog.get(key)
             if value and value not in active_strategy_types:
                 missing_strategy_ids.add(value)
+                has_missing_strategy = True
+        
+        # Mark program as orphan if its strategy is missing
+        if has_missing_strategy:
+            program_id = prog.get("id")
+            if program_id:
+                orphan_program_ids.append(program_id)
 
     if equipment_type_id and equipment_type_id not in active_strategy_types:
         missing_strategy_ids.add(equipment_type_id)
@@ -553,21 +563,25 @@ async def cleanup_schedules_without_strategy(
     }
 
     task_delete_filters: List[Dict[str, Any]] = []
+    
+    # Delete tasks belonging to orphan programs
     if orphan_program_ids:
         task_delete_filters.append({"maintenance_program_id": {"$in": orphan_program_ids}})
 
+    # Delete tasks with strategy_id that no longer exists (regardless of task_source)
     if missing_strategy_ids:
         strategy_task_filter: Dict[str, Any] = {
             "strategy_id": {"$in": list(missing_strategy_ids)},
-            "task_source": {"$nin": list(STRATEGY_EXEMPT_TASK_SOURCES)},
+            # Removed task_source exclusion - delete ALL orphan tasks
         }
         if scoped_equipment_ids:
             strategy_task_filter["equipment_id"] = {"$in": list(scoped_equipment_ids)}
         task_delete_filters.append(strategy_task_filter)
 
+    # Delete tasks referencing non-existent programs (regardless of task_source)
     broken_program_filter: Dict[str, Any] = {
         "maintenance_program_id": {"$nin": list(all_program_ids), "$ne": None},
-        "task_source": {"$nin": list(STRATEGY_EXEMPT_TASK_SOURCES)},
+        # Removed task_source exclusion - delete ALL orphan tasks
     }
     if scoped_equipment_ids:
         broken_program_filter["equipment_id"] = {"$in": list(scoped_equipment_ids)}
