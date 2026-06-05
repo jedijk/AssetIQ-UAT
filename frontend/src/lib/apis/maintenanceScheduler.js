@@ -3,6 +3,20 @@
  */
 import { api } from "../apiClient";
 
+/** React Query keys use `maintenance-scheduler-*`; prefix invalidation must use a predicate. */
+export const isMaintenanceSchedulerQuery = (query) => {
+  const key = query?.queryKey?.[0];
+  return typeof key === "string" && key.startsWith("maintenance-scheduler");
+};
+
+export async function refreshMaintenanceSchedulerQueries(queryClient) {
+  await queryClient.invalidateQueries({ predicate: isMaintenanceSchedulerQuery });
+  await queryClient.refetchQueries({
+    predicate: isMaintenanceSchedulerQuery,
+    type: "active",
+  });
+}
+
 export const maintenanceSchedulerAPI = {
   // ============= Equipment Maintenance Programs =============
   

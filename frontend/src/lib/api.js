@@ -11,7 +11,10 @@ export { actionsAPI } from "./apis/actions";
 export { aiRiskAPI } from "./apis/aiRisk";
 export { maintenanceStrategyAPI } from "./apis/maintenanceStrategies";
 export { maintenanceStrategyV2API } from "./apis/maintenanceStrategyV2";
-export { maintenanceSchedulerAPI } from "./apis/maintenanceScheduler";
+export {
+  maintenanceSchedulerAPI,
+  refreshMaintenanceSchedulerQueries,
+} from "./apis/maintenanceScheduler";
 export { usersAPI, rbacAPI } from "./apis/users";
 export { feedbackAPI } from "./apis/feedback";
 export { imageAnalysisAPI } from "./apis/imageAnalysis";

@@ -58,6 +58,7 @@ import { ScrollArea } from "../../ui/scroll-area";
 import { cn } from "../../../lib/utils";
 import {
   maintenanceSchedulerAPI,
+  refreshMaintenanceSchedulerQueries,
   maintenanceStrategyV2API,
   equipmentHierarchyAPI,
 } from "../../../lib/api";
@@ -211,11 +212,11 @@ export function MaintenanceScheduleManager({ equipmentType }) {
 
   const runSchedulerMutation = useMutation({
     mutationFn: (params) => maintenanceSchedulerAPI.runScheduler(params),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       toast.success(
         `${t("maintenance.schedulerCompleted")} ${data.tasks_created} ${t("maintenance.tasksCreatedSuffix")}`,
       );
-      queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] });
+      await refreshMaintenanceSchedulerQueries(queryClient);
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || t("maintenance.failedRunScheduler"));
@@ -239,7 +240,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
               .replace("{programs}", programs + v2Programs)
           : t("maintenance.clearOrphanScheduleEmpty"),
       );
-      await queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] });
+      await refreshMaintenanceSchedulerQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ["maintenance-program"] });
       queryClient.invalidateQueries({ queryKey: ["maintenance-strategy-v2"] });
     },
@@ -250,7 +251,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
 
   const applyStrategyMutation = useMutation({
     mutationFn: (equipmentIds) => maintenanceSchedulerAPI.applyStrategy(equipmentTypeId, equipmentIds),
-    onSuccess: (data, equipmentIds) => {
+    onSuccess: async (data, equipmentIds) => {
       const emCreated = data.equipment_manager_programs_created ?? 0;
       const emRegenerated = data.equipment_manager_programs_regenerated ?? 0;
       const emErrors = data.equipment_manager_program_errors ?? [];
@@ -274,7 +275,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
       }
 
       setApplyDialogOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] });
+      await refreshMaintenanceSchedulerQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ["maintenance-program"] });
       emEquipmentIds.forEach((id) => {
         queryClient.invalidateQueries({ queryKey: ["maintenance-program", id] });
@@ -305,14 +306,14 @@ export function MaintenanceScheduleManager({ equipmentType }) {
 
   const applyAiPlanMutation = useMutation({
     mutationFn: (recs) => maintenanceSchedulerAPI.applyAiPlan(recs),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       toast.success(
         `${t("maintenance.aiPlanApplied")} ${data.tasks_updated} ${t("maintenance.tasksUpdatedSuffix")}`,
       );
       setAiPlanOpen(false);
       setAiPlanResult(null);
       setSelectedAiRecs(new Set());
-      queryClient.invalidateQueries(["maintenance-scheduler"]);
+      await refreshMaintenanceSchedulerQueries(queryClient);
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || t("maintenance.failedApplyAiPlan"));
@@ -321,9 +322,9 @@ export function MaintenanceScheduleManager({ equipmentType }) {
 
   const updateTaskMutation = useMutation({
     mutationFn: ({ taskId, data }) => maintenanceSchedulerAPI.updateTask(taskId, data),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success(t("maintenance.taskUpdated"));
-      queryClient.invalidateQueries(["maintenance-scheduler"]);
+      await refreshMaintenanceSchedulerQueries(queryClient);
       setSelectedTask(null);
     },
     onError: (err) => {
@@ -333,9 +334,9 @@ export function MaintenanceScheduleManager({ equipmentType }) {
 
   const completeTaskMutation = useMutation({
     mutationFn: ({ taskId, data }) => maintenanceSchedulerAPI.completeTask(taskId, data),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success(t("maintenance.taskCompleted"));
-      queryClient.invalidateQueries(["maintenance-scheduler"]);
+      await refreshMaintenanceSchedulerQueries(queryClient);
       setSelectedTask(null);
     },
     onError: (err) => {
@@ -345,9 +346,9 @@ export function MaintenanceScheduleManager({ equipmentType }) {
 
   const deferTaskMutation = useMutation({
     mutationFn: ({ taskId, data }) => maintenanceSchedulerAPI.deferTask(taskId, data),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success(t("maintenance.taskDeferred"));
-      queryClient.invalidateQueries(["maintenance-scheduler"]);
+      await refreshMaintenanceSchedulerQueries(queryClient);
       setSelectedTask(null);
     },
     onError: (err) => {
