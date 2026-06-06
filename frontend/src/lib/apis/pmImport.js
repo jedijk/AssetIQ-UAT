@@ -1,27 +1,46 @@
 import { api } from "../apiClient";
 
+/** How often we poll a background job while waiting for completion. */
 const JOB_POLL_INTERVAL_MS = 2000;
+
+/** Stop polling after this long and surface a timeout error. */
 const JOB_POLL_TIMEOUT_MS = 5 * 60 * 1000;
 
+const sleep = (milliseconds) =>
+  new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+const isSuccessfulJob = (status) => status === "completed";
+
+const isFailedJob = (status) => status === "failed" || status === "dead_letter";
+
+/**
+ * Poll GET /pm-import/jobs/{jobId} until the job completes or fails.
+ * Returns the handler result payload on success.
+ */
 export async function pollPmImportJob(
   jobId,
   { intervalMs = JOB_POLL_INTERVAL_MS, timeoutMs = JOB_POLL_TIMEOUT_MS } = {}
 ) {
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
     const response = await api.get(`/pm-import/jobs/${jobId}`);
     const job = response.data;
     const status = job?.status;
-    if (status === "completed") {
+
+    if (isSuccessfulJob(status)) {
       return job.result ?? job;
     }
-    if (status === "failed" || status === "dead_letter") {
-      const err = new Error(job?.error || "PM import job failed");
-      err.job = job;
-      throw err;
+
+    if (isFailedJob(status)) {
+      const error = new Error(job?.error || "PM import job failed");
+      error.job = job;
+      throw error;
     }
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+
+    await sleep(intervalMs);
   }
+
   throw new Error("PM import job timed out while waiting for background job");
 }
 

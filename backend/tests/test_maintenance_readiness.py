@@ -50,8 +50,8 @@ async def test_maintenance_readiness_snapshot(monkeypatch):
     admin_mod = _load_admin_module(mock_db)
     queue_health = {"status": "ok", "by_status": {"pending": 1}, "dead_letter_total": 0}
 
-    with patch(
-        "services.background_jobs.background_job_service.get_queue_health",
+    with patch("services.maintenance_readiness.db", mock_db), patch(
+        "services.maintenance_readiness.background_job_service.get_queue_health",
         AsyncMock(return_value=queue_health),
     ):
         result = await admin_mod.get_maintenance_readiness(current_user={"role": "admin"})

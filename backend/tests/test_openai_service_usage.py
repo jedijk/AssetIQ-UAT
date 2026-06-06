@@ -6,7 +6,7 @@ import pytest
 
 sys.modules.setdefault("openai", MagicMock(OpenAI=MagicMock()))
 
-from services.openai_service import _record_openai_usage, chat_completion
+from services.openai_service import UsageContext, _record_chat_usage, chat_completion
 
 
 @pytest.mark.asyncio
@@ -20,7 +20,7 @@ async def test_chat_completion_records_usage():
     client.chat.completions.create.return_value = response
 
     with patch("services.openai_service.OpenAI", return_value=client), patch(
-        "services.openai_service._record_openai_usage"
+        "services.openai_service._record_chat_usage"
     ) as record_mock, patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
         result = await chat_completion(
             messages=[{"role": "user", "content": "hi"}],
@@ -31,31 +31,34 @@ async def test_chat_completion_records_usage():
 
     assert result == "hello"
     record_mock.assert_called_once()
-    kwargs = record_mock.call_args.kwargs
-    assert kwargs["user_id"] == "user-1"
-    assert kwargs["company_id"] == "co-1"
-    assert kwargs["feature"] == "test_feature"
+    usage_context = record_mock.call_args.kwargs["usage"]
+    assert usage_context.user_id == "user-1"
+    assert usage_context.company_id == "co-1"
+    assert usage_context.feature == "test_feature"
 
 
-def test_record_openai_usage_skips_without_usage():
+def test_record_chat_usage_skips_when_openai_returns_no_usage():
     with patch("services.ai_cost_guard.record_ai_tokens") as record_mock:
-        _record_openai_usage(MagicMock(usage=None), endpoint="test", model="gpt-4o")
+        _record_chat_usage(
+            MagicMock(usage=None),
+            model="gpt-4o",
+            usage=UsageContext(endpoint="test"),
+        )
     record_mock.assert_not_called()
 
 
-def test_record_openai_usage_calls_record_ai_tokens():
+def test_record_chat_usage_persists_token_counts():
     usage = MagicMock(prompt_tokens=10, completion_tokens=5)
     response = MagicMock(usage=usage)
+    context = UsageContext(
+        user_id="u1",
+        company_id="c1",
+        feature="pm_import",
+        endpoint="openai_service.chat_completion",
+    )
 
     with patch("services.ai_cost_guard.record_ai_tokens") as record_mock:
-        _record_openai_usage(
-            response,
-            endpoint="openai_service.chat_completion",
-            model="gpt-4o",
-            user_id="u1",
-            company_id="c1",
-            feature="pm_import",
-        )
+        _record_chat_usage(response, model="gpt-4o", usage=context)
 
     record_mock.assert_called_once_with(
         user_id="u1",

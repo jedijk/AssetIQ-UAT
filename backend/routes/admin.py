@@ -119,41 +119,7 @@ async def get_installations(
 async def get_maintenance_readiness(
     current_user: dict = Depends(require_admin),
 ):
-    """
-    Read-only UAT maintenance cutover snapshot. Admin/Owner only.
-    """
-    from services.background_jobs import background_job_service
-    from services.scheduler_config import (
-        should_read_legacy_maintenance_programs,
-        should_sync_legacy_maintenance_programs,
-    )
-    from services.worker_config import use_external_background_worker
+    """Read-only UAT maintenance cutover snapshot. Admin/Owner only."""
+    from services.maintenance_readiness import build_maintenance_readiness_snapshot
 
-    (
-        strategy_needs_apply_count,
-        active_strategies,
-        v2_program_count,
-        legacy_program_count,
-        reliability_edges_total,
-    ) = await asyncio.gather(
-        db.equipment_type_strategies.count_documents({"strategy_needs_apply": True}),
-        db.equipment_type_strategies.count_documents({"status": "active"}),
-        db.maintenance_programs_v2.count_documents({}),
-        db.maintenance_programs.count_documents({}),
-        db.reliability_edges.count_documents({}),
-    )
-
-    background_jobs = await background_job_service.get_queue_health()
-
-    return {
-        "read_legacy_maintenance_programs": should_read_legacy_maintenance_programs(),
-        "sync_legacy_maintenance_programs": should_sync_legacy_maintenance_programs(),
-        "use_external_background_worker": use_external_background_worker(),
-        "strategy_needs_apply_count": strategy_needs_apply_count,
-        "active_strategies": active_strategies,
-        "v2_program_count": v2_program_count,
-        "legacy_program_count": legacy_program_count,
-        "background_jobs": background_jobs,
-        "reliability_edges_total": reliability_edges_total,
-        "uat_gates_script": "backend/scripts/verify_uat_gates.py",
-    }
+    return await build_maintenance_readiness_snapshot()

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -14,6 +14,7 @@ import {
   BarChart3,
   ChevronRight,
   ArrowLeft,
+  Search,
   FileText,
   Shield,
   ScrollText,
@@ -25,8 +26,43 @@ import {
   ClipboardCheck
 } from "lucide-react";
 import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { cn } from "../lib/utils";
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function highlightMatch(text, query) {
+  if (!query.trim()) return text;
+
+  const parts = text.split(new RegExp(`(${escapeRegExp(query.trim())})`, "gi"));
+  return parts.map((part, index) =>
+    part.toLowerCase() === query.trim().toLowerCase() ? (
+      <mark key={index} className="bg-yellow-200/80 text-inherit rounded px-0.5">
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+}
+
+function sectionMatchesQuery(section, query, t) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return true;
+
+  const label = t(`settings.sections.${section.sectionKey}.label`).toLowerCase();
+  const description = t(`settings.sections.${section.sectionKey}.description`).toLowerCase();
+  const keywords = `${section.id} ${section.sectionKey}`.toLowerCase();
+
+  return (
+    label.includes(normalizedQuery) ||
+    description.includes(normalizedQuery) ||
+    keywords.includes(normalizedQuery)
+  );
+}
 
 const APP_VERSION = process.env.REACT_APP_VERSION || "3.7.3";
 
@@ -185,6 +221,7 @@ export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState("general");
   const [showMobileNav, setShowMobileNav] = useState(true);
   const [isMobileView, setIsMobileView] = useState(window.innerWidth < 768);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Mobile detection with resize listener
   useEffect(() => {
@@ -199,6 +236,11 @@ export default function SettingsPage() {
     if (section.desktopOnly && isMobileView) return false;
     return section.roles.includes(user.role);
   });
+
+  const filteredSections = useMemo(
+    () => visibleSections.filter((section) => sectionMatchesQuery(section, searchQuery, t)),
+    [visibleSections, searchQuery, t]
+  );
 
   // Determine active section from URL
   useEffect(() => {
@@ -263,10 +305,28 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        <div className="px-4 pb-3 border-b border-slate-200">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Input
+              placeholder={t("settings.searchPlaceholder")}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 h-9 text-sm"
+              data-testid="settings-search"
+            />
+          </div>
+        </div>
+
         {/* Navigation */}
         <ScrollArea className="flex-1">
           <nav className="p-2 space-y-1">
-            {visibleSections.map((section) => {
+            {filteredSections.length === 0 && (
+              <p className="px-3 py-6 text-sm text-slate-500 text-center">
+                {t("settings.noSearchResults")}
+              </p>
+            )}
+            {filteredSections.map((section) => {
               const Icon = section.icon;
               const isActive = activeSection === section.id;
               
@@ -295,10 +355,16 @@ export default function SettingsPage() {
                       "text-sm font-medium truncate",
                       isActive ? "text-blue-700" : "text-slate-900"
                     )}>
-                      {t(`settings.sections.${section.sectionKey}.label`)}
+                      {highlightMatch(
+                        t(`settings.sections.${section.sectionKey}.label`),
+                        searchQuery
+                      )}
                     </p>
                     <p className="text-xs text-slate-500 truncate hidden xl:block">
-                      {t(`settings.sections.${section.sectionKey}.description`)}
+                      {highlightMatch(
+                        t(`settings.sections.${section.sectionKey}.description`),
+                        searchQuery
+                      )}
                     </p>
                   </div>
                   <ChevronRight className={cn(

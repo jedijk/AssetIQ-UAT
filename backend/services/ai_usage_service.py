@@ -260,9 +260,13 @@ def schedule_log_usage(
     feature: str,
     metadata: Optional[Dict[str, Any]] = None,
 ) -> None:
-    """Persist AI usage to MongoDB from sync callers (fire-and-forget)."""
+    """
+    Persist one AI usage row to MongoDB without blocking the caller.
 
-    async def _log() -> None:
+    Safe to call from sync code inside FastAPI request handlers.
+    """
+
+    async def persist_row() -> None:
         try:
             from database import ai_usage_tracker as tracker
 
@@ -276,12 +280,17 @@ def schedule_log_usage(
                 feature=feature,
                 metadata=metadata,
             )
-        except Exception as e:
-            logger.error("Failed to persist AI usage: %s", e)
+        except Exception as exc:
+            logger.error("Failed to persist AI usage: %s", exc)
 
+    _run_in_background(persist_row)
+
+
+def _run_in_background(coro_factory) -> None:
+    """Schedule a coroutine on the active loop, or run it in a daemon thread."""
     try:
         loop = asyncio.get_running_loop()
-        loop.create_task(_log())
+        loop.create_task(coro_factory())
         return
     except RuntimeError:
         pass
@@ -289,12 +298,12 @@ def schedule_log_usage(
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            asyncio.run_coroutine_threadsafe(_log(), loop)
+            asyncio.run_coroutine_threadsafe(coro_factory(), loop)
             return
     except Exception:
         pass
 
-    threading.Thread(target=lambda: asyncio.run(_log()), daemon=True).start()
+    threading.Thread(target=lambda: asyncio.run(coro_factory()), daemon=True).start()
 
 
 # Singleton instance (initialized in database.py)

@@ -271,17 +271,10 @@ class BackgroundJobService:
 
     async def claim_next_pending(self, job_types: Optional[list] = None) -> Optional[dict]:
         """Atomically claim the oldest pending job for an external worker process."""
-        from services.worker_config import worker_tenant_id
-
-        filt: dict = {"status": JobStatus.PENDING.value}
-        if job_types:
-            filt["job_type"] = {"$in": job_types}
-        tenant = worker_tenant_id()
-        if tenant:
-            filt["tenant_id"] = tenant
+        claim_filter = self._build_claim_filter(job_types)
         try:
             return await self._collection().find_one_and_update(
-                filt,
+                claim_filter,
                 {
                     "$set": {
                         "status": JobStatus.RUNNING.value,
@@ -294,6 +287,21 @@ class BackgroundJobService:
         except Exception as exc:
             logger.warning("background_jobs claim failed: %s", exc)
             return None
+
+    def _build_claim_filter(self, job_types: Optional[list]) -> dict:
+        """Pending jobs only; optionally filter by handler types and worker tenant."""
+        from services.worker_config import worker_tenant_id
+
+        claim_filter: dict = {"status": JobStatus.PENDING.value}
+
+        if job_types:
+            claim_filter["job_type"] = {"$in": job_types}
+
+        tenant_id = worker_tenant_id()
+        if tenant_id:
+            claim_filter["tenant_id"] = tenant_id
+
+        return claim_filter
 
     async def run_claimed_job(
         self,

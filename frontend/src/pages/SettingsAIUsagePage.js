@@ -51,6 +51,40 @@ import {
   SelectValue,
 } from "../components/ui/select";
 
+function formatTokenCount(num) {
+  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
+  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
+  return num?.toString() || "0";
+}
+
+function formatUsd(amount) {
+  return `$${(amount ?? 0).toFixed(2)}`;
+}
+
+function utilizationBarColor(percent) {
+  if (percent >= 90) return "bg-red-500";
+  if (percent >= 70) return "bg-amber-500";
+  return "bg-green-500";
+}
+
+function UtilizationBar({ percent }) {
+  const clamped = Math.min(percent ?? 0, 100);
+
+  return (
+    <div className="relative h-5 w-full overflow-hidden rounded-full bg-slate-200">
+      <div
+        className={`h-full transition-all ${utilizationBarColor(percent ?? 0)}`}
+        style={{ width: `${clamped}%` }}
+      />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-xs font-semibold text-white drop-shadow-sm">
+          {Math.round(clamped)}%
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsAIUsagePage() {
   const { t } = useLanguage();
   const { user } = useAuth();
@@ -134,37 +168,6 @@ export default function SettingsAIUsagePage() {
 
   const { installations = [], summary = {}, limits = {} } = usageData || {};
   const availableInstallations = installationsData?.installations || [];
-
-  const formatNumber = (num) => {
-    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
-    return num?.toString() || "0";
-  };
-
-  const formatUsd = (num) => `$${(num ?? 0).toFixed(2)}`;
-
-  const getUtilColor = (pct) => {
-    if (pct >= 90) return "bg-red-500";
-    if (pct >= 70) return "bg-amber-500";
-    return "bg-green-500";
-  };
-
-  const UtilProgress = ({ pct }) => {
-    const value = Math.min(pct ?? 0, 100);
-    return (
-      <div className="relative h-5 w-full overflow-hidden rounded-full bg-slate-200">
-        <div
-          className={`h-full transition-all ${getUtilColor(pct ?? 0)}`}
-          style={{ width: `${value}%` }}
-        />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-xs font-semibold text-white drop-shadow-sm">
-            {Math.round(value)}%
-          </span>
-        </div>
-      </div>
-    );
-  };
 
   const {
     rate_limit: rateLimit = {},
@@ -250,7 +253,7 @@ export default function SettingsAIUsagePage() {
                   </div>
                   {dailyLimits.spend_cap_usd > 0 ? (
                     <>
-                      <UtilProgress pct={utilization.spend_pct} />
+                      <UtilizationBar percent={utilization.spend_pct} />
                       <p className="text-sm text-slate-600">
                         {formatUsd(usageToday.company_spend_usd)} of {formatUsd(dailyLimits.spend_cap_usd)}{" "}
                         <span className="text-slate-400">
@@ -271,9 +274,9 @@ export default function SettingsAIUsagePage() {
                   </div>
                   {dailyLimits.company_request_limit > 0 ? (
                     <>
-                      <UtilProgress pct={utilization.company_requests_pct} />
+                      <UtilizationBar percent={utilization.company_requests_pct} />
                       <p className="text-sm text-slate-600">
-                        {formatNumber(usageToday.company_requests)} / {formatNumber(dailyLimits.company_request_limit)}{" "}
+                        {formatTokenCount(usageToday.company_requests)} / {formatTokenCount(dailyLimits.company_request_limit)}{" "}
                         {t("settings.aiUsage.companyRequestsToday") || "Company requests today"}
                       </p>
                     </>
@@ -281,11 +284,11 @@ export default function SettingsAIUsagePage() {
                   <div className="flex flex-wrap gap-2 pt-1">
                     <Badge variant="outline" className="text-xs">
                       {t("settings.aiUsage.perUserLimit") || "Per-user limit"}:{" "}
-                      {formatNumber(dailyLimits.user_request_limit)}
+                      {formatTokenCount(dailyLimits.user_request_limit)}
                     </Badge>
                     <Badge variant="outline" className="text-xs">
                       {t("settings.aiUsage.companyLimit") || "Company limit"}:{" "}
-                      {formatNumber(dailyLimits.company_request_limit)}
+                      {formatTokenCount(dailyLimits.company_request_limit)}
                     </Badge>
                   </div>
                 </div>
@@ -333,7 +336,7 @@ export default function SettingsAIUsagePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-slate-500">Total Tokens</p>
-                  <p className="text-2xl font-bold text-slate-900">{formatNumber(summary.total_tokens)}</p>
+                  <p className="text-2xl font-bold text-slate-900">{formatTokenCount(summary.total_tokens)}</p>
                 </div>
                 <div className="p-3 bg-purple-100 rounded-lg">
                   <Zap className="w-6 h-6 text-purple-600" />
@@ -346,7 +349,7 @@ export default function SettingsAIUsagePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-slate-500">Prompt Tokens</p>
-                  <p className="text-2xl font-bold text-slate-900">{formatNumber(summary.prompt_tokens)}</p>
+                  <p className="text-2xl font-bold text-slate-900">{formatTokenCount(summary.prompt_tokens)}</p>
                 </div>
                 <div className="p-3 bg-blue-100 rounded-lg">
                   <TrendingUp className="w-6 h-6 text-blue-600" />
@@ -359,7 +362,7 @@ export default function SettingsAIUsagePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-slate-500">Completion Tokens</p>
-                  <p className="text-2xl font-bold text-slate-900">{formatNumber(summary.completion_tokens)}</p>
+                  <p className="text-2xl font-bold text-slate-900">{formatTokenCount(summary.completion_tokens)}</p>
                 </div>
                 <div className="p-3 bg-green-100 rounded-lg">
                   <BarChart3 className="w-6 h-6 text-green-600" />
@@ -372,7 +375,7 @@ export default function SettingsAIUsagePage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-slate-500">API Requests</p>
-                  <p className="text-2xl font-bold text-slate-900">{formatNumber(summary.request_count)}</p>
+                  <p className="text-2xl font-bold text-slate-900">{formatTokenCount(summary.request_count)}</p>
                 </div>
                 <div className="p-3 bg-amber-100 rounded-lg">
                   <Brain className="w-6 h-6 text-amber-600" />
@@ -421,13 +424,13 @@ export default function SettingsAIUsagePage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatNumber(inst.total_tokens)}
+                        {formatTokenCount(inst.total_tokens)}
                       </TableCell>
                       <TableCell className="text-right font-mono text-slate-500">
-                        {formatNumber(inst.prompt_tokens)}
+                        {formatTokenCount(inst.prompt_tokens)}
                       </TableCell>
                       <TableCell className="text-right font-mono text-slate-500">
-                        {formatNumber(inst.completion_tokens)}
+                        {formatTokenCount(inst.completion_tokens)}
                       </TableCell>
                       <TableCell className="text-right">
                         {inst.request_count}
