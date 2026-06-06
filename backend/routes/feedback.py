@@ -6,6 +6,7 @@ from typing import Optional
 import uuid
 
 from auth import get_current_user
+from services.ai_gateway import chat as ai_gateway_chat, user_context
 from models.feedback_models import (
     FeedbackCreate,
     FeedbackUpdate,
@@ -360,10 +361,6 @@ async def generate_ai_prompt(
     current_user: dict = Depends(get_current_user)
 ):
     """Generate an AI prompt from selected feedback items."""
-    import os
-    import uuid
-    from openai import OpenAI
-    
     feedback_ids = data.get("feedback_ids", [])
     if not feedback_ids:
         raise HTTPException(status_code=400, detail="No feedback items selected")
@@ -389,11 +386,6 @@ async def generate_ai_prompt(
     
     combined_feedback = "\n\n".join(feedback_context)
     
-    # Get API key
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="AI service not configured")
-    
     try:
         # Generate prompt using GPT
         system_prompt = """You are an expert at converting user feedback into clear, actionable prompts for a development AI agent.
@@ -415,18 +407,18 @@ Keep the prompt concise but complete. Do not include any preamble or explanation
 
 Generate a clear, actionable prompt that can be directly used with an AI development agent."""
 
-        client = OpenAI(api_key=api_key)
-        
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
+        uid, cid = user_context(current_user)
+        generated_prompt = await ai_gateway_chat(
+            [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message}
+                {"role": "user", "content": user_message},
             ],
-            temperature=0.5
+            user_id=uid,
+            company_id=cid,
+            endpoint="feedback.generate_prompt",
+            model="gpt-4o",
+            temperature=0.5,
         )
-        
-        generated_prompt = response.choices[0].message.content
         
         return {
             "prompt": generated_prompt,

@@ -10,7 +10,11 @@ import uuid
 import logging
 import io
 from database import db, failure_modes_service, efm_service
-from auth import get_current_user
+from auth import get_current_user, require_permission
+from services.ai_gateway import user_context
+from services.background_jobs import schedule_tracked_job
+
+_library_write = require_permission("library:write")
 from services.threat_score_service import recalculate_threat_scores_for_failure_mode
 from services.translation_service import TranslationService
 from models.translation import EntityType
@@ -556,7 +560,7 @@ async def auto_translate_failure_mode(fm_id: str, fm_data: dict, created_by: str
 async def create_failure_mode(
     data: FailureModeCreate,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write),
 ):
     """Create a new failure mode in MongoDB."""
     # Auto-link equipment types if not provided
@@ -604,11 +608,14 @@ async def create_failure_mode(
             "causes": data.potential_causes or "",
             "recommended_actions": ", ".join(data.recommended_actions) if data.recommended_actions else "",
         }
-        background_tasks.add_task(
-            auto_translate_failure_mode, 
+        schedule_tracked_job(
+            background_tasks,
+            "translate_failure_mode",
+            auto_translate_failure_mode,
             data.failure_mode,
             fm_data_for_translation,
-            current_user["id"]
+            current_user["id"],
+            user_id=current_user["id"],
         )
         
         return new_fm
@@ -649,7 +656,7 @@ async def update_failure_mode(
     mode_id: str,
     data: FailureModeUpdate,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write),
 ):
     """Update a failure mode in MongoDB."""
     try:
@@ -808,7 +815,7 @@ class RollbackRequest(BaseModel):
 async def rollback_failure_mode(
     mode_id: str,
     data: RollbackRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write),
 ):
     """Rollback a failure mode to a specific version."""
     try:
@@ -837,7 +844,7 @@ async def rollback_failure_mode(
 async def validate_failure_mode(
     mode_id: str,
     data: FailureModeValidation,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write),
 ):
     """Validate a failure mode with validator name and position."""
     try:
@@ -876,7 +883,7 @@ async def validate_failure_mode(
 @router.post("/failure-modes/{mode_id}/unvalidate")
 async def unvalidate_failure_mode(
     mode_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write),
 ):
     """Remove validation from a failure mode."""
     try:
@@ -906,9 +913,10 @@ async def unvalidate_failure_mode(
 @router.post("/failure-modes/find-similar")
 async def scan_similar_failure_modes(
     request: FindSimilarFailureModesScanRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_library_write),
 ):
     """Batch scan for near-duplicate failure modes across the full library (lexical, no AI)."""
+    uid, cid = user_context(current_user)
     try:
         return await failure_modes_service.scan_similar_groups(
             equipment_type_id=request.equipment_type_id,
@@ -922,6 +930,8 @@ async def scan_similar_failure_modes(
             use_ai=request.use_ai,
             ai_max_clusters=request.ai_max_clusters,
             ai_time_budget_seconds=request.ai_time_budget_seconds,
+            user_id=uid,
+            company_id=cid,
         )
     except Exception as e:
         logger.error(f"Error scanning similar failure modes: {e}")
@@ -931,10 +941,11 @@ async def scan_similar_failure_modes(
 @router.post("/failure-modes/find-duplicate-actions")
 async def scan_duplicate_actions_in_failure_modes(
     request: FindDuplicateActionsScanRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_library_write),
 ):
     """Scan recommended_actions for duplicates within each failure mode (owner only)."""
     _require_owner(current_user)
+    uid, cid = user_context(current_user)
     try:
         return await failure_modes_service.scan_duplicate_actions(
             failure_mode_id=request.failure_mode_id,
@@ -944,6 +955,8 @@ async def scan_duplicate_actions_in_failure_modes(
             ai_max_failure_modes=request.ai_max_failure_modes,
             ai_max_clusters_per_fm=request.ai_max_clusters_per_fm,
             limit_results=request.limit_results,
+            user_id=uid,
+            company_id=cid,
         )
     except Exception as e:
         logger.error(f"Error scanning duplicate actions: {e}")
@@ -953,7 +966,7 @@ async def scan_duplicate_actions_in_failure_modes(
 @router.post("/failure-modes/merge-duplicate-actions")
 async def merge_duplicate_actions(
     request: MergeDuplicateActionsRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_library_write),
 ):
     """Merge duplicate recommended actions within one failure mode into a single action (owner only)."""
     _require_owner(current_user)
@@ -985,7 +998,7 @@ async def merge_duplicate_actions(
 @router.post("/failure-modes/merge")
 async def merge_failure_modes(
     request: MergeFailureModesRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_library_write),
 ):
     """Merge loser failure modes into a winner. Use dry_run=true to preview only.
 
@@ -1036,7 +1049,7 @@ async def merge_failure_modes(
 @router.delete("/failure-modes/{mode_id}")
 async def delete_failure_mode(
     mode_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write),
 ):
     """Delete a custom failure mode from MongoDB."""
     try:

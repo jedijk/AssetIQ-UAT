@@ -15,6 +15,9 @@ import logging
 import re
 import time
 
+from utils.mongo_regex import escape_regex, exact_case_insensitive
+from services.ai_gateway import chat as ai_gateway_chat
+
 logger = logging.getLogger(__name__)
 
 # Simple in-memory cache for failure modes (invalidated on write)
@@ -181,7 +184,7 @@ class FailureModesService:
     async def get_by_name(self, failure_mode_name: str) -> Optional[Dict[str, Any]]:
         """Get a failure mode by exact name match (case-insensitive)."""
         doc = await self.collection.find_one({
-            "failure_mode": {"$regex": f"^{failure_mode_name}$", "$options": "i"}
+            "failure_mode": exact_case_insensitive(failure_mode_name)
         })
         if doc:
             return self._serialize(doc)
@@ -194,12 +197,15 @@ class FailureModesService:
     
     async def search_by_keywords(self, keywords: List[str]) -> List[Dict[str, Any]]:
         """Find failure modes matching any of the provided keywords."""
-        query = {
-            "$or": [
-                {"keywords": {"$in": [k.lower() for k in keywords]}},
-                {"failure_mode": {"$regex": "|".join(keywords), "$options": "i"}},
-            ]
-        }
+        escaped = [escape_regex(k) for k in keywords if k]
+        keyword_or: List[Dict[str, Any]] = [
+            {"keywords": {"$in": [k.lower() for k in keywords]}},
+        ]
+        if escaped:
+            keyword_or.append(
+                {"failure_mode": {"$regex": "|".join(escaped), "$options": "i"}}
+            )
+        query = {"$or": keyword_or}
         
         cursor = self.collection.find(query).sort("rpn", -1)
         results = []
@@ -999,20 +1005,17 @@ class FailureModesService:
     async def _ai_confirm_similar_failure_mode_cluster(
         self,
         cluster: List[Dict[str, Any]],
+        *,
+        user_id: str = "system",
+        company_id: str = "default",
     ) -> List[Dict[str, Any]]:
         """GPT: which failure modes in this cluster are truly the same phenomenon."""
         import json
-        import os
-        from openai import AsyncOpenAI, RateLimitError
 
         if len(cluster) < 2:
             return []
         if len(cluster) > 35:
             cluster = cluster[:35]
-
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            raise RuntimeError("OPENAI_API_KEY not configured")
 
         items = [
             {
@@ -1043,29 +1046,24 @@ class FailureModesService:
             "Each id in at most one group. Omit borderline cases."
         )
 
-        client = AsyncOpenAI(api_key=api_key)
         data = None
-        for attempt in range(3):
-            try:
-                resp = await client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[
-                        {"role": "system", "content": sys_prompt},
-                        {"role": "user", "content": user_msg},
-                    ],
-                    temperature=0,
-                    max_tokens=1400,
-                    seed=42,
-                    response_format={"type": "json_object"},
-                )
-                data = json.loads(resp.choices[0].message.content.strip())
-                break
-            except RateLimitError:
-                if attempt == 2:
-                    raise
-                await asyncio.sleep(2 ** attempt)
-            except json.JSONDecodeError:
-                logger.warning("AI similar-FM cluster JSON parse failed")
+        try:
+            content = await ai_gateway_chat(
+                [
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_msg},
+                ],
+                user_id=user_id,
+                company_id=company_id,
+                endpoint="failure_modes.ai_confirm_similar_cluster",
+                model="gpt-4o-mini",
+                temperature=0,
+                max_tokens=1400,
+                response_format={"type": "json_object"},
+            )
+            data = json.loads(content.strip())
+        except json.JSONDecodeError:
+            logger.warning("AI similar-FM cluster JSON parse failed")
         if not data:
             return []
 
@@ -1210,6 +1208,8 @@ class FailureModesService:
         use_ai: bool = True,
         ai_max_clusters: int = 30,
         ai_time_budget_seconds: float = 55.0,
+        user_id: str = "system",
+        company_id: str = "default",
     ) -> Dict[str, Any]:
         """Batch scan: cluster near-duplicate failure modes across the full library.
 
@@ -1358,7 +1358,9 @@ class FailureModesService:
 
             async def _confirm_sub(sub: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
                 async with sem:
-                    return await self._ai_confirm_similar_failure_mode_cluster(sub)
+                    return await self._ai_confirm_similar_failure_mode_cluster(
+                        sub, user_id=user_id, company_id=company_id
+                    )
 
             idx = 0
             while idx < len(ai_subtasks):
@@ -1589,18 +1591,15 @@ class FailureModesService:
         equipment: str,
         actions: List[Any],
         indices: List[int],
+        *,
+        user_id: str = "system",
+        company_id: str = "default",
     ) -> List[Dict[str, Any]]:
         """GPT confirms a small lexical cluster of duplicate actions."""
         import json
-        import os
-        from openai import AsyncOpenAI, RateLimitError
 
         if len(indices) < 2 or len(indices) > 12:
             return []
-
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            raise RuntimeError("OPENAI_API_KEY not configured")
 
         payload = []
         for local_idx, action_idx in enumerate(indices):
@@ -1636,29 +1635,24 @@ class FailureModesService:
             "(confidence ≥ 75). Each local index in at most one group."
         )
 
-        client = AsyncOpenAI(api_key=api_key)
         data = None
-        for attempt in range(3):
-            try:
-                resp = await client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[
-                        {"role": "system", "content": sys_prompt},
-                        {"role": "user", "content": user_msg},
-                    ],
-                    temperature=0,
-                    max_tokens=800,
-                    seed=42,
-                    response_format={"type": "json_object"},
-                )
-                data = json.loads(resp.choices[0].message.content.strip())
-                break
-            except RateLimitError:
-                if attempt == 2:
-                    raise
-                await asyncio.sleep(2 ** attempt)
-            except json.JSONDecodeError:
-                logger.warning("AI duplicate-actions JSON parse failed for %s", failure_mode_name)
+        try:
+            content = await ai_gateway_chat(
+                [
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_msg},
+                ],
+                user_id=user_id,
+                company_id=company_id,
+                endpoint="failure_modes.ai_confirm_duplicate_actions",
+                model="gpt-4o-mini",
+                temperature=0,
+                max_tokens=800,
+                response_format={"type": "json_object"},
+            )
+            data = json.loads(content.strip())
+        except json.JSONDecodeError:
+            logger.warning("AI duplicate-actions JSON parse failed for %s", failure_mode_name)
         if not data:
             return []
 
@@ -1878,6 +1872,8 @@ class FailureModesService:
         ai_max_failure_modes: int = 50,
         ai_max_clusters_per_fm: int = 3,
         limit_results: int = 500,
+        user_id: str = "system",
+        company_id: str = "default",
     ) -> Dict[str, Any]:
         """Find duplicate recommended_actions within each failure mode (library-wide scan)."""
         query: Dict[str, Any] = {}
@@ -1936,7 +1932,12 @@ class FailureModesService:
                     clusters_reviewed += 1
                     try:
                         confirmed = await self._ai_confirm_duplicate_action_cluster(
-                            fm_name, equipment, actions, indices
+                            fm_name,
+                            equipment,
+                            actions,
+                            indices,
+                            user_id=user_id,
+                            company_id=company_id,
                         )
                         duplicate_groups.extend(confirmed)
                     except Exception as e:

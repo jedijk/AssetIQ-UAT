@@ -18,6 +18,7 @@ import json
 
 from database import db
 from auth import get_current_user, require_permission
+from utils.mongo_regex import or_search_fields
 from services.pm_import_service import PMImportService, normalize_pm_import_display_status
 from services.background_jobs import background_job_service, JobStatus, tenant_id_from_user
 from services.worker_config import use_external_background_worker
@@ -420,12 +421,7 @@ async def lookup_equipment(
     current_user: dict = Depends(get_current_user)
 ):
     """Search equipment hierarchy nodes by tag or name (for manual mapping dropdown)."""
-    query = {}
-    if q:
-        query = {"$or": [
-            {"tag": {"$regex": q, "$options": "i"}},
-            {"name": {"$regex": q, "$options": "i"}},
-        ]}
+    query = or_search_fields(q, "tag", "name") if q else {}
     cursor = db.equipment_nodes.find(query).limit(limit)
     items = []
     async for n in cursor:

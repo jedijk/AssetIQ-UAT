@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime, timezone
 from database import db
 from auth import get_current_user
+from utils.mongo_regex import exact_case_insensitive
 
 router = APIRouter()
 
@@ -31,7 +32,7 @@ async def get_equipment_history(
             "created_by": current_user["id"],
             "$or": [
                 {"linked_equipment_id": node_id},
-                {"asset": {"$regex": f"^{equipment_name}$", "$options": "i"}}
+                {"asset": exact_case_insensitive(equipment_name)}
             ]
         },
         {"_id": 0}
@@ -59,7 +60,7 @@ async def get_equipment_history(
         "created_by": current_user["id"],
         "$or": [
             {"linked_equipment_id": node_id},
-            {"equipment_name": {"$regex": f"^{equipment_name}$", "$options": "i"}},
+            {"equipment_name": exact_case_insensitive(equipment_name)},
         ]
     }
     if observation_ids:
@@ -90,7 +91,7 @@ async def get_equipment_history(
             "created_by": current_user["id"],
             "$or": [
                 {"linked_equipment_id": node_id},
-                {"equipment_name": {"$regex": f"^{equipment_name}$", "$options": "i"}},
+                {"equipment_name": exact_case_insensitive(equipment_name)},
                 {"equipment_id": node_id}
             ]
         },

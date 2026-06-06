@@ -11,7 +11,9 @@ from datetime import datetime
 import logging
 
 from database import db
-from auth import get_current_user
+from auth import get_current_user, require_permission
+
+_scheduler_write = require_permission("scheduler:write")
 from models.maintenance_program import (
     MaintenanceProgram,
     MaintenanceProgramTask,
@@ -239,7 +241,7 @@ async def get_maintenance_program(
 async def create_maintenance_program(
     equipment_id: str,
     request: CreateMaintenanceProgramRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_scheduler_write),
 ):
     """
     Create or initialize a maintenance program for an equipment item.
@@ -292,7 +294,7 @@ async def create_maintenance_program(
 @router.delete("/{equipment_id}")
 async def delete_maintenance_program(
     equipment_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_scheduler_write),
 ):
     """
     Delete a maintenance program.
@@ -367,7 +369,7 @@ async def get_program_tasks(
 async def add_task(
     equipment_id: str,
     request: AddTaskRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_scheduler_write),
 ):
     """
     Add a manual task to a maintenance program.
@@ -411,7 +413,7 @@ async def update_task(
     equipment_id: str,
     task_id: str,
     request: UpdateTaskRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_scheduler_write),
 ):
     """
     Update or override a task in a maintenance program.
@@ -475,7 +477,7 @@ async def update_task(
 async def delete_task(
     equipment_id: str,
     task_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_scheduler_write),
 ):
     """
     Delete a task from a maintenance program.
@@ -508,7 +510,7 @@ async def delete_task(
 async def regenerate_program(
     equipment_id: str,
     request: RegenerateProgramRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_scheduler_write),
 ):
     """
     Regenerate a maintenance program from the equipment type strategy.
@@ -554,7 +556,7 @@ async def regenerate_program(
 async def import_tasks(
     equipment_id: str,
     request: ImportTasksRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_scheduler_write),
 ):
     """
     Import tasks from a PM Import session into this maintenance program.
@@ -586,7 +588,7 @@ async def import_tasks(
 async def generate_ai_recommendations(
     equipment_id: str,
     request: AIRecommendationRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_scheduler_write),
 ):
     """
     Generate AI maintenance recommendations for this equipment.
@@ -617,7 +619,7 @@ async def generate_ai_recommendations(
 async def accept_ai_recommendation(
     equipment_id: str,
     task: Dict[str, Any],
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_scheduler_write),
 ):
     """
     Accept an AI recommendation and add it to the maintenance program.
@@ -648,7 +650,7 @@ async def accept_ai_recommendation(
 async def update_program_status(
     equipment_id: str,
     status: ProgramStatus,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_scheduler_write),
 ):
     """
     Update the status of a maintenance program.
@@ -676,7 +678,7 @@ async def update_program_status(
 async def approve_program(
     equipment_id: str,
     request: ApprovalRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_scheduler_write),
 ):
     """
     Approve or reject a maintenance program.
@@ -763,7 +765,7 @@ async def get_audit_log(
 async def bulk_generate_programs(
     equipment_ids: List[str],
     generate_from_strategy: bool = True,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_scheduler_write),
 ):
     """
     Generate maintenance programs for multiple equipment items.
@@ -810,7 +812,7 @@ async def bulk_regenerate_programs(
     equipment_type_id: str,
     preserve_overrides: bool = True,
     preserve_manual_tasks: bool = True,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_scheduler_write),
 ):
     """
     Regenerate all maintenance programs for an equipment type.

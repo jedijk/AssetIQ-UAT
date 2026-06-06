@@ -15,6 +15,8 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 import logging
 import re
 
+from utils.mongo_regex import escape_regex
+
 logger = logging.getLogger(__name__)
 
 
@@ -257,11 +259,17 @@ class ObservationService:
         
         # Text search on keywords
         if keywords:
-            query["$or"] = [
-                {"failure_mode": {"$regex": "|".join(keywords), "$options": "i"}},
+            escaped = [escape_regex(k) for k in keywords if k]
+            keyword_or: List[Dict[str, Any]] = [
                 {"keywords": {"$in": [k.lower() for k in keywords]}},
-                {"mechanism": {"$regex": "|".join(keywords), "$options": "i"}},
             ]
+            if escaped:
+                pattern = "|".join(escaped)
+                keyword_or.extend([
+                    {"failure_mode": {"$regex": pattern, "$options": "i"}},
+                    {"mechanism": {"$regex": pattern, "$options": "i"}},
+                ])
+            query["$or"] = keyword_or
         
         # Get potential matches
         cursor = self.failure_modes.find(query).sort("rpn", -1).limit(max_suggestions * 2)

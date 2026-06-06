@@ -11,9 +11,7 @@ import io
 import logging
 from database import db
 from auth import get_current_user
-
-# AI Integration
-from openai import OpenAI
+from services.ai_gateway import chat as ai_gateway_chat, user_context
 
 # PowerPoint imports
 from pptx import Presentation
@@ -700,7 +698,7 @@ class AISummaryResponse(BaseModel):
     recommendations: list
 
 
-async def generate_ai_summary(data: dict) -> dict:
+async def generate_ai_summary(data: dict, current_user: dict | None = None) -> dict:
     """Generate AI-powered summary of investigation with next steps."""
     inv = data["investigation"]
     events = data["events"]
@@ -877,22 +875,22 @@ Respond in JSON format:
         import uuid
         inv_id = inv.get('id', str(uuid.uuid4()))
         
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            raise Exception("OpenAI API key not configured")
-        
-        client = OpenAI(api_key=api_key)
-        
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "You are a senior reliability engineer and root cause analysis expert. Always respond with valid JSON only."},
-                {"role": "user", "content": prompt}
+        uid, cid = user_context(current_user)
+        response_text = await ai_gateway_chat(
+            [
+                {
+                    "role": "system",
+                    "content": "You are a senior reliability engineer and root cause analysis expert. Always respond with valid JSON only.",
+                },
+                {"role": "user", "content": prompt},
             ],
-            temperature=0.5
+            user_id=uid,
+            company_id=cid,
+            endpoint="reports.investigation_ai_summary",
+            model="gpt-4o",
+            temperature=0.5,
         )
-        
-        response_text = response.choices[0].message.content.strip()
+        response_text = response_text.strip()
         
         # Parse JSON response
         import json
@@ -954,7 +952,7 @@ async def get_ai_summary(
     """Generate AI-powered summary of investigation with next steps."""
     try:
         data = await get_investigation_data(investigation_id, current_user["id"])
-        summary = await generate_ai_summary(data)
+        summary = await generate_ai_summary(data, current_user)
         return summary
     except HTTPException:
         raise

@@ -11,6 +11,7 @@ import os
 from models.api_models import UserResponse
 from routes.auth import get_current_user
 from database import db
+from services.ai_gateway import chat as ai_gateway_chat, user_context
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["insights"])
@@ -480,30 +481,24 @@ Focus on:
 Return as JSON array with fields: title, description, impact (high/medium/low)
 """
         
-        # Call AI
-        from openai import OpenAI
-        
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            raise HTTPException(status_code=500, detail="AI service not configured")
-            
-        client = OpenAI(api_key=api_key)
-        
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
+        import json
+
+        uid, cid = user_context(current_user)
+        response_text = await ai_gateway_chat(
+            [
                 {
                     "role": "system",
-                    "content": "You are a reliability engineering expert. Provide specific, actionable recommendations based on the data. Return only valid JSON array."
+                    "content": "You are a reliability engineering expert. Provide specific, actionable recommendations based on the data. Return only valid JSON array.",
                 },
-                {"role": "user", "content": context}
+                {"role": "user", "content": context},
             ],
-            temperature=0.5
+            user_id=uid,
+            company_id=cid,
+            endpoint="insights.ai_recommendations",
+            model="gpt-4o",
+            temperature=0.5,
         )
-        
-        # Parse response
-        import json
-        response_text = response.choices[0].message.content.strip()
+        response_text = response_text.strip()
         
         # Extract JSON from response
         if "```json" in response_text:

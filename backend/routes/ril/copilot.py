@@ -53,7 +53,7 @@ async def query_copilot(
     _, copilot_service = get_services()
     owner_id = current_user.get("owner_id") or current_user.get("id")
     
-    response = await copilot_service.process_query(owner_id, request)
+    response = await copilot_service.process_query(owner_id, request, current_user=current_user)
     
     return response
 

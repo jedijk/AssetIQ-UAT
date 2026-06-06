@@ -4,6 +4,7 @@ Equipment Search and Utility operations.
 from fastapi import APIRouter, Depends
 from database import db
 from auth import get_current_user
+from utils.mongo_regex import case_insensitive_contains
 from iso14224_models import (
     ISOLevel, ISO_LEVEL_ORDER, CRITICALITY_PROFILES, Discipline,
     get_valid_parent_level, get_valid_child_levels, ISO_LEVEL_LABELS
@@ -36,9 +37,10 @@ async def search_equipment(
     is_admin_or_owner = user_role in ["owner", "admin"]
     
     # First, do the name search
-    search_filter = {
-        "name": {"$regex": q, "$options": "i"}
-    }
+    name_match = case_insensitive_contains(q)
+    if not name_match:
+        return {"results": []}
+    search_filter = {"name": name_match}
     
     # Search equipment nodes
     nodes = await db.equipment_nodes.find(

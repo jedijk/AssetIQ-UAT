@@ -10,6 +10,7 @@ from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from database import db
 from auth import get_current_user
+from utils.mongo_regex import case_insensitive_contains
 from bson import ObjectId
 from services.db_monitoring import timed_find
 from services.work_item_query import fetch_unbridged_maintenance_work_items
@@ -241,7 +242,9 @@ async def get_my_tasks(
     
     # Filter by discipline if specified
     if discipline:
-        query["discipline"] = {"$regex": discipline, "$options": "i"}
+        discipline_match = case_insensitive_contains(discipline)
+        if discipline_match:
+            query["discipline"] = discipline_match
     
     # Apply filters
     now = datetime.now(timezone.utc)
@@ -537,7 +540,9 @@ async def get_my_tasks(
         
         # Filter by discipline if specified
         if discipline:
-            action_query["discipline"] = {"$regex": discipline, "$options": "i"}
+            discipline_match = case_insensitive_contains(discipline)
+            if discipline_match:
+                action_query["discipline"] = discipline_match
         
         # Apply date filter for actions
         if filter == "today":

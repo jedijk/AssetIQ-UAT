@@ -10,6 +10,7 @@ import logging
 from database import db
 from auth import get_current_user
 from services.background_jobs import schedule_tracked_job
+from utils.mongo_regex import exact_case_insensitive
 from models.translation import (
     Language, DictionaryTerm, EntityTranslation, TranslationJob,
     EntityType, TranslationStatus,
@@ -163,7 +164,7 @@ async def create_dictionary_term(
     """
     # Check if term already exists
     existing = await db.translation_dictionary.find_one(
-        {"source_term": {"$regex": f"^{request.source_term}$", "$options": "i"}}
+        {"source_term": exact_case_insensitive(request.source_term)}
     )
     if existing:
         raise HTTPException(status_code=400, detail="Term already exists")
@@ -263,7 +264,7 @@ async def seed_default_dictionary(
     created = 0
     for term_data in default_terms:
         existing = await db.translation_dictionary.find_one(
-            {"source_term": {"$regex": f"^{term_data['source_term']}$", "$options": "i"}}
+            {"source_term": exact_case_insensitive(term_data["source_term"])}
         )
         if not existing:
             term = DictionaryTerm(

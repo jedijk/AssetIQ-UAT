@@ -9,6 +9,7 @@ from datetime import datetime
 from database import db, form_service
 from services.cache_service import cache
 from auth import get_current_user
+from services.ai_gateway import chat as ai_gateway_chat, user_context
 from models.form_models import (
     FormTemplateCreate, FormTemplateUpdate,
     FormFieldDefinition, FormFieldUpdate,
@@ -674,8 +675,6 @@ async def search_form_documents(
     
     # Use AI to search documents
     try:
-        from openai import OpenAI
-        
         # Build context from documents
         doc_context = "\n\n".join([
             f"Document: {d['name']}\nDescription: {d.get('description', 'No description')}\nType: {d['type']}"
@@ -692,22 +691,18 @@ Provide helpful, concise answers based on the document names, descriptions and t
 If a specific document would be most relevant, mention its name.
 If you cannot find relevant information, say so clearly and suggest which document type might help."""
         
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            raise Exception("OpenAI API key not configured")
-            
-        client = OpenAI(api_key=api_key)
-        
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
+        uid, cid = user_context(current_user)
+        answer = await ai_gateway_chat(
+            [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": request.query}
+                {"role": "user", "content": request.query},
             ],
-            temperature=0.3
+            user_id=uid,
+            company_id=cid,
+            endpoint="forms.document_search",
+            model="gpt-4o-mini",
+            temperature=0.3,
         )
-        
-        answer = response.choices[0].message.content
         
         return {
             "query": request.query,

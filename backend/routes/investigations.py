@@ -21,6 +21,8 @@ from investigation_models import (
     EvidenceCreate, RecurringQuadrantData
 )
 from utils.auto_translate import translate_investigation
+from utils.mongo_regex import exact_case_insensitive
+from services.ai_gateway import chat as ai_gateway_chat, user_context
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +150,7 @@ async def check_for_similar_incidents(user_id: str, asset_name: str, description
     # Find past investigations with same equipment
     query = {
         "created_by": user_id,
-        "asset_name": {"$regex": f"^{asset_name}$", "$options": "i"},
+        "asset_name": exact_case_insensitive(asset_name),
         "status": {"$in": ["completed", "closed"]}
     }
     if exclude_id:
@@ -332,7 +334,7 @@ async def get_investigations(
         # Add equipment tag if asset_name is present
         if inv.get("asset_name"):
             equipment = await db.equipment_nodes.find_one(
-                {"name": {"$regex": f"^{inv['asset_name']}$", "$options": "i"}},
+                {"name": exact_case_insensitive(inv["asset_name"])},
                 {"_id": 0, "tag": 1}
             )
             inv["equipment_tag"] = equipment.get("tag") if equipment else None
@@ -356,7 +358,7 @@ async def get_investigation(
     # Add equipment tag if asset_name is present
     if inv.get("asset_name"):
         equipment = await db.equipment_nodes.find_one(
-            {"name": {"$regex": f"^{inv['asset_name']}$", "$options": "i"}},
+            {"name": exact_case_insensitive(inv["asset_name"])},
             {"_id": 0, "tag": 1}
         )
         inv["equipment_tag"] = equipment.get("tag") if equipment else None
@@ -997,27 +999,21 @@ async def ai_problem_check(
     if not description:
         raise HTTPException(status_code=400, detail="Description cannot be empty")
     
-    # Check for OpenAI API key
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="AI service not configured")
-    
     try:
-        from openai import OpenAI
-        client = OpenAI(api_key=api_key)
-        
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
+        uid, cid = user_context(current_user)
+        content = await ai_gateway_chat(
+            [
                 {"role": "system", "content": DEFENSIVE_REASONING_CHECK_PROMPT},
-                {"role": "user", "content": f"Analyze this problem statement for defensive reasoning:\n\n{description}"}
+                {"role": "user", "content": f"Analyze this problem statement for defensive reasoning:\n\n{description}"},
             ],
+            user_id=uid,
+            company_id=cid,
+            endpoint="investigations.ai_problem_check",
+            model="gpt-4o-mini",
             temperature=0.3,
-            max_tokens=2000  # Increased for more detailed analysis
+            max_tokens=2000,
         )
-        
-        # Parse response
-        content = response.choices[0].message.content.strip()
+        content = content.strip()
         
         # Clean up JSON if wrapped in markdown code block
         if content.startswith("```"):

@@ -51,3 +51,31 @@ def test_chat_analyze_requires_auth():
     block = source[idx: idx + 400]
     assert "Depends(get_current_user)" in block
     assert "ai_gateway" in source or "from services.ai_gateway import chat" in source
+
+
+def test_failure_modes_mutations_require_library_write():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "failure_modes_routes.py").read_text()
+    assert '_library_write = require_permission("library:write")' in source
+    assert "Depends(_library_write)" in source
+    assert "failure_modes.ai_confirm_similar_cluster" not in source
+
+
+def test_maintenance_program_mutations_require_scheduler_write():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "maintenance_program.py").read_text()
+    assert '_scheduler_write = require_permission("scheduler:write")' in source
+    assert "Depends(_scheduler_write)" in source
+
+
+def test_investigations_ai_problem_check_uses_gateway():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "investigations.py").read_text()
+    assert "from services.ai_gateway import chat as ai_gateway_chat" in source
+    idx = source.index("async def ai_problem_check")
+    block = source[idx: idx + 2500]
+    assert "ai_gateway_chat" in block
+    assert 'endpoint="investigations.ai_problem_check"' in block
+
+
+def test_equipment_search_escapes_regex():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "equipment" / "equipment_utils.py").read_text()
+    assert "case_insensitive_contains" in source
+    assert '"$regex": q' not in source

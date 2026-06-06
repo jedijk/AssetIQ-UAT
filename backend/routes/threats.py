@@ -56,7 +56,9 @@ async def get_failure_mode_by_name_or_id(failure_mode_name: str = None, failure_
             return fm
     
     if failure_mode_name:
-        db_fm = await db.failure_modes.find_one({"name": {"$regex": f"^{failure_mode_name}$", "$options": "i"}})
+        from utils.mongo_regex import exact_case_insensitive
+
+        db_fm = await db.failure_modes.find_one({"name": exact_case_insensitive(failure_mode_name)})
         if db_fm:
             db_fm.pop("_id", None)
             fm = {

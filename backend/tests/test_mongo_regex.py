@@ -39,3 +39,8 @@ def test_exact_case_insensitive():
 def test_exact_case_insensitive_any():
     match = exact_case_insensitive_any("Pump A", "Pump.*B")
     assert "Pump\\.\\*B" in match["$regex"]
+
+
+def test_escape_regex_empty():
+    assert escape_regex("") == ""
+    assert escape_regex("  ") == ""

@@ -9,6 +9,7 @@ from database import db
 from failure_modes import FAILURE_MODES_LIBRARY
 from models.risk_settings import DEFAULT_RISK_SETTINGS
 from services.criticality_score import compute_criticality_score
+from utils.mongo_regex import exact_case_insensitive
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +137,7 @@ async def recalculate_threat_scores_for_asset(asset_name: str, user_id: str, new
         failure_mode_name = threat.get("failure_mode")
         if failure_mode_name and failure_mode_name != "Unknown":
             # First check database for user-created failure modes
-            db_fm = await db.failure_modes.find_one({"name": {"$regex": f"^{failure_mode_name}$", "$options": "i"}})
+            db_fm = await db.failure_modes.find_one({"name": exact_case_insensitive(failure_mode_name)})
             if db_fm:
                 rpn = db_fm.get("rpn", 500)
                 fmea_score = min(100, int(rpn / 10))
@@ -272,7 +273,7 @@ async def propagate_risk_to_linked_entities(threat_ids: list, threats: list = No
 
 async def recalculate_threat_scores_for_failure_mode(failure_mode_name: str, new_severity: int, new_occurrence: int, new_detectability: int):
     threats = await db.threats.find(
-        {"failure_mode": {"$regex": f"^{failure_mode_name}$", "$options": "i"}}
+        {"failure_mode": exact_case_insensitive(failure_mode_name)}
     ).to_list(1000)
 
     if not threats:

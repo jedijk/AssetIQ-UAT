@@ -168,6 +168,15 @@ INDEX_DEFINITIONS = {
         {"keys": [("event_type", 1), ("timestamp", -1)]},
     ],
     
+    # Failure modes library
+    "failure_modes": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("failure_mode", 1)]},
+        {"keys": [("category", 1)]},
+        {"keys": [("rpn", -1)]},
+        {"keys": [("equipment_type_ids", 1)]},
+    ],
+
     # Equipment failure modes
     "equipment_failure_modes": [
         {"keys": [("id", 1)], "unique": True},

@@ -55,7 +55,8 @@ class ReliabilityCopilotService:
     async def process_query(
         self,
         owner_id: str,
-        request: CopilotQueryRequest
+        request: CopilotQueryRequest,
+        current_user: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """
         Process a natural language query about reliability.
@@ -77,7 +78,9 @@ class ReliabilityCopilotService:
         data = await self._gather_data(owner_id, intent, query, equipment_id)
         
         # Generate AI response
-        response = await self._generate_response(owner_id, query, intent, data, context)
+        response = await self._generate_response(
+            owner_id, query, intent, data, context, current_user=current_user
+        )
         
         return response
     
@@ -308,11 +311,16 @@ class ReliabilityCopilotService:
         query: str,
         intent: str,
         data: Dict[str, Any],
-        context: Dict[str, Any]
+        context: Dict[str, Any],
+        current_user: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """Generate AI response based on gathered data"""
-        client = self._get_openai_client()
-        
+        from services.ai_gateway import chat as ai_gateway_chat, user_context
+
+        uid, cid = user_context(current_user)
+        if uid == "anonymous":
+            uid = str(owner_id)
+
         # Build system prompt
         system_prompt = """You are the Reliability Copilot, an AI assistant for industrial reliability engineers.
 You help analyze equipment health, identify risks, explain failure patterns, and provide actionable recommendations.
@@ -343,18 +351,18 @@ Available Data:
 Please provide a helpful response to the query based on the available data."""
 
         try:
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
+            answer = await ai_gateway_chat(
+                [
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
+                    {"role": "user", "content": user_prompt},
                 ],
+                user_id=uid,
+                company_id=cid,
+                endpoint="ril.copilot.query",
+                model="gpt-4o",
                 temperature=0.3,
-                max_tokens=1000
+                max_tokens=1000,
             )
-            
-            answer = response.choices[0].message.content
-            
         except Exception as e:
             logger.error(f"Error generating copilot response: {e}")
             answer = self._generate_fallback_response(intent, data)
