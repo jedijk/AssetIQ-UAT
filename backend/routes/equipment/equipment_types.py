@@ -4,9 +4,12 @@ Equipment Types CRUD operations.
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from datetime import datetime, timezone
 from database import db
-from auth import get_current_user
+from auth import get_current_user, require_permission
 from iso14224_models import EQUIPMENT_TYPES, EquipmentTypeCreate, EquipmentTypeUpdate
+from services.background_jobs import schedule_tracked_job
 from utils.auto_translate import translate_equipment_type
+
+_equipment_write = require_permission("equipment:write")
 
 router = APIRouter()
 
@@ -33,7 +36,7 @@ async def get_iso_equipment_types(
 async def create_equipment_type(
     type_data: EquipmentTypeCreate,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_equipment_write)
 ):
     """Create a custom equipment type."""
     # Check if ID already exists for this user
@@ -62,11 +65,14 @@ async def create_equipment_type(
     await db.custom_equipment_types.insert_one(type_doc)
     
     # Auto-translate equipment type
-    background_tasks.add_task(
+    schedule_tracked_job(
+        background_tasks,
+        "translate_equipment_type",
         translate_equipment_type,
         type_data.id,
         {"name": type_data.name, "description": ""},
-        current_user["id"]
+        current_user["id"],
+        user_id=current_user["id"],
     )
     
     type_doc.pop("_id", None)
@@ -78,7 +84,7 @@ async def update_equipment_type(
     type_id: str,
     update: EquipmentTypeUpdate,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_equipment_write)
 ):
     """Update a custom equipment type."""
     # Check if it's a custom type
@@ -120,11 +126,14 @@ async def update_equipment_type(
     
     # Auto-translate if name changed
     if update.name:
-        background_tasks.add_task(
+        schedule_tracked_job(
+            background_tasks,
+            "translate_equipment_type",
             translate_equipment_type,
             type_id,
             {"name": updated.get("name", ""), "description": ""},
-            current_user["id"]
+            current_user["id"],
+            user_id=current_user["id"],
         )
     
     return updated
@@ -133,7 +142,7 @@ async def update_equipment_type(
 @router.delete("/equipment-hierarchy/types/{type_id}")
 async def delete_equipment_type(
     type_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_equipment_write)
 ):
     """Delete a custom equipment type."""
     result = await db.custom_equipment_types.delete_one(

@@ -123,3 +123,55 @@ def test_production_logs_ingest_uses_tracked_jobs():
     idx = source.index("async def ingest_logs")
     block = source[idx: idx + 1200]
     assert "schedule_tracked_job" in block
+
+
+def test_ai_fm_suggestions_uses_ai_gateway():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "ai_fm_suggestions.py").read_text()
+    assert "from services.ai_gateway import chat_completion_response" in source
+    assert "AsyncOpenAI" not in source
+    assert "guarded_openai_create" not in source
+    assert "chat_completion_response" in source
+
+
+def test_translations_mutations_require_library_write():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "translations.py").read_text()
+    assert '_library_write = require_permission("library:write")' in source
+    idx = source.index("async def create_language")
+    block = source[idx: idx + 200]
+    assert "Depends(_library_write)" in block
+    idx_pref = source.index("async def set_user_language_preference")
+    pref_block = source[idx_pref: idx_pref + 200]
+    assert "Depends(get_current_user)" in pref_block
+
+
+def test_observations_mutations_require_observations_write():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "observations.py").read_text()
+    assert '_observations_write = require_permission("observations:write")' in source
+    idx = source.index("async def create_observation")
+    assert "Depends(_observations_write)" in source[idx: idx + 250]
+
+
+def test_definitions_mutations_require_settings_write():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "definitions.py").read_text()
+    assert '_settings_write = require_permission("settings:write")' in source
+    idx = source.index("async def create_or_update_definitions")
+    assert "Depends(_settings_write)" in source[idx: idx + 250]
+
+
+def test_process_import_mutations_require_library_write():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "process_import.py").read_text()
+    assert '_library_write = require_permission("library:write")' in source
+    idx = source.index("async def upload_process_diagram")
+    assert "Depends(_library_write)" in source[idx: idx + 600]
+    idx_get = source.index("async def get_session")
+    assert "Depends(get_current_user)" in source[idx_get: idx_get + 200]
+
+
+def test_routes_use_tracked_jobs_not_raw_background_tasks():
+    routes_dir = Path(__file__).resolve().parents[1] / "routes"
+    offenders = []
+    for path in routes_dir.rglob("*.py"):
+        text = path.read_text()
+        if "background_tasks.add_task(" in text:
+            offenders.append(str(path.relative_to(routes_dir.parent)))
+    assert offenders == [], f"Use schedule_tracked_job instead: {offenders}"

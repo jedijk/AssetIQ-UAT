@@ -15,12 +15,14 @@ import logging
 import io
 
 from database import db
-from auth import get_current_user
+from auth import get_current_user, require_permission
 from services.process_import_service import ProcessImportService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/process-import", tags=["Process Intelligence Import"])
+
+_library_write = require_permission("library:write")
 
 
 # ============== MODELS ==============
@@ -98,7 +100,7 @@ async def upload_process_diagram(
     generate_subunits: bool = Query(True, description="Auto-generate subunits from templates"),
     generate_maintainable_items: bool = Query(False, description="Auto-generate maintainable items"),
     estimate_criticality: bool = Query(True, description="AI-estimate criticality scores"),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Upload a process diagram for analysis.
@@ -197,7 +199,7 @@ async def update_item(
     session_id: str,
     item_id: str,
     updates: ItemUpdateRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Update a hierarchy item."""
     
@@ -219,7 +221,7 @@ async def update_item(
 async def delete_item(
     session_id: str,
     item_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Delete a hierarchy item and its children."""
     
@@ -236,7 +238,7 @@ async def delete_item(
 async def add_item(
     session_id: str,
     item_data: AddItemRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Add a new hierarchy item manually."""
     
@@ -253,7 +255,7 @@ async def add_item(
 async def accept_item(
     session_id: str,
     item_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Mark an item as accepted."""
     
@@ -270,7 +272,7 @@ async def accept_item(
 async def reject_item(
     session_id: str,
     item_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Mark an item as rejected."""
     
@@ -287,7 +289,7 @@ async def reject_item(
 async def accept_all_items(
     session_id: str,
     min_confidence: int = Query(70, description="Minimum confidence to accept"),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Accept all items with confidence >= threshold."""
     
@@ -322,7 +324,7 @@ async def accept_all_items(
 async def import_to_assetiq(
     session_id: str,
     request: ImportRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Import hierarchy to AssetIQ equipment register."""
     
@@ -507,7 +509,7 @@ async def export_excel(
 @router.delete("/session/{session_id}")
 async def delete_session(
     session_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Delete a session."""
     

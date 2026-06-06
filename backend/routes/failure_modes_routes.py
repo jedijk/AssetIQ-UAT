@@ -745,11 +745,14 @@ async def update_failure_mode(
                          for a in (result.get("recommended_actions") or [])]
                     ),
                 }
-                background_tasks.add_task(
+                schedule_tracked_job(
+                    background_tasks,
+                    "translate_failure_mode",
                     auto_translate_failure_mode,
                     result.get("failure_mode", "") or mode_id,
                     fm_data_for_translation,
-                    current_user["id"]
+                    current_user["id"],
+                    user_id=current_user["id"],
                 )
             
             return result

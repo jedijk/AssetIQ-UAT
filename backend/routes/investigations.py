@@ -10,7 +10,8 @@ import json
 import os
 import logging
 from database import db
-from auth import get_current_user
+from auth import get_current_user, require_permission
+from services.background_jobs import schedule_tracked_job
 from services.storage_service import put_object_async, get_object_async, MIME_TYPES, APP_NAME
 from investigation_models import (
     InvestigationCreate, InvestigationUpdate, InvestigationStatus,
@@ -264,11 +265,14 @@ async def create_investigation(
     inv_doc.pop("_id", None)
     
     # Auto-translate investigation title and description
-    background_tasks.add_task(
+    schedule_tracked_job(
+        background_tasks,
+        "translate_investigation",
         translate_investigation,
         inv_id,
         {"title": data.title, "description": data.description or ""},
-        current_user["id"]
+        current_user["id"],
+        user_id=current_user["id"],
     )
     
     # Include similar incidents info in response

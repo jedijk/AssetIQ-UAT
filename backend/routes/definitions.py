@@ -9,10 +9,12 @@ from datetime import datetime, timezone
 import uuid
 import logging
 from database import db
-from auth import get_current_user
+from auth import get_current_user, require_permission
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Definitions"])
+
+_settings_write = require_permission("settings:write")
 
 
 async def propagate_definitions_to_threats(equipment_id: str, user_id: str, definitions: dict):
@@ -324,7 +326,7 @@ async def get_installations_with_definitions(
 @router.post("/definitions")
 async def create_or_update_definitions(
     data: DefinitionsCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_settings_write)
 ):
     """
     Create or update custom definitions for an equipment/installation.
@@ -402,7 +404,7 @@ async def create_or_update_definitions(
 async def update_definitions(
     equipment_id: str,
     data: DefinitionsUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_settings_write)
 ):
     """
     Partially update definitions for an equipment/installation.
@@ -452,7 +454,7 @@ async def update_definitions(
 @router.delete("/definitions/{equipment_id}")
 async def delete_definitions(
     equipment_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_settings_write)
 ):
     """
     Delete custom definitions for an equipment/installation.

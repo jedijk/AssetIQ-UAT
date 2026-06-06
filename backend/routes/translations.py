@@ -8,7 +8,7 @@ from datetime import datetime
 import logging
 
 from database import db
-from auth import get_current_user
+from auth import get_current_user, require_permission
 from services.background_jobs import schedule_tracked_job
 from utils.mongo_regex import exact_case_insensitive
 from models.translation import (
@@ -25,6 +25,8 @@ from services.translation_service import TranslationService
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/translations", tags=["Translations"])
+
+_library_write = require_permission("library:write")
 
 
 # ============= Language Management =============
@@ -48,7 +50,7 @@ async def get_languages(
 @router.post("/languages")
 async def create_language(
     request: CreateLanguageRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Add a new supported language
@@ -79,7 +81,7 @@ async def create_language(
 async def update_language(
     code: str,
     request: UpdateLanguageRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Update language settings
@@ -104,7 +106,7 @@ async def update_language(
 
 @router.post("/languages/seed")
 async def seed_default_languages(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Seed default languages (EN, NL, DE)
@@ -157,7 +159,7 @@ async def get_dictionary(
 @router.post("/dictionary")
 async def create_dictionary_term(
     request: CreateDictionaryTermRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Add a new dictionary term
@@ -187,7 +189,7 @@ async def create_dictionary_term(
 async def update_dictionary_term(
     term_id: str,
     request: UpdateDictionaryTermRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Update a dictionary term
@@ -209,7 +211,7 @@ async def update_dictionary_term(
 @router.delete("/dictionary/{term_id}")
 async def delete_dictionary_term(
     term_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Delete a dictionary term
@@ -222,7 +224,7 @@ async def delete_dictionary_term(
 
 @router.post("/dictionary/seed")
 async def seed_default_dictionary(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Seed default technical dictionary terms
@@ -282,7 +284,7 @@ async def seed_default_dictionary(
 @router.post("/dictionary/validate")
 async def validate_dictionary(
     language_code: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Validate stored entity translations against the technical dictionary.
@@ -403,7 +405,7 @@ async def get_batch_translations(
 async def generate_translations(
     request: GenerateTranslationsRequest,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Generate AI translations for entities
@@ -520,7 +522,7 @@ async def generate_all_translations(
     background_tasks: BackgroundTasks,
     target_languages: List[str] = ["nl", "de"],
     only_missing: bool = True,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Bulk-translate ALL existing entities of a given type to the target languages.
@@ -678,7 +680,7 @@ async def get_translation_job(
 async def update_translation(
     translation_id: str,
     request: UpdateTranslationRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Update a translation
@@ -706,7 +708,7 @@ async def update_translation(
 @router.post("/bulk-status")
 async def bulk_update_status(
     request: BulkUpdateTranslationStatusRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Bulk update translation statuses
@@ -901,7 +903,7 @@ async def translate_single_text(
     text: str,
     target_language: str,
     source_language: str = "en",
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Translate a single piece of text (utility endpoint)

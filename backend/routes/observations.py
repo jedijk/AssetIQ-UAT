@@ -6,10 +6,13 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from database import db, observation_service
-from auth import get_current_user
+from auth import get_current_user, require_permission
+from services.background_jobs import schedule_tracked_job
 from utils.auto_translate import translate_observation
 
 router = APIRouter(tags=["Observations"])
+
+_observations_write = require_permission("observations:write")
 
 
 class ObservationCreate(BaseModel):
@@ -125,7 +128,7 @@ async def get_observation(
 async def create_observation(
     data: ObservationCreate,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_observations_write)
 ):
     """Create a new observation manually."""
     result = await observation_service.create_observation(
@@ -135,7 +138,9 @@ async def create_observation(
     )
     # Trigger auto-translation in background
     if result and result.get("id"):
-        background_tasks.add_task(
+        schedule_tracked_job(
+            background_tasks,
+            "translate_observation",
             translate_observation,
             result["id"],
             {
@@ -143,6 +148,7 @@ async def create_observation(
                 "description": result.get("description", "") or "",
             },
             current_user["id"],
+            user_id=current_user["id"],
         )
     return result
 
@@ -151,7 +157,7 @@ async def update_observation(
     obs_id: str,
     data: ObservationUpdate,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_observations_write)
 ):
     """Update an observation."""
     update_payload = data.model_dump(exclude_unset=True)
@@ -163,7 +169,9 @@ async def update_observation(
         raise HTTPException(status_code=404, detail="Observation not found")
     # Re-translate if user-facing text changed
     if any(k in update_payload for k in ("description",)):
-        background_tasks.add_task(
+        schedule_tracked_job(
+            background_tasks,
+            "translate_observation",
             translate_observation,
             obs_id,
             {
@@ -171,6 +179,7 @@ async def update_observation(
                 "description": result.get("description", "") or "",
             },
             current_user["id"],
+            user_id=current_user["id"],
         )
     return result
 
@@ -178,7 +187,7 @@ async def update_observation(
 async def close_observation(
     obs_id: str,
     resolution_notes: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_observations_write)
 ):
     """Close an observation."""
     result = await observation_service.close_observation(obs_id, resolution_notes)

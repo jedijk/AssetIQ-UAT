@@ -6,7 +6,6 @@ Uses OpenAI GPT-4o with deterministic settings for consistent output.
 import os
 import re
 import json
-import asyncio
 import hashlib
 import logging
 from datetime import datetime, timezone
@@ -14,7 +13,6 @@ from typing import List, Dict, Any, Optional
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from openai import AsyncOpenAI, RateLimitError
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -22,7 +20,7 @@ load_dotenv()
 from iso14224_models import EQUIPMENT_TYPES
 from database import db
 from auth import require_permission, get_current_user
-from services.ai_cost_guard import guard_ai_request, record_ai_tokens
+from services.ai_gateway import chat_completion_response, user_context
 
 logger = logging.getLogger(__name__)
 
@@ -35,108 +33,6 @@ router = APIRouter(
 # In-memory cache (per-process). Backed by Mongo for cross-restart persistence.
 _suggestion_cache: Dict[str, Any] = {}
 _CACHE_COLLECTION = "ai_fm_suggestion_cache"
-
-# Initialize OpenAI client
-openai_client = None
-
-def get_openai_client():
-    global openai_client
-    if openai_client is None:
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured")
-        openai_client = AsyncOpenAI(api_key=api_key)
-    return openai_client
-
-
-# Retry-after parser: OpenAI 429 error messages include a "Please try again in 9.348s." hint.
-_RETRY_AFTER_RE = re.compile(r"try again in ([\d.]+)s", re.IGNORECASE)
-
-
-async def call_openai_with_retry(client: AsyncOpenAI, *, max_retries: int = 4, **kwargs):
-    """Wrap an OpenAI chat completion call with retry on 429 (TPM rate limit).
-    Honours the wait hint in the error message; falls back to exponential backoff.
-    """
-    delay = 2.0
-    for attempt in range(max_retries):
-        try:
-            return await client.chat.completions.create(**kwargs)
-        except RateLimitError as e:
-            wait = None
-            msg = str(e)
-            m = _RETRY_AFTER_RE.search(msg)
-            if m:
-                try:
-                    wait = float(m.group(1)) + 0.5  # small buffer
-                except ValueError:
-                    wait = None
-            if wait is None:
-                wait = delay
-                delay = min(delay * 2, 30.0)
-            if attempt == max_retries - 1:
-                raise
-            logger.warning(
-                f"OpenAI 429 (attempt {attempt + 1}/{max_retries}); sleeping {wait:.1f}s"
-            )
-            await asyncio.sleep(wait)
-    # Unreachable but keeps type checkers happy
-    raise HTTPException(status_code=503, detail="OpenAI rate-limit retries exhausted")
-
-
-def _ai_user_ids(current_user: Optional[dict]) -> tuple[str, str]:
-    if not current_user:
-        return "system", "default"
-    uid = current_user.get("id") or current_user.get("user_id") or "system"
-    cid = current_user.get("company_id") or current_user.get("organization_id") or "default"
-    return str(uid), str(cid)
-
-
-def _record_openai_response_usage(
-    response,
-    *,
-    user_id: str,
-    company_id: str,
-    endpoint: str,
-    model: str,
-) -> None:
-    usage = getattr(response, "usage", None)
-    if not usage:
-        return
-    record_ai_tokens(
-        user_id=user_id,
-        company_id=company_id,
-        endpoint=endpoint,
-        prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
-        completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
-        model=model,
-        feature=endpoint,
-    )
-
-
-async def guarded_openai_create(
-    client: AsyncOpenAI,
-    *,
-    user_id: str,
-    company_id: str,
-    endpoint: str,
-    max_retries: int = 1,
-    **kwargs,
-):
-    """Cost-guarded OpenAI chat completion (optional retry for rate limits)."""
-    guard_ai_request(user_id=user_id, company_id=company_id, endpoint=endpoint)
-    model = kwargs.get("model", "gpt-4o")
-    if max_retries > 1:
-        response = await call_openai_with_retry(client, max_retries=max_retries, **kwargs)
-    else:
-        response = await client.chat.completions.create(**kwargs)
-    _record_openai_response_usage(
-        response,
-        user_id=user_id,
-        company_id=company_id,
-        endpoint=endpoint,
-        model=str(model),
-    )
-    return response
 
 # ============= Models =============
 
@@ -224,8 +120,6 @@ async def get_ai_suggestions(
     except Exception as e:
         logger.warning(f"Cache lookup failed (non-fatal): {e}")
 
-    client = get_openai_client()
-    
     # Prepare data in minimal format
     fm_list = [
         {"id": fm.get("id"), "name": fm.get("failure_mode"), "category": fm.get("category")}
@@ -261,9 +155,8 @@ Return JSON:
 }}"""
 
     try:
-        uid, cid = _ai_user_ids(current_user)
-        response = await guarded_openai_create(
-            client,
+        uid, cid = user_context(current_user)
+        response = await chat_completion_response(
             user_id=uid,
             company_id=cid,
             endpoint="ai_fm_suggestions.failure_modes",
@@ -549,8 +442,6 @@ async def get_equipment_type_mapping_suggestions(
     except Exception as e:
         logger.warning(f"Mapping cache lookup failed (non-fatal): {e}")
 
-    client = get_openai_client()
-
     et_list = [{"id": et.id, "name": et.name, "discipline": et.discipline or ""} for et in equipment_types]
     node_list = [
         {
@@ -597,9 +488,8 @@ Return JSON:
 If no equipment_type fits a node with confidence >= 0.70, set its best_match to null and alternatives to []."""
 
     try:
-        uid, cid = _ai_user_ids(current_user)
-        response = await guarded_openai_create(
-            client,
+        uid, cid = user_context(current_user)
+        response = await chat_completion_response(
             user_id=uid,
             company_id=cid,
             endpoint="ai_fm_suggestions.equipment_type_mappings",
@@ -805,8 +695,6 @@ async def get_new_equipment_type_suggestions(
     except Exception as e:
         logger.warning(f"New-types cache lookup failed (non-fatal): {e}")
 
-    client = get_openai_client()
-
     existing_list = [
         {"id": et.id, "name": et.name, "discipline": et.discipline or ""}
         for et in existing_types
@@ -843,9 +731,8 @@ Return JSON:
 }}"""
 
     try:
-        uid, cid = _ai_user_ids(current_user)
-        response = await guarded_openai_create(
-            client,
+        uid, cid = user_context(current_user)
+        response = await chat_completion_response(
             user_id=uid,
             company_id=cid,
             endpoint="ai_fm_suggestions.new_equipment_types",
@@ -1076,8 +963,6 @@ async def get_new_failure_mode_suggestions(
     except Exception as e:
         logger.warning(f"New-FM cache lookup failed (non-fatal): {e}")
 
-    client = get_openai_client()
-
     et_list = [
         {"id": et.id, "name": et.name, "discipline": et.discipline or ""}
         for et in equipment_types
@@ -1120,9 +1005,8 @@ Return JSON:
 }}"""
 
     try:
-        uid, cid = _ai_user_ids(current_user)
-        response = await guarded_openai_create(
-            client,
+        uid, cid = user_context(current_user)
+        response = await chat_completion_response(
             user_id=uid,
             company_id=cid,
             endpoint="ai_fm_suggestions.new_failure_modes",
@@ -1456,8 +1340,6 @@ async def improve_failure_mode_with_ai(
     except Exception as e:
         logger.warning(f"Improve-FM cache lookup failed (non-fatal): {e}")
 
-    client = get_openai_client()
-
     # Shrink the catalog so each request stays under ~3k prompt tokens (vs ~5k before).
     # Priority: 1) existing ET ids already on the FM, 2) ETs sharing the FM's discipline.
     fm_discipline = (fm.category or "").strip().lower()
@@ -1520,9 +1402,8 @@ Return JSON:
 }}"""
 
     try:
-        uid, cid = _ai_user_ids(current_user)
-        response = await guarded_openai_create(
-            client,
+        uid, cid = user_context(current_user)
+        response = await chat_completion_response(
             user_id=uid,
             company_id=cid,
             endpoint="ai_fm_suggestions.improve_failure_mode",
@@ -1842,8 +1723,6 @@ async def review_action_disciplines(
     if len(request.actions) > 60:
         raise HTTPException(status_code=400, detail="Send at most 60 actions per batch.")
 
-    client = get_openai_client()
-
     payload = [
         {
             "i": idx,
@@ -1869,9 +1748,8 @@ Actions:
 Return JSON: {{"results": [{{"i": 0, "discipline": "mechanical", "reason": "..."}}]}}"""
 
     try:
-        uid, cid = _ai_user_ids(current_user)
-        response = await guarded_openai_create(
-            client,
+        uid, cid = user_context(current_user)
+        response = await chat_completion_response(
             user_id=uid,
             company_id=cid,
             endpoint="ai_fm_suggestions.review_action_disciplines",
@@ -2048,7 +1926,6 @@ async def find_similar_failure_modes(
             skipped_reason="no candidate clusters",
         )
 
-    client = get_openai_client()
     et_label = request.equipment_type_name or request.equipment_type_id
 
     all_groups: List[SimilarGroup] = []
@@ -2076,9 +1953,8 @@ async def find_similar_failure_modes(
             "in at most ONE group — never overlap."
         )
         try:
-            uid, cid = _ai_user_ids(current_user)
-            resp = await guarded_openai_create(
-                client,
+            uid, cid = user_context(current_user)
+            resp = await chat_completion_response(
                 user_id=uid,
                 company_id=cid,
                 endpoint="ai_fm_suggestions.find_similar_failure_modes",

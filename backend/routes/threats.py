@@ -8,6 +8,7 @@ import uuid
 import logging
 from database import db, failure_modes_service, efm_service, installation_filter
 from auth import get_current_user
+from services.background_jobs import schedule_tracked_job
 from models.api_models import ThreatResponse, ThreatUpdate
 from failure_modes import FAILURE_MODES_LIBRARY
 from services.threat_score_service import calculate_rank, update_all_ranks, recalculate_threat_scores_for_asset, recalculate_threat_scores_for_failure_mode, propagate_risk_to_linked_entities
@@ -746,15 +747,18 @@ async def update_threat(
         updated["risk_score"] = int(updated["risk_score"])
     # Trigger auto-translation if user-facing text changed
     if any(k in update_data for k in ("title", "description")):
-        background_tasks.add_task(
-            translate_observation,
-            threat_id,
-            {
-                "title": updated.get("title") or updated.get("name", ""),
-                "description": updated.get("description", "") or "",
-            },
-            current_user["id"],
-        )
+                schedule_tracked_job(
+                    background_tasks,
+                    "translate_observation",
+                    translate_observation,
+                    threat_id,
+                    {
+                        "title": updated.get("title") or updated.get("name", ""),
+                        "description": updated.get("description", "") or "",
+                    },
+                    current_user["id"],
+                    user_id=current_user["id"],
+                )
     return updated
 
 @router.delete("/threats/{threat_id}")
