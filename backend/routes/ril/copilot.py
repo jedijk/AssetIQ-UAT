@@ -59,6 +59,26 @@ async def query_copilot(
     return response
 
 
+@router.get("/context/{equipment_id}", response_model=dict)
+async def get_equipment_reliability_context(
+    equipment_id: str,
+    refresh: bool = False,
+    current_user: dict = Depends(_ril_read),
+):
+    """Reliability graph + failure modes + open work bundle for copilot UIs."""
+    from services.reliability_context_service import ReliabilityContextService
+
+    owner_id = current_user.get("owner_id") or current_user.get("id")
+    svc = ReliabilityContextService()
+    ctx = await svc.get_context(
+        equipment_id,
+        owner_id,
+        user=current_user,
+        use_cache=not refresh,
+    )
+    return {"success": True, "context": ctx}
+
+
 @router.get("/suggestions", response_model=dict)
 async def get_query_suggestions(
     current_user: dict = Depends(_ril_read)

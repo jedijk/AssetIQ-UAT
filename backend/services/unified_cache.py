@@ -42,6 +42,7 @@ CACHE_TTL = {
     "users_list": 120,
     "dashboard": 60,
     "my_tasks": 30,
+    "work_items": 30,
 }
 
 

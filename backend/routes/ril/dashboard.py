@@ -77,10 +77,13 @@ async def get_executive_dashboard(
     - Trend indicators
     """
     from database import db
+    from services.executive_reliability_kpis import compute_executive_reliability_kpis
+
     owner_id = current_user.get("owner_id") or current_user.get("id")
     service = get_ril_service()
     
     stats = await service.get_dashboard_stats(owner_id)
+    reliability_kpis = await compute_executive_reliability_kpis(owner_id)
     
     # Calculate reliability score
     # Based on ratio of resolved cases, low alert volume, few predictions at risk
@@ -100,9 +103,7 @@ async def get_executive_dashboard(
         "overall_health_score": {"$lt": 70}
     })
 
-    open_threats = await db.threats.count_documents({
-        "status": {"$in": ["Open", "open", "In Progress", "in_progress"]},
-    })
+    open_threats = reliability_kpis.get("open_threats", 0)
 
     equipment_levels = ["equipment_unit", "equipment", "subunit", "maintainable_item", "unit"]
     total_equipment = await db.equipment_nodes.count_documents({"level": {"$in": equipment_levels}})
@@ -156,6 +157,9 @@ async def get_executive_dashboard(
         "risk_exposure": at_risk_count,
         "predicted_failures": at_risk_count,  # Equipment with low health score
         "open_threats": open_threats,
+        "high_risk_threats": reliability_kpis.get("high_risk_threats", 0),
+        "overdue_pm": reliability_kpis.get("overdue_pm", {}),
+        "mtbf_proxy": reliability_kpis.get("mtbf_proxy", {}),
         "strategy_coverage_pct": strategy_coverage_pct,
         "reliability_edges_total": reliability_edges_total,
         "open_cases": stats.get("open_cases", 0),

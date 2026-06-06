@@ -262,6 +262,29 @@ export default function RILDashboardPage() {
             color="orange"
           />
           <KPICard
+            title="Overdue PM"
+            value={exec.overdue_pm?.total ?? 0}
+            subtitle={`Scheduled: ${exec.overdue_pm?.scheduled_tasks ?? 0} | Instances: ${exec.overdue_pm?.task_instances ?? 0}`}
+            icon={Clock}
+            color="red"
+            data-testid="ril-kpi-overdue-pm"
+          />
+          <KPICard
+            title="MTBF Proxy"
+            value={exec.mtbf_proxy?.fleet_mean_days != null ? `${exec.mtbf_proxy.fleet_mean_days}d` : "—"}
+            subtitle={`${exec.mtbf_proxy?.sample_equipment_count ?? 0} assets · ${exec.mtbf_proxy?.window_days ?? 90}d window`}
+            icon={TrendingUp}
+            color="green"
+            data-testid="ril-kpi-mtbf-proxy"
+          />
+          <KPICard
+            title="High-Risk Threats"
+            value={exec.high_risk_threats ?? 0}
+            subtitle="Critical / high risk level"
+            icon={AlertTriangle}
+            color="orange"
+          />
+          <KPICard
             title="Strategy Coverage"
             value={exec.strategy_coverage_pct != null ? `${exec.strategy_coverage_pct}%` : "—"}
             subtitle="Equipment with maintenance strategy"

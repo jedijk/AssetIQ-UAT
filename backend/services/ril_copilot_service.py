@@ -76,6 +76,23 @@ class ReliabilityCopilotService:
         
         # Gather relevant data based on intent
         data = await self._gather_data(owner_id, intent, query, equipment_id)
+
+        # Enrich with reliability graph + FM + open work when equipment is known
+        equipment = data.get("equipment")
+        eq_id = equipment_id or (equipment.get("id") if isinstance(equipment, dict) else None)
+        if eq_id:
+            try:
+                from services.reliability_context_service import (
+                    ReliabilityContextService,
+                    format_context_for_prompt,
+                )
+                ctx_svc = ReliabilityContextService(self.db)
+                uid = (current_user or {}).get("id") or owner_id
+                reliability_ctx = await ctx_svc.get_context(eq_id, uid, user=current_user)
+                data["reliability_context"] = reliability_ctx
+                data["reliability_context_summary"] = format_context_for_prompt(reliability_ctx)
+            except Exception as exc:
+                logger.warning("ReliabilityContextService enrichment failed: %s", exc)
         
         # Generate AI response
         response = await self._generate_response(
@@ -432,6 +449,10 @@ Please provide a helpful response to the query based on the available data."""
                     if p.get("predictions"):
                         for fp in p["predictions"][:2]:
                             lines.append(f"    • {fp.get('failure_mode')}: {fp.get('probability', 0)*100:.0f}% probability")
+
+        if data.get("reliability_context_summary"):
+            lines.append("\nReliability graph context:")
+            lines.append(data["reliability_context_summary"])
         
         return "\n".join(lines) if lines else "No relevant data available."
     

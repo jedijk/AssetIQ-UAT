@@ -278,3 +278,48 @@ def test_maintenance_strategy_v2_reads_require_library_read():
     assert "Depends(_library_read)" in source[idx: idx + 250]
     idx_write = source.index("async def create_equipment_type_strategy")
     assert "Depends(_library_write)" in source[idx_write: idx_write + 250]
+
+
+def test_reliability_context_service_exists():
+    source = (
+        Path(__file__).resolve().parents[1] / "services" / "reliability_context_service.py"
+    ).read_text()
+    assert "class ReliabilityContextService" in source
+    assert "build_reliability_context" in source
+    assert "format_context_for_prompt" in source
+
+
+def test_work_item_projection_service_exists():
+    source = (
+        Path(__file__).resolve().parents[1] / "services" / "work_item_projection.py"
+    ).read_text()
+    assert "get_projected_work_items" in source
+    assert "work_item_projections" in source
+
+
+def test_oidc_routes_mounted():
+    init_source = (Path(__file__).resolve().parents[1] / "routes" / "__init__.py").read_text()
+    assert "auth_oidc_router" in init_source
+    oidc_source = (Path(__file__).resolve().parents[1] / "routes" / "auth_oidc.py").read_text()
+    assert "/auth/oidc/config" in oidc_source or 'prefix="/auth/oidc"' in oidc_source
+
+
+def test_audit_log_export_endpoint():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "audit_log.py").read_text()
+    assert "async def export_audit_log" in source
+    assert "/audit-log/export" in source
+
+
+def test_copilot_context_endpoint():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "ril" / "copilot.py").read_text()
+    assert "get_equipment_reliability_context" in source
+    assert "ReliabilityContextService" in source
+
+
+def test_executive_kpis_service_exists():
+    source = (
+        Path(__file__).resolve().parents[1] / "services" / "executive_reliability_kpis.py"
+    ).read_text()
+    assert "compute_executive_reliability_kpis" in source
+    assert "mtbf_proxy" in source
+    assert "overdue_pm" in source

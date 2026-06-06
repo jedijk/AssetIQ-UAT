@@ -2,6 +2,7 @@
 Route module registry. Import all routers here.
 """
 from routes.auth import router as auth_router
+from routes.auth_oidc import router as auth_oidc_router
 from routes.chat import router as chat_router
 from routes.threats import router as threats_router
 from routes.stats import router as stats_router
@@ -54,6 +55,7 @@ from routes.work_items import router as work_items_router
 
 all_routers = [
     auth_router,
+    auth_oidc_router,
     chat_router,
     threats_router,
     stats_router,

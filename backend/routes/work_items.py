@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, Query, Body
 
 from auth import require_permission
 from routes import my_tasks as my_tasks_routes
+from services.work_item_projection import get_projected_work_items, invalidate_user_projections
 from services.work_item_query import (
     fetch_unbridged_maintenance_work_items,
     fetch_work_items,
@@ -30,19 +31,22 @@ async def list_work_items(
     equipment_id: Optional[str] = None,
     status: Optional[str] = None,
     discipline: Optional[str] = None,
+    refresh: bool = Query(False, description="Bypass projection cache"),
     current_user: dict = Depends(_tasks_read),
 ):
     """Unified work-item list for My Tasks and scheduler views."""
     user_id = current_user.get("id") or ""
-    items = await fetch_work_items(
+    result = await get_projected_work_items(
         user_id,
         filter_name=filter,
         date=date,
         equipment_id=equipment_id,
         status=status,
         discipline=discipline,
+        user=current_user,
+        force_refresh=refresh,
     )
-    return {"items": items, "count": len(items), "filter": filter}
+    return result
 
 
 @router.get("/maintenance/unbridged")
@@ -73,7 +77,9 @@ async def execute_adhoc_plan(
     plan_id: str,
     current_user: dict = Depends(_tasks_write),
 ):
-    return await my_tasks_routes.execute_adhoc_plan(plan_id, current_user=current_user)
+    result = await my_tasks_routes.execute_adhoc_plan(plan_id, current_user=current_user)
+    await invalidate_user_projections(current_user.get("id") or "")
+    return result
 
 
 @router.get("/{task_id}")
@@ -89,7 +95,9 @@ async def start_work_item(
     task_id: str,
     current_user: dict = Depends(_tasks_write),
 ):
-    return await my_tasks_routes.start_my_task(task_id, current_user=current_user)
+    result = await my_tasks_routes.start_my_task(task_id, current_user=current_user)
+    await invalidate_user_projections(current_user.get("id") or "")
+    return result
 
 
 @router.post("/actions/{action_id}/start")
@@ -97,7 +105,9 @@ async def start_work_item_action(
     action_id: str,
     current_user: dict = Depends(_tasks_write),
 ):
-    return await my_tasks_routes.start_my_action(action_id, current_user=current_user)
+    result = await my_tasks_routes.start_my_action(action_id, current_user=current_user)
+    await invalidate_user_projections(current_user.get("id") or "")
+    return result
 
 
 @router.post("/actions/{action_id}/complete")
@@ -106,6 +116,8 @@ async def complete_work_item_action(
     data: Optional[dict] = Body(default=None),
     current_user: dict = Depends(_tasks_write),
 ):
-    return await my_tasks_routes.complete_my_action(
+    result = await my_tasks_routes.complete_my_action(
         action_id, data=data, current_user=current_user
     )
+    await invalidate_user_projections(current_user.get("id") or "")
+    return result

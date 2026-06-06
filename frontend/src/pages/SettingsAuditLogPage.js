@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Shield, ArrowLeft, RefreshCw, Search, Filter, User, Clock, Calendar as CalendarIcon } from "lucide-react";
+import { Shield, ArrowLeft, RefreshCw, Search, Filter, User, Clock, Calendar as CalendarIcon, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -142,6 +142,27 @@ export default function SettingsAuditLogPage() {
     }
   }
 
+  async function exportLog(format) {
+    if (!isAllowed) return;
+    try {
+      const res = await api.get("/audit-log/export", {
+        params: { ...params, format, limit: 5000 },
+        responseType: "blob",
+      });
+      const blob = new Blob([res.data], {
+        type: format === "csv" ? "text/csv" : "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `audit-log-export.${format}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e?.response?.data?.detail || e?.message || "Export failed");
+    }
+  }
+
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,6 +209,14 @@ export default function SettingsAuditLogPage() {
           <Button variant="outline" onClick={() => navigate(-1)} className="gap-2">
             <ArrowLeft className="w-4 h-4" />
             Back
+          </Button>
+          <Button variant="outline" onClick={() => exportLog("csv")} className="gap-2">
+            <Download className="w-4 h-4" />
+            CSV
+          </Button>
+          <Button variant="outline" onClick={() => exportLog("json")} className="gap-2">
+            <Download className="w-4 h-4" />
+            JSON
           </Button>
           <Button onClick={load} disabled={loading} className="gap-2">
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />

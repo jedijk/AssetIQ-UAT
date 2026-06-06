@@ -358,6 +358,16 @@ INDEX_DEFINITIONS = {
         {"keys": [("source_type", 1), ("source_id", 1)]},
         {"keys": [("target_type", 1), ("target_id", 1)]},
     ],
+    "work_item_projections": [
+        {"keys": [("cache_key", 1)], "unique": True},
+        {"keys": [("tenant_id", 1), ("user_id", 1), ("updated_at", -1)]},
+        {"keys": [("expires_at", 1)], "expireAfterSeconds": 0},
+    ],
+    "reliability_context_snapshots": [
+        {"keys": [("equipment_id", 1)]},
+        {"keys": [("tenant_id", 1), ("equipment_id", 1)]},
+        {"keys": [("expires_at", 1)], "expireAfterSeconds": 0},
+    ],
     "audit_log": [
         {"keys": [("ts", -1)]},
         {"keys": [("actor.id", 1), ("ts", -1)]},
