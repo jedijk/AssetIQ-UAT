@@ -65,6 +65,7 @@ const SettingsPrivacyPage = lazy(() => import("./pages/SettingsPrivacyPage"));
 const SettingsDeletionRequestsPage = lazy(() => import("./pages/SettingsDeletionRequestsPage"));
 const SettingsConsentManagementPage = lazy(() => import("./pages/SettingsConsentManagementPage"));
 const SettingsTranslationsPage = lazy(() => import("./pages/SettingsTranslationsPage"));
+const SettingsDisciplinesConfiguratorPage = lazy(() => import("./pages/SettingsDisciplinesConfiguratorPage"));
 const SettingsAuditLogPage = lazy(() => import("./pages/SettingsAuditLogPage"));
 const GranulometryPage = lazy(() => import("./pages/GranulometryPage"));
 
@@ -469,6 +470,7 @@ function App() {
                   <Route path="deletion-requests" element={<Suspense fallback={<RouteFallback />}><SettingsDeletionRequestsPage /></Suspense>} />
                   <Route path="consent-management" element={<Suspense fallback={<RouteFallback />}><SettingsConsentManagementPage /></Suspense>} />
                   <Route path="translations" element={<Suspense fallback={<RouteFallback />}><SettingsTranslationsPage /></Suspense>} />
+                  <Route path="disciplines" element={<Suspense fallback={<RouteFallback />}><SettingsDisciplinesConfiguratorPage /></Suspense>} />
                 </Route>
                 
                 <Route path="user-statistics" element={<Suspense fallback={<RouteFallback />}><UserStatisticsPage /></Suspense>} />

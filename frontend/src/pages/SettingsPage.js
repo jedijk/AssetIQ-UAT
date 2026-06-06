@@ -19,6 +19,7 @@ import {
   ScrollText,
   Trash2,
   Tag,
+  Wrench,
   Languages
 } from "lucide-react";
 import { Button } from "../components/ui/button";
@@ -135,6 +136,13 @@ const SETTINGS_SECTIONS = [
     path: "/settings/labels",
     roles: ["owner"],
     desktopOnly: true
+  },
+  {
+    id: "disciplines",
+    sectionKey: "disciplines",
+    icon: Wrench,
+    path: "/settings/disciplines",
+    roles: ["owner", "admin"]
   },
   {
     id: "translations",
