@@ -1,6 +1,126 @@
 import React from "react";
+import {
+  Users,
+  Search,
+  Shield,
+  ShieldCheck,
+  Eye,
+  Edit,
+  X,
+  Check,
+  RefreshCw,
+  Camera,
+  Trash2,
+  AlertCircle,
+  UserPlus,
+  Bell,
+  Factory,
+  KeyRound,
+  Lock,
+  PlayCircle,
+  ArrowLeft,
+  Smartphone,
+  Briefcase,
+  Building2,
+  Clock,
+  MoreVertical,
+  UserCog,
+  UserX,
+  UserCheck,
+} from "lucide-react";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
+import { Badge } from "../../components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../../components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "../../components/ui/dialog";
+import { Label } from "../../components/ui/label";
+import ImageEditor from "../../components/ImageEditor";
+import { roleIcons, roleColors, UserAvatar } from "./userManagementShared";
 
-export function UserManagementMobileView(props) {
+export function UserManagementMobileView({
+  navigate,
+  refetch,
+  search,
+  setSearch,
+  roleFilter,
+  setRoleFilter,
+  simpleModeFilter,
+  setSimpleModeFilter,
+  simpleModeCount,
+  users,
+  usersLoading,
+  displayUsers,
+  pendingData,
+  roles,
+  isOwner,
+  currentUser,
+  t,
+  formatDate,
+  avatarUrls,
+  editingUser,
+  setEditingUser,
+  editForm,
+  setEditForm,
+  changeRoleUser,
+  setChangeRoleUser,
+  selectedRole,
+  setSelectedRole,
+  approvalDialogUser,
+  setApprovalDialogUser,
+  approvalAction,
+  setApprovalAction,
+  approvalRole,
+  setApprovalRole,
+  approvalInstallations,
+  setApprovalInstallations,
+  rejectionReason,
+  setRejectionReason,
+  approvalMutation,
+  deleteConfirmUser,
+  setDeleteConfirmUser,
+  deleteUserMutation,
+  editorOpen,
+  editorImage,
+  fileInputRef,
+  handleAvatarUpload,
+  handleEditProfile,
+  handleChangeRole,
+  handleConfirmRoleChange,
+  handleSaveProfile,
+  handleEditorClose,
+  handleEditorSave,
+  handleFileChange,
+  handleOpenSetPassword,
+  resetPasswordMutation,
+  resetIntroMutation,
+  resetConsentMutation,
+  updateProfileMutation,
+  updateRoleMutation,
+  updateStatusMutation,
+  installations,
+  setInstallationDialogUser,
+  setSelectedInstallations,
+  setPasswordDialog,
+  }) {
   return (
     <>
       <div className="min-h-screen bg-slate-50 pb-20" data-testid="user-management-page-mobile">
@@ -599,10 +719,6 @@ export function UserManagementMobileView(props) {
           className="hidden"
         />
       </div>
-    );
-  }
-
-  // Desktop Layout
     </>
   );
 }
