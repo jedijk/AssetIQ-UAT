@@ -23,7 +23,7 @@ const JOB_POLL_TIMEOUT_MS = 5 * 60 * 1000;
 
 export async function pollSchedulerJob(jobId, { intervalMs = JOB_POLL_INTERVAL_MS, timeoutMs = JOB_POLL_TIMEOUT_MS } = {}) {
   const started = Date.now();
-  while Date.now() - started < timeoutMs) {
+  while (Date.now() - started < timeoutMs) {
     const response = await api.get(`/maintenance-scheduler/jobs/${jobId}`);
     const job = response.data;
     const status = job?.status;
