@@ -1430,6 +1430,16 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
           </div>
         </div>
         
+        {hasStrategy && strategy?.strategy_needs_apply && (
+          <div
+            className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+            data-testid="strategy-needs-apply-banner"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+            <p className="font-medium">{t("maintenance.strategyNeedsApplyBanner")}</p>
+          </div>
+        )}
+
         {/* Schedule Manager */}
         <MaintenanceScheduleManager equipmentType={equipmentType} />
       </div>
@@ -1453,6 +1463,18 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
           </TabsList>
         </Tabs>
       </div>
+
+      {hasStrategy && strategy?.strategy_needs_apply && (
+        <div
+          className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          data-testid="strategy-needs-apply-banner"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <div>
+            <p className="font-medium">{t("maintenance.strategyNeedsApplyBanner")}</p>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between">

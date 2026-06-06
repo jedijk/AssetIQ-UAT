@@ -21,6 +21,63 @@ from models.maintenance_strategy_v2 import (
 
 logger = logging.getLogger(__name__)
 
+
+async def mark_strategy_needs_apply(equipment_type_id: str) -> None:
+    """Persist flag that schedule/programs are out of sync with strategy edits."""
+    await db.equipment_type_strategies.update_one(
+        {"equipment_type_id": equipment_type_id},
+        {
+            "$set": {
+                "strategy_needs_apply": True,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+        },
+    )
+
+
+async def clear_strategy_needs_apply(
+    equipment_type_id: str,
+    *,
+    applied_version: Optional[str] = None,
+) -> None:
+    """Clear apply flag after successful Apply Strategy."""
+    fields: Dict[str, Any] = {
+        "strategy_needs_apply": False,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "last_strategy_applied_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if applied_version:
+        fields["last_applied_strategy_version"] = applied_version
+    await db.equipment_type_strategies.update_one(
+        {"equipment_type_id": equipment_type_id},
+        {"$set": fields},
+    )
+
+
+async def enrich_strategy_needs_apply(
+    equipment_type_id: str,
+    strategy: Dict[str, Any],
+) -> bool:
+    """Return persisted flag, optionally augmented by version drift on v2 programs."""
+    if strategy.get("strategy_needs_apply"):
+        return True
+    strategy_version = strategy.get("version")
+    if not strategy_version:
+        return False
+    drift = await db.maintenance_programs_v2.find_one(
+        {
+            "equipment_type_id": equipment_type_id,
+            "strategy_tasks": {"$gt": 0},
+            "$or": [
+                {"source_strategy_version": {"$ne": strategy_version}},
+                {"source_strategy_version": None},
+            ],
+        },
+        {"_id": 0, "id": 1},
+    )
+    return drift is not None
+
+
 def calculate_frequency_for_criticality(
     frequency_matrix: CriticalityFrequency,
     criticality: CriticalityLevel

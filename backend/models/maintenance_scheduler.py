@@ -1,5 +1,9 @@
 """
 Maintenance Scheduler & Planning Engine Models
+
+Legacy ``maintenance_programs`` (flat rows) is deprecated for new work.
+Canonical programs live in ``maintenance_programs_v2``; the scheduler loads
+v2 tasks via ``services.scheduler_program_source`` with legacy fallback.
 """
 from pydantic import BaseModel, Field
 from typing import Optional, List

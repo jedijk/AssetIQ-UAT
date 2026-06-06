@@ -121,6 +121,7 @@ INDEX_DEFINITIONS = {
         # Compound index for common filtered queries
         {"keys": [("status", 1), ("scheduled_date", 1)]},
         {"keys": [("equipment_id", 1), ("status", 1)]},
+        {"keys": [("scheduled_task_id", 1)]},
     ],
     
     # Form templates

@@ -228,6 +228,13 @@ async def _apply_strategy_to_equipment_impl(
         time.perf_counter() - t0,
     )
 
+    from routes.maintenance_strategy_v2.strategy_helpers import clear_strategy_needs_apply
+
+    await clear_strategy_needs_apply(
+        equipment_type_id,
+        applied_version=strategy_version,
+    )
+
     return {
         "message": f"Strategy applied to {len(equipment_list)} equipment",
         "equipment_count": len(equipment_list),

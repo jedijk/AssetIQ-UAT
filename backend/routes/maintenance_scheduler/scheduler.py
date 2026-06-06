@@ -113,19 +113,27 @@ async def schedule_program(program: dict, horizon_days: int = DEFAULT_HORIZON_DA
         await db.scheduled_tasks.insert_many(new_tasks)
 
     if last_created_iso:
-        await db.maintenance_programs.update_one(
-            {"id": program_id},
-            {"$set": {"last_scheduled_date": today_str}},
-        )
+        if program.get("program_source") == "v2" and program.get("v2_program_id"):
+            await db.maintenance_programs_v2.update_one(
+                {"id": program["v2_program_id"]},
+                {"$set": {"last_scheduled_date": today_str}},
+            )
+        elif program.get("program_source") != "v2":
+            await db.maintenance_programs.update_one(
+                {"id": program_id},
+                {"$set": {"last_scheduled_date": today_str}},
+            )
 
     return created_ids
 
 
 async def schedule_programs_for_equipment_type(equipment_type_id: str, horizon_days: int = DEFAULT_HORIZON_DAYS) -> int:
     """Generate scheduled tasks for all active programs of a given equipment type."""
+    from services.scheduler_program_source import load_schedulable_programs
+
+    programs = await load_schedulable_programs(equipment_type_id=equipment_type_id)
     total = 0
-    cursor = db.maintenance_programs.find({"equipment_type_id": equipment_type_id, "is_active": True})
-    async for program in cursor:
+    for program in programs:
         created = await schedule_program(program, horizon_days)
         total += len(created)
     return total
@@ -141,9 +149,9 @@ async def schedule_programs_for_equipment(equipment_ids: List[str], horizon_days
     if not equipment_ids:
         return 0
     import asyncio as _asyncio
-    programs = await db.maintenance_programs.find(
-        {"equipment_id": {"$in": equipment_ids}, "is_active": True}
-    ).to_list(5000)
+    from services.scheduler_program_source import load_schedulable_programs
+
+    programs = await load_schedulable_programs(equipment_ids=equipment_ids)
     if not programs:
         return 0
     results = await _asyncio.gather(
@@ -195,10 +203,8 @@ async def run_scheduler(
         request = RunSchedulerRequest()
 
     from services.maintenance_program_service import MaintenanceProgramService
-    from services.maintenance_scheduler_sync import (
-        cleanup_schedules_without_strategy,
-        filter_schedulable_programs,
-    )
+    from services.maintenance_scheduler_sync import cleanup_schedules_without_strategy
+    from services.scheduler_program_source import load_schedulable_programs
 
     strategy_cleanup = await cleanup_schedules_without_strategy(
         equipment_type_id=request.equipment_type_id,
@@ -209,13 +215,10 @@ async def run_scheduler(
         schedule=False,
     )
 
-    query = {"is_active": True}
-    if request.equipment_type_id:
-        query["equipment_type_id"] = request.equipment_type_id
-
-    programs = await db.maintenance_programs.find(query).to_list(5000)
-    schedulable_programs = await filter_schedulable_programs(programs)
-    programs_skipped = len(programs) - len(schedulable_programs)
+    schedulable_programs = await load_schedulable_programs(
+        equipment_type_id=request.equipment_type_id,
+    )
+    programs_skipped = 0
 
     tasks_created = []
     horizon = request.planning_horizon_days or DEFAULT_HORIZON_DAYS

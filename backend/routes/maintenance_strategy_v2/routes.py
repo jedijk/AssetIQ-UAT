@@ -48,6 +48,8 @@ from routes.maintenance_strategy_v2.strategy_helpers import (
     refresh_failure_mode_strategy_from_library,
     lookup_library_failure_mode,
     log_strategy_audit,
+    enrich_strategy_needs_apply,
+    clear_strategy_needs_apply,
 )
 
 logger = logging.getLogger(__name__)
@@ -173,6 +175,9 @@ async def get_equipment_type_strategy(
     ).to_list(1000)
     equipment_with_strategy_applied = len(set([p.get("equipment_id") for p in programs_with_strategy if p.get("equipment_id")]))
     strategy["equipment_with_strategy_applied_count"] = equipment_with_strategy_applied
+    strategy["strategy_needs_apply"] = await enrich_strategy_needs_apply(
+        equipment_type_id, strategy
+    )
     
     # Optionally update the database with the enriched data
     if needs_update or strategy.get("active_failure_modes") != active_fms:
@@ -189,7 +194,8 @@ async def get_equipment_type_strategy(
         "strategy": strategy,
         "equipment_type_id": equipment_type_id,
         "exists": True,
-        "affected_equipment_count": affected_equipment_count
+        "affected_equipment_count": affected_equipment_count,
+        "strategy_needs_apply": strategy.get("strategy_needs_apply", False),
     }
 
 
@@ -370,6 +376,7 @@ async def update_equipment_type_strategy(
         "updated_by": current_user.get("user_id"),
         "changes": list(update_data.keys())
     }
+    update_data["strategy_needs_apply"] = True
     
     await db.equipment_type_strategies.update_one(
         {"equipment_type_id": equipment_type_id},

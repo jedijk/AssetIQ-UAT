@@ -118,6 +118,17 @@ async def _build_program_discipline_map(program_ids: List[str]) -> Dict[str, Opt
         if row.get("id"):
             out[row["id"]] = row.get("discipline")
 
+    # v2 task ids stored as maintenance_program_id on scheduled_tasks
+    v2_task_rows = await db.maintenance_programs_v2.find(
+        {"tasks.id": {"$in": unique_ids}},
+        {"_id": 0, "tasks.id": 1, "tasks.discipline": 1},
+    ).to_list(200)
+    for prog in v2_task_rows:
+        for task in prog.get("tasks") or []:
+            tid = task.get("id")
+            if tid in unique_ids and tid not in out:
+                out[tid] = task.get("discipline")
+
     missing = [pid for pid in unique_ids if pid not in out]
     if missing:
         legacy_rows = await db.maintenance_programs.find(

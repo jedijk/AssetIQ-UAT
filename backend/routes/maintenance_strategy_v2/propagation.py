@@ -486,7 +486,11 @@ async def _bump_strategy_version(
     await db.equipment_type_strategies.update_one(
         {"equipment_type_id": equipment_type_id},
         {
-            "$set": {"version": new_version, "updated_at": now},
+            "$set": {
+                "version": new_version,
+                "updated_at": now,
+                "strategy_needs_apply": True,
+            },
             "$push": {"version_history": entry},
         },
     )
