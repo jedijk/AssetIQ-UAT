@@ -593,7 +593,7 @@ export const AIReviewModal = ({ isOpen, onClose, sessionId, onComplete }) => {
                   {reviewing ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Analyzing...
+                      Review in progress...
                     </>
                   ) : (
                     <>
@@ -635,6 +635,11 @@ export const AIReviewModal = ({ isOpen, onClose, sessionId, onComplete }) => {
               <div className="flex flex-col items-center justify-center py-12">
                 <Loader2 className="w-8 h-8 text-purple-600 animate-spin mb-4" />
                 <p className="text-slate-500">Loading review results...</p>
+              </div>
+            ) : reviewing ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 text-purple-600 animate-spin mb-4" />
+                <p className="text-slate-500">Review in progress...</p>
               </div>
             ) : suggestions.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">

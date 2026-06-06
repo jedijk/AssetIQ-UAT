@@ -1,5 +1,30 @@
 import { api } from "../apiClient";
 
+const JOB_POLL_INTERVAL_MS = 2000;
+const JOB_POLL_TIMEOUT_MS = 5 * 60 * 1000;
+
+export async function pollPmImportJob(
+  jobId,
+  { intervalMs = JOB_POLL_INTERVAL_MS, timeoutMs = JOB_POLL_TIMEOUT_MS } = {}
+) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const response = await api.get(`/pm-import/jobs/${jobId}`);
+    const job = response.data;
+    const status = job?.status;
+    if (status === "completed") {
+      return job.result ?? job;
+    }
+    if (status === "failed" || status === "dead_letter") {
+      const err = new Error(job?.error || "PM import job failed");
+      err.job = job;
+      throw err;
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  throw new Error("PM import job timed out while waiting for background job");
+}
+
 /** User-facing PM import statuses: pending | applied | merged */
 export const resolvePmImportStatus = (task) => {
   if (!task) return "pending";
@@ -218,14 +243,34 @@ export const pmImportAPI = {
   // ============== AI REVIEW APIs ==============
 
   /**
-   * Run AI review on all accepted tasks in a session
-   * @param {string} sessionId 
+   * Run AI review on all accepted tasks in a session.
+   * Uses background job + polling by default; falls back to sync when no job_id returned.
+   * @param {string} sessionId
+   * @param {object} [options]
+   * @param {boolean} [options.runAsync=true]
+   * @param {object} [options.poll] - pollPmImportJob interval/timeout overrides
    * @returns {Promise<{suggestions: array, total_reviewed: number, message: string}>}
    */
-  runAIReview: async (sessionId) => {
-    const response = await api.post(`/pm-import/session/${sessionId}/ai-review`, {}, {
-      timeout: 180000, // 3 minute timeout for AI processing
-    });
+  runAIReview: async (sessionId, options = {}) => {
+    const runAsync = options.runAsync !== false;
+    const response = await api.post(
+      `/pm-import/session/${sessionId}/ai-review`,
+      {},
+      {
+        params: runAsync ? { run_async: true } : {},
+        timeout: 180000,
+      }
+    );
+    const data = response.data;
+
+    if (data?.job_id && data?.status === "pending") {
+      return pollPmImportJob(data.job_id, options.poll);
+    }
+    return data;
+  },
+
+  getJob: async (jobId) => {
+    const response = await api.get(`/pm-import/jobs/${jobId}`);
     return response.data;
   },
 

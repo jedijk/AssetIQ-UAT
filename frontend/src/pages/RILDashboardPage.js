@@ -185,7 +185,7 @@ export default function RILDashboardPage() {
   const isLoading = execLoading || intelLoading;
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950" data-testid="ril-dashboard">
       {/* Header */}
       <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-6 py-4">
         <div className="flex items-center justify-between">
@@ -194,7 +194,10 @@ export default function RILDashboardPage() {
               <Brain className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">
+              <h1
+                className="text-2xl font-bold text-zinc-900 dark:text-white"
+                data-testid="ril-dashboard-title"
+              >
                 Reliability Intelligence
               </h1>
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
@@ -225,7 +228,10 @@ export default function RILDashboardPage() {
 
       <div className="p-6 max-w-7xl mx-auto">
         {/* Executive KPIs */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6"
+          data-testid="ril-executive-kpis"
+        >
           <KPICard
             title="Reliability Score"
             value={exec.reliability_score?.toFixed(1) || "—"}
@@ -248,9 +254,23 @@ export default function RILDashboardPage() {
             color="red"
           />
           <KPICard
+            title="Open Threats"
+            value={exec.open_threats ?? 0}
+            subtitle="Active observations"
+            icon={Target}
+            color="orange"
+          />
+          <KPICard
+            title="Strategy Coverage"
+            value={exec.strategy_coverage_pct != null ? `${exec.strategy_coverage_pct}%` : "—"}
+            subtitle="Equipment with maintenance strategy"
+            icon={Layers}
+            color="purple"
+          />
+          <KPICard
             title="Predicted Failures"
             value={exec.predicted_failures || 0}
-            subtitle="Within 30 days"
+            subtitle="Low health score"
             icon={Zap}
             color="orange"
           />

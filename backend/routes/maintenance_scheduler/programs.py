@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 from auth import get_current_user, require_permission
 from models.maintenance_scheduler import ApplyStrategyRequest
 from services.maintenance_scheduler_sync import refresh_equipment_schedule
-from services.background_jobs import background_job_service, JobStatus
+from services.background_jobs import background_job_service, JobStatus, tenant_id_from_user
 from services.worker_config import use_external_background_worker
 
 router = APIRouter()
@@ -61,6 +61,7 @@ async def apply_strategy_to_equipment(
     use_async = request.run_async or len(request.equipment_ids) >= APPLY_STRATEGY_ASYNC_THRESHOLD
     if use_async:
         user_id = current_user.get("id") or current_user.get("user_id")
+        tenant_id = tenant_id_from_user(current_user)
         job_payload = {
             "equipment_type_id": equipment_type_id,
             "equipment_count": len(request.equipment_ids),
@@ -72,6 +73,7 @@ async def apply_strategy_to_equipment(
                 user_id=user_id,
                 payload=job_payload,
                 max_retries=1,
+                tenant_id=tenant_id,
             )
         else:
             job_id = await background_job_service.schedule_returning_job_id(
@@ -84,6 +86,7 @@ async def apply_strategy_to_equipment(
                 user_id=user_id,
                 payload=job_payload,
                 max_retries=1,
+                tenant_id=tenant_id,
             )
         return {
             "status": JobStatus.PENDING.value,

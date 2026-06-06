@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from database import db
+from services.db_monitoring import timed_find
 from services.task_instance_bridge import (
     STATUS_MAP,
     _build_default_assignees,
@@ -165,9 +166,8 @@ async def fetch_unbridged_maintenance_work_items(
     if query is None:
         return []
 
-    candidate_tasks = await db.scheduled_tasks.find(query, {"_id": 0}).sort(
-        "due_date", 1
-    ).to_list(MAX_UNBRIDGED_ITEMS * 2)
+    cursor = await timed_find(db.scheduled_tasks, query, {"_id": 0})
+    candidate_tasks = await cursor.sort("due_date", 1).to_list(MAX_UNBRIDGED_ITEMS * 2)
 
     if not candidate_tasks:
         return []
@@ -175,10 +175,12 @@ async def fetch_unbridged_maintenance_work_items(
     candidate_ids = [t.get("id") for t in candidate_tasks if t.get("id")]
     existing_set: set = set()
     if candidate_ids:
-        existing = await db.task_instances.find(
+        existing_cursor = await timed_find(
+            db.task_instances,
             {"scheduled_task_id": {"$in": candidate_ids}},
             {"_id": 0, "scheduled_task_id": 1},
-        ).to_list(len(candidate_ids))
+        )
+        existing = await existing_cursor.to_list(len(candidate_ids))
         existing_set = {e["scheduled_task_id"] for e in existing if e.get("scheduled_task_id")}
 
     default_assignees = await _build_default_assignees()

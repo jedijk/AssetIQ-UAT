@@ -19,7 +19,7 @@ import json
 from database import db
 from auth import get_current_user, require_permission
 from services.pm_import_service import PMImportService, normalize_pm_import_display_status
-from services.background_jobs import background_job_service, JobStatus
+from services.background_jobs import background_job_service, JobStatus, tenant_id_from_user
 from services.worker_config import use_external_background_worker
 
 _library_write = require_permission("library:write")
@@ -908,6 +908,24 @@ async def list_all_tasks(
     }
 
 
+@router.get("/jobs/{job_id}")
+async def get_pm_import_job(
+    job_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Poll status of a PM Import background job (e.g. ai-review)."""
+    job = await background_job_service.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.get("user_id") and job["user_id"] != (
+        current_user.get("id") or current_user.get("user_id")
+    ):
+        role = current_user.get("role")
+        if role not in ("owner", "admin"):
+            raise HTTPException(status_code=403, detail="Not allowed to view this job")
+    return job
+
+
 # ============== AI REVIEW ROUTES ==============
 
 @router.post("/session/{session_id}/ai-review")
@@ -930,6 +948,7 @@ async def ai_review_session(
     """
     if run_async or use_external_background_worker():
         user_id = current_user.get("id") or current_user.get("user_id")
+        tenant_id = tenant_id_from_user(current_user)
         payload = {"session_id": session_id}
         if use_external_background_worker():
             job_id = await background_job_service.enqueue_for_external_worker(
@@ -937,6 +956,7 @@ async def ai_review_session(
                 user_id=user_id,
                 payload=payload,
                 max_retries=1,
+                tenant_id=tenant_id,
             )
         else:
             async def _run_review(session_id: str) -> dict:
@@ -951,6 +971,7 @@ async def ai_review_session(
                 user_id=user_id,
                 payload=payload,
                 max_retries=1,
+                tenant_id=tenant_id,
             )
         return {
             "status": JobStatus.PENDING.value,

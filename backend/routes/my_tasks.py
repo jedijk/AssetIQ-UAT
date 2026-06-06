@@ -11,6 +11,7 @@ from datetime import datetime, timezone, timedelta
 from database import db
 from auth import get_current_user
 from bson import ObjectId
+from services.db_monitoring import timed_find
 from services.work_item_query import fetch_unbridged_maintenance_work_items
 
 logger = logging.getLogger(__name__)
@@ -292,7 +293,8 @@ async def get_my_tasks(
         query["status"] = status
     
     # Fetch tasks
-    tasks_cursor = db.task_instances.find(query).sort([
+    tasks_cursor = await timed_find(db.task_instances, query)
+    tasks_cursor = tasks_cursor.sort([
         ("status", 1),  # overdue first
         ("priority", 1),  # critical/high priority first
         ("due_date", 1)  # earliest due date first

@@ -98,6 +98,26 @@ async def get_executive_dashboard(
         "owner_id": owner_id,
         "overall_health_score": {"$lt": 70}
     })
+
+    open_threats = await db.threats.count_documents({
+        "status": {"$in": ["Open", "open", "In Progress", "in_progress"]},
+    })
+
+    equipment_levels = ["equipment_unit", "equipment", "subunit", "maintainable_item", "unit"]
+    total_equipment = await db.equipment_nodes.count_documents({"level": {"$in": equipment_levels}})
+    strategy_equipment_types = [
+        et for et in await db.equipment_type_strategies.distinct("equipment_type_id") if et
+    ]
+    if strategy_equipment_types:
+        equipment_with_strategy = await db.equipment_nodes.count_documents({
+            "level": {"$in": equipment_levels},
+            "equipment_type_id": {"$in": strategy_equipment_types},
+        })
+    else:
+        equipment_with_strategy = 0
+    strategy_coverage_pct = round(
+        equipment_with_strategy / max(total_equipment, 1) * 100, 1
+    )
     
     # Get cases by status
     cases_by_status = {}
@@ -132,6 +152,8 @@ async def get_executive_dashboard(
         "reliability_score": round(reliability_score, 1),
         "risk_exposure": at_risk_count,
         "predicted_failures": at_risk_count,  # Equipment with low health score
+        "open_threats": open_threats,
+        "strategy_coverage_pct": strategy_coverage_pct,
         "open_cases": stats.get("open_cases", 0),
         "p1_cases": stats.get("p1_cases", 0),
         "p2_cases": stats.get("p2_cases", 0),

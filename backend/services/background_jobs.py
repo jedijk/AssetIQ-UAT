@@ -16,6 +16,13 @@ from fastapi import BackgroundTasks
 logger = logging.getLogger("assetiq.jobs")
 
 
+def tenant_id_from_user(user: Optional[dict]) -> Optional[str]:
+    """Extract tenant id from JWT user payload (company_id or organization_id)."""
+    if not user:
+        return None
+    return user.get("company_id") or user.get("organization_id") or None
+
+
 def _serialize_job_result(result: Any) -> Any:
     """Persist JSON-friendly job output (dict/list/scalars only)."""
     if result is None or isinstance(result, (str, int, float, bool)):
@@ -58,6 +65,7 @@ class BackgroundJobService:
         user_id: Optional[str] = None,
         payload: Optional[dict] = None,
         max_retries: int = 3,
+        tenant_id: Optional[str] = None,
     ) -> str:
         job_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
@@ -73,6 +81,8 @@ class BackgroundJobService:
             "created_at": now,
             "updated_at": now,
         }
+        if tenant_id:
+            doc["tenant_id"] = tenant_id
         try:
             await self._collection().insert_one(doc)
         except Exception as exc:
@@ -186,6 +196,7 @@ class BackgroundJobService:
         user_id: Optional[str] = None,
         payload: Optional[dict] = None,
         max_retries: int = 1,
+        tenant_id: Optional[str] = None,
         **kwargs: Any,
     ) -> str:
         """Create a job record, queue work, and return job_id immediately."""
@@ -194,6 +205,7 @@ class BackgroundJobService:
             user_id=user_id,
             payload=payload,
             max_retries=max_retries,
+            tenant_id=tenant_id,
         )
         self._in_memory["queued"] += 1
 
@@ -217,6 +229,7 @@ class BackgroundJobService:
         user_id: Optional[str] = None,
         payload: Optional[dict] = None,
         max_retries: int = 1,
+        tenant_id: Optional[str] = None,
     ) -> str:
         """Persist a pending job for run_background_worker.py (no in-process execution)."""
         job_id = await self.create_record(
@@ -224,6 +237,7 @@ class BackgroundJobService:
             user_id=user_id,
             payload=payload,
             max_retries=max_retries,
+            tenant_id=tenant_id,
         )
         self._in_memory["queued"] += 1
         logger.info(

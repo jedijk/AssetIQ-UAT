@@ -2,7 +2,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from services.background_jobs import BackgroundJobService, JobStatus
+from services.background_jobs import BackgroundJobService, JobStatus, tenant_id_from_user
 
 
 @pytest.fixture
@@ -47,3 +47,34 @@ async def test_job_dead_letters_after_retries(job_service):
         )
     assert result is None
     assert job_service._in_memory["dead_letter"] == 1
+
+
+def test_tenant_id_from_user_prefers_company_id():
+    assert tenant_id_from_user({"company_id": "co-1", "organization_id": "org-1"}) == "co-1"
+    assert tenant_id_from_user({"organization_id": "org-2"}) == "org-2"
+    assert tenant_id_from_user({}) is None
+    assert tenant_id_from_user(None) is None
+
+
+@pytest.mark.asyncio
+async def test_create_record_stores_tenant_id(job_service):
+    coll = MagicMock()
+    coll.insert_one = AsyncMock()
+
+    with patch.object(job_service, "_collection", return_value=coll):
+        await job_service.create_record("test_job", tenant_id="tenant-abc")
+
+    doc = coll.insert_one.call_args[0][0]
+    assert doc["tenant_id"] == "tenant-abc"
+
+
+@pytest.mark.asyncio
+async def test_create_record_omits_tenant_id_when_absent(job_service):
+    coll = MagicMock()
+    coll.insert_one = AsyncMock()
+
+    with patch.object(job_service, "_collection", return_value=coll):
+        await job_service.create_record("test_job")
+
+    doc = coll.insert_one.call_args[0][0]
+    assert "tenant_id" not in doc

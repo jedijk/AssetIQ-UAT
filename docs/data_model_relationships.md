@@ -140,8 +140,11 @@ Month 3 ops (optional infrastructure):
     REDIS_URL → unified_cache query layer (intelligence map stats, multi-instance)
     SLOW_QUERY_MS / SLOW_API_MS → Mongo + API slow-path logging (see /api/metrics observability)
     pm_import_ai_review → background_jobs handler (USE_EXTERNAL_BACKGROUND_WORKER; async PM Import AI review)
+    Job polling: GET /maintenance-scheduler/jobs/{job_id}, GET /pm-import/jobs/{job_id}
+    tenant_id stored on background_jobs from company_id at enqueue (multi-tenant isolation preview; domain collections not wired yet)
     verify_v2_program_coverage.py → legacy program retirement gate
     verify_schedule_drift.py → strategy/program drift gate before prod cutover
+    verify_uat_gates.py → runs drift + v2 coverage gates (UAT cutover checklist)
 
 reliability_edges (graph)
     equipment → strategy_type, program_task → failure_mode, equipment → program

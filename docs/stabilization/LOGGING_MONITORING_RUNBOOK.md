@@ -53,3 +53,20 @@ Unset `SENTRY_DSN` to disable (default).
 ## Application metrics
 
 `GET /api/metrics` (owner/admin): database ping, cache stats, AI daily summary.
+
+## UAT gates & background jobs
+
+**UAT cutover checklist** — run drift + v2 program coverage gates:
+
+```bash
+cd backend && MONGO_URL=mongodb://... python scripts/verify_uat_gates.py
+```
+
+Exit `0` = all gates passed; `2` = one or more gates failed.
+
+**External background worker** — set `USE_EXTERNAL_BACKGROUND_WORKER=true` so the API only enqueues jobs to MongoDB; `run_background_worker.py` executes them (Railway sidecar).
+
+**Job polling** — async apply-strategy and PM Import AI review return `job_id`; poll:
+
+- `GET /maintenance-scheduler/jobs/{job_id}`
+- `GET /pm-import/jobs/{job_id}`
