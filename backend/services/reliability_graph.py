@@ -140,7 +140,7 @@ async def retire_stale_program_task_edges(
 
 async def ensure_reliability_graph_indexes(database=None) -> int:
     """Create compound indexes for tenant-scoped graph reads (idempotent)."""
-    coll = (database or db)[COLLECTION]
+    coll = (database if database is not None else db)[COLLECTION]
     specs = [
         ([("tenant_id", 1), ("equipment_id", 1), ("status", 1), ("updated_at", -1)], "rg_tenant_eq_status_updated"),
         ([("tenant_id", 1), ("source_type", 1), ("source_id", 1)], "rg_tenant_source"),
