@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 from database import db
 from services.reliability_graph import get_edges_for_equipment
 from services.reliability_graph_query import GraphTraversalService
+from services.reliability_snapshot_service import get_week_over_week_delta
 from services.tenant_schema import merge_tenant_filter, tenant_filter, tenant_id_from_user, with_tenant_id
 from services.work_item_query import fetch_work_items
 
@@ -73,6 +74,7 @@ async def build_reliability_context(
     chain = await traversal.get_chain(
         equipment_id, depth=5, user=user, edge_limit=edge_limit
     )
+    risk_explanation = await traversal.explain_risk(equipment_id, user=user)
     edges = chain.get("edges") or await get_edges_for_equipment(
         equipment_id, limit=edge_limit, tenant_id=tid
     )
@@ -105,6 +107,8 @@ async def build_reliability_context(
             {"_id": 0, "id": 1, "title": 1, "failure_mode": 1, "risk_score": 1, "risk_level": 1, "status": 1},
         ).sort("risk_score", -1).limit(15).to_list(15)
 
+    twin = await get_week_over_week_delta(equipment_id, user=user)
+
     return {
         "found": True,
         "equipment_id": equipment_id,
@@ -117,6 +121,7 @@ async def build_reliability_context(
             "edge_count": len(edges),
             "relations": _summarize_relations(edges),
             "paths": chain.get("paths", [])[:25],
+            "path_entries": risk_explanation.get("path_entries", [])[:25],
             "nodes_visited": chain.get("nodes_visited", 0),
         },
         "graph_threat_edges": _count_graph_open_threats(edges),
@@ -126,6 +131,7 @@ async def build_reliability_context(
         "open_work_count": len(open_work),
         "open_threats": open_threats,
         "open_threat_count": len(open_threats),
+        "twin_snapshot": twin,
         "assembled_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -165,9 +171,39 @@ def format_context_for_prompt(ctx: Dict[str, Any]) -> str:
         lines.append("Graph relations: " + ", ".join(f"{k}={v}" for k, v in top_rels))
     paths = graph.get("paths") or []
     if paths:
-        lines.append("Sample chain paths:")
-        for path in paths[:4]:
+        lines.append("Chain paths (cite edge_id when referencing):")
+        path_entries = graph.get("path_entries") or []
+        entry_by_id = {p.get("edge_id"): p for p in path_entries if p.get("edge_id")}
+        for path in paths[:6]:
             lines.append(f"  - {' '.join(path)}")
+        if path_entries:
+            lines.append("Path edge IDs:")
+            for entry in path_entries[:8]:
+                lines.append(
+                    f"  - {entry.get('edge_id')}: "
+                    f"{entry.get('source')} -[{entry.get('relation')}]-> {entry.get('target')}"
+                )
+
+    twin = ctx.get("twin_snapshot") or {}
+    latest = twin.get("latest")
+    delta = twin.get("delta")
+    if latest:
+        lines.append(
+            f"Twin snapshot (at {latest.get('snapshot_at')}): "
+            f"health={latest.get('health_score')}, "
+            f"open_threats={latest.get('open_threat_count')}, "
+            f"overdue_pm={latest.get('overdue_pm_count')}, "
+            f"edge_fingerprint={latest.get('edge_fingerprint')}"
+        )
+    if delta:
+        lines.append(
+            f"Week-over-week delta: health {delta.get('health_score'):+.1f}, "
+            f"threats {delta.get('open_threat_count'):+d}, "
+            f"overdue_pm {delta.get('overdue_pm_count'):+d}, "
+            f"graph_changed={delta.get('edge_fingerprint_changed')}"
+        )
+    elif twin.get("prior") is None and latest:
+        lines.append("Week-over-week delta: no prior snapshot (~7d) available")
 
     fms = ctx.get("failure_modes") or []
     if fms:

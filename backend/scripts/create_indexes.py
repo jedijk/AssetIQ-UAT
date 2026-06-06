@@ -396,6 +396,11 @@ INDEX_DEFINITIONS = {
         {"keys": [("tenant_id", 1), ("equipment_id", 1)]},
         {"keys": [("expires_at", 1)], "expireAfterSeconds": 0},
     ],
+    "reliability_snapshots": [
+        {"keys": [("equipment_id", 1), ("snapshot_at", -1)]},
+        {"keys": [("tenant_id", 1), ("equipment_id", 1), ("snapshot_at", -1)]},
+        {"keys": [("snapshot_at", -1)]},
+    ],
     "audit_log": [
         {"keys": [("ts", -1)]},
         {"keys": [("actor.id", 1), ("ts", -1)]},

@@ -268,6 +268,18 @@ class GraphTraversalService:
             }, user)
         )
 
+        path_entries = []
+        for edge in chain.get("edges", [])[:40]:
+            eid = edge.get("id")
+            if not eid:
+                continue
+            path_entries.append({
+                "edge_id": eid,
+                "relation": edge.get("relation"),
+                "source": f"{edge.get('source_type')}:{edge.get('source_id')}",
+                "target": f"{edge.get('target_type')}:{edge.get('target_id')}",
+            })
+
         return {
             "equipment_id": equipment_id,
             "open_threat_count": len(open_threats),
@@ -275,6 +287,7 @@ class GraphTraversalService:
             "open_threats": open_threats,
             "overdue_pm_scheduled": overdue_pm,
             "risk_paths": chain.get("paths", [])[:20],
+            "path_entries": path_entries,
             "relevant_edges": chain.get("edges", [])[:40],
             "tenant_id": tid,
         }

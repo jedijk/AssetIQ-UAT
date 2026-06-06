@@ -57,23 +57,36 @@ class ReliabilityCopilotService:
         # Enrich with reliability graph + FM + open work when equipment is known
         equipment = data.get("equipment")
         eq_id = equipment_id or (equipment.get("id") if isinstance(equipment, dict) else None)
+        risk_paths: List[Dict[str, Any]] = []
         if eq_id:
             try:
                 from services.reliability_context_service import (
                     ReliabilityContextService,
                     format_context_for_prompt,
                 )
+                from services.reliability_graph_query import GraphTraversalService
+
                 ctx_svc = ReliabilityContextService(self.db)
                 uid = (current_user or {}).get("id") or owner_id
                 reliability_ctx = await ctx_svc.get_context(eq_id, uid, user=current_user)
                 data["reliability_context"] = reliability_ctx
                 data["reliability_context_summary"] = format_context_for_prompt(reliability_ctx)
+
+                if intent in ("changes_summary", "risk_analysis", "predictions"):
+                    twin = reliability_ctx.get("twin_snapshot")
+                    if twin:
+                        data["twin_snapshot"] = twin
+
+                risk = await GraphTraversalService(self.db).explain_risk(eq_id, user=current_user)
+                risk_paths = risk.get("path_entries") or []
+                data["risk_path_entries"] = risk_paths
             except Exception as exc:
                 logger.warning("ReliabilityContextService enrichment failed: %s", exc)
         
         # Generate AI response
         response = await self._generate_response(
-            owner_id, query, intent, data, context, current_user=current_user
+            owner_id, query, intent, data, context, current_user=current_user,
+            risk_path_entries=risk_paths,
         )
         
         return response
@@ -340,6 +353,7 @@ class ReliabilityCopilotService:
         data: Dict[str, Any],
         context: Dict[str, Any],
         current_user: Optional[dict] = None,
+        risk_path_entries: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """Generate AI response based on gathered data"""
         from services.ai_gateway import chat as ai_gateway_chat, user_context
@@ -358,15 +372,27 @@ Your responses should be:
 - Based on the provided data
 - Include specific numbers and equipment references when available
 
+When reliability graph path edge IDs are provided, cite them inline using [edge:<edge_id>] for traceability.
+
 Format your response with:
 1. A direct answer to the question
-2. Key supporting data points
+2. Key supporting data points (include twin week-over-week deltas when present)
 3. Recommended actions (if applicable)
+4. A "Sources" section listing cited graph edge IDs when paths were used
 
 Use markdown formatting for clarity."""
 
         # Build user prompt with data context
         data_summary = self._summarize_data_for_prompt(data, intent)
+        path_lines = ""
+        entries = risk_path_entries or data.get("risk_path_entries") or []
+        if entries:
+            path_lines = "\nGraph path edge IDs (cite as [edge:<id>]):\n"
+            for entry in entries[:12]:
+                path_lines += (
+                    f"- {entry.get('edge_id')}: {entry.get('source')} "
+                    f"-[{entry.get('relation')}]-> {entry.get('target')}\n"
+                )
         
         user_prompt = f"""Query: {query}
 
@@ -374,7 +400,7 @@ Intent Classification: {intent}
 
 Available Data:
 {data_summary}
-
+{path_lines}
 Please provide a helpful response to the query based on the available data."""
 
         try:
@@ -406,6 +432,16 @@ Please provide a helpful response to the query based on the available data."""
             "intent": intent,
             "actions": actions,
             "visualization_type": viz_type,
+            "cited_paths": [
+                {
+                    "edge_id": e.get("edge_id"),
+                    "relation": e.get("relation"),
+                    "source": e.get("source"),
+                    "target": e.get("target"),
+                }
+                for e in (entries or [])
+                if e.get("edge_id")
+            ],
             "processed_at": datetime.utcnow().isoformat()
         }
     
@@ -463,6 +499,20 @@ Please provide a helpful response to the query based on the available data."""
         if data.get("reliability_context_summary"):
             lines.append("\nReliability graph context:")
             lines.append(data["reliability_context_summary"])
+
+        twin = data.get("twin_snapshot") or {}
+        if twin.get("delta"):
+            d = twin["delta"]
+            lines.append(
+                f"\nTwin week-over-week: health {d.get('health_score'):+.1f}, "
+                f"threats {d.get('open_threat_count'):+d}, overdue_pm {d.get('overdue_pm_count'):+d}"
+            )
+        elif twin.get("latest"):
+            snap = twin["latest"]
+            lines.append(
+                f"\nTwin snapshot: health={snap.get('health_score')}, "
+                f"threats={snap.get('open_threat_count')}, overdue_pm={snap.get('overdue_pm_count')}"
+            )
         
         return "\n".join(lines) if lines else "No relevant data available."
     

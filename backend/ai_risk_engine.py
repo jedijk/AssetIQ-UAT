@@ -583,6 +583,13 @@ EQUIPMENT INFORMATION:
             
             data = self._parse_json_response(response) or {}
             
+            if eq_id:
+                await self._annotate_twin_risk_edges(
+                    equipment_id=eq_id,
+                    threat=threat,
+                    risk_data=data,
+                )
+            
             # Use the threat's actual risk_score for consistency, but clamp to 0-100
             raw_threat_risk_score = threat.get("risk_score", 50)
             threat_risk_score = max(0, min(100, raw_threat_risk_score if isinstance(raw_threat_risk_score, (int, float)) else 50))
@@ -645,6 +652,55 @@ EQUIPMENT INFORMATION:
                 key_insights=["AI analysis temporarily unavailable"],
                 recommendations=threat.get("recommended_actions", [])
             )
+    
+    async def _annotate_twin_risk_edges(
+        self,
+        *,
+        equipment_id: str,
+        threat: dict,
+        risk_data: dict,
+    ) -> None:
+        """Best-effort: attach twin RUL / risk metadata to equipment→failure_mode edges."""
+        failure_mode_id = (
+            threat.get("failure_mode_id")
+            or (threat.get("failure_mode") or {}).get("id")
+            if isinstance(threat.get("failure_mode"), dict)
+            else None
+        )
+        if not failure_mode_id:
+            return
+
+        ttf_hours = risk_data.get("time_to_failure_hours")
+        if ttf_hours is None:
+            return
+
+        try:
+            rul_days = round(float(ttf_hours) / 24.0, 1)
+        except (TypeError, ValueError):
+            return
+
+        try:
+            from services.reliability_graph import upsert_edge
+
+            tenant_id = threat.get("tenant_id") or threat.get("company_id")
+            await upsert_edge(
+                source_type="equipment",
+                source_id=equipment_id,
+                relation="has_failure_mode",
+                target_type="failure_mode",
+                target_id=str(failure_mode_id),
+                equipment_id=equipment_id,
+                tenant_id=tenant_id,
+                metadata={
+                    "twin_rul_days": rul_days,
+                    "risk_score": risk_data.get("failure_probability"),
+                    "annotated_at": datetime.now(timezone.utc).isoformat(),
+                    "source": "ai_risk_engine",
+                    "threat_id": threat.get("id"),
+                },
+            )
+        except Exception as exc:
+            logger.debug("twin risk edge annotation skipped: %s", exc)
     
     def _normalize_probability_level(self, level: str) -> str:
         """Normalize AI-returned probability levels to valid enum values"""

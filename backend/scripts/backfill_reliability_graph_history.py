@@ -273,6 +273,13 @@ async def backfill_scheduled_tasks(db, config: BackfillConfig) -> PhaseStats:
         if not task_id:
             stats.skipped += 1
             continue
+        if stats.scanned > 0 and stats.scanned % 100 == 0:
+            logger.info(
+                "backfill scheduled_tasks progress: scanned=%s synced=%s errors=%s",
+                stats.scanned,
+                stats.synced,
+                stats.errors,
+            )
         event = scheduled_task_event(task.get("status"))
         tenant_id = _tenant_id(task)
         label = f"sync_edges_for_scheduled_task event={event}"

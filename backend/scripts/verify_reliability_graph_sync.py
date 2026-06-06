@@ -74,6 +74,16 @@ def _static_path_checks() -> list[str]:
             ["tenant_id", "retire_edges_for_entity", "sync_outcome_edges"],
             "reliability_graph platform",
         ),
+        (
+            BACKEND_ROOT / "services" / "reliability_snapshot_service.py",
+            ["refresh_reliability_snapshots", "get_graph_at_time"],
+            "reliability_snapshot_service",
+        ),
+        (
+            BACKEND_ROOT / "services" / "job_handlers.py",
+            ["reliability_snapshots_daily_refresh"],
+            "reliability snapshot job handler",
+        ),
     ]
 
     for path, needles, label in checks:

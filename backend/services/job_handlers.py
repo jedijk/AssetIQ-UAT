@@ -74,8 +74,37 @@ async def handle_asset_health_daily_refresh(job: dict) -> dict:
     return result
 
 
+async def handle_reliability_snapshots_daily_refresh(job: dict) -> dict:
+    """Materialize reliability_snapshots for all equipment (Digital Twin DT-1)."""
+    payload = job.get("payload") or {}
+    equipment_ids = payload.get("equipment_ids")
+    snapshot_at_raw = payload.get("snapshot_at")
+
+    from datetime import datetime, timezone
+
+    from services.reliability_snapshot_service import refresh_reliability_snapshots
+
+    snapshot_at = None
+    if snapshot_at_raw:
+        snapshot_at = datetime.fromisoformat(str(snapshot_at_raw).replace("Z", "+00:00"))
+        if snapshot_at.tzinfo is None:
+            snapshot_at = snapshot_at.replace(tzinfo=timezone.utc)
+
+    result = await refresh_reliability_snapshots(
+        snapshot_at=snapshot_at,
+        equipment_ids=equipment_ids,
+    )
+    logger.info(
+        "reliability_snapshots_daily_refresh upserted=%s snapshot_at=%s",
+        result.get("upserted"),
+        result.get("snapshot_at"),
+    )
+    return result
+
+
 JOB_HANDLERS: Dict[str, Callable[..., Any]] = {
     "apply_strategy": handle_apply_strategy,
     "pm_import_ai_review": handle_pm_import_ai_review,
     "asset_health_daily_refresh": handle_asset_health_daily_refresh,
+    "reliability_snapshots_daily_refresh": handle_reliability_snapshots_daily_refresh,
 }

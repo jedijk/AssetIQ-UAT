@@ -13,6 +13,7 @@ from routes.ril.cases import router as cases_router
 from routes.ril.predictions import router as predictions_router
 from routes.ril.copilot import router as copilot_router
 from routes.ril.dashboard import router as dashboard_router
+from routes.ril.twin import router as twin_router
 
 router = APIRouter(prefix="/ril", tags=["Reliability Intelligence Layer"])
 
@@ -25,3 +26,4 @@ router.include_router(cases_router)
 router.include_router(predictions_router)
 router.include_router(copilot_router)
 router.include_router(dashboard_router)
+router.include_router(twin_router)
