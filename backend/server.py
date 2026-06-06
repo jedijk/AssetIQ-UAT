@@ -807,6 +807,17 @@ async def background_startup():
                 logger.info("Failure modes library ready")
             except Exception as e:
                 logger.warning(f"Failure modes seeding skipped: {e}")
+
+            # Seed disciplines configurator (no-op if already populated)
+            try:
+                from routes.disciplines import seed_disciplines_if_empty
+                inserted = await seed_disciplines_if_empty()
+                if inserted:
+                    logger.info(f"Disciplines configurator seeded with {inserted} entries")
+                else:
+                    logger.info("Disciplines configurator already populated")
+            except Exception as e:
+                logger.warning(f"Disciplines seeding skipped: {e}")
             
             # Start periodic cleanup of old pending registrations
             asyncio.create_task(cleanup_pending_registrations_task(db))

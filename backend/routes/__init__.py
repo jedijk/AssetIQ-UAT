@@ -48,6 +48,7 @@ from routes.translations import router as translations_router
 from routes.maintenance_program import router as maintenance_program_router
 from routes.ril import router as ril_router
 from routes.intelligence_map import router as intelligence_map_router
+from routes.disciplines import router as disciplines_router
 
 all_routers = [
     auth_router,
@@ -97,4 +98,5 @@ all_routers = [
     maintenance_program_router,
     ril_router,
     intelligence_map_router,
+    disciplines_router,
 ]
