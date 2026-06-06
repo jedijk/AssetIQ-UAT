@@ -1,4 +1,4 @@
-import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
+import { api } from '../lib/apiClient';
 import { compressImage, formatFileSize, getCompressionPercent } from '../lib/imageCompression';
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -134,13 +134,8 @@ export default function ActionDetailPage() {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/rbac/users`, {
-          headers: getAuthHeaders(),
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setUsersList(data.users || []);
-        }
+        const response = await api.get("/rbac/users");
+        setUsersList(response.data.users || []);
       } catch (err) {
         console.error("Failed to fetch users:", err);
       }

@@ -23,8 +23,8 @@ function tasksFromMyTasksPayload(payload) {
 
 const fetchTaskCounts = async () => {
   const [openRes, overdueRes] = await Promise.all([
-    api.get("/my-tasks", { params: { filter: "open" } }),
-    api.get("/my-tasks", { params: { filter: "overdue" } }),
+    api.get("/work-items", { params: { filter: "open" } }),
+    api.get("/work-items", { params: { filter: "overdue" } }),
   ]);
   const openTasks = tasksFromMyTasksPayload(openRes.data);
   const overdueTasks = tasksFromMyTasksPayload(overdueRes.data);

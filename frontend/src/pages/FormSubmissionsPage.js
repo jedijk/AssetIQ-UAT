@@ -361,27 +361,16 @@ const UserAvatar = ({ name, photo, size = "sm" }) => {
 
 // Fetch form submissions
 const fetchSubmissions = async (filters) => {
-  const params = new URLSearchParams();
-  params.append("limit", "200"); // API caps list size; `total` in response is full match count
-  if (filters.hasWarnings) params.append("has_warnings", "true");
-  if (filters.hasCritical) params.append("has_critical", "true");
-  
-  const response = await fetch(`${API_BASE_URL}/api/form-submissions?${params}`, {
-    headers: getAuthHeaders(),
-    credentials: FETCH_CREDENTIALS,
-  });
-  if (!response.ok) throw new Error("Failed to fetch submissions");
-  return response.json();
+  const params = { limit: 200 };
+  if (filters.hasWarnings) params.has_warnings = "true";
+  if (filters.hasCritical) params.has_critical = "true";
+  const response = await api.get("/form-submissions", { params });
+  return response.data;
 };
 
-// Fetch single submission
 const fetchSubmission = async (id) => {
-  const response = await fetch(`${API_BASE_URL}/api/form-submissions/${id}`, {
-    headers: getAuthHeaders(),
-    credentials: FETCH_CREDENTIALS,
-  });
-  if (!response.ok) throw new Error("Failed to fetch submission");
-  return response.json();
+  const response = await api.get(`/form-submissions/${id}`);
+  return response.data;
 };
 
 export default function FormSubmissionsPage() {

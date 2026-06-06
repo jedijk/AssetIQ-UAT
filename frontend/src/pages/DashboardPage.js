@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { useIsFetching, useQuery, useQueryClient } from "@tanstack/react-query";
-import { statsAPI, actionsAPI, investigationAPI, equipmentHierarchyAPI, threatsAPI, usersAPI } from "../lib/api";
+import { statsAPI, actionsAPI, investigationAPI, equipmentHierarchyAPI, threatsAPI, usersAPI, api } from "../lib/api";
 import { formAPI } from "../components/forms";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -607,17 +607,8 @@ export default function DashboardPage({ initialTab }) {
   const handleQuickViewClick = async (submission) => {
     setLoadingQuickView(true);
     try {
-      const apiUrl = getBackendUrl();
-      const response = await fetch(`${apiUrl}/api/form-submissions/${submission.id}`, {
-        headers: getAuthHeaders(),
-      });
-      if (response.ok) {
-        const fullSubmission = await response.json();
-        setQuickViewSubmission(fullSubmission);
-      } else {
-        // Fallback to lightweight version
-        setQuickViewSubmission(submission);
-      }
+      const response = await api.get(`/form-submissions/${submission.id}`);
+      setQuickViewSubmission(response.data);
     } catch (error) {
       console.error("Failed to fetch submission details:", error);
       setQuickViewSubmission(submission);

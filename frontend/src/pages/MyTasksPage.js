@@ -550,13 +550,9 @@ const MyTasksPage = () => {
           const fallback = labelCfg?.label_template_id || "";
           if (!submissionId) return fallback;
           try {
-            const { getBackendUrl, getAuthHeaders } = await import("../lib/apiConfig");
-            const res = await fetch(`${getBackendUrl()}/api/form-submissions/${submissionId}`, {
-              headers: getAuthHeaders(),
-            });
-            if (!res.ok) return fallback;
-            const sub = await res.json();
-            return sub?.label_template_id || fallback;
+            const { api } = await import("../lib/apiClient");
+            const res = await api.get(`/form-submissions/${submissionId}`);
+            return res.data?.label_template_id || fallback;
           } catch {
             return fallback;
           }

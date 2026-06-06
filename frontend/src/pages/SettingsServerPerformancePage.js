@@ -37,24 +37,7 @@ import { Progress } from "../components/ui/progress";
 import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
-import { getBackendUrl } from "../lib/apiConfig";
-
-// Get API URL dynamically (supports Vercel + Railway deployment)
-const getApiUrl = () => getBackendUrl();
-
-// Helper to build headers with auth and database environment
-const getAuthHeaders = () => {
-  const token = localStorage.getItem("token");
-  const dbEnv = localStorage.getItem("database_environment");
-  const headers = {};
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  if (dbEnv) {
-    headers["X-Database-Environment"] = dbEnv;
-  }
-  return headers;
-};
+import { api } from "../lib/apiClient";
 
 // Helper to format uptime
 const formatUptime = (seconds) => {
@@ -249,15 +232,7 @@ const SettingsServerPerformancePage = () => {
     if (showRefreshing) setSecurityRefreshing(true);
     
     try {
-      const response = await fetch(`${getApiUrl()}/api/system/security`, {
-        headers: getAuthHeaders()
-      });
-      
-      if (!response.ok) {
-        throw new Error("Failed to fetch security status");
-      }
-      
-      const data = await response.json();
+      const { data } = await api.get("/system/security");
       setSecurity(data);
       setSecurityError(null);
     } catch (err) {
@@ -274,15 +249,7 @@ const SettingsServerPerformancePage = () => {
     if (!isOwner) return;
     
     try {
-      const response = await fetch(`${getApiUrl()}/api/system/database`, {
-        headers: getAuthHeaders()
-      });
-      
-      if (!response.ok) {
-        throw new Error("Failed to fetch database storage");
-      }
-      
-      const data = await response.json();
+      const { data } = await api.get("/system/database");
       setDbStorage(data);
       setDbStorageError(null);
     } catch (err) {
@@ -298,15 +265,7 @@ const SettingsServerPerformancePage = () => {
     if (!isOwner) return;
     
     try {
-      const response = await fetch(`${getApiUrl()}/api/system/file-storage`, {
-        headers: getAuthHeaders()
-      });
-      
-      if (!response.ok) {
-        throw new Error("Failed to fetch file storage stats");
-      }
-      
-      const data = await response.json();
+      const { data } = await api.get("/system/file-storage");
       setFileStorage(data);
       setFileStorageError(null);
     } catch (err) {
@@ -325,18 +284,7 @@ const SettingsServerPerformancePage = () => {
     
     try {
       const unresolved = errorFilter === "unresolved";
-      const response = await fetch(
-        `${getApiUrl()}/api/system/errors?limit=50&unresolved_only=${unresolved}`, 
-        {
-          headers: getAuthHeaders()
-        }
-      );
-      
-      if (!response.ok) {
-        throw new Error("Failed to fetch error logs");
-      }
-      
-      const data = await response.json();
+      const { data } = await api.get("/system/errors", { params: { limit: 50, unresolved_only: unresolved } });
       setErrorLogs(data);
       setErrorLogsError(null);
     } catch (err) {
@@ -351,14 +299,7 @@ const SettingsServerPerformancePage = () => {
   // Resolve an error
   const resolveError = async (errorId) => {
     try {
-      const response = await fetch(`${getApiUrl()}/api/system/errors/${errorId}/resolve`, {
-        method: "POST",
-        headers: getAuthHeaders()
-      });
-      
-      if (!response.ok) {
-        throw new Error("Failed to resolve error");
-      }
+      await api.post(`/system/errors/${errorId}/resolve`);
       
       toast.success("Error marked as resolved");
       fetchErrorLogs();
@@ -372,14 +313,7 @@ const SettingsServerPerformancePage = () => {
     if (!window.confirm("Are you sure you want to clear all error logs?")) return;
     
     try {
-      const response = await fetch(`${getApiUrl()}/api/system/errors`, {
-        method: "DELETE",
-        headers: getAuthHeaders()
-      });
-      
-      if (!response.ok) {
-        throw new Error("Failed to clear error logs");
-      }
+      await api.delete("/system/errors");
       
       toast.success("Error logs cleared");
       fetchErrorLogs();
@@ -391,14 +325,7 @@ const SettingsServerPerformancePage = () => {
   // Create test error (for debugging)
   const createTestError = async () => {
     try {
-      const response = await fetch(`${getApiUrl()}/api/system/errors/test`, {
-        method: "POST",
-        headers: getAuthHeaders()
-      });
-      
-      if (!response.ok) {
-        throw new Error("Failed to create test error");
-      }
+      await api.post("/system/errors/test");
       
       toast.success("Test error created");
       fetchErrorLogs(true);
@@ -413,18 +340,15 @@ const SettingsServerPerformancePage = () => {
     if (showRefreshIndicator) setIsRefreshing(true);
     
     try {
-      const response = await fetch(`${getApiUrl()}/api/system/metrics`, {
-        headers: getAuthHeaders()
-      });
-      
-      if (!response.ok) {
-        if (response.status === 403) {
+      let data;
+      try {
+        ({ data } = await api.get("/system/metrics"));
+      } catch (err) {
+        if (err.response?.status === 403) {
           throw new Error("Access denied. Admin privileges required.");
         }
         throw new Error("Failed to fetch metrics");
       }
-      
-      const data = await response.json();
       setMetrics(data);
       setLastUpdated(new Date());
       setError(null);

@@ -1,4 +1,4 @@
-import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
+import { api } from '../lib/apiClient';
 import PhotoDataCaptureField from '../components/forms/PhotoDataCaptureField';
 import { EXTRACTION_TEMPLATES } from '../components/forms/extractionTemplates';
 import LabelPrintConfigPanel from '../components/forms/LabelPrintConfigPanel';
@@ -270,14 +270,10 @@ const FormsPage = ({ embedded = false }) => {
     
     setSearchingEquipment(true);
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/equipment-hierarchy/search?q=${encodeURIComponent(query)}&limit=10`,
-        { headers: getAuthHeaders() }
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setEquipmentSearchResults(data.results || []);
-      }
+      const response = await api.get("/equipment-hierarchy/search", {
+        params: { q: query, limit: 10 },
+      });
+      setEquipmentSearchResults(response.data.results || []);
     } catch (error) {
       console.error("Equipment search failed:", error);
     } finally {

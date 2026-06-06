@@ -1104,15 +1104,12 @@ export default function EquipmentManagerPage() {
   const handleExportExcel = async () => {
     setIsExporting(true);
     try {
-      const response = await fetch(`${getBackendUrl()}/api/equipment-hierarchy/export`, {
-        headers: getAuthHeaders()
-      });
-      if (!response.ok) throw new Error('Export failed');
-      const blob = await response.blob();
+      const response = await api.get("/equipment-hierarchy/export", { responseType: "blob" });
+      const blob = response.data;
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      const contentDisposition = response.headers.get('content-disposition');
+      const contentDisposition = response.headers['content-disposition'];
       let filename = 'equipment_hierarchy.xlsx';
       if (contentDisposition) {
         const match = contentDisposition.match(/filename=(.+)/);

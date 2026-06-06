@@ -17,7 +17,7 @@ import {
   MessageSquare
 } from "lucide-react";
 import { Button } from "./ui/button";
-import { getBackendUrl } from "../lib/apiConfig";
+import { api } from "../lib/apiClient";
 
 // Desktop steps - highlights sidebar navigation
 const DESKTOP_STEPS = [
@@ -692,13 +692,7 @@ export const useIntroOverlay = () => {
     localStorage.setItem("assetiq_intro_seen", "true");
     // Also save to backend
     try {
-      const token = localStorage.getItem("token");
-      if (token) {
-        await fetch(`${getBackendUrl()}/api/users/mark-intro-seen`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      }
+      await api.post("/users/mark-intro-seen");
     } catch (err) {
       console.error("Failed to mark intro as seen:", err);
     }

@@ -1,4 +1,4 @@
-import { getBackendUrl } from '../lib/apiConfig';
+import { api } from "../lib/apiClient";
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { 
@@ -14,31 +14,19 @@ import {
 } from "lucide-react";
 import { format, subDays, subMonths, startOfMonth, endOfMonth } from "date-fns";
 
-const API_BASE_URL = getBackendUrl();
-
-// Fetch functions
-const fetchAnalytics = async (token) => {
-  const response = await fetch(`${API_BASE_URL}/api/analytics/dashboard`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  if (!response.ok) throw new Error("Failed to fetch analytics");
-  return response.json();
+const fetchAnalytics = async () => {
+  const response = await api.get("/analytics/dashboard");
+  return response.data;
 };
 
-const fetchRiskOverview = async (token) => {
-  const response = await fetch(`${API_BASE_URL}/api/analytics/risk-overview`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  if (!response.ok) throw new Error("Failed to fetch risk overview");
-  return response.json();
+const fetchRiskOverview = async () => {
+  const response = await api.get("/analytics/risk-overview");
+  return response.data;
 };
 
-const fetchStats = async (token) => {
-  const response = await fetch(`${API_BASE_URL}/api/stats`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  if (!response.ok) throw new Error("Failed to fetch stats");
-  return response.json();
+const fetchStats = async () => {
+  const response = await api.get("/stats");
+  return response.data;
 };
 
 // Metric Card Component
@@ -277,30 +265,25 @@ const DatePickerModal = ({ isOpen, onClose, selectedRange, onSelect }) => {
 };
 
 const MobileAnalytics = () => {
-  const token = localStorage.getItem("token");
   const [dateRange, setDateRange] = useState({ 
     start: subMonths(new Date(), 6), 
     end: new Date() 
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // Queries
   const { data: analyticsData, isLoading: analyticsLoading } = useQuery({
     queryKey: ["mobile-analytics"],
-    queryFn: () => fetchAnalytics(token),
-    enabled: !!token
+    queryFn: fetchAnalytics,
   });
 
   const { data: riskData, isLoading: riskLoading } = useQuery({
     queryKey: ["mobile-risk-overview"],
-    queryFn: () => fetchRiskOverview(token),
-    enabled: !!token
+    queryFn: fetchRiskOverview,
   });
 
   const { data: statsData, isLoading: statsLoading } = useQuery({
     queryKey: ["mobile-stats"],
-    queryFn: () => fetchStats(token),
-    enabled: !!token
+    queryFn: fetchStats,
   });
 
   const isLoading = analyticsLoading || riskLoading || statsLoading;

@@ -80,16 +80,27 @@ export const taskSchedulerAPI = {
   },
 };
 
-// ==================== MY TASKS API ====================
+function normalizeWorkItemsList(data) {
+  const tasks = data?.tasks ?? data?.items ?? [];
+  return {
+    tasks,
+    count: data?.count ?? tasks.length,
+    filter: data?.filter,
+  };
+}
+
+// ==================== MY TASKS / WORK ITEMS API ====================
 export const myTasksAPI = {
+  /** Unified work-item list (task instances, unbridged scheduled tasks, actions). */
   getTasks: async (params = {}) => {
     const searchParams = new URLSearchParams();
     if (params.filter) searchParams.append("filter", params.filter);
     if (params.date) searchParams.append("date", params.date);
     if (params.status) searchParams.append("status", params.status);
     if (params.discipline) searchParams.append("discipline", params.discipline);
-    const response = await api.get(`/my-tasks?${searchParams}`);
-    return response.data;
+    if (params.equipment_id) searchParams.append("equipment_id", params.equipment_id);
+    const response = await api.get(`/work-items?${searchParams}`);
+    return normalizeWorkItemsList(response.data);
   },
   uploadAttachment: async (file) => {
     const formData = new FormData();

@@ -3,7 +3,7 @@
  * Extracted from MyTasksPage.js for better modularity
  * Handles task execution with form fields, attachments, and issue tracking
  */
-import { getBackendUrl } from '../../lib/apiConfig';
+import { api } from '../../lib/apiClient';
 import { compressImage, formatFileSize, getCompressionPercent } from '../../lib/imageCompression';
 import PhotoDataCaptureField from '../forms/PhotoDataCaptureField';
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -372,14 +372,10 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
     
     setSearchingEquipment(fieldId);
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/equipment-hierarchy/search?q=${encodeURIComponent(query)}&limit=10`,
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setEquipmentResults(prev => ({ ...prev, [fieldId]: data.results || data.nodes || [] }));
-      }
+      const response = await api.get("/equipment-hierarchy/search", {
+        params: { q: query, limit: 10 },
+      });
+      setEquipmentResults(prev => ({ ...prev, [fieldId]: response.data.results || response.data.nodes || [] }));
     } catch (error) {
       console.error("Equipment search failed:", error);
     } finally {
@@ -514,11 +510,10 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
             ai_value: c.original_ai_value,
             corrected_value: c.corrected_value,
           }));
-          fetch(`${API_BASE_URL}/api/ai/extract/corrections`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ form_template_id: task.form_template_id, corrections }),
-          });
+          api.post("/ai/extract/corrections", {
+            form_template_id: task.form_template_id,
+            corrections,
+          }).catch(() => {});
         } catch (e) {
           // Non-critical, don't block submission
         }

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { threatsAPI, actionsAPI } from "../../lib/api";
-import { getBackendUrl } from "../../lib/apiConfig";
+import { threatsAPI, actionsAPI, api } from "../../lib/api";
 import { formatDate } from "../../lib/dateUtils";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -306,13 +305,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
   const createFailureModeMutation = useMutation({
     mutationFn: async () => {
       // Create failure mode in FMEA library
-      const response = await fetch(`${getBackendUrl()}/api/failure-modes`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({
+      const response = await api.post("/failure-modes", {
           category: threat.equipment_type || "General",
           equipment: threat.equipment_type || threat.asset || "Equipment",
           failure_mode: threat.failure_mode,
@@ -324,14 +317,8 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
           description: `Created from observation: ${threat.title}`,
           source: "observation",
           linked_threat_id: threatId,
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to create failure mode');
-      }
-      
-      const newFm = await response.json();
+        });
+      const newFm = response.data;
       
       // Update the threat to link to the new failure mode and clear is_new_failure_mode flag
       await threatsAPI.update(threatId, {
