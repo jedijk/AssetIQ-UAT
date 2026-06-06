@@ -23,6 +23,17 @@ WAVE1_COLLECTIONS = frozenset({
     "users",
 })
 
+# Wave 2 — work execution and maintenance program collections.
+WAVE2_COLLECTIONS = frozenset({
+    "task_instances",
+    "scheduled_tasks",
+    "central_actions",
+    "maintenance_programs_v2",
+    "equipment_type_strategies",
+})
+
+WAVE_COLLECTIONS = PILOT_COLLECTIONS | WAVE1_COLLECTIONS | WAVE2_COLLECTIONS
+
 DEFAULT_TENANT_FIELD = "tenant_id"
 
 

@@ -447,3 +447,25 @@ def test_ai_risk_engine_uses_gateway():
     idx = source.index("async def _call_openai")
     block = source[idx: idx + 500]
     assert "chat_completion_response" in block
+
+
+def test_ai_helpers_chat_paths_use_gateway():
+    source = (Path(__file__).resolve().parents[1] / "ai_helpers.py").read_text()
+    assert "_gateway_completion" in source
+    idx = source.index("async def analyze_threat_with_ai")
+    block = source[idx: idx + 800]
+    assert "_gateway_completion" in block
+    assert "chat_completions_create(client" not in block
+
+
+def test_seed_endpoint_has_no_default_secret():
+    source = (Path(__file__).resolve().parents[1] / "server.py").read_text()
+    idx = source.index("async def trigger_database_seed")
+    block = source[idx: idx + 450]
+    assert "emergent-seed-2024" not in block
+    assert "SEED_SECRET_KEY" in block
+
+
+def test_scheduler_job_uses_leader_lock():
+    sched = (Path(__file__).resolve().parents[1] / "services" / "scheduler_job.py").read_text()
+    assert "try_acquire_scheduler_leadership" in sched

@@ -62,6 +62,28 @@ def get_openai_client() -> OpenAI:
         raise ValueError("OPENAI_API_KEY not configured in environment")
     return OpenAI(api_key=api_key)
 
+
+async def _gateway_completion(
+    endpoint: str,
+    messages: list,
+    *,
+    model: Optional[str] = None,
+    user_id: str = "system",
+    company_id: str = "default",
+    **kwargs,
+):
+    """Async chat completion via the shared AI gateway (cost guard + usage logging)."""
+    from services.ai_gateway import chat_completion_response
+
+    return await chat_completion_response(
+        messages,
+        user_id=user_id,
+        company_id=company_id,
+        endpoint=endpoint,
+        model=model or os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
+        **kwargs,
+    )
+
 # ============= SYSTEM PROMPTS =============
 
 THREAT_ANALYSIS_SYSTEM_PROMPT = """You are AssetIQ AI extracting equipment failures from user messages.
@@ -185,15 +207,14 @@ async def classify_user_intent(message: str, session_id: str) -> dict:
 
     # Only use AI for ambiguous cases
     try:
-        client = get_openai_client()
-        
-        response = chat_completions_create(client, "ai_helpers",
-            model="gpt-4o-mini",
-            messages=[
+        response = await _gateway_completion(
+            "ai_helpers.classify_user_intent",
+            [
                 {"role": "system", "content": QUERY_CLASSIFIER_PROMPT},
-                {"role": "user", "content": message}
+                {"role": "user", "content": message},
             ],
-            temperature=0.3
+            model="gpt-4o-mini",
+            temperature=0.3,
         )
 
         clean_response = response.choices[0].message.content.strip()
@@ -266,11 +287,10 @@ async def merge_issue_description_with_edit(
         return ed
 
     try:
-        client = get_openai_client()
         lang = "Dutch" if language == "nl" else "English"
-        response = chat_completions_create(client, "ai_helpers",
-            model=os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
-            messages=[
+        response = await _gateway_completion(
+            "ai_helpers.merge_issue_description_with_edit",
+            [
                 {
                     "role": "system",
                     "content": (
@@ -315,10 +335,9 @@ async def translate_to_english_for_record(text: str, purpose: str = "threat regi
     if low in {"unknown / not specified", "unknown", "unknown equipment", "n/a", "—", "-"}:
         return t
     try:
-        client = get_openai_client()
-        response = chat_completions_create(client, "ai_helpers",
-            model=os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
-            messages=[
+        response = await _gateway_completion(
+            "ai_helpers.translate_to_english_for_record",
+            [
                 {
                     "role": "system",
                     "content": (
@@ -439,42 +458,41 @@ async def answer_data_query(message: str, session_id: str, data_context: str) ->
 async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Optional[str] = None) -> dict:
     """Analyze failure description using AI with fallback for AI unavailability."""
     try:
-        client = get_openai_client()
-
         image_context = ""
         if image_base64:
-            # Analyze image first using vision model
             image_content = [
                 {
                     "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}
+                    "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"},
                 },
                 {
                     "type": "text",
-                    "text": "Analyze this image of equipment failure:"
-                }
+                    "text": "Analyze this image of equipment failure:",
+                },
             ]
-            
-            image_response = chat_completions_create(client, "ai_helpers",
-                model="gpt-4o-mini",
-                messages=[
+
+            image_response = await _gateway_completion(
+                "ai_helpers.analyze_threat_image",
+                [
                     {"role": "system", "content": IMAGE_ANALYSIS_SYSTEM_PROMPT},
-                    {"role": "user", "content": image_content}
+                    {"role": "user", "content": image_content},
                 ],
-                temperature=0.5
+                model="gpt-4o-mini",
+                temperature=0.5,
             )
             image_analysis = image_response.choices[0].message.content
             image_context = f"\n\nImage Analysis: {image_analysis}"
 
         full_message = message + image_context
-        
-        response = chat_completions_create(client, "ai_helpers",
-            model="gpt-4o",
-            messages=[
+
+        response = await _gateway_completion(
+            "ai_helpers.analyze_threat_with_ai",
+            [
                 {"role": "system", "content": THREAT_ANALYSIS_SYSTEM_PROMPT},
-                {"role": "user", "content": full_message}
+                {"role": "user", "content": full_message},
             ],
-            temperature=0.5
+            model="gpt-4o",
+            temperature=0.5,
         )
 
         clean_response = response.choices[0].message.content.strip()
@@ -530,8 +548,6 @@ async def analyze_threat_with_ai(message: str, session_id: str, image_base64: Op
 async def analyze_attachment_image(image_base64: str, threat_context: str) -> dict:
     """Analyze an image attachment for an existing observation and return findings + action recommendations."""
     try:
-        client = get_openai_client()
-
         messages = [
             {"role": "system", "content": (
                 "You are an equipment reliability AI. Analyze this photo attached to an observation. "
@@ -550,16 +566,14 @@ async def analyze_attachment_image(image_base64: str, threat_context: str) -> di
             )},
             {"role": "user", "content": [
                 {"type": "text", "text": f"Observation context: {threat_context}"},
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
-            ]}
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}},
+            ]},
         ]
 
-        response = await asyncio.to_thread(
-            chat_completions_create,
-            client,
-            "analyze_attachment_image",
+        response = await _gateway_completion(
+            "ai_helpers.analyze_attachment_image",
+            messages,
             model="gpt-4o",
-            messages=messages,
             temperature=0.3,
             max_tokens=500,
         )
@@ -614,6 +628,12 @@ async def transcribe_audio_with_ai(
     """Transcribe and translate audio to English using OpenAI Whisper."""
     temp_path = None
     try:
+        guard_ai_request(
+            user_id=user_id,
+            company_id=company_id,
+            endpoint="ai_helpers.transcribe_audio",
+            estimated_tokens=500,
+        )
         client = get_openai_client()
 
         # Strip data URL prefix if present (e.g., "data:audio/webm;base64,...")

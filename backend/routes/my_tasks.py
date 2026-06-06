@@ -129,6 +129,7 @@ async def get_my_tasks(
         equipment_id=equipment_id,
         status=status,
         discipline=discipline,
+        user=current_user,
     )
     return {
         "tasks": tasks,

@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 # How far ahead to include unbridged maintenance in My Tasks.
 MAINTENANCE_HORIZON_DAYS = 14
 MAX_UNBRIDGED_ITEMS = 50
+# Fleet-scale caps for merged work-item lists.
+MAX_TASK_INSTANCES = 100
+MAX_ACTION_ITEMS = 100
 
 
 def _parse_due_date(value: Optional[str]) -> Optional[datetime]:
@@ -374,6 +377,7 @@ async def fetch_work_items(
     status: Optional[str] = None,
     discipline: Optional[str] = None,
     now: Optional[datetime] = None,
+    user: Optional[dict] = None,
 ) -> List[dict]:
     """
     Unified read: task_instances + unbridged scheduled_tasks + central_actions.
@@ -439,13 +443,17 @@ async def fetch_work_items(
     if status:
         query["status"] = status
 
+    from services.tenant_schema import merge_tenant_filter
+
+    query = merge_tenant_filter(query, user)
+
     tasks_cursor = await timed_find(db.task_instances, query)
     tasks_cursor = tasks_cursor.sort([
         ("status", 1),
         ("priority", 1),
         ("due_date", 1),
-    ]).limit(100)
-    raw_tasks = await tasks_cursor.to_list(length=100)
+    ]).limit(MAX_TASK_INSTANCES)
+    raw_tasks = await tasks_cursor.to_list(length=MAX_TASK_INSTANCES)
 
     # Start unbridged maintenance fetch in parallel with task enrichment when allowed.
     maintenance_task = None
@@ -682,7 +690,7 @@ async def fetch_work_items(
                 {"due_date": {"$ne": ""}},
             ]
 
-        raw_actions = await db.central_actions.find(action_query, {"_id": 0}).to_list(length=100)
+        raw_actions = await db.central_actions.find(action_query, {"_id": 0}).to_list(length=MAX_ACTION_ITEMS)
 
         threat_source_ids = set()
         investigation_source_ids = set()

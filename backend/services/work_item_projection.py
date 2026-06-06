@@ -90,6 +90,7 @@ async def get_projected_work_items(
         equipment_id=equipment_id,
         status=status,
         discipline=discipline,
+        user=user,
     )
     expires_at = now.replace(microsecond=0) + timedelta(seconds=ttl_seconds)
     doc = with_tenant_id({

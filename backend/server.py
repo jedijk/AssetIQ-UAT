@@ -953,8 +953,14 @@ async def shutdown_db_client():
 @app.api_route("/api/admin/seed-database", methods=["GET", "POST"])
 async def trigger_database_seed(secret_key: str = None):
     """Admin endpoint to seed the database with preview data."""
-    expected_key = os.environ.get('SEED_SECRET_KEY', 'emergent-seed-2024')
-    
+    env = (os.environ.get("ENVIRONMENT") or os.environ.get("RAILWAY_ENVIRONMENT") or "").lower()
+    if env in ("production", "prod") and os.environ.get("SEED_ENABLED", "").lower() not in ("1", "true", "yes"):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    expected_key = os.environ.get("SEED_SECRET_KEY")
+    if not expected_key:
+        raise HTTPException(status_code=503, detail="Database seeding is disabled")
+
     if secret_key != expected_key:
         raise HTTPException(status_code=403, detail="Invalid secret key")
     

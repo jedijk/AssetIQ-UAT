@@ -2,6 +2,7 @@
 from services.tenant_schema import (
     PILOT_COLLECTIONS,
     WAVE1_COLLECTIONS,
+    WAVE2_COLLECTIONS,
     merge_tenant_filter,
     tenant_filter,
     tenant_id_from_user,
@@ -34,6 +35,12 @@ def test_pilot_collections_include_projections():
 
 def test_wave1_collections():
     assert WAVE1_COLLECTIONS == frozenset({"equipment_nodes", "threats", "users"})
+
+
+def test_wave2_collections():
+    assert "task_instances" in WAVE2_COLLECTIONS
+    assert "scheduled_tasks" in WAVE2_COLLECTIONS
+    assert "central_actions" in WAVE2_COLLECTIONS
 
 
 def test_tenant_read_filter_migration_safe():

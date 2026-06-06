@@ -71,6 +71,7 @@ import { VoiceInput } from "../ui/voice-input";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { imageAnalysisAPI } from "../../lib/api";
 import { DocumentViewer } from "../DocumentViewer";
+import { getBackendUrl } from "../../lib/apiConfig";
 
 const API_BASE_URL = getBackendUrl();
 

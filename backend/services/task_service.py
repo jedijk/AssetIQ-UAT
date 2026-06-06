@@ -910,9 +910,9 @@ class TaskService:
         completed_at: datetime,
     ) -> None:
         """Materialize reliability graph edges after task instance completion."""
-        import os
+        from services.reliability_graph_strict import graph_sync_strict
 
-        audit_mode = os.environ.get("RELIABILITY_GRAPH_AUDIT_MODE", "").lower() == "true"
+        strict = graph_sync_strict()
         try:
             from services.reliability_graph import sync_edges_for_scheduled_task, upsert_edge
 
@@ -960,7 +960,7 @@ class TaskService:
                 )
         except Exception as exc:
             logger.warning("task instance graph edge sync failed: %s", exc)
-            if audit_mode:
+            if strict:
                 raise
     
     async def _create_observation_from_task(

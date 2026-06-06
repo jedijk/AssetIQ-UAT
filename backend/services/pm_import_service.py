@@ -3552,23 +3552,9 @@ Respond with a JSON object:
         failure_mode_id: str,
         apply_mode: str,
     ) -> None:
-        try:
-            from services.reliability_graph import sync_edge_for_pm_import_task
+        from services.pm_import_graph_sync import sync_pm_import_graph_edge
 
-            equip_match = task.get("equipment_match") or {}
-            await sync_edge_for_pm_import_task(
-                task_id=task_id,
-                failure_mode_id=failure_mode_id,
-                equipment_id=equip_match.get("equipment_id") or task.get("equipment_id"),
-                equipment_type_id=equip_match.get("equipment_type_id"),
-                apply_mode=apply_mode,
-            )
-        except Exception as exc:
-            logger.warning("pm import graph edge sync failed: %s", exc)
-            import os
-
-            if os.environ.get("RELIABILITY_GRAPH_AUDIT_MODE", "").lower() == "true":
-                raise
+        await sync_pm_import_graph_edge(task, task_id, failure_mode_id, apply_mode)
 
     async def apply_task_to_failure_mode(
         self,

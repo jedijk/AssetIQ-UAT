@@ -51,6 +51,7 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { DocumentViewer } from "../components/DocumentViewer";
 import AttachmentsPanel from "../components/attachments/AttachmentsPanel";
+import { getBackendUrl } from "../lib/apiConfig";
 
 const API_BASE_URL = getBackendUrl();
 

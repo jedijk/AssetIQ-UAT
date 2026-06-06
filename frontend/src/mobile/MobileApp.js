@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { 
   Home, 
   ClipboardList, 
@@ -7,6 +7,7 @@ import {
   CheckSquare,
   BarChart3
 } from "lucide-react";
+import { usePermissions } from "../contexts/PermissionsContext";
 import MobileHierarchy from "./MobileHierarchy";
 import MobileMyTasks from "./MobileMyTasks";
 import MobileObservations from "./MobileObservations";
@@ -16,16 +17,31 @@ import MobileAnalytics from "./MobileAnalytics";
 import MobileExecutiveKPIs from "./MobileExecutiveKPIs";
 
 const MobileApp = () => {
+  const { hasPermission, userRole } = usePermissions();
   const [activeTab, setActiveTab] = useState("home");
   const [showChat, setShowChat] = useState(false);
 
-  const tabs = [
-    { id: "home", label: "Home", icon: Home },
-    { id: "analytics", label: "Analytics", icon: BarChart3 },
-    { id: "post", label: "Report", icon: Plus },
-    { id: "tasks", label: "Tasks", icon: ClipboardList },
-    { id: "observations", label: "Alerts", icon: AlertTriangle },
-  ];
+  const tabs = useMemo(() => {
+    const all = [
+      { id: "home", label: "Home", icon: Home, visible: hasPermission("equipment", "read") },
+      {
+        id: "analytics",
+        label: "Analytics",
+        icon: BarChart3,
+        visible: hasPermission("library", "read") || hasPermission("statistics", "read"),
+      },
+      { id: "post", label: "Report", icon: Plus, visible: hasPermission("observations", "write") },
+      { id: "tasks", label: "Tasks", icon: ClipboardList, visible: hasPermission("tasks", "read") },
+      { id: "observations", label: "Alerts", icon: AlertTriangle, visible: hasPermission("observations", "read") },
+    ];
+    return all.filter((t) => t.visible);
+  }, [hasPermission, userRole]);
+
+  React.useEffect(() => {
+    if (tabs.length && !tabs.some((t) => t.id === activeTab)) {
+      setActiveTab(tabs[0].id);
+    }
+  }, [tabs, activeTab]);
 
   const handleTabClick = (tabId) => {
     if (tabId === "post") {

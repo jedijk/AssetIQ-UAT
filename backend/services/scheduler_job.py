@@ -84,6 +84,12 @@ def compute_next_runs(cron_expression: str, tz_name: str, n: int = 3) -> list:
 
 async def _run_weekly_job():
     """Invoked by APScheduler. Computes next-Monday window and triggers the bridge."""
+    from services.scheduler_leader import try_acquire_scheduler_leadership
+
+    if not await try_acquire_scheduler_leadership():
+        logger.info("weekly_task_generation skipped — not scheduler leader")
+        return
+
     cfg = await get_task_generation_config()
     if not cfg["enabled"]:
         logger.info("weekly_task_generation skipped — disabled in settings")
@@ -108,9 +114,14 @@ async def _run_weekly_job():
 
 async def init_scheduler() -> AsyncIOScheduler:
     """Boot APScheduler and register the weekly job. Idempotent."""
+    from services.scheduler_leader import api_scheduler_enabled
+
     global _scheduler
     if _scheduler is not None:
         return _scheduler
+    if not api_scheduler_enabled():
+        logger.info("Task generation scheduler disabled (DISABLE_API_SCHEDULER)")
+        return None  # type: ignore[return-value]
     cfg = await get_task_generation_config()
     sched = AsyncIOScheduler(timezone=ZoneInfo(cfg["timezone"]))
     sched.start()

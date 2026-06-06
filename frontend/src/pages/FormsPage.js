@@ -87,6 +87,8 @@ import {
   DocumentManager,
 } from "../components/forms";
 
+import { getBackendUrl } from "../lib/apiConfig";
+
 // Get base URL without /api suffix
 const API_BASE_URL = getBackendUrl();
 
