@@ -1,12 +1,24 @@
 """
 Maintenance strategy v2 — program/scheduled-task propagation helpers.
+
+Phase 5: canonical updates target ``maintenance_programs_v2`` nested tasks.
+Legacy ``maintenance_programs`` writes are gated by ``SYNC_LEGACY_MAINTENANCE_PROGRAMS``.
 """
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from database import db
-from services.scheduler_helpers import program_is_strategy_backed
+from services.program_task_resolution import (
+    scheduler_program_ids_for_equipment_type,
+    scheduler_program_ids_for_failure_mode,
+    scheduler_program_ids_for_task_template,
+)
+from services.scheduler_config import should_sync_legacy_maintenance_programs
+from services.scheduler_helpers import (
+    normalize_program_criticality,
+    program_is_strategy_backed,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,30 +31,90 @@ _FREQUENCY_DAYS = {
 }
 
 
-async def _propagate_task_template_to_programs(equipment_type_id: str, task_template: dict, new_strategy_version: str):
-    """
-    When a task template is added/edited on a strategy, propagate the changed
-    fields to all maintenance_programs that reference it. Frequency is
-    re-derived per-program based on each equipment's criticality.
-    """
-    from pymongo import UpdateOne
-    
+def _v2_criticality(program: dict) -> str:
+    return normalize_program_criticality(
+        program.get("criticality_level") or program.get("criticality")
+    )
+
+
+async def _propagate_task_template_to_v2_programs(
+    equipment_type_id: str,
+    task_template: dict,
+    new_strategy_version: str,
+) -> int:
+    """Push strategy task template fields into v2 nested program tasks."""
     task_template_id = task_template.get("id")
     if not task_template_id:
         return 0
 
     freq_matrix = task_template.get("frequency_matrix", {}) or {}
     now = datetime.now(timezone.utc).isoformat()
+    modified = 0
 
-    # Find all programs that reference this task template
+    programs = await db.maintenance_programs_v2.find(
+        {
+            "equipment_type_id": equipment_type_id,
+            "tasks.traceability.task_template_id": task_template_id,
+        }
+    ).to_list(5000)
+
+    for prog in programs:
+        criticality = _v2_criticality(prog)
+        frequency = freq_matrix.get(criticality, "monthly")
+        freq_days = _FREQUENCY_DAYS.get(frequency, 30)
+        result = await db.maintenance_programs_v2.update_one(
+            {"_id": prog["_id"]},
+            {
+                "$set": {
+                    "tasks.$[t].task_title": task_template.get("name"),
+                    "tasks.$[t].task_description": task_template.get("description"),
+                    "tasks.$[t].task_type": task_template.get("task_type", "preventive"),
+                    "tasks.$[t].estimated_duration_hours": task_template.get(
+                        "duration_hours", 1.0
+                    ),
+                    "tasks.$[t].frequency": frequency,
+                    "tasks.$[t].frequency_days": freq_days,
+                    "tasks.$[t].discipline": task_template.get("discipline"),
+                    "source_strategy_version": new_strategy_version,
+                    "updated_at": now,
+                }
+            },
+            array_filters=[{"t.traceability.task_template_id": task_template_id}],
+        )
+        modified += result.modified_count
+
+    return modified
+
+
+async def _propagate_task_template_to_programs(
+    equipment_type_id: str,
+    task_template: dict,
+    new_strategy_version: str,
+):
+    """
+    When a task template is added/edited on a strategy, propagate the changed
+    fields to v2 program tasks (and legacy flat rows when dual-write is enabled).
+    """
+    from pymongo import UpdateOne
+
+    task_template_id = task_template.get("id")
+    if not task_template_id:
+        return 0
+
+    modified = await _propagate_task_template_to_v2_programs(
+        equipment_type_id, task_template, new_strategy_version
+    )
+
+    if not should_sync_legacy_maintenance_programs():
+        return modified
+
+    freq_matrix = task_template.get("frequency_matrix", {}) or {}
+    now = datetime.now(timezone.utc).isoformat()
+
     programs = await db.maintenance_programs.find(
         {"equipment_type_id": equipment_type_id, "task_template_id": task_template_id}
     ).to_list(5000)
 
-    if not programs:
-        return 0
-
-    # Build bulk operations
     operations = []
     for prog in programs:
         criticality = prog.get("criticality") or "low"
@@ -53,7 +125,9 @@ async def _propagate_task_template_to_programs(equipment_type_id: str, task_temp
             "task_name": task_template.get("name", prog.get("task_name")),
             "task_description": task_template.get("description"),
             "task_type": task_template.get("task_type", prog.get("task_type")),
-            "estimated_duration_hours": task_template.get("duration_hours", prog.get("estimated_duration_hours", 1.0)),
+            "estimated_duration_hours": task_template.get(
+                "duration_hours", prog.get("estimated_duration_hours", 1.0)
+            ),
             "frequency": frequency,
             "frequency_days": freq_days,
             "discipline": task_template.get("discipline"),
@@ -61,26 +135,41 @@ async def _propagate_task_template_to_programs(equipment_type_id: str, task_temp
             "strategy_version": new_strategy_version,
             "updated_at": now,
         }
-        operations.append(
-            UpdateOne({"_id": prog["_id"]}, {"$set": set_fields})
-        )
+        operations.append(UpdateOne({"_id": prog["_id"]}, {"$set": set_fields}))
 
-    # Execute all updates in a single bulk operation
     if operations:
         result = await db.maintenance_programs.bulk_write(operations, ordered=False)
-        return result.modified_count
-    
-    return 0
+        modified += result.modified_count
+
+    return modified
 
 
 async def _deactivate_programs_for_task(equipment_type_id: str, task_template_id: str):
-    """Mark all programs for this deleted task template as inactive."""
+    """Mark v2 (and optionally legacy) program tasks inactive for a removed template."""
     now = datetime.now(timezone.utc).isoformat()
-    result = await db.maintenance_programs.update_many(
-        {"equipment_type_id": equipment_type_id, "task_template_id": task_template_id},
-        {"$set": {"is_active": False, "updated_at": now}},
+    v2_result = await db.maintenance_programs_v2.update_many(
+        {
+            "equipment_type_id": equipment_type_id,
+            "tasks.traceability.task_template_id": task_template_id,
+        },
+        {
+            "$set": {
+                "tasks.$[t].is_active": False,
+                "updated_at": now,
+            }
+        },
+        array_filters=[{"t.traceability.task_template_id": task_template_id}],
     )
-    return result.modified_count
+    modified = v2_result.modified_count
+
+    if should_sync_legacy_maintenance_programs():
+        legacy = await db.maintenance_programs.update_many(
+            {"equipment_type_id": equipment_type_id, "task_template_id": task_template_id},
+            {"$set": {"is_active": False, "updated_at": now}},
+        )
+        modified += legacy.modified_count
+
+    return modified
 
 
 async def _toggle_programs_for_failure_mode(
@@ -88,19 +177,34 @@ async def _toggle_programs_for_failure_mode(
     failure_mode_id: str,
     enabled: bool,
 ):
-    """
-    When a failure mode strategy is enabled/disabled, activate/deactivate
-    all programs whose failure_mode_id matches.
-    """
+    """Activate/deactivate v2 tasks (and legacy rows when dual-write is enabled)."""
     now = datetime.now(timezone.utc).isoformat()
-    result = await db.maintenance_programs.update_many(
+    v2_result = await db.maintenance_programs_v2.update_many(
         {
             "equipment_type_id": equipment_type_id,
-            "failure_mode_id": failure_mode_id,
+            "tasks.traceability.failure_mode_id": failure_mode_id,
         },
-        {"$set": {"is_active": enabled, "updated_at": now}},
+        {
+            "$set": {
+                "tasks.$[t].is_active": enabled,
+                "updated_at": now,
+            }
+        },
+        array_filters=[{"t.traceability.failure_mode_id": failure_mode_id}],
     )
-    return result.modified_count
+    modified = v2_result.modified_count
+
+    if should_sync_legacy_maintenance_programs():
+        legacy = await db.maintenance_programs.update_many(
+            {
+                "equipment_type_id": equipment_type_id,
+                "failure_mode_id": failure_mode_id,
+            },
+            {"$set": {"is_active": enabled, "updated_at": now}},
+        )
+        modified += legacy.modified_count
+
+    return modified
 
 
 # ---------- Scheduled-task cascade (Planner side) ----------
@@ -121,13 +225,9 @@ async def _sync_metadata_to_open_scheduled_tasks(
     if not task_template_id:
         return 0
 
-    # Find the linked program ids first (scheduled_tasks reference them)
-    program_ids = [
-        p["id"] async for p in db.maintenance_programs.find(
-            {"equipment_type_id": equipment_type_id, "task_template_id": task_template_id},
-            {"id": 1, "_id": 0},
-        )
-    ]
+    program_ids = await scheduler_program_ids_for_task_template(
+        equipment_type_id, task_template_id
+    )
     if not program_ids:
         return 0
 
@@ -153,12 +253,9 @@ async def _delete_open_scheduled_tasks_for_task(
     task_template_id: str,
 ):
     """Hard-delete every OPEN scheduled_task generated from a (now removed) strategy task."""
-    program_ids = [
-        p["id"] async for p in db.maintenance_programs.find(
-            {"equipment_type_id": equipment_type_id, "task_template_id": task_template_id},
-            {"id": 1, "_id": 0},
-        )
-    ]
+    program_ids = await scheduler_program_ids_for_task_template(
+        equipment_type_id, task_template_id
+    )
     if not program_ids:
         return 0
     result = await db.scheduled_tasks.delete_many({
@@ -173,12 +270,9 @@ async def _cancel_open_scheduled_tasks_for_task(
     task_template_id: str,
 ):
     """Cancel every OPEN scheduled_task generated from a (now removed) strategy task."""
-    program_ids = [
-        p["id"] async for p in db.maintenance_programs.find(
-            {"equipment_type_id": equipment_type_id, "task_template_id": task_template_id},
-            {"id": 1, "_id": 0},
-        )
-    ]
+    program_ids = await scheduler_program_ids_for_task_template(
+        equipment_type_id, task_template_id
+    )
     if not program_ids:
         return 0
 
@@ -202,12 +296,9 @@ async def _cancel_open_scheduled_tasks_for_failure_mode(
     failure_mode_id: str,
 ):
     """Cancel every OPEN scheduled_task whose program is linked to the disabled FM."""
-    program_ids = [
-        p["id"] async for p in db.maintenance_programs.find(
-            {"equipment_type_id": equipment_type_id, "failure_mode_id": failure_mode_id},
-            {"id": 1, "_id": 0},
-        )
-    ]
+    program_ids = await scheduler_program_ids_for_failure_mode(
+        equipment_type_id, failure_mode_id
+    )
     if not program_ids:
         return 0
 
@@ -228,12 +319,7 @@ async def _cancel_open_scheduled_tasks_for_failure_mode(
 
 async def _delete_open_scheduled_tasks_for_strategy(equipment_type_id: str):
     """Hard-delete every OPEN scheduled_task linked to the given equipment-type strategy."""
-    program_ids = [
-        p["id"] async for p in db.maintenance_programs.find(
-            {"equipment_type_id": equipment_type_id},
-            {"id": 1, "_id": 0},
-        )
-    ]
+    program_ids = await scheduler_program_ids_for_equipment_type(equipment_type_id)
     if not program_ids:
         return 0
     result = await db.scheduled_tasks.delete_many({
@@ -245,12 +331,7 @@ async def _delete_open_scheduled_tasks_for_strategy(equipment_type_id: str):
 
 async def _cancel_open_scheduled_tasks_for_strategy(equipment_type_id: str):
     """Cancel every OPEN scheduled_task linked to the given equipment-type strategy."""
-    program_ids = [
-        p["id"] async for p in db.maintenance_programs.find(
-            {"equipment_type_id": equipment_type_id},
-            {"id": 1, "_id": 0},
-        )
-    ]
+    program_ids = await scheduler_program_ids_for_equipment_type(equipment_type_id)
     if not program_ids:
         return 0
 
@@ -273,11 +354,12 @@ async def _cancel_open_scheduled_tasks_for_strategy(equipment_type_id: str):
 
 async def _resync_programs_with_strategy(equipment_type_id: str):
     """
-    Re-derive `is_active` on every maintenance_program for this strategy and
-    cancel any open scheduled_tasks for newly inactive programs.
+    Re-derive ``is_active`` on v2 nested tasks (and legacy programs when dual-write
+    is enabled), then cancel open scheduled_tasks for newly inactive program ids.
 
     Uses the same active-task rules as the strategy UI and program generation.
     """
+    from models.maintenance_program import TaskSource
     from services.scheduler_helpers import build_task_to_failure_modes, is_strategy_task_active
 
     strategy = await db.equipment_type_strategies.find_one(
@@ -294,56 +376,90 @@ async def _resync_programs_with_strategy(equipment_type_id: str):
         if t.get("id") and is_strategy_task_active(t, task_to_fms=task_to_fms)
     }
 
-    programs = await db.maintenance_programs.find(
+    now = datetime.now(timezone.utc).isoformat()
+    activated = 0
+    deactivated = 0
+    program_ids_to_cancel_tasks: List[str] = []
+
+    v2_programs = await db.maintenance_programs_v2.find(
         {"equipment_type_id": equipment_type_id}
     ).to_list(5000)
 
-    now = datetime.now(timezone.utc).isoformat()
-    
-    # Collect program IDs to activate/deactivate in bulk
-    programs_to_activate = []
-    programs_to_deactivate = []
-    program_ids_to_cancel_tasks = []
+    for prog in v2_programs:
+        for task in prog.get("tasks") or []:
+            source = (task.get("task_source") or "").lower()
+            if source != TaskSource.STRATEGY_GENERATED.value:
+                continue
+            trace = task.get("traceability") or {}
+            template_id = trace.get("task_template_id")
+            new_active = bool(template_id and template_id in active_task_ids)
+            current_active = task.get("is_active", True)
+            if current_active == new_active:
+                continue
 
-    for prog in programs:
-        if not program_is_strategy_backed(prog):
-            continue
+            task_id = task.get("id")
+            if not task_id:
+                continue
 
-        tid = prog.get("task_template_id")
-        new_active = bool(tid and tid in active_task_ids)
-
-        if prog.get("is_active") != new_active:
+            await db.maintenance_programs_v2.update_one(
+                {"_id": prog["_id"]},
+                {
+                    "$set": {
+                        "tasks.$[t].is_active": new_active,
+                        "updated_at": now,
+                    }
+                },
+                array_filters=[{"t.id": task_id}],
+            )
             if new_active:
-                programs_to_activate.append(prog["_id"])
+                activated += 1
             else:
-                programs_to_deactivate.append(prog["_id"])
-                if prog.get("id"):
-                    program_ids_to_cancel_tasks.append(prog["id"])
+                deactivated += 1
+                program_ids_to_cancel_tasks.append(task_id)
 
-    # Bulk update programs - activate
-    activated = 0
-    if programs_to_activate:
-        result = await db.maintenance_programs.update_many(
-            {"_id": {"$in": programs_to_activate}},
-            {"$set": {"is_active": True, "updated_at": now}},
-        )
-        activated = result.modified_count
+    if should_sync_legacy_maintenance_programs():
+        programs = await db.maintenance_programs.find(
+            {"equipment_type_id": equipment_type_id}
+        ).to_list(5000)
 
-    # Bulk update programs - deactivate
-    deactivated = 0
-    if programs_to_deactivate:
-        result = await db.maintenance_programs.update_many(
-            {"_id": {"$in": programs_to_deactivate}},
-            {"$set": {"is_active": False, "updated_at": now}},
-        )
-        deactivated = result.modified_count
+        programs_to_activate = []
+        programs_to_deactivate = []
 
-    # Bulk cancel scheduled tasks for deactivated programs
+        for prog in programs:
+            if not program_is_strategy_backed(prog):
+                continue
+
+            tid = prog.get("task_template_id")
+            new_active = bool(tid and tid in active_task_ids)
+
+            if prog.get("is_active") != new_active:
+                if new_active:
+                    programs_to_activate.append(prog["_id"])
+                else:
+                    programs_to_deactivate.append(prog["_id"])
+                    if prog.get("id"):
+                        program_ids_to_cancel_tasks.append(prog["id"])
+
+        if programs_to_activate:
+            result = await db.maintenance_programs.update_many(
+                {"_id": {"$in": programs_to_activate}},
+                {"$set": {"is_active": True, "updated_at": now}},
+            )
+            activated += result.modified_count
+
+        if programs_to_deactivate:
+            result = await db.maintenance_programs.update_many(
+                {"_id": {"$in": programs_to_deactivate}},
+                {"$set": {"is_active": False, "updated_at": now}},
+            )
+            deactivated += result.modified_count
+
     scheduled_cancelled = 0
-    if program_ids_to_cancel_tasks:
+    unique_cancel_ids = list(dict.fromkeys(program_ids_to_cancel_tasks))
+    if unique_cancel_ids:
         result = await db.scheduled_tasks.update_many(
             {
-                "maintenance_program_id": {"$in": program_ids_to_cancel_tasks},
+                "maintenance_program_id": {"$in": unique_cancel_ids},
                 "status": {"$nin": ["completed", "cancelled"]},
             },
             {"$set": {

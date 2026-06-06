@@ -1,6 +1,10 @@
 """
-Sync maintenance strategy / program changes to the scheduler (maintenance_programs
-+ scheduled_tasks) so equipment-type and all-equipment schedule views stay current.
+Sync maintenance strategy / program changes to the scheduler (scheduled_tasks)
+so equipment-type and all-equipment schedule views stay current.
+
+Phase 5: canonical programs live in ``maintenance_programs_v2``. Legacy flat-row
+sync to ``maintenance_programs`` is off by default; set
+``SYNC_LEGACY_MAINTENANCE_PROGRAMS=true`` to re-enable dual-write.
 """
 import logging
 import time
@@ -12,6 +16,7 @@ from pymongo import InsertOne, UpdateOne
 from database import db
 from models.maintenance_program import TaskSource
 from models.maintenance_scheduler import CriticalityLevel, EquipmentMaintenanceProgram
+from services.scheduler_config import should_sync_legacy_maintenance_programs
 from services.scheduler_helpers import (
     build_task_to_failure_modes,
     frequency_to_days,
@@ -35,6 +40,9 @@ async def sync_strategy_programs_for_equipment(
     strategy: Dict[str, Any],
 ) -> Tuple[int, int, int]:
     """Upsert legacy maintenance_programs from active strategy task templates for one equipment."""
+    if not should_sync_legacy_maintenance_programs():
+        return 0, 0, 0
+
     equipment_type_id = strategy.get("equipment_type_id") or equipment.get("equipment_type_id")
     equipment_id = equipment.get("id")
     if not equipment_id or not equipment_type_id:
@@ -189,6 +197,9 @@ async def sync_v2_program_tasks_to_scheduler(
     strategy: Optional[Dict[str, Any]] = None,
 ) -> int:
     """Mirror v2 program tasks (manual, overrides, inactive state) to legacy programs."""
+    if not should_sync_legacy_maintenance_programs():
+        return 0
+
     equipment_id = equipment.get("id")
     if not equipment_id:
         return 0
@@ -863,6 +874,7 @@ async def refresh_equipment_schedule(
     """
     from routes.maintenance_scheduler.scheduler import schedule_programs_for_equipment
     from services.maintenance_program_service import MaintenanceProgramService
+    from services.scheduler_program_source import load_schedulable_programs
 
     equipment = await db.equipment_nodes.find_one({"id": equipment_id}, {"_id": 0})
     if not equipment:
@@ -889,11 +901,9 @@ async def refresh_equipment_schedule(
     if not skip_scheduling:
         scheduled_created = await schedule_programs_for_equipment([equipment_id])
 
-    active_program_count = await db.maintenance_programs.count_documents(
-        {"equipment_id": equipment_id, "is_active": True},
-    )
+    schedulable_programs = await load_schedulable_programs(equipment_ids=[equipment_id])
     schedule_cleared = 0
-    if active_program_count == 0:
+    if not schedulable_programs:
         clear_result = await db.scheduled_tasks.delete_many({"equipment_id": equipment_id})
         schedule_cleared = clear_result.deleted_count
 
@@ -906,6 +916,7 @@ async def refresh_equipment_schedule(
         "pm_import_programs_synced": pm_sync.get("programs_synced", 0),
         "scheduled_tasks_created": scheduled_created,
         "scheduled_tasks_cleared_no_program": schedule_cleared,
+        "legacy_program_sync_enabled": should_sync_legacy_maintenance_programs(),
     }
 
 

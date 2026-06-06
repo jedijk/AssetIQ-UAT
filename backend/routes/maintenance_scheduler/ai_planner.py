@@ -33,13 +33,16 @@ async def ai_plan_tasks(
     explicit reasoning per task.
     """
     try:
-        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        from services.openai_service import chat_completion
     except ImportError:
-        raise HTTPException(status_code=500, detail="emergentintegrations library not installed")
+        raise HTTPException(status_code=500, detail="OpenAI service not available")
 
-    emergent_key = os.environ.get("EMERGENT_LLM_KEY")
-    if not emergent_key:
-        raise HTTPException(status_code=500, detail="EMERGENT_LLM_KEY not configured")
+    api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("EMERGENT_LLM_KEY")
+    if not api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="OPENAI_API_KEY or EMERGENT_LLM_KEY not configured",
+        )
 
     if request is None:
         request = AIScheduleRequest(
@@ -116,19 +119,17 @@ async def ai_plan_tasks(
     }
 
     session_id = f"ai-plan-{uuid.uuid4()}"
-    chat = (
-        LlmChat(
-            api_key=emergent_key,
-            session_id=session_id,
-            system_message=system_message,
-        )
-        .with_model("openai", "gpt-4o")
-        .with_params(response_format={"type": "json_object"})
-    )
+    logger.debug("AI planner session %s", session_id)
 
     try:
-        response_text = await chat.send_message(
-            UserMessage(text=json.dumps(user_payload))
+        response_text = await chat_completion(
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": json.dumps(user_payload)},
+            ],
+            model="gpt-4o",
+            response_format={"type": "json_object"},
+            api_key=api_key,
         )
     except Exception as e:
         logger.exception("AI planner LLM call failed")

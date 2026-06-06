@@ -20,6 +20,7 @@ from typing import Optional, List, Dict, Any, Tuple
 from database import db
 from routes.maintenance_scheduler._shared import normalize_program_criticality
 from services.scheduler_helpers import build_task_to_failure_modes, is_strategy_task_active
+from services.scheduler_config import should_sync_legacy_maintenance_programs
 from services.criticality_score import compute_criticality_score, resolve_equipment_criticality_score
 from models.maintenance_program import (
     MaintenanceProgram,
@@ -872,9 +873,25 @@ class MaintenanceProgramService:
                 continue
 
             equipment_processed += 1
+            active_v2_ids: List[str] = [
+                t.get("id") for t in imported_tasks if t.get("id")
+            ]
+
+            if not should_sync_legacy_maintenance_programs():
+                synced_programs += len(active_v2_ids)
+                if schedule:
+                    from routes.maintenance_scheduler.scheduler import (
+                        schedule_programs_for_equipment,
+                    )
+
+                    scheduled_tasks += await schedule_programs_for_equipment(
+                        [equipment_id], horizon_days
+                    )
+                continue
+
             equip_criticality = normalize_program_criticality(equipment.get("criticality"))
             today = datetime.utcnow().date().isoformat()
-            active_v2_ids: List[str] = []
+            active_v2_ids = []
 
             for task in imported_tasks:
                 v2_task_id = task.get("id")

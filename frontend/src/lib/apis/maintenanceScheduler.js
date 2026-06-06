@@ -17,14 +17,6 @@ export async function refreshMaintenanceSchedulerQueries(queryClient) {
   });
 }
 
-export async function refreshMaintenanceSchedulerQueries(queryClient) {
-  await queryClient.invalidateQueries({ predicate: isMaintenanceSchedulerQuery });
-  await queryClient.refetchQueries({
-    predicate: isMaintenanceSchedulerQuery,
-    type: "active",
-  });
-}
-
 const APPLY_STRATEGY_ASYNC_THRESHOLD = 5;
 const JOB_POLL_INTERVAL_MS = 2000;
 const JOB_POLL_TIMEOUT_MS = 5 * 60 * 1000;
