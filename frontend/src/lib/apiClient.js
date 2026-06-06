@@ -1,21 +1,29 @@
 import axios from "axios";
-import { getApiUrl, getBackendUrl } from "./apiConfig";
+import { getApiUrl, getBackendUrl, AUTH_MODE, getCsrfToken } from "./apiConfig";
 import { debugLog } from "./debug";
 
 // Get API URL at initialization for static uses
 export const API_URL = getApiUrl();
 
-const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" (default) | "cookie"
+function applyCookieAuthHeaders(config) {
+  const m = (config.method || "get").toLowerCase();
+  const unsafe = !["get", "head", "options"].includes(m);
+  if (unsafe) {
+    const csrf = getCsrfToken();
+    if (csrf) config.headers["X-CSRF-Token"] = csrf;
+  }
+  const dbEnv = localStorage.getItem("database_environment");
+  if (dbEnv) config.headers["X-Database-Environment"] = dbEnv;
+  return config;
+}
 
-function getCookie(name) {
-  try {
-    const cookies = document.cookie ? document.cookie.split(";") : [];
-    for (const c of cookies) {
-      const [k, ...rest] = c.trim().split("=");
-      if (k === name) return decodeURIComponent(rest.join("=") || "");
-    }
-  } catch (_e) {}
-  return null;
+// Global axios defaults for cookie-auth (AuthContext and legacy raw axios calls).
+if (AUTH_MODE === "cookie") {
+  axios.defaults.withCredentials = true;
+  axios.interceptors.request.use((config) => {
+    config.headers = config.headers || {};
+    return applyCookieAuthHeaders(config);
+  });
 }
 
 // Log API configuration at startup (development only)
@@ -42,24 +50,18 @@ api.interceptors.request.use((config) => {
     console.error("[API] WARNING: API URL does not include /api prefix:", config.baseURL);
   }
 
+  config.headers = config.headers || {};
   if (AUTH_MODE !== "cookie") {
     const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-  } else {
-    // Double-submit CSRF for unsafe methods when using cookie auth
-    const m = (config.method || "get").toLowerCase();
-    const unsafe = !["get", "head", "options"].includes(m);
-    if (unsafe) {
-      const csrf = getCookie("assetiq_csrf");
-      if (csrf) config.headers["X-CSRF-Token"] = csrf;
+    const dbEnv = localStorage.getItem("database_environment");
+    if (dbEnv) {
+      config.headers["X-Database-Environment"] = dbEnv;
     }
-  }
-
-  const dbEnv = localStorage.getItem("database_environment");
-  if (dbEnv) {
-    config.headers["X-Database-Environment"] = dbEnv;
+  } else {
+    applyCookieAuthHeaders(config);
   }
 
   try {
@@ -124,24 +126,18 @@ export const aiApi = axios.create({
 });
 
 aiApi.interceptors.request.use((config) => {
+  config.headers = config.headers || {};
   if (AUTH_MODE !== "cookie") {
     const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-  } else {
-    const m = (config.method || "get").toLowerCase();
-    const unsafe = !["get", "head", "options"].includes(m);
-    if (unsafe) {
-      const csrf = getCookie("assetiq_csrf");
-      if (csrf) config.headers["X-CSRF-Token"] = csrf;
+    const dbEnv = localStorage.getItem("database_environment");
+    if (dbEnv) {
+      config.headers["X-Database-Environment"] = dbEnv;
     }
-  }
-
-  // Keep DB environment switching consistent with the primary api client
-  const dbEnv = localStorage.getItem("database_environment");
-  if (dbEnv) {
-    config.headers["X-Database-Environment"] = dbEnv;
+  } else {
+    applyCookieAuthHeaders(config);
   }
   return config;
 });

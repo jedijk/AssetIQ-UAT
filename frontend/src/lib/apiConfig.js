@@ -16,6 +16,30 @@
 // Debug flag - set to true to enable console logging
 const DEBUG_API_CONFIG = false;
 
+export const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+export const CSRF_COOKIE_NAME = process.env.REACT_APP_CSRF_COOKIE_NAME || "assetiq_csrf";
+
+const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+export function getCookie(name) {
+  try {
+    const cookies = document.cookie ? document.cookie.split(";") : [];
+    for (const c of cookies) {
+      const [k, ...rest] = c.trim().split("=");
+      if (k === name) return decodeURIComponent(rest.join("=") || "");
+    }
+  } catch (_e) {}
+  return null;
+}
+
+export function getCsrfToken() {
+  return getCookie(CSRF_COOKIE_NAME);
+}
+
+function isUnsafeMethod(method) {
+  return UNSAFE_METHODS.has(String(method || "GET").toUpperCase());
+}
+
 // No hardcoded fallback - require explicit configuration for production
 // This prevents accidental cross-environment API calls
 
@@ -29,7 +53,7 @@ const logDebug = (message, ...args) => {
 export const getBackendUrl = () => {
   // Cookie auth should be same-origin to avoid third-party cookie restrictions
   // (notably Safari/iOS). We rely on Vercel rewrites for /api -> backend.
-  const authMode = process.env.REACT_APP_AUTH_MODE || "bearer";
+  const authMode = AUTH_MODE;
   const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
   if (authMode === "cookie" && currentOrigin) {
     return currentOrigin;
@@ -109,45 +133,54 @@ export default getBackendUrl;
 
 /**
  * Get standard auth headers including database environment for fetch() calls.
- * Use this for any raw fetch() calls to ensure database switching works.
- * 
+ *
  * @param {Object} additionalHeaders - Additional headers to merge
- * @returns {Object} Headers object with Authorization and X-Database-Environment
+ * @param {string} method - HTTP method (CSRF token added for unsafe methods in cookie mode)
+ * @returns {Object} Headers object
  */
-export const getAuthHeaders = (additionalHeaders = {}) => {
-  const token = localStorage.getItem("token");
-  const dbEnv = localStorage.getItem("database_environment");
-  
+export const getAuthHeaders = (additionalHeaders = {}, method = "GET") => {
   const headers = {
-    "Content-Type": "application/json",
-    ...additionalHeaders
+    ...additionalHeaders,
   };
-  
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+
+  if (AUTH_MODE === "bearer") {
+    const token = localStorage.getItem("token");
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+  } else if (isUnsafeMethod(method)) {
+    const csrf = getCsrfToken();
+    if (csrf) {
+      headers["X-CSRF-Token"] = csrf;
+    }
   }
-  
+
+  const dbEnv = localStorage.getItem("database_environment");
   if (dbEnv) {
     headers["X-Database-Environment"] = dbEnv;
   }
-  
+
   return headers;
 };
 
 /**
+ * Build fetch init with auth credentials, CSRF (cookie mode), and DB env headers.
+ */
+export const getAuthFetchInit = (options = {}) => {
+  const method = options.method || "GET";
+  const headers = getAuthHeaders(options.headers || {}, method);
+  return {
+    ...options,
+    method,
+    headers,
+    credentials: AUTH_MODE === "cookie" ? "include" : "omit",
+  };
+};
+
+/**
  * Wrapper for fetch() that automatically includes auth and database headers.
- * Drop-in replacement for fetch() in authenticated API calls.
- * 
- * @param {string} url - The URL to fetch
- * @param {Object} options - Fetch options (method, body, etc.)
- * @returns {Promise<Response>} Fetch response
  */
 export const authFetch = async (url, options = {}) => {
-  const headers = getAuthHeaders(options.headers || {});
-  
-  return fetch(url, {
-    ...options,
-    headers
-  });
+  return fetch(url, getAuthFetchInit(options));
 };
 

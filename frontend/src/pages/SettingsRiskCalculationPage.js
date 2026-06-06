@@ -21,10 +21,9 @@ import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import { useIsMobile } from "../hooks/useIsMobile";
-import { getBackendUrl } from "../lib/apiConfig";
+import { getBackendUrl, getAuthFetchInit } from "../lib/apiConfig";
 
 const API_URL = getBackendUrl();
-const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
 
 const SettingsRiskCalculationPage = () => {
   const navigate = useNavigate();
@@ -43,13 +42,7 @@ const SettingsRiskCalculationPage = () => {
 
   const fetchRiskSettings = async () => {
     try {
-      const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
-      const response = await fetch(`${API_URL}/api/risk-settings`, {
-        credentials: AUTH_MODE === "cookie" ? "include" : "omit",
-        headers: {
-          ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
+      const response = await fetch(`${API_URL}/api/risk-settings`, getAuthFetchInit());
       
       if (response.ok) {
         const data = await response.json();
@@ -113,18 +106,13 @@ const SettingsRiskCalculationPage = () => {
     
     setSaving(true);
     try {
-      const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
       const response = await fetch(
         `${API_URL}/api/risk-settings/${selectedInstallation.installation_id}?recalculate=true`,
-        {
+        getAuthFetchInit({
           method: "PUT",
-          headers: {
-            ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
-            "Content-Type": "application/json"
-          },
-          credentials: AUTH_MODE === "cookie" ? "include" : "omit",
-          body: JSON.stringify(settings)
-        }
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(settings),
+        })
       );
       
       if (response.ok) {
@@ -153,16 +141,9 @@ const SettingsRiskCalculationPage = () => {
     
     setRecalculating(true);
     try {
-      const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
       const response = await fetch(
         `${API_URL}/api/risk-settings/${selectedInstallation.installation_id}?recalculate=true`,
-        {
-          method: "DELETE",
-          headers: {
-            ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          credentials: AUTH_MODE === "cookie" ? "include" : "omit",
-        }
+        getAuthFetchInit({ method: "DELETE" })
       );
       
       if (response.ok) {
@@ -184,16 +165,9 @@ const SettingsRiskCalculationPage = () => {
     
     setRecalculating(true);
     try {
-      const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
       const response = await fetch(
         `${API_URL}/api/risk-settings/${selectedInstallation.installation_id}/recalculate`,
-        {
-          method: "POST",
-          headers: {
-            ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          credentials: AUTH_MODE === "cookie" ? "include" : "omit",
-        }
+        getAuthFetchInit({ method: "POST" })
       );
       
       if (response.ok) {

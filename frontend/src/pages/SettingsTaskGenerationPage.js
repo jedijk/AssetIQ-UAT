@@ -26,26 +26,15 @@ import {
 } from "../components/ui/dialog";
 import { toast } from "sonner";
 import { SettingsSection, SettingsCard } from "./SettingsPage";
-import { getBackendUrl } from "../lib/apiConfig";
+import { getBackendUrl, getAuthFetchInit } from "../lib/apiConfig";
 
 const API_BASE_URL = getBackendUrl();
-const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer";
-
-function authHeaders(extra = {}) {
-  const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...extra,
-  };
-}
 
 async function fetchJson(path, options = {}) {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    headers: authHeaders(options.headers),
-    credentials: AUTH_MODE === "cookie" ? "include" : "omit",
+  const res = await fetch(`${API_BASE_URL}${path}`, getAuthFetchInit({
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
     ...options,
-  });
+  }));
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || `${res.status} ${res.statusText}`);

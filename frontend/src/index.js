@@ -1,5 +1,6 @@
 // Load polyfills FIRST for older browser support
 import "./lib/polyfills";
+import "./lib/apiClient";
 
 import React from "react";
 import ReactDOM from "react-dom/client";

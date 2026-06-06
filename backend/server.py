@@ -567,6 +567,11 @@ async def csrf_protect_cookie_auth(request: Request, call_next):
         if authz.lower().startswith("bearer "):
             return await call_next(request)
 
+        # Only enforce CSRF when a session cookie is present (cookie-auth sessions).
+        auth_cookie_name = os.environ.get("AUTH_COOKIE_NAME", "assetiq_token")
+        if not request.cookies.get(auth_cookie_name):
+            return await call_next(request)
+
         csrf_cookie = request.cookies.get(os.environ.get("CSRF_COOKIE_NAME", "assetiq_csrf"))
         csrf_header = request.headers.get("x-csrf-token")
         if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
