@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import {
   AlertTriangle,
   CheckCircle,
@@ -12,6 +13,7 @@ import {
   User,
   Link,
   Search,
+  X,
 } from "lucide-react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -145,6 +147,33 @@ export function FailureModeFormDialog(props) {
     resetFmForm,
     setEditingFm,
   } = props;
+
+  const [equipmentTypeSearch, setEquipmentTypeSearch] = useState("");
+
+  const filteredEquipmentTypes = useMemo(
+    () =>
+      equipmentTypes.filter(
+        (et) =>
+          !equipmentTypeSearch ||
+          et.name.toLowerCase().includes(equipmentTypeSearch.toLowerCase()) ||
+          (et.description && et.description.toLowerCase().includes(equipmentTypeSearch.toLowerCase())),
+      ),
+    [equipmentTypes, equipmentTypeSearch],
+  );
+
+  const DISCIPLINE_OPTIONS = useMemo(
+    () => [
+      { value: "mechanical", label: t("library.mechanical") },
+      { value: "electrical", label: t("library.electrical") },
+      { value: "instrumentation", label: t("library.instrumentation") },
+      { value: "process", label: t("library.process") },
+      { value: "civil", label: t("library.disciplineCivilStructural") },
+      { value: "operations", label: t("disciplines.Operations") },
+      { value: "laboratory", label: t("disciplines.Laboratory") },
+    ],
+    [t],
+  );
+
   return (
 <Dialog open={isFmDialogOpen} onOpenChange={setIsFmDialogOpen}>
   <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
