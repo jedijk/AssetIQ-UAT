@@ -324,30 +324,33 @@ const CRON_PRESETS = [
 ];
 
 function ScheduleEditor() {
-  const qc = useQueryClient();
   const { data: schedule, isLoading } = useQuery({
     queryKey: ["task-generation-schedule"],
     queryFn: () => fetchJson("/api/admin/task-generation/schedule"),
   });
 
-  const [draftCron, setDraftCron] = useState("");
-  const [draftTz, setDraftTz] = useState("");
-  const [draftLookAhead, setDraftLookAhead] = useState(7);
-  const [draftEnabled, setDraftEnabled] = useState(true);
+  if (isLoading || !schedule) {
+    return (
+      <SettingsCard title="Weekly Schedule" description="Loading…">
+        <div className="text-sm text-slate-500">Loading…</div>
+      </SettingsCard>
+    );
+  }
+  // Remount the form whenever the saved schedule changes so draft state is
+  // re-initialized cleanly from the latest server value (no set-state-in-effect).
+  const formKey = `${schedule.cron_expression}|${schedule.timezone}|${schedule.look_ahead_days}|${schedule.enabled}`;
+  return <ScheduleEditorForm key={formKey} schedule={schedule} />;
+}
+
+function ScheduleEditorForm({ schedule }) {
+  const qc = useQueryClient();
+
+  const [draftCron, setDraftCron] = useState(schedule.cron_expression);
+  const [draftTz, setDraftTz] = useState(schedule.timezone);
+  const [draftLookAhead, setDraftLookAhead] = useState(schedule.look_ahead_days);
+  const [draftEnabled, setDraftEnabled] = useState(schedule.enabled);
   const [preview, setPreview] = useState(null);
   const [previewError, setPreviewError] = useState(null);
-
-  const hydrated = useMemo(() => {
-    if (!schedule) return false;
-    if (draftCron === "") {
-      setDraftCron(schedule.cron_expression);
-      setDraftTz(schedule.timezone);
-      setDraftLookAhead(schedule.look_ahead_days);
-      setDraftEnabled(schedule.enabled);
-      return true;
-    }
-    return true;
-  }, [schedule, draftCron]);
 
   const previewMutation = useMutation({
     mutationFn: (body) =>
@@ -379,20 +382,10 @@ function ScheduleEditor() {
   });
 
   const hasChanges =
-    hydrated &&
-    schedule &&
-    (draftCron !== schedule.cron_expression ||
-      draftTz !== schedule.timezone ||
-      draftLookAhead !== schedule.look_ahead_days ||
-      draftEnabled !== schedule.enabled);
-
-  if (isLoading) {
-    return (
-      <SettingsCard title="Weekly Schedule" description="Loading…">
-        <div className="text-sm text-slate-500">Loading…</div>
-      </SettingsCard>
-    );
-  }
+    draftCron !== schedule.cron_expression ||
+    draftTz !== schedule.timezone ||
+    draftLookAhead !== schedule.look_ahead_days ||
+    draftEnabled !== schedule.enabled;
 
   return (
     <SettingsCard

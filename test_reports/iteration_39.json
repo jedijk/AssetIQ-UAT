@@ -1,0 +1,39 @@
+{
+  "summary": "Phase P3 (Weekly Task Generation cron + Settings UI) end-to-end verified. 15/15 backend pytest cases pass and the Settings → Task Generation page now renders without crashing — useMemo+setState-in-render bug confirmed fixed. Cron preset chips, Preview, Save & reload scheduler, and the live 'Scheduler running' badge / Next runs panel all work. Schedule was restored to cron='0 2 * * sun', tz='Europe/Amsterdam', look_ahead_days=7, enabled=true at the end of testing.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/admin/task-generation/schedule/preview", "issue": "Invalid timezone silently falls back to UTC inside compute_next_runs() instead of returning 400 like PUT does. Inconsistent with PUT /schedule (which returns 400 'Unknown timezone'). Consider validating tz explicitly in the preview endpoint for parity."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Settings → Task Generation", "issues": ["Onboarding tour modal ('Welcome to AssetIQ — Step 1 of 9') auto-appears on every settings page load for users who already have data; consider scoping intro to first login only — already gated by localStorage flag 'assetiq_intro_seen' but did re-appear during testing."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_task_generation_schedule.py",
+    "/app/test_reports/pytest/p3_schedule_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Make POST /api/admin/task-generation/schedule/preview validate timezone explicitly and return 400 'Unknown timezone' for parity with PUT /schedule."
+  ],
+  "critical_code_review_comments": [
+    "scheduler_job.py: compute_next_runs() silently falls back to UTC on ZoneInfoNotFoundError — masks bad input from preview endpoint. Either raise so HTTPException(400) is returned, or validate tz before calling.",
+    "scheduler_job.py: AsyncIOScheduler runs in-process; with a Kubernetes deployment of >1 backend replica, the cron will fire N times. Today supervisor uses --workers 1 so it is fine, but document/guard against scaling.",
+    "task_generation_admin.py: PUT /schedule and POST /schedule/preview both use ScheduleUpdate model — preview accepts look_ahead_days/enabled fields it never uses. Consider a narrower preview model.",
+    "SettingsTaskGenerationPage.js: 'Next runs' uses localized timestamps (e.g. 'Jun 7, 2026, 4:00 AM'). For UTC and Europe/Amsterdam this is fine, but consider also showing the resolved IANA tz on the right of each line for clarity."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_task_generation_schedule.py (new)"
+  ],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "100% (all 7 testids + preset+preview+save+toast+badge+next-runs verified)"},
+  "test_credentials": "Owner: jedijk@gmail.com / Jaap8019@.  Pre-approved viewer for 403 tests: TEST_nonadmin_1780733944@example.com / Testpass123! (created + DB-promoted to approved/viewer; kept in DB for reuse by next testing agent).",
+  "seed_data_creation": "Created and approved one viewer user TEST_nonadmin_1780733944@example.com for non-admin 403 assertions. Left in place.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression suite at /app/backend/tests/test_task_generation_schedule.py covers GET/PUT/preview/run + 403s. To re-run: `pytest /app/backend/tests/test_task_generation_schedule.py -v`. The session-scoped restore_defaults fixture always puts the schedule back to '0 2 * * sun', Europe/Amsterdam, look_ahead_days=7, enabled=true. The idempotency live-run test triggers a real (non-dry) run once — per the brief, do NOT triple-run it. The TEST_nonadmin_1780733944@example.com viewer user already exists for 403 tests.",
+  "rca of the issue": "Original P3 bug (set-state in render) was fixed by main agent before this iteration by splitting ScheduleEditor into a wrapper (data gate) + ScheduleEditorForm (draft state initialised from prop, remount via key on save). Verified: navigating to /settings/task-generation as owner renders fully, no React error boundary, no pageerror in console, all 7 data-testids visible, cron prefilled, preset+preview+save round-trip works, toast confirms reload, badge shows 'Scheduler running', and Next runs panel updates."
+}
