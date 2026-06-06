@@ -44,6 +44,8 @@ const en = {
     themeAssetIQ: "AssetIQ Blue",
     title: "Settings",
     subtitle: "Manage your preferences",
+    searchPlaceholder: "Search settings...",
+    noSearchResults: "No settings match your search",
     accessLevel: "{role} access level",
     version: "Version {version}",
     sections: {
@@ -2107,6 +2109,8 @@ const nl = {
     themeAssetIQ: "AssetIQ Blauw",
     title: "Instellingen",
     subtitle: "Beheer uw voorkeuren",
+    searchPlaceholder: "Zoek instellingen...",
+    noSearchResults: "Geen instellingen gevonden",
     accessLevel: "{role} toegangsniveau",
     version: "Versie {version}",
     sections: {
