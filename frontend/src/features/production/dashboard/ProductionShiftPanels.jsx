@@ -1,14 +1,14 @@
-import { Plus, Pencil, Trash2, MessageCircle, Pin, PinOff } from "lucide-react";
-import { Button } from "../../../components/ui/button";
-import { Badge } from "../../../components/ui/badge";
-import { WasteReportingPanel, PRODUCTION_DASH_ACTION_EDIT, PRODUCTION_DASH_ACTION_DELETE, PRODUCTION_DASH_INFO_ACTION_EDIT, PRODUCTION_DASH_INFO_ACTION_DELETE } from "./productionDashboardShared";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../../components/ui/dropdown-menu";
-import { Tooltip as RadixTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../../components/ui/tooltip";
-import { toast } from "sonner";
 import React from "react";
 import { Plus, Pencil, Trash2, MessageCircle, Pin, PinOff } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { Badge } from "../../../components/ui/badge";
+import {
+  WasteReportingPanel,
+  PRODUCTION_DASH_ACTION_EDIT,
+  PRODUCTION_DASH_ACTION_DELETE,
+  PRODUCTION_DASH_INFO_ACTION_EDIT,
+  PRODUCTION_DASH_INFO_ACTION_DELETE,
+} from "./productionDashboardShared";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "../../../components/ui/dropdown-menu";
@@ -17,13 +17,6 @@ import {
 } from "../../../components/ui/tooltip";
 import { formatDateTimeCompact } from "../../../lib/dateUtils";
 import { toast } from "sonner";
-import {
-  WasteReportingPanel,
-  PRODUCTION_DASH_ACTION_EDIT,
-  PRODUCTION_DASH_ACTION_DELETE,
-  PRODUCTION_DASH_INFO_ACTION_EDIT,
-  PRODUCTION_DASH_INFO_ACTION_DELETE,
-} from "./productionDashboardShared";
 export function ProductionShiftPanels({
   data, isMobile, formTemplates, line90Equipment, setFormExec, setDeleteConfirm,
   wasteWeightThresholdKg, expandedEosNotes, setExpandedEosNotes, editBigBag, setEditBigBag,

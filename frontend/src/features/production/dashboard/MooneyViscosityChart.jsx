@@ -1,5 +1,3 @@
-import { ResponsiveContainer, ComposedChart, CartesianGrid, ReferenceArea, XAxis, YAxis, Tooltip, Legend, Line } from "recharts";
-import { ChartSeriesToggles, ViscosityTooltip } from "./productionDashboardShared";
 import React from "react";
 import {
   ResponsiveContainer, ComposedChart, CartesianGrid, ReferenceArea,

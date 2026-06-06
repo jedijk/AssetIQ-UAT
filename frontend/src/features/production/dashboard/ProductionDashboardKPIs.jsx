@@ -1,5 +1,3 @@
-import { Package, Trash2, TrendingUp, FlaskConical, Sigma, Clock } from "lucide-react";
-import { KPICard, formatHoursMinutes } from "./productionDashboardShared";
 import React from "react";
 import { Package, Trash2, TrendingUp, FlaskConical, Sigma, Clock } from "lucide-react";
 import { KPICard, formatHoursMinutes } from "./productionDashboardShared";
