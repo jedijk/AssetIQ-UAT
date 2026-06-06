@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from database import db
+from services.scheduler_config import should_read_legacy_maintenance_programs
 
 logger = logging.getLogger(__name__)
 
@@ -65,9 +66,11 @@ async def _get_program_discipline(program_id: Optional[str]) -> Optional[str]:
         return None
     prog = await db.maintenance_programs_v2.find_one(
         {"id": program_id}, {"_id": 0, "discipline": 1}
-    ) or await db.maintenance_programs.find_one(
-        {"id": program_id}, {"_id": 0, "discipline": 1}
     )
+    if not prog and should_read_legacy_maintenance_programs():
+        prog = await db.maintenance_programs.find_one(
+            {"id": program_id}, {"_id": 0, "discipline": 1}
+        )
     return prog.get("discipline") if prog else None
 
 
@@ -130,7 +133,7 @@ async def _build_program_discipline_map(program_ids: List[str]) -> Dict[str, Opt
                 out[tid] = task.get("discipline")
 
     missing = [pid for pid in unique_ids if pid not in out]
-    if missing:
+    if missing and should_read_legacy_maintenance_programs():
         legacy_rows = await db.maintenance_programs.find(
             {"id": {"$in": missing}},
             {"_id": 0, "id": 1, "discipline": 1},

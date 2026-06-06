@@ -11,6 +11,7 @@ from datetime import datetime, timezone, timedelta
 from database import db
 from auth import get_current_user
 from bson import ObjectId
+from services.work_item_query import fetch_unbridged_maintenance_work_items
 
 logger = logging.getLogger(__name__)
 
@@ -499,6 +500,25 @@ async def get_my_tasks(
         
         task["source_type"] = "task"  # Mark as task instance
         tasks.append(serialize_task(task))
+
+    # Unbridged maintenance from scheduled_tasks (fills gap between weekly bridge runs)
+    if filter not in ("recurring", "adhoc"):
+        try:
+            maintenance_items = await fetch_unbridged_maintenance_work_items(
+                user_id,
+                filter_name=filter,
+                equipment_id=equipment_id,
+                discipline=discipline,
+                now=now,
+            )
+            existing_ids = {t.get("scheduled_task_id") for t in tasks if t.get("scheduled_task_id")}
+            for item in maintenance_items:
+                sid = item.get("scheduled_task_id")
+                if sid and sid in existing_ids:
+                    continue
+                tasks.append(item)
+        except Exception as exc:
+            logger.warning("unbridged maintenance work items skipped: %s", exc)
     
     # ============================================
     # FETCH OPEN ACTIONS FROM CENTRAL_ACTIONS

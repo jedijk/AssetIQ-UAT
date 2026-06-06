@@ -233,6 +233,54 @@ class BackgroundJobService:
         except Exception as exc:
             return {"status": "degraded", "error": str(exc)[:200], "in_memory": dict(self._in_memory)}
 
+    async def claim_next_pending(self, job_types: Optional[list] = None) -> Optional[dict]:
+        """Atomically claim the oldest pending job for an external worker process."""
+        filt: dict = {"status": JobStatus.PENDING.value}
+        if job_types:
+            filt["job_type"] = {"$in": job_types}
+        try:
+            return await self._collection().find_one_and_update(
+                filt,
+                {
+                    "$set": {
+                        "status": JobStatus.RUNNING.value,
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    },
+                },
+                sort=[("created_at", 1)],
+                return_document=True,
+            )
+        except Exception as exc:
+            logger.warning("background_jobs claim failed: %s", exc)
+            return None
+
+    async def run_claimed_job(
+        self,
+        job: dict,
+        handlers: Dict[str, Callable],
+    ) -> Any:
+        """Execute a claimed job using a registered handler."""
+        job_id = job.get("id")
+        job_type = job.get("job_type")
+        if not job_id or not job_type:
+            return None
+        handler = handlers.get(job_type)
+        if not handler:
+            await self.update_record(
+                job_id,
+                status=JobStatus.DEAD_LETTER.value,
+                error=f"no handler for job_type={job_type}",
+            )
+            return None
+        max_retries = int(job.get("max_retries") or 1)
+        return await self.run_with_retries(
+            job_id,
+            job_type,
+            handler,
+            job,
+            max_retries=max_retries,
+        )
+
 
 background_job_service = BackgroundJobService()
 

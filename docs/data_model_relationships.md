@@ -129,6 +129,10 @@ equipment_type_strategies (v2)
     → Apply Strategy → maintenance_programs_v2 (1 doc / equipment, nested tasks)
     → load_schedulable_programs() → scheduled_tasks (planner / Gantt)
     → task_instance_bridge → task_instances (My Tasks execution)
+    → work_item_query (My Tasks also reads unbridged scheduled_tasks between bridge runs)
+
+Background jobs:
+    apply_strategy → background_jobs → run_background_worker.py (optional sidecar)
 
 reliability_edges (graph)
     equipment → strategy_type, program_task → failure_mode, equipment → program

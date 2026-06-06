@@ -18,7 +18,7 @@ import json
 
 from database import db
 from auth import get_current_user, require_permission
-from services.pm_import_service import PMImportService
+from services.pm_import_service import PMImportService, normalize_pm_import_display_status
 
 _library_write = require_permission("library:write")
 
@@ -891,10 +891,9 @@ async def list_all_tasks(
                 "confidence_score": task.get("confidence_score") or 50,
                 "equipment_match": equipment_match,
                 "review_status": task.get("review_status") or "pending",
-                "import_status": task.get("import_status") or "pending",
-                "target_failure_mode_id": task.get("target_failure_mode_id"),
+                "import_status": normalize_pm_import_display_status(task),
                 "apply_mode": task.get("apply_mode"),
-                "implemented_at": task.get("implemented_at"),
+                "target_failure_mode_id": task.get("target_failure_mode_id"),
                 "original_task": task.get("original_task") or "",
             })
 

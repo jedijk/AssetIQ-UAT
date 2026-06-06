@@ -71,6 +71,7 @@ async def apply_strategy_to_equipment(
             payload={
                 "equipment_type_id": equipment_type_id,
                 "equipment_count": len(request.equipment_ids),
+                "equipment_ids": list(request.equipment_ids),
             },
             max_retries=1,
         )

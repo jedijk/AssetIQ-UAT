@@ -22,6 +22,24 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 
 logger = logging.getLogger(__name__)
 
+PM_IMPORT_DISPLAY_STATUSES = ("pending", "applied", "merged")
+
+
+def normalize_pm_import_display_status(task: Dict[str, Any]) -> str:
+    """Map stored task fields to the three user-facing import statuses."""
+    import_status = (task.get("import_status") or "pending").lower()
+    apply_mode = (task.get("apply_mode") or "").lower()
+
+    if import_status == "merged":
+        return "merged"
+    if import_status == "applied":
+        return "applied"
+    if import_status == "implemented":
+        if apply_mode in ("replaced", "existing"):
+            return "merged"
+        return "applied"
+    return "pending"
+
 
 def _sanitize_for_json(value: Any) -> Any:
     """Recursively convert MongoDB / Python values to JSON-safe types."""
@@ -3543,7 +3561,9 @@ Respond with a JSON object:
         replace_action_index: Optional[int] = None,
     ) -> None:
         """Record that a PM Import task was applied to the failure mode library."""
-        task["import_status"] = "implemented"
+        task["import_status"] = (
+            "merged" if apply_mode in ("replaced", "existing") else "applied"
+        )
         task["target_failure_mode_id"] = failure_mode_id
         task["apply_mode"] = apply_mode
         task["implemented_at"] = datetime.now(timezone.utc).isoformat()

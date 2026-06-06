@@ -86,7 +86,7 @@ import {
 } from "../components/ui/dropdown-menu";
 import { toast } from "sonner";
 import api, { equipmentHierarchyAPI, failureModesAPI, getErrorMessage } from "../lib/api";
-import { pmImportAPI } from "../lib/apis/pmImport";
+import { pmImportAPI, resolvePmImportStatus, isPmImportFinalized } from "../lib/apis/pmImport";
 import MaintenanceStrategyTab from "../components/library/MaintenanceStrategyTab";
 import BackButton from "../components/BackButton";
 
@@ -262,23 +262,22 @@ const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrategy }) 
   };
   
   const getImportStatusBadge = (task) => {
-    const status = task.import_status || task.review_status;
-    if (status === 'implemented' || task.import_status === 'implemented') {
-      const mode = task.apply_mode;
-      const label =
-        mode === 'replaced' ? 'Implemented (replaced)'
-        : mode === 'added' ? 'Implemented (added)'
-        : mode === 'existing' ? 'Implemented (existing)'
-        : 'Implemented';
-      return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 text-xs">{label}</Badge>;
-    }
-    if (task.review_status === 'accepted') {
-      return <Badge variant="outline" className="bg-green-50 text-green-700 text-xs">Accepted</Badge>;
-    }
-    if (task.review_status === 'rejected') {
-      return <Badge variant="outline" className="bg-red-50 text-red-700 text-xs">Rejected</Badge>;
-    }
-    return <Badge variant="outline" className="bg-gray-50 text-gray-600 text-xs">Pending</Badge>;
+    const status = resolvePmImportStatus(task);
+    const styles = {
+      pending: "bg-gray-50 text-gray-600",
+      applied: "bg-emerald-50 text-emerald-700",
+      merged: "bg-blue-50 text-blue-700",
+    };
+    const labels = {
+      pending: "Pending",
+      applied: "Applied",
+      merged: "Merged",
+    };
+    return (
+      <Badge variant="outline" className={`${styles[status] || styles.pending} text-xs`}>
+        {labels[status] || "Pending"}
+      </Badge>
+    );
   };
 
   const getTaskTypeBadge = (taskType) => {
@@ -515,7 +514,7 @@ const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrategy }) 
                           variant="ghost"
                           className="h-7 px-2 text-purple-600 hover:bg-purple-50"
                           title="Apply to failure mode"
-                          disabled={task.review_status !== 'accepted' && task.review_status !== 'implemented'}
+                          disabled={isPmImportFinalized(task) || (task.review_status !== 'accepted' && task.review_status !== 'implemented')}
                           onClick={() => setApplyToFmTask(task)}
                           data-testid={`pm-task-apply-fm-${task.task_id}`}
                         >
@@ -526,7 +525,7 @@ const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrategy }) 
                           variant="ghost"
                           className="h-7 px-2 text-green-600 hover:bg-green-50"
                           title="Accept"
-                          disabled={task.review_status === 'accepted' || task.review_status === 'implemented'}
+                          disabled={task.review_status === 'accepted' || task.review_status === 'implemented' || isPmImportFinalized(task)}
                           onClick={() => acceptMutation.mutate(task)}
                           data-testid={`pm-task-accept-${task.task_id}`}
                         >

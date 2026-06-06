@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { failureModesAPI } from '../../lib/apis/failureModes';
-import { pmImportAPI } from '../../lib/apis/pmImport';
+import { pmImportAPI, isPmImportFinalized, resolvePmImportStatus } from '../../lib/apis/pmImport';
 import { toast } from 'sonner';
 import { Loader2, Target, GitMerge, Plus } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -80,6 +80,10 @@ const PMApplyFailureModeDialog = ({ task, onClose, onSuccess }) => {
 
   const handleApply = async () => {
     if (!task || !selectedFm?.id) return;
+    if (isPmImportFinalized(task)) {
+      toast.error('This task has already been applied or merged');
+      return;
+    }
     if (task.review_status !== 'accepted' && task.review_status !== 'implemented') {
       toast.error('Accept the task before applying to a failure mode');
       return;
@@ -98,11 +102,9 @@ const PMApplyFailureModeDialog = ({ task, onClose, onSuccess }) => {
       });
       if (result.success) {
         const suffix =
-          result.mode === 'replaced'
-            ? ' (replaced existing action)'
-            : result.mode === 'existing'
-              ? ' (already on failure mode)'
-              : ' (added as new action)';
+          result.mode === 'replaced' || result.mode === 'existing'
+            ? ' (merged with existing action)'
+            : ' (applied as new action)';
         toast.success((result.message || 'Applied to failure mode') + suffix);
         onSuccess?.(result);
         onClose();
@@ -118,8 +120,10 @@ const PMApplyFailureModeDialog = ({ task, onClose, onSuccess }) => {
 
   if (!task) return null;
 
+  const importStatus = resolvePmImportStatus(task);
+  const isFinalized = isPmImportFinalized(task);
+  const statusLabels = { applied: 'Applied', merged: 'Merged' };
   const existingActions = selectedFm?.recommended_actions || [];
-  const isImplemented = task.import_status === 'implemented' || task.review_status === 'implemented';
 
   return (
     <Dialog open={!!task} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -131,9 +135,9 @@ const PMApplyFailureModeDialog = ({ task, onClose, onSuccess }) => {
           </DialogTitle>
           <DialogDescription>
             {(task.task_description || '').slice(0, 120)}
-            {isImplemented && (
+            {isFinalized && (
               <Badge variant="outline" className="ml-2 bg-emerald-50 text-emerald-700">
-                Already implemented
+                {statusLabels[importStatus] || 'Applied'}
               </Badge>
             )}
           </DialogDescription>
@@ -264,7 +268,7 @@ const PMApplyFailureModeDialog = ({ task, onClose, onSuccess }) => {
             data-testid="pm-apply-fm-submit"
           >
             {applying ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-            Apply & mark implemented
+            Apply to failure mode
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,5 +1,24 @@
 import { api } from "../apiClient";
 
+/** User-facing PM import statuses: pending | applied | merged */
+export const resolvePmImportStatus = (task) => {
+  if (!task) return "pending";
+  const importStatus = (task.import_status || "").toLowerCase();
+  const applyMode = (task.apply_mode || "").toLowerCase();
+
+  if (importStatus === "merged") return "merged";
+  if (importStatus === "applied") return "applied";
+  if (importStatus === "implemented") {
+    return applyMode === "replaced" || applyMode === "existing" ? "merged" : "applied";
+  }
+  return "pending";
+};
+
+export const isPmImportFinalized = (task) => {
+  const status = resolvePmImportStatus(task);
+  return status === "applied" || status === "merged";
+};
+
 /**
  * PM Intelligence Import API
  * 
