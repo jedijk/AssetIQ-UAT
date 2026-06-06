@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { motion } from "framer-motion";
 import { getBackendUrl } from "../../lib/apiConfig";
 import { AuthenticatedImage } from "../../components/AuthenticatedMedia";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../../components/ui/hover-card";
 import { Progress } from "../../components/ui/progress";
-import { X, Download } from "lucide-react";
+import { Button } from "../../components/ui/button";
+import { X, Download, ExternalLink, TrendingUp, TrendingDown, Briefcase } from "lucide-react";
 
 // Authenticated Lightbox component for viewing images with proper mobile auth
 const AuthenticatedLightbox = ({ url, name, onClose }) => {

@@ -1,4 +1,5 @@
 import React from "react";
+import { motion } from "framer-motion";
 
 export function InvestigationFailuresTab(props) {
   return (
