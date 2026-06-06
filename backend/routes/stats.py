@@ -9,6 +9,7 @@ from database import db, installation_filter
 from auth import get_current_user
 from failure_modes import FAILURE_MODES_LIBRARY
 from services.cache_service import cache
+from services.equipment_type_registry import equipment_type_id_set
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Stats"])
@@ -106,7 +107,17 @@ async def get_reliability_scores(
     # Get all hierarchy nodes with only needed fields
     nodes = await db.equipment_nodes.find(
         {"created_by": user_id}, 
-        {"_id": 0, "id": 1, "name": 1, "level": 1, "equipment_type": 1, "criticality": 1, "description": 1, "parent_id": 1}
+        {
+            "_id": 0,
+            "id": 1,
+            "name": 1,
+            "level": 1,
+            "equipment_type": 1,
+            "equipment_type_id": 1,
+            "criticality": 1,
+            "description": 1,
+            "parent_id": 1,
+        },
     ).to_list(1000)
     
     # Get all threats with only needed fields
@@ -127,19 +138,20 @@ async def get_reliability_scores(
         {"_id": 0, "id": 1, "threat_id": 1, "asset_name": 1, "status": 1}
     ).to_list(1000)
     
-    # Get maintenance strategies
-    strategies = await db.maintenance_strategies.find({}, {"_id": 0, "equipment_id": 1}).to_list(1000)
-    
-    # Get equipment types
-    equipment_types = await db.equipment_types.find({}, {"_id": 0, "id": 1}).to_list(1000)
-    eq_type_ids = {et["id"] for et in equipment_types}
+    # Maintenance strategies (v2 canonical collection)
+    strategies = await db.equipment_type_strategies.find(
+        {},
+        {"_id": 0, "equipment_type_id": 1, "task_templates": 1, "status": 1},
+    ).to_list(1000)
+
+    eq_type_ids = await equipment_type_id_set(db)
     
     # Calculate scores for each equipment node
     def calculate_node_scores(node):
         node_id = node["id"]
         node_name = node.get("name", "")
         node_level = node.get("level", "")
-        equipment_type = node.get("equipment_type")
+        equipment_type = node.get("equipment_type_id") or node.get("equipment_type")
         criticality = node.get("criticality")
         
         # 1. Criticality Score (0-100)
@@ -176,28 +188,26 @@ async def get_reliability_scores(
         else:
             investigations_score = 50  # Neutral baseline
         
-        # 4. Maintenance Score (0-100)
-        # Based on maintenance strategies for the equipment type
+        # 4. Maintenance Score (0-100) — based on v2 equipment-type strategies
         maintenance_score = 0
         if equipment_type and equipment_type in eq_type_ids:
-            type_strategies = [s for s in strategies if s.get("equipment_type_id") == equipment_type]
-            if len(type_strategies) > 0:
+            type_strategies = [
+                s for s in strategies if s.get("equipment_type_id") == equipment_type
+            ]
+            if type_strategies:
                 strategy = type_strategies[0]
-                content = strategy.get("strategies_by_criticality", {})
-                # Check if strategy has all required components
-                if content:
-                    maintenance_score = 70  # Has strategy
-                    # Bonus for completeness
-                    for crit_level, crit_content in content.items():
-                        if crit_content.get("operator_rounds"):
-                            maintenance_score += 5
-                        if crit_content.get("detection_systems"):
-                            maintenance_score += 5
-                        if crit_content.get("maintenance_tasks"):
-                            maintenance_score += 5
-                        if crit_content.get("spare_parts"):
-                            maintenance_score += 5
-                    maintenance_score = min(100, maintenance_score)
+                templates = strategy.get("task_templates") or []
+                mandatory = [
+                    t for t in templates if t.get("is_mandatory", True) is not False
+                ]
+                if mandatory:
+                    maintenance_score = min(100, 60 + len(mandatory) * 8)
+                elif templates:
+                    maintenance_score = 45
+                elif strategy.get("status") == "active":
+                    maintenance_score = 40
+                else:
+                    maintenance_score = 35
             else:
                 maintenance_score = 30  # Equipment type exists but no strategy
         else:

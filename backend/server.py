@@ -16,6 +16,7 @@ import logging
 import asyncio
 import time
 import json
+import re
 from datetime import datetime, timezone
 
 # Configure logging FIRST
@@ -488,14 +489,12 @@ async def add_security_headers(request, call_next):
         "picture-in-picture=(), usb=()"
     )
     response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
-    
+
     docs_paths = ["/api/docs", "/api/redoc", "/api/openapi.json", "/docs", "/redoc", "/openapi.json"]
     if request.url.path in docs_paths:
         response.headers["Cross-Origin-Resource-Policy"] = "cross-origin"
         response.headers["Cross-Origin-Embedder-Policy"] = "unsafe-none"
     else:
-        # CSP on an API doesn't protect your SPA, but it *does* reduce blast radius if
-        # an endpoint ever reflects HTML. Keep it strict and avoid unsafe-eval by default.
         response.headers["Content-Security-Policy"] = (
             "default-src 'none'; "
             "base-uri 'none'; "
@@ -507,7 +506,22 @@ async def add_security_headers(request, call_next):
             "script-src 'none'; "
             "object-src 'none'"
         )
-    
+        response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+        response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
+
+    return response
+
+
+@app.middleware("http")
+async def legacy_maintenance_strategy_deprecation(request, call_next):
+    """Mark legacy v1 maintenance strategy API responses as deprecated."""
+    response = await call_next(request)
+    path = request.url.path
+    if re.match(r"^/api/maintenance-strategies(/|$)", path):
+        response.headers["Deprecation"] = "true"
+        response.headers["Sunset"] = "Sun, 01 Sep 2026 00:00:00 GMT"
+        response.headers["Link"] = '</api/maintenance-strategies-v2>; rel="successor-version"'
+        response.headers["X-AssetIQ-Deprecated"] = "Use /api/maintenance-strategies-v2 instead"
     return response
 
 

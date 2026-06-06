@@ -19,6 +19,8 @@ import logging
 from database import db, installation_filter
 from auth import get_current_user
 from services.cache_service import cache
+from services.equipment_type_registry import count_equipment_types, list_equipment_types
+from services.equipment_hierarchy_filters import apply_plant_system_filters
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/intelligence-map", tags=["Intelligence Map"])
@@ -76,7 +78,7 @@ async def get_intelligence_map_stats(
         if equipment_type_id:
             et_query["id"] = equipment_type_id
             
-        equipment_types_count = await db.equipment_types.count_documents(et_query)
+        equipment_types_count = await count_equipment_types(db, et_query)
         
         # Get equipment types that are actually used in equipment
         equipment_types_in_use = await db.equipment_nodes.distinct("equipment_type_id", {
@@ -132,24 +134,16 @@ async def get_intelligence_map_stats(
         total_task_templates = strategy_agg[0]["total_task_templates"] if strategy_agg else 0
         
         # ========== EQUIPMENT ==========
-        equipment_query = {}
-        
-        # Apply hierarchy filters
-        if plant_id:
-            # Get all equipment under this plant
-            equipment_query["$or"] = [
-                {"installation_id": plant_id},
-                {"parent_path": {"$regex": f".*{plant_id}.*"}}
-            ]
-        if system_id:
-            equipment_query["$or"] = [
-                {"parent_id": system_id},
-                {"parent_path": {"$regex": f".*{system_id}.*"}}
-            ]
+        equipment_query: dict = {}
+
         if equipment_type_id:
             equipment_query["equipment_type_id"] = equipment_type_id
         if equipment_id:
             equipment_query["id"] = equipment_id
+
+        equipment_query = await apply_plant_system_filters(
+            db, equipment_query, plant_id=plant_id, system_id=system_id
+        )
         
         # Filter by equipment levels (not installations/plants)
         equipment_levels = ["equipment_unit", "equipment", "subunit", "maintainable_item", "unit"]
@@ -567,11 +561,12 @@ async def get_intelligence_map_filters(
             {"id": 1, "name": 1, "parent_id": 1, "_id": 0}
         ).to_list(500)
         
-        # Get equipment types
-        equipment_types = await db.equipment_types.find(
-            {},
-            {"id": 1, "name": 1, "category": 1, "_id": 0}
-        ).to_list(500)
+        # Get equipment types (canonical library collection)
+        equipment_types = await list_equipment_types(
+            db,
+            projection={"id": 1, "name": 1, "category": 1, "_id": 0},
+            limit=500,
+        )
         
         return {
             "plants": plants,

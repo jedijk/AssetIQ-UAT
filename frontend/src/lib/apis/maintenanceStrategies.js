@@ -1,6 +1,8 @@
+/**
+ * LEGACY v1 Maintenance Strategy API — deprecated.
+ * Use maintenanceStrategyV2.js and /api/maintenance-strategies-v2 instead.
+ */
 import { api } from "../apiClient";
-
-// Maintenance Strategy API
 export const maintenanceStrategyAPI = {
   // List all strategies with optional search
   getAll: async (filters = {}) => {

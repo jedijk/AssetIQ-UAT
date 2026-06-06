@@ -1,5 +1,8 @@
 """
-Maintenance Strategies routes.
+Maintenance Strategies routes (LEGACY v1).
+
+Deprecated: use ``/api/maintenance-strategies-v2`` and ``equipment_type_strategies``.
+These endpoints remain for backward compatibility until Sunset 2026-09-01.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse

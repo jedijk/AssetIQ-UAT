@@ -1,3 +1,7 @@
+/**
+ * @deprecated Legacy v1 maintenance strategy panel — not wired in App routes.
+ * Use MaintenanceStrategyManager.jsx (maintenance-strategies-v2) instead.
+ */
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
