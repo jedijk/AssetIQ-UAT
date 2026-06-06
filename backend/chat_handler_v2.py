@@ -5,6 +5,8 @@ Matches equipment from hierarchy and failure modes from FMEA library.
 No DB state queries — state is passed in by the caller (routes/chat.py).
 """
 
+from __future__ import annotations
+
 import re
 import logging
 from typing import List, Dict, Any, Optional
@@ -111,7 +113,7 @@ def extract_keywords(text: str) -> List[str]:
     return [w for w in words if w not in stop_words]
 
 
-def find_full_equipment_match(message: str, candidates: List[Dict]) -> Dict | None:
+def find_full_equipment_match(message: str, candidates: List[Dict]) -> Optional[Dict]:
     """Return the candidate whose name or tag exactly matches (case-insensitive)
     a substring / token in the user's message. Used to auto-select when one
     of several search results is an unambiguous exact match.

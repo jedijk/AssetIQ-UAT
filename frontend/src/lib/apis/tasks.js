@@ -111,25 +111,27 @@ export const myTasksAPI = {
     return response.data;
   },
   getAdhocPlans: async () => {
-    const response = await api.get("/adhoc-plans");
+    const response = await api.get("/work-items/adhoc-plans");
     return response.data;
   },
   executeAdhocPlan: async (planId) => {
-    const response = await api.post(`/adhoc-plans/${planId}/execute`);
+    const response = await api.post(`/work-items/adhoc-plans/${planId}/execute`);
     return response.data;
   },
   getTaskDetail: async (taskId) => {
-    const response = await api.get(`/my-tasks/${taskId}`);
+    const response = await api.get(`/work-items/${taskId}`);
     return response.data;
   },
   startTask: async (taskId, isAction = false) => {
-    const endpoint = isAction ? `/my-tasks/action/${taskId}/start` : `/task-instances/${taskId}/start`;
+    const endpoint = isAction
+      ? `/work-items/actions/${taskId}/start`
+      : `/work-items/${taskId}/start`;
     const response = await api.post(endpoint);
     return response.data;
   },
   completeTask: async ({ taskId, data, isAction = false }) => {
     const endpoint = isAction
-      ? `/my-tasks/action/${taskId}/complete`
+      ? `/work-items/actions/${taskId}/complete`
       : `/task-instances/${taskId}/complete`;
     const response = await api.post(endpoint, data);
     return response.data;

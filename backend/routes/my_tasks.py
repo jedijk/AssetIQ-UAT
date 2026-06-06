@@ -9,18 +9,35 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from database import db
-from auth import get_current_user
+from auth import require_permission
 from bson import ObjectId
 from services.work_item_query import (
     fetch_work_items,
     safe_isoformat,
     serialize_action_as_task,
     serialize_task,
+    _user_can_see_item,
 )
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["My Tasks"])
+
+_tasks_read = require_permission("tasks:read")
+_tasks_write = require_permission("tasks:write")
+
+
+def _assigned_user_id_str(task: dict) -> Optional[str]:
+    raw = task.get("assigned_user_id")
+    if raw is None:
+        return None
+    return str(raw)
+
+
+def _ensure_user_can_execute_task(task: dict, user_id: str) -> None:
+    assigned = _assigned_user_id_str(task)
+    if not _user_can_see_item(assigned, user_id):
+        raise HTTPException(status_code=403, detail="Not assigned to this task")
 
 
 async def _process_attachments(raw_attachments: List[dict]) -> List[dict]:
@@ -93,9 +110,9 @@ async def get_my_tasks(
     equipment_id: Optional[str] = Query(None, description="Filter by equipment"),
     status: Optional[str] = Query(None, description="Filter by status"),
     discipline: Optional[str] = Query(None, description="Filter by discipline (Mechanical, Electrical, etc.)"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_tasks_read),
 ):
-    """Get unified work items for the current user (delegates to work_item_query)."""
+    """Get unified work items for the current user (delegates to work_item_query). Deprecated: use GET /work-items/."""
     user_id = current_user["id"]
     tasks = await fetch_work_items(
         user_id,
@@ -115,9 +132,10 @@ async def get_my_tasks(
 @router.get("/my-tasks/{task_id}")
 async def get_my_task_detail(
     task_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_read)
 ):
     """Get detailed information about a specific task."""
+    user_id = current_user["id"]
     try:
         task = await db.task_instances.find_one({"_id": ObjectId(task_id)})
     except Exception:
@@ -125,6 +143,8 @@ async def get_my_task_detail(
     
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+
+    _ensure_user_can_execute_task(task, user_id)
     
     # Enrich with related data
     if task.get("equipment_id"):
@@ -174,9 +194,10 @@ async def get_my_task_detail(
 @router.post("/my-tasks/{task_id}/start")
 async def start_my_task(
     task_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_write)
 ):
     """Mark a task as started/in-progress."""
+    user_id = current_user["id"]
     try:
         task = await db.task_instances.find_one({"_id": ObjectId(task_id)})
     except Exception:
@@ -184,10 +205,11 @@ async def start_my_task(
     
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+
+    _ensure_user_can_execute_task(task, user_id)
     
     # Update status - handle both ObjectId and UUID user IDs
     now = datetime.now(timezone.utc)
-    user_id = current_user["id"]
     try:
         user_id_value = ObjectId(user_id)
     except Exception:
@@ -258,7 +280,7 @@ async def start_my_task(
 async def complete_my_action(
     action_id: str,
     data: Optional[dict] = Body(default=None),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_write)
 ):
     """Mark an action as completed from My Tasks."""
     user_id = current_user["id"]
@@ -394,7 +416,7 @@ async def complete_my_action(
 @router.post("/my-tasks/action/{action_id}/start")
 async def start_my_action(
     action_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_write)
 ):
     """Mark an action as in-progress from My Tasks."""
     user_id = current_user["id"]
@@ -425,7 +447,7 @@ async def start_my_action(
 
 @router.get("/adhoc-plans")
 async def get_adhoc_plans(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_read)
 ):
     """Get all active ad-hoc plans that can be executed on-demand."""
     
@@ -559,7 +581,7 @@ async def get_adhoc_plans(
 @router.post("/adhoc-plans/{plan_id}/execute")
 async def execute_adhoc_plan(
     plan_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_write)
 ):
     """Create a task instance from an ad-hoc plan for immediate execution."""
     

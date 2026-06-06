@@ -1,15 +1,22 @@
 """Tests for P1 Translation Management Dashboard + Dictionary Validation features."""
 import os
+from pathlib import Path
+
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/") or os.environ.get("PUBLIC_BACKEND_URL", "").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/") or os.environ.get(
+    "PUBLIC_BACKEND_URL", ""
+).rstrip("/")
 if not BASE_URL:
-    # fall back to frontend .env loader
-    with open("/app/frontend/.env") as f:
-        for line in f:
+    _env_path = Path(__file__).resolve().parents[2] / "frontend" / ".env"
+    if _env_path.is_file():
+        for line in _env_path.read_text().splitlines():
             if line.startswith("REACT_APP_BACKEND_URL="):
-                BASE_URL = line.split("=", 1)[1].strip().rstrip("/")
+                BASE_URL = line.split("=", 1)[1].strip().strip('"').rstrip("/")
+                break
+
+pytestmark = pytest.mark.skipif(not BASE_URL, reason="Backend URL not configured")
 
 OWNER_EMAIL = "jedijk@gmail.com"
 OWNER_PASSWORD = "Jaap8019@"

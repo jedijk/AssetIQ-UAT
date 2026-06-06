@@ -1,6 +1,10 @@
 """Regression tests for AI photo extraction date normalization."""
 from datetime import datetime, timezone
 
+import pytest
+
+pytest.importorskip("email_validator")
+
 from routes.ai_extract import (
     _calibrate_date_value_to_capture,
     _expand_two_digit_year,

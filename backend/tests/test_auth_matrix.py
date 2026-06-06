@@ -228,3 +228,53 @@ def test_routes_use_tracked_jobs_not_raw_background_tasks():
         if "background_tasks.add_task(" in text:
             offenders.append(str(path.relative_to(routes_dir.parent)))
     assert offenders == [], f"Use schedule_tracked_job instead: {offenders}"
+
+
+def test_my_tasks_routes_require_tasks_permissions():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "my_tasks.py").read_text()
+    assert '_tasks_read = require_permission("tasks:read")' in source
+    assert '_tasks_write = require_permission("tasks:write")' in source
+    assert "Depends(_tasks_read)" in source
+    assert "Depends(_tasks_write)" in source
+    assert "_ensure_user_can_execute_task" in source
+
+
+def test_work_items_mutations_require_tasks_write():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "work_items.py").read_text()
+    assert 'require_permission("tasks:write")' in source
+    idx = source.index("async def start_work_item")
+    assert "Depends(_tasks_write)" in source[idx: idx + 250]
+    idx_list = source.index("async def list_adhoc_plans")
+    assert "Depends(_tasks_read)" in source[idx_list: idx_list + 200]
+
+
+def test_production_logs_require_settings_permissions():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "production_logs.py").read_text()
+    assert '_settings_read = require_permission("settings:read")' in source
+    assert '_settings_write = require_permission("settings:write")' in source
+    assert "_owner_only" not in source
+    idx = source.index("async def upload_log_files")
+    assert "Depends(_settings_write)" in source[idx: idx + 250]
+    idx_get = source.index("async def list_jobs")
+    assert "Depends(_settings_read)" in source[idx_get: idx_get + 250]
+
+
+def test_qr_codes_require_settings_permissions():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "qr_codes.py").read_text()
+    assert '_settings_read = require_permission("settings:read")' in source
+    assert '_settings_write = require_permission("settings:write")' in source
+    idx = source.index("async def generate_qr_code")
+    assert "Depends(_settings_write)" in source[idx: idx + 250]
+    idx_list = source.index("async def list_qr_codes")
+    assert "Depends(_settings_read)" in source[idx_list: idx_list + 300]
+
+
+def test_maintenance_strategy_v2_reads_require_library_read():
+    source = (
+        Path(__file__).resolve().parents[1] / "routes" / "maintenance_strategy_v2" / "routes.py"
+    ).read_text()
+    assert '_library_read = require_permission("library:read")' in source
+    idx = source.index("async def list_equipment_type_strategies")
+    assert "Depends(_library_read)" in source[idx: idx + 250]
+    idx_write = source.index("async def create_equipment_type_strategy")
+    assert "Depends(_library_write)" in source[idx_write: idx_write + 250]

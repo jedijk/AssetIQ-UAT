@@ -1,8 +1,14 @@
 """Big Bag dashboard inclusion — first load of the day must not be dropped by shift filters."""
+import os
 import sys
-from datetime import datetime, timezone
+from pathlib import Path
 
-sys.path.insert(0, "/app/backend")
+import pytest
+
+pytest.importorskip("email_validator")
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from datetime import datetime, timezone
 
 from routes.production import (
     _calendar_day_in_envelope,

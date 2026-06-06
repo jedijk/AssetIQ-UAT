@@ -9,7 +9,6 @@ import logging
 import os
 
 from database import db
-from routes.auth import get_current_user
 from auth import require_permission
 from utils.auto_translate import translate_maintenance_task
 from services.background_jobs import schedule_tracked_job
@@ -70,6 +69,7 @@ METADATA_PROPAGATION_KEYS = frozenset({
 })
 
 _library_write = require_permission("library:write")
+_library_read = require_permission("library:read")
 
 
 # ============= Equipment Type Strategy Endpoints =============
@@ -79,7 +79,7 @@ async def list_equipment_type_strategies(
     equipment_type_id: Optional[str] = None,
     status: Optional[str] = None,
     search: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_read)
 ):
     """List all equipment type strategies"""
     query = {}
@@ -109,7 +109,7 @@ async def list_equipment_type_strategies(
 @router.get("/{equipment_type_id}")
 async def get_equipment_type_strategy(
     equipment_type_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_read)
 ):
     """Get strategy for a specific equipment type"""
     strategy = await db.equipment_type_strategies.find_one(
@@ -669,7 +669,7 @@ async def sync_equipment_type_strategy(
 @router.get("/{equipment_type_id}/affected-equipment")
 async def get_affected_equipment(
     equipment_type_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_read)
 ):
     """Get list of equipment affected by this strategy.
 
@@ -704,7 +704,7 @@ async def get_affected_equipment(
 @router.get("/{equipment_type_id}/version-history")
 async def get_strategy_version_history(
     equipment_type_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_read)
 ):
     """Get version history for an equipment type strategy"""
     strategy = await db.equipment_type_strategies.find_one(
@@ -731,7 +731,7 @@ async def get_strategy_version_history(
 async def get_strategy_audit_log(
     equipment_type_id: str,
     limit: int = Query(default=50, le=200),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_read)
 ):
     """Get audit log for an equipment type strategy"""
     audit_entries = await db.maintenance_strategy_audit.find(
@@ -750,7 +750,7 @@ async def get_strategy_audit_log(
 @router.get("/{equipment_type_id}/failure-modes")
 async def get_failure_mode_strategies(
     equipment_type_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_read)
 ):
     """Get all failure mode strategies for an equipment type"""
     strategy = await db.equipment_type_strategies.find_one(
@@ -861,7 +861,7 @@ async def update_failure_mode_strategy(
 @router.get("/{equipment_type_id}/tasks")
 async def get_task_templates(
     equipment_type_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_read)
 ):
     """Get all task templates for an equipment type"""
     strategy = await db.equipment_type_strategies.find_one(
@@ -1191,7 +1191,7 @@ async def generate_tasks_for_equipment(
 @router.get("/equipment/{equipment_id}")
 async def get_equipment_strategy_instance(
     equipment_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_read)
 ):
     """Get the strategy instance for a specific equipment asset"""
     instance = await db.equipment_strategy_instances.find_one(
@@ -1572,7 +1572,7 @@ async def enable_failure_mode_for_equipment(
 @router.get("/equipment/{equipment_id}/sync-status")
 async def get_equipment_sync_status(
     equipment_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_read)
 ):
     """Check sync status between equipment strategy and type strategy"""
     instance = await db.equipment_strategy_instances.find_one(

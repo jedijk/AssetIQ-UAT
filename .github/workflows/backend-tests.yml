@@ -62,4 +62,12 @@ jobs:
             tests/test_mongo_regex.py \
             tests/test_reliability_graph_query.py \
             tests/test_ai_fm_suggestions_auth.py \
+            tests/test_work_item_query.py \
             -q
+
+      - name: Run UAT readiness gates
+        env:
+          MONGO_URL: mongodb://localhost:27017/test
+          DB_NAME: test
+        run: |
+          cd backend && python scripts/verify_uat_gates.py

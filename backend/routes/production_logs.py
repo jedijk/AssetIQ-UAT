@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from pydantic import BaseModel
-from auth import get_current_user
+from auth import require_permission
 from database import db
 from services.storage_service import put_object_async
 from services.background_jobs import schedule_tracked_job
@@ -26,6 +26,9 @@ from services.ai_gateway import chat as ai_gateway_chat, user_context
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/production-logs", tags=["Production Logs"])
+
+_settings_read = require_permission("settings:read")
+_settings_write = require_permission("settings:write")
 
 ALLOWED_EXTENSIONS = {"csv", "txt", "log", "zip", "xlsx", "xls"}
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
@@ -96,11 +99,6 @@ class BatchIngestWithTemplateRequest(BaseModel):
 
 
 # ======================== Helpers ========================
-
-def _owner_only(user: dict):
-    if user.get("role") != "owner":
-        raise HTTPException(status_code=403, detail="Owner access required")
-
 
 def _normalize_column_name(name: str) -> str:
     """Normalize column name for fuzzy matching."""
@@ -679,11 +677,9 @@ def _parse_excel_content(file_bytes: bytes, ext: str, template: ParseTemplate) -
 async def upload_log_files(
     files: List[UploadFile] = File(...),
     job_id: Optional[str] = Form(None),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_write),
 ):
     """Upload one or more log files. Creates or appends to an ingestion job."""
-    _owner_only(current_user)
-
     is_new = job_id is None
     if is_new:
         job_id = str(uuid.uuid4())
@@ -801,11 +797,9 @@ async def detect_columns(
     delimiter: str = Form(","),
     has_header: bool = Form(True),
     skip_rows: int = Form(0),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_write),
 ):
     """Read the first file in a job and return detected columns/sample rows."""
-    _owner_only(current_user)
-
     job = await db.log_ingestion_jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -915,11 +909,9 @@ async def detect_columns(
 async def parse_preview(
     job_id: str = Form(...),
     template_json: str = Form(...),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_write),
 ):
     """Parse files using a template and return a preview of the first 100 records."""
-    _owner_only(current_user)
-
     job = await db.log_ingestion_jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -1002,11 +994,9 @@ async def parse_preview(
 async def ingest_logs(
     request: IngestRequest,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_write),
 ):
     """Confirm and start async ingestion of parsed logs into production_logs collection."""
-    _owner_only(current_user)
-
     job = await db.log_ingestion_jobs.find_one({"id": request.job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -1038,11 +1028,9 @@ async def ingest_logs(
 async def batch_ingest_logs(
     request: BatchIngestRequest,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_write),
 ):
     """Parse and ingest multiple jobs at once using the same template."""
-    _owner_only(current_user)
-
     if not request.job_ids:
         raise HTTPException(status_code=400, detail="No jobs selected")
 
@@ -1170,11 +1158,9 @@ async def _run_ingestion(job_id: str, job: dict):
 
 @router.get("/jobs")
 async def list_jobs(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_read),
 ):
     """List all ingestion jobs. Auto-reconciles uploaded jobs whose files are already ingested."""
-    _owner_only(current_user)
-
     # Auto-reconcile: check if any "uploaded" jobs have files already in production_logs
     uploaded_jobs = await db.log_ingestion_jobs.find(
         {"status": "uploaded"}, {"_id": 1, "id": 1, "files": 1}
@@ -1208,11 +1194,9 @@ async def list_jobs(
 @router.get("/jobs/{job_id}")
 async def get_job(
     job_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_read),
 ):
     """Get details of a specific ingestion job."""
-    _owner_only(current_user)
-
     job = await db.log_ingestion_jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -1223,11 +1207,9 @@ async def get_job(
 @router.delete("/jobs/{job_id}")
 async def delete_job(
     job_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_write),
 ):
     """Delete a job and its ingested data."""
-    _owner_only(current_user)
-
     job = await db.log_ingestion_jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -1247,11 +1229,9 @@ async def delete_job(
 @router.post("/templates")
 async def save_template(
     request: SaveTemplateRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_write),
 ):
     """Save a parse template for reuse."""
-    _owner_only(current_user)
-    
     # Check for duplicate name
     existing = await db.log_parse_templates.find_one({"name": request.name})
     if existing:
@@ -1278,11 +1258,9 @@ async def save_template(
 
 @router.get("/templates")
 async def list_templates(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_read),
 ):
     """List all saved parse templates."""
-    _owner_only(current_user)
-    
     templates = await db.log_parse_templates.find(
         {}, {"_id": 0}
     ).sort("created_at", -1).to_list(100)
@@ -1293,11 +1271,9 @@ async def list_templates(
 @router.get("/templates/{template_id}")
 async def get_template(
     template_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_read),
 ):
     """Get a specific template."""
-    _owner_only(current_user)
-    
     template = await db.log_parse_templates.find_one({"id": template_id}, {"_id": 0})
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -1309,11 +1285,9 @@ async def get_template(
 async def update_template(
     template_id: str,
     request: SaveTemplateRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_write),
 ):
     """Update an existing template."""
-    _owner_only(current_user)
-    
     template = await db.log_parse_templates.find_one({"id": template_id})
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -1342,11 +1316,9 @@ async def update_template(
 @router.delete("/templates/{template_id}")
 async def delete_template(
     template_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_write),
 ):
     """Delete a template."""
-    _owner_only(current_user)
-    
     result = await db.log_parse_templates.delete_one({"id": template_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -1359,14 +1331,12 @@ async def delete_template(
 async def batch_ingest_with_saved_template(
     request: BatchIngestWithTemplateRequest,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_write),
 ):
     """
     Batch ingest multiple jobs using a saved template with fuzzy column matching.
     This is the "train once, apply to many" workflow.
     """
-    _owner_only(current_user)
-    
     if not request.job_ids:
         raise HTTPException(status_code=400, detail="No jobs selected")
     
@@ -1502,14 +1472,12 @@ async def batch_ingest_with_saved_template(
 async def preview_template_match(
     job_id: str = Form(...),
     template_id: str = Form(...),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_write),
 ):
     """
     Preview how a saved template would match columns in a specific job.
     Useful for verifying the fuzzy matching before batch processing.
     """
-    _owner_only(current_user)
-    
     # Get job
     job = await db.log_ingestion_jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
@@ -1642,12 +1610,10 @@ async def query_entries(
     end: Optional[str] = None,
     limit: int = 100,
     skip: int = 0,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_read),
 ):
     """Query production log entries with filters, deduplicating by timestamp+asset_id.
     When duplicate timestamps exist, prefer the entry with mooney_viscosity data."""
-    _owner_only(current_user)
-
     match_stage = {}
     if asset_id:
         match_stage["asset_id"] = asset_id
@@ -1700,10 +1666,9 @@ async def query_entries(
 @router.get("/available-dates")
 async def get_available_dates(
     asset_id: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_read),
 ):
     """Get sorted list of unique production dates for an asset."""
-    _owner_only(current_user)
     match = {}
     if asset_id:
         match["asset_id"] = asset_id
@@ -1721,11 +1686,9 @@ async def get_available_dates(
 
 @router.get("/stats")
 async def get_log_stats(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_read),
 ):
     """Get overall production log statistics."""
-    _owner_only(current_user)
-
     total = await db.production_logs.count_documents({})
 
     # Event type counts
@@ -1765,11 +1728,9 @@ async def get_log_stats(
 @router.post("/aggregate")
 async def run_aggregation(
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_write),
 ):
     """Build/rebuild asset_history aggregations from production_logs."""
-    _owner_only(current_user)
-
     total = await db.production_logs.count_documents({})
     if total == 0:
         raise HTTPException(status_code=400, detail="No production logs to aggregate")
@@ -1878,11 +1839,9 @@ async def get_asset_history(
     start: Optional[str] = None,
     end: Optional[str] = None,
     limit: int = 500,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_read),
 ):
     """Query aggregated asset history."""
-    _owner_only(current_user)
-
     query = {}
     if asset_id:
         query["asset_id"] = asset_id
@@ -1900,11 +1859,9 @@ async def get_asset_history(
 
 @router.get("/assets")
 async def list_log_assets(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_read),
 ):
     """List all unique asset_ids in production logs."""
-    _owner_only(current_user)
-
     pipeline = [
         {"$group": {"_id": "$asset_id", "count": {"$sum": 1}}},
         {"$sort": {"count": -1}},
@@ -1919,11 +1876,9 @@ async def get_timeseries(
     metric: Optional[str] = None,
     start: Optional[str] = None,
     end: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_read),
 ):
     """Get time series data for charts — from asset_history aggregation."""
-    _owner_only(current_user)
-
     query = {"asset_id": asset_id}
     if start or end:
         hour_filter = {}
@@ -1968,11 +1923,9 @@ async def get_timeseries(
 async def ai_parse_file(
     job_id: str = Form(...),
     file_id: Optional[str] = Form(None),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_write),
 ):
     """Use AI to analyze an unstructured log file and suggest column mappings."""
-    _owner_only(current_user)
-
     vision_key = os.environ.get("OPENAI_VISION_KEY") or os.environ.get("OPENAI_API_KEY")
     if not vision_key:
         raise HTTPException(status_code=400, detail="OPENAI_API_KEY not configured")

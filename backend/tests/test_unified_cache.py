@@ -1,6 +1,8 @@
 """Tests for unified cache service."""
 import pytest
 
+pytest.importorskip("cachetools")
+
 from services.unified_cache import CacheDomain, unified_cache, invalidate_equipment_related
 
 

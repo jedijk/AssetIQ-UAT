@@ -27,9 +27,12 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 
 from database import db
-from routes.auth import get_current_user
+from auth import require_permission
 
 router = APIRouter(prefix="/qr", tags=["QR Codes"])
+
+_settings_read = require_permission("settings:read")
+_settings_write = require_permission("settings:write")
 
 # ==================== MODELS ====================
 
@@ -156,7 +159,7 @@ def get_size_pixels(size: str, custom_mm: Optional[int] = None) -> int:
 # ==================== ROUTES ====================
 
 @router.post("/generate")
-async def generate_qr_code(request: QRCreateRequest, user: dict = Depends(get_current_user)):
+async def generate_qr_code(request: QRCreateRequest, user: dict = Depends(_settings_write)):
     """Generate a new QR code"""
     qr_id = str(uuid.uuid4())
     frontend_url = get_frontend_url()
@@ -207,7 +210,7 @@ async def generate_qr_code(request: QRCreateRequest, user: dict = Depends(get_cu
     }
 
 @router.post("/generate-bulk")
-async def generate_bulk_qr_codes(request: QRBulkCreateRequest, user: dict = Depends(get_current_user)):
+async def generate_bulk_qr_codes(request: QRBulkCreateRequest, user: dict = Depends(_settings_write)):
     """Generate QR codes for multiple hierarchy items"""
     results = []
     frontend_url = get_frontend_url()
@@ -278,7 +281,7 @@ async def list_qr_codes(
     hierarchy_item_id: Optional[str] = None,
     limit: int = Query(default=100, le=500),
     skip: int = 0,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(_settings_read)
 ):
     """List all QR codes"""
     query = {}
@@ -307,7 +310,8 @@ async def get_qr_image(
     size: str = "medium",
     custom_size_mm: Optional[int] = None,
     show_label: bool = True,
-    format: str = "png"
+    format: str = "png",
+    user: dict = Depends(_settings_read),
 ):
     """Get QR code image (no auth required for embedding)"""
     qr = await db.qr_codes.find_one({"id": qr_id}, {"_id": 0, "label": 1})
@@ -337,7 +341,7 @@ async def get_qr_image(
     return StreamingResponse(buffer, media_type=media_type)
 
 @router.get("/{qr_id}")
-async def get_qr_code(qr_id: str, user: dict = Depends(get_current_user)):
+async def get_qr_code(qr_id: str, user: dict = Depends(_settings_read)):
     """Get QR code details"""
     qr = await db.qr_codes.find_one({"id": qr_id}, {"_id": 0})
     if not qr:
@@ -353,7 +357,7 @@ async def get_qr_code(qr_id: str, user: dict = Depends(get_current_user)):
     }
 
 @router.put("/{qr_id}")
-async def update_qr_code(qr_id: str, request: QRUpdateRequest, user: dict = Depends(get_current_user)):
+async def update_qr_code(qr_id: str, request: QRUpdateRequest, user: dict = Depends(_settings_write)):
     """Update QR code settings"""
     qr = await db.qr_codes.find_one({"id": qr_id})
     if not qr:
@@ -388,7 +392,7 @@ async def update_qr_code(qr_id: str, request: QRUpdateRequest, user: dict = Depe
 async def delete_qr_code(
     qr_id: str, 
     permanent: bool = Query(default=False, description="Permanently delete instead of deactivating"),
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(_settings_write)
 ):
     """Delete a QR code (deactivate or permanently remove)"""
     if permanent:
@@ -408,7 +412,7 @@ async def delete_qr_code(
 # ==================== SCAN RESOLUTION ====================
 
 @router.get("/resolve/{qr_id}")
-async def resolve_qr_code(qr_id: str, user: dict = Depends(get_current_user)):
+async def resolve_qr_code(qr_id: str, user: dict = Depends(_settings_read)):
     """Resolve QR code scan - returns actions and hierarchy info"""
     qr = await db.qr_codes.find_one({"id": qr_id}, {"_id": 0})
     if not qr:
@@ -449,7 +453,7 @@ async def resolve_qr_code(qr_id: str, user: dict = Depends(get_current_user)):
 # ==================== PRINT & EXPORT ====================
 
 @router.post("/print")
-async def print_qr_codes(request: QRPrintRequest, user: dict = Depends(get_current_user)):
+async def print_qr_codes(request: QRPrintRequest, user: dict = Depends(_settings_write)):
     """Generate printable PDF of QR codes"""
     qr_codes = await db.qr_codes.find(
         {"id": {"$in": request.qr_ids}},
@@ -527,7 +531,7 @@ async def print_qr_codes(request: QRPrintRequest, user: dict = Depends(get_curre
     )
 
 @router.post("/export")
-async def export_qr_codes(request: QRExportRequest, user: dict = Depends(get_current_user)):
+async def export_qr_codes(request: QRExportRequest, user: dict = Depends(_settings_write)):
     """Export QR codes in various formats"""
     qr_codes = await db.qr_codes.find(
         {"id": {"$in": request.qr_ids}},
@@ -633,7 +637,7 @@ async def export_qr_codes(request: QRExportRequest, user: dict = Depends(get_cur
 # ==================== EQUIPMENT INTEGRATION ====================
 
 @router.get("/equipment/{equipment_id}")
-async def get_qr_for_equipment(equipment_id: str, user: dict = Depends(get_current_user)):
+async def get_qr_for_equipment(equipment_id: str, user: dict = Depends(_settings_read)):
     """Get QR code for a specific equipment item"""
     qr = await db.qr_codes.find_one(
         {"hierarchy_item_id": equipment_id, "status": "active"},
@@ -650,7 +654,7 @@ async def get_qr_for_equipment(equipment_id: str, user: dict = Depends(get_curre
 async def generate_qr_for_equipment(
     equipment_id: str,
     default_action: str = "view_asset",
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(_settings_write)
 ):
     """Generate QR code for a specific equipment item"""
     # Check if QR already exists

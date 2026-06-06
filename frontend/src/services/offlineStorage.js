@@ -229,7 +229,7 @@ class OfflineStorageService {
     for (const completion of pending) {
       try {
         const endpoint = completion.is_action
-          ? `${API_BASE_URL}/api/my-tasks/action/${completion.task_id}/complete`
+          ? `${API_BASE_URL}/api/work-items/actions/${completion.task_id}/complete`
           : `${API_BASE_URL}/api/task-instances/${completion.task_id}/complete`;
         
         const response = await fetch(endpoint, {

@@ -6,15 +6,13 @@ Tests for:
 - POST /api/production/events - Create production event
 - DELETE /api/production/events/{id} - Delete production event
 """
+import os
 import pytest
 import requests
-import os
 import uuid
 
-# Get BASE_URL from environment
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
-if not BASE_URL:
-    raise ValueError("REACT_APP_BACKEND_URL environment variable not set")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
+pytestmark = pytest.mark.skipif(not BASE_URL, reason="REACT_APP_BACKEND_URL not set")
 
 # Test credentials
 TEST_EMAIL = "test@test.com"

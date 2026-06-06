@@ -2,20 +2,23 @@
 Unified work-items API — task_instances, unbridged scheduled_tasks, and actions.
 
 Same serialization as My Tasks via ``work_item_query.fetch_work_items``.
+Legacy ``/my-tasks/*`` routes remain as deprecated aliases.
 """
 from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Body
 
 from auth import require_permission
+from routes import my_tasks as my_tasks_routes
 from services.work_item_query import (
     fetch_unbridged_maintenance_work_items,
     fetch_work_items,
 )
 
 _tasks_read = require_permission("tasks:read")
+_tasks_write = require_permission("tasks:write")
 
 router = APIRouter(prefix="/work-items", tags=["Work Items"])
 
@@ -58,3 +61,51 @@ async def list_unbridged_maintenance_work_items(
         discipline=discipline,
     )
     return {"items": items, "count": len(items)}
+
+
+@router.get("/adhoc-plans")
+async def list_adhoc_plans(current_user: dict = Depends(_tasks_read)):
+    return await my_tasks_routes.get_adhoc_plans(current_user=current_user)
+
+
+@router.post("/adhoc-plans/{plan_id}/execute")
+async def execute_adhoc_plan(
+    plan_id: str,
+    current_user: dict = Depends(_tasks_write),
+):
+    return await my_tasks_routes.execute_adhoc_plan(plan_id, current_user=current_user)
+
+
+@router.get("/{task_id}")
+async def get_work_item_detail(
+    task_id: str,
+    current_user: dict = Depends(_tasks_read),
+):
+    return await my_tasks_routes.get_my_task_detail(task_id, current_user=current_user)
+
+
+@router.post("/{task_id}/start")
+async def start_work_item(
+    task_id: str,
+    current_user: dict = Depends(_tasks_write),
+):
+    return await my_tasks_routes.start_my_task(task_id, current_user=current_user)
+
+
+@router.post("/actions/{action_id}/start")
+async def start_work_item_action(
+    action_id: str,
+    current_user: dict = Depends(_tasks_write),
+):
+    return await my_tasks_routes.start_my_action(action_id, current_user=current_user)
+
+
+@router.post("/actions/{action_id}/complete")
+async def complete_work_item_action(
+    action_id: str,
+    data: Optional[dict] = Body(default=None),
+    current_user: dict = Depends(_tasks_write),
+):
+    return await my_tasks_routes.complete_my_action(
+        action_id, data=data, current_user=current_user
+    )
