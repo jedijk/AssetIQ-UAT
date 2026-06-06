@@ -57,4 +57,4 @@ jobs:
             tests/test_reliability_graph_pm_import.py \
             tests/test_worker_config.py \
             tests/test_ai_cost_guard.py \
-            -q --noconftest
+            -q
