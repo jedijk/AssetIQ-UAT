@@ -259,10 +259,15 @@ const SankeyDiagram = ({ data, isLoading }) => {
     }
     if (relationships.programs_to_equipment?.value > 0) {
       // Direct programs → schedules now (equipment node removed)
+      // Use the ACTUAL scheduled_tasks record count (data lineage), not the count
+      // of task templates with a frequency.
       links.push({
         source: "maintenance_programs",
         target: "schedules",
-        value: data?.schedules?.for_applied || relationships.programs_to_equipment.value,
+        value:
+          data?.schedules?.actual_for_applied ||
+          data?.schedules?.for_applied ||
+          relationships.programs_to_equipment.value,
       });
     }
     if (relationships.schedules_to_work?.value > 0) {

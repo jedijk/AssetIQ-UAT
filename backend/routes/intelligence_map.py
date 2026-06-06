@@ -293,6 +293,18 @@ async def get_intelligence_map_stats(
                 {"frequency": {"$exists": False}}
             ]
         })
+
+        # Actual scheduled_tasks record count scoped to equipment with an active program.
+        # Used by the Data Lineage Sankey so the "Schedules" node reflects the real
+        # data lineage record count (not the conceptual count of task templates with
+        # a frequency).
+        if equipment_ids_with_active_program:
+            schedules_actual_for_applied = await db.scheduled_tasks.count_documents({
+                **schedule_query,
+                "equipment_id": {"$in": list(equipment_ids_with_active_program)},
+            })
+        else:
+            schedules_actual_for_applied = 0
         
         # ========== PLANNED WORK (Future Tasks) ==========
         # today can be used for filtering due_date > today if needed
@@ -407,6 +419,7 @@ async def get_intelligence_map_stats(
             "schedules": {
                 "count": schedules_count,
                 "for_applied": schedules_for_applied_count,
+                "actual_for_applied": schedules_actual_for_applied,
                 "from_strategy": strategy_active_tasks_total,
                 "from_pm_import": pm_tasks_active_count,
                 "by_status": schedule_by_status,
