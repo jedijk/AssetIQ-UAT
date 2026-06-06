@@ -124,14 +124,22 @@ async def preview_schedule(
 ):
     """Compute the next 3 fire times for an unsaved cron+tz combo."""
     _admin_only(current_user)
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+    from croniter import croniter
+
     cfg = await get_task_generation_config()
     cron_expression = payload.cron_expression or cfg["cron_expression"]
     timezone = payload.timezone or cfg["timezone"]
     try:
-        return {
-            "cron_expression": cron_expression,
-            "timezone": timezone,
-            "next_fire_times": compute_next_runs(cron_expression, timezone, n=3),
-        }
+        ZoneInfo(timezone)
+    except ZoneInfoNotFoundError:
+        raise HTTPException(status_code=400, detail=f"Unknown timezone: {timezone}")
+    try:
+        croniter(cron_expression)
     except Exception as ex:
-        raise HTTPException(status_code=400, detail=str(ex))
+        raise HTTPException(status_code=400, detail=f"Invalid cron expression: {ex}")
+    return {
+        "cron_expression": cron_expression,
+        "timezone": timezone,
+        "next_fire_times": compute_next_runs(cron_expression, timezone, n=3),
+    }

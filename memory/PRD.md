@@ -7,6 +7,15 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Jun 2026] **Weekly Task Generation — Phase P3 cron + live schedule editor (VERIFIED)**:
+  - APScheduler `AsyncIOScheduler` started in `background_startup()` (FastAPI lifespan) via `services/scheduler_job.init_scheduler()`. Default cron `0 2 * * sun` plant-local (`Europe/Amsterdam`), look-ahead 7 days. Config persisted in `app_settings.task_generation`. Misfire grace = 1h, `coalesce=True` for single missed-run catchup.
+  - Admin endpoints: `GET/PUT /api/admin/task-generation/schedule`, `POST /api/admin/task-generation/schedule/preview` (validates timezone + cron, returns 400 on either), `GET /runs`, `POST /run` (manual / dry-run). All gated to owner/admin.
+  - Settings → Task Generation page: live cron expression editor with 5 presets (Sunday 02:00 default), timezone dropdown (19 zones), look-ahead input, enable/disable toggle, "Preview next runs" + "Save & reload scheduler" buttons, and a live "Next runs (active/preview)" panel with a "Scheduler running" badge. Editor pattern: `ScheduleEditor` (data gate) + `ScheduleEditorForm` (draft state from prop, remount via `key` on save) — avoids set-state-in-render.
+  - Verified via testing agent (iteration_39): 15/15 backend pytest cases pass, all 7 data-testids present, preset → preview → save → toast → badge round-trip works, invalid cron/tz return 400, idempotency preserved on re-run. Regression suite added at `/app/backend/tests/test_task_generation_schedule.py`.
+  - Files: `services/scheduler_job.py`, `routes/task_generation_admin.py`, `frontend/src/pages/SettingsTaskGenerationPage.js`, `server.py` (lifespan wiring).
+
+
+## Recent Changes
 - [Feb 2026] **Library tabs — Intelligence Map moved to first position (VERIFIED)**:
   - Tab order is now: Intelligence Map → Failure Modes → Equipment Types → Maintenance Strategy → Maintenance Schedule → PM Import. Default landing tab is still `failure-modes` (preserved by `useState(() => searchParams.get("tab") || "failure-modes")`).
   - File: `/app/frontend/src/pages/FailureModesPage.js`.
