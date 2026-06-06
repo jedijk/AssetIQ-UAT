@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, Search, Pencil, Printer, Loader2 } from "lucide-react";
+import { Plus, Search, Pencil, Printer, Loader2, Trash2 } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { Badge } from "../../../components/ui/badge";
 import { Input } from "../../../components/ui/input";
@@ -7,10 +7,15 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "../../../components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { formatDateOnlyCompact } from "../../../lib/dateUtils";
+import {
+  PRODUCTION_DASH_ACTION_EDIT,
+  PRODUCTION_DASH_ACTION_DELETE,
+} from "./productionDashboardShared";
 export function ProductionLogTable({
   isMobile, logSearch, setLogSearch, filteredLog, data, getTimeKey, viscosityByTime,
   isAnomalyRow, selectedTime, setEditEntry, handleProductionLogReprint,
-  printingLogSubmissionId, formTemplates, line90Equipment, setFormExec
+  printingLogSubmissionId, formTemplates, line90Equipment, setFormExec, setDeleteConfirm,
 }) {
   return (
     <>

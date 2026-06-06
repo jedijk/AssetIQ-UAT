@@ -1059,6 +1059,7 @@ export default function ProductionDashboardPage() {
             formTemplates={formTemplates}
             line90Equipment={line90Equipment}
             setFormExec={setFormExec}
+            setDeleteConfirm={setDeleteConfirm}
           />
         </>
       )}
