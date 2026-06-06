@@ -9,6 +9,7 @@ import logging
 from database import db, failure_modes_service, efm_service, installation_filter
 from auth import require_permission
 from services.threat_enrichment import enrich_with_creator_info, enrich_with_equipment_tags
+from services.tenant_schema import merge_tenant_filter, with_tenant_id
 from services.background_jobs import schedule_tracked_job
 from models.api_models import ThreatResponse, ThreatUpdate
 from failure_modes import FAILURE_MODES_LIBRARY
@@ -157,6 +158,7 @@ async def get_threats(
     if query.get("_impossible"):
         return []
     
+    query = merge_tenant_filter(query, current_user)
     threats = await db.threats.find(query, {"_id": 0}).sort("rank", 1).limit(limit).to_list(limit)
     total_count = len(threats)
     
@@ -222,6 +224,7 @@ async def get_top_threats(
     if query.get("_impossible"):
         return []
     
+    query = merge_tenant_filter(query, current_user)
     threats = await db.threats.find(query, {"_id": 0}).sort("risk_score", -1).limit(limit).to_list(limit)
     total_count = len(threats)
     
@@ -270,7 +273,9 @@ async def recalculate_all_threat_scores(
     Uses NEW METHODOLOGY: Risk Score = (Criticality × 0.75) + (FMEA × 0.25)
     """
     # Get all threats for this user
-    threats = await db.threats.find({"created_by": current_user["id"]}).to_list(1000)
+    threats = await db.threats.find(
+        merge_tenant_filter({"created_by": current_user["id"]}, current_user)
+    ).to_list(1000)
     
     if not threats:
         return {"message": "No threats found", "updated_count": 0}
@@ -632,6 +637,7 @@ async def update_threat(
     
     if update_data:
         update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        with_tenant_id(update_data, current_user)
         await db.threats.update_one({"id": threat_id}, {"$set": update_data})
         
         # Recalculate ranks if status changed

@@ -1,0 +1,12 @@
+# Railway sidecar config for the external background worker service.
+# Create a separate Railway service pointing at this repo and set:
+#   Root Directory: backend
+#   Config file: railway.worker.toml (or copy startCommand below)
+
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "python scripts/run_background_worker.py"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

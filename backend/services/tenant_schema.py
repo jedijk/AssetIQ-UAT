@@ -16,6 +16,13 @@ PILOT_COLLECTIONS = frozenset({
     "audit_log",
 })
 
+# Wave 1 — tenant_id on reads/writes with migration-safe $or filter.
+WAVE1_COLLECTIONS = frozenset({
+    "equipment_nodes",
+    "threats",
+    "users",
+})
+
 DEFAULT_TENANT_FIELD = "tenant_id"
 
 
@@ -39,6 +46,29 @@ def tenant_filter(user: Optional[dict]) -> Dict[str, Any]:
     if tid:
         return {DEFAULT_TENANT_FIELD: tid}
     return {}
+
+
+def tenant_read_filter(user: Optional[dict]) -> Dict[str, Any]:
+    """Migration-safe read filter: tenant docs plus legacy rows without tenant_id."""
+    tid = tenant_id_from_user(user)
+    if tid:
+        return {
+            "$or": [
+                {DEFAULT_TENANT_FIELD: tid},
+                {DEFAULT_TENANT_FIELD: {"$exists": False}},
+            ]
+        }
+    return {}
+
+
+def merge_tenant_filter(base_query: Dict[str, Any], user: Optional[dict]) -> Dict[str, Any]:
+    """Combine an existing Mongo query with the migration-safe tenant read filter."""
+    tenant_part = tenant_read_filter(user)
+    if not tenant_part:
+        return base_query or {}
+    if not base_query:
+        return tenant_part
+    return {"$and": [base_query, tenant_part]}
 
 
 def ensure_pilot_indexes(db) -> None:

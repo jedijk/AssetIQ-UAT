@@ -6,6 +6,7 @@ between bridge runs), and open ``central_actions`` into one coherent list shape.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -446,6 +447,19 @@ async def fetch_work_items(
     ]).limit(100)
     raw_tasks = await tasks_cursor.to_list(length=100)
 
+    # Start unbridged maintenance fetch in parallel with task enrichment when allowed.
+    maintenance_task = None
+    if filter_name not in ("recurring", "adhoc"):
+        maintenance_task = asyncio.create_task(
+            fetch_unbridged_maintenance_work_items(
+                user_id,
+                filter_name=filter_name,
+                equipment_id=equipment_id,
+                discipline=discipline,
+                now=now,
+            )
+        )
+
     equipment_ids = set()
     plan_ids_oid = set()
     for task in raw_tasks:
@@ -461,36 +475,47 @@ async def fetch_work_items(
             else:
                 plan_ids_oid.add(task_plan_id)
 
-    equipment_map: Dict[Any, Any] = {}
-    if equipment_ids:
-        equip_nodes_cursor = db.equipment_nodes.find(
+    # Batch independent Mongo lookups after raw_tasks (equipment_nodes + task_plans in parallel).
+    async def _load_equipment_nodes() -> Dict[Any, Any]:
+        equip_map: Dict[Any, Any] = {}
+        if not equipment_ids:
+            return equip_map
+        cursor = await timed_find(
+            db.equipment_nodes,
             {"id": {"$in": list(equipment_ids)}},
             {"_id": 0, "id": 1, "name": 1, "tag": 1},
         )
-        async for eq in equip_nodes_cursor:
-            equipment_map[eq["id"]] = {"name": eq.get("name", "Unknown"), "tag": eq.get("tag")}
+        for eq in await cursor.to_list(len(equipment_ids)):
+            equip_map[eq["id"]] = {"name": eq.get("name", "Unknown"), "tag": eq.get("tag")}
+        return equip_map
 
-        missing_ids = [eid for eid in equipment_ids if eid not in equipment_map]
-        if missing_ids:
-            oid_list = []
-            for eid in missing_ids:
-                try:
-                    oid_list.append(ObjectId(eid))
-                except Exception:
-                    pass
-            if oid_list:
-                legacy_cursor = db.equipment.find(
-                    {"_id": {"$in": oid_list}},
-                    {"_id": 1, "name": 1, "tag": 1},
-                )
-                async for eq in legacy_cursor:
-                    equipment_map[str(eq["_id"])] = {"name": eq.get("name", "Unknown"), "tag": eq.get("tag")}
+    async def _load_task_plans() -> Dict[str, dict]:
+        plan_map_local: Dict[str, dict] = {}
+        if not plan_ids_oid:
+            return plan_map_local
+        cursor = await timed_find(db.task_plans, {"_id": {"$in": list(plan_ids_oid)}})
+        for plan in await cursor.to_list(len(plan_ids_oid)):
+            plan_map_local[str(plan["_id"])] = plan
+        return plan_map_local
 
-    plan_map: Dict[str, dict] = {}
-    if plan_ids_oid:
-        plans_cursor = db.task_plans.find({"_id": {"$in": list(plan_ids_oid)}})
-        async for plan in plans_cursor:
-            plan_map[str(plan["_id"])] = plan
+    equipment_map, plan_map = await asyncio.gather(_load_equipment_nodes(), _load_task_plans())
+
+    missing_ids = [eid for eid in equipment_ids if eid not in equipment_map]
+    if missing_ids:
+        oid_list = []
+        for eid in missing_ids:
+            try:
+                oid_list.append(ObjectId(eid))
+            except Exception:
+                pass
+        if oid_list:
+            legacy_cursor = await timed_find(
+                db.equipment,
+                {"_id": {"$in": oid_list}},
+                {"_id": 1, "name": 1, "tag": 1},
+            )
+            for eq in await legacy_cursor.to_list(len(oid_list)):
+                equipment_map[str(eq["_id"])] = {"name": eq.get("name", "Unknown"), "tag": eq.get("tag")}
 
     template_ids_oid = set()
     for plan in plan_map.values():
@@ -508,8 +533,11 @@ async def fetch_work_items(
 
     template_map: Dict[str, dict] = {}
     if template_ids_oid:
-        templates_cursor = db.task_templates.find({"_id": {"$in": list(template_ids_oid)}})
-        async for tmpl in templates_cursor:
+        templates_cursor = await timed_find(
+            db.task_templates,
+            {"_id": {"$in": list(template_ids_oid)}},
+        )
+        for tmpl in await templates_cursor.to_list(len(template_ids_oid)):
             template_map[str(tmpl["_id"])] = tmpl
 
     form_template_ids = set()
@@ -532,8 +560,8 @@ async def fetch_work_items(
             except Exception:
                 pass
         if form_ids_oid:
-            form_cursor = db.form_templates.find({"_id": {"$in": form_ids_oid}})
-            async for ft in form_cursor:
+            form_cursor = await timed_find(db.form_templates, {"_id": {"$in": form_ids_oid}})
+            for ft in await form_cursor.to_list(len(form_ids_oid)):
                 form_template_map[str(ft["_id"])] = ft
 
     items: List[dict] = []
@@ -616,15 +644,9 @@ async def fetch_work_items(
         task["source_type"] = "task"
         items.append(serialize_task(task))
 
-    if filter_name not in ("recurring", "adhoc"):
+    if maintenance_task is not None:
         try:
-            maintenance_items = await fetch_unbridged_maintenance_work_items(
-                user_id,
-                filter_name=filter_name,
-                equipment_id=equipment_id,
-                discipline=discipline,
-                now=now,
-            )
+            maintenance_items = await maintenance_task
             existing_ids = {t.get("scheduled_task_id") for t in items if t.get("scheduled_task_id")}
             for item in maintenance_items:
                 sid = item.get("scheduled_task_id")
@@ -675,36 +697,48 @@ async def fetch_work_items(
             else:
                 threat_source_ids.add(sid)
 
+        # Batch threat/investigation lookups where safe (investigations first, then threats + equipment).
         inv_threat_map: Dict[str, str] = {}
         if investigation_source_ids:
-            inv_cursor = db.investigations.find(
+            inv_cursor = await timed_find(
+                db.investigations,
                 {"id": {"$in": list(investigation_source_ids)}},
                 {"_id": 0, "id": 1, "threat_id": 1},
             )
-            async for inv in inv_cursor:
+            for inv in await inv_cursor.to_list(len(investigation_source_ids)):
                 if inv.get("threat_id"):
                     inv_threat_map[inv["id"]] = inv["threat_id"]
                     threat_source_ids.add(inv["threat_id"])
 
         threat_map: Dict[str, dict] = {}
         threat_equipment_ids = set()
-        if threat_source_ids:
-            threats_cursor = db.threats.find(
+
+        async def _load_threats() -> Dict[str, dict]:
+            result: Dict[str, dict] = {}
+            if not threat_source_ids:
+                return result
+            threats_cursor = await timed_find(
+                db.threats,
                 {"id": {"$in": list(threat_source_ids)}},
                 {"_id": 0, "id": 1, "fmea_rpn": 1, "risk_score": 1, "risk_level": 1, "linked_equipment_id": 1},
             )
-            async for threat in threats_cursor:
-                threat_map[threat["id"]] = threat
-                if threat.get("linked_equipment_id"):
-                    threat_equipment_ids.add(threat["linked_equipment_id"])
+            for threat in await threats_cursor.to_list(len(threat_source_ids)):
+                result[threat["id"]] = threat
+            return result
+
+        threat_map = await _load_threats()
+        for threat in threat_map.values():
+            if threat.get("linked_equipment_id"):
+                threat_equipment_ids.add(threat["linked_equipment_id"])
 
         action_equip_tag_map: Dict[str, str] = {}
         if threat_equipment_ids:
-            equip_cursor = db.equipment_nodes.find(
+            equip_cursor = await timed_find(
+                db.equipment_nodes,
                 {"id": {"$in": list(threat_equipment_ids)}},
                 {"_id": 0, "id": 1, "tag": 1},
             )
-            async for eq in equip_cursor:
+            for eq in await equip_cursor.to_list(len(threat_equipment_ids)):
                 if eq.get("tag"):
                     action_equip_tag_map[eq["id"]] = eq["tag"]
 

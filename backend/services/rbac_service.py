@@ -187,7 +187,8 @@ class RBACService:
         role: Optional[str] = None,
         is_active: Optional[bool] = None,
         skip: int = 0,
-        limit: int = 100
+        limit: int = 100,
+        tenant_scope: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Get users with filtering."""
         query = {}
@@ -204,6 +205,9 @@ class RBACService:
         
         if is_active is not None:
             query["is_active"] = is_active
+
+        if tenant_scope:
+            query = {"$and": [query, tenant_scope]} if query else tenant_scope
         
         cursor = self.users.find(query, {"password_hash": 0}).sort("name", 1).skip(skip).limit(limit)
         users = []

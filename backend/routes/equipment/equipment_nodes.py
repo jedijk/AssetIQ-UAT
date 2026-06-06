@@ -16,6 +16,7 @@ from iso14224_models import (
 from services.query_cache import query_cache
 from services.cache_service import invalidate_equipment_related
 from services.background_jobs import schedule_tracked_job
+from services.tenant_schema import merge_tenant_filter, with_tenant_id
 from utils.auto_translate import translate_equipment_node
 
 logger = logging.getLogger(__name__)
@@ -77,7 +78,7 @@ async def get_equipment_nodes(
     
     # Get all nodes that belong to assigned installations (no created_by filter)
     nodes_cursor = await db.equipment_nodes.find(
-        {"id": {"$in": list(equipment_ids)}},
+        merge_tenant_filter({"id": {"$in": list(equipment_ids)}}, current_user),
         {"_id": 0}
     ).to_list(5000)
     
@@ -104,7 +105,7 @@ async def get_all_installations(
     """Get all installation-level nodes across all users (for admin assignment)."""
     # Get nodes that are ONLY installations (top-level per ISO 14224)
     nodes = await db.equipment_nodes.find(
-        {"level": "installation"},
+        merge_tenant_filter({"level": "installation"}, current_user),
         {"_id": 0, "id": 1, "name": 1, "level": 1, "created_by": 1}
     ).sort("name", 1).to_list(500)
     
@@ -155,7 +156,10 @@ async def export_equipment_hierarchy_excel(
     
     # Fetch nodes using installation filter (same as hierarchy view)
     nodes = await db.equipment_nodes.find(
-        {"id": {"$in": list(equipment_ids)}} if equipment_ids else {},
+        merge_tenant_filter(
+            {"id": {"$in": list(equipment_ids)}} if equipment_ids else {},
+            current_user,
+        ),
         {"_id": 0}
     ).sort("sort_order", 1).to_list(5000)
     
@@ -423,7 +427,7 @@ async def create_equipment_node(
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
     
-    await db.equipment_nodes.insert_one(node_doc)
+    await db.equipment_nodes.insert_one(with_tenant_id(node_doc, current_user))
     
     # Auto-generate EFMs if equipment_type_id is specified
     if node_data.equipment_type_id:

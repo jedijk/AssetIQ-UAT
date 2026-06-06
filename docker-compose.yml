@@ -1,0 +1,53 @@
+services:
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.runCommand({ ping: 1 })"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: python:3.11-slim
+    working_dir: /app/backend
+    volumes:
+      - ./backend:/app/backend
+    command: >
+      sh -c "pip install -q -r requirements.txt &&
+             uvicorn server:app --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      ENVIRONMENT: development
+      USE_EXTERNAL_BACKGROUND_WORKER: "true"
+      JWT_SECRET: local-dev-secret-change-in-production
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  worker:
+    image: python:3.11-slim
+    working_dir: /app/backend
+    volumes:
+      - ./backend:/app/backend
+    command: >
+      sh -c "pip install -q -r requirements.txt &&
+             python scripts/run_background_worker.py"
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      ENVIRONMENT: development
+    depends_on:
+      mongo:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    profiles:
+      - worker
+
+volumes:
+  mongo_data:

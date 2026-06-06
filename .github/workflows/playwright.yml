@@ -1,0 +1,65 @@
+name: Playwright E2E
+
+on:
+  push:
+    branches:
+      - main
+      - deploy-uat
+      - deploy-uat-push
+      - "uat/**"
+  pull_request:
+    branches:
+      - main
+      - deploy-uat
+      - deploy-uat-push
+      - "uat/**"
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start backend and MongoDB
+        run: |
+          docker compose up -d mongo backend
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8000/health > /dev/null; then
+              echo "Backend healthy"
+              exit 0
+            fi
+            echo "Waiting for /health ($i/60)..."
+            sleep 5
+          done
+          echo "Backend failed to become healthy"
+          docker compose logs backend
+          exit 1
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+
+      - name: Install test dependencies
+        working-directory: tests
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: tests
+        run: npm run install:browsers
+
+      - name: Run Playwright tests
+        working-directory: tests
+        env:
+          CI: "true"
+          REACT_APP_BACKEND_URL: http://localhost:8000
+        run: npm run test:e2e
+
+      - name: Stop docker-compose
+        if: always()
+        run: docker compose down -v

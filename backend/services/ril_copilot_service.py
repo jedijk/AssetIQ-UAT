@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class ReliabilityCopilotService:
     """
     AI-powered natural language interface for reliability intelligence.
-    Uses OpenAI GPT-4o for understanding queries and generating responses.
+    Uses ai_gateway for query understanding (fallback) and response generation.
     """
     
     def __init__(self, db, ril_service):
@@ -110,7 +110,40 @@ class ReliabilityCopilotService:
         if any(word in query_lower for word in ["alert", "alarm", "warning"]):
             return "alerts_summary"
         
-        # Default to general summary
+        # Unmatched queries: optional ai_gateway intent classification
+        try:
+            from services.ai_gateway import chat as ai_gateway_chat
+
+            answer = await ai_gateway_chat(
+                [
+                    {
+                        "role": "system",
+                        "content": (
+                            "Classify the reliability query into one intent: "
+                            "risk_analysis, changes_summary, equipment_details, "
+                            "attention_required, predictions, cases_summary, alerts_summary, "
+                            "general_summary. Reply with the intent slug only."
+                        ),
+                    },
+                    {"role": "user", "content": query},
+                ],
+                user_id="ril-copilot",
+                endpoint="ril.copilot.classify_intent",
+                model="gpt-4o-mini",
+                temperature=0,
+                max_tokens=32,
+            )
+            slug = (answer or "").strip().lower().replace(" ", "_")
+            allowed = {
+                "risk_analysis", "changes_summary", "equipment_details",
+                "attention_required", "predictions", "cases_summary",
+                "alerts_summary", "general_summary",
+            }
+            if slug in allowed:
+                return slug
+        except Exception as exc:
+            logger.debug("ai_gateway intent fallback skipped: %s", exc)
+
         return "general_summary"
     
     async def _gather_data(

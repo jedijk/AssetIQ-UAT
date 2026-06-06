@@ -349,6 +349,14 @@ try:
 except Exception as e:
     logger.warning("Structured logging middleware not available: %s", e)
 
+try:
+    from middleware.tenant_context import TenantContextMiddleware
+
+    app.add_middleware(TenantContextMiddleware)
+    logger.info("Tenant context middleware enabled")
+except Exception as e:
+    logger.warning("Tenant context middleware not available: %s", e)
+
 
 # =============================================================================
 # Database Context Middleware (for multi-database support)

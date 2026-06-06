@@ -14,6 +14,7 @@ from database import db, rbac_service, JWT_SECRET, JWT_ALGORITHM
 from auth import get_current_user, hash_password, require_permission
 from services.storage_service import upload_avatar_async, get_object_async, get_mime_type, is_storage_available
 from services.cache_service import CacheService as cache
+from services.tenant_schema import merge_tenant_filter, with_tenant_id
 
 # Try to import resend for email
 try:
@@ -253,7 +254,7 @@ async def admin_create_user(
         "assigned_installations": user_data.installations,  # Assign to installations
         "has_seen_intro": True,  # Don't show intro until after password change
     }
-    await db.users.insert_one(user_doc)
+    await db.users.insert_one(with_tenant_id(user_doc, current_user))
     
     logger.info(f"User created by admin {current_user['email']}: {user_data.email} with role {user_data.role}, installations: {user_data.installations}")
     
@@ -570,7 +571,8 @@ async def get_users(
     result = await rbac_service.get_users(
         search=search,
         role=role,
-        is_active=is_active
+        is_active=is_active,
+        tenant_scope=merge_tenant_filter({}, current_user),
     )
     
     # Enrich with avatar paths
@@ -633,7 +635,7 @@ async def get_pending_users(
         raise HTTPException(status_code=403, detail="Admin access required")
     
     pending_users = await db.users.find(
-        {"approval_status": "pending"},
+        merge_tenant_filter({"approval_status": "pending"}, current_user),
         {"_id": 0, "password_hash": 0}
     ).to_list(100)
     

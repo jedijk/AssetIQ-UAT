@@ -1,3 +1,7 @@
+# API service only. For the background worker sidecar, see ../railway.worker.toml
+# and docs/stabilization/EXTERNAL_WORKER_DEPLOY.md.
+# Set USE_EXTERNAL_BACKGROUND_WORKER=true on this service in UAT/production.
+
 [build]
 builder = "nixpacks"
 
