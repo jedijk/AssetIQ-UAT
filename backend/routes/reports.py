@@ -2,6 +2,8 @@
 Report generation routes for Causal Investigations.
 Generates PowerPoint and PDF reports.
 """
+from __future__ import annotations
+
 import os
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel

@@ -1,6 +1,8 @@
 """
 Equipment Hierarchy Import operations.
 """
+from __future__ import annotations
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from datetime import datetime, timezone

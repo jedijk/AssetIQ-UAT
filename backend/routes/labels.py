@@ -5,6 +5,8 @@ Smart Labeling System - Sprint 1 MVP
 - Print job history
 - QR workflow with configurable target
 """
+from __future__ import annotations
+
 import uuid
 import io
 from datetime import datetime, timezone
