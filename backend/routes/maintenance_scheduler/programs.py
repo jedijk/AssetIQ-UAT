@@ -7,6 +7,7 @@ Equipment Maintenance Programs:
 import asyncio
 import logging
 import time
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from typing import Optional
 
@@ -260,11 +261,14 @@ async def _apply_strategy_to_equipment_impl(
         tenant_id=tenant_id_from_user(current_user),
     )
 
+    # Legacy flat-row count is 0 when SYNC_LEGACY_MAINTENANCE_PROGRAMS is off; surface v2 creates.
+    effective_programs_created = programs_created_count or v2_programs_created
+
     return {
         "message": f"Strategy applied to {len(equipment_list)} equipment",
         "equipment_count": len(equipment_list),
-        "programs_created": programs_created_count,
-        "programs_updated": len(equipment_list) * active_task_count - programs_created_count,
+        "programs_created": effective_programs_created,
+        "programs_updated": len(equipment_list) * active_task_count - effective_programs_created,
         "scheduled_tasks_created": scheduled_count,
         "programs_deactivated_on_resync": resync["programs_deactivated"],
         "equipment_manager_programs_created": v2_programs_created,
@@ -330,10 +334,21 @@ async def get_programs_summary(
             "task_count": len(active_tasks),
         })
 
+    today = datetime.utcnow().date().isoformat()
+    overdue_count = await db.scheduled_tasks.count_documents({
+        "equipment_type_id": equipment_type_id,
+        "status": {"$nin": ["completed", "cancelled"]},
+        "due_date": {"$lt": today},
+    })
+
     return {
         "equipment_type_id": equipment_type_id,
         "equipment_count": len(equipment_summary),
         "total_program_tasks": total_tasks,
+        # Backward-compatible fields for Maintenance Schedule UI (pre-v2 response shape).
+        "total_programs": total_tasks,
+        "overdue_count": overdue_count,
+        "equipment": equipment_summary,
         "equipment_summary": equipment_summary,
         "source": "maintenance_programs_v2",
     }
