@@ -59,7 +59,11 @@ export function FailureModesListPanel({
   onOpenFindDuplicateActions,
 }) {
   return (
-    <>
+    <div
+      className={`${
+        selectedFm ? "w-1/2 lg:w-2/5" : "w-full"
+      } transition-all duration-300 flex flex-col min-h-0 min-w-0`}
+    >
       <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
         <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
           <div className="p-1.5 rounded-md bg-slate-100">
@@ -276,7 +280,7 @@ export function FailureModesListPanel({
         </div>
       </div>
 
-      <div className={`${selectedFm ? "w-1/2 lg:w-2/5" : "w-full"} transition-all duration-300`}>
+      <div className="flex-1 min-h-0">
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
             <div className="loading-dots">
@@ -370,6 +374,6 @@ export function FailureModesListPanel({
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }

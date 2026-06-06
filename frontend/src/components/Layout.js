@@ -62,6 +62,7 @@ import { actionsAPI, feedbackAPI } from "../lib/api";
 import { useOfflineSync } from "../hooks/useOfflineSync";
 import { usePageTracking } from "../hooks/useAnalyticsTracking";
 import { AppErrorBoundary } from "./AppErrorBoundary";
+import EnvironmentRibbon from "./EnvironmentRibbon";
 import { useCapabilities } from "../core/performance";
 import { notify, getNotificationSettings, isNotificationSupported, getPermissionStatus } from "../services/notificationService";
 
@@ -537,6 +538,7 @@ const Layout = () => {
 
   return (
     <div className="app-container">
+      <EnvironmentRibbon />
       {/* Header */}
       <LayoutHeader
         isOperatorActive={isOperatorActive}

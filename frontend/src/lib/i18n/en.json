@@ -1251,6 +1251,12 @@
     "signUp": "Sign up",
     "signIn": "Sign in",
     "forgotPassword": "Forgot password?",
+    "signInFailed": "Sign-in failed",
+    "accountLocked": "Account temporarily locked",
+    "lockoutMessage": "Too many failed sign-in attempts. Please wait before trying again.",
+    "lockoutCountdownHint": "You can sign in again when the timer reaches zero.",
+    "lockoutContactAdmin": "Or contact your administrator to reset access.",
+    "signInWithSso": "Sign in with SSO",
     "forgotPasswordSubtitle": "Enter your email and we'll send you a link to reset your password.",
     "resetPassword": "Reset Password",
     "newPassword": "New Password",
@@ -1895,7 +1901,14 @@
     "flipVertical": "Flip Vertical",
     "reset": "Reset",
     "savePhoto": "Save Photo",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "setPassword": "Set Password",
+    "createPassword": "Create Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password",
+    "passwordsDoNotMatch": "Passwords don't match",
+    "passwordRequired": "Password is required",
+    "passwordRequirements": "Minimum 8 characters with uppercase, lowercase, number, and special character."
   },
   "userStatistics": {
     "title": "User Statistics",

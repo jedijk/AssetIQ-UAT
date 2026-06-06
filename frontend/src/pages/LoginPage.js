@@ -6,10 +6,13 @@ import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Loader2, Shield, Activity, BarChart3, RefreshCw, Server, WifiOff, LogIn } from "lucide-react";
+import { Loader2, Shield, Activity, BarChart3, RefreshCw, Server, LogIn, Lock, AlertCircle } from "lucide-react";
 import { getBackendUrl } from "../lib/apiConfig";
 import { publicAssetUrl } from "../lib/assetUrl";
 import { authAPI } from "../lib/apis/auth";
+import { parseAuthError, formatCountdown } from "../lib/authErrors";
+import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
+import EnvironmentRibbon from "../components/EnvironmentRibbon";
 
 const OIDC_STATE_KEY = "oidc_state";
 
@@ -33,6 +36,8 @@ const LoginPage = () => {
   const [loginBrandSrc, setLoginBrandSrc] = useState(LOGIN_BRAND_PRIMARY);
   const [oidcEnabled, setOidcEnabled] = useState(false);
   const [ssoLoading, setSsoLoading] = useState(false);
+  const [authError, setAuthError] = useState(null);
+  const [lockoutSeconds, setLockoutSeconds] = useState(0);
   
   // Server startup state
   const [serverStarting, setServerStarting] = useState(false);
@@ -65,7 +70,8 @@ const LoginPage = () => {
       window.location.href = authorization_url;
     } catch (err) {
       setSsoLoading(false);
-      toast.error("SSO is not available. Use email and password.");
+      const { message } = parseAuthError(err);
+      setAuthError(message || "SSO is not available. Use email and password.");
     }
   };
 
@@ -124,21 +130,15 @@ const LoginPage = () => {
       setServerStarting(false);
       setAutoRetrying(false);
       pendingLoginRef.current = null;
-      
-      let message = "Login failed. Please try again.";
-      const detail = error.response?.data?.detail;
-      if (typeof detail === "string") {
-        message = detail;
-      } else if (Array.isArray(detail) && detail.length > 0) {
-        message = detail.map((d) => (d?.msg ? d.msg : String(d))).join(" ");
-      } else if (error.message) {
-        message = error.message;
-      } else if (error.response?.status === 401) {
-        message = "Invalid email or password.";
+
+      const parsed = parseAuthError(error);
+      setAuthError(parsed.message);
+
+      if (parsed.isLockout && parsed.retryAfterSeconds) {
+        setLockoutSeconds(parsed.retryAfterSeconds);
       }
 
-      console.error("Login error:", error.response?.status ?? "—", message);
-      toast.error(message);
+      console.error("Login error:", parsed.status ?? "—", parsed.message);
       return true; // Return true to stop retrying
     }
   }, [login, navigate, from, t]);
@@ -169,8 +169,31 @@ const LoginPage = () => {
     };
   }, [serverStarting, retryCount, performLogin]);
 
+  // Lockout countdown timer
+  useEffect(() => {
+    if (lockoutSeconds <= 0) return undefined;
+
+    const timer = setInterval(() => {
+      setLockoutSeconds((prev) => {
+        if (prev <= 1) {
+          setAuthError(null);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [lockoutSeconds]);
+
+  const isLockedOut = lockoutSeconds > 0;
+  const isSubmitting = loading || ssoLoading || isLockedOut;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isLockedOut) return;
+
+    setAuthError(null);
     setLoading(true);
     setServerStarting(false);
     setRetryCount(0);
@@ -180,7 +203,7 @@ const LoginPage = () => {
     const passwordValue = passwordRef.current?.value || password;
 
     if (!emailValue || !passwordValue) {
-      toast.error("Please enter email and password");
+      setAuthError("Please enter email and password");
       setLoading(false);
       return;
     }
@@ -212,7 +235,9 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="login-page-container">
+    <>
+      <EnvironmentRibbon />
+      <div className="login-page-container">
       {/* Mobile Video Background - positioned at container level */}
       <video 
         src={BACKGROUND_VIDEO}
@@ -284,6 +309,43 @@ const LoginPage = () => {
             <span className="text-xl font-bold text-slate-900">AssetIQ</span>
           </div>
 
+          {/* Account lockout overlay */}
+          {isLockedOut && (
+            <div className="server-starting-overlay" data-testid="login-lockout-overlay">
+              <div className="server-starting-content">
+                <div className="server-starting-icon">
+                  <Lock className="w-8 h-8 text-amber-600" />
+                </div>
+                <h2 className="text-xl font-semibold text-slate-900 mt-4">
+                  {t("auth.accountLocked") || "Account temporarily locked"}
+                </h2>
+                <p className="text-sm text-slate-500 mt-2 text-center max-w-xs">
+                  {authError ||
+                    (t("auth.lockoutMessage") ||
+                      "Too many failed sign-in attempts. Please wait before trying again.")}
+                </p>
+                <div className="mt-4 text-3xl font-mono font-semibold text-amber-700 tabular-nums" data-testid="login-lockout-countdown">
+                  {formatCountdown(lockoutSeconds)}
+                </div>
+                <p className="text-xs text-slate-400 mt-2">
+                  {t("auth.lockoutCountdownHint") || "You can sign in again when the timer reaches zero."}
+                </p>
+                <div className="flex flex-col items-center gap-2 mt-5 text-sm">
+                  <Link
+                    to="/forgot-password"
+                    className="text-blue-600 hover:underline"
+                    data-testid="lockout-forgot-password-link"
+                  >
+                    {t("auth.forgotPassword") || "Forgot password?"}
+                  </Link>
+                  <span className="text-slate-400 text-xs">
+                    {t("auth.lockoutContactAdmin") || "Or contact your administrator to reset access."}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Server Starting Overlay */}
           {serverStarting && (
             <div className="server-starting-overlay" data-testid="server-starting-overlay">
@@ -347,6 +409,14 @@ const LoginPage = () => {
           <h1 className="auth-title" data-testid="login-title">{t("auth.loginTitle")}</h1>
           <p className="auth-subtitle">{t("auth.loginSubtitle")}</p>
 
+          {authError && !isLockedOut && (
+            <Alert variant="destructive" className="mb-4" data-testid="login-error">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>{t("auth.signInFailed") || "Sign-in failed"}</AlertTitle>
+              <AlertDescription>{authError}</AlertDescription>
+            </Alert>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-5" data-testid="login-form">
             <div className="space-y-2">
               <Label htmlFor="email">{t("auth.email")}</Label>
@@ -393,7 +463,7 @@ const LoginPage = () => {
 
             <Button
               type="submit"
-              disabled={loading}
+              disabled={isSubmitting}
               className="w-full h-11 bg-blue-600 hover:bg-blue-700"
               data-testid="login-submit-button"
             >
@@ -421,7 +491,7 @@ const LoginPage = () => {
               <Button
                 type="button"
                 variant="outline"
-                disabled={ssoLoading || loading}
+                disabled={isSubmitting}
                 onClick={handleSsoLogin}
                 className="w-full h-11"
                 data-testid="login-sso-button"
@@ -734,7 +804,8 @@ const LoginPage = () => {
           }
         }
       `}</style>
-    </div>
+      </div>
+    </>
   );
 };
 

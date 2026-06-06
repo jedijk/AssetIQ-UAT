@@ -77,13 +77,6 @@ import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -109,7 +102,7 @@ import { cn } from "../lib/utils";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { imageAnalysisAPI } from "../lib/api";
 import { offlineStorage, useOfflineStatus } from "../services/offlineStorage";
-import { DISCIPLINES, normalizeDiscipline } from "../constants/disciplines";
+import { DISCIPLINES, getDisciplineLabel, normalizeDiscipline } from "../constants/disciplines";
 import TaskExecutionFrame from "../components/task-execution/TaskExecutionFrame";
 import TaskCard, { SortableTaskCard } from "../components/task-execution/TaskCard";
 import { useSortable } from "@dnd-kit/sortable";
@@ -303,7 +296,8 @@ const MyTasksPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTask, setSelectedTask] = useState(null);
   const [viewMode, setViewMode] = useState("list"); // "list" or "execution"
-  const [selectedDiscipline, setSelectedDiscipline] = useState("");
+  const [selectedDisciplines, setSelectedDisciplines] = useState([]);
+  const [disciplineDropdownOpen, setDisciplineDropdownOpen] = useState(false);
 
   const isMobileView = useIsMobile();
   const uaTouch =
@@ -458,30 +452,59 @@ const MyTasksPage = () => {
   const userNormalisedDiscipline = !isMaintenanceUser && userDisciplineRaw
     ? normalizeDiscipline(userDisciplineRaw)
     : "";
-  const autoDisciplinesForUser = isMaintenanceUser
-    ? TECHNICAL_DISCIPLINES
-    : (userNormalisedDiscipline ? [userNormalisedDiscipline] : []);
 
-  // Seed selectedDiscipline once from user discipline (single value) unless they
-  // already chose something or are a maintenance-user (handled client-side).
+  const toggleDiscipline = (value) => {
+    setSelectedDisciplines((prev) =>
+      prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value]
+    );
+  };
+
+  const clearDisciplineFilter = () => setSelectedDisciplines([]);
+
+  const getDisciplineDisplayText = () => {
+    if (selectedDisciplines.length === 0) return "All Disciplines";
+    if (selectedDisciplines.length === 1) {
+      return getDisciplineLabel(selectedDisciplines[0]);
+    }
+    return `${getDisciplineLabel(selectedDisciplines[0])} +${selectedDisciplines.length - 1}`;
+  };
+
+  const matchesDisciplineFilter = (item) => {
+    if (selectedDisciplines.length === 0) return true;
+    const disc = (
+      normalizeDiscipline(item.discipline) ||
+      item.discipline ||
+      item.mitigation_strategy ||
+      ""
+    ).toLowerCase();
+    return selectedDisciplines.some((d) => {
+      const dl = d.toLowerCase();
+      return disc.includes(dl) || dl.includes(disc) || disc === dl;
+    });
+  };
+
+  // Seed selectedDisciplines once from user discipline unless they already picked.
   useEffect(() => {
-    if (selectedDiscipline) return; // user already picked
-    if (isMaintenanceUser) return;  // multi-value → applied client-side
+    if (selectedDisciplines.length > 0) return;
+    if (isMaintenanceUser) {
+      setSelectedDisciplines(TECHNICAL_DISCIPLINES);
+      return;
+    }
     if (userNormalisedDiscipline) {
-      setSelectedDiscipline(userNormalisedDiscipline);
+      setSelectedDisciplines([userNormalisedDiscipline]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
   
   // Fetch tasks with offline caching
   const { data: tasksData, isLoading: tasksLoading, error: tasksError, refetch: refetchTasks } = useQuery({
-    queryKey: ["my-tasks", activeFilter, selectedDate, selectedDiscipline],
+    queryKey: ["my-tasks", activeFilter, selectedDate, selectedDisciplines],
     queryFn: async () => {
       try {
         const data = await myTasksAPI.getTasks({
           filter: activeFilter,
           date: activeFilter === "open" ? format(selectedDate, "yyyy-MM-dd") : undefined,
-          discipline: selectedDiscipline || undefined,
+          discipline: selectedDisciplines.length === 1 ? selectedDisciplines[0] : undefined,
         });
         // Cache tasks for offline access
         if (data?.tasks) {
@@ -796,6 +819,10 @@ const MyTasksPage = () => {
     if (task.status === "completed" || task.status === "completed_offline") {
       return false;
     }
+    // Apply discipline filter (multi-select; API only handles single discipline)
+    if (selectedDisciplines.length > 1 && !matchesDisciplineFilter(task)) {
+      return false;
+    }
     // Apply search filter
     if (searchQuery) {
       return task.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -878,7 +905,7 @@ const MyTasksPage = () => {
   };
   
   // Calculate stats - adjust for adhoc tab
-  const adhocPlans = adhocPlansData?.plans || [];
+  const adhocPlans = (adhocPlansData?.plans || []).filter(matchesDisciplineFilter);
   const isAdhocTab = activeFilter === "adhoc";
   
   // Sort adhoc plans - manual or default (by last executed, then by title)
@@ -1042,20 +1069,73 @@ const MyTasksPage = () => {
               />
             </div>
             
-            {/* Discipline Filter */}
-            <Select value={selectedDiscipline || "all"} onValueChange={(v) => setSelectedDiscipline(v === "all" ? "" : v)}>
-              <SelectTrigger className="w-[90px] sm:w-[140px] h-9 text-xs sm:text-sm" data-testid="discipline-filter">
-                <SelectValue placeholder="All" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Disciplines</SelectItem>
-                {disciplines.map((disc) => (
-                  <SelectItem key={disc.value} value={disc.value}>
-                    {disc.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Discipline Filter — multi-select */}
+            <div className="relative">
+              {disciplineDropdownOpen && (
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setDisciplineDropdownOpen(false)}
+                />
+              )}
+              <button
+                type="button"
+                onClick={() => setDisciplineDropdownOpen(!disciplineDropdownOpen)}
+                className="flex items-center justify-between w-[90px] sm:w-[140px] h-9 px-2 sm:px-3 bg-white border border-slate-200 rounded-md text-xs sm:text-sm hover:bg-slate-50 transition-colors"
+                data-testid="discipline-filter"
+              >
+                <span
+                  className={cn(
+                    "truncate",
+                    selectedDisciplines.length > 0 ? "text-slate-900" : "text-slate-500"
+                  )}
+                >
+                  {getDisciplineDisplayText()}
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "w-3.5 h-3.5 text-slate-400 transition-transform flex-shrink-0 ml-1",
+                    disciplineDropdownOpen && "rotate-180"
+                  )}
+                />
+              </button>
+              {disciplineDropdownOpen && (
+                <div className="absolute top-full right-0 mt-1 w-52 sm:w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1 max-h-72 overflow-y-auto">
+                  <button
+                    type="button"
+                    onClick={clearDisciplineFilter}
+                    className={cn(
+                      "w-full px-3 py-2 text-left text-sm hover:bg-slate-50 border-b border-slate-100",
+                      selectedDisciplines.length === 0
+                        ? "text-slate-900 font-medium bg-slate-50"
+                        : "text-blue-600 hover:bg-blue-50"
+                    )}
+                    data-testid="discipline-option-all"
+                  >
+                    All Disciplines
+                  </button>
+                  {disciplines.map((disc) => {
+                    const isSelected = selectedDisciplines.includes(disc.value);
+                    return (
+                      <button
+                        key={disc.value}
+                        type="button"
+                        onClick={() => toggleDiscipline(disc.value)}
+                        className="w-full px-3 py-2 flex items-center gap-2 hover:bg-slate-50 transition-colors text-left"
+                        data-testid={`discipline-option-${disc.value}`}
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          className="pointer-events-none"
+                          aria-hidden
+                        />
+                        <span className="text-sm text-slate-700 flex-1">{disc.label}</span>
+                        {isSelected && <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             
             {/* Date Picker - Desktop only */}
             <Popover>
@@ -1172,7 +1252,7 @@ const MyTasksPage = () => {
               <Loader2 className="w-8 h-8 animate-spin mx-auto text-slate-400 mb-2" />
               <p className="text-slate-500">Loading ad-hoc plans...</p>
             </div>
-          ) : (adhocPlansData?.plans || []).length === 0 ? (
+          ) : adhocPlans.length === 0 ? (
             <div className="text-center py-12 bg-slate-50 rounded-lg border border-dashed border-slate-200">
               <Zap className="w-12 h-12 mx-auto text-amber-400 mb-3" />
               <h3 className="text-lg font-medium text-slate-900 mb-1">No ad-hoc plans available</h3>

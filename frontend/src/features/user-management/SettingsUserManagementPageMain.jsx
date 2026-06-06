@@ -43,6 +43,7 @@ import {
   Factory,
   Crown,
   KeyRound,
+  Lock,
   PlayCircle,
   ArrowLeft,
   Smartphone,
@@ -135,6 +136,10 @@ export default function SettingsUserManagementPage() {
   
   // Delete confirmation state
   const [deleteConfirmUser, setDeleteConfirmUser] = useState(null);
+
+  // Set password dialog state (owner only)
+  const [setPasswordUser, setSetPasswordUser] = useState(null);
+  const [setPasswordForm, setSetPasswordForm] = useState({ password: "", confirmPassword: "" });
   
   // Tab state for Users / Permissions
   const [activeTab, setActiveTab] = useState("users");
@@ -280,6 +285,20 @@ export default function SettingsUserManagementPage() {
     onError: (error) => {
       toast.error(error.message || "Failed to send password reset email");
     }
+  });
+
+  const setPasswordMutation = useMutation({
+    mutationFn: rbacAPI.setUserPassword,
+    onSuccess: (data) => {
+      toast.success(data.message || "Password set successfully");
+      queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
+      setSetPasswordUser(null);
+      setSetPasswordForm({ password: "", confirmPassword: "" });
+    },
+    onError: (error) => {
+      const msg = error?.response?.data?.detail || error.message || "Failed to set password";
+      toast.error(msg);
+    },
   });
 
   // Reset intro tour mutation
@@ -474,10 +493,95 @@ export default function SettingsUserManagementPage() {
     }
   };
 
+  const handleOpenSetPassword = (user) => {
+    setSetPasswordUser(user);
+    setSetPasswordForm({ password: "", confirmPassword: "" });
+  };
+
+  const handleCloseSetPassword = () => {
+    setSetPasswordUser(null);
+    setSetPasswordForm({ password: "", confirmPassword: "" });
+  };
+
+  const handleSubmitSetPassword = () => {
+    if (setPasswordForm.password !== setPasswordForm.confirmPassword) {
+      toast.error(t("userManagement.passwordsDoNotMatch") || "Passwords don't match");
+      return;
+    }
+    if (!setPasswordForm.password) {
+      toast.error(t("userManagement.passwordRequired") || "Password is required");
+      return;
+    }
+    setPasswordMutation.mutate({
+      userId: setPasswordUser.id,
+      password: setPasswordForm.password,
+    });
+  };
+
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
     return formatDateUtil(dateStr);
   };
+
+  const setPasswordDialog = (
+    <Dialog open={!!setPasswordUser} onOpenChange={(open) => !open && handleCloseSetPassword()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {setPasswordUser?.has_password
+              ? (t("userManagement.setPassword") || "Set Password")
+              : (t("userManagement.createPassword") || "Create Password")}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <p className="text-sm text-slate-600">
+            Set a new password for <strong>{setPasswordUser?.name}</strong> ({setPasswordUser?.email})
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="set-password-new">{t("userManagement.newPassword") || "New Password"}</Label>
+            <Input
+              id="set-password-new"
+              type="password"
+              value={setPasswordForm.password}
+              onChange={(e) => setSetPasswordForm({ ...setPasswordForm, password: e.target.value })}
+              data-testid="set-password-input"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="set-password-confirm">{t("userManagement.confirmPassword") || "Confirm Password"}</Label>
+            <Input
+              id="set-password-confirm"
+              type="password"
+              value={setPasswordForm.confirmPassword}
+              onChange={(e) => setSetPasswordForm({ ...setPasswordForm, confirmPassword: e.target.value })}
+              data-testid="set-password-confirm-input"
+            />
+          </div>
+          <p className="text-xs text-slate-500">
+            {t("userManagement.passwordRequirements") || "Minimum 8 characters with uppercase, lowercase, number, and special character."}
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={handleCloseSetPassword}>{t("common.cancel") || "Cancel"}</Button>
+          <Button
+            onClick={handleSubmitSetPassword}
+            disabled={
+              setPasswordMutation.isPending
+              || !setPasswordForm.password
+              || !setPasswordForm.confirmPassword
+            }
+            data-testid="set-password-submit"
+          >
+            {setPasswordMutation.isPending
+              ? (t("userManagement.saving") || "Saving...")
+              : setPasswordUser?.has_password
+                ? (t("userManagement.setPassword") || "Set Password")
+                : (t("userManagement.createPassword") || "Create Password")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 
   // Mobile Layout
   if (isMobile) {
@@ -691,6 +795,17 @@ export default function SettingsUserManagementPage() {
                         >
                           <KeyRound className="w-4 h-4 mr-2" /> Reset Password
                         </DropdownMenuItem>
+                        {isOwner && (
+                          <DropdownMenuItem
+                            onClick={() => handleOpenSetPassword(user)}
+                            data-testid={`mobile-set-password-${user.id}`}
+                          >
+                            <Lock className="w-4 h-4 mr-2" />
+                            {user.has_password
+                              ? (t("userManagement.setPassword") || "Set Password")
+                              : (t("userManagement.createPassword") || "Create Password")}
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem 
                           onClick={() => resetIntroMutation.mutate(user.id)}
                           disabled={resetIntroMutation.isPending}
@@ -1056,6 +1171,8 @@ export default function SettingsUserManagementPage() {
           title="Edit Photo"
         />
 
+        {setPasswordDialog}
+
         {/* Hidden file input */}
         <input
           type="file"
@@ -1390,6 +1507,17 @@ export default function SettingsUserManagementPage() {
                             >
                               <KeyRound className="w-4 h-4 mr-2" /> Reset Password
                             </DropdownMenuItem>
+                            {isOwner && (
+                              <DropdownMenuItem
+                                onClick={() => handleOpenSetPassword(user)}
+                                data-testid={`desktop-set-password-${user.id}`}
+                              >
+                                <Lock className="w-4 h-4 mr-2" />
+                                {user.has_password
+                                  ? (t("userManagement.setPassword") || "Set Password")
+                                  : (t("userManagement.createPassword") || "Create Password")}
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem 
                               onClick={() => resetIntroMutation.mutate(user.id)}
                               disabled={resetIntroMutation.isPending}
@@ -1586,6 +1714,8 @@ export default function SettingsUserManagementPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {setPasswordDialog}
 
       {/* Hidden file input for avatar upload */}
       <input

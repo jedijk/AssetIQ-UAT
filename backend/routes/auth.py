@@ -86,15 +86,15 @@ def validate_password_complexity(password: str) -> tuple[bool, str]:
     return True, ""
 
 
-async def check_account_lockout(email: str) -> tuple[bool, int]:
+async def check_account_lockout(email: str) -> tuple[bool, int, int]:
     """
     Check if account is locked due to failed login attempts.
-    Returns (is_locked, remaining_minutes)
+    Returns (is_locked, remaining_minutes, retry_after_seconds)
     """
     lockout = await db.login_attempts.find_one({"email": email.lower()})
     
     if not lockout:
-        return False, 0
+        return False, 0, 0
     
     if lockout.get("locked_until"):
         locked_until = lockout["locked_until"]
@@ -103,10 +103,11 @@ async def check_account_lockout(email: str) -> tuple[bool, int]:
         
         now = datetime.now(timezone.utc)
         if now < locked_until:
-            remaining = (locked_until - now).total_seconds() / 60
-            return True, int(remaining) + 1
+            remaining_seconds = max(1, int((locked_until - now).total_seconds()))
+            remaining_minutes = max(1, int(remaining_seconds / 60) + (1 if remaining_seconds % 60 else 0))
+            return True, remaining_minutes, remaining_seconds
     
-    return False, 0
+    return False, 0, 0
 
 
 async def record_login_attempt(email: str, success: bool, ip_address: str = None):
@@ -311,11 +312,20 @@ async def login(request: Request, credentials: UserLogin, response: Response):
     ip_address = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown")
     
     # Check if account is locked
-    is_locked, remaining_minutes = await check_account_lockout(credentials.email)
+    is_locked, remaining_minutes, retry_after_seconds = await check_account_lockout(credentials.email)
     if is_locked:
         raise HTTPException(
             status_code=429,
-            detail=f"Account is temporarily locked due to too many failed attempts. Try again in {remaining_minutes} minutes."
+            detail={
+                "message": (
+                    f"Account is temporarily locked due to too many failed attempts. "
+                    f"Try again in {remaining_minutes} minutes."
+                ),
+                "retry_after_seconds": retry_after_seconds,
+                "remaining_minutes": remaining_minutes,
+                "error_code": "account_locked",
+            },
+            headers={"Retry-After": str(retry_after_seconds)},
         )
     
     try:

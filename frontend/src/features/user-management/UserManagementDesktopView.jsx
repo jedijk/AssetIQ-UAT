@@ -323,6 +323,17 @@ export function UserManagementDesktopView(props) {
                             >
                               <KeyRound className="w-4 h-4 mr-2" /> Reset Password
                             </DropdownMenuItem>
+                            {isOwner && (
+                              <DropdownMenuItem
+                                onClick={() => handleOpenSetPassword(user)}
+                                data-testid={`desktop-set-password-${user.id}`}
+                              >
+                                <Lock className="w-4 h-4 mr-2" />
+                                {user.has_password
+                                  ? (t("userManagement.setPassword") || "Set Password")
+                                  : (t("userManagement.createPassword") || "Create Password")}
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem 
                               onClick={() => resetIntroMutation.mutate(user.id)}
                               disabled={resetIntroMutation.isPending}
@@ -519,6 +530,8 @@ export function UserManagementDesktopView(props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {setPasswordDialog}
 
       {/* Hidden file input for avatar upload */}
       <input

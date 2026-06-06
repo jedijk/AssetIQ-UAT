@@ -11,7 +11,8 @@ import base64
 import os
 import jwt
 from database import db, rbac_service, JWT_SECRET, JWT_ALGORITHM
-from auth import get_current_user, hash_password, require_permission
+from auth import get_current_user, hash_password, verify_password, require_permission
+from routes.auth import validate_password_complexity
 from services.storage_service import upload_avatar_async, get_object_async, get_mime_type, is_storage_available
 from services.cache_service import CacheService as cache
 from services.tenant_schema import merge_tenant_filter, with_tenant_id
@@ -79,6 +80,11 @@ class UserProfileUpdate(BaseModel):
     position: str = None
     phone: str = None
     location: str = None
+
+
+class AdminSetPasswordRequest(BaseModel):
+    """Schema for owner setting a user's password directly."""
+    password: str
 
 
 async def send_welcome_email(user_email: str, user_name: str, password: str, role: str):
@@ -575,13 +581,14 @@ async def get_users(
         tenant_scope=merge_tenant_filter({}, current_user),
     )
     
-    # Enrich with avatar paths
+    # Enrich with avatar paths and password status
     for user in result.get("users", []):
         user_doc = await db.users.find_one(
             {"id": user["id"]},
-            {"_id": 0, "avatar_path": 1}
+            {"_id": 0, "avatar_path": 1, "password_hash": 1}
         )
         user["avatar_path"] = user_doc.get("avatar_path") if user_doc else None
+        user["has_password"] = bool(user_doc and user_doc.get("password_hash"))
     
     return result
 
@@ -877,6 +884,54 @@ async def get_role_distribution(current_user: dict = Depends(_users_read)):
     """Get count of users per role."""
     return await rbac_service.get_role_distribution()
 
+
+
+@router.post("/users/{user_id}/set-password")
+async def admin_set_user_password(
+    user_id: str,
+    body: AdminSetPasswordRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Owner-only: set or create a password for another user.
+    """
+    if current_user.get("role") != "owner":
+        raise HTTPException(status_code=403, detail="Only owners can set user passwords")
+
+    user = await db.users.find_one(
+        {"id": user_id},
+        {"_id": 0, "email": 1, "name": 1, "password_hash": 1},
+    )
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    is_valid, error_msg = validate_password_complexity(body.password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+
+    existing_hash = user.get("password_hash")
+    if existing_hash and verify_password(body.password, existing_hash):
+        raise HTTPException(status_code=400, detail="New password must be different from current password")
+
+    await db.users.update_one(
+        {"id": user_id},
+        {
+            "$set": {
+                "password_hash": hash_password(body.password),
+                "must_change_password": False,
+                "password_changed_at": datetime.now(timezone.utc).isoformat(),
+            }
+        },
+    )
+
+    await db.login_attempts.delete_many({"email": user["email"].lower()})
+
+    logger.info(f"Owner {current_user.get('email')} set password for user {user.get('email')}")
+
+    return {
+        "status": "success",
+        "message": f"Password set for {user.get('name') or user.get('email')}",
+    }
 
 
 @router.post("/rbac/users/{user_id}/reset-intro")

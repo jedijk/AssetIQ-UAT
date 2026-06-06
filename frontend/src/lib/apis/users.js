@@ -107,6 +107,10 @@ export const rbacAPI = {
     const response = await api.post("/auth/admin-reset-password", { user_id: userId });
     return response.data;
   },
+  setUserPassword: async ({ userId, password }) => {
+    const response = await api.post(`/users/${userId}/set-password`, { password });
+    return response.data;
+  },
   resetIntro: async (userId) => {
     const response = await api.post(`/rbac/users/${userId}/reset-intro`);
     return response.data;

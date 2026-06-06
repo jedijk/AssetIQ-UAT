@@ -212,6 +212,17 @@ export function UserManagementMobileView(props) {
                         >
                           <KeyRound className="w-4 h-4 mr-2" /> Reset Password
                         </DropdownMenuItem>
+                        {isOwner && (
+                          <DropdownMenuItem
+                            onClick={() => handleOpenSetPassword(user)}
+                            data-testid={`mobile-set-password-${user.id}`}
+                          >
+                            <Lock className="w-4 h-4 mr-2" />
+                            {user.has_password
+                              ? (t("userManagement.setPassword") || "Set Password")
+                              : (t("userManagement.createPassword") || "Create Password")}
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem 
                           onClick={() => resetIntroMutation.mutate(user.id)}
                           disabled={resetIntroMutation.isPending}
@@ -576,6 +587,8 @@ export function UserManagementMobileView(props) {
           cropShape="round"
           title="Edit Photo"
         />
+
+        {setPasswordDialog}
 
         {/* Hidden file input */}
         <input
