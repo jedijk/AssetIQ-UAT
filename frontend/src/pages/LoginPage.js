@@ -6,11 +6,11 @@ import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Loader2, Shield, Activity, BarChart3, RefreshCw, Server, LogIn, Lock, AlertCircle } from "lucide-react";
+import { Loader2, Shield, Activity, BarChart3, RefreshCw, Server, LogIn, Lock, AlertCircle, Mail } from "lucide-react";
 import { getBackendUrl } from "../lib/apiConfig";
 import { publicAssetUrl } from "../lib/assetUrl";
 import { authAPI } from "../lib/apis/auth";
-import { parseAuthError, formatCountdown } from "../lib/authErrors";
+import { parseAuthError, formatCountdown, buildUnlockMailto } from "../lib/authErrors";
 import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
 import EnvironmentRibbon from "../components/EnvironmentRibbon";
 
@@ -37,7 +37,9 @@ const LoginPage = () => {
   const [oidcEnabled, setOidcEnabled] = useState(false);
   const [ssoLoading, setSsoLoading] = useState(false);
   const [authError, setAuthError] = useState(null);
+  const [lockoutReason, setLockoutReason] = useState(null);
   const [lockoutSeconds, setLockoutSeconds] = useState(0);
+  const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
   
   // Server startup state
   const [serverStarting, setServerStarting] = useState(false);
@@ -134,8 +136,20 @@ const LoginPage = () => {
       const parsed = parseAuthError(error);
       setAuthError(parsed.message);
 
-      if (parsed.isLockout && parsed.retryAfterSeconds) {
-        setLockoutSeconds(parsed.retryAfterSeconds);
+      if (parsed.isLockout) {
+        setLockoutReason(parsed.message);
+        if (parsed.retryAfterSeconds) {
+          setLockoutSeconds(parsed.retryAfterSeconds);
+        }
+        setRateLimitSeconds(0);
+      } else if (parsed.isRateLimited && parsed.retryAfterSeconds) {
+        setRateLimitSeconds(parsed.retryAfterSeconds);
+        setLockoutSeconds(0);
+        setLockoutReason(null);
+      } else {
+        setLockoutSeconds(0);
+        setRateLimitSeconds(0);
+        setLockoutReason(null);
       }
 
       console.error("Login error:", parsed.status ?? "—", parsed.message);
@@ -177,6 +191,7 @@ const LoginPage = () => {
       setLockoutSeconds((prev) => {
         if (prev <= 1) {
           setAuthError(null);
+          setLockoutReason(null);
           return 0;
         }
         return prev - 1;
@@ -186,6 +201,17 @@ const LoginPage = () => {
     return () => clearInterval(timer);
   }, [lockoutSeconds]);
 
+  // IP rate-limit countdown (inline, non-lockout)
+  useEffect(() => {
+    if (rateLimitSeconds <= 0) return undefined;
+
+    const timer = setInterval(() => {
+      setRateLimitSeconds((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [rateLimitSeconds]);
+
   const isLockedOut = lockoutSeconds > 0;
   const isSubmitting = loading || ssoLoading || isLockedOut;
 
@@ -194,6 +220,8 @@ const LoginPage = () => {
     if (isLockedOut) return;
 
     setAuthError(null);
+    setLockoutReason(null);
+    setRateLimitSeconds(0);
     setLoading(true);
     setServerStarting(false);
     setRetryCount(0);
@@ -317,29 +345,35 @@ const LoginPage = () => {
                   <Lock className="w-8 h-8 text-amber-600" />
                 </div>
                 <h2 className="text-xl font-semibold text-slate-900 mt-4">
-                  {t("auth.accountLocked") || "Account temporarily locked"}
+                  {t("auth.accountLocked")}
                 </h2>
                 <p className="text-sm text-slate-500 mt-2 text-center max-w-xs">
-                  {authError ||
-                    (t("auth.lockoutMessage") ||
-                      "Too many failed sign-in attempts. Please wait before trying again.")}
+                  {lockoutReason || t("auth.lockoutMessage")}
                 </p>
                 <div className="mt-4 text-3xl font-mono font-semibold text-amber-700 tabular-nums" data-testid="login-lockout-countdown">
                   {formatCountdown(lockoutSeconds)}
                 </div>
                 <p className="text-xs text-slate-400 mt-2">
-                  {t("auth.lockoutCountdownHint") || "You can sign in again when the timer reaches zero."}
+                  {t("auth.lockoutCountdownHint")}
                 </p>
-                <div className="flex flex-col items-center gap-2 mt-5 text-sm">
+                <div className="flex flex-col items-center gap-3 mt-5 text-sm">
+                  <a
+                    href={buildUnlockMailto(emailRef.current?.value || email)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 hover:bg-amber-100 transition-colors font-medium"
+                    data-testid="lockout-email-admin-link"
+                  >
+                    <Mail className="w-4 h-4" />
+                    {t("auth.emailAdminToUnlock")}
+                  </a>
                   <Link
                     to="/forgot-password"
                     className="text-blue-600 hover:underline"
                     data-testid="lockout-forgot-password-link"
                   >
-                    {t("auth.forgotPassword") || "Forgot password?"}
+                    {t("auth.forgotPassword")}
                   </Link>
-                  <span className="text-slate-400 text-xs">
-                    {t("auth.lockoutContactAdmin") || "Or contact your administrator to reset access."}
+                  <span className="text-slate-400 text-xs text-center max-w-xs">
+                    {t("auth.lockoutContactAdmin")}
                   </span>
                 </div>
               </div>
@@ -412,8 +446,15 @@ const LoginPage = () => {
           {authError && !isLockedOut && (
             <Alert variant="destructive" className="mb-4" data-testid="login-error">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>{t("auth.signInFailed") || "Sign-in failed"}</AlertTitle>
-              <AlertDescription>{authError}</AlertDescription>
+              <AlertTitle>{t("auth.signInFailed")}</AlertTitle>
+              <AlertDescription>
+                <span>{authError}</span>
+                {rateLimitSeconds > 0 && (
+                  <p className="mt-2 font-mono text-sm tabular-nums" data-testid="login-rate-limit-countdown">
+                    {t("auth.tryAgainIn")} {formatCountdown(rateLimitSeconds)}
+                  </p>
+                )}
+              </AlertDescription>
             </Alert>
           )}
 
@@ -499,12 +540,12 @@ const LoginPage = () => {
                 {ssoLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Redirecting…
+                    {t("auth.ssoRedirecting")}
                   </>
                 ) : (
                   <>
                     <LogIn className="w-4 h-4 mr-2" />
-                    Sign in with SSO
+                    {t("auth.signInWithSso")}
                   </>
                 )}
               </Button>

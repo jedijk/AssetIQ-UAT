@@ -315,7 +315,7 @@ async def login(request: Request, credentials: UserLogin, response: Response):
     is_locked, remaining_minutes, retry_after_seconds = await check_account_lockout(credentials.email)
     if is_locked:
         raise HTTPException(
-            status_code=429,
+            status_code=423,
             detail={
                 "message": (
                     f"Account is temporarily locked due to too many failed attempts. "

@@ -205,29 +205,8 @@ export const AuthProvider = ({ children }) => {
     
     return { ...userData, must_change_password: must_change_password || userData.must_change_password };
     } catch (error) {
-      // Clear authenticating flag on error
       setIsAuthenticating(false);
-      
-      // Log detailed error for debugging
       console.error("[Auth] Login failed:", error.response?.status, error.response?.data || error.message);
-      
-      if (error.response?.status === 401) {
-        throw new Error("Invalid email or password");
-      } else if (error.response?.status === 429) {
-        const detail = error.response?.data?.detail;
-        let message = "Too many login attempts. Please try again later.";
-        if (typeof detail === "string") {
-          message = detail;
-        } else if (Array.isArray(detail) && detail.length > 0) {
-          message = detail.map((d) => (d?.msg ? d.msg : String(d))).join(" ");
-        }
-        throw new Error(message);
-      } else if (!error.response) {
-        // Network error - likely CORS or backend unreachable
-        console.error("[Auth] Network error - check if backend is reachable and CORS is configured");
-        throw new Error("Cannot connect to server. Please try again later.");
-      }
-      
       throw error;
     }
   };
