@@ -10,6 +10,36 @@ from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
+
+def _record_openai_usage(
+    response: Any,
+    *,
+    endpoint: str,
+    model: str,
+    user_id: str = "system",
+    company_id: str = "default",
+    feature: Optional[str] = None,
+    installation_id: Optional[str] = None,
+    installation_name: Optional[str] = None,
+) -> None:
+    """Persist token usage from an OpenAI response to the cost guard and MongoDB."""
+    usage = getattr(response, "usage", None)
+    if not usage:
+        return
+    from services.ai_cost_guard import record_ai_tokens
+
+    record_ai_tokens(
+        user_id=user_id or "system",
+        company_id=company_id or "default",
+        endpoint=endpoint,
+        prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
+        completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
+        model=model or "",
+        feature=feature or endpoint,
+        installation_id=installation_id,
+        installation_name=installation_name,
+    )
+
 # Initialize OpenAI client
 def get_openai_client() -> OpenAI:
     """Get OpenAI client with API key from environment."""
@@ -42,6 +72,12 @@ async def chat_completion(
     max_tokens: Optional[int] = None,
     response_format: Optional[Dict] = None,
     api_key: Optional[str] = None,
+    user_id: str = "system",
+    company_id: str = "default",
+    feature: Optional[str] = None,
+    installation_id: Optional[str] = None,
+    installation_name: Optional[str] = None,
+    endpoint: str = "openai_service.chat_completion",
 ) -> str:
     """
     Send a chat completion request to OpenAI.
@@ -76,6 +112,16 @@ async def chat_completion(
             kwargs["response_format"] = response_format
         
         response = client.chat.completions.create(**kwargs)
+        _record_openai_usage(
+            response,
+            endpoint=endpoint,
+            model=actual_model,
+            user_id=user_id,
+            company_id=company_id,
+            feature=feature or endpoint,
+            installation_id=installation_id,
+            installation_name=installation_name,
+        )
         return response.choices[0].message.content
         
     except Exception as e:
@@ -90,6 +136,12 @@ async def chat_completion_with_images(
     model: str = "gpt-4o",
     temperature: float = 0.7,
     max_tokens: Optional[int] = None,
+    user_id: str = "system",
+    company_id: str = "default",
+    feature: Optional[str] = None,
+    installation_id: Optional[str] = None,
+    installation_name: Optional[str] = None,
+    endpoint: str = "openai_service.chat_completion_with_images",
 ) -> str:
     """
     Send a chat completion request with images to OpenAI.
@@ -147,6 +199,16 @@ async def chat_completion_with_images(
             kwargs["max_tokens"] = max_tokens
         
         response = client.chat.completions.create(**kwargs)
+        _record_openai_usage(
+            response,
+            endpoint=endpoint,
+            model=actual_model,
+            user_id=user_id,
+            company_id=company_id,
+            feature=feature or endpoint,
+            installation_id=installation_id,
+            installation_name=installation_name,
+        )
         return response.choices[0].message.content
         
     except Exception as e:
@@ -158,6 +220,10 @@ async def transcribe_audio(
     audio_data: bytes,
     filename: str = "audio.webm",
     language: Optional[str] = None,
+    user_id: str = "system",
+    company_id: str = "default",
+    installation_id: Optional[str] = None,
+    installation_name: Optional[str] = None,
 ) -> str:
     """
     Transcribe audio using OpenAI Whisper.
@@ -187,7 +253,21 @@ async def transcribe_audio(
             kwargs["language"] = language
         
         response = client.audio.transcriptions.create(**kwargs)
-        return response.text
+        text = response.text
+        from services.ai_cost_guard import record_ai_tokens
+
+        record_ai_tokens(
+            user_id=user_id or "system",
+            company_id=company_id or "default",
+            endpoint="openai_service.transcribe_audio",
+            prompt_tokens=0,
+            completion_tokens=max(1, len(text or "") // 4),
+            model="whisper-1",
+            feature="voice_transcription",
+            installation_id=installation_id,
+            installation_name=installation_name,
+        )
+        return text
         
     except Exception as e:
         logger.error(f"OpenAI Whisper transcription error: {str(e)}")
@@ -198,6 +278,10 @@ def transcribe_audio_sync(
     audio_data: bytes,
     filename: str = "audio.webm",
     language: Optional[str] = None,
+    user_id: str = "system",
+    company_id: str = "default",
+    installation_id: Optional[str] = None,
+    installation_name: Optional[str] = None,
 ) -> str:
     """
     Synchronous version of transcribe_audio for use in sync contexts.
@@ -218,7 +302,21 @@ def transcribe_audio_sync(
             kwargs["language"] = language
         
         response = client.audio.transcriptions.create(**kwargs)
-        return response.text
+        text = response.text
+        from services.ai_cost_guard import record_ai_tokens
+
+        record_ai_tokens(
+            user_id=user_id or "system",
+            company_id=company_id or "default",
+            endpoint="openai_service.transcribe_audio_sync",
+            prompt_tokens=0,
+            completion_tokens=max(1, len(text or "") // 4),
+            model="whisper-1",
+            feature="voice_transcription",
+            installation_id=installation_id,
+            installation_name=installation_name,
+        )
+        return text
         
     except Exception as e:
         logger.error(f"OpenAI Whisper transcription error: {str(e)}")
@@ -232,12 +330,14 @@ class OpenAIChat:
     This makes migration easier by maintaining similar method signatures.
     """
     
-    def __init__(self, api_key: str = None):
+    def __init__(self, api_key: str = None, user_id: str = "system", company_id: str = "default"):
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
         self.model = "gpt-4o"
         self.temperature = 0.7
         self.max_tokens = None
         self.messages = []
+        self.user_id = user_id
+        self.company_id = company_id
         
     def with_model(self, provider: str, model: str) -> "OpenAIChat":
         """Set the model to use."""
@@ -275,6 +375,14 @@ class OpenAIChat:
                 kwargs["max_tokens"] = self.max_tokens
             
             response = client.chat.completions.create(**kwargs)
+            _record_openai_usage(
+                response,
+                endpoint="openai_service.OpenAIChat.chat",
+                model=self.model,
+                user_id=self.user_id,
+                company_id=self.company_id,
+                feature="openai_chat",
+            )
             return response.choices[0].message.content
             
         except Exception as e:
@@ -321,6 +429,14 @@ class OpenAIChat:
                 kwargs["max_tokens"] = self.max_tokens
             
             response = client.chat.completions.create(**kwargs)
+            _record_openai_usage(
+                response,
+                endpoint="openai_service.OpenAIChat.chat_with_images",
+                model=self.model,
+                user_id=self.user_id,
+                company_id=self.company_id,
+                feature="openai_vision_chat",
+            )
             return response.choices[0].message.content
             
         except Exception as e:

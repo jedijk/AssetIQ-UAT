@@ -74,3 +74,18 @@ Exit `0` = all gates passed; `2` = one or more gates failed.
 
 - `GET /maintenance-scheduler/jobs/{job_id}`
 - `GET /pm-import/jobs/{job_id}`
+
+## Plan completion / prod cutover
+
+1. **Deploy UAT** — deploy the release branch to the UAT environment and confirm the API is healthy.
+2. **Check maintenance readiness** — as owner/admin, open **Settings → Maintenance Readiness** or call `GET /api/admin/maintenance-readiness`. Review env flags, strategy/program counts, and background job queue health.
+3. **Run UAT gates** — from the backend directory:
+
+   ```bash
+   cd backend && MONGO_URL=mongodb://... python scripts/verify_uat_gates.py
+   ```
+
+   Exit `0` = all gates passed; `2` = one or more gates failed (do not cut over).
+
+4. **Enable external worker** — set `USE_EXTERNAL_BACKGROUND_WORKER=true` on the API and run `run_background_worker.py` as a sidecar (or dedicated worker service). Confirm queue drains and no dead-letter growth in the readiness snapshot.
+5. **Disable legacy read in production** — after UAT sign-off, deploy to production with `READ_LEGACY_MAINTENANCE_PROGRAMS=false` (and `SYNC_LEGACY_MAINTENANCE_PROGRAMS=false` when legacy sync is no longer required). Re-check `GET /api/admin/maintenance-readiness` post-deploy.

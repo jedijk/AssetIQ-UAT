@@ -307,10 +307,13 @@ INDEX_DEFINITIONS = {
     "ai_usage": [
         {"keys": [("user_id", 1)]},
         {"keys": [("timestamp", -1)]},
+        {"keys": [("date", 1)]},
         {"keys": [("model", 1)]},
         {"keys": [("feature", 1)]},
+        {"keys": [("installation_id", 1)]},
         # Compound for analytics
         {"keys": [("user_id", 1), ("timestamp", -1)]},
+        {"keys": [("date", 1), ("installation_id", 1)]},
     ],
     
     # File storage - MongoDB-based file storage

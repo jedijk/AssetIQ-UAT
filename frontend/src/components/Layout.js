@@ -704,6 +704,7 @@ const Layout = () => {
     { path: "/settings/server-performance", label: "Server Performance", icon: Server, ownerOnly: true },
     { path: "/settings/database", label: "Database Environment", icon: Database, ownerOnly: true },
     { path: "/settings/ai-usage", label: t("nav.aiUsage"), icon: Brain, adminOnly: true, desktopOnly: true },
+    { path: "/settings/maintenance-readiness", label: t("nav.maintenanceReadiness"), icon: ClipboardCheck, adminOnly: true, desktopOnly: true },
     // Explicit roles to keep UX consistent with SettingsPage + backend (owner only).
     { path: "/settings/audit-log", label: "Audit Log", icon: ScrollText, roles: ["owner"] },
     { path: "/settings/statistics", label: t("nav.statistics"), icon: BarChart3 },

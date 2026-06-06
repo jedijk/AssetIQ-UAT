@@ -3,7 +3,7 @@ import { useIsMobile } from "../hooks/useIsMobile";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
-import { getBackendUrl } from "../lib/apiConfig";
+import { api } from "../lib/apiClient";
 import { formatDate } from "../lib/dateUtils";
 import { toast } from "sonner";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
@@ -51,25 +51,6 @@ import {
   SelectValue,
 } from "../components/ui/select";
 
-// API helper
-const fetchWithAuth = async (url, options = {}) => {
-  const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
-  const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
-  const response = await fetch(`${getBackendUrl()}${url}`, {
-    ...options,
-    credentials: AUTH_MODE === "cookie" ? "include" : "omit",
-    headers: {
-      ...options.headers,
-      ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
-      "Content-Type": "application/json",
-    },
-  });
-  if (!response.ok) {
-    throw new Error(response.statusText);
-  }
-  return response.json();
-};
-
 export default function SettingsAIUsagePage() {
   const { t } = useLanguage();
   const { user } = useAuth();
@@ -101,7 +82,7 @@ export default function SettingsAIUsagePage() {
       if (installationFilter !== "all") {
         params.append("installation_id", installationFilter);
       }
-      return fetchWithAuth(`/api/admin/ai-usage?${params}`);
+      return api.get(`/admin/ai-usage?${params}`).then((response) => response.data);
     },
     retry: 1,
   });
@@ -109,7 +90,7 @@ export default function SettingsAIUsagePage() {
   // Fetch installations for filter
   const { data: installationsData } = useQuery({
     queryKey: ["installations"],
-    queryFn: () => fetchWithAuth("/api/admin/installations"),
+    queryFn: () => api.get("/admin/installations").then((response) => response.data),
     retry: 1,
   });
 

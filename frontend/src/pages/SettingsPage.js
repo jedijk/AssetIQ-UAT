@@ -21,7 +21,8 @@ import {
   Tag,
   Wrench,
   CalendarClock,
-  Languages
+  Languages,
+  ClipboardCheck
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { ScrollArea } from "../components/ui/scroll-area";
@@ -87,6 +88,14 @@ const SETTINGS_SECTIONS = [
     icon: Brain,
     path: "/settings/ai-usage",
     roles: ["owner", "admin"]
+  },
+  {
+    id: "maintenance-readiness",
+    sectionKey: "maintenanceReadiness",
+    icon: ClipboardCheck,
+    path: "/settings/maintenance-readiness",
+    roles: ["owner", "admin"],
+    desktopOnly: true
   },
   {
     id: "performance",
