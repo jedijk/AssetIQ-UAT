@@ -43,7 +43,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
+          pip install -r backend/requirements-dev.txt
 
       - name: Run unit tests
         env:
@@ -52,9 +52,14 @@ jobs:
           cd backend && python -m pytest \
             tests/test_background_jobs.py \
             tests/test_maintenance_readiness.py \
+            tests/test_maintenance_readiness_service.py \
             tests/test_verify_uat_gates.py \
             tests/test_pm_import_job_handler.py \
             tests/test_reliability_graph_pm_import.py \
             tests/test_worker_config.py \
             tests/test_ai_cost_guard.py \
+            tests/test_auth_matrix.py \
+            tests/test_mongo_regex.py \
+            tests/test_reliability_graph_query.py \
+            tests/test_ai_fm_suggestions_auth.py \
             -q

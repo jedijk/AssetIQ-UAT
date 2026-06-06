@@ -67,6 +67,15 @@ async def sync_edges_for_apply_strategy(
     if not strategy:
         return {"edges_upserted": 0}
 
+    programs_cursor = db.maintenance_programs_v2.find(
+        {"equipment_id": {"$in": list(equipment_ids)}},
+        {"_id": 0},
+    )
+    programs = await programs_cursor.to_list(len(equipment_ids) or 1)
+    program_by_equipment = {
+        p["equipment_id"]: p for p in programs if p.get("equipment_id")
+    }
+
     for equipment_id in equipment_ids:
         await upsert_edge(
             source_type="equipment",
@@ -80,10 +89,7 @@ async def sync_edges_for_apply_strategy(
         )
         created += 1
 
-        program = await db.maintenance_programs_v2.find_one(
-            {"equipment_id": equipment_id},
-            {"_id": 0},
-        )
+        program = program_by_equipment.get(equipment_id)
         if not program:
             continue
 

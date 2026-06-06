@@ -120,11 +120,11 @@ class TaskService:
             query["equipment_type_ids"] = equipment_type_id
         
         if search:
-            query["$or"] = [
-                {"name": {"$regex": search, "$options": "i"}},
-                {"description": {"$regex": search, "$options": "i"}},
-                {"tags": {"$regex": search, "$options": "i"}},
-            ]
+            from utils.mongo_regex import or_search_fields
+
+            search_clause = or_search_fields(search, "name", "description", "tags")
+            if search_clause:
+                query.update(search_clause)
         
         cursor = self.templates.find(query).sort("name", 1).skip(skip).limit(limit)
         

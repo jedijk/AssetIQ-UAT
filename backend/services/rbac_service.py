@@ -134,6 +134,13 @@ ROLES = {
 }
 
 
+# Role aliases used in legacy UI routes (manager → admin permissions).
+ROLE_ALIASES = {
+    "manager": "admin",
+    "operator": "operations",
+}
+
+
 class RBACService:
     """Service for Role-Based Access Control operations."""
     
@@ -147,6 +154,7 @@ class RBACService:
     
     def get_role_permissions(self, role: str) -> List[str]:
         """Get permissions for a specific role."""
+        role = ROLE_ALIASES.get(role, role)
         role_def = ROLES.get(role)
         if role_def:
             return role_def["permissions"]
@@ -179,10 +187,11 @@ class RBACService:
         query = {}
         
         if search:
-            query["$or"] = [
-                {"name": {"$regex": search, "$options": "i"}},
-                {"email": {"$regex": search, "$options": "i"}}
-            ]
+            from utils.mongo_regex import or_search_fields
+
+            search_clause = or_search_fields(search, "name", "email")
+            if search_clause:
+                query.update(search_clause)
         
         if role:
             query["role"] = role

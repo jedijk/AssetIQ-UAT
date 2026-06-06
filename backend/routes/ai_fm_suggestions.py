@@ -12,7 +12,7 @@ import logging
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from openai import AsyncOpenAI, RateLimitError
 
@@ -21,10 +21,15 @@ load_dotenv()
 
 from iso14224_models import EQUIPMENT_TYPES
 from database import db
+from auth import require_permission
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/ai-suggestions", tags=["AI Suggestions"])
+router = APIRouter(
+    prefix="/ai-suggestions",
+    tags=["AI Suggestions"],
+    dependencies=[Depends(require_permission("library:write"))],
+)
 
 # In-memory cache (per-process). Backed by Mongo for cross-restart persistence.
 _suggestion_cache: Dict[str, Any] = {}

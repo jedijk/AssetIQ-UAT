@@ -131,12 +131,17 @@ class ObservationService:
                 query["created_at"]["$lte"] = to_date
         
         if search:
-            query["$or"] = [
-                {"description": {"$regex": search, "$options": "i"}},
-                {"equipment_name": {"$regex": search, "$options": "i"}},
-                {"failure_mode_name": {"$regex": search, "$options": "i"}},
-                {"tags": {"$regex": search, "$options": "i"}},
-            ]
+            from utils.mongo_regex import or_search_fields
+
+            search_clause = or_search_fields(
+                search,
+                "description",
+                "equipment_name",
+                "failure_mode_name",
+                "tags",
+            )
+            if search_clause:
+                query.update(search_clause)
         
         cursor = self.observations.find(query).sort("created_at", -1).skip(skip).limit(limit)
         

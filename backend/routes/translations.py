@@ -139,7 +139,11 @@ async def get_dictionary(
     if category:
         query["category"] = category
     if search:
-        query["source_term"] = {"$regex": search, "$options": "i"}
+        from utils.mongo_regex import case_insensitive_contains
+
+        term_match = case_insensitive_contains(search)
+        if term_match:
+            query["source_term"] = term_match
     
     terms = []
     async for term in db.translation_dictionary.find(query).sort("source_term", 1):

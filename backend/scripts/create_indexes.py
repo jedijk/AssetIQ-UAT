@@ -352,6 +352,34 @@ INDEX_DEFINITIONS = {
         {"keys": [("source_type", 1), ("source_id", 1)]},
         {"keys": [("target_type", 1), ("target_id", 1)]},
     ],
+    "audit_log": [
+        {"keys": [("ts", -1)]},
+        {"keys": [("actor.id", 1), ("ts", -1)]},
+        {"keys": [("http.method", 1), ("ts", -1)]},
+        {"keys": [("http.path", 1), ("ts", -1)]},
+    ],
+    "security_audit_log": [
+        {"keys": [("ts", -1)]},
+        {"keys": [("event_type", 1), ("ts", -1)]},
+        {"keys": [("actor.email", 1), ("ts", -1)]},
+    ],
+    "login_attempts": [
+        {"keys": [("email", 1), ("ts", -1)]},
+        {"keys": [("ip", 1), ("ts", -1)]},
+    ],
+    "equipment_type_strategies": [
+        {"keys": [("equipment_type_id", 1)], "unique": True},
+        {"keys": [("status", 1)]},
+        {"keys": [("strategy_needs_apply", 1)]},
+    ],
+    "ril_observations": [
+        {"keys": [("equipment_id", 1), ("created_at", -1)]},
+        {"keys": [("status", 1), ("created_at", -1)]},
+    ],
+    "ril_alerts": [
+        {"keys": [("equipment_id", 1), ("created_at", -1)]},
+        {"keys": [("status", 1)]},
+    ],
 }
 
 

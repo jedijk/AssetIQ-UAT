@@ -108,15 +108,19 @@ class FailureModesService:
         
         # Text search across multiple fields
         if search:
-            search_regex = {"$regex": search, "$options": "i"}
-            query["$or"] = [
-                {"failure_mode": search_regex},
-                {"equipment": search_regex},
-                {"category": search_regex},
-                {"keywords": search_regex},
-                {"recommended_actions": search_regex},
-                {"mechanism": search_regex},
-            ]
+            from utils.mongo_regex import or_search_fields
+
+            search_clause = or_search_fields(
+                search,
+                "failure_mode",
+                "equipment",
+                "category",
+                "keywords",
+                "recommended_actions",
+                "mechanism",
+            )
+            if search_clause:
+                query.update(search_clause)
         
         # Execute count and fetch in PARALLEL for performance
         count_task = self.collection.count_documents(query) if query else self.collection.estimated_document_count()
