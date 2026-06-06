@@ -12,6 +12,7 @@ Example Questions:
 
 from fastapi import APIRouter, Depends
 from auth import get_current_user
+from routes.ril._auth import _ril_read, _ril_write
 from services.ril_service import RILService
 from services.ril_copilot_service import ReliabilityCopilotService
 from models.ril import CopilotQueryRequest
@@ -30,7 +31,7 @@ def get_services():
 @router.post("/query", response_model=dict)
 async def query_copilot(
     request: CopilotQueryRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_write)
 ):
     """
     Ask the Reliability Copilot a question in natural language.
@@ -60,7 +61,7 @@ async def query_copilot(
 
 @router.get("/suggestions", response_model=dict)
 async def get_query_suggestions(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_read)
 ):
     """
     Get suggested queries based on current context.

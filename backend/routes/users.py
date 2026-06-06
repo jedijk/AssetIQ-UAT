@@ -11,7 +11,7 @@ import base64
 import os
 import jwt
 from database import db, rbac_service, JWT_SECRET, JWT_ALGORITHM
-from auth import get_current_user, hash_password
+from auth import get_current_user, hash_password, require_permission
 from services.storage_service import upload_avatar_async, get_object_async, get_mime_type, is_storage_available
 from services.cache_service import CacheService as cache
 
@@ -24,6 +24,10 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["User Profile"])
+
+_users_read = require_permission("users:read")
+_users_write = require_permission("users:write")
+_users_delete = require_permission("users:delete")
 
 # Email configuration
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
@@ -560,7 +564,7 @@ async def get_users(
     search: str = Query(None),
     role: str = Query(None),
     is_active: bool = Query(None),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_users_read)
 ):
     """Get all users with optional filtering. Includes avatar info."""
     result = await rbac_service.get_users(
@@ -581,7 +585,7 @@ async def get_users(
 
 
 @router.get("/rbac/roles")
-async def get_roles(current_user: dict = Depends(get_current_user)):
+async def get_roles(current_user: dict = Depends(_users_read)):
     """Get all available roles."""
     return {"roles": rbac_service.get_roles()}
 
@@ -590,7 +594,7 @@ async def get_roles(current_user: dict = Depends(get_current_user)):
 async def update_user_role(
     user_id: str,
     role_data: dict,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_users_write)
 ):
     """Update a user's role."""
     result = await rbac_service.update_user_role(
@@ -607,7 +611,7 @@ async def update_user_role(
 async def update_user_status(
     user_id: str,
     status_data: dict,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_users_write)
 ):
     """Activate or deactivate a user."""
     result = await rbac_service.update_user_status(
@@ -622,7 +626,7 @@ async def update_user_status(
 
 @router.get("/rbac/users/pending")
 async def get_pending_users(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_users_read)
 ):
     """Get all users with pending approval status. Admin/Owner only."""
     if current_user.get("role") not in ["admin", "owner"]:
@@ -640,7 +644,7 @@ async def get_pending_users(
 async def approve_user(
     user_id: str,
     approval_data: dict,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_users_write)
 ):
     """Approve or reject a pending user. Admin/Owner only."""
     if current_user.get("role") not in ["admin", "owner"]:
@@ -705,7 +709,7 @@ async def approve_user(
 async def update_user_profile(
     user_id: str,
     profile_data: dict,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_users_write)
 ):
     """Update user profile (name, department, position, phone)."""
     result = await rbac_service.update_user_profile(
@@ -721,7 +725,7 @@ async def update_user_profile(
 async def update_user_installations(
     user_id: str,
     data: dict,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_users_write)
 ):
     """Update user's assigned installations. Admin/Owner only."""
     if current_user.get("role") not in ["admin", "owner"]:
@@ -746,7 +750,7 @@ async def update_user_installations(
 async def upload_user_avatar_admin(
     user_id: str,
     file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_users_write)
 ):
     """
     Admin endpoint to upload avatar for any user.
@@ -832,7 +836,7 @@ async def upload_user_avatar_admin(
 @router.delete("/rbac/users/{user_id}")
 async def delete_user(
     user_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_users_delete)
 ):
     """
     Delete a user permanently.
@@ -867,7 +871,7 @@ async def delete_user(
 
 
 @router.get("/rbac/role-distribution")
-async def get_role_distribution(current_user: dict = Depends(get_current_user)):
+async def get_role_distribution(current_user: dict = Depends(_users_read)):
     """Get count of users per role."""
     return await rbac_service.get_role_distribution()
 
@@ -876,7 +880,7 @@ async def get_role_distribution(current_user: dict = Depends(get_current_user)):
 @router.post("/rbac/users/{user_id}/reset-intro")
 async def reset_user_intro(
     user_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_users_write)
 ):
     """
     Reset the intro tour for a user.

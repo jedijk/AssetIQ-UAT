@@ -202,6 +202,10 @@ async def check_for_similar_incidents(user_id: str, asset_name: str, description
 
 router = APIRouter(tags=["Investigations"])
 
+_investigations_read = require_permission("investigations:read")
+_investigations_write = require_permission("investigations:write")
+_investigations_delete = require_permission("investigations:delete")
+
 
 async def generate_case_number(user_id: str) -> str:
     count = await db.investigations.count_documents({"created_by": user_id})
@@ -217,7 +221,7 @@ async def generate_action_number(investigation_id: str) -> str:
 async def create_investigation(
     data: InvestigationCreate,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_write)
 ):
     """Create a new investigation case."""
     inv_id = str(uuid.uuid4())
@@ -284,7 +288,7 @@ async def create_investigation(
 @router.get("/investigations")
 async def get_investigations(
     status: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_read)
 ):
     """Get all investigations for the current user."""
     query = {"created_by": current_user["id"]}
@@ -349,7 +353,7 @@ async def get_investigations(
 @router.get("/investigations/{inv_id}")
 async def get_investigation(
     inv_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_read)
 ):
     """Get a specific investigation with all related data."""
     inv = await db.investigations.find_one(
@@ -402,7 +406,7 @@ async def get_investigation(
 async def update_investigation(
     inv_id: str,
     update: InvestigationUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_write)
 ):
     """Update an investigation."""
     inv = await db.investigations.find_one(
@@ -427,7 +431,7 @@ async def update_investigation(
 async def delete_investigation(
     inv_id: str,
     delete_central_actions: bool = Query(False, description="Also delete linked Central Actions"),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_delete)
 ):
     """Delete an investigation and all related data. Optionally delete linked Central Actions."""
     inv = await db.investigations.find_one(
@@ -467,7 +471,7 @@ async def delete_investigation(
 async def create_timeline_event(
     inv_id: str,
     data: TimelineEventCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_write)
 ):
     """Add a timeline event to an investigation."""
     inv = await db.investigations.find_one(
@@ -499,7 +503,7 @@ async def update_timeline_event(
     inv_id: str,
     event_id: str,
     update: TimelineEventUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_write)
 ):
     """Update a timeline event."""
     event = await db.timeline_events.find_one({"id": event_id, "investigation_id": inv_id})
@@ -523,7 +527,7 @@ async def update_timeline_event(
 async def delete_timeline_event(
     inv_id: str,
     event_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_delete)
 ):
     """Delete a timeline event."""
     result = await db.timeline_events.delete_one({"id": event_id, "investigation_id": inv_id})
@@ -538,7 +542,7 @@ async def delete_timeline_event(
 async def create_failure_identification(
     inv_id: str,
     data: FailureIdentificationCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_write)
 ):
     """Add a failure identification to an investigation."""
     inv = await db.investigations.find_one(
@@ -572,7 +576,7 @@ async def update_failure_identification(
     inv_id: str,
     failure_id: str,
     update: FailureIdentificationUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_write)
 ):
     """Update a failure identification."""
     failure = await db.failure_identifications.find_one({"id": failure_id, "investigation_id": inv_id})
@@ -591,7 +595,7 @@ async def update_failure_identification(
 async def delete_failure_identification(
     inv_id: str,
     failure_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_delete)
 ):
     """Delete a failure identification."""
     result = await db.failure_identifications.delete_one({"id": failure_id, "investigation_id": inv_id})
@@ -606,7 +610,7 @@ async def delete_failure_identification(
 async def create_cause_node(
     inv_id: str,
     data: CauseNodeCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_write)
 ):
     """Add a cause node to the causal tree."""
     inv = await db.investigations.find_one(
@@ -645,7 +649,7 @@ async def update_cause_node(
     inv_id: str,
     cause_id: str,
     update: CauseNodeUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_write)
 ):
     """Update a cause node."""
     cause = await db.cause_nodes.find_one({"id": cause_id, "investigation_id": inv_id})
@@ -667,7 +671,7 @@ async def update_cause_node(
 async def delete_cause_node(
     inv_id: str,
     cause_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_delete)
 ):
     """Delete a cause node and its children."""
     # Get all children recursively
@@ -697,7 +701,7 @@ async def delete_cause_node(
 async def create_action_item(
     inv_id: str,
     data: ActionItemCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_write)
 ):
     """Add an action item to an investigation."""
     inv = await db.investigations.find_one(
@@ -737,7 +741,7 @@ async def update_action_item(
     inv_id: str,
     action_id: str,
     update: ActionItemUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_write)
 ):
     """Update an action item."""
     action = await db.action_items.find_one({"id": action_id, "investigation_id": inv_id})
@@ -805,7 +809,7 @@ async def update_action_item(
 async def delete_action_item(
     inv_id: str,
     action_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_delete)
 ):
     """Delete an action item."""
     result = await db.action_items.delete_one({"id": action_id, "investigation_id": inv_id})
@@ -820,7 +824,7 @@ async def delete_action_item(
 async def add_evidence(
     inv_id: str,
     data: EvidenceCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_write)
 ):
     """Add evidence to an investigation."""
     inv = await db.investigations.find_one(
@@ -851,7 +855,7 @@ async def add_evidence(
 async def delete_evidence(
     inv_id: str,
     evidence_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_delete)
 ):
     """Delete evidence."""
     result = await db.evidence_items.delete_one({"id": evidence_id, "investigation_id": inv_id})
@@ -865,7 +869,7 @@ async def upload_investigation_file(
     inv_id: str,
     file: UploadFile = File(...),
     description: str = Form(None),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_write)
 ):
     """Upload a file to an investigation."""
     # Verify investigation exists
@@ -939,7 +943,7 @@ async def download_file(
     path: str,
     authorization: str = Header(None),
     auth: str = Query(None),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_read)
 ):
     """Download a file from MongoDB storage."""
     # Find file record
@@ -982,7 +986,7 @@ class AIProblemCheckResponse(BaseModel):
 async def ai_problem_check(
     inv_id: str,
     request: AIProblemCheckRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_read)
 ):
     """
     Analyze investigation description using AI for:
@@ -1049,7 +1053,7 @@ async def ai_problem_check(
 @router.get("/investigations/{inv_id}/similar-incidents")
 async def get_similar_incidents(
     inv_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_read)
 ):
     """
     Find similar past incidents for a given investigation.
@@ -1075,7 +1079,7 @@ async def get_similar_incidents(
 @router.get("/investigations/{inv_id}/linked-incident")
 async def get_linked_incident(
     inv_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_read)
 ):
     """
     Get the details of the linked previous incident for recurring analysis.
@@ -1104,7 +1108,7 @@ async def get_linked_incident(
 async def update_recurring_quadrant(
     inv_id: str,
     quadrant_data: RecurringQuadrantData,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_write)
 ):
     """
     Update the IS/IS NOT quadrant data for recurring issue analysis.
@@ -1136,7 +1140,7 @@ async def update_recurring_quadrant(
 async def link_incident(
     inv_id: str,
     linked_incident_id: str = Query(..., description="ID of the previous incident to link"),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_write)
 ):
     """
     Link an investigation to a previous similar incident for recurring analysis.
@@ -1179,7 +1183,7 @@ async def link_incident(
 @router.delete("/investigations/{inv_id}/link-incident")
 async def unlink_incident(
     inv_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_investigations_delete)
 ):
     """
     Remove the link to a previous incident.

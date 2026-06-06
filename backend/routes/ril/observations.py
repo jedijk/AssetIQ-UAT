@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 from datetime import datetime
 from auth import get_current_user
+from routes.ril._auth import _ril_read, _ril_write
 from services.ril_service import RILService
 from models.ril import (
     CreateObservationRequest,
@@ -25,7 +26,7 @@ def get_ril_service():
 @router.post("", response_model=dict)
 async def create_observation(
     request: CreateObservationRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_write)
 ):
     """
     Create a unified observation from any source.
@@ -59,7 +60,7 @@ async def list_observations(
     to_date: Optional[datetime] = Query(None, description="End date filter"),
     limit: int = Query(100, ge=1, le=500),
     skip: int = Query(0, ge=0),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_read)
 ):
     """
     List observations with optional filtering.
@@ -90,7 +91,7 @@ async def list_observations(
 @router.get("/{observation_id}", response_model=dict)
 async def get_observation(
     observation_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_read)
 ):
     """Get a single observation by ID"""
     from database import db

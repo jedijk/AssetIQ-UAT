@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, 
 from datetime import datetime
 from database import db, form_service
 from services.cache_service import cache
-from auth import get_current_user
+from auth import get_current_user, require_permission
 from services.background_jobs import schedule_tracked_job
 from services.ai_gateway import chat as ai_gateway_chat, user_context
 from models.form_models import (
@@ -25,6 +25,10 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Forms"])
 
+_forms_read = require_permission("forms:read")
+_forms_write = require_permission("forms:write")
+_forms_delete = require_permission("forms:delete")
+
 @router.get("/form-templates")
 async def get_form_templates(
     discipline: Optional[str] = None,
@@ -34,7 +38,7 @@ async def get_form_templates(
     active_only: bool = True,
     skip: int = 0,
     limit: int = 100,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_read)
 ):
     """Get form templates with optional filters."""
     from services.query_cache import query_cache
@@ -71,7 +75,7 @@ async def get_form_templates(
 @router.get("/form-templates/{template_id}")
 async def get_form_template(
     template_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_read)
 ):
     """Get a specific form template."""
     template = await form_service.get_template_by_id(template_id)
@@ -82,7 +86,7 @@ async def get_form_template(
 @router.get("/form-templates/{template_id}/versions")
 async def get_form_template_versions(
     template_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_read)
 ):
     """Get all versions of a form template."""
     versions = await form_service.get_template_versions(template_id)
@@ -92,7 +96,7 @@ async def get_form_template_versions(
 async def create_form_template(
     data: FormTemplateCreate,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_write)
 ):
     """Create a new form template."""
     from services.query_cache import query_cache
@@ -120,7 +124,7 @@ async def update_form_template(
     data: FormTemplateUpdate,
     background_tasks: BackgroundTasks,
     create_version: bool = True,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_write)
 ):
     """Update a form template. Creates new version if template has been used."""
     import logging
@@ -170,7 +174,7 @@ async def update_form_template(
 @router.delete("/form-templates/{template_id}")
 async def delete_form_template(
     template_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_delete)
 ):
     """Delete (deactivate) a form template."""
     from services.query_cache import query_cache
@@ -186,7 +190,7 @@ async def delete_form_template(
 async def add_form_field(
     template_id: str,
     field: FormFieldDefinition,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_write)
 ):
     """Add a field to a form template."""
     result = await form_service.add_field_to_template(template_id, field.model_dump())
@@ -199,7 +203,7 @@ async def update_form_field(
     template_id: str,
     field_id: str,
     updates: FormFieldUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_write)
 ):
     """Update a specific field in a form template."""
     result = await form_service.update_field_in_template(
@@ -213,7 +217,7 @@ async def update_form_field(
 async def remove_form_field(
     template_id: str,
     field_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_delete)
 ):
     """Remove a field from a form template."""
     result = await form_service.remove_field_from_template(template_id, field_id)
@@ -228,7 +232,7 @@ class FieldOrderRequest(BaseModel):
 async def reorder_form_fields(
     template_id: str,
     data: FieldOrderRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_write)
 ):
     """Reorder fields in a form template."""
     result = await form_service.reorder_fields(template_id, data.field_order)
@@ -246,7 +250,7 @@ async def get_form_submissions(
     has_critical: Optional[bool] = None,
     skip: int = 0,
     limit: int = 10,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_read)
 ):
     """
     Get form submissions list - ULTRA-LIGHTWEIGHT endpoint.
@@ -415,7 +419,7 @@ async def get_form_submissions(
 @router.get("/form-submissions/{submission_id}")
 async def get_form_submission(
     submission_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_read)
 ):
     """Get a specific form submission."""
     submission = await form_service.get_submission_by_id(submission_id)
@@ -426,7 +430,7 @@ async def get_form_submission(
 @router.post("/form-submissions")
 async def submit_form(
     data: FormSubmission,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_write)
 ):
     """Submit a form with data validation and threshold evaluation."""
     try:
@@ -438,7 +442,7 @@ async def submit_form(
 @router.delete("/form-submissions/{submission_id}")
 async def delete_form_submission(
     submission_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_delete)
 ):
     """Delete a form submission by custom ID or MongoDB ObjectId."""
     from bson import ObjectId
@@ -499,7 +503,7 @@ async def get_form_analytics(
     template_id: str,
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_read)
 ):
     """Get analytics for a form template."""
     from_dt = datetime.fromisoformat(from_date) if from_date else None
@@ -515,7 +519,7 @@ async def upload_form_document(
     template_id: str,
     file: UploadFile = File(...),
     description: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_write)
 ):
     """Upload a reference document to a form template."""
     from bson import ObjectId
@@ -583,7 +587,7 @@ async def upload_form_document(
 async def delete_form_document(
     template_id: str,
     document_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_delete)
 ):
     """Delete a document from a form template."""
     from bson import ObjectId
@@ -609,7 +613,7 @@ async def serve_form_document(
     document_path: str,
     token: str = Query(None),
     authorization: str = Header(None),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_read)
 ):
     """Serve a form document file from MongoDB storage.
     
@@ -643,7 +647,7 @@ async def serve_form_document(
 @router.get("/form-templates/{template_id}/documents")
 async def get_form_documents(
     template_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_read)
 ):
     """Get all documents attached to a form template."""
     template = await form_service.get_template_by_id(template_id)
@@ -662,7 +666,7 @@ class DocumentSearchRequest(BaseModel):
 async def search_form_documents(
     template_id: str,
     request: DocumentSearchRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_forms_write)
 ):
     """AI-powered search across form template documents."""
     template = await form_service.get_template_by_id(template_id)

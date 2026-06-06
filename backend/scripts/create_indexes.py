@@ -284,15 +284,12 @@ INDEX_DEFINITIONS = {
         {"keys": [("strategy_type", 1)]},
     ],
     
-    # Security audit log - important for compliance
+    # Security audit log - auth events, GDPR consent, password changes
     "security_audit_log": [
         {"keys": [("timestamp", -1)]},
-        {"keys": [("user_id", 1)]},
-        {"keys": [("action", 1)]},
-        {"keys": [("resource_type", 1)]},
-        # Compound for audit queries
+        {"keys": [("event", 1), ("timestamp", -1)]},
         {"keys": [("user_id", 1), ("timestamp", -1)]},
-        {"keys": [("resource_type", 1), ("timestamp", -1)]},
+        {"keys": [("email", 1), ("timestamp", -1)]},
     ],
     
     # Custom equipment types
@@ -366,15 +363,10 @@ INDEX_DEFINITIONS = {
         {"keys": [("actor.id", 1), ("ts", -1)]},
         {"keys": [("http.method", 1), ("ts", -1)]},
         {"keys": [("http.path", 1), ("ts", -1)]},
-    ],
-    "security_audit_log": [
-        {"keys": [("ts", -1)]},
-        {"keys": [("event_type", 1), ("ts", -1)]},
-        {"keys": [("actor.email", 1), ("ts", -1)]},
+        {"keys": [("http.status", 1), ("ts", -1)]},
     ],
     "login_attempts": [
-        {"keys": [("email", 1), ("ts", -1)]},
-        {"keys": [("ip", 1), ("ts", -1)]},
+        {"keys": [("email", 1)], "unique": True},
     ],
     "equipment_type_strategies": [
         {"keys": [("equipment_type_id", 1)], "unique": True},

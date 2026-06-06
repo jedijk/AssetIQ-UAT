@@ -12,10 +12,13 @@ import uuid
 
 from bson import ObjectId
 from database import db
-from auth import get_current_user
+from auth import get_current_user, require_permission
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Production Dashboard"])
+
+_forms_write = require_permission("forms:write")
+_settings_write = require_permission("settings:write")
 
 
 def _require_owner_or_admin(user: dict):
@@ -1662,7 +1665,7 @@ async def get_production_events(
 @router.post("/production/events")
 async def create_production_event(
     data: dict,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_forms_write),
 ):
     """Create a production action or insight event."""
     event = {
@@ -1687,7 +1690,7 @@ async def create_production_event(
 @router.delete("/production/events/{event_id}")
 async def delete_production_event(
     event_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_forms_write),
 ):
     """Delete a production event."""
     result = await db.production_events.delete_one({"id": event_id})
@@ -1700,7 +1703,7 @@ async def delete_production_event(
 async def set_production_information_pin(
     submission_id: str,
     data: dict,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_forms_write),
 ):
     """Pin or unpin an information form submission on the production dashboard (shared, persisted)."""
     raw = data.get("pinned")
@@ -1733,7 +1736,7 @@ async def set_production_information_pin(
 async def update_production_submission(
     submission_id: str,
     data: dict,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_forms_write),
 ):
     """Update field values on a production form submission OR an ingested production_logs entry."""
     updates = data.get("values", {})
@@ -1848,7 +1851,7 @@ async def update_production_submission(
 @router.post("/production/create-viscosity")
 async def create_viscosity_submission(
     data: dict,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_forms_write),
 ):
     """
     Create a new Mooney Viscosity form submission.
@@ -2029,7 +2032,7 @@ async def viscosity_pairing_status(
 async def repair_viscosity_pairing(
     date: str = Query(..., description="YYYY-MM-DD"),
     limit: int = Query(50, ge=1, le=500),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_write),
 ):
     """
     Re-run viscosity auto-pairing for already-submitted Mooney samples on a given day.
@@ -2340,7 +2343,7 @@ async def viscosity_pairing_debug_report(
 
 @router.delete("/production/seed-data")
 async def clear_seed_data(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_write),
 ):
     """Clear all seeded production sample data. Use this to remove demo data."""
     # Delete seeded form submissions

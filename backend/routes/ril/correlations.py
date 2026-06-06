@@ -6,6 +6,7 @@ Multi-Source Correlation - Automatically identify relationships between observat
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 from auth import get_current_user
+from routes.ril._auth import _ril_read, _ril_write
 from services.ril_service import RILService
 
 router = APIRouter(prefix="/correlations", tags=["RIL Correlations"])
@@ -21,7 +22,7 @@ def get_ril_service():
 async def find_correlations(
     equipment_id: Optional[str] = Query(None, description="Limit to specific equipment"),
     time_window_hours: int = Query(24, ge=1, le=168, description="Time window for correlation (1-168 hours)"),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_write)
 ):
     """
     Find correlations between observations, alerts, and readings.
@@ -63,7 +64,7 @@ async def list_correlations(
     active_only: bool = Query(True, description="Only return active correlations"),
     limit: int = Query(50, ge=1, le=200),
     skip: int = Query(0, ge=0),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_read)
 ):
     """
     List stored correlations.
@@ -89,7 +90,7 @@ async def list_correlations(
 @router.get("/{correlation_id}", response_model=dict)
 async def get_correlation(
     correlation_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_read)
 ):
     """Get a single correlation by ID with full details"""
     from database import db

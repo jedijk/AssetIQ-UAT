@@ -167,6 +167,59 @@ def test_process_import_mutations_require_library_write():
     assert "Depends(get_current_user)" in source[idx_get: idx_get + 200]
 
 
+def test_scheduler_write_granted_to_admin_and_reliability_engineer():
+    svc = RBACService.__new__(RBACService)
+    assert svc.has_permission("admin", "scheduler:write") is True
+    assert svc.has_permission("reliability_engineer", "scheduler:write") is True
+    assert svc.has_permission("maintenance", "scheduler:write") is False
+    assert svc.has_permission("viewer", "scheduler:read") is True
+
+
+def test_owner_bypass_in_require_permission():
+    source = (Path(__file__).resolve().parents[1] / "auth.py").read_text()
+    idx = source.index("def require_permission(")
+    block = source[idx: idx + 450]
+    assert 'role == "owner"' in block
+
+
+def test_investigations_mutations_require_investigations_write():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "investigations.py").read_text()
+    assert '_investigations_write = require_permission("investigations:write")' in source
+    idx = source.index("async def create_investigation")
+    assert "Depends(_investigations_write)" in source[idx: idx + 250]
+
+
+def test_forms_mutations_require_forms_write():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "forms.py").read_text()
+    assert '_forms_write = require_permission("forms:write")' in source
+    idx = source.index("async def create_form_template")
+    assert "Depends(_forms_write)" in source[idx: idx + 250]
+
+
+def test_users_rbac_mutations_require_users_write():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "users.py").read_text()
+    assert '_users_write = require_permission("users:write")' in source
+    idx = source.index("async def update_user_role")
+    assert "Depends(_users_write)" in source[idx: idx + 250]
+    idx_del = source.index("async def delete_user")
+    assert "Depends(_users_delete)" in source[idx_del: idx_del + 250]
+
+
+def test_ril_mutations_require_decision_engine_write():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "ril" / "cases.py").read_text()
+    assert "from routes.ril._auth import _ril_read, _ril_write" in source
+    idx = source.index("async def create_case")
+    assert "Depends(_ril_write)" in source[idx: idx + 250]
+
+
+def test_production_mutations_require_forms_or_settings_write():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "production.py").read_text()
+    idx = source.index("async def create_production_event")
+    assert "Depends(_forms_write)" in source[idx: idx + 250]
+    idx_seed = source.index("async def clear_seed_data")
+    assert "Depends(_settings_write)" in source[idx_seed: idx_seed + 250]
+
+
 def test_routes_use_tracked_jobs_not_raw_background_tasks():
     routes_dir = Path(__file__).resolve().parents[1] / "routes"
     offenders = []

@@ -23,6 +23,7 @@ Intelligence Dashboard:
 from fastapi import APIRouter, Depends
 from datetime import datetime, timedelta
 from auth import get_current_user
+from routes.ril._auth import _ril_read, _ril_write
 from services.ril_service import RILService
 
 router = APIRouter(prefix="/dashboard", tags=["RIL Dashboard"])
@@ -36,7 +37,7 @@ def get_ril_service():
 
 @router.get("/stats", response_model=dict)
 async def get_dashboard_stats(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_read)
 ):
     """
     Get main RIL dashboard statistics.
@@ -63,7 +64,7 @@ async def get_dashboard_stats(
 
 @router.get("/executive", response_model=dict)
 async def get_executive_dashboard(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_read)
 ):
     """
     Get executive-level KPIs.
@@ -172,7 +173,7 @@ async def get_executive_dashboard(
 
 @router.get("/intelligence", response_model=dict)
 async def get_intelligence_dashboard(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_read)
 ):
     """
     Get intelligence dashboard data.
@@ -240,7 +241,7 @@ async def get_intelligence_dashboard(
 
 @router.get("/data-quality", response_model=dict)
 async def get_data_quality_dashboard(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_read)
 ):
     """
     Get data quality statistics.
@@ -312,7 +313,7 @@ async def get_data_quality_dashboard(
 async def get_equipment_reliability_edges(
     equipment_id: str,
     limit: int = 200,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_ril_read),
 ):
     """Traversable reliability graph edges for an equipment item."""
     from services.reliability_graph import get_edges_for_equipment

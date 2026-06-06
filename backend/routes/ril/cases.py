@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 from datetime import datetime
 from auth import get_current_user
+from routes.ril._auth import _ril_read, _ril_write
 from services.ril_service import RILService
 from models.ril import (
     CreateReliabilityCaseRequest,
@@ -34,7 +35,7 @@ def get_ril_service():
 @router.post("", response_model=dict)
 async def create_case(
     request: CreateReliabilityCaseRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_write)
 ):
     """
     Create a new reliability case.
@@ -69,7 +70,7 @@ async def list_cases(
     priority: Optional[AlertPriority] = Query(None, description="Filter by priority"),
     limit: int = Query(50, ge=1, le=200),
     skip: int = Query(0, ge=0),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_read)
 ):
     """
     List reliability cases with optional filtering.
@@ -97,7 +98,7 @@ async def list_cases(
 @router.get("/{case_id}", response_model=dict)
 async def get_case(
     case_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_read)
 ):
     """Get a single reliability case by ID with full details"""
     service = get_ril_service()
@@ -142,7 +143,7 @@ async def get_case(
 async def update_case(
     case_id: str,
     request: UpdateReliabilityCaseRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_write)
 ):
     """
     Update a reliability case.
@@ -174,7 +175,7 @@ async def update_case(
 async def link_observation_to_case(
     case_id: str,
     observation_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_write)
 ):
     """Link an observation to a reliability case"""
     from database import db
@@ -205,7 +206,7 @@ async def link_observation_to_case(
 async def link_alert_to_case(
     case_id: str,
     alert_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_write)
 ):
     """Link an alert to a reliability case"""
     from database import db
@@ -236,7 +237,7 @@ async def link_alert_to_case(
 async def link_investigation_to_case(
     case_id: str,
     investigation_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_write)
 ):
     """Link an AssetIQ investigation to a reliability case"""
     from database import db

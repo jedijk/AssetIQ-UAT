@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 from datetime import datetime
 from auth import get_current_user
+from routes.ril._auth import _ril_read, _ril_write
 from services.ril_service import RILService
 from models.ril import (
     CreateAlertRequest, AlertPriority
@@ -24,7 +25,7 @@ def get_ril_service():
 @router.post("", response_model=dict)
 async def create_alert(
     request: CreateAlertRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_write)
 ):
     """
     Create and auto-triage an alert.
@@ -63,7 +64,7 @@ async def list_alerts(
     to_date: Optional[datetime] = Query(None, description="End date filter"),
     limit: int = Query(100, ge=1, le=500),
     skip: int = Query(0, ge=0),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_read)
 ):
     """
     List alerts with optional filtering.
@@ -94,7 +95,7 @@ async def list_alerts(
 @router.get("/{alert_id}", response_model=dict)
 async def get_alert(
     alert_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_read)
 ):
     """Get a single alert by ID"""
     from database import db
@@ -117,7 +118,7 @@ async def update_alert(
     alert_id: str,
     status: Optional[str] = None,
     assigned_to: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_write)
 ):
     """Update alert status or assignment"""
     from database import db

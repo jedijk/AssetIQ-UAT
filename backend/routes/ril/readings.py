@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from typing import Optional
 from datetime import datetime
 from auth import get_current_user
+from routes.ril._auth import _ril_read, _ril_write
 from services.ril_service import RILService
 from models.ril import (
     CreateReadingRequest, BulkReadingsRequest
@@ -24,7 +25,7 @@ def get_ril_service():
 @router.post("", response_model=dict)
 async def ingest_reading(
     request: CreateReadingRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_write)
 ):
     """
     Ingest a single reading from an external system.
@@ -56,7 +57,7 @@ async def ingest_reading(
 @router.post("/bulk", response_model=dict)
 async def ingest_readings_bulk(
     request: BulkReadingsRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_write)
 ):
     """
     Ingest multiple readings at once.
@@ -83,7 +84,7 @@ async def list_readings(
     alarms_only: bool = Query(False, description="Only return readings that triggered alarms"),
     limit: int = Query(100, ge=1, le=1000),
     skip: int = Query(0, ge=0),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_read)
 ):
     """
     List readings with optional filtering.

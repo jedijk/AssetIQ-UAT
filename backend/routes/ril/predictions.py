@@ -22,6 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional
 from datetime import datetime
 from auth import get_current_user
+from routes.ril._auth import _ril_read, _ril_write
 from services.ril_service import RILService
 
 router = APIRouter(prefix="/predictions", tags=["RIL Predictions"])
@@ -39,7 +40,7 @@ async def list_predictions(
     min_risk: Optional[float] = Query(None, ge=0, le=100, description="Minimum risk score"),
     limit: int = Query(50, ge=1, le=200),
     skip: int = Query(0, ge=0),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_read)
 ):
     """
     Get predictive failure insights.
@@ -77,7 +78,7 @@ async def list_predictions(
 @router.post("/generate/{equipment_id}", response_model=dict)
 async def generate_prediction(
     equipment_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_write)
 ):
     """
     Generate a new prediction for specific equipment.
@@ -108,7 +109,7 @@ async def generate_prediction(
 @router.get("/equipment/{equipment_id}", response_model=dict)
 async def get_equipment_prediction(
     equipment_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_read)
 ):
     """
     Get the latest prediction for specific equipment.
@@ -148,7 +149,7 @@ async def get_equipment_prediction(
 async def get_equipment_at_risk(
     health_threshold: float = Query(70, ge=0, le=100, description="Health score threshold"),
     limit: int = Query(20, ge=1, le=100),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_ril_read)
 ):
     """
     Get list of equipment at risk (health score below threshold).

@@ -162,7 +162,7 @@ def require_permission(permission: str):
 
     async def _dependency(current_user: dict = Depends(get_current_user)) -> dict:
         role = current_user.get("role", "viewer")
-        if rbac_service.has_permission(role, permission):
+        if role == "owner" or rbac_service.has_permission(role, permission):
             return current_user
         raise HTTPException(status_code=403, detail=f"Permission denied: {permission}")
 
