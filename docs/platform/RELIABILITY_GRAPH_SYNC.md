@@ -62,11 +62,35 @@ Registered in `backend/scripts/verify_uat_gates.py` as `reliability_graph_sync`.
 
 ## Backfill
 
+### Tenant id on legacy edges
+
 ```bash
 cd backend && MONGO_URL=... python scripts/backfill_reliability_edge_tenant.py
 ```
 
 Backfills `tenant_id` from `equipment_nodes` and defaults `status=active` on legacy edges.
+
+### Historical graph edges
+
+```bash
+cd backend && MONGO_URL=... DB_NAME=assetiq-UAT python scripts/backfill_reliability_graph_history.py --dry-run
+cd backend && MONGO_URL=... python scripts/backfill_reliability_graph_history.py --phase maintenance
+cd backend && MONGO_URL=... python scripts/backfill_reliability_graph_history.py --equipment-id <id> --limit 50
+```
+
+| Flag | Purpose |
+|------|---------|
+| `--dry-run` | Log entity id + sync function; no writes |
+| `--phase maintenance\|reactive\|all` | Limit to maintenance, reactive, or both (default `all`) |
+| `--equipment-id ID` | Scope to one equipment |
+| `--batch-size N` | Mongo cursor batch size (default 100) |
+| `--limit N` | Cap entities per collection (UAT sampling) |
+
+**Maintenance phase:** `maintenance_programs_v2` → `sync_edges_for_apply_strategy`; `scheduled_tasks` → `sync_edges_for_scheduled_task`; completed `task_instances` → `sync_task_instance_completion_edges`.
+
+**Reactive phase:** `observations`, `threats`, `investigations`, `cause_nodes`, `central_actions` (+ `sync_outcome_edges` for completed/closed actions without an existing outcome edge).
+
+Idempotent for edges (upserts). Re-run safe; completed actions skip outcome sync when a `resulted_in` edge already exists.
 
 ## Audit mode
 
