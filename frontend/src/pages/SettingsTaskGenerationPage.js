@@ -234,27 +234,8 @@ export default function SettingsTaskGenerationPage() {
         )}
       </SettingsCard>
 
-      {/* Schedule placeholder (P3 will wire APScheduler) */}
-      <SettingsCard
-        title="Weekly Schedule"
-        description="Automatic cron in plant-local time."
-      >
-        <div className="flex items-center gap-3 p-3 rounded-md border border-slate-200 bg-slate-50/50">
-          <Calendar className="w-4 h-4 text-slate-500" />
-          <div className="text-sm">
-            <div className="font-medium text-slate-700">
-              Sunday 02:00 — Plant time
-            </div>
-            <div className="text-xs text-slate-500">
-              Default cron `0 2 * * 0`. APScheduler trigger wires up in the next
-              phase. Until then, run manually with the button above.
-            </div>
-          </div>
-          <Badge variant="outline" className="ml-auto text-[10px]">
-            Coming in P3
-          </Badge>
-        </div>
-      </SettingsCard>
+      {/* Schedule editor (P3) */}
+      <ScheduleEditor />
 
       {/* Dry-run preview dialog */}
       <Dialog open={!!dryRunPreview} onOpenChange={() => setDryRunPreview(null)}>
@@ -308,5 +289,265 @@ export default function SettingsTaskGenerationPage() {
         </DialogContent>
       </Dialog>
     </SettingsSection>
+  );
+}
+
+// ---------- Schedule Editor ----------
+const COMMON_TIMEZONES = [
+  "Europe/Amsterdam",
+  "Europe/London",
+  "Europe/Berlin",
+  "Europe/Paris",
+  "Europe/Madrid",
+  "Europe/Rome",
+  "Europe/Stockholm",
+  "UTC",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "America/Sao_Paulo",
+  "Asia/Dubai",
+  "Asia/Kolkata",
+  "Asia/Singapore",
+  "Asia/Tokyo",
+  "Asia/Shanghai",
+  "Australia/Sydney",
+];
+
+const CRON_PRESETS = [
+  { label: "Sunday 02:00", expression: "0 2 * * sun" },
+  { label: "Sunday 06:00", expression: "0 6 * * sun" },
+  { label: "Monday 02:00", expression: "0 2 * * mon" },
+  { label: "Daily 02:00", expression: "0 2 * * *" },
+  { label: "Every 4 hours", expression: "0 */4 * * *" },
+];
+
+function ScheduleEditor() {
+  const qc = useQueryClient();
+  const { data: schedule, isLoading } = useQuery({
+    queryKey: ["task-generation-schedule"],
+    queryFn: () => fetchJson("/api/admin/task-generation/schedule"),
+  });
+
+  const [draftCron, setDraftCron] = useState("");
+  const [draftTz, setDraftTz] = useState("");
+  const [draftLookAhead, setDraftLookAhead] = useState(7);
+  const [draftEnabled, setDraftEnabled] = useState(true);
+  const [preview, setPreview] = useState(null);
+  const [previewError, setPreviewError] = useState(null);
+
+  const hydrated = useMemo(() => {
+    if (!schedule) return false;
+    if (draftCron === "") {
+      setDraftCron(schedule.cron_expression);
+      setDraftTz(schedule.timezone);
+      setDraftLookAhead(schedule.look_ahead_days);
+      setDraftEnabled(schedule.enabled);
+      return true;
+    }
+    return true;
+  }, [schedule, draftCron]);
+
+  const previewMutation = useMutation({
+    mutationFn: (body) =>
+      fetchJson("/api/admin/task-generation/schedule/preview", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: (data) => {
+      setPreview(data);
+      setPreviewError(null);
+    },
+    onError: (e) => {
+      setPreviewError(e.message);
+      setPreview(null);
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: (body) =>
+      fetchJson("/api/admin/task-generation/schedule", {
+        method: "PUT",
+        body: JSON.stringify(body),
+      }),
+    onSuccess: () => {
+      toast.success("Schedule updated — scheduler reloaded");
+      qc.invalidateQueries({ queryKey: ["task-generation-schedule"] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const hasChanges =
+    hydrated &&
+    schedule &&
+    (draftCron !== schedule.cron_expression ||
+      draftTz !== schedule.timezone ||
+      draftLookAhead !== schedule.look_ahead_days ||
+      draftEnabled !== schedule.enabled);
+
+  if (isLoading) {
+    return (
+      <SettingsCard title="Weekly Schedule" description="Loading…">
+        <div className="text-sm text-slate-500">Loading…</div>
+      </SettingsCard>
+    );
+  }
+
+  return (
+    <SettingsCard
+      title="Weekly Schedule"
+      description="Automatic cron for the weekly task-generation run. Time zone is plant-local."
+    >
+      <div className="grid md:grid-cols-2 gap-4">
+        <div>
+          <label className="text-xs font-medium text-slate-600">
+            Cron expression
+          </label>
+          <input
+            value={draftCron}
+            onChange={(e) => setDraftCron(e.target.value)}
+            className="mt-1 w-full font-mono text-sm border border-slate-300 rounded-md px-2 py-1.5"
+            placeholder="0 2 * * sun"
+            data-testid="cron-expression-input"
+          />
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {CRON_PRESETS.map((p) => (
+              <button
+                key={p.expression}
+                type="button"
+                onClick={() => setDraftCron(p.expression)}
+                className="text-[10px] px-2 py-0.5 rounded-full border border-slate-200 hover:bg-slate-100 text-slate-600"
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-slate-600">Time zone</label>
+          <select
+            value={draftTz}
+            onChange={(e) => setDraftTz(e.target.value)}
+            className="mt-1 w-full text-sm border border-slate-300 rounded-md px-2 py-1.5 bg-white"
+            data-testid="cron-timezone-select"
+          >
+            {COMMON_TIMEZONES.map((tz) => (
+              <option key={tz} value={tz}>
+                {tz}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-medium text-slate-600">
+            Look-ahead (days)
+          </label>
+          <input
+            type="number"
+            min={1}
+            max={60}
+            value={draftLookAhead}
+            onChange={(e) => setDraftLookAhead(parseInt(e.target.value || "7", 10))}
+            className="mt-1 w-full text-sm border border-slate-300 rounded-md px-2 py-1.5"
+          />
+        </div>
+        <div className="flex items-center justify-between border border-slate-200 rounded-md px-3 py-2 mt-5">
+          <div>
+            <div className="text-sm font-medium">Cron enabled</div>
+            <div className="text-xs text-slate-500">
+              Disable to pause automatic generation.
+            </div>
+          </div>
+          <input
+            type="checkbox"
+            checked={draftEnabled}
+            onChange={(e) => setDraftEnabled(e.target.checked)}
+            className="w-4 h-4"
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mt-4">
+        <Button
+          variant="outline"
+          onClick={() =>
+            previewMutation.mutate({
+              cron_expression: draftCron,
+              timezone: draftTz,
+            })
+          }
+          disabled={previewMutation.isPending}
+          data-testid="cron-preview-btn"
+        >
+          <Calendar className="w-4 h-4 mr-2" />
+          Preview next runs
+        </Button>
+        <Button
+          onClick={() =>
+            saveMutation.mutate({
+              cron_expression: draftCron,
+              timezone: draftTz,
+              look_ahead_days: draftLookAhead,
+              enabled: draftEnabled,
+            })
+          }
+          disabled={!hasChanges || saveMutation.isPending}
+          data-testid="cron-save-btn"
+        >
+          {saveMutation.isPending ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 mr-2" />
+          )}
+          Save & reload scheduler
+        </Button>
+      </div>
+
+      {previewError && (
+        <div className="mt-3 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-md px-3 py-2">
+          {previewError}
+        </div>
+      )}
+
+      {/* Active fire times card */}
+      <div className="mt-4 p-3 rounded-md border border-slate-200 bg-slate-50/40">
+        <div className="flex items-center gap-2 mb-2">
+          <Calendar className="w-4 h-4 text-slate-500" />
+          <div className="text-sm font-medium text-slate-700">
+            Next runs ({preview ? "preview" : "active"})
+          </div>
+          {schedule?.scheduler?.running && (
+            <Badge
+              variant="outline"
+              className="ml-auto text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200"
+            >
+              Scheduler running
+            </Badge>
+          )}
+          {schedule?.scheduler?.running === false && (
+            <Badge
+              variant="outline"
+              className="ml-auto text-[10px] bg-rose-50 text-rose-700 border-rose-200"
+            >
+              Scheduler stopped
+            </Badge>
+          )}
+        </div>
+        <ul className="text-sm space-y-0.5">
+          {(preview?.next_fire_times || schedule?.next_fire_times || []).map(
+            (t) => (
+              <li
+                key={t}
+                className="font-mono text-xs text-slate-700 flex items-center gap-2"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                {formatTs(t)}
+              </li>
+            ),
+          )}
+        </ul>
+      </div>
+    </SettingsCard>
   );
 }

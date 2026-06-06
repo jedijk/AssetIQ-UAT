@@ -11,6 +11,13 @@ from pydantic import BaseModel
 from database import db
 from auth import get_current_user
 from services.task_instance_bridge import sync_scheduled_tasks_to_instances, next_monday
+from services.scheduler_job import (
+    get_task_generation_config,
+    save_task_generation_config,
+    reload_task_generation_schedule,
+    get_scheduler_status,
+    compute_next_runs,
+)
 
 router = APIRouter(prefix="/admin/task-generation", tags=["admin", "task-generation"])
 
@@ -66,3 +73,65 @@ async def list_runs(
     )
     runs = await cursor.to_list(limit)
     return {"runs": runs, "total": len(runs)}
+
+
+# ---------- Schedule config + status ----------
+class ScheduleUpdate(BaseModel):
+    cron_expression: Optional[str] = None
+    timezone: Optional[str] = None
+    look_ahead_days: Optional[int] = None
+    enabled: Optional[bool] = None
+
+
+@router.get("/schedule")
+async def get_schedule(current_user: dict = Depends(get_current_user)):
+    """Return the active cron config + next 3 fire times + scheduler health."""
+    _admin_only(current_user)
+    cfg = await get_task_generation_config()
+    return {
+        **cfg,
+        "next_fire_times": compute_next_runs(cfg["cron_expression"], cfg["timezone"], n=3),
+        "scheduler": get_scheduler_status(),
+    }
+
+
+@router.put("/schedule")
+async def update_schedule(
+    payload: ScheduleUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    """Update the cron config and reload the scheduler in place."""
+    _admin_only(current_user)
+    try:
+        merged = await save_task_generation_config(
+            {k: v for k, v in payload.model_dump(exclude_unset=True).items() if v is not None}
+        )
+    except ValueError as ex:
+        raise HTTPException(status_code=400, detail=str(ex))
+    cfg = await reload_task_generation_schedule()
+    return {
+        **cfg,
+        "next_fire_times": compute_next_runs(cfg["cron_expression"], cfg["timezone"], n=3),
+        "scheduler": get_scheduler_status(),
+        "saved": merged,
+    }
+
+
+@router.post("/schedule/preview")
+async def preview_schedule(
+    payload: ScheduleUpdate,
+    current_user: dict = Depends(get_current_user),
+):
+    """Compute the next 3 fire times for an unsaved cron+tz combo."""
+    _admin_only(current_user)
+    cfg = await get_task_generation_config()
+    cron_expression = payload.cron_expression or cfg["cron_expression"]
+    timezone = payload.timezone or cfg["timezone"]
+    try:
+        return {
+            "cron_expression": cron_expression,
+            "timezone": timezone,
+            "next_fire_times": compute_next_runs(cron_expression, timezone, n=3),
+        }
+    except Exception as ex:
+        raise HTTPException(status_code=400, detail=str(ex))

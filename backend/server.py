@@ -818,6 +818,14 @@ async def background_startup():
                     logger.info("Disciplines configurator already populated")
             except Exception as e:
                 logger.warning(f"Disciplines seeding skipped: {e}")
+
+            # Start the task-generation cron (Sunday 02:00 plant-local by default).
+            # Reads cron + timezone from app_settings.task_generation.
+            try:
+                from services.scheduler_job import init_scheduler
+                await init_scheduler()
+            except Exception as e:
+                logger.warning(f"Task-generation scheduler failed to start: {e}")
             
             # Start periodic cleanup of old pending registrations
             asyncio.create_task(cleanup_pending_registrations_task(db))
