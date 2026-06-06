@@ -135,6 +135,27 @@ async def sync_edges_for_apply_strategy(
     return {"edges_upserted": created}
 
 
+async def sync_edge_for_pm_import_task(
+    *,
+    task_id: str,
+    failure_mode_id: str,
+    equipment_id: Optional[str] = None,
+    equipment_type_id: Optional[str] = None,
+    apply_mode: str = "added",
+) -> None:
+    """Record PM Import → failure mode linkage in the reliability graph."""
+    await upsert_edge(
+        source_type="pm_import_task",
+        source_id=task_id,
+        relation="applied_to",
+        target_type="failure_mode",
+        target_id=failure_mode_id,
+        equipment_id=equipment_id,
+        equipment_type_id=equipment_type_id,
+        metadata={"apply_mode": apply_mode},
+    )
+
+
 async def get_edges_for_equipment(
     equipment_id: str,
     *,

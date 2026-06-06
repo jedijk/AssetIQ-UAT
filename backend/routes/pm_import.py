@@ -19,6 +19,8 @@ import json
 from database import db
 from auth import get_current_user, require_permission
 from services.pm_import_service import PMImportService, normalize_pm_import_display_status
+from services.background_jobs import background_job_service, JobStatus
+from services.worker_config import use_external_background_worker
 
 _library_write = require_permission("library:write")
 
@@ -911,7 +913,9 @@ async def list_all_tasks(
 @router.post("/session/{session_id}/ai-review")
 async def ai_review_session(
     session_id: str,
-    current_user: dict = Depends(_library_write)
+    background_tasks: BackgroundTasks,
+    run_async: bool = False,
+    current_user: dict = Depends(_library_write),
 ):
     """
     Run AI review on all accepted tasks in a session.
@@ -922,7 +926,39 @@ async def ai_review_session(
     3. Generates AI recommendation (merge, new_failure_mode, new_task, keep_custom)
     
     Returns suggestions for each accepted task.
+    Set run_async=true or USE_EXTERNAL_BACKGROUND_WORKER=true to queue as a background job.
     """
+    if run_async or use_external_background_worker():
+        user_id = current_user.get("id") or current_user.get("user_id")
+        payload = {"session_id": session_id}
+        if use_external_background_worker():
+            job_id = await background_job_service.enqueue_for_external_worker(
+                "pm_import_ai_review",
+                user_id=user_id,
+                payload=payload,
+                max_retries=1,
+            )
+        else:
+            async def _run_review(session_id: str) -> dict:
+                service = PMImportService(db)
+                return await service.ai_review_accepted_tasks(session_id)
+
+            job_id = await background_job_service.schedule_returning_job_id(
+                background_tasks,
+                "pm_import_ai_review",
+                _run_review,
+                session_id,
+                user_id=user_id,
+                payload=payload,
+                max_retries=1,
+            )
+        return {
+            "status": JobStatus.PENDING.value,
+            "job_id": job_id,
+            "session_id": session_id,
+            "worker_mode": "external" if use_external_background_worker() else "in_process",
+        }
+
     pm_service = PMImportService(db)
     
     try:

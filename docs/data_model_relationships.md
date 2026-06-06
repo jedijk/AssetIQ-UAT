@@ -137,12 +137,15 @@ Background jobs:
 
 Month 3 ops (optional infrastructure):
     REDIS_URL → distributed AI cost guard + shared rate limits (fallback: in-memory)
+    REDIS_URL → unified_cache query layer (intelligence map stats, multi-instance)
     SLOW_QUERY_MS / SLOW_API_MS → Mongo + API slow-path logging (see /api/metrics observability)
+    pm_import_ai_review → background_jobs handler (USE_EXTERNAL_BACKGROUND_WORKER; async PM Import AI review)
     verify_v2_program_coverage.py → legacy program retirement gate
     verify_schedule_drift.py → strategy/program drift gate before prod cutover
 
 reliability_edges (graph)
     equipment → strategy_type, program_task → failure_mode, equipment → program
+    pm_import_task → applied_to → failure_mode (on PM Import apply)
 
 Legacy (retired for writes; optional read fallback via READ_LEGACY_MAINTENANCE_PROGRAMS):
     maintenance_programs (flat rows)

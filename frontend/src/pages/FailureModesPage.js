@@ -1673,7 +1673,7 @@ const FailureModesPage = () => {
       {/* Main Tabs */}
       <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
         <TabsList className="inline-flex w-auto max-w-full overflow-x-auto">
-          <TabsTrigger value="intelligence-map" className="flex items-center gap-1.5 whitespace-nowrap">
+          <TabsTrigger value="intelligence-map" data-testid="intelligence-map-tab" className="flex items-center gap-1.5 whitespace-nowrap">
             <Network className="w-3.5 h-3.5" />
             Intelligence Map
           </TabsTrigger>

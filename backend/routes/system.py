@@ -428,7 +428,7 @@ async def get_application_metrics(
             "slow_api_threshold_ms": int(__import__("os").environ.get("SLOW_API_MS", "1000")),
             "background_worker": {
                 "script": "backend/scripts/run_background_worker.py",
-                "handlers": ["apply_strategy"],
+                "handlers": ["apply_strategy", "pm_import_ai_review"],
                 "external_mode_env": "USE_EXTERNAL_BACKGROUND_WORKER",
             },
         }

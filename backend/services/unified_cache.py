@@ -135,6 +135,15 @@ class UnifiedCache:
     def query_get(self, key: str) -> Optional[Any]:
         """Get a query-cached value. Key may be raw prefix or full key."""
         full_key = key if key.count(":") >= 2 else self._make_query_key(key)
+        try:
+            from services.redis_store import get_json
+
+            redis_val = get_json(f"ucq:{full_key}")
+            if redis_val is not None:
+                self._inc("query_hits")
+                return redis_val
+        except Exception:
+            pass
         with self._query_lock:
             entry = self._query.get(full_key)
             if entry is None:
@@ -149,6 +158,13 @@ class UnifiedCache:
 
     def query_set(self, key: str, value: Any, ttl: int = 300) -> None:
         full_key = key if key.count(":") >= 2 else self._make_query_key(key)
+        try:
+            from services.redis_store import set_json
+
+            if set_json(f"ucq:{full_key}", value, ttl):
+                return
+        except Exception:
+            pass
         with self._query_lock:
             self._query[full_key] = {
                 "value": value,

@@ -38,6 +38,23 @@ async def handle_apply_strategy(job: dict) -> dict:
     return {"status": "completed"}
 
 
+async def handle_pm_import_ai_review(job: dict) -> dict:
+    """Run PM Import AI review for a session (external worker)."""
+    payload = job.get("payload") or {}
+    session_id = payload.get("session_id")
+    if not session_id:
+        raise ValueError("pm_import_ai_review job missing session_id")
+
+    from services.pm_import_service import PMImportService
+
+    service = PMImportService(db)
+    result = await service.ai_review_accepted_tasks(session_id)
+    if isinstance(result, dict):
+        return result
+    return {"status": "completed"}
+
+
 JOB_HANDLERS: Dict[str, Callable[..., Any]] = {
     "apply_strategy": handle_apply_strategy,
+    "pm_import_ai_review": handle_pm_import_ai_review,
 }
