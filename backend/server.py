@@ -56,6 +56,7 @@ app = FastAPI(
 # Store startup time
 app.state.start_time = time.time()
 app.state.ready = False  # Will be set to True after background init
+route_load_error = None  # Set if API routers fail to import at startup
 
 # =============================================================================
 # CRITICAL: Define health endpoints FIRST - these must ALWAYS work
@@ -90,12 +91,16 @@ async def api_health_check():
     
     uptime = round(time.time() - app.state.start_time, 2)
     
+    routes_ok = route_load_error is None
+    overall_ok = db_status == "connected" and routes_ok
+    
     return {
-        "status": "ok" if db_status == "connected" else "degraded",
+        "status": "ok" if overall_ok else "degraded",
         "database": db_status,
         "database_latency_ms": db_latency,
         "uptime_seconds": uptime,
         "ready": app.state.ready,
+        "routes_loaded": routes_ok,
         "version": APP_VERSION
     }
 
@@ -192,7 +197,6 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 # Load all API routes (wrapped for safety)
-route_load_error = None
 try:
     from routes import all_routers
     

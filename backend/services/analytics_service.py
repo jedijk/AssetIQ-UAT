@@ -27,10 +27,6 @@ class AnalyticsService:
     
     def __init__(self, db: AsyncIOMotorDatabase):
         self.db = db
-
-    @staticmethod
-    def _tenant_scope(query: Dict[str, Any], user: Optional[dict]) -> Dict[str, Any]:
-        return merge_tenant_filter(query, user) if user else query
         self.threats = db["threats"]
         self.observations = db["observations"]
         self.efms = db["equipment_failure_modes"]
@@ -39,6 +35,10 @@ class AnalyticsService:
         self.task_plans = db["task_plans"]
         self.task_instances = db["task_instances"]
         self.form_submissions = db["form_submissions"]
+
+    @staticmethod
+    def _tenant_scope(query: Dict[str, Any], user: Optional[dict]) -> Dict[str, Any]:
+        return merge_tenant_filter(query, user) if user else query
     
     # ==================== RISK ANALYTICS ====================
     

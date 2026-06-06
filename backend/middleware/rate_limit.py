@@ -7,6 +7,7 @@ and are exempt from the global default bucket to avoid double-counting.
 from __future__ import annotations
 
 import inspect
+import logging
 import os
 from typing import Iterable
 
@@ -14,6 +15,8 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_RATE_LIMIT = os.environ.get("DEFAULT_RATE_LIMIT", "120/minute")
 
@@ -48,7 +51,7 @@ class DefaultRateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         try:
-            limiter._check_request_limit(request, handler=None, in_middleware=True)
+            limiter._check_request_limit(request, None, in_middleware=True)
         except RateLimitExceeded as exc:
             handler = request.app.exception_handlers.get(
                 RateLimitExceeded, _rate_limit_exceeded_handler
@@ -56,5 +59,7 @@ class DefaultRateLimitMiddleware(BaseHTTPMiddleware):
             if inspect.iscoroutinefunction(handler):
                 return await handler(request, exc)
             return handler(request, exc)
+        except Exception as exc:
+            logger.warning("Rate limit check skipped: %s", exc)
 
         return await call_next(request)
