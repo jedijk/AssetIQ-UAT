@@ -139,6 +139,30 @@ def get_db_name_for_environment(env: str) -> str:
     return DEFAULT_DB_NAME
 
 
+def get_production_db_name() -> str:
+    """Return the production MongoDB database name."""
+    return AVAILABLE_DATABASES.get("production", {}).get("name", DEFAULT_DB_NAME)
+
+
+async def update_user_by_id(user_id: str, update_fields: dict):
+    """
+    Update a user document using the same lookup order as JWT auth:
+    request-scoped DB first, then production fallback when the user is not
+    present in the active environment (common on UAT hosts with prod-only users).
+    """
+    request_db = get_request_db()
+    result = await request_db.users.update_one({"id": user_id}, {"$set": update_fields})
+    if result.matched_count > 0:
+        return result
+
+    prod_name = get_production_db_name()
+    if request_db.name != prod_name:
+        prod_db = client[prod_name]
+        result = await prod_db.users.update_one({"id": user_id}, {"$set": update_fields})
+
+    return result
+
+
 def normalize_db_env_key(raw: Optional[str]) -> Optional[str]:
     """Normalize client-provided environment keys (e.g. Production → production)."""
     if not raw:

@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import json
 
-from database import db
+from database import db, update_user_by_id
 from auth import get_current_user
 
 # Try to import resend for email functionality
@@ -81,17 +81,23 @@ async def accept_terms(
     logger.info(f"Terms acceptance by user {user_id} - version {request.terms_version}")
     
     acceptance_timestamp = datetime.now(timezone.utc).isoformat()
-    
-    # Update user record with terms acceptance
-    await db.users.update_one(
-        {"id": user_id},
-        {"$set": {
-            "terms_accepted_version": request.terms_version,
-            "terms_accepted_at": acceptance_timestamp,
-            "privacy_accepted_version": request.terms_version,
-            "privacy_accepted_at": acceptance_timestamp
-        }}
-    )
+
+    update_fields = {
+        "terms_accepted_version": request.terms_version,
+        "terms_accepted_at": acceptance_timestamp,
+        "privacy_accepted_version": request.terms_version,
+        "privacy_accepted_at": acceptance_timestamp,
+    }
+
+    # Mirror auth lookup: write to request DB, fall back to production when the
+    # authenticated user was resolved from production on a UAT request.
+    result = await update_user_by_id(user_id, update_fields)
+    if result.matched_count == 0:
+        logger.error(
+            "Terms acceptance failed: user %s not found in request or production DB",
+            user_id,
+        )
+        raise HTTPException(status_code=404, detail="User not found")
     
     # Log the acceptance for compliance audit trail
     await db.gdpr_consent_log.insert_one({

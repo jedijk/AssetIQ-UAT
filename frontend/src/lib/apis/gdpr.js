@@ -22,6 +22,12 @@ export const gdprAPI = {
     const response = await api.get("/gdpr/terms-status");
     return response.data;
   },
+  acceptTerms: async (termsVersion) => {
+    const response = await api.post("/gdpr/accept-terms", {
+      terms_version: termsVersion,
+    });
+    return response.data;
+  },
   updateConsent: async (consents) => {
     const response = await api.post("/gdpr/consent", consents);
     return response.data;
