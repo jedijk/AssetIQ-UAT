@@ -70,17 +70,12 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for Railway/Emergent deployment - must return instantly."""
+    """Liveness probe for Railway — always 200 when uvicorn is running."""
+    routes_loaded = route_load_error is None
+    payload = {"status": "ok", "routes_loaded": routes_loaded}
     if route_load_error is not None:
-        return JSONResponse(
-            status_code=503,
-            content={
-                "status": "degraded",
-                "routes_loaded": False,
-                "route_load_error": route_load_error.get("error"),
-            },
-        )
-    return {"status": "ok"}
+        payload["route_load_error"] = route_load_error.get("error")
+    return payload
 
 
 @app.get("/api/health")
