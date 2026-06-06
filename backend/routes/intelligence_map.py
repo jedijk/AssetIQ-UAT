@@ -21,6 +21,7 @@ from auth import get_current_user
 from services.cache_service import cache
 from services.equipment_type_registry import count_equipment_types, list_equipment_types
 from services.equipment_hierarchy_filters import apply_plant_system_filters
+from services.db_monitoring import timed_aggregate
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/intelligence-map", tags=["Intelligence Map"])
@@ -107,7 +108,7 @@ async def get_intelligence_map_stats(
             {"$match": {"equipment_type_ids": {"$in": equipment_types_in_use_list}}},
             {"$group": {"_id": "$equipment_type_ids"}}
         ]
-        fm_et_result = await db.failure_modes.aggregate(fm_et_pipeline).to_list(1000)
+        fm_et_result = await timed_aggregate(db.failure_modes, fm_et_pipeline)
         fm_equipment_types_set = set([r["_id"] for r in fm_et_result if r["_id"]])
         fm_equipment_types_count = len(fm_equipment_types_set)
         
@@ -130,7 +131,7 @@ async def get_intelligence_map_stats(
                 "total_task_templates": {"$sum": {"$size": {"$ifNull": ["$task_templates", []]}}}
             }}
         ]
-        strategy_agg = await db.equipment_type_strategies.aggregate(strategy_pipeline).to_list(1)
+        strategy_agg = await timed_aggregate(db.equipment_type_strategies, strategy_pipeline)
         total_task_templates = strategy_agg[0]["total_task_templates"] if strategy_agg else 0
         
         # ========== EQUIPMENT ==========
@@ -193,15 +194,15 @@ async def get_intelligence_map_stats(
             {"$match": pm_task_active_match},
             {"$group": {"_id": "$tasks_extracted.equipment_match.equipment_id"}},
         ]
-        pm_equipment_result = await db.pm_import_sessions.aggregate(pm_equipment_pipeline).to_list(1000)
+        pm_equipment_result = await timed_aggregate(db.pm_import_sessions, pm_equipment_pipeline)
         equipment_ids_with_pm_import = set(r["_id"] for r in pm_equipment_result if r.get("_id"))
 
-        pm_tasks_active_count = await db.pm_import_sessions.aggregate([
+        pm_tasks_active_rows = await timed_aggregate(db.pm_import_sessions, [
             {"$unwind": "$tasks_extracted"},
             {"$match": pm_task_active_match},
             {"$count": "c"},
-        ]).to_list(1)
-        pm_tasks_active_count = pm_tasks_active_count[0]["c"] if pm_tasks_active_count else 0
+        ])
+        pm_tasks_active_count = pm_tasks_active_rows[0]["c"] if pm_tasks_active_rows else 0
 
         # Combined: equipment with any "active program" (strategy applied OR PM imported)
         equipment_ids_with_active_program = (
@@ -238,7 +239,7 @@ async def get_intelligence_map_stats(
                 "manual_tasks": {"$sum": {"$ifNull": ["$manual_tasks", 0]}}
             }}
         ]
-        program_agg = await db.maintenance_programs_v2.aggregate(program_pipeline).to_list(1)
+        program_agg = await timed_aggregate(db.maintenance_programs_v2, program_pipeline)
         program_stats = program_agg[0] if program_agg else {
             "total_tasks": 0, "active_tasks": 0, "strategy_tasks": 0,
             "imported_tasks": 0, "ai_tasks": 0, "manual_tasks": 0
@@ -257,13 +258,16 @@ async def get_intelligence_map_stats(
         # — strategy-driven active tasks PLUS accepted PM import tasks
         # (each PM import accepted task contributes one task with a schedule frequency).
         if equipment_ids_with_strategy_applied:
-            applied_programs_agg = await db.maintenance_programs_v2.aggregate([
-                {"$match": {"equipment_id": {"$in": list(equipment_ids_with_strategy_applied)}}},
-                {"$group": {
-                    "_id": None,
-                    "active_tasks": {"$sum": {"$ifNull": ["$active_tasks", 0]}},
-                }},
-            ]).to_list(1)
+            applied_programs_agg = await timed_aggregate(
+                db.maintenance_programs_v2,
+                [
+                    {"$match": {"equipment_id": {"$in": list(equipment_ids_with_strategy_applied)}}},
+                    {"$group": {
+                        "_id": None,
+                        "active_tasks": {"$sum": {"$ifNull": ["$active_tasks", 0]}},
+                    }},
+                ],
+            )
             strategy_active_tasks_total = (
                 applied_programs_agg[0]["active_tasks"] if applied_programs_agg else 0
             )
@@ -276,7 +280,7 @@ async def get_intelligence_map_stats(
             {"$match": schedule_query},
             {"$group": {"_id": "$status", "count": {"$sum": 1}}}
         ]
-        schedule_status = await db.scheduled_tasks.aggregate(schedule_status_pipeline).to_list(10)
+        schedule_status = await timed_aggregate(db.scheduled_tasks, schedule_status_pipeline)
         schedule_by_status = {s["_id"]: s["count"] for s in schedule_status if s["_id"]}
         
         # Count schedules missing frequency
@@ -333,7 +337,7 @@ async def get_intelligence_map_stats(
             }},
             {"$count": "count"}
         ]
-        pm_accepted_result = await db.pm_import_sessions.aggregate(pm_sessions_pipeline).to_list(1)
+        pm_accepted_result = await timed_aggregate(db.pm_import_sessions, pm_sessions_pipeline)
         pm_accepted_no_fm_total = pm_accepted_result[0]["count"] if pm_accepted_result else 0
         
         # Also get session count for reference

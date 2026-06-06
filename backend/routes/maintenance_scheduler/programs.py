@@ -17,6 +17,7 @@ from auth import get_current_user, require_permission
 from models.maintenance_scheduler import ApplyStrategyRequest
 from services.maintenance_scheduler_sync import refresh_equipment_schedule
 from services.background_jobs import background_job_service, JobStatus
+from services.worker_config import use_external_background_worker
 
 router = APIRouter()
 
@@ -60,26 +61,36 @@ async def apply_strategy_to_equipment(
     use_async = request.run_async or len(request.equipment_ids) >= APPLY_STRATEGY_ASYNC_THRESHOLD
     if use_async:
         user_id = current_user.get("id") or current_user.get("user_id")
-        job_id = await background_job_service.schedule_returning_job_id(
-            background_tasks,
-            "apply_strategy",
-            _apply_strategy_to_equipment_impl,
-            equipment_type_id,
-            request,
-            current_user,
-            user_id=user_id,
-            payload={
-                "equipment_type_id": equipment_type_id,
-                "equipment_count": len(request.equipment_ids),
-                "equipment_ids": list(request.equipment_ids),
-            },
-            max_retries=1,
-        )
+        job_payload = {
+            "equipment_type_id": equipment_type_id,
+            "equipment_count": len(request.equipment_ids),
+            "equipment_ids": list(request.equipment_ids),
+        }
+        if use_external_background_worker():
+            job_id = await background_job_service.enqueue_for_external_worker(
+                "apply_strategy",
+                user_id=user_id,
+                payload=job_payload,
+                max_retries=1,
+            )
+        else:
+            job_id = await background_job_service.schedule_returning_job_id(
+                background_tasks,
+                "apply_strategy",
+                _apply_strategy_to_equipment_impl,
+                equipment_type_id,
+                request,
+                current_user,
+                user_id=user_id,
+                payload=job_payload,
+                max_retries=1,
+            )
         return {
             "status": JobStatus.PENDING.value,
             "job_id": job_id,
             "message": "Apply strategy queued",
             "equipment_count": len(request.equipment_ids),
+            "worker_mode": "external" if use_external_background_worker() else "in_process",
         }
 
     try:

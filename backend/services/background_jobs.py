@@ -210,6 +210,28 @@ class BackgroundJobService:
         background_tasks.add_task(_runner)
         return job_id
 
+    async def enqueue_for_external_worker(
+        self,
+        job_type: str,
+        *,
+        user_id: Optional[str] = None,
+        payload: Optional[dict] = None,
+        max_retries: int = 1,
+    ) -> str:
+        """Persist a pending job for run_background_worker.py (no in-process execution)."""
+        job_id = await self.create_record(
+            job_type,
+            user_id=user_id,
+            payload=payload,
+            max_retries=max_retries,
+        )
+        self._in_memory["queued"] += 1
+        logger.info(
+            "job enqueued for external worker",
+            extra={"job_event": "external_enqueue", "job_id": job_id, "job_type": job_type},
+        )
+        return job_id
+
     async def get_job(self, job_id: str) -> Optional[dict]:
         try:
             return await self._collection().find_one({"id": job_id}, {"_id": 0})

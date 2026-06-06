@@ -133,6 +133,7 @@ equipment_type_strategies (v2)
 
 Background jobs:
     apply_strategy → background_jobs → run_background_worker.py (optional sidecar)
+    USE_EXTERNAL_BACKGROUND_WORKER=true → API enqueues only; worker executes (Railway sidecar)
 
 Month 3 ops (optional infrastructure):
     REDIS_URL → distributed AI cost guard + shared rate limits (fallback: in-memory)

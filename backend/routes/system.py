@@ -429,6 +429,7 @@ async def get_application_metrics(
             "background_worker": {
                 "script": "backend/scripts/run_background_worker.py",
                 "handlers": ["apply_strategy"],
+                "external_mode_env": "USE_EXTERNAL_BACKGROUND_WORKER",
             },
         }
     except Exception as exc:

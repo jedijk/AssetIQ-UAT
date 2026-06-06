@@ -3,8 +3,11 @@
 Durable background job worker for AssetIQ.
 
 Polls MongoDB ``background_jobs`` for pending work and executes registered
-handlers. Run as a separate Railway service or cron sidecar when the API
-process should not own long-running Apply Strategy batches.
+handlers. Run as a separate Railway service when the API process should not
+own long-running Apply Strategy batches.
+
+Set ``USE_EXTERNAL_BACKGROUND_WORKER=true`` on the API so async Apply Strategy
+jobs are enqueued only (not executed in-process).
 
 Usage:
     cd backend && python scripts/run_background_worker.py
