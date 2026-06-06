@@ -156,7 +156,11 @@ async def search_equipment_hierarchy(db, search_text: str, user_id: str) -> List
 
     search_conditions = []
     for kw in keywords:
-        r = {"$regex": kw, "$options": "i"}
+        from utils.mongo_regex import case_insensitive_contains
+
+        r = case_insensitive_contains(kw)
+        if not r:
+            continue
         search_conditions += [{"name": r}, {"tag": r}, {"tag_number": r},
                               {"description": r}, {"equipment_type": r}, {"equipment_type_name": r}]
 

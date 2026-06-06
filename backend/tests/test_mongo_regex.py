@@ -1,5 +1,11 @@
 """Tests for MongoDB regex escape helpers."""
-from utils.mongo_regex import escape_regex, or_search_fields, case_insensitive_contains
+from utils.mongo_regex import (
+    escape_regex,
+    or_search_fields,
+    case_insensitive_contains,
+    exact_case_insensitive,
+    exact_case_insensitive_any,
+)
 
 
 def test_escape_regex_metacharacters():
@@ -22,3 +28,14 @@ def test_case_insensitive_contains():
     match = case_insensitive_contains("valve")
     assert match["$regex"] == "valve"
     assert match["$options"] == "i"
+
+
+def test_exact_case_insensitive():
+    match = exact_case_insensitive("Valve")
+    assert match["$regex"] == "^Valve$"
+    assert match["$options"] == "i"
+
+
+def test_exact_case_insensitive_any():
+    match = exact_case_insensitive_any("Pump A", "Pump.*B")
+    assert "Pump\\.\\*B" in match["$regex"]

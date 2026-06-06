@@ -1,4 +1,6 @@
 """RBAC alias and permission matrix unit tests."""
+from pathlib import Path
+
 from services.rbac_service import RBACService, ROLE_ALIASES, ROLES
 
 
@@ -25,3 +27,27 @@ def test_viewer_cannot_write_library():
 def test_all_roles_defined_or_aliased():
     for alias, target in ROLE_ALIASES.items():
         assert target in ROLES, f"alias {alias} -> missing target {target}"
+
+
+def test_permissions_route_aliases_match_rbac():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "permissions.py").read_text()
+    assert 'DEFAULT_PERMISSIONS["manager"] = DEFAULT_PERMISSIONS["admin"]' in source
+    assert 'DEFAULT_PERMISSIONS["operator"] = DEFAULT_PERMISSIONS["operations"]' in source
+
+
+def test_require_permission_helper_exists_in_auth():
+    source = (Path(__file__).resolve().parents[1] / "auth.py").read_text()
+    assert "def require_permission(" in source
+
+
+def test_work_items_route_requires_tasks_read():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "work_items.py").read_text()
+    assert 'require_permission("tasks:read")' in source
+
+
+def test_chat_analyze_requires_auth():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "ai_routes.py").read_text()
+    idx = source.index('async def chat_analyze')
+    block = source[idx: idx + 400]
+    assert "Depends(get_current_user)" in block
+    assert "ai_gateway" in source or "from services.ai_gateway import chat" in source

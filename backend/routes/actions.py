@@ -172,7 +172,11 @@ async def get_all_actions(
     if priority and priority != "all":
         query["priority"] = priority
     if assignee:
-        query["assignee"] = {"$regex": assignee, "$options": "i"}
+        from utils.mongo_regex import case_insensitive_contains
+
+        assignee_match = case_insensitive_contains(assignee)
+        if assignee_match:
+            query["assignee"] = assignee_match
     if source_type and source_type != "all":
         query["source_type"] = source_type
     

@@ -65,7 +65,9 @@ Focus on:
 async def analyze_image_for_damage(
     image_base64: str,
     context: Optional[str] = None,
-    equipment_type: Optional[str] = None
+    equipment_type: Optional[str] = None,
+    user_id: str = "system",
+    company_id: str = "default",
 ) -> Dict[str, Any]:
     """
     Analyze an image for damage detection.
@@ -119,29 +121,18 @@ async def analyze_image_for_damage(
         if equipment_type:
             analysis_prompt += f"\nEquipment type: {equipment_type}"
         
-        # Initialize OpenAI client
-        client = OpenAI(api_key=api_key)
-        
-        # Create message with image
-        response = client.chat.completions.create(
+        from services.ai_gateway import chat_with_images
+
+        full_prompt = f"{DAMAGE_ANALYSIS_PROMPT}\n\n{analysis_prompt}"
+        response_text = await chat_with_images(
+            full_prompt,
+            image_base64_list=[{"data": image_base64, "media_type": "image/jpeg"}],
             model="gpt-4o",
-            messages=[
-                {"role": "system", "content": DAMAGE_ANALYSIS_PROMPT},
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}
-                        },
-                        {"type": "text", "text": analysis_prompt}
-                    ]
-                }
-            ],
-            temperature=0.3
+            temperature=0.3,
+            user_id=user_id,
+            company_id=company_id,
+            endpoint="image_analysis.analyze_damage",
         )
-        
-        response_text = response.choices[0].message.content
         
         # Parse JSON response
         try:

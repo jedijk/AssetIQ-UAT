@@ -93,12 +93,12 @@ def calculate_frequency_for_criticality(
 
 async def get_failure_modes_for_equipment_type(equipment_type_id: str, equipment_type_name: str) -> List[Dict]:
     """Get all failure modes linked to an equipment type."""
-    query = {
-        "$or": [
-            {"equipment_type_ids": equipment_type_id},
-            {"equipment": {"$regex": equipment_type_name, "$options": "i"}},
-        ]
-    }
+    from utils.mongo_regex import case_insensitive_contains
+
+    equipment_match = case_insensitive_contains(equipment_type_name) if equipment_type_name else {}
+    query: Dict[str, Any] = {"$or": [{"equipment_type_ids": equipment_type_id}]}
+    if equipment_match:
+        query["$or"].append({"equipment": equipment_match})
 
     docs = await db.failure_modes.find(query).to_list(500)
     failure_modes: List[Dict[str, Any]] = []

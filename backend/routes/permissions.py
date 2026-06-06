@@ -121,6 +121,10 @@ DEFAULT_PERMISSIONS = {
     },
 }
 
+# Legacy UI role aliases — keep in sync with rbac_service.ROLE_ALIASES
+DEFAULT_PERMISSIONS["manager"] = DEFAULT_PERMISSIONS["admin"]
+DEFAULT_PERMISSIONS["operator"] = DEFAULT_PERMISSIONS["operations"]
+
 # Feature descriptions for UI
 FEATURES = {
     "observations": {

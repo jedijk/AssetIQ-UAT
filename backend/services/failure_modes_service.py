@@ -79,10 +79,14 @@ class FailureModesService:
         query = {}
         
         if category and category.lower() != "all":
-            query["category"] = {"$regex": f"^{category}$", "$options": "i"}
+            from utils.mongo_regex import exact_case_insensitive
+
+            query["category"] = exact_case_insensitive(category)
         
         if equipment:
-            query["equipment"] = {"$regex": f"^{equipment}$", "$options": "i"}
+            from utils.mongo_regex import exact_case_insensitive
+
+            query["equipment"] = exact_case_insensitive(equipment)
         
         if min_rpn:
             query["rpn"] = {"$gte": min_rpn}
@@ -91,7 +95,11 @@ class FailureModesService:
             query["equipment_type_ids"] = equipment_type_id
         
         if mechanism:
-            query["mechanism"] = {"$regex": mechanism, "$options": "i"}
+            from utils.mongo_regex import case_insensitive_contains
+
+            mechanism_match = case_insensitive_contains(mechanism)
+            if mechanism_match:
+                query["mechanism"] = mechanism_match
         
         if is_validated is not None:
             query["is_validated"] = is_validated

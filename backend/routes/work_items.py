@@ -9,8 +9,10 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 
-from auth import get_current_user
+from auth import require_permission
 from services.work_item_query import fetch_unbridged_maintenance_work_items
+
+_tasks_read = require_permission("tasks:read")
 
 router = APIRouter(prefix="/work-items", tags=["Work Items"])
 
@@ -20,7 +22,7 @@ async def list_unbridged_maintenance_work_items(
     filter: str = Query("open", description="open | today | overdue | all"),
     equipment_id: Optional[str] = None,
     discipline: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_tasks_read),
 ):
     """Open scheduled maintenance tasks without a task_instance row yet."""
     user_id = current_user.get("id") or ""

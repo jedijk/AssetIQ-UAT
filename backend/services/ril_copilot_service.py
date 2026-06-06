@@ -287,12 +287,15 @@ class ReliabilityCopilotService:
             if matches:
                 tag = matches[0]
                 # Search for equipment with this tag
+                from utils.mongo_regex import case_insensitive_contains
+
+                tag_match = case_insensitive_contains(tag)
+                tag_clauses = [{"tag": tag}]
+                if tag_match:
+                    tag_clauses.append({"name": tag_match})
                 equipment = await self.db.equipment_nodes.find_one({
                     "owner_id": owner_id,
-                    "$or": [
-                        {"tag": tag},
-                        {"name": {"$regex": tag, "$options": "i"}}
-                    ]
+                    "$or": tag_clauses,
                 })
                 if equipment:
                     return equipment.get("id")

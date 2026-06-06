@@ -185,8 +185,11 @@ async def enrich_with_equipment_tags(items: list) -> list:
     if equipment_ids:
         query_conditions.append({"id": {"$in": equipment_ids}})
     if asset_names:
-        # Case-insensitive name matching
-        query_conditions.append({"name": {"$regex": f"^({'|'.join(asset_names)})$", "$options": "i"}})
+        from utils.mongo_regex import exact_case_insensitive_any
+
+        name_match = exact_case_insensitive_any(*asset_names)
+        if name_match:
+            query_conditions.append({"name": name_match})
     
     equipment_nodes = await db.equipment_nodes.find(
         {"$or": query_conditions} if query_conditions else {},
@@ -1151,14 +1154,17 @@ async def create_investigation_from_threat(
     if threat.get("failure_mode"):
         # Try to find matching failure mode - check database first, then static library
         failure_mode_text = threat["failure_mode"].lower()
+        from utils.mongo_regex import case_insensitive_contains
+
+        fm_pattern = case_insensitive_contains(failure_mode_text)
         
         # Check database for user-created failure modes
         db_fm = await db.failure_modes.find_one({
             "$or": [
-                {"name": {"$regex": failure_mode_text, "$options": "i"}},
-                {"keywords": {"$regex": failure_mode_text, "$options": "i"}}
+                {"name": fm_pattern},
+                {"keywords": fm_pattern},
             ]
-        })
+        }) if fm_pattern else None
         if db_fm:
             db_fm.pop("_id", None)
             matching_fm = {

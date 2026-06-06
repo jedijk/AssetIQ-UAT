@@ -20,7 +20,7 @@ from ai_risk_models import (
     AnalyzeRiskRequest, GenerateCausesRequest, GenerateFaultTreeRequest, OptimizeActionsRequest
 )
 from services.ai_security_service import detect_prompt_injection
-from services.openai_service import chat_completion
+from services.ai_gateway import chat, user_context
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +130,8 @@ async def dashboard_intent(
 
     try:
         model = os.environ.get("OPENAI_MODEL_DASHBOARD_BUILDER", "gpt-4o-mini")
-        raw = await chat_completion(
+        uid, cid = user_context(current_user)
+        raw = await chat(
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": json.dumps(user)},
@@ -139,6 +140,9 @@ async def dashboard_intent(
             temperature=0.2,
             max_tokens=500,
             response_format={"type": "json_object"},
+            user_id=uid,
+            company_id=cid,
+            endpoint="ai_routes.dashboard_intent",
         )
 
         parsed = json.loads(raw or "{}")
@@ -216,7 +220,11 @@ def check_injection_attempt(data: dict, endpoint: str) -> None:
 
 
 @router.post("/ai/chat-analyze")
-async def chat_analyze(data: dict):
+async def chat_analyze(
+    request: Request,
+    data: dict,
+    current_user: dict = Depends(get_current_user),
+):
     """
     Simple chat-based AI analysis endpoint.
     Accepts a message and returns AI-generated analysis.
@@ -228,23 +236,12 @@ async def chat_analyze(data: dict):
             "error": "No message provided",
             "message": "Please provide a message to analyze"
         }
+
+    check_injection_attempt({"message": message}, endpoint="/ai/chat-analyze")
     
     try:
-        # Use the OpenAI client for chat
-        from openai import OpenAI
-        
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            return {
-                "success": False,
-                "error": "AI service not configured",
-                "message": "OpenAI API key not found"
-            }
-        
-        client = OpenAI(api_key=api_key)
-        
-        response = client.chat.completions.create(
-            model="gpt-4o",
+        uid, cid = user_context(current_user)
+        ai_response = await chat(
             messages=[
                 {
                     "role": "system",
@@ -252,11 +249,13 @@ async def chat_analyze(data: dict):
                 },
                 {"role": "user", "content": message}
             ],
+            model="gpt-4o",
             temperature=0.7,
-            max_tokens=1000
+            max_tokens=1000,
+            user_id=uid,
+            company_id=cid,
+            endpoint="ai_routes.chat_analyze",
         )
-        
-        ai_response = response.choices[0].message.content
         
         return {
             "success": True,

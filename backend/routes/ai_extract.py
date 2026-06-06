@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 from auth import get_current_user
 from database import db
-from openai import OpenAI
+from services.ai_gateway import chat_with_images, user_context
 from services.storage_service import put_object_async
 
 logger = logging.getLogger(__name__)
@@ -411,23 +411,18 @@ async def extract_from_image(
     )
 
     try:
-        client = OpenAI(api_key=VISION_KEY)
-        response = client.chat.completions.create(
+        uid, cid = user_context(current_user)
+        raw = await chat_with_images(
+            prompt,
+            image_base64_list=[{"data": b64, "media_type": mime}],
             model="gpt-4o",
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": data_uri, "detail": "high"}},
-                    ],
-                }
-            ],
-            max_completion_tokens=1000,
+            max_tokens=1000,
             temperature=0.1,
+            user_id=uid,
+            company_id=cid,
+            endpoint="ai_extract.extract_from_photo",
         )
-
-        raw = response.choices[0].message.content.strip()
+        raw = raw.strip()
         logger.info(f"[AI Extract] Raw response (first 500 chars): {raw[:500]}")
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from auth import get_current_user
+from services.ai_gateway import user_context
 from services.image_analysis_service import analyze_image_for_damage, analyze_multiple_images
 
 router = APIRouter(prefix="/image-analysis", tags=["Image Analysis"])
@@ -73,10 +74,13 @@ async def analyze_image(
     if len(clean_base64) < 100:
         raise HTTPException(status_code=400, detail="Image data appears to be invalid or too small")
     
+    uid, cid = user_context(current_user)
     result = await analyze_image_for_damage(
         image_base64=request.image_base64,
         context=request.context,
-        equipment_type=request.equipment_type
+        equipment_type=request.equipment_type,
+        user_id=uid,
+        company_id=cid,
     )
     
     # Convert findings to proper format

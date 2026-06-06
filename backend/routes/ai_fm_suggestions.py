@@ -21,7 +21,8 @@ load_dotenv()
 
 from iso14224_models import EQUIPMENT_TYPES
 from database import db
-from auth import require_permission
+from auth import require_permission, get_current_user
+from services.ai_cost_guard import guard_ai_request, record_ai_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,62 @@ async def call_openai_with_retry(client: AsyncOpenAI, *, max_retries: int = 4, *
             await asyncio.sleep(wait)
     # Unreachable but keeps type checkers happy
     raise HTTPException(status_code=503, detail="OpenAI rate-limit retries exhausted")
+
+
+def _ai_user_ids(current_user: Optional[dict]) -> tuple[str, str]:
+    if not current_user:
+        return "system", "default"
+    uid = current_user.get("id") or current_user.get("user_id") or "system"
+    cid = current_user.get("company_id") or current_user.get("organization_id") or "default"
+    return str(uid), str(cid)
+
+
+def _record_openai_response_usage(
+    response,
+    *,
+    user_id: str,
+    company_id: str,
+    endpoint: str,
+    model: str,
+) -> None:
+    usage = getattr(response, "usage", None)
+    if not usage:
+        return
+    record_ai_tokens(
+        user_id=user_id,
+        company_id=company_id,
+        endpoint=endpoint,
+        prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
+        completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
+        model=model,
+        feature=endpoint,
+    )
+
+
+async def guarded_openai_create(
+    client: AsyncOpenAI,
+    *,
+    user_id: str,
+    company_id: str,
+    endpoint: str,
+    max_retries: int = 1,
+    **kwargs,
+):
+    """Cost-guarded OpenAI chat completion (optional retry for rate limits)."""
+    guard_ai_request(user_id=user_id, company_id=company_id, endpoint=endpoint)
+    model = kwargs.get("model", "gpt-4o")
+    if max_retries > 1:
+        response = await call_openai_with_retry(client, max_retries=max_retries, **kwargs)
+    else:
+        response = await client.chat.completions.create(**kwargs)
+    _record_openai_response_usage(
+        response,
+        user_id=user_id,
+        company_id=company_id,
+        endpoint=endpoint,
+        model=str(model),
+    )
+    return response
 
 # ============= Models =============
 
@@ -141,7 +198,8 @@ def get_cache_key(equipment_ids: List[str], fm_ids: List[str]) -> str:
 
 async def get_ai_suggestions(
     equipment_types: List[Dict[str, Any]],
-    failure_modes: List[Dict[str, Any]]
+    failure_modes: List[Dict[str, Any]],
+    current_user: Optional[dict] = None,
 ) -> List[EquipmentTypeSuggestions]:
     """Use OpenAI GPT-4o with deterministic settings and persistent cache."""
 
@@ -203,7 +261,12 @@ Return JSON:
 }}"""
 
     try:
-        response = await client.chat.completions.create(
+        uid, cid = _ai_user_ids(current_user)
+        response = await guarded_openai_create(
+            client,
+            user_id=uid,
+            company_id=cid,
+            endpoint="ai_fm_suggestions.failure_modes",
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -275,7 +338,10 @@ Return JSON:
 # ============= API Endpoints =============
 
 @router.post("/failure-modes", response_model=SuggestFailureModesResponse)
-async def suggest_failure_modes(request: SuggestFailureModesRequest):
+async def suggest_failure_modes(
+    request: SuggestFailureModesRequest,
+    current_user: dict = Depends(get_current_user),
+):
     """Get deterministic AI-powered suggestions for mapping failure modes to equipment types."""
 
     # Process ALL equipment types at once (no batching)
@@ -310,7 +376,7 @@ async def suggest_failure_modes(request: SuggestFailureModesRequest):
         raise HTTPException(status_code=400, detail="No valid equipment types provided")
 
     failure_modes = request.existing_failure_modes[:150]  # Increased limit
-    suggestions = await get_ai_suggestions(equipment_types, failure_modes)
+    suggestions = await get_ai_suggestions(equipment_types, failure_modes, current_user)
     total = sum(len(s.suggested_failure_modes) for s in suggestions)
 
     return SuggestFailureModesResponse(
@@ -463,6 +529,7 @@ def get_mapping_cache_key(nodes: List[EquipmentNodeInput], et_ids: List[str]) ->
 async def get_equipment_type_mapping_suggestions(
     nodes: List[EquipmentNodeInput],
     equipment_types: List[EquipmentTypeOption],
+    current_user: Optional[dict] = None,
 ) -> List[NodeMappingSuggestion]:
     """Use OpenAI to suggest equipment_type_id per equipment node, with persistent cache."""
     et_ids = [et.id for et in equipment_types]
@@ -530,7 +597,12 @@ Return JSON:
 If no equipment_type fits a node with confidence >= 0.70, set its best_match to null and alternatives to []."""
 
     try:
-        response = await client.chat.completions.create(
+        uid, cid = _ai_user_ids(current_user)
+        response = await guarded_openai_create(
+            client,
+            user_id=uid,
+            company_id=cid,
+            endpoint="ai_fm_suggestions.equipment_type_mappings",
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": EQUIPMENT_TYPE_MAPPING_SYSTEM_PROMPT},
@@ -622,7 +694,10 @@ If no equipment_type fits a node with confidence >= 0.70, set its best_match to 
 
 
 @router.post("/equipment-type-mappings", response_model=SuggestEquipmentTypeMappingsResponse)
-async def suggest_equipment_type_mappings(request: SuggestEquipmentTypeMappingsRequest):
+async def suggest_equipment_type_mappings(
+    request: SuggestEquipmentTypeMappingsRequest,
+    current_user: dict = Depends(get_current_user),
+):
     """Get deterministic AI-powered equipment_type suggestions for equipment nodes."""
     if not request.nodes:
         raise HTTPException(status_code=400, detail="No equipment nodes provided")
@@ -634,7 +709,7 @@ async def suggest_equipment_type_mappings(request: SuggestEquipmentTypeMappingsR
     nodes = request.nodes[:30]
     types = request.equipment_types[:300]
 
-    suggestions = await get_equipment_type_mapping_suggestions(nodes, types)
+    suggestions = await get_equipment_type_mapping_suggestions(nodes, types, current_user)
     total_matched = sum(1 for s in suggestions if s.best_match is not None)
 
     return SuggestEquipmentTypeMappingsResponse(
@@ -710,6 +785,7 @@ def get_new_types_cache_key(nodes: List[EquipmentNodeInput], et_ids: List[str]) 
 async def get_new_equipment_type_suggestions(
     nodes: List[EquipmentNodeInput],
     existing_types: List[EquipmentTypeOption],
+    current_user: Optional[dict] = None,
 ) -> List[NewEquipmentTypeSuggestion]:
     """Use OpenAI to propose new equipment types based on hierarchy nodes."""
     et_ids = [et.id for et in existing_types]
@@ -767,7 +843,12 @@ Return JSON:
 }}"""
 
     try:
-        response = await client.chat.completions.create(
+        uid, cid = _ai_user_ids(current_user)
+        response = await guarded_openai_create(
+            client,
+            user_id=uid,
+            company_id=cid,
+            endpoint="ai_fm_suggestions.new_equipment_types",
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": NEW_EQUIPMENT_TYPE_SYSTEM_PROMPT},
@@ -860,7 +941,10 @@ Return JSON:
 
 
 @router.post("/new-equipment-types", response_model=SuggestNewEquipmentTypesResponse)
-async def suggest_new_equipment_types(request: SuggestNewEquipmentTypesRequest):
+async def suggest_new_equipment_types(
+    request: SuggestNewEquipmentTypesRequest,
+    current_user: dict = Depends(get_current_user),
+):
     """Get AI-suggested NEW equipment types based on the user's plant hierarchy."""
     if not request.nodes:
         raise HTTPException(status_code=400, detail="No equipment nodes provided")
@@ -868,7 +952,7 @@ async def suggest_new_equipment_types(request: SuggestNewEquipmentTypesRequest):
     nodes = request.nodes[:200]  # accept more nodes since this is a discovery task
     existing = request.existing_equipment_types[:400]
 
-    suggestions = await get_new_equipment_type_suggestions(nodes, existing)
+    suggestions = await get_new_equipment_type_suggestions(nodes, existing, current_user)
     return SuggestNewEquipmentTypesResponse(
         suggestions=suggestions,
         total=len(suggestions),
@@ -973,6 +1057,7 @@ def get_new_fms_cache_key(eq_types: List[EquipmentTypeOption], existing: List[Ex
 async def get_new_failure_mode_suggestions(
     equipment_types: List[EquipmentTypeOption],
     existing_failure_modes: List[ExistingFailureModeBrief],
+    current_user: Optional[dict] = None,
 ) -> List[NewFailureModeSuggestion]:
     """Propose NEW failure modes that should be added to the library."""
     cache_key = get_new_fms_cache_key(equipment_types, existing_failure_modes)
@@ -1035,7 +1120,12 @@ Return JSON:
 }}"""
 
     try:
-        response = await client.chat.completions.create(
+        uid, cid = _ai_user_ids(current_user)
+        response = await guarded_openai_create(
+            client,
+            user_id=uid,
+            company_id=cid,
+            endpoint="ai_fm_suggestions.new_failure_modes",
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": NEW_FAILURE_MODE_SYSTEM_PROMPT},
@@ -1141,7 +1231,10 @@ Return JSON:
 
 
 @router.post("/new-failure-modes", response_model=SuggestNewFailureModesResponse)
-async def suggest_new_failure_modes(request: SuggestNewFailureModesRequest):
+async def suggest_new_failure_modes(
+    request: SuggestNewFailureModesRequest,
+    current_user: dict = Depends(get_current_user),
+):
     """Get AI-suggested NEW failure modes based on the user's equipment type catalog."""
     if not request.equipment_types:
         raise HTTPException(status_code=400, detail="No equipment types provided")
@@ -1177,7 +1270,7 @@ async def suggest_new_failure_modes(request: SuggestNewFailureModesRequest):
     # the AI has solid context, but dedup runs against the FULL set below.
     prompt_existing = full_existing_briefs[:600]
 
-    raw_suggestions = await get_new_failure_mode_suggestions(eq_types, prompt_existing)
+    raw_suggestions = await get_new_failure_mode_suggestions(eq_types, prompt_existing, current_user)
 
     # Hard dedup against the full Mongo library — drop any name that already exists
     # even if it slipped past the AI prompt (e.g. user lib > 600 FMs).
@@ -1343,6 +1436,7 @@ def _improve_cache_key(fm: ExistingFailureModeFull, et_ids: List[str]) -> str:
 async def improve_failure_mode_with_ai(
     fm: ExistingFailureModeFull,
     equipment_types: List[EquipmentTypeOption],
+    current_user: Optional[dict] = None,
 ) -> ImprovedFailureMode:
     """Use OpenAI to produce an improved version of a single failure mode."""
     et_ids = [et.id for et in equipment_types]
@@ -1426,8 +1520,13 @@ Return JSON:
 }}"""
 
     try:
-        response = await call_openai_with_retry(
+        uid, cid = _ai_user_ids(current_user)
+        response = await guarded_openai_create(
             client,
+            user_id=uid,
+            company_id=cid,
+            endpoint="ai_fm_suggestions.improve_failure_mode",
+            max_retries=4,
             model="gpt-4o",
             messages=[
                 {"role": "system", "content": IMPROVE_FAILURE_MODE_SYSTEM_PROMPT},
@@ -1602,12 +1701,15 @@ Return JSON:
 
 
 @router.post("/improve-failure-mode", response_model=ImprovedFailureMode)
-async def improve_failure_mode_endpoint(request: ImproveFailureModeRequest):
+async def improve_failure_mode_endpoint(
+    request: ImproveFailureModeRequest,
+    current_user: dict = Depends(get_current_user),
+):
     """Have an AI reliability engineer improve a single failure mode record."""
     if not request.failure_mode or not request.failure_mode.failure_mode:
         raise HTTPException(status_code=400, detail="No failure mode provided")
     eq_types = request.equipment_types[:200]
-    return await improve_failure_mode_with_ai(request.failure_mode, eq_types)
+    return await improve_failure_mode_with_ai(request.failure_mode, eq_types, current_user)
 
 
 # ============= Action Discipline Review =============
@@ -1724,7 +1826,10 @@ def _normalize_discipline(value: Optional[str]) -> str:
 
 
 @router.post("/review-action-disciplines", response_model=ReviewActionDisciplinesResponse)
-async def review_action_disciplines(request: ReviewActionDisciplinesRequest):
+async def review_action_disciplines(
+    request: ReviewActionDisciplinesRequest,
+    current_user: dict = Depends(get_current_user),
+):
     """Classify a batch of recommended-action items into the correct discipline.
 
     The caller is expected to chunk the full library into batches (~25 actions
@@ -1764,8 +1869,13 @@ Actions:
 Return JSON: {{"results": [{{"i": 0, "discipline": "mechanical", "reason": "..."}}]}}"""
 
     try:
-        response = await call_openai_with_retry(
+        uid, cid = _ai_user_ids(current_user)
+        response = await guarded_openai_create(
             client,
+            user_id=uid,
+            company_id=cid,
+            endpoint="ai_fm_suggestions.review_action_disciplines",
+            max_retries=4,
             model="gpt-4o-mini",  # cheaper/faster model is plenty for classification
             messages=[
                 {"role": "system", "content": REVIEW_ACTION_DISCIPLINE_SYSTEM_PROMPT},
@@ -1878,7 +1988,10 @@ class FindSimilarFailureModesResponse(BaseModel):
 
 
 @router.post("/find-similar-failure-modes", response_model=FindSimilarFailureModesResponse)
-async def find_similar_failure_modes(request: FindSimilarFailureModesRequest):
+async def find_similar_failure_modes(
+    request: FindSimilarFailureModesRequest,
+    current_user: dict = Depends(get_current_user),
+):
     """Identify groups of near-duplicate failure modes in the submitted set (library-wide).
 
     Equipment type is not used for clustering — pass all failure modes to scan the library.
@@ -1963,8 +2076,13 @@ async def find_similar_failure_modes(request: FindSimilarFailureModesRequest):
             "in at most ONE group — never overlap."
         )
         try:
-            resp = await call_openai_with_retry(
+            uid, cid = _ai_user_ids(current_user)
+            resp = await guarded_openai_create(
                 client,
+                user_id=uid,
+                company_id=cid,
+                endpoint="ai_fm_suggestions.find_similar_failure_modes",
+                max_retries=4,
                 model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": sys_prompt},

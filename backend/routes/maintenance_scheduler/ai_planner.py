@@ -33,7 +33,7 @@ async def ai_plan_tasks(
     explicit reasoning per task.
     """
     try:
-        from services.openai_service import chat_completion
+        from services.ai_gateway import chat, user_context
     except ImportError:
         raise HTTPException(status_code=500, detail="OpenAI service not available")
 
@@ -122,14 +122,17 @@ async def ai_plan_tasks(
     logger.debug("AI planner session %s", session_id)
 
     try:
-        response_text = await chat_completion(
+        uid, cid = user_context(current_user)
+        response_text = await chat(
             messages=[
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": json.dumps(user_payload)},
             ],
             model="gpt-4o",
             response_format={"type": "json_object"},
-            api_key=api_key,
+            user_id=uid,
+            company_id=cid,
+            endpoint="maintenance_scheduler.ai_plan",
         )
     except Exception as e:
         logger.exception("AI planner LLM call failed")
