@@ -14,6 +14,7 @@ from auth import get_current_user, require_permission
 from services.ai_gateway import user_context
 from services.background_jobs import schedule_tracked_job
 
+_library_read = require_permission("library:read")
 _library_write = require_permission("library:write")
 from services.threat_score_service import recalculate_threat_scores_for_failure_mode
 from services.translation_service import TranslationService
@@ -60,7 +61,8 @@ async def get_failure_modes(
     failure_mode_type: Optional[str] = None,  # "generic", "customer_specific", or "recently_added"
     recently_added_days: Optional[int] = 30,  # For recently_added filter, default 30 days
     skip: int = 0,
-    limit: int = 500
+    limit: int = 500,
+    current_user: dict = Depends(_library_read),
 ):
     """Get failure modes from MongoDB with optional filters."""
     # Try MongoDB first, fall back to static library if empty
@@ -114,7 +116,7 @@ async def get_failure_modes(
         return {"total": len(results), "failure_modes": results, "source": "static"}
 
 @router.get("/failure-modes/categories")
-async def get_categories():
+async def get_categories(current_user: dict = Depends(_library_read)):
     """Get all unique categories."""
     try:
         categories = await failure_modes_service.get_categories()
@@ -126,7 +128,7 @@ async def get_categories():
     return {"categories": get_all_categories()}
 
 @router.get("/failure-modes/equipment-types")
-async def get_equipment_types():
+async def get_equipment_types(current_user: dict = Depends(_library_read)):
     """Get all unique equipment types."""
     try:
         types = await failure_modes_service.get_equipment_types()
@@ -138,7 +140,7 @@ async def get_equipment_types():
     return {"equipment_types": get_all_equipment_types()}
 
 @router.get("/failure-modes/mechanisms")
-async def get_mechanisms():
+async def get_mechanisms(current_user: dict = Depends(_library_read)):
     """Get all unique ISO 14224 mechanisms."""
     try:
         mechanisms = await failure_modes_service.get_mechanisms()
@@ -150,7 +152,7 @@ async def get_mechanisms():
 
 @router.get("/failure-modes/counts-by-equipment-type")
 async def get_failure_mode_counts_by_equipment_type(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_read),
 ):
     """
     Get failure mode counts grouped by equipment_type_id.
@@ -185,7 +187,7 @@ async def get_failure_mode_counts_by_equipment_type(
 
 @router.get("/failure-modes/export")
 async def export_failure_modes_excel(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_read),
 ):
     """Export all failure modes to an Excel file."""
     from openpyxl import Workbook
@@ -320,7 +322,10 @@ async def export_failure_modes_excel(
     )
 
 @router.get("/failure-modes/high-risk")
-async def get_high_risk_modes(threshold: int = 150):
+async def get_high_risk_modes(
+    threshold: int = 150,
+    current_user: dict = Depends(_library_read),
+):
     """Get failure modes with RPN above threshold."""
     try:
         high_risk = await failure_modes_service.get_high_risk(threshold)
@@ -337,7 +342,10 @@ async def get_high_risk_modes(threshold: int = 150):
         return {"threshold": threshold, "total": len(high_risk), "failure_modes": high_risk}
 
 @router.get("/failure-modes/{mode_id}")
-async def get_failure_mode_by_id(mode_id: str):
+async def get_failure_mode_by_id(
+    mode_id: str,
+    current_user: dict = Depends(_library_read),
+):
     """Get a specific failure mode by ID (MongoDB _id or legacy_id)."""
     try:
         fm = await failure_modes_service.get_by_id(mode_id)
@@ -364,7 +372,7 @@ async def get_similar_failure_modes(
     threshold: float = 55.0,
     limit: int = 20,
     require_shared_equipment_type: bool = False,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_library_read),
 ):
     """Lexical similarity search for near-duplicate failure modes (no AI)."""
     try:
@@ -798,7 +806,7 @@ async def update_failure_mode(
 @router.get("/failure-modes/{mode_id}/versions")
 async def get_failure_mode_versions(
     mode_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_read),
 ):
     """Get version history for a failure mode."""
     try:

@@ -10,6 +10,7 @@ import logging
 
 from database import db
 from routes.auth import get_current_user
+from services.permission_resolver import invalidate_permissions_cache
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -351,6 +352,7 @@ async def create_role(
         upsert=True
     )
     
+    invalidate_permissions_cache()
     logger.info(f"Custom role '{role_name}' created by user {current_user['id']}")
     
     return {
@@ -409,6 +411,7 @@ async def delete_role(
                 {"$set": {"permissions": current_perms}}
             )
     
+    invalidate_permissions_cache()
     logger.info(f"Custom role '{role_name}' deleted by user {current_user['id']}")
     
     return {"message": f"Role '{role_name}' deleted successfully"}
@@ -571,6 +574,7 @@ async def update_role_permissions(
         upsert=True
     )
     
+    invalidate_permissions_cache()
     logger.info(f"Permissions updated for role '{role}' by user {current_user['id']}")
     
     return {"message": f"Permissions updated for role '{role}'", "role": role, "permissions": permissions}
@@ -628,6 +632,7 @@ async def patch_permission(
         upsert=True
     )
     
+    invalidate_permissions_cache()
     return {
         "message": "Permission updated",
         "role": update.role,
@@ -655,6 +660,7 @@ async def reset_permissions(current_user: dict = Depends(get_current_user)):
         upsert=True
     )
     
+    invalidate_permissions_cache()
     logger.info(f"Permissions reset to defaults by user {current_user['id']}")
     
     return {"message": "Permissions reset to defaults", "permissions": DEFAULT_PERMISSIONS}

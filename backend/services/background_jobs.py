@@ -18,9 +18,9 @@ logger = logging.getLogger("assetiq.jobs")
 
 def tenant_id_from_user(user: Optional[dict]) -> Optional[str]:
     """Extract tenant id from JWT user payload (company_id or organization_id)."""
-    if not user:
-        return None
-    return user.get("company_id") or user.get("organization_id") or None
+    from services.tenant_schema import tenant_id_from_user as _schema_tid
+
+    return _schema_tid(user)
 
 
 def _serialize_job_result(result: Any) -> Any:
@@ -69,7 +69,10 @@ class BackgroundJobService:
     ) -> str:
         job_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
-        doc = {
+        from services.tenant_schema import with_tenant_id
+
+        user_for_tenant = {"company_id": tenant_id} if tenant_id else None
+        doc = with_tenant_id({
             "id": job_id,
             "job_type": job_type,
             "status": JobStatus.PENDING.value,
@@ -80,9 +83,7 @@ class BackgroundJobService:
             "error": None,
             "created_at": now,
             "updated_at": now,
-        }
-        if tenant_id:
-            doc["tenant_id"] = tenant_id
+        }, user_for_tenant)
         try:
             await self._collection().insert_one(doc)
         except Exception as exc:
@@ -341,4 +342,24 @@ def schedule_tracked_job(
     *args: Any,
     **kwargs: Any,
 ) -> None:
+    """Schedule durable background work; prefer external worker when configured."""
+    from services.job_handlers import JOB_HANDLERS
+    from services.worker_config import use_external_background_worker
+
+    payload = kwargs.get("payload")
+    if use_external_background_worker() and job_type in JOB_HANDLERS and payload is not None:
+        user_id = kwargs.get("user_id")
+        tenant_id = kwargs.get("tenant_id")
+
+        async def _enqueue_external() -> None:
+            await background_job_service.enqueue_for_external_worker(
+                job_type,
+                user_id=user_id,
+                payload=payload,
+                tenant_id=tenant_id,
+            )
+
+        background_tasks.add_task(_enqueue_external)
+        return
+
     background_job_service.schedule(background_tasks, job_type, fn, *args, **kwargs)

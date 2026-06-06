@@ -1,5 +1,8 @@
 """RBAC alias and permission matrix unit tests."""
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from services.rbac_service import RBACService, ROLE_ALIASES, ROLES
 
@@ -323,3 +326,124 @@ def test_executive_kpis_service_exists():
     assert "compute_executive_reliability_kpis" in source
     assert "mtbf_proxy" in source
     assert "overdue_pm" in source
+
+
+def test_permission_resolver_maps_threats_to_observations():
+    from services.permission_resolver import API_TO_UI_FEATURE
+
+    assert API_TO_UI_FEATURE["threats"] == "observations"
+
+
+@pytest.mark.asyncio
+async def test_viewer_ui_matrix_denies_observations_write():
+    from services.permission_resolver import check_api_permission, invalidate_permissions_cache
+
+    invalidate_permissions_cache()
+    with patch("services.permission_resolver._load_ui_permissions", new_callable=AsyncMock) as mock_load:
+        mock_load.return_value = {
+            "viewer": {
+                "observations": {"read": True, "write": False, "delete": False},
+            }
+        }
+        assert await check_api_permission("viewer", "threats:write") is False
+        assert await check_api_permission("viewer", "threats:read") is True
+
+
+def test_threats_routes_require_permission_deps():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "threats.py").read_text()
+    assert '_threats_read = require_permission("threats:read")' in source
+    assert '_threats_write = require_permission("threats:write")' in source
+    assert '_threats_delete = require_permission("threats:delete")' in source
+    assert "Depends(_threats_write)" in source
+    assert "_assert_threat_installation_scope" in source
+
+
+def test_actions_routes_require_permission_deps():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "actions.py").read_text()
+    assert '_actions_read = require_permission("actions:read")' in source
+    assert '_actions_write = require_permission("actions:write")' in source
+    assert '_actions_delete = require_permission("actions:delete")' in source
+    assert "Depends(_actions_write)" in source
+    assert "_assert_action_installation_scope" in source
+
+
+def test_failure_modes_reads_require_library_read():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "failure_modes_routes.py").read_text()
+    assert '_library_read = require_permission("library:read")' in source
+    idx = source.index("async def export_failure_modes_excel")
+    assert "Depends(_library_read)" in source[idx: idx + 250]
+
+
+def test_equipment_file_view_requires_auth_and_equipment_read():
+    source = (
+        Path(__file__).resolve().parents[1] / "routes" / "equipment" / "equipment_files.py"
+    ).read_text()
+    idx = source.index("async def view_equipment_file_public")
+    block = source[idx: idx + 500]
+    assert 'require_permission("equipment:read")' in source
+    assert "Depends(_equipment_read)" in block
+    assert "assert_user_can_access_equipment" in block
+    assert "no auth required" not in block.lower()
+
+
+def test_inactive_user_rejected_in_validate_token():
+    source = (Path(__file__).resolve().parents[1] / "auth.py").read_text()
+    assert 'user.get("is_active") is False' in source
+    assert "Account deactivated" in source
+
+
+def test_require_permission_uses_async_resolver():
+    source = (Path(__file__).resolve().parents[1] / "auth.py").read_text()
+    idx = source.index("def require_permission(")
+    block = source[idx: idx + 500]
+    assert "check_api_permission" in block
+
+
+def test_permissions_updates_invalidate_resolver_cache():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "permissions.py").read_text()
+    assert "invalidate_permissions_cache" in source
+
+
+def test_threat_enrichment_extracted():
+    threats_source = (Path(__file__).resolve().parents[1] / "routes" / "threats.py").read_text()
+    enrichment_source = (
+        Path(__file__).resolve().parents[1] / "services" / "threat_enrichment.py"
+    ).read_text()
+    assert "from services.threat_enrichment import" in threats_source
+    assert "async def enrich_with_creator_info" in enrichment_source
+    assert "async def enrich_with_equipment_tags" in enrichment_source
+
+
+def test_installation_filter_user_can_access_equipment():
+    source = (
+        Path(__file__).resolve().parents[1] / "services" / "installation_filter_service.py"
+    ).read_text()
+    assert "async def user_can_access_equipment" in source
+    assert "async def assert_user_can_access_equipment" in source
+
+
+def test_create_indexes_passes_expire_after_seconds():
+    source = (Path(__file__).resolve().parents[1] / "scripts" / "create_indexes.py").read_text()
+    assert "expire_after = idx_def.get" in source
+    assert '"expireAfterSeconds"' in source or "expireAfterSeconds" in source
+
+
+def test_schedule_tracked_job_prefers_external_worker():
+    source = (Path(__file__).resolve().parents[1] / "services" / "background_jobs.py").read_text()
+    idx = source.index("def schedule_tracked_job(")
+    block = source[idx: idx + 900]
+    assert "use_external_background_worker" in block
+    assert "enqueue_for_external_worker" in block
+
+
+def test_ril_copilot_dropped_direct_openai_client():
+    source = (Path(__file__).resolve().parents[1] / "services" / "ril_copilot_service.py").read_text()
+    assert "_get_openai_client" not in source
+    assert "ai_gateway_chat" in source or "from services.ai_gateway import chat" in source
+
+
+def test_ai_risk_engine_uses_gateway():
+    source = (Path(__file__).resolve().parents[1] / "ai_risk_engine.py").read_text()
+    idx = source.index("async def _call_openai")
+    block = source[idx: idx + 500]
+    assert "chat_completion_response" in block

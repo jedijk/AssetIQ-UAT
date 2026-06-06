@@ -8,11 +8,44 @@ from datetime import datetime, timezone
 import uuid
 import logging
 from database import db, installation_filter
-from auth import get_current_user
+from auth import require_permission
 from services.cache_service import cache
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Actions"])
+
+_actions_read = require_permission("actions:read")
+_actions_write = require_permission("actions:write")
+_actions_delete = require_permission("actions:delete")
+
+
+async def _assert_action_installation_scope(user: dict, action: dict) -> None:
+    """Ensure the user may mutate an action within their installation assignments."""
+    eq_id = action.get("linked_equipment_id")
+    if eq_id:
+        await installation_filter.assert_user_can_access_equipment(user, eq_id)
+        return
+    threat_id = action.get("threat_id") or (
+        action.get("source_id") if action.get("source_type") == "threat" else None
+    )
+    if threat_id:
+        threat = await db.threats.find_one({"id": threat_id})
+        if threat:
+            eq_id = threat.get("linked_equipment_id")
+            if eq_id:
+                await installation_filter.assert_user_can_access_equipment(user, eq_id)
+                return
+            if installation_filter.is_owner(user):
+                return
+            if threat.get("created_by") == user.get("id"):
+                return
+            raise HTTPException(status_code=403, detail="Action not in your assigned installations")
+    if installation_filter.is_owner(user):
+        return
+    if action.get("created_by") == user.get("id"):
+        return
+    raise HTTPException(status_code=403, detail="Action not in your assigned installations")
+
 
 # Helper function to enrich items with creator info (with caching)
 async def enrich_with_creator_info(items: list) -> list:
@@ -119,7 +152,7 @@ async def get_all_actions(
     priority: Optional[str] = None,
     assignee: Optional[str] = None,
     source_type: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_actions_read)
 ):
     """Get all centralized actions with optional filters, filtered by user's assigned installations."""
     # Get user's installation filter data
@@ -291,7 +324,7 @@ async def get_all_actions(
 
 @router.get("/actions/overdue")
 async def get_overdue_actions(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_actions_read)
 ):
     """Get all overdue actions for notifications."""
     now = datetime.now(timezone.utc).isoformat()
@@ -311,9 +344,15 @@ async def get_overdue_actions(
 @router.post("/actions")
 async def create_central_action(
     data: CentralActionCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_actions_write)
 ):
     """Create a new centralized action (promote from threat or investigation)."""
+    if data.source_type == "threat":
+        threat = await db.threats.find_one({"id": data.source_id})
+        if threat:
+            eq_id = threat.get("linked_equipment_id")
+            if eq_id:
+                await installation_filter.assert_user_can_access_equipment(current_user, eq_id)
     action_id = str(uuid.uuid4())
     
     # Generate action number atomically using a single global counter.
@@ -401,7 +440,7 @@ async def create_central_action(
 @router.get("/actions/{action_id}")
 async def get_central_action(
     action_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_actions_read)
 ):
     """Get a specific centralized action."""
     from bson import ObjectId
@@ -451,7 +490,7 @@ async def get_central_action(
 async def update_central_action(
     action_id: str,
     data: CentralActionUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_actions_write)
 ):
     """Update a centralized action. Owner and Admin can update any action."""
     from bson import ObjectId
@@ -468,6 +507,7 @@ async def update_central_action(
     
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
+    await _assert_action_installation_scope(current_user, action)
     
     update_data = {k: v for k, v in data.dict().items() if v is not None}
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -542,27 +582,23 @@ async def update_central_action(
 @router.delete("/actions/{action_id}")
 async def delete_central_action(
     action_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_actions_delete)
 ):
     """Delete a centralized action. Owner and Admin can delete any action."""
     from bson import ObjectId
-    
+
+    action = await db.central_actions.find_one({"id": action_id})
+    if not action:
+        try:
+            action = await db.central_actions.find_one({"_id": ObjectId(action_id)})
+        except Exception:
+            pass
+    if not action:
+        raise HTTPException(status_code=404, detail="Action not found")
+    await _assert_action_installation_scope(current_user, action)
+
     # Owner and Admin can delete any action
     if current_user.get("role") in ["owner", "admin"]:
-        # Try to find by id field first
-        action = await db.central_actions.find_one({"id": action_id})
-        
-        # If not found, try by ObjectId
-        if not action:
-            try:
-                action = await db.central_actions.find_one({"_id": ObjectId(action_id)})
-            except:
-                pass
-        
-        if not action:
-            raise HTTPException(status_code=404, detail="Action not found")
-        
-        # Delete using the found document's _id
         result = await db.central_actions.delete_one({"_id": action["_id"]})
     else:
         # Others can only delete their own
@@ -588,7 +624,7 @@ class ActionValidateRequest(BaseModel):
 async def validate_action(
     action_id: str,
     data: ActionValidateRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_actions_write)
 ):
     """Validate an action (mark as reviewed/approved by a person)."""
     from bson import ObjectId
@@ -605,6 +641,7 @@ async def validate_action(
     
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
+    await _assert_action_installation_scope(current_user, action)
     
     update_data = {
         "is_validated": True,
@@ -627,14 +664,20 @@ async def validate_action(
 @router.post("/actions/{action_id}/unvalidate")
 async def unvalidate_action(
     action_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_actions_write)
 ):
     """Remove validation from an action."""
-    action = await db.central_actions.find_one(
-        {"id": action_id, "created_by": current_user["id"]}
-    )
+    from bson import ObjectId
+
+    action = await db.central_actions.find_one({"id": action_id})
+    if not action:
+        try:
+            action = await db.central_actions.find_one({"_id": ObjectId(action_id)})
+        except Exception:
+            pass
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
+    await _assert_action_installation_scope(current_user, action)
     
     update_data = {
         "is_validated": False,
@@ -660,7 +703,7 @@ async def unvalidate_action(
 async def get_source_action_completion_status(
     source_type: str,
     source_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_actions_read)
 ):
     """
     Check if all actions for a given source (threat/investigation) are completed.

@@ -7,7 +7,8 @@ from datetime import datetime, timezone
 import uuid
 import logging
 from database import db, failure_modes_service, efm_service, installation_filter
-from auth import get_current_user
+from auth import require_permission
+from services.threat_enrichment import enrich_with_creator_info, enrich_with_equipment_tags
 from services.background_jobs import schedule_tracked_job
 from models.api_models import ThreatResponse, ThreatUpdate
 from failure_modes import FAILURE_MODES_LIBRARY
@@ -101,131 +102,34 @@ FAILURE_MODE_CAUSES = {
 
 router = APIRouter(tags=["Threats"])
 
+_threats_read = require_permission("threats:read")
+_threats_write = require_permission("threats:write")
+_threats_delete = require_permission("threats:delete")
+
+
+async def _assert_threat_installation_scope(user: dict, threat: dict) -> None:
+    """Ensure the user may mutate a threat within their installation assignments."""
+    eq_id = threat.get("linked_equipment_id")
+    if eq_id:
+        await installation_filter.assert_user_can_access_equipment(user, eq_id)
+        return
+    if installation_filter.is_owner(user):
+        return
+    if threat.get("created_by") == user.get("id"):
+        return
+    raise HTTPException(status_code=403, detail="Threat not in your assigned installations")
+
 
 async def generate_case_number(user_id: str) -> str:
     count = await db.investigations.count_documents({"created_by": user_id})
     year = datetime.now(timezone.utc).strftime("%Y")
     return f"INV-{year}-{count + 1:04d}"
 
-# Helper function to enrich items with creator info
-async def enrich_with_creator_info(items: list) -> list:
-    """Add creator name and initials to items based on created_by field.
-    Uses caching to reduce database queries."""
-    if not items:
-        return items
-    
-    # Collect unique creator IDs
-    creator_ids = list(set(item.get("created_by") for item in items if item.get("created_by")))
-    if not creator_ids:
-        return items
-    
-    # Check cache first
-    cached_creators = cache.get_users_batch(creator_ids)
-    uncached_ids = [uid for uid in creator_ids if uid not in cached_creators]
-    
-    # Only fetch uncached users from database
-    if uncached_ids:
-        creators = await db.users.find(
-            {"id": {"$in": uncached_ids}},
-            {"_id": 0, "id": 1, "name": 1, "email": 1, "photo_url": 1, "avatar_path": 1, "avatar_data": 1, "position": 1, "role": 1}
-        ).to_list(100)
-        
-        # Cache the fetched users
-        fetched_map = {c["id"]: c for c in creators}
-        cache.set_users_batch(fetched_map)
-        
-        # Merge with cached
-        cached_creators.update(fetched_map)
-    
-    creator_map = cached_creators
-    
-    # Enrich items
-    for item in items:
-        creator_id = item.get("created_by")
-        if creator_id and creator_id in creator_map:
-            creator = creator_map[creator_id]
-            item["creator_name"] = creator.get("name") or creator.get("email", "").split("@")[0]
-            item["creator_position"] = creator.get("position") or creator.get("role") or "Team Member"
-            # Check photo_url, avatar_path, or avatar_data (MongoDB fallback)
-            if creator.get("photo_url"):
-                item["creator_photo"] = creator.get("photo_url")
-            elif creator.get("avatar_path") or creator.get("avatar_data"):
-                # Generate API URL for avatar (works for both storage methods)
-                item["creator_photo"] = f"/api/users/{creator_id}/avatar"
-            else:
-                item["creator_photo"] = None
-            # Generate initials
-            name = item["creator_name"]
-            if name:
-                parts = name.split()
-                item["creator_initials"] = "".join(p[0].upper() for p in parts[:2])
-            else:
-                item["creator_initials"] = "?"
-        else:
-            item["creator_name"] = None
-            item["creator_position"] = None
-            item["creator_photo"] = None
-            item["creator_initials"] = "?"
-    
-    return items
-
-
-async def enrich_with_equipment_tags(items: list) -> list:
-    """Add equipment tag to items based on linked_equipment_id or asset name.
-    Uses batch lookup for efficiency."""
-    if not items:
-        return items
-    
-    # Collect equipment IDs and asset names for batch lookup
-    equipment_ids = list(set(item.get("linked_equipment_id") for item in items if item.get("linked_equipment_id")))
-    asset_names = list(set(item.get("asset", "").lower() for item in items if item.get("asset")))
-    
-    if not equipment_ids and not asset_names:
-        return items
-    
-    # Build query for equipment nodes
-    query_conditions = []
-    if equipment_ids:
-        query_conditions.append({"id": {"$in": equipment_ids}})
-    if asset_names:
-        from utils.mongo_regex import exact_case_insensitive_any
-
-        name_match = exact_case_insensitive_any(*asset_names)
-        if name_match:
-            query_conditions.append({"name": name_match})
-    
-    equipment_nodes = await db.equipment_nodes.find(
-        {"$or": query_conditions} if query_conditions else {},
-        {"_id": 0, "id": 1, "name": 1, "tag": 1}
-    ).to_list(500)
-    
-    # Build lookup maps
-    equipment_by_id = {eq["id"]: eq for eq in equipment_nodes}
-    equipment_by_name = {eq["name"].lower(): eq for eq in equipment_nodes if eq.get("name")}
-    
-    # Enrich items with tags
-    for item in items:
-        tag = None
-        # First try by linked_equipment_id
-        eq_id = item.get("linked_equipment_id")
-        if eq_id and eq_id in equipment_by_id:
-            tag = equipment_by_id[eq_id].get("tag")
-        # Fallback to asset name lookup
-        if not tag:
-            asset_name = (item.get("asset") or "").lower()
-            if asset_name and asset_name in equipment_by_name:
-                tag = equipment_by_name[asset_name].get("tag")
-        
-        item["equipment_tag"] = tag
-    
-    return items
-
-
 @router.get("/threats", response_model=List[ThreatResponse])
 async def get_threats(
     status: Optional[str] = None,
     limit: int = 100,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_threats_read)
 ):
     # Get user's installation filter data
     installation_ids = await installation_filter.get_user_installation_ids(current_user)
@@ -294,7 +198,7 @@ async def get_threats(
 @router.get("/threats/top", response_model=List[ThreatResponse])
 async def get_top_threats(
     limit: int = 10,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_threats_read)
 ):
     # Get user's installation filter data
     installation_ids = await installation_filter.get_user_installation_ids(current_user)
@@ -359,7 +263,7 @@ async def get_top_threats(
 
 @router.post("/threats/recalculate-scores")
 async def recalculate_all_threat_scores(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_threats_write)
 ):
     """
     Recalculate risk scores for all threats based on current criticality and FMEA data.
@@ -493,7 +397,7 @@ async def recalculate_all_threat_scores(
 @router.get("/threats/{threat_id}", response_model=ThreatResponse)
 async def get_threat(
     threat_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_threats_read)
 ):
     try:
         # Remove created_by filter - threats are shared tenant entities
@@ -688,12 +592,13 @@ async def update_threat(
     threat_id: str,
     update: ThreatUpdate,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_threats_write)
 ):
     # Remove created_by filter - threats are shared tenant entities
     threat = await db.threats.find_one({"id": threat_id})
     if not threat:
         raise HTTPException(status_code=404, detail="Threat not found")
+    await _assert_threat_installation_scope(current_user, threat)
     
     update_data = {k: v for k, v in update.model_dump().items() if v is not None}
     
@@ -766,9 +671,14 @@ async def delete_threat(
     threat_id: str,
     delete_actions: bool = Query(False, description="Also delete linked Central Actions"),
     delete_investigations: bool = Query(False, description="Also delete linked Investigations"),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_threats_delete)
 ):
     """Delete a threat/observation. Optionally delete linked Actions and Investigations."""
+    threat = await db.threats.find_one({"id": threat_id})
+    if not threat:
+        raise HTTPException(status_code=404, detail="Threat not found")
+    await _assert_threat_installation_scope(current_user, threat)
+
     deleted_actions_count = 0
     deleted_investigations_count = 0
     
@@ -834,7 +744,7 @@ async def delete_threat(
 async def link_threat_to_equipment(
     threat_id: str,
     equipment_node_id: str = Body(..., embed=True),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_threats_write)
 ):
     """
     Link a threat to an equipment node and apply its criticality to the threat score.
@@ -844,6 +754,8 @@ async def link_threat_to_equipment(
     threat = await db.threats.find_one({"id": threat_id})
     if not threat:
         raise HTTPException(status_code=404, detail="Threat not found")
+    await _assert_threat_installation_scope(current_user, threat)
+    await installation_filter.assert_user_can_access_equipment(current_user, equipment_node_id)
     
     # Get the equipment node (shared entity - no created_by filter)
     node = await db.equipment_nodes.find_one({"id": equipment_node_id})
@@ -933,7 +845,7 @@ async def link_threat_to_equipment(
 async def link_threat_to_failure_mode(
     threat_id: str,
     failure_mode_id: int = Body(..., embed=True),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_threats_write)
 ):
     """
     Link a threat to a failure mode from the FMEA library and recalculate the risk score.
@@ -942,6 +854,7 @@ async def link_threat_to_failure_mode(
     threat = await db.threats.find_one({"id": threat_id})
     if not threat:
         raise HTTPException(status_code=404, detail="Threat not found")
+    await _assert_threat_installation_scope(current_user, threat)
     
     # Find the failure mode - check database first, then static library
     matched_fm = None
@@ -1055,7 +968,7 @@ async def link_threat_to_failure_mode(
 @router.post("/threats/{threat_id}/investigate")
 async def create_investigation_from_threat(
     threat_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_threats_write)
 ):
     """Create a new investigation from an existing threat with auto-generated timeline and causal diagram."""
     # Shared entity - no created_by filter for read access
@@ -1065,6 +978,7 @@ async def create_investigation_from_threat(
     )
     if not threat:
         raise HTTPException(status_code=404, detail="Threat not found")
+    await _assert_threat_installation_scope(current_user, threat)
     
     # Check if investigation already exists for this threat
     existing = await db.investigations.find_one({"threat_id": threat_id})
@@ -1350,7 +1264,7 @@ async def create_investigation_from_threat(
 @router.get("/threats/{threat_id}/timeline")
 async def get_threat_timeline(
     threat_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_threats_read)
 ):
     """
     Get timeline of all activity related to a specific observation/threat.

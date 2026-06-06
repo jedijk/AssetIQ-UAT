@@ -10,8 +10,6 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 
-from openai import OpenAI
-
 from ai_risk_models import (
     DynamicRiskScore, RiskTrend, ConfidenceLevel, RiskForecast, RiskInsight,
     ProbableCause, CauseProbability, CausalExplanation,
@@ -26,13 +24,6 @@ from services.ai_security_service import (
 )
 
 logger = logging.getLogger(__name__)
-
-def get_openai_client() -> OpenAI:
-    """Get OpenAI client with API key from environment."""
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY not configured in environment")
-    return OpenAI(api_key=api_key)
 
 
 # ============= System Prompts =============
@@ -342,28 +333,30 @@ class AIRiskEngine:
         'action_optimization': 4000
     }
     
-    def _call_openai(self, system_prompt: str, user_message: str, analysis_type: str = 'risk_analysis') -> str:
-        """Make a chat completion call to OpenAI with cost guard and usage tracking."""
-        from ai_helpers import chat_completions_create
+    async def _call_openai(
+        self,
+        system_prompt: str,
+        user_message: str,
+        analysis_type: str = "risk_analysis",
+    ) -> str:
+        """Make a guarded chat completion via the AI gateway."""
+        from services.ai_gateway import chat_completion_response
 
         max_tokens = self.TOKEN_LIMITS.get(analysis_type, 3000)
-        temperature = 0.3 if analysis_type == 'risk_analysis' else 0.4
+        temperature = 0.3 if analysis_type == "risk_analysis" else 0.4
         try:
-            logger.info(f"Calling OpenAI with model gpt-4o, max_tokens={max_tokens}")
-            client = get_openai_client()
-            response = chat_completions_create(
-                client,
-                f"ai_risk_engine.{analysis_type}",
-                model="gpt-4o",
-                messages=[
+            logger.info("Calling AI gateway with model gpt-4o, max_tokens=%s", max_tokens)
+            response = await chat_completion_response(
+                [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message},
                 ],
+                endpoint=f"ai_risk_engine.{analysis_type}",
+                model="gpt-4o",
                 max_completion_tokens=max_tokens,
                 temperature=temperature,
             )
-            content = response.choices[0].message.content
-            return content
+            return response.choices[0].message.content
         except Exception as e:
             logger.error(f"OpenAI API error: {str(e)}")
             raise
@@ -570,7 +563,7 @@ EQUIPMENT INFORMATION:
         try:
             context = self._build_threat_context(threat, equipment_data, historical_threats, equipment_history)
             
-            response = self._call_openai(RISK_ANALYSIS_PROMPT, f"Analyze this threat:\n{context}", 'risk_analysis')
+            response = await self._call_openai(RISK_ANALYSIS_PROMPT, f"Analyze this threat:\n{context}", 'risk_analysis')
             
             data = self._parse_json_response(response) or {}
             
@@ -687,7 +680,7 @@ EQUIPMENT INFORMATION:
         try:
             context = self._build_threat_context(threat, equipment_data, None, equipment_history)
             
-            response = self._call_openai(CAUSE_ANALYSIS_PROMPT, f"Analyze causes for this threat (max {max_causes} causes):\n{context}", 'cause_analysis')
+            response = await self._call_openai(CAUSE_ANALYSIS_PROMPT, f"Analyze causes for this threat (max {max_causes} causes):\n{context}", 'cause_analysis')
             data = self._parse_json_response(response)
             
             # Build probable causes with normalized probability levels
@@ -741,7 +734,7 @@ EQUIPMENT INFORMATION:
         try:
             context = self._build_threat_context(threat)
             
-            response = self._call_openai(FAULT_TREE_PROMPT, f"Generate a fault tree (max depth {max_depth}):\n{context}", 'fault_tree')
+            response = await self._call_openai(FAULT_TREE_PROMPT, f"Generate a fault tree (max depth {max_depth}):\n{context}", 'fault_tree')
             data = self._parse_json_response(response)
             
             def parse_node(node_data: dict) -> FaultTreeNode:
@@ -783,7 +776,7 @@ EQUIPMENT INFORMATION:
         try:
             context = self._build_threat_context(threat)
             
-            response = self._call_openai(BOW_TIE_PROMPT, f"Generate a bow-tie model:\n{context}", 'bow_tie')
+            response = await self._call_openai(BOW_TIE_PROMPT, f"Generate a bow-tie model:\n{context}", 'bow_tie')
             data = self._parse_json_response(response)
             
             preventive_barriers = [
@@ -836,7 +829,7 @@ EQUIPMENT INFORMATION:
             
             context += f"\nPRIORITIZE BY: {prioritize_by}\n"
             
-            response = self._call_openai(ACTION_OPTIMIZATION_PROMPT, f"Recommend optimized actions:\n{context}", 'action_optimization')
+            response = await self._call_openai(ACTION_OPTIMIZATION_PROMPT, f"Recommend optimized actions:\n{context}", 'action_optimization')
             data = self._parse_json_response(response)
             
             recommended_actions = [

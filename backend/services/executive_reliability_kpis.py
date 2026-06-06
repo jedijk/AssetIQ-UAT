@@ -6,31 +6,66 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from database import db
+from database import db, installation_filter
+
+
+async def _equipment_scope_filter(user: Optional[dict]) -> Dict[str, Any]:
+    """Build a Mongo filter limiting KPIs to the user's installation scope."""
+    if not user:
+        return {}
+    installation_ids = await installation_filter.get_user_installation_ids(user)
+    if not installation_ids:
+        return {"_impossible": True}
+    equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
+        installation_ids, user.get("id")
+    )
+    if not equipment_ids:
+        return {"_impossible": True}
+    return {"linked_equipment_id": {"$in": list(equipment_ids)}}
 
 
 async def compute_executive_reliability_kpis(
     owner_id: Optional[str] = None,
+    user: Optional[dict] = None,
 ) -> Dict[str, Any]:
     """Compute installation-wide executive KPIs."""
     now = datetime.now(timezone.utc)
     today_iso = now.date().isoformat()
 
-    open_threats = await db.threats.count_documents({
-        "status": {"$in": ["Open", "open", "In Progress", "in_progress"]},
-    })
+    scope = await _equipment_scope_filter(user)
+    if user and scope.get("_impossible"):
+        return {
+            "open_threats": 0,
+            "high_risk_threats": 0,
+            "overdue_pm": {"scheduled_tasks": 0, "task_instances": 0, "total": 0},
+            "mtbf_proxy": {
+                "fleet_mean_days": None,
+                "sample_equipment_count": 0,
+                "window_days": 90,
+                "worst_performers": [],
+            },
+            "generated_at": now.isoformat(),
+        }
+
+    threat_scope = {**scope, "status": {"$in": ["Open", "open", "In Progress", "in_progress"]}}
+    open_threats = await db.threats.count_documents(threat_scope)
 
     high_risk_threats = await db.threats.count_documents({
-        "status": {"$in": ["Open", "open", "In Progress", "in_progress"]},
+        **threat_scope,
         "risk_level": {"$in": ["High", "high", "Critical", "critical"]},
     })
 
+    pm_scope: Dict[str, Any] = {}
+    if scope.get("linked_equipment_id"):
+        pm_scope["equipment_id"] = scope["linked_equipment_id"]
     overdue_pm_scheduled = await db.scheduled_tasks.count_documents({
+        **pm_scope,
         "status": {"$nin": ["completed", "cancelled"]},
         "due_date": {"$lt": today_iso},
     })
 
     overdue_pm_instances = await db.task_instances.count_documents({
+        **pm_scope,
         "status": {"$in": ["pending", "overdue", "scheduled"]},
         "due_date": {"$lt": now},
     })
@@ -39,7 +74,8 @@ async def compute_executive_reliability_kpis(
 
     # MTBF proxy: mean days between resolved threats per equipment (90d window)
     window_start = now - timedelta(days=90)
-    mtbf_by_equipment = await _mtbf_proxy_days(window_start)
+    equipment_ids = scope.get("linked_equipment_id", {}).get("$in") if scope else None
+    mtbf_by_equipment = await _mtbf_proxy_days(window_start, equipment_ids=equipment_ids)
 
     fleet_mtbf_days = None
     if mtbf_by_equipment:
@@ -47,7 +83,9 @@ async def compute_executive_reliability_kpis(
             sum(mtbf_by_equipment) / len(mtbf_by_equipment), 1
         )
 
-    worst_equipment = await _worst_mtbf_equipment(window_start, limit=5)
+    worst_equipment = await _worst_mtbf_equipment(
+        window_start, limit=5, equipment_ids=equipment_ids
+    )
 
     return {
         "open_threats": open_threats,
@@ -67,16 +105,22 @@ async def compute_executive_reliability_kpis(
     }
 
 
-async def _mtbf_proxy_days(since: datetime) -> List[float]:
+async def _mtbf_proxy_days(
+    since: datetime,
+    *,
+    equipment_ids: Optional[List[str]] = None,
+) -> List[float]:
     """Return inter-failure intervals (days) per equipment from resolved threats."""
+    match: Dict[str, Any] = {
+        "status": {"$in": ["Resolved", "resolved", "Closed", "closed"]},
+        "created_at": {"$gte": since},
+    }
+    if equipment_ids:
+        match["linked_equipment_id"] = {"$in": equipment_ids}
+    else:
+        match["linked_equipment_id"] = {"$exists": True, "$ne": None}
     pipeline = [
-        {
-            "$match": {
-                "status": {"$in": ["Resolved", "resolved", "Closed", "closed"]},
-                "created_at": {"$gte": since},
-                "linked_equipment_id": {"$exists": True, "$ne": None},
-            }
-        },
+        {"$match": match},
         {"$sort": {"linked_equipment_id": 1, "created_at": 1}},
         {
             "$group": {
@@ -102,16 +146,23 @@ async def _mtbf_proxy_days(since: datetime) -> List[float]:
     return intervals
 
 
-async def _worst_mtbf_equipment(since: datetime, *, limit: int = 5) -> List[dict]:
+async def _worst_mtbf_equipment(
+    since: datetime,
+    *,
+    limit: int = 5,
+    equipment_ids: Optional[List[str]] = None,
+) -> List[dict]:
     """Equipment with shortest mean interval between failures (proxy)."""
+    match: Dict[str, Any] = {
+        "status": {"$in": ["Resolved", "resolved", "Closed", "closed"]},
+        "created_at": {"$gte": since},
+    }
+    if equipment_ids:
+        match["linked_equipment_id"] = {"$in": equipment_ids}
+    else:
+        match["linked_equipment_id"] = {"$exists": True, "$ne": None}
     pipeline = [
-        {
-            "$match": {
-                "status": {"$in": ["Resolved", "resolved", "Closed", "closed"]},
-                "created_at": {"$gte": since},
-                "linked_equipment_id": {"$exists": True, "$ne": None},
-            }
-        },
+        {"$match": match},
         {"$sort": {"linked_equipment_id": 1, "created_at": 1}},
         {
             "$group": {

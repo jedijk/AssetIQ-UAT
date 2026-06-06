@@ -83,7 +83,7 @@ async def get_executive_dashboard(
     service = get_ril_service()
     
     stats = await service.get_dashboard_stats(owner_id)
-    reliability_kpis = await compute_executive_reliability_kpis(owner_id)
+    reliability_kpis = await compute_executive_reliability_kpis(owner_id, user=current_user)
     
     # Calculate reliability score
     # Based on ratio of resolved cases, low alert volume, few predictions at risk

@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 import logging
-from database import db, analytics_service, rbac_service
+from database import db, analytics_service, rbac_service, installation_filter
 from auth import get_current_user
 from services.rbac_service import ROLES
 logger = logging.getLogger(__name__)
@@ -22,16 +22,33 @@ analytics_service = AnalyticsService(db)
 rbac_service = RBACService(db)
 
 
+async def _scoped_equipment_ids(user: dict):
+    installation_ids = await installation_filter.get_user_installation_ids(user)
+    if not installation_ids:
+        return set()
+    return await installation_filter.get_all_equipment_ids_for_installations(
+        installation_ids, user.get("id")
+    )
+
+
 @router.get("/analytics/dashboard")
 async def get_analytics_dashboard(current_user: dict = Depends(get_current_user)):
     """Get comprehensive analytics dashboard"""
-    return await analytics_service.get_full_dashboard(current_user.get("user_id"))
+    equipment_ids = await _scoped_equipment_ids(current_user)
+    return await analytics_service.get_full_dashboard(
+        current_user.get("user_id"),
+        equipment_ids=equipment_ids,
+    )
 
 
 @router.get("/analytics/risk-overview")
 async def get_risk_overview(current_user: dict = Depends(get_current_user)):
     """Get risk overview metrics"""
-    return await analytics_service.get_risk_overview(current_user.get("user_id"))
+    equipment_ids = await _scoped_equipment_ids(current_user)
+    return await analytics_service.get_risk_overview(
+        current_user.get("user_id"),
+        equipment_ids=equipment_ids,
+    )
 
 
 @router.get("/analytics/top-risks")

@@ -12,6 +12,8 @@ from typing import Any, Dict, List, Optional
 PILOT_COLLECTIONS = frozenset({
     "work_item_projections",
     "reliability_context_snapshots",
+    "background_jobs",
+    "audit_log",
 })
 
 DEFAULT_TENANT_FIELD = "tenant_id"

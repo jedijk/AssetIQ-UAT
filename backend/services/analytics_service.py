@@ -36,11 +36,19 @@ class AnalyticsService:
     
     # ==================== RISK ANALYTICS ====================
     
-    async def get_risk_overview(self, user_id: Optional[str] = None) -> Dict[str, Any]:
+    async def get_risk_overview(
+        self,
+        user_id: Optional[str] = None,
+        equipment_ids: Optional[set] = None,
+    ) -> Dict[str, Any]:
         """Get overall risk metrics."""
         
-        # Use aggregation pipeline to get all stats in one query
-        match_stage = {"$match": {"created_by": user_id}} if user_id else {"$match": {}}
+        match_filter: Dict[str, Any] = {}
+        if equipment_ids:
+            match_filter["linked_equipment_id"] = {"$in": list(equipment_ids)}
+        elif user_id:
+            match_filter["created_by"] = user_id
+        match_stage = {"$match": match_filter}
         
         pipeline = [
             match_stage,
@@ -518,12 +526,16 @@ class AnalyticsService:
     
     # ==================== COMPREHENSIVE DASHBOARD ====================
     
-    async def get_full_dashboard(self, user_id: Optional[str] = None) -> Dict[str, Any]:
+    async def get_full_dashboard(
+        self,
+        user_id: Optional[str] = None,
+        equipment_ids: Optional[set] = None,
+    ) -> Dict[str, Any]:
         """Get comprehensive analytics dashboard."""
-        
+
         return {
             "generated_at": datetime.now(timezone.utc).isoformat(),
-            "risk_overview": await self.get_risk_overview(user_id),
+            "risk_overview": await self.get_risk_overview(user_id, equipment_ids=equipment_ids),
             "top_risks": await self.get_top_risks(10),
             "task_compliance": await self.get_task_compliance(30),
             "task_workload": await self.get_task_workload(7),

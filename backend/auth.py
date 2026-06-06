@@ -71,6 +71,8 @@ async def _validate_token(token: str) -> dict:
             user = await prod_db.users.find_one({"id": user_id}, {"_id": 0})
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
+        if user.get("is_active") is False:
+            raise HTTPException(status_code=401, detail="Account deactivated")
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
@@ -161,8 +163,12 @@ def require_permission(permission: str):
     """FastAPI dependency: enforce RBAC permission string (e.g. library:write)."""
 
     async def _dependency(current_user: dict = Depends(get_current_user)) -> dict:
+        from services.permission_resolver import check_api_permission
+
         role = current_user.get("role", "viewer")
-        if role == "owner" or rbac_service.has_permission(role, permission):
+        if role == "owner":
+            return current_user
+        if await check_api_permission(role, permission):
             return current_user
         raise HTTPException(status_code=403, detail=f"Permission denied: {permission}")
 

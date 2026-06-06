@@ -6,8 +6,8 @@ Owner role bypasses all installation filtering.
 import logging
 import time
 from typing import List, Optional, Set
-from functools import lru_cache
-import asyncio
+
+from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -342,3 +342,55 @@ class InstallationFilterService:
             return True
         assigned = user.get("assigned_installations", [])
         return len(assigned) > 0
+
+    async def user_can_access_equipment(self, user: dict, equipment_id: str) -> bool:
+        """Return True when equipment_id is within the user's installation scope."""
+        if not equipment_id:
+            return False
+        if self.is_owner(user):
+            return True
+        installation_ids = await self.get_user_installation_ids(user)
+        if not installation_ids:
+            return False
+        allowed_ids = await self.get_all_equipment_ids_for_installations(
+            installation_ids, user.get("id")
+        )
+        return equipment_id in allowed_ids
+
+    async def assert_user_can_access_equipment(self, user: dict, equipment_id: str) -> None:
+        """Raise 403 when equipment is outside the user's installation scope."""
+        if not await self.user_can_access_equipment(user, equipment_id):
+            raise HTTPException(
+                status_code=403,
+                detail="Equipment not in your assigned installations",
+            )
+
+    async def resolve_equipment_installation_id(self, equipment_id: str) -> Optional[str]:
+        """Return installation node id for an equipment node (walk parents if needed)."""
+        if not equipment_id:
+            return None
+        node = await self.db.equipment_nodes.find_one(
+            {"id": equipment_id},
+            {"_id": 0, "id": 1, "level": 1, "parent_id": 1, "installation_id": 1},
+        )
+        if not node:
+            return None
+        if node.get("level") == "installation":
+            return node.get("id")
+        if node.get("installation_id"):
+            return node.get("installation_id")
+        current = node
+        for _ in range(15):
+            parent_id = current.get("parent_id")
+            if not parent_id:
+                break
+            parent = await self.db.equipment_nodes.find_one(
+                {"id": parent_id},
+                {"_id": 0, "id": 1, "level": 1, "parent_id": 1},
+            )
+            if not parent:
+                break
+            if parent.get("level") == "installation":
+                return parent.get("id")
+            current = parent
+        return None

@@ -6,8 +6,10 @@ import uuid
 import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
-from auth import get_current_user
-from database import db
+from auth import get_current_user, require_permission
+from database import db, installation_filter
+
+_equipment_read = require_permission("equipment:read")
 from services.storage_service import put_object_async, get_object_async, delete_object_async
 
 logger = logging.getLogger(__name__)
@@ -117,11 +119,18 @@ async def download_equipment_file(file_id: str, current_user: dict = Depends(get
 
 
 @router.get("/equipment-files/{file_id}/view")
-async def view_equipment_file_public(file_id: str):
-    """Public endpoint for Office Online viewer — no auth required."""
+async def view_equipment_file_public(
+    file_id: str,
+    current_user: dict = Depends(_equipment_read),
+):
+    """Authenticated inline view for Office Online viewer."""
     doc = await db.equipment_files.find_one({"id": file_id}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="File not found")
+
+    equipment_id = doc.get("equipment_id")
+    if equipment_id:
+        await installation_filter.assert_user_can_access_equipment(current_user, equipment_id)
 
     from fastapi.responses import Response
 

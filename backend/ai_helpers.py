@@ -214,17 +214,17 @@ async def summarize_issue_description(text: str, language: str = "en") -> str:
     Short summary of the operator's issue text for a confirmation step before
     equipment mapping + failure mode selection.
     """
+    from services.ai_gateway import chat as ai_gateway_chat
+
     t = (text or "").strip()
     if not t:
         return ""
     if len(t) <= 160:
         return t
     try:
-        client = get_openai_client()
         lang_note = "Dutch" if language == "nl" else "English"
-        response = chat_completions_create(client, "ai_helpers",
-            model=os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
-            messages=[
+        out = await ai_gateway_chat(
+            [
                 {
                     "role": "system",
                     "content": (
@@ -234,10 +234,12 @@ async def summarize_issue_description(text: str, language: str = "en") -> str:
                 },
                 {"role": "user", "content": t[:4000]},
             ],
+            endpoint="ai_helpers.summarize_issue_description",
+            model=os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
             temperature=0.2,
             max_tokens=150,
         )
-        out = (response.choices[0].message.content or "").strip()
+        out = (out or "").strip()
         if out:
             return out
     except Exception as e:
@@ -408,21 +410,20 @@ Recent Threats (last 10):
 
 async def answer_data_query(message: str, session_id: str, data_context: str) -> dict:
     """Answer a data query using the provided context."""
+    from services.ai_gateway import chat as ai_gateway_chat
+
     try:
         prompt = DATA_QUERY_SYSTEM_PROMPT.format(data_context=data_context)
 
-        client = get_openai_client()
-        
-        response = chat_completions_create(client, "ai_helpers",
-            model="gpt-4o-mini",
-            messages=[
+        clean_response = (await ai_gateway_chat(
+            [
                 {"role": "system", "content": prompt},
-                {"role": "user", "content": message}
+                {"role": "user", "content": message},
             ],
-            temperature=0.5
-        )
-
-        clean_response = response.choices[0].message.content.strip()
+            endpoint="ai_helpers.answer_data_query",
+            model="gpt-4o-mini",
+            temperature=0.5,
+        )).strip()
         if clean_response.startswith("```"):
             clean_response = clean_response.split("```")[1]
             if clean_response.startswith("json"):

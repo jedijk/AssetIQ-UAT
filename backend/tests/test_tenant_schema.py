@@ -25,3 +25,5 @@ def test_tenant_filter_scopes_reads():
 def test_pilot_collections_include_projections():
     assert "work_item_projections" in PILOT_COLLECTIONS
     assert "reliability_context_snapshots" in PILOT_COLLECTIONS
+    assert "background_jobs" in PILOT_COLLECTIONS
+    assert "audit_log" in PILOT_COLLECTIONS

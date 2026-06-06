@@ -11,7 +11,6 @@ Supports queries like:
 """
 
 import logging
-import os
 import json
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
@@ -29,28 +28,6 @@ class ReliabilityCopilotService:
     def __init__(self, db, ril_service):
         self.db = db
         self.ril_service = ril_service
-        self._openai_client = None
-    
-    def _get_openai_client(self):
-        """Get or create OpenAI client"""
-        if self._openai_client is None:
-            try:
-                from emergentintegrations.llm.openai import get_openai_client
-                api_key = os.environ.get("EMERGENT_LLM_KEY") or os.environ.get("OPENAI_API_KEY")
-                if api_key:
-                    self._openai_client = get_openai_client(api_key)
-                else:
-                    logger.warning("No OpenAI API key found for Reliability Copilot")
-            except ImportError:
-                logger.warning("emergentintegrations not available, trying direct OpenAI")
-                try:
-                    from openai import OpenAI
-                    api_key = os.environ.get("OPENAI_API_KEY")
-                    if api_key:
-                        self._openai_client = OpenAI(api_key=api_key)
-                except ImportError:
-                    logger.error("OpenAI library not available")
-        return self._openai_client
     
     async def process_query(
         self,
