@@ -893,6 +893,8 @@ class TaskService:
             if data.get("create_observation") and data.get("issues_found"):
                 await self._create_observation_from_task(instance, data, now)
             
+            await self._sync_reliability_graph_on_complete(instance, result, now)
+
             serialized = self._serialize_instance(result)
             if created_submission_id:
                 serialized["form_submission_id"] = created_submission_id
@@ -900,6 +902,66 @@ class TaskService:
                 serialized["label_print_config"] = label_print_config
             return serialized
         return None
+
+    async def _sync_reliability_graph_on_complete(
+        self,
+        instance: Dict[str, Any],
+        result: Dict[str, Any],
+        completed_at: datetime,
+    ) -> None:
+        """Materialize reliability graph edges after task instance completion."""
+        import os
+
+        audit_mode = os.environ.get("RELIABILITY_GRAPH_AUDIT_MODE", "").lower() == "true"
+        try:
+            from services.reliability_graph import sync_edges_for_scheduled_task, upsert_edge
+
+            sched_id = instance.get("scheduled_task_id")
+            if sched_id:
+                scheduled_task = await self.db.scheduled_tasks.find_one({"id": sched_id})
+                if scheduled_task:
+                    await sync_edges_for_scheduled_task(
+                        scheduled_task,
+                        event="completed",
+                        metadata={
+                            "completed_at": completed_at.isoformat(),
+                            "task_instance_id": str(
+                                result.get("id") or instance.get("id") or instance.get("_id", "")
+                            ),
+                        },
+                    )
+
+            ti_id = str(result.get("id") or instance.get("id") or instance.get("_id", ""))
+            equipment_id = instance.get("equipment_id")
+            if ti_id and equipment_id:
+                await upsert_edge(
+                    source_type="task_instance",
+                    source_id=ti_id,
+                    relation="executed_on",
+                    target_type="equipment",
+                    target_id=equipment_id,
+                    equipment_id=equipment_id,
+                    metadata={"completed_at": completed_at.isoformat()},
+                )
+
+            failure_mode_id = instance.get("failure_mode_id")
+            if not failure_mode_id:
+                meta = instance.get("metadata") or {}
+                failure_mode_id = meta.get("failure_mode_id")
+            if ti_id and failure_mode_id:
+                await upsert_edge(
+                    source_type="task_instance",
+                    source_id=ti_id,
+                    relation="mitigates_failure_mode",
+                    target_type="failure_mode",
+                    target_id=str(failure_mode_id),
+                    equipment_id=equipment_id,
+                    metadata={"completed_at": completed_at.isoformat()},
+                )
+        except Exception as exc:
+            logger.warning("task instance graph edge sync failed: %s", exc)
+            if audit_mode:
+                raise
     
     async def _create_observation_from_task(
         self,

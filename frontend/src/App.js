@@ -25,6 +25,7 @@ import { ProductionReleaseToast } from "./components/ProductionReleaseToast";
 // iOS Safari can feel slower with too many small lazy chunks (waterfall + parse overhead).
 // Keep core routes eagerly loaded; lazy-load heavier/rare routes.
 import LoginPage from "./pages/LoginPage";
+import OidcCallbackPage from "./pages/OidcCallbackPage";
 import RegisterPage from "./pages/RegisterPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
@@ -387,6 +388,11 @@ function App() {
                   <Suspense fallback={<RouteFallback />}>
                     <LoginPage />
                   </Suspense>
+                </PublicRoute>
+              } />
+              <Route path="/login/callback" element={
+                <PublicRoute>
+                  <OidcCallbackPage />
                 </PublicRoute>
               } />
               <Route path="/register" element={

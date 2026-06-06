@@ -34,6 +34,7 @@ def test_one_gate_fails_exit_2():
             "subprocess.run",
             side_effect=[
                 MagicMock(returncode=0),
+                MagicMock(returncode=0),
                 MagicMock(returncode=2),
             ],
         ):

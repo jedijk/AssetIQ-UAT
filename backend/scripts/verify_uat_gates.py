@@ -19,6 +19,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 GATES = (
     ("schedule_drift", SCRIPTS_DIR / "verify_schedule_drift.py"),
     ("v2_program_coverage", SCRIPTS_DIR / "verify_v2_program_coverage.py"),
+    ("reliability_graph_sync", SCRIPTS_DIR / "verify_reliability_graph_sync.py"),
 )
 
 

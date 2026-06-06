@@ -5,7 +5,7 @@ import logging
 import uuid
 import base64
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, Query, Body
+from fastapi import APIRouter, Depends, HTTPException, Query, Body, Response
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from database import db
@@ -103,8 +103,15 @@ async def _process_attachments(raw_attachments: List[dict]) -> List[dict]:
     return processed
 
 
+def _apply_my_tasks_deprecation_headers(response: Response) -> None:
+    response.headers["Deprecation"] = "true"
+    response.headers["Sunset"] = "2026-09-01"
+    response.headers["Link"] = '</api/work-items/>; rel="successor-version"'
+
+
 @router.get("/my-tasks")
 async def get_my_tasks(
+    response: Response,
     filter: str = Query("open", description="Filter: open, overdue, recurring, adhoc, all"),
     date: Optional[str] = Query(None, description="Date for filtering (YYYY-MM-DD)"),
     equipment_id: Optional[str] = Query(None, description="Filter by equipment"),
@@ -113,6 +120,7 @@ async def get_my_tasks(
     current_user: dict = Depends(_tasks_read),
 ):
     """Get unified work items for the current user (delegates to work_item_query). Deprecated: use GET /work-items/."""
+    _apply_my_tasks_deprecation_headers(response)
     user_id = current_user["id"]
     tasks = await fetch_work_items(
         user_id,

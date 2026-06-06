@@ -1,0 +1,122 @@
+[
+  {
+    "id": "gp-01",
+    "prompt": "Why is P-104 high risk?",
+    "expected_intent": "risk_analysis",
+    "keyword_checks": ["risk", "P-104"]
+  },
+  {
+    "id": "gp-02",
+    "prompt": "What changed this week on the fleet?",
+    "expected_intent": "changes_summary",
+    "keyword_checks": ["week", "change"]
+  },
+  {
+    "id": "gp-03",
+    "prompt": "Show all evidence for HX-201",
+    "expected_intent": "equipment_details",
+    "keyword_checks": ["evidence", "HX-201"]
+  },
+  {
+    "id": "gp-04",
+    "prompt": "Which assets need urgent attention now?",
+    "expected_intent": "attention_required",
+    "keyword_checks": ["attention"]
+  },
+  {
+    "id": "gp-05",
+    "prompt": "What failures are predicted this month?",
+    "expected_intent": "predictions",
+    "keyword_checks": ["predict", "failure"]
+  },
+  {
+    "id": "gp-06",
+    "prompt": "How many open reliability cases do we have?",
+    "expected_intent": "cases_summary",
+    "keyword_checks": ["case"]
+  },
+  {
+    "id": "gp-07",
+    "prompt": "List alerts from the last 24 hours",
+    "expected_intent": "alerts_summary",
+    "keyword_checks": ["alert"]
+  },
+  {
+    "id": "gp-08",
+    "prompt": "Give me a reliability summary for the plant",
+    "expected_intent": "general_summary",
+    "keyword_checks": ["summary"]
+  },
+  {
+    "id": "gp-09",
+    "prompt": "Is compressor C-201 in critical condition?",
+    "expected_intent": "risk_analysis",
+    "keyword_checks": ["critical", "C-201"]
+  },
+  {
+    "id": "gp-10",
+    "prompt": "What trends emerged in observations recently?",
+    "expected_intent": "changes_summary",
+    "keyword_checks": ["trend", "recent"]
+  },
+  {
+    "id": "gp-11",
+    "prompt": "Show details about pump P-301 vibration issues",
+    "expected_intent": "equipment_details",
+    "keyword_checks": ["details", "P-301"]
+  },
+  {
+    "id": "gp-12",
+    "prompt": "What should I focus on urgently?",
+    "expected_intent": "attention_required",
+    "keyword_checks": ["urgent", "focus"]
+  },
+  {
+    "id": "gp-13",
+    "prompt": "Forecast equipment failures for next quarter",
+    "expected_intent": "predictions",
+    "keyword_checks": ["forecast", "failure"]
+  },
+  {
+    "id": "gp-14",
+    "prompt": "Status of P1 and P2 cases",
+    "expected_intent": "cases_summary",
+    "keyword_checks": ["case", "status"]
+  },
+  {
+    "id": "gp-15",
+    "prompt": "Any warning alarms on HX units?",
+    "expected_intent": "alerts_summary",
+    "keyword_checks": ["warning", "alarm"]
+  },
+  {
+    "id": "gp-16",
+    "prompt": "Overview of plant reliability health",
+    "expected_intent": "general_summary",
+    "keyword_checks": ["reliability"]
+  },
+  {
+    "id": "gp-17",
+    "prompt": "Explain the danger level for motor M-105",
+    "expected_intent": "risk_analysis",
+    "keyword_checks": ["danger", "M-105"]
+  },
+  {
+    "id": "gp-18",
+    "prompt": "What is different compared to last week?",
+    "expected_intent": "changes_summary",
+    "keyword_checks": ["week"]
+  },
+  {
+    "id": "gp-19",
+    "prompt": "Show all about valve V-220",
+    "expected_intent": "equipment_details",
+    "keyword_checks": ["V-220"]
+  },
+  {
+    "id": "gp-20",
+    "prompt": "Which equipment has highest priority for maintenance?",
+    "expected_intent": "attention_required",
+    "keyword_checks": ["priority", "maintenance"]
+  }
+]

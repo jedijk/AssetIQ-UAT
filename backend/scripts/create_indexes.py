@@ -358,6 +358,11 @@ INDEX_DEFINITIONS = {
         {"keys": [("source_type", 1), ("source_id", 1)]},
         {"keys": [("target_type", 1), ("target_id", 1)]},
     ],
+    "asset_health_documents": [
+        {"keys": [("equipment_id", 1), ("snapshot_date", 1)], "unique": True},
+        {"keys": [("snapshot_date", 1)]},
+        {"keys": [("overdue_pm_flag", 1), ("snapshot_date", 1)]},
+    ],
     "work_item_projections": [
         {"keys": [("cache_key", 1)], "unique": True},
         {"keys": [("tenant_id", 1), ("user_id", 1), ("updated_at", -1)]},

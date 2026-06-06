@@ -3565,6 +3565,10 @@ Respond with a JSON object:
             )
         except Exception as exc:
             logger.warning("pm import graph edge sync failed: %s", exc)
+            import os
+
+            if os.environ.get("RELIABILITY_GRAPH_AUDIT_MODE", "").lower() == "true":
+                raise
 
     async def apply_task_to_failure_mode(
         self,

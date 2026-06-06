@@ -54,7 +54,28 @@ async def handle_pm_import_ai_review(job: dict) -> dict:
     return {"status": "completed"}
 
 
+async def handle_asset_health_daily_refresh(job: dict) -> dict:
+    """Refresh materialized asset_health_documents for all equipment."""
+    payload = job.get("payload") or {}
+    snapshot_date = payload.get("snapshot_date")
+    equipment_ids = payload.get("equipment_ids")
+
+    from services.asset_health_materializer import refresh_asset_health_documents
+
+    result = await refresh_asset_health_documents(
+        snapshot_date=snapshot_date,
+        equipment_ids=equipment_ids,
+    )
+    logger.info(
+        "asset_health_daily_refresh upserted=%s snapshot_date=%s",
+        result.get("upserted"),
+        result.get("snapshot_date"),
+    )
+    return result
+
+
 JOB_HANDLERS: Dict[str, Callable[..., Any]] = {
     "apply_strategy": handle_apply_strategy,
     "pm_import_ai_review": handle_pm_import_ai_review,
+    "asset_health_daily_refresh": handle_asset_health_daily_refresh,
 }

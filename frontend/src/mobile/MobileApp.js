@@ -13,6 +13,7 @@ import MobileObservations from "./MobileObservations";
 import MobileActions from "./MobileActions";
 import MobileChat from "./MobileChat";
 import MobileAnalytics from "./MobileAnalytics";
+import MobileExecutiveKPIs from "./MobileExecutiveKPIs";
 
 const MobileApp = () => {
   const [activeTab, setActiveTab] = useState("home");
@@ -39,7 +40,12 @@ const MobileApp = () => {
       case "home":
         return <MobileHierarchy />;
       case "analytics":
-        return <MobileAnalytics />;
+        return (
+          <>
+            <MobileExecutiveKPIs />
+            <MobileAnalytics />
+          </>
+        );
       case "tasks":
         return <MobileMyTasks />;
       case "observations":

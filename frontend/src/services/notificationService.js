@@ -317,6 +317,7 @@ export const notify = {
     });
   },
 
+  // Deep links use /my-tasks until sunset 2026-09-01 (MyTasksPage route); API is /work-items
   newTask: (task) => {
     const settings = getNotificationSettings();
     if (!settings.newTasks) return;

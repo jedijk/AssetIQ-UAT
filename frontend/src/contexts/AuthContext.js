@@ -232,6 +232,46 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const loginWithSsoToken = async (token, userData) => {
+    const API_URL = getApiUrl();
+    setIsAuthenticating(true);
+
+    try {
+      if (AUTH_MODE === "bearer") {
+        localStorage.setItem("token", token);
+        axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+        setToken(token);
+      } else {
+        axios.defaults.withCredentials = true;
+        setToken(null);
+      }
+
+      setUser(userData);
+      setLoading(false);
+      setMustChangePassword(userData.must_change_password || false);
+
+      const userTermsVersion = userData.terms_accepted_version;
+      const needsTermsAcceptance = !userTermsVersion || userTermsVersion !== CURRENT_TERMS_VERSION;
+      setMustAcceptTerms(needsTermsAcceptance && !userData.must_change_password);
+
+      await fetchAndCachePreferences(API_URL);
+
+      if (userData.must_change_password || needsTermsAcceptance) {
+        localStorage.setItem("assetiq_intro_seen", "true");
+      } else if (userData.has_seen_intro === false) {
+        localStorage.removeItem("assetiq_intro_seen");
+      } else if (userData.has_seen_intro === true) {
+        localStorage.setItem("assetiq_intro_seen", "true");
+      }
+
+      setIsAuthenticating(false);
+      return userData;
+    } catch (error) {
+      setIsAuthenticating(false);
+      throw error;
+    }
+  };
+
   const changePassword = async (currentPassword, newPassword) => {
     const API_URL = getApiUrl();
     const response = await axios.post(`${API_URL}/auth/change-password`, {
@@ -343,8 +383,9 @@ export const AuthProvider = ({ children }) => {
       user, 
       token, 
       loading, 
-      login, 
-      register, 
+      login,
+      loginWithSsoToken,
+      register,
       logout, 
       mustChangePassword, 
       changePassword,

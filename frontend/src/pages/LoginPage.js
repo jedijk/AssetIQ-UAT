@@ -6,9 +6,12 @@ import { toast } from "sonner";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Loader2, Shield, Activity, BarChart3, RefreshCw, Server, WifiOff } from "lucide-react";
+import { Loader2, Shield, Activity, BarChart3, RefreshCw, Server, WifiOff, LogIn } from "lucide-react";
 import { getBackendUrl } from "../lib/apiConfig";
 import { publicAssetUrl } from "../lib/assetUrl";
+import { authAPI } from "../lib/apis/auth";
+
+const OIDC_STATE_KEY = "oidc_state";
 
 // Static assets from /public (PUBLIC_URL-safe)
 const BACKGROUND_VIDEO = publicAssetUrl("/background.mp4");
@@ -28,6 +31,8 @@ const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [loginBrandSrc, setLoginBrandSrc] = useState(LOGIN_BRAND_PRIMARY);
+  const [oidcEnabled, setOidcEnabled] = useState(false);
+  const [ssoLoading, setSsoLoading] = useState(false);
   
   // Server startup state
   const [serverStarting, setServerStarting] = useState(false);
@@ -42,6 +47,27 @@ const LoginPage = () => {
 
   // Get the redirect destination from state (set by ProtectedRoute)
   const from = location.state?.from || "/";
+
+  useEffect(() => {
+    authAPI
+      .getOidcConfig()
+      .then((cfg) => setOidcEnabled(Boolean(cfg?.enabled)))
+      .catch(() => setOidcEnabled(false));
+  }, []);
+
+  const handleSsoLogin = async () => {
+    setSsoLoading(true);
+    try {
+      const state = crypto.randomUUID?.() || String(Date.now());
+      sessionStorage.setItem(OIDC_STATE_KEY, state);
+      const { authorization_url, state: returnedState } = await authAPI.getOidcAuthorizeUrl(state);
+      sessionStorage.setItem(OIDC_STATE_KEY, returnedState || state);
+      window.location.href = authorization_url;
+    } catch (err) {
+      setSsoLoading(false);
+      toast.error("SSO is not available. Use email and password.");
+    }
+  };
 
   // Cleanup on unmount
   useEffect(() => {
@@ -381,6 +407,39 @@ const LoginPage = () => {
               )}
             </Button>
           </form>
+
+          {oidcEnabled && (
+            <>
+              <div className="relative my-5">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-slate-200" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white px-2 text-slate-400">or</span>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={ssoLoading || loading}
+                onClick={handleSsoLogin}
+                className="w-full h-11"
+                data-testid="login-sso-button"
+              >
+                {ssoLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Redirecting…
+                  </>
+                ) : (
+                  <>
+                    <LogIn className="w-4 h-4 mr-2" />
+                    Sign in with SSO
+                  </>
+                )}
+              </Button>
+            </>
+          )}
 
           <p className="mt-6 text-center text-sm text-slate-500">
             {t("auth.noAccount")}{" "}
