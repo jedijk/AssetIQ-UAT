@@ -6,7 +6,7 @@ IMPORTANT: This file is structured to ensure the app ALWAYS starts,
 even if database or other dependencies fail. Health endpoints are
 defined first to guarantee Railway healthchecks pass.
 """
-from fastapi import FastAPI, APIRouter, HTTPException, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends
 from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -36,13 +36,20 @@ except Exception as _logging_init_err:
 # hard refresh whenever it sees a newer version than the one baked into its bundle.
 APP_VERSION = "3.7.3"
 
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "development").lower()
+_IS_DEV_ENV = ENVIRONMENT in ("development", "dev", "local", "test", "testing")
+ENABLE_API_DOCS = os.environ.get(
+    "ENABLE_API_DOCS",
+    "true" if _IS_DEV_ENV else "false",
+).lower() == "true"
+
 # Create FastAPI app IMMEDIATELY - before any potentially failing imports
 app = FastAPI(
     title="AssetIQ API",
     version=APP_VERSION,
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json"
+    docs_url="/api/docs" if ENABLE_API_DOCS else None,
+    redoc_url="/api/redoc" if ENABLE_API_DOCS else None,
+    openapi_url="/api/openapi.json" if ENABLE_API_DOCS else None,
 )
 
 # Store startup time
@@ -192,9 +199,11 @@ except Exception as e:
     # App will still run with health endpoints
 
 
-# Debug endpoint to list routes
+# Debug endpoint to list routes (owner/admin only)
+from auth import require_roles
+
 @app.get("/api/routes")
-async def list_routes():
+async def list_routes(current_user: dict = Depends(require_roles("owner", "admin"))):
     """List all registered API routes."""
     routes = []
     for route in app.routes:
@@ -205,9 +214,9 @@ async def list_routes():
     return {"total": len(routes), "routes": sorted(routes, key=lambda x: x['path'])}
 
 
-# Diagnostic endpoint to check route loading status
+# Diagnostic endpoint to check route loading status (owner/admin only in non-dev)
 @app.get("/api/debug/routes-status")
-async def routes_status():
+async def routes_status(current_user: dict = Depends(require_roles("owner", "admin"))):
     """Check if routes loaded correctly - for debugging deployment issues."""
     return {
         "routes_loaded": route_load_error is None,
@@ -350,53 +359,74 @@ async def set_database_context(request, call_next):
     Set the database context for multi-database support.
 
     Priority order:
-    1) Explicit header: X-Database-Environment
-    2) Explicit query param: ?db_env=uat|production
-    3) Cookie: assetiq_db_env (optional)
+    1) Explicit header: X-Database-Environment (owner/admin only)
+    2) Explicit query param: ?db_env=uat|production (owner/admin only)
+    3) Cookie: assetiq_db_env (owner/admin only)
     4) Host-based inference (e.g. *uat* domains default to uat)
     5) Fallback: production/default
+
+    Explicit overrides require owner or admin role to prevent cross-environment
+    data access by regular authenticated users.
     """
-    from database import set_request_db, get_db_name_for_environment, AVAILABLE_DATABASES, DEFAULT_DB_NAME
-    
-    # 1) Header
-    db_env = request.headers.get("X-Database-Environment")
+    from database import (
+        set_request_db,
+        AVAILABLE_DATABASES,
+        DEFAULT_DB_NAME,
+        normalize_db_env_key,
+    )
+    from auth import get_optional_user_from_request, _role_can_switch_database
 
-    # 2) Query param fallback (useful for direct navigations like <img src>, window.open)
-    if not db_env:
+    explicit_env = None
+    header_env = normalize_db_env_key(request.headers.get("X-Database-Environment"))
+    if header_env:
+        explicit_env = header_env
+    if not explicit_env:
         try:
-            db_env = request.query_params.get("db_env")
+            explicit_env = normalize_db_env_key(request.query_params.get("db_env"))
         except Exception:
-            db_env = None
-
-    # 3) Cookie fallback
-    if not db_env:
+            explicit_env = None
+    if not explicit_env:
         try:
-            db_env = request.cookies.get("assetiq_db_env")
+            explicit_env = normalize_db_env_key(request.cookies.get("assetiq_db_env"))
         except Exception:
-            db_env = None
+            explicit_env = None
 
-    # 4) Host inference
-    if not db_env:
-        try:
-            host = (request.headers.get("host") or "").lower()
-            if "uat" in host:
-                db_env = "uat"
-        except Exception:
-            db_env = None
+    host_inferred_env = None
+    try:
+        host = (request.headers.get("host") or "").lower()
+        if "uat" in host:
+            host_inferred_env = "uat"
+    except Exception:
+        host_inferred_env = None
 
-    # 5) Default
-    if not db_env:
-        db_env = "production"
-    
-    # Validate and set the database name
+    db_env = None
+    if explicit_env:
+        user = await get_optional_user_from_request(request)
+        role = user.get("role") if user else None
+        # Allow explicit override when it matches host inference (normal UAT/prod routing).
+        # Cross-environment switching (e.g. prod host + uat header) requires owner/admin.
+        host_default = host_inferred_env or "production"
+        if explicit_env == host_default or _role_can_switch_database(role):
+            db_env = explicit_env
+        else:
+            logger.warning(
+                "Ignored cross-environment database override (%s, host=%s) for role=%s path=%s",
+                explicit_env,
+                host_default,
+                role or "anonymous",
+                request.url.path,
+            )
+            db_env = host_default
+    else:
+        db_env = host_inferred_env or "production"
+
     if db_env in AVAILABLE_DATABASES:
         db_name = AVAILABLE_DATABASES[db_env]["name"]
     else:
         db_name = DEFAULT_DB_NAME
-    
-    # Set the database for this request context
+
     set_request_db(db_name)
-    
+
     response = await call_next(request)
     return response
 

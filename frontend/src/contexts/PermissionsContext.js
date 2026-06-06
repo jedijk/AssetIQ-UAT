@@ -9,7 +9,7 @@ const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "co
 // Keep this aligned with backend FEATURES in `backend/routes/permissions.py`.
 const FEATURE_PATHS = {
   observations: ["/threats", "/observations"],
-  investigations: ["/investigations", "/causal-engine"],
+  investigations: ["/investigations", "/causal-engine", "/decision-engine"],
   actions: ["/actions"],
   // "tasks" is execution / personal work queue
   tasks: ["/my-tasks"],
@@ -17,8 +17,8 @@ const FEATURE_PATHS = {
   scheduler: ["/tasks"],
   forms: ["/forms", "/form-submissions", "/granulometry"],
   equipment: ["/equipment", "/definitions", "/equipment-manager"],
-  library: ["/library"],
-  insights: ["/settings/insights"],
+  library: ["/library", "/reliability"],
+  insights: ["/settings/insights", "/production"],
   // chat is currently a sidebar (no dedicated route), keep mapping empty for now
   chat: [],
   statistics: ["/settings/statistics", "/user-statistics"],
@@ -43,8 +43,14 @@ const FEATURE_PATHS = {
     "/settings/deletion-requests",
     "/settings/consent-management",
     "/settings/criticality-definitions",
+    "/settings/disciplines",
+    "/settings/task-generation",
+    "/settings/translations",
   ],
 };
+
+// Authenticated routes that do not map to a feature permission check.
+const AUTHENTICATED_PUBLIC_PATHS = ["/", "/dashboard"];
 
 export const PermissionsProvider = ({ children }) => {
   const { user, token } = useAuth();
@@ -101,6 +107,10 @@ export const PermissionsProvider = ({ children }) => {
   const canAccessRoute = useCallback((path) => {
     // Owner and admin can access everything
     if (user?.role === "owner" || user?.role === "admin") return true;
+
+    if (AUTHENTICATED_PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`))) {
+      return true;
+    }
     
     // Check each feature's paths
     for (const [feature, paths] of Object.entries(FEATURE_PATHS)) {
@@ -109,8 +119,8 @@ export const PermissionsProvider = ({ children }) => {
       }
     }
     
-    // Default to allowing access for unmatched paths (dashboard, etc.)
-    return true;
+    // Deny unmapped routes (previously defaulted to allow)
+    return false;
   }, [hasPermission, user?.role]);
 
   // Check if a nav item should be visible

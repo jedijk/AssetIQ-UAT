@@ -6,6 +6,7 @@ Supports multiple database environments (Production, UAT).
 import os
 import logging
 import asyncio
+from typing import Optional
 from pathlib import Path
 from contextvars import ContextVar
 from dotenv import load_dotenv
@@ -138,6 +139,22 @@ def get_db_name_for_environment(env: str) -> str:
     return DEFAULT_DB_NAME
 
 
+def normalize_db_env_key(raw: Optional[str]) -> Optional[str]:
+    """Normalize client-provided environment keys (e.g. Production → production)."""
+    if not raw:
+        return None
+    key = str(raw).strip().lower()
+    if key in AVAILABLE_DATABASES:
+        return key
+    aliases = {
+        "prod": "production",
+        "live": "production",
+        "staging": "uat",
+        "test": "uat",
+    }
+    return aliases.get(key)
+
+
 async def verify_database_connection(max_retries: int = 3, timeout: float = 5.0) -> bool:
     """Verify database connection with retry logic."""
     for attempt in range(max_retries):
@@ -177,7 +194,12 @@ async def safe_db_query(query_func, fallback_value=None, timeout: float = 5.0):
 #   but we log loudly so misconfig is obvious.
 # - If you want fail-fast behavior in production, set REQUIRE_JWT_SECRET_KEY=true.
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "development").lower()
-REQUIRE_JWT_SECRET_KEY = os.environ.get("REQUIRE_JWT_SECRET_KEY", "false").lower() == "true"
+_IS_DEV_ENV = ENVIRONMENT in ("development", "dev", "local", "test", "testing")
+# Fail fast in non-dev unless explicitly relaxed (REQUIRE_JWT_SECRET_KEY=false).
+REQUIRE_JWT_SECRET_KEY = os.environ.get(
+    "REQUIRE_JWT_SECRET_KEY",
+    "false" if _IS_DEV_ENV else "true",
+).lower() == "true"
 
 JWT_SECRET = os.environ.get("JWT_SECRET_KEY")
 if not JWT_SECRET:

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from database import db
-from auth import get_current_user
+from auth import require_roles
 from services.task_instance_bridge import sync_scheduled_tasks_to_instances, next_monday
 from services.scheduler_job import (
     get_task_generation_config,
@@ -21,11 +21,7 @@ from services.scheduler_job import (
 
 router = APIRouter(prefix="/admin/task-generation", tags=["admin", "task-generation"])
 
-
-def _admin_only(current_user: dict):
-    role = current_user.get("role")
-    if role not in ("owner", "admin"):
-        raise HTTPException(status_code=403, detail="Admin role required")
+_admin_dep = require_roles("owner", "admin")
 
 
 class GenerateRequest(BaseModel):
@@ -37,10 +33,9 @@ class GenerateRequest(BaseModel):
 @router.post("/run")
 async def generate_tasks(
     payload: GenerateRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_admin_dep),
 ):
     """Run the task generation bridge for a single week (manual trigger)."""
-    _admin_only(current_user)
     if payload.week_start:
         try:
             start = datetime.fromisoformat(payload.week_start).replace(tzinfo=timezone.utc)
@@ -62,10 +57,9 @@ async def generate_tasks(
 @router.get("/runs")
 async def list_runs(
     limit: int = 20,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_admin_dep),
 ):
     """Return the most recent task_generation_runs entries."""
-    _admin_only(current_user)
     cursor = (
         db.task_generation_runs.find({}, {"_id": 0})
         .sort("started_at", -1)
@@ -84,9 +78,8 @@ class ScheduleUpdate(BaseModel):
 
 
 @router.get("/schedule")
-async def get_schedule(current_user: dict = Depends(get_current_user)):
+async def get_schedule(current_user: dict = Depends(_admin_dep)):
     """Return the active cron config + next 3 fire times + scheduler health."""
-    _admin_only(current_user)
     cfg = await get_task_generation_config()
     return {
         **cfg,
@@ -98,10 +91,9 @@ async def get_schedule(current_user: dict = Depends(get_current_user)):
 @router.put("/schedule")
 async def update_schedule(
     payload: ScheduleUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_admin_dep),
 ):
     """Update the cron config and reload the scheduler in place."""
-    _admin_only(current_user)
     try:
         merged = await save_task_generation_config(
             {k: v for k, v in payload.model_dump(exclude_unset=True).items() if v is not None}
@@ -120,10 +112,9 @@ async def update_schedule(
 @router.post("/schedule/preview")
 async def preview_schedule(
     payload: ScheduleUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_admin_dep),
 ):
     """Compute the next 3 fire times for an unsaved cron+tz combo."""
-    _admin_only(current_user)
     from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
     from croniter import croniter
 

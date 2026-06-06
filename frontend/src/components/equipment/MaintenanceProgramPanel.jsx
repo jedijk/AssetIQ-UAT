@@ -7,6 +7,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { maintenanceProgramAPI } from '../../lib/apis/maintenanceProgram';
+import { refreshMaintenanceSchedulerQueries } from '../../lib/apis/maintenanceScheduler';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { toast } from 'sonner';
 import {
@@ -872,7 +873,7 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
     onSuccess: () => {
       toast.success('Maintenance program created');
       queryClient.invalidateQueries({ queryKey: ['maintenance-program', equipmentId] });
-      queryClient.invalidateQueries({ queryKey: ['maintenance-scheduler'] });
+      refreshMaintenanceSchedulerQueries(queryClient);
     },
     onError: (error) => {
       toast.error(`Failed to create program: ${error.message}`);
@@ -891,7 +892,7 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
       );
       queryClient.invalidateQueries({ queryKey: ['maintenance-program', equipmentId] });
       queryClient.invalidateQueries({ queryKey: ['maintenance-program'] });
-      queryClient.invalidateQueries({ queryKey: ['maintenance-scheduler'] });
+      refreshMaintenanceSchedulerQueries(queryClient);
     },
     onError: (error) => {
       toast.error(error.response?.data?.detail || error.message || 'Failed to delete program');
@@ -904,7 +905,7 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
     onSuccess: () => {
       toast.success('Task deleted');
       queryClient.invalidateQueries({ queryKey: ['maintenance-program', equipmentId] });
-      queryClient.invalidateQueries({ queryKey: ['maintenance-scheduler'] });
+      refreshMaintenanceSchedulerQueries(queryClient);
     },
     onError: (error) => {
       toast.error(`Failed to delete task: ${error.message}`);
@@ -920,7 +921,7 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
     onSuccess: (_data, { wasActive }) => {
       toast.success(wasActive ? 'Task disabled' : 'Task enabled');
       queryClient.invalidateQueries({ queryKey: ['maintenance-program', equipmentId] });
-      queryClient.invalidateQueries({ queryKey: ['maintenance-scheduler'] });
+      refreshMaintenanceSchedulerQueries(queryClient);
     },
     onError: (error) => {
       toast.error(error.response?.data?.detail || error.message || 'Failed to update task');
@@ -937,7 +938,7 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
       const changes = response.changes || {};
       toast.success(`Program regenerated: ${changes.tasks_to_add?.length || 0} added, ${changes.tasks_to_remove?.length || 0} removed`);
       queryClient.invalidateQueries({ queryKey: ['maintenance-program', equipmentId] });
-      queryClient.invalidateQueries({ queryKey: ['maintenance-scheduler'] });
+      refreshMaintenanceSchedulerQueries(queryClient);
     },
     onError: (error) => {
       toast.error(`Failed to regenerate: ${error.message}`);
@@ -1008,7 +1009,7 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
   
   const handleTaskSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['maintenance-program', equipmentId] });
-    queryClient.invalidateQueries({ queryKey: ['maintenance-scheduler'] });
+    refreshMaintenanceSchedulerQueries(queryClient);
   };
   
   if (isLoadingProgram) {

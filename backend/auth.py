@@ -9,7 +9,16 @@ from fastapi import Depends, HTTPException, Query, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
 
-from database import db, client, JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRATION_HOURS, get_request_db, AVAILABLE_DATABASES
+from database import (
+    db,
+    client,
+    JWT_SECRET,
+    JWT_ALGORITHM,
+    JWT_EXPIRATION_HOURS,
+    get_request_db,
+    AVAILABLE_DATABASES,
+    rbac_service,
+)
 
 security = HTTPBearer(auto_error=False)
 
@@ -104,4 +113,58 @@ async def get_current_user(
     
     # No auth provided
     raise HTTPException(status_code=401, detail="Not authenticated")
+
+
+def _extract_bearer_token(request: Request) -> Optional[str]:
+    """Extract JWT from Authorization header or auth cookie."""
+    auth_header = request.headers.get("authorization") or ""
+    if auth_header.lower().startswith("bearer "):
+        return auth_header[7:].strip() or None
+    if ALLOW_COOKIE_AUTH:
+        try:
+            cookie_token = request.cookies.get(AUTH_COOKIE_NAME)
+            if cookie_token:
+                return cookie_token
+        except Exception:
+            pass
+    return None
+
+
+async def get_optional_user_from_request(request: Request) -> Optional[dict]:
+    """Return the current user when a valid token is present; otherwise None."""
+    token = _extract_bearer_token(request)
+    if not token:
+        return None
+    try:
+        return await _validate_token(token)
+    except HTTPException:
+        return None
+
+
+def _role_can_switch_database(role: Optional[str]) -> bool:
+    return role in ("owner", "admin")
+
+
+def require_roles(*allowed_roles: str):
+    """FastAPI dependency: restrict route to specific roles (owner always allowed)."""
+
+    async def _dependency(current_user: dict = Depends(get_current_user)) -> dict:
+        role = current_user.get("role")
+        if role == "owner" or role in allowed_roles:
+            return current_user
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    return _dependency
+
+
+def require_permission(permission: str):
+    """FastAPI dependency: enforce RBAC permission string (e.g. library:write)."""
+
+    async def _dependency(current_user: dict = Depends(get_current_user)) -> dict:
+        role = current_user.get("role", "viewer")
+        if rbac_service.has_permission(role, permission):
+            return current_user
+        raise HTTPException(status_code=403, detail=f"Permission denied: {permission}")
+
+    return _dependency
 

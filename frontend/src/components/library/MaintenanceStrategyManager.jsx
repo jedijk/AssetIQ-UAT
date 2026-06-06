@@ -105,6 +105,7 @@ import {
   AlertDialogTrigger,
 } from "../ui/alert-dialog";
 import { maintenanceStrategyV2API } from "../../lib/api";
+import { refreshMaintenanceSchedulerQueries } from "../../lib/apis/maintenanceScheduler";
 import { DISCIPLINES as FM_DISCIPLINES, DISCIPLINE_COLORS } from "./EquipmentTypeItem";
 import MaintenanceScheduleManager from "./MaintenanceScheduleManager";
 import { useLanguage } from "../../contexts/LanguageContext";
@@ -1278,7 +1279,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
     onSuccess: () => {
       toast.success("Strategy deleted successfully");
       queryClient.invalidateQueries({ queryKey: ["maintenance-strategy-v2", equipmentTypeId] });
-      queryClient.invalidateQueries({ queryKey: ["maintenance-scheduler"] });
+      refreshMaintenanceSchedulerQueries(queryClient);
       queryClient.invalidateQueries({ queryKey: ["maintenance-program"] });
     },
     onError: (err) => {
