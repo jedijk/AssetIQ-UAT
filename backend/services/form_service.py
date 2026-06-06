@@ -15,6 +15,8 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 import logging
 import uuid
 
+from services.tenant_schema import merge_tenant_filter, with_tenant_id
+
 logger = logging.getLogger(__name__)
 
 
@@ -30,7 +32,12 @@ class FormService:
     
     # ==================== FORM TEMPLATES ====================
     
-    async def create_template(self, data: Dict[str, Any], created_by: str) -> Dict[str, Any]:
+    async def create_template(
+        self,
+        data: Dict[str, Any],
+        created_by: str,
+        user: Optional[dict] = None,
+    ) -> Dict[str, Any]:
         """Create a new form template."""
         now = datetime.now(timezone.utc)
         
@@ -62,6 +69,7 @@ class FormService:
             "created_at": now,
             "updated_at": now,
         }
+        with_tenant_id(doc, user)
         
         result = await self.templates.insert_one(doc)
         doc["_id"] = result.inserted_id
@@ -77,7 +85,8 @@ class FormService:
         active_only: bool = True,
         latest_only: bool = True,
         skip: int = 0,
-        limit: int = 100
+        limit: int = 100,
+        user: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """Get form templates with filters."""
         
@@ -104,6 +113,8 @@ class FormService:
             search_clause = or_search_fields(search, "name", "description", "tags")
             if search_clause:
                 query.update(search_clause)
+        
+        query = merge_tenant_filter(query, user)
         
         cursor = self.templates.find(query).sort("name", 1).skip(skip).limit(limit)
         

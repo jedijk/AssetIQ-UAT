@@ -6,10 +6,13 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 import logging
 from database import db, efm_service
-from auth import get_current_user
+from auth import require_permission
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Equipment Failure Modes"])
+
+_library_read = require_permission("library:read")
+_library_write = require_permission("library:write")
 
 # ============= EQUIPMENT FAILURE MODES (EFM) ENDPOINTS =============
 
@@ -25,7 +28,7 @@ async def get_equipment_efms(
     equipment_id: str,
     active_only: bool = True,
     category: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_read)
 ):
     """Get all Equipment Failure Modes (EFMs) for a specific equipment."""
     # Verify equipment exists and belongs to user
@@ -51,7 +54,7 @@ async def get_equipment_efms(
 @router.get("/equipment/{equipment_id}/efms/summary")
 async def get_equipment_efm_summary(
     equipment_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_read)
 ):
     """Get summary statistics for an equipment's EFMs."""
     equipment = await db.equipment_nodes.find_one(
@@ -68,7 +71,7 @@ async def get_equipment_efm_summary(
 @router.get("/equipment/{equipment_id}/risk")
 async def get_equipment_risk(
     equipment_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_read)
 ):
     """Calculate aggregated risk metrics for an equipment based on its EFMs."""
     equipment = await db.equipment_nodes.find_one(
@@ -85,7 +88,7 @@ async def get_equipment_risk(
 @router.post("/equipment/{equipment_id}/efms/generate")
 async def generate_efms_for_equipment(
     equipment_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("library:write"))
 ):
     """Manually trigger EFM generation for an equipment (if not already generated)."""
     equipment = await db.equipment_nodes.find_one(
@@ -116,7 +119,7 @@ async def generate_efms_for_equipment(
 async def get_high_risk_efms(
     equipment_id: Optional[str] = None,
     min_rpn: int = 150,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_read)
 ):
     """Get EFMs with high RPN values across all equipment or for specific equipment."""
     if equipment_id:
@@ -140,7 +143,7 @@ async def get_high_risk_efms(
 @router.get("/efms/{efm_id}")
 async def get_efm_by_id(
     efm_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_read)
 ):
     """Get a specific EFM by ID."""
     efm = await efm_service.get_efm_by_id(efm_id)
@@ -160,7 +163,7 @@ async def get_efm_by_id(
 async def update_efm(
     efm_id: str,
     data: EFMUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("library:write"))
 ):
     """Update an EFM's values (override from template)."""
     # Get EFM first to verify ownership
@@ -199,7 +202,7 @@ async def update_efm(
 @router.post("/efms/{efm_id}/reset")
 async def reset_efm_to_template(
     efm_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("library:write"))
 ):
     """Reset an EFM's values back to the template defaults."""
     efm = await efm_service.get_efm_by_id(efm_id)

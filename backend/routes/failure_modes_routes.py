@@ -78,7 +78,8 @@ async def get_failure_modes(
             failure_mode_type=failure_mode_type,
             recently_added_days=recently_added_days if failure_mode_type == "recently_added" else None,
             skip=skip,
-            limit=limit
+            limit=limit,
+            user=current_user,
         )
         
         # If MongoDB is empty, use static library as fallback
@@ -603,7 +604,8 @@ async def create_failure_mode(
                 "potential_causes": data.potential_causes,
                 "iso14224_mechanism": data.iso14224_mechanism,
             },
-            created_by=current_user["id"]
+            created_by=current_user["id"],
+            user=current_user,
         )
         
         # Trigger auto-translation in background

@@ -116,6 +116,10 @@ class ScheduledTask(BaseModel):
     
     # Traceability
     maintenance_program_id: str
+    program_task_id: Optional[str] = None
+    v2_task_id: Optional[str] = None
+    v2_program_id: Optional[str] = None
+    program_source: Optional[str] = None
     strategy_id: str
     strategy_version: str
     failure_mode_id: Optional[str] = None

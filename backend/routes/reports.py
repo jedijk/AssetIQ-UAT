@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 import io
 import logging
 from database import db
-from auth import get_current_user
+from auth import require_permission
 from services.ai_gateway import chat as ai_gateway_chat, user_context
 
 # PowerPoint imports
@@ -644,7 +644,7 @@ def generate_pdf(data):
 @router.get("/investigations/{investigation_id}/report/pptx")
 async def generate_pptx_report(
     investigation_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("library:read"))
 ):
     """Generate PowerPoint report for an investigation."""
     try:
@@ -668,7 +668,7 @@ async def generate_pptx_report(
 @router.get("/investigations/{investigation_id}/report/pdf")
 async def generate_pdf_report(
     investigation_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("library:read"))
 ):
     """Generate PDF report for an investigation."""
     try:
@@ -947,7 +947,7 @@ Overall investigation status: {inv.get('status', 'In Progress').replace('_', ' '
 @router.get("/investigations/{investigation_id}/ai-summary")
 async def get_ai_summary(
     investigation_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("library:read"))
 ):
     """Generate AI-powered summary of investigation with next steps."""
     try:

@@ -109,11 +109,25 @@ try:
     from slowapi import Limiter, _rate_limit_exceeded_handler
     from slowapi.util import get_remote_address
     from slowapi.errors import RateLimitExceeded
-    
-    limiter = Limiter(key_func=get_remote_address)
+    from middleware.rate_limit import (
+        DEFAULT_RATE_LIMIT,
+        RATE_LIMIT_ENABLED,
+        DefaultRateLimitMiddleware,
+    )
+
+    limiter = Limiter(
+        key_func=get_remote_address,
+        default_limits=[DEFAULT_RATE_LIMIT],
+        enabled=RATE_LIMIT_ENABLED,
+    )
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-    logger.info("Rate limiter initialized")
+    app.add_middleware(DefaultRateLimitMiddleware)
+    logger.info(
+        "Rate limiter initialized (default=%s, enabled=%s)",
+        DEFAULT_RATE_LIMIT,
+        RATE_LIMIT_ENABLED,
+    )
 except Exception as e:
     logger.warning(f"Rate limiter not available: {e}")
 

@@ -14,7 +14,7 @@ import logging
 import os
 from pathlib import Path
 from database import db, failure_modes_service
-from auth import get_current_user
+from auth import require_permission
 from maintenance_strategy_models import (
     MaintenanceStrategy, CriticalityLevel, MaintenanceFrequency,
     MaintenanceStrategyCreate, MaintenanceStrategyUpdate, GenerateStrategyRequest,
@@ -47,7 +47,7 @@ def _block_legacy_v1_mutation() -> None:
 async def list_maintenance_strategies(
     equipment_type_id: Optional[str] = None,
     search: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("scheduler:read"))
 ):
     """List all maintenance strategies, optionally filtered"""
     query = {}
@@ -73,7 +73,7 @@ async def list_maintenance_strategies(
 @router.get("/maintenance-strategies/{strategy_id}")
 async def get_maintenance_strategy(
     strategy_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("scheduler:read"))
 ):
     """Get a specific maintenance strategy by ID"""
     strategy = await db.maintenance_strategies.find_one({"id": strategy_id}, {"_id": 0})
@@ -85,7 +85,7 @@ async def get_maintenance_strategy(
 @router.get("/maintenance-strategies/by-equipment-type/{equipment_type_id}")
 async def get_strategies_by_equipment_type(
     equipment_type_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("scheduler:read"))
 ):
     """Get maintenance strategy for an equipment type"""
     strategy = await db.maintenance_strategies.find_one(
@@ -98,7 +98,7 @@ async def get_strategies_by_equipment_type(
 @router.post("/maintenance-strategies/generate")
 async def generate_maintenance_strategy(
     request: GenerateStrategyRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("scheduler:write")),
 ):
     """Auto-generate a maintenance strategy for ALL criticality levels from FMEA data"""
     _block_legacy_v1_mutation()
@@ -199,7 +199,7 @@ async def generate_maintenance_strategy(
 @router.post("/maintenance-strategies/generate-all")
 async def generate_all_maintenance_strategies(
     request: GenerateAllStrategiesRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("scheduler:write")),
 ):
     """Generate maintenance strategies for ALL equipment types"""
     _block_legacy_v1_mutation()
@@ -328,7 +328,7 @@ async def generate_all_maintenance_strategies(
 @router.post("/maintenance-strategies")
 async def create_maintenance_strategy(
     data: MaintenanceStrategyCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("scheduler:write")),
 ):
     """Create a new maintenance strategy manually"""
     _block_legacy_v1_mutation()
@@ -365,7 +365,7 @@ async def create_maintenance_strategy(
 async def update_maintenance_strategy(
     strategy_id: str,
     data: MaintenanceStrategyUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("scheduler:write")),
 ):
     """Update an existing maintenance strategy"""
     _block_legacy_v1_mutation()
@@ -416,7 +416,7 @@ async def update_maintenance_strategy(
 @router.delete("/maintenance-strategies/{strategy_id}")
 async def delete_maintenance_strategy(
     strategy_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("scheduler:write")),
 ):
     """Delete a maintenance strategy"""
     _block_legacy_v1_mutation()
@@ -430,7 +430,7 @@ async def delete_maintenance_strategy(
 async def increment_strategy_version(
     strategy_id: str,
     major: bool = False,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("scheduler:write")),
 ):
     """Increment the strategy version number"""
     _block_legacy_v1_mutation()

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional
 
 from database import db
-from auth import get_current_user
+from auth import require_permission
 from models.maintenance_scheduler import (
     MaintenanceHistory,
     TaskStatus,
@@ -17,6 +17,8 @@ from models.maintenance_scheduler import (
 from ._shared import ensure_imported_pm_tasks_scheduled, scope_scheduled_tasks_query
 
 router = APIRouter()
+
+_scheduler_read = require_permission("scheduler:read")
 
 
 # Task types that are corrective/reactive — these are triggered on failure, not planned.
@@ -33,7 +35,7 @@ async def get_scheduled_tasks(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     include_completed: bool = False,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_scheduler_read),
 ):
     """Get scheduled tasks with filtering."""
     await ensure_imported_pm_tasks_scheduled(equipment_type_id)
@@ -77,7 +79,7 @@ async def get_scheduled_tasks(
 @router.get("/tasks/daily-planner")
 async def get_daily_planner(
     date: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_scheduler_read),
 ):
     """Get tasks for daily planner view."""
     await ensure_imported_pm_tasks_scheduled()
@@ -123,7 +125,7 @@ async def get_daily_planner(
 @router.get("/tasks/weekly-planner")
 async def get_weekly_planner(
     start_date: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_scheduler_read),
 ):
     """Get tasks for weekly planner view."""
     await ensure_imported_pm_tasks_scheduled()
@@ -178,7 +180,7 @@ async def get_weekly_planner(
 async def update_task(
     task_id: str,
     request: UpdateTaskStatusRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("scheduler:write")),
 ):
     """Update a scheduled task."""
     task = await db.scheduled_tasks.find_one({"id": task_id})
@@ -230,7 +232,7 @@ async def update_task(
 async def complete_task(
     task_id: str,
     request: CompleteTaskRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("scheduler:write")),
 ):
     """Complete a scheduled task."""
     task = await db.scheduled_tasks.find_one({"id": task_id})
@@ -361,7 +363,7 @@ async def complete_task(
 async def defer_task(
     task_id: str,
     request: DeferTaskRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("scheduler:write")),
 ):
     """Defer a scheduled task."""
     task = await db.scheduled_tasks.find_one({"id": task_id})

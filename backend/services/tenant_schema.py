@@ -6,7 +6,8 @@ Existing collections remain unchanged until a migration phase.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+import os
+from typing import Any, Dict, Optional
 
 # Collections created after the tenant pilot that should always carry tenant_id.
 PILOT_COLLECTIONS = frozenset({
@@ -32,9 +33,29 @@ WAVE2_COLLECTIONS = frozenset({
     "equipment_type_strategies",
 })
 
-WAVE_COLLECTIONS = PILOT_COLLECTIONS | WAVE1_COLLECTIONS | WAVE2_COLLECTIONS
+# Wave 3 — library, forms, investigations, graph, PM import analytics.
+WAVE3_COLLECTIONS = frozenset({
+    "failure_modes",
+    "form_templates",
+    "form_submissions",
+    "investigations",
+    "timeline_events",
+    "failure_identifications",
+    "cause_nodes",
+    "action_items",
+    "evidence_items",
+    "reliability_edges",
+    "pm_import_sessions",
+})
+
+WAVE_COLLECTIONS = (
+    PILOT_COLLECTIONS | WAVE1_COLLECTIONS | WAVE2_COLLECTIONS | WAVE3_COLLECTIONS
+)
 
 DEFAULT_TENANT_FIELD = "tenant_id"
+
+# When true, reads use strict {tenant_id: tid} instead of migration-safe $or.
+TENANT_STRICT_MODE = os.environ.get("TENANT_STRICT_MODE", "false").lower() == "true"
 
 
 def tenant_id_from_user(user: Optional[dict]) -> Optional[str]:
@@ -60,26 +81,53 @@ def tenant_filter(user: Optional[dict]) -> Dict[str, Any]:
 
 
 def tenant_read_filter(user: Optional[dict]) -> Dict[str, Any]:
-    """Migration-safe read filter: tenant docs plus legacy rows without tenant_id."""
+    """Read filter: strict tenant match, or migration-safe $or when strict mode is off."""
     tid = tenant_id_from_user(user)
-    if tid:
-        return {
-            "$or": [
-                {DEFAULT_TENANT_FIELD: tid},
-                {DEFAULT_TENANT_FIELD: {"$exists": False}},
-            ]
-        }
-    return {}
+    if not tid:
+        return {}
+    if TENANT_STRICT_MODE:
+        return {DEFAULT_TENANT_FIELD: tid}
+    return {
+        "$or": [
+            {DEFAULT_TENANT_FIELD: tid},
+            {DEFAULT_TENANT_FIELD: {"$exists": False}},
+        ]
+    }
 
 
 def merge_tenant_filter(base_query: Dict[str, Any], user: Optional[dict]) -> Dict[str, Any]:
-    """Combine an existing Mongo query with the migration-safe tenant read filter."""
+    """Combine an existing Mongo query with the tenant read filter."""
     tenant_part = tenant_read_filter(user)
     if not tenant_part:
         return base_query or {}
     if not base_query:
         return tenant_part
     return {"$and": [base_query, tenant_part]}
+
+
+def prepend_tenant_match(pipeline: list, user: Optional[dict]) -> list:
+    """Prepend a $match stage with the tenant read filter to an aggregation pipeline."""
+    tenant_part = tenant_read_filter(user)
+    if not tenant_part:
+        return pipeline
+    return [{"$match": tenant_part}, *pipeline]
+
+
+def ensure_tenant_indexes(db, collections: Optional[frozenset] = None) -> int:
+    """Create {tenant_id: 1} indexes on wave collections (idempotent). Returns count created."""
+    created = 0
+    target = collections or WAVE_COLLECTIONS
+    for name in target:
+        try:
+            db[name].create_index(
+                [(DEFAULT_TENANT_FIELD, 1)],
+                name=f"{name}_tenant_id",
+                background=True,
+            )
+            created += 1
+        except Exception:
+            pass
+    return created
 
 
 def ensure_pilot_indexes(db) -> None:

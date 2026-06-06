@@ -12,6 +12,8 @@ from typing import Any, Dict, List, Optional
 
 from database import db
 
+from services.program_task_resolution import resolve_program_task_id
+
 logger = logging.getLogger(__name__)
 
 COLLECTION = "reliability_edges"
@@ -185,7 +187,7 @@ async def sync_edges_for_scheduled_task(
         return {"edges_upserted": 0}
 
     equipment_id = scheduled_task.get("equipment_id")
-    program_task_id = scheduled_task.get("maintenance_program_id")
+    program_task_id = await resolve_program_task_id(scheduled_task)
     failure_mode_id = scheduled_task.get("failure_mode_id")
     equipment_type_id = scheduled_task.get("equipment_type_id")
     upserted = 0

@@ -1,17 +1,50 @@
 """Unit tests for scheduled_task reliability graph edge sync."""
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+from services.program_task_resolution import resolve_program_task_id
 from services.reliability_graph import sync_edges_for_scheduled_task
 
 
 @pytest.mark.asyncio
-async def test_sync_edges_for_scheduled_task_completed():
+async def test_resolve_program_task_id_prefers_v2_task_id():
+    assert await resolve_program_task_id(
+        {"maintenance_program_id": "legacy-1", "v2_task_id": "v2-task-1"}
+    ) == "v2-task-1"
+
+
+@pytest.mark.asyncio
+async def test_resolve_program_task_id_v2_program_source():
+    assert await resolve_program_task_id(
+        {
+            "maintenance_program_id": "task-abc",
+            "program_source": "v2",
+        }
+    ) == "task-abc"
+
+
+@pytest.mark.asyncio
+async def test_resolve_program_task_id_legacy_lookup():
+    mock_db = MagicMock()
+    mock_db.maintenance_programs.find_one = AsyncMock(
+        return_value={"v2_task_id": "resolved-v2"}
+    )
+    mock_db.maintenance_programs_v2.find_one = AsyncMock(return_value=None)
+    with patch("services.program_task_resolution.db", mock_db):
+        result = await resolve_program_task_id(
+            {"maintenance_program_id": "legacy-row-id", "program_source": "legacy"}
+        )
+    assert result == "resolved-v2"
+
+
+@pytest.mark.asyncio
+async def test_sync_edges_for_scheduled_task_completed_legacy_program_id():
     mock_upsert = AsyncMock()
     task = {
         "id": "st-1",
         "equipment_id": "eq-1",
-        "maintenance_program_id": "pt-1",
+        "maintenance_program_id": "legacy-id",
+        "v2_task_id": "pt-correct",
         "failure_mode_id": "fm-1",
         "task_name": "Inspect seal",
         "strategy_id": "str-1",
@@ -25,25 +58,31 @@ async def test_sync_edges_for_scheduled_task_completed():
         )
 
     assert result["edges_upserted"] == 4
-    relations = [call.kwargs["relation"] for call in mock_upsert.await_args_list]
-    assert "derived_from" in relations
-    assert "scheduled_for" in relations
-    assert "mitigates_failure_mode" in relations
-    assert "completed_on" in relations
+    derived = [
+        c
+        for c in mock_upsert.await_args_list
+        if c.kwargs.get("relation") == "derived_from"
+    ]
+    assert derived[0].kwargs["target_id"] == "pt-correct"
 
 
 @pytest.mark.asyncio
-async def test_sync_edges_for_scheduled_task_cancelled():
+async def test_sync_edges_for_scheduled_task_cancelled_v2_source():
     mock_upsert = AsyncMock()
     task = {
         "id": "st-2",
         "equipment_id": "eq-2",
-        "maintenance_program_id": "pt-2",
+        "maintenance_program_id": "v2-task-9",
+        "program_source": "v2",
         "task_name": "Lubricate bearing",
     }
     with patch("services.reliability_graph.upsert_edge", mock_upsert):
         result = await sync_edges_for_scheduled_task(task, event="cancelled")
 
     assert result["edges_upserted"] == 3
-    relations = [call.kwargs["relation"] for call in mock_upsert.await_args_list]
-    assert "cancelled_for" in relations
+    cancelled = [
+        c
+        for c in mock_upsert.await_args_list
+        if c.kwargs.get("relation") == "cancelled_for"
+    ]
+    assert cancelled[0].kwargs["target_id"] == "v2-task-9"

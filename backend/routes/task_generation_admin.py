@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from database import db
-from auth import require_roles
+from auth import require_permission
 from services.task_instance_bridge import sync_scheduled_tasks_to_instances, next_monday
 from services.scheduler_job import (
     get_task_generation_config,
@@ -21,7 +21,7 @@ from services.scheduler_job import (
 
 router = APIRouter(prefix="/admin/task-generation", tags=["admin", "task-generation"])
 
-_admin_dep = require_roles("owner", "admin")
+_admin_dep = require_permission("scheduler:write")
 
 
 class GenerateRequest(BaseModel):

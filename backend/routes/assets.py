@@ -6,7 +6,7 @@ from fastapi.responses import Response
 import logging
 
 from services.storage_service import get_object_async, is_storage_available
-from auth import get_current_user
+from auth import require_permission
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ router = APIRouter(tags=["Assets"])
 async def serve_storage_file(
     request: Request,
     path: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("equipment:read")),
 ):
     """
     Serve a file from MongoDB storage.

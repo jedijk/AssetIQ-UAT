@@ -1,4 +1,5 @@
 """RBAC alias and permission matrix unit tests."""
+import re
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -474,3 +475,95 @@ def test_seed_endpoint_has_no_default_secret():
 def test_scheduler_job_uses_leader_lock():
     sched = (Path(__file__).resolve().parents[1] / "services" / "scheduler_job.py").read_text()
     assert "try_acquire_scheduler_leadership" in sched
+
+
+ALLOWED_MUTATION_FILES = frozenset({
+    "auth.py",
+    "auth_oidc.py",
+    "gdpr.py",
+    "__init__.py",
+})
+
+ALLOWED_MUTATION_PATH_SNIPPETS = (
+    "/webhook",
+    "/health",
+    "login",
+    "register",
+    "callback",
+    "oidc",
+    "forgot-password",
+    "reset-password",
+)
+
+
+def _mutation_block_has_rbac(block: str, file_text: str) -> bool:
+    if "require_permission" in block or "require_roles" in block:
+        return True
+    for match in re.finditer(r"Depends\(([_a-zA-Z0-9]+)\)", block):
+        dep = match.group(1)
+        if (
+            f"{dep} = require_permission" in file_text
+            or f"{dep} = require_roles" in file_text
+        ):
+            return True
+    return False
+
+
+PRIORITY_SENSITIVE_ROUTE_FILES = frozenset({
+    "routes/admin.py",
+    "routes/task_generation_admin.py",
+    "routes/system.py",
+    "routes/analytics.py",
+    "routes/intelligence_map.py",
+    "routes/chat.py",
+    "routes/efms.py",
+    "routes/granulometry.py",
+    "routes/insights.py",
+    "routes/feedback.py",
+    "routes/reports.py",
+    "routes/labels.py",
+    "routes/config_performance.py",
+    "routes/assets.py",
+    "routes/image_analysis.py",
+    "routes/decision_engine_routes.py",
+    "routes/maintenance.py",
+    "routes/stats.py",
+})
+
+
+def _priority_route_path(path: Path, routes_root: Path) -> str:
+    rel = path.relative_to(routes_root.parent)
+    return str(rel).replace("\\", "/")
+
+
+def _feedback_user_mutation_ok(block: str) -> bool:
+    """User-scoped feedback mutations only need authentication."""
+    header = "\n".join(block.split("\n")[:8])
+    decorator = header.split("\n", 1)[0]
+    if "/admin" in decorator or "generate-prompt" in decorator:
+        return False
+    return "Depends(get_current_user)" in header
+
+
+def test_sensitive_mutations_have_permission_deps():
+    """CI guard: priority sensitive mutation routes must declare RBAC deps."""
+    routes_root = Path(__file__).resolve().parents[1] / "routes"
+    offenders = []
+    for path in sorted(routes_root.rglob("*.py")):
+        rel = _priority_route_path(path, routes_root)
+        if rel not in PRIORITY_SENSITIVE_ROUTE_FILES and not rel.startswith(
+            "routes/maintenance_scheduler/"
+        ):
+            continue
+        text = path.read_text()
+        for match in re.finditer(r"@router\.(post|put|patch|delete)\(", text):
+            block = text[match.start() : match.start() + 400]
+            if _mutation_block_has_rbac(block, text):
+                continue
+            if _feedback_user_mutation_ok(block):
+                continue
+            if any(snippet in block.lower() for snippet in ALLOWED_MUTATION_PATH_SNIPPETS):
+                continue
+            line = text[: match.start()].count("\n") + 1
+            offenders.append(f"{rel}:{line}")
+    assert offenders == [], f"Priority mutation routes missing RBAC deps: {offenders}"

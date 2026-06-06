@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional
 from database import db, decision_engine
-from auth import get_current_user
+from auth import require_permission
 
 
 class RuleUpdate(BaseModel):
@@ -16,9 +16,12 @@ class RuleUpdate(BaseModel):
 
 router = APIRouter(tags=["Decision Engine"])
 
+_de_read = require_permission("decision_engine:read")
+_de_write = require_permission("decision_engine:write")
+
 @router.get("/decision-engine/dashboard")
 async def get_decision_dashboard(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_de_read)
 ):
     """Get decision engine dashboard stats."""
     return await decision_engine.get_decision_dashboard()
@@ -26,7 +29,7 @@ async def get_decision_dashboard(
 @router.get("/decision-engine/rules")
 async def get_decision_rules(
     enabled_only: bool = False,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_de_read)
 ):
     """Get all decision rules."""
     rules = await decision_engine.get_rules(enabled_only=enabled_only)
@@ -36,7 +39,7 @@ async def get_decision_rules(
 async def update_decision_rule(
     rule_id: str,
     data: RuleUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("decision_engine:write"))
 ):
     """Update a decision rule configuration."""
     result = await decision_engine.update_rule(rule_id, data.model_dump(exclude_unset=True))
@@ -46,7 +49,7 @@ async def update_decision_rule(
 
 @router.post("/decision-engine/evaluate")
 async def evaluate_all_rules(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("decision_engine:write"))
 ):
     """Evaluate all enabled rules and generate suggestions."""
     return await decision_engine.evaluate_all_rules(current_user["id"])
@@ -58,7 +61,7 @@ async def get_decision_suggestions(
     priority: Optional[str] = None,
     skip: int = 0,
     limit: int = 50,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_de_read)
 ):
     """Get decision suggestions."""
     return await decision_engine.get_suggestions(
@@ -73,7 +76,7 @@ async def get_decision_suggestions(
 async def approve_suggestion(
     suggestion_id: str,
     notes: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("decision_engine:write"))
 ):
     """Approve a decision suggestion."""
     result = await decision_engine.approve_suggestion(
@@ -89,7 +92,7 @@ async def approve_suggestion(
 async def reject_suggestion(
     suggestion_id: str,
     reason: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("decision_engine:write"))
 ):
     """Reject a decision suggestion."""
     result = await decision_engine.reject_suggestion(
@@ -104,7 +107,7 @@ async def reject_suggestion(
 @router.post("/decision-engine/suggestions/{suggestion_id}/execute")
 async def execute_suggestion(
     suggestion_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("decision_engine:write"))
 ):
     """Execute an approved suggestion."""
     try:
@@ -116,5 +119,4 @@ async def execute_suggestion(
         raise HTTPException(status_code=400, detail=str(e))
 
 # ============= UNSTRUCTURED ITEMS ENDPOINTS =============
-
 

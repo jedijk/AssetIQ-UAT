@@ -14,6 +14,7 @@ import time
 from utils.mongo_regex import escape_regex, exact_case_insensitive
 from services.ai_gateway import chat as ai_gateway_chat
 from services.failure_modes.cache import _cache, _invalidate_cache
+from services.tenant_schema import merge_tenant_filter, with_tenant_id
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,8 @@ class FailureModesMixin:
         failure_mode_type: Optional[str] = None,
         recently_added_days: Optional[int] = None,
         skip: int = 0,
-        limit: int = 500
+        limit: int = 500,
+        user: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """Get failure modes with optional filters."""
         import asyncio
@@ -109,6 +111,8 @@ class FailureModesMixin:
             )
             if search_clause:
                 query.update(search_clause)
+        
+        query = merge_tenant_filter(query, user) if user else query
         
         # Execute count and fetch in PARALLEL for performance
         count_task = self.collection.count_documents(query) if query else self.collection.estimated_document_count()
@@ -237,7 +241,12 @@ class FailureModesMixin:
     
     # ============== WRITE OPERATIONS ==============
     
-    async def create(self, data: Dict[str, Any], created_by: Optional[str] = None) -> Dict[str, Any]:
+    async def create(
+        self,
+        data: Dict[str, Any],
+        created_by: Optional[str] = None,
+        user: Optional[dict] = None,
+    ) -> Dict[str, Any]:
         """Create a new failure mode."""
         now = datetime.now(timezone.utc)
         
@@ -277,6 +286,7 @@ class FailureModesMixin:
             "created_at": now,
             "updated_at": now,
         }
+        with_tenant_id(doc, user)
         
         result = await self.collection.insert_one(doc)
         doc["_id"] = result.inserted_id

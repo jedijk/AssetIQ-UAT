@@ -4,7 +4,7 @@ Image Analysis API Routes for Damage Detection
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from auth import get_current_user
+from auth import require_permission
 from services.ai_gateway import user_context
 from services.image_analysis_service import analyze_image_for_damage, analyze_multiple_images
 
@@ -50,7 +50,7 @@ class ImageAnalysisResponse(BaseModel):
 @router.post("/analyze", response_model=ImageAnalysisResponse)
 async def analyze_image(
     request: ImageAnalysisRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("observations:write"))
 ):
     """
     Analyze a single image for damage detection.
@@ -109,7 +109,7 @@ async def analyze_image(
 @router.post("/analyze-multiple", response_model=ImageAnalysisResponse)
 async def analyze_multiple_images_endpoint(
     request: MultiImageAnalysisRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("observations:write"))
 ):
     """
     Analyze multiple images for damage detection.

@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 
 from database import db
-from auth import get_current_user
+from auth import require_permission
 from models.maintenance_scheduler import (
     TaskStatus,
     AIScheduleRequest,
@@ -25,7 +25,7 @@ router = APIRouter()
 @router.post("/ai-plan")
 async def ai_plan_tasks(
     request: AIScheduleRequest = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("scheduler:write")),
 ):
     """
     AI Maintenance Planner: optimizes task assignments and planned dates
@@ -166,7 +166,7 @@ async def ai_plan_tasks(
 @router.post("/ai-plan/apply")
 async def apply_ai_plan(
     request: ApplyAIPlanRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("scheduler:write")),
 ):
     """Apply selected AI recommendations to scheduled tasks."""
     if not request.recommendations:

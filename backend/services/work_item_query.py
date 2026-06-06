@@ -16,6 +16,10 @@ from bson import ObjectId
 from database import db
 from services.db_monitoring import timed_find
 from services.tenant_schema import merge_tenant_filter
+from services.work_execution_config import (
+    should_include_unbridged_work_items,
+    work_items_source_mode,
+)
 from utils.mongo_regex import case_insensitive_contains
 from services.task_instance_bridge import (
     STATUS_MAP,
@@ -104,6 +108,8 @@ def serialize_scheduled_task_as_work_item(
         "action_type": None,
         "risk_score": None,
         "rpn": None,
+        "maintenance_program_id": scheduled_task.get("maintenance_program_id"),
+        "v2_task_id": scheduled_task.get("v2_task_id"),
         "is_unbridged_maintenance": True,
     }
 
@@ -151,6 +157,27 @@ def _build_scheduled_task_query(
     return query
 
 
+async def _maybe_fetch_unbridged(
+    user_id: str,
+    *,
+    filter_name: str = "open",
+    equipment_id: Optional[str] = None,
+    discipline: Optional[str] = None,
+    now: Optional[datetime] = None,
+    user: Optional[dict] = None,
+) -> List[dict]:
+    if not await should_include_unbridged_work_items():
+        return []
+    return await fetch_unbridged_maintenance_work_items(
+        user_id,
+        filter_name=filter_name,
+        equipment_id=equipment_id,
+        discipline=discipline,
+        now=now,
+        user=user,
+    )
+
+
 async def fetch_unbridged_maintenance_work_items(
     user_id: str,
     *,
@@ -185,6 +212,7 @@ async def fetch_unbridged_maintenance_work_items(
 
     candidate_ids = [t.get("id") for t in candidate_tasks if t.get("id")]
     existing_set: set = set()
+    existing_fingerprints: set = set()
     if candidate_ids:
         existing_cursor = await timed_find(
             db.task_instances,
@@ -192,10 +220,71 @@ async def fetch_unbridged_maintenance_work_items(
                 {"scheduled_task_id": {"$in": candidate_ids}},
                 user,
             ),
-            {"_id": 0, "scheduled_task_id": 1},
+            {
+                "_id": 0,
+                "scheduled_task_id": 1,
+                "equipment_id": 1,
+                "due_date": 1,
+                "scheduled_date": 1,
+                "v2_task_id": 1,
+                "maintenance_program_id": 1,
+                "task_plan_id": 1,
+            },
         )
         existing = await existing_cursor.to_list(len(candidate_ids))
-        existing_set = {e["scheduled_task_id"] for e in existing if e.get("scheduled_task_id")}
+        for row in existing:
+            if row.get("scheduled_task_id"):
+                existing_set.add(row["scheduled_task_id"])
+            existing_fingerprints.add(
+                _work_item_dedupe_key(
+                    {
+                        "scheduled_task_id": row.get("scheduled_task_id"),
+                        "equipment_id": row.get("equipment_id"),
+                        "v2_task_id": row.get("v2_task_id"),
+                        "maintenance_program_id": row.get("maintenance_program_id")
+                        or row.get("task_plan_id"),
+                        "due_date": _safe_iso(row.get("due_date")) or row.get("due_date"),
+                        "scheduled_date": row.get("scheduled_date"),
+                    }
+                )
+            )
+
+    eq_ids = list({t.get("equipment_id") for t in candidate_tasks if t.get("equipment_id")})
+    if eq_ids:
+        overlap_cursor = await timed_find(
+            db.task_instances,
+            merge_tenant_filter(
+                {
+                    "equipment_id": {"$in": eq_ids},
+                    "status": {"$nin": ["completed", "cancelled"]},
+                },
+                user,
+            ),
+            {
+                "_id": 0,
+                "scheduled_task_id": 1,
+                "equipment_id": 1,
+                "due_date": 1,
+                "scheduled_date": 1,
+                "v2_task_id": 1,
+                "maintenance_program_id": 1,
+                "task_plan_id": 1,
+            },
+        )
+        for row in await overlap_cursor.to_list(MAX_UNBRIDGED_ITEMS * 4):
+            existing_fingerprints.add(
+                _work_item_dedupe_key(
+                    {
+                        "scheduled_task_id": row.get("scheduled_task_id"),
+                        "equipment_id": row.get("equipment_id"),
+                        "v2_task_id": row.get("v2_task_id"),
+                        "maintenance_program_id": row.get("maintenance_program_id")
+                        or row.get("task_plan_id"),
+                        "due_date": _safe_iso(row.get("due_date")) or row.get("due_date"),
+                        "scheduled_date": row.get("scheduled_date"),
+                    }
+                )
+            )
 
     default_assignees = await _build_default_assignees()
     discipline_cache: Dict[str, str] = {}
@@ -212,6 +301,19 @@ async def fetch_unbridged_maintenance_work_items(
     for st in candidate_tasks:
         sched_id = st.get("id")
         if not sched_id or sched_id in existing_set:
+            continue
+
+        fp = _work_item_dedupe_key(
+            {
+                "scheduled_task_id": sched_id,
+                "equipment_id": st.get("equipment_id"),
+                "v2_task_id": st.get("v2_task_id"),
+                "maintenance_program_id": st.get("maintenance_program_id"),
+                "program_task_id": st.get("program_task_id"),
+                "due_date": st.get("due_date"),
+            }
+        )
+        if fp in existing_fingerprints and fp != (None, None, None, None):
             continue
 
         program_disc = program_disciplines.get(st.get("maintenance_program_id"))
@@ -236,6 +338,7 @@ async def fetch_unbridged_maintenance_work_items(
                 assignee=assignee_meta.get("user_name"),
             )
         )
+        existing_fingerprints.add(fp)
         if len(items) >= MAX_UNBRIDGED_ITEMS:
             break
 
@@ -288,6 +391,8 @@ def serialize_task(task: dict) -> dict:
         "equipment_tag": task.get("equipment_tag"),
         "photo_extraction_config": task.get("photo_extraction_config"),
         "scheduled_task_id": task.get("scheduled_task_id"),
+        "maintenance_program_id": task.get("maintenance_program_id"),
+        "v2_task_id": task.get("v2_task_id"),
         "is_unbridged_maintenance": False,
     }
 
@@ -345,6 +450,45 @@ def serialize_action_as_task(action: dict) -> dict:
         "equipment_tag": action.get("equipment_tag"),
         "is_unbridged_maintenance": False,
     }
+
+
+def _work_item_dedupe_key(item: dict) -> tuple:
+    """Fingerprint for deduping task_instances vs unbridged scheduled_tasks."""
+    sched_id = item.get("scheduled_task_id")
+    equipment_id = item.get("equipment_id")
+    due = item.get("due_date") or item.get("scheduled_date")
+    program_ref = (
+        item.get("v2_task_id")
+        or item.get("program_task_id")
+        or item.get("maintenance_program_id")
+        or item.get("task_plan_id")
+    )
+    return (sched_id, equipment_id, program_ref, due)
+
+
+def _merge_work_items_prefer_instances(
+    instance_items: List[dict],
+    unbridged_items: List[dict],
+) -> List[dict]:
+    """Merge lists; task_instance rows win over unbridged duplicates."""
+    merged = list(instance_items)
+    seen_sched_ids = {
+        t.get("scheduled_task_id") for t in instance_items if t.get("scheduled_task_id")
+    }
+    seen_fingerprints = {_work_item_dedupe_key(t) for t in instance_items}
+
+    for item in unbridged_items:
+        sched_id = item.get("scheduled_task_id")
+        if sched_id and sched_id in seen_sched_ids:
+            continue
+        fp = _work_item_dedupe_key(item)
+        if fp in seen_fingerprints and fp != (None, None, None, None):
+            continue
+        merged.append(item)
+        if sched_id:
+            seen_sched_ids.add(sched_id)
+        seen_fingerprints.add(fp)
+    return merged
 
 
 def work_item_sort_key(item: dict, now: datetime) -> tuple:
@@ -460,11 +604,15 @@ async def fetch_work_items(
     ]).limit(MAX_TASK_INSTANCES)
     raw_tasks = await tasks_cursor.to_list(length=MAX_TASK_INSTANCES)
 
-    # Start unbridged maintenance fetch in parallel with task enrichment when allowed.
+    # Start unbridged maintenance fetch in parallel when hybrid mode allows it.
     maintenance_task = None
-    if filter_name not in ("recurring", "adhoc"):
+    include_unbridged = (
+        work_items_source_mode() != "v2_instances"
+        and filter_name not in ("recurring", "adhoc")
+    )
+    if include_unbridged:
         maintenance_task = asyncio.create_task(
-            fetch_unbridged_maintenance_work_items(
+            _maybe_fetch_unbridged(
                 user_id,
                 filter_name=filter_name,
                 equipment_id=equipment_id,
@@ -661,12 +809,7 @@ async def fetch_work_items(
     if maintenance_task is not None:
         try:
             maintenance_items = await maintenance_task
-            existing_ids = {t.get("scheduled_task_id") for t in items if t.get("scheduled_task_id")}
-            for item in maintenance_items:
-                sid = item.get("scheduled_task_id")
-                if sid and sid in existing_ids:
-                    continue
-                items.append(item)
+            items = _merge_work_items_prefer_instances(items, maintenance_items)
         except Exception as exc:
             logger.warning("unbridged maintenance work items skipped: %s", exc)
 

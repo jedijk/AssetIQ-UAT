@@ -17,6 +17,8 @@ from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorDatabase
 import logging
 
+from services.tenant_schema import merge_tenant_filter
+
 logger = logging.getLogger(__name__)
 
 
@@ -25,6 +27,10 @@ class AnalyticsService:
     
     def __init__(self, db: AsyncIOMotorDatabase):
         self.db = db
+
+    @staticmethod
+    def _tenant_scope(query: Dict[str, Any], user: Optional[dict]) -> Dict[str, Any]:
+        return merge_tenant_filter(query, user) if user else query
         self.threats = db["threats"]
         self.observations = db["observations"]
         self.efms = db["equipment_failure_modes"]
@@ -40,6 +46,7 @@ class AnalyticsService:
         self,
         user_id: Optional[str] = None,
         equipment_ids: Optional[set] = None,
+        user: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """Get overall risk metrics."""
         
@@ -48,6 +55,7 @@ class AnalyticsService:
             match_filter["linked_equipment_id"] = {"$in": list(equipment_ids)}
         elif user_id:
             match_filter["created_by"] = user_id
+        match_filter = self._tenant_scope(match_filter, user)
         match_stage = {"$match": match_filter}
         
         pipeline = [
@@ -203,14 +211,16 @@ class AnalyticsService:
     
     # ==================== TASK ANALYTICS ====================
     
-    async def get_task_compliance(self, days: int = 30) -> Dict[str, Any]:
+    async def get_task_compliance(
+        self, days: int = 30, user: Optional[dict] = None
+    ) -> Dict[str, Any]:
         """Get task compliance metrics."""
         
         start_date = datetime.now(timezone.utc) - timedelta(days=days)
         
         # Task status distribution
         pipeline = [
-            {"$match": {"scheduled_date": {"$gte": start_date}}},
+            {"$match": self._tenant_scope({"scheduled_date": {"$gte": start_date}}, user)},
             {"$group": {
                 "_id": "$status",
                 "count": {"$sum": 1}
@@ -530,14 +540,17 @@ class AnalyticsService:
         self,
         user_id: Optional[str] = None,
         equipment_ids: Optional[set] = None,
+        user: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """Get comprehensive analytics dashboard."""
 
         return {
             "generated_at": datetime.now(timezone.utc).isoformat(),
-            "risk_overview": await self.get_risk_overview(user_id, equipment_ids=equipment_ids),
+            "risk_overview": await self.get_risk_overview(
+                user_id, equipment_ids=equipment_ids, user=user
+            ),
             "top_risks": await self.get_top_risks(10),
-            "task_compliance": await self.get_task_compliance(30),
+            "task_compliance": await self.get_task_compliance(30, user=user),
             "task_workload": await self.get_task_workload(7),
             "failure_mode_pareto": await self.get_failure_mode_pareto(10),
             "detection_effectiveness": await self.get_detection_effectiveness(),

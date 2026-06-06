@@ -29,7 +29,7 @@ APPLY_STRATEGY_ASYNC_THRESHOLD = 5
 @router.get("/jobs/{job_id}")
 async def get_scheduler_job(
     job_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("scheduler:read")),
 ):
     """Poll status of a maintenance scheduler background job."""
     job = await background_job_service.get_job(job_id)
@@ -287,7 +287,7 @@ async def get_maintenance_programs(
     equipment_type_id: Optional[str] = None,
     equipment_id: Optional[str] = None,
     is_active: bool = True,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("scheduler:read")),
 ):
     """Get schedulable maintenance program rows (canonical v2 source)."""
     from services.scheduler_program_source import load_schedulable_programs
@@ -306,7 +306,7 @@ async def get_maintenance_programs(
 @router.get("/programs/{equipment_type_id}/summary")
 async def get_programs_summary(
     equipment_type_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("scheduler:read")),
 ):
     """Get summary of maintenance programs for an equipment type (v2)."""
     programs = await db.maintenance_programs_v2.find(

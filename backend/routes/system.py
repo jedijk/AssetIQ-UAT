@@ -20,7 +20,7 @@ try:
 except ImportError:
     PSUTIL_AVAILABLE = False
 
-from auth import get_current_user
+from auth import get_current_user, require_roles, require_permission
 from database import db, client, get_available_databases, get_current_db_name
 
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ class DatabaseSwitchRequest(BaseModel):
 
 @router.get("/system/databases")
 async def get_databases(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_roles("owner", "admin"))
 ):
     """
     Get available database environments.
@@ -90,7 +90,7 @@ async def get_databases(
 @router.post("/system/databases/switch")
 async def switch_database(
     request: DatabaseSwitchRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_roles("owner", "admin")),
 ):
     """
     Switch to a different database environment.
@@ -171,7 +171,7 @@ async def switch_database(
 
 @router.get("/system/databases/status")
 async def get_database_status(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("settings:read"))
 ):
     """
     Get status of all available databases.
@@ -217,7 +217,7 @@ async def get_database_status(
 
 @router.get("/system/metrics")
 async def get_system_metrics(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("settings:read"))
 ):
     """
     Get real-time server performance metrics.
@@ -316,7 +316,7 @@ async def get_system_metrics(
 
 @router.get("/system/file-storage")
 async def get_file_storage_stats(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("settings:read"))
 ):
     """
     Get file storage statistics (R2 + MongoDB legacy).
@@ -369,7 +369,7 @@ async def get_system_health():
 
 @router.get("/system/cache-stats")
 async def get_cache_stats(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("settings:read"))
 ):
     """
     Get query cache statistics.
@@ -390,7 +390,7 @@ async def get_cache_stats(
 
 @router.get("/metrics")
 async def get_application_metrics(
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("settings:read")),
 ):
     """
     Application health metrics: cache, database, version.
@@ -462,7 +462,7 @@ async def get_application_metrics(
 
 @router.get("/system/database")
 async def get_database_storage(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("settings:read"))
 ):
     """
     Get MongoDB database storage usage.
@@ -535,7 +535,7 @@ async def get_database_storage(
 @router.get("/system/security")
 async def get_security_status(
     request: Request,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("settings:read"))
 ):
     """
     Run security checks and return status.
@@ -1004,7 +1004,7 @@ async def get_error_logs(
     error_type: str = None,
     source: str = None,
     unresolved_only: bool = False,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("settings:read"))
 ):
     """
     Get application error logs.
@@ -1040,7 +1040,7 @@ async def get_error_logs(
 
 @router.get("/system/errors/stats")
 async def get_error_stats(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("settings:read"))
 ):
     """Get error statistics summary."""
     if current_user.get("role") != "owner":
@@ -1055,15 +1055,9 @@ async def get_error_stats(
 @router.post("/system/errors/{error_id}/resolve")
 async def resolve_error(
     error_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_roles("owner", "admin")),
 ):
     """Mark an error as resolved."""
-    if current_user.get("role") != "owner":
-        raise HTTPException(
-            status_code=403, 
-            detail="Only owners can resolve errors"
-        )
-    
     if error_log.mark_resolved(error_id):
         return {"success": True, "message": "Error marked as resolved"}
     else:
@@ -1073,7 +1067,7 @@ async def resolve_error(
 @router.delete("/system/errors")
 async def clear_error_logs(
     older_than_hours: int = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_roles("owner", "admin")),
 ):
     """
     Clear error logs.
@@ -1081,27 +1075,15 @@ async def clear_error_logs(
     Query Parameters:
         - older_than_hours: Only clear errors older than this many hours
     """
-    if current_user.get("role") != "owner":
-        raise HTTPException(
-            status_code=403, 
-            detail="Only owners can clear error logs"
-        )
-    
     error_log.clear_errors(older_than_hours)
     return {"success": True, "message": "Error logs cleared"}
 
 
 @router.post("/system/errors/test")
 async def create_test_error(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_roles("owner", "admin")),
 ):
     """Create a test error for debugging purposes."""
-    if current_user.get("role") != "owner":
-        raise HTTPException(
-            status_code=403, 
-            detail="Only owners can create test errors"
-        )
-    
     error = log_error(
         error_type="test",
         message="This is a test error created manually",

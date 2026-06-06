@@ -9,7 +9,7 @@ import logging
 import os
 
 from models.api_models import UserResponse
-from routes.auth import get_current_user
+from auth import require_permission
 from database import db
 from services.ai_gateway import chat as ai_gateway_chat, user_context
 
@@ -19,7 +19,7 @@ router = APIRouter(tags=["insights"])
 
 @router.get("/execution/actions")
 async def get_action_execution_metrics(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("library:read"))
 ):
     """
     Get action execution performance metrics.
@@ -84,7 +84,7 @@ async def get_action_execution_metrics(
 
 @router.get("/execution/tasks")
 async def get_task_execution_metrics(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("library:read"))
 ):
     """
     Get task execution metrics comparing recurring vs ad-hoc tasks.
@@ -163,7 +163,7 @@ async def get_task_execution_metrics(
 
 @router.get("/execution/disciplines")
 async def get_discipline_performance(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("library:read"))
 ):
     """
     Get performance metrics by discipline (actor performance).
@@ -244,7 +244,7 @@ async def get_discipline_performance(
 
 @router.get("/reliability/data-quality")
 async def get_data_quality_metrics(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("library:read"))
 ):
     """
     Assess quality and completeness of reliability data.
@@ -333,7 +333,7 @@ async def get_data_quality_metrics(
 
 @router.get("/reliability/gaps")
 async def get_reliability_gaps(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("library:read"))
 ):
     """
     Identify areas where execution or data is insufficient.
@@ -422,7 +422,7 @@ async def get_reliability_gaps(
 
 @router.post("/ai/recommendations")
 async def generate_ai_recommendations(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("library:read"))
 ):
     """
     Generate AI-driven recommendations based on current reliability data.
@@ -592,7 +592,7 @@ Return as JSON array with fields: title, description, impact (high/medium/low)
 
 @router.get("/insights/summary")
 async def get_insights_summary(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("library:read"))
 ):
     """
     Get quick overview summary of system health.

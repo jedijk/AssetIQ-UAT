@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from typing import Optional
 
 from database import db
-from auth import get_current_user
+from auth import require_permission
 from models.maintenance_scheduler import TaskStatus
 from ._shared import ensure_imported_pm_tasks_scheduled, scope_scheduled_tasks_query
 
@@ -18,7 +18,7 @@ async def get_timeline(
     equipment_type_id: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("scheduler:read")),
 ):
     """Get timeline view of scheduled tasks grouped by equipment."""
     await ensure_imported_pm_tasks_scheduled(equipment_type_id)

@@ -14,7 +14,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, File
 from database import db, failure_modes_service
-from auth import get_current_user
+from auth import get_current_user, require_permission
 from models.api_models import (
     ChatMessageCreate, ChatResponse, ThreatResponse, VoiceTranscriptionResponse,
 )
@@ -35,6 +35,8 @@ from services.cache_service import cache
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Chat"])
+
+_tasks_read = require_permission("tasks:read")
 
 # ---------------------------------------------------------------------------
 # Image compression
@@ -999,7 +1001,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
 @router.post("/chat/send", response_model=ChatResponse)
 async def send_chat_message(
     message: ChatMessageCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("tasks:read")),
 ):
     session_id = f"user_{current_user['id']}_{datetime.now(timezone.utc).strftime('%Y%m%d')}"
     detected_lang = message.language or detect_language(message.content)
@@ -1009,7 +1011,7 @@ async def send_chat_message(
 
 
 @router.get("/chat/history")
-async def get_chat_history(limit: int = 50, current_user: dict = Depends(get_current_user)):
+async def get_chat_history(limit: int = 50, current_user: dict = Depends(_tasks_read)):
     messages = await db.chat_messages.find(
         {"user_id": current_user["id"]}, {"_id": 0}
     ).sort("created_at", -1).limit(limit).to_list(limit)
@@ -1017,7 +1019,7 @@ async def get_chat_history(limit: int = 50, current_user: dict = Depends(get_cur
 
 
 @router.delete("/chat/clear")
-async def clear_chat_history(current_user: dict = Depends(get_current_user)):
+async def clear_chat_history(current_user: dict = Depends(require_permission("tasks:read"))):
     user_id = current_user["id"]
     result = await db.chat_messages.delete_many({"user_id": user_id})
     await db.chat_conversations.delete_many({"user_id": user_id})
@@ -1025,7 +1027,7 @@ async def clear_chat_history(current_user: dict = Depends(get_current_user)):
 
 
 @router.post("/chat/cancel")
-async def cancel_chat_flow(current_user: dict = Depends(get_current_user)):
+async def cancel_chat_flow(current_user: dict = Depends(require_permission("tasks:read"))):
     user_id = current_user["id"]
     conv = await _read_conv(user_id)
     ui_nl = conv.get("chat_ui_language") == "nl"
@@ -1045,7 +1047,7 @@ async def cancel_chat_flow(current_user: dict = Depends(get_current_user)):
 
 @router.post("/voice/transcribe", response_model=VoiceTranscriptionResponse)
 async def transcribe_voice(audio_base64: str = Form(...),
-                           current_user: dict = Depends(get_current_user)):
+                           current_user: dict = Depends(require_permission("tasks:read"))):
     text = await transcribe_audio_with_ai(
         audio_base64,
         user_id=current_user.get("id", "system"),
@@ -1062,7 +1064,7 @@ async def transcribe_voice(audio_base64: str = Form(...),
 async def voice_send(
     audio: bytes = File(...),
     language: Optional[str] = Form(None),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("tasks:read")),
 ):
     """Transcribe audio then process as chat message (single round-trip)."""
     user_id = current_user["id"]

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from typing import Optional
 
 from database import db
-from auth import get_current_user
+from auth import require_permission
 from models.maintenance_scheduler import TaskStatus
 from ._shared import scope_scheduled_tasks_query
 
@@ -16,7 +16,7 @@ router = APIRouter()
 @router.get("/dashboard")
 async def get_scheduler_dashboard(
     equipment_type_id: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("scheduler:read")),
 ):
     """Get scheduler dashboard KPIs."""
     today = datetime.utcnow().date().isoformat()

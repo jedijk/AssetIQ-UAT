@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 from database import db
 
 from services.reliability_graph import COLLECTION
+from services.program_task_resolution import resolve_program_task_id
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +156,7 @@ async def audit_scheduled_task_completed(scheduled_task: dict) -> List[str]:
         return ["scheduled_task missing id"]
 
     equipment_id = scheduled_task.get("equipment_id")
-    program_task_id = scheduled_task.get("maintenance_program_id")
+    program_task_id = await resolve_program_task_id(scheduled_task)
     failure_mode_id = scheduled_task.get("failure_mode_id")
 
     base_checks = [

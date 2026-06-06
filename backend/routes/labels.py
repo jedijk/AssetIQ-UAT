@@ -19,9 +19,12 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 from database import db
-from routes.auth import get_current_user
+from auth import require_permission
 
 router = APIRouter(prefix="/labels", tags=["Labels"])
+
+_settings_read = require_permission("settings:read")
+_settings_write = require_permission("settings:write")
 
 
 # ==================== MODELS ====================
@@ -1212,7 +1215,7 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
 @router.get("/templates")
 async def list_templates(
     status: Optional[str] = Query(None, regex="^(draft|published|archived)$"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_read),
 ):
     query = {}
     if status:
@@ -1230,7 +1233,7 @@ async def list_templates(
 
 
 @router.get("/templates/{template_id}")
-async def get_template(template_id: str, current_user: dict = Depends(get_current_user)):
+async def get_template(template_id: str, current_user: dict = Depends(_settings_read)):
     doc = await db.label_templates.find_one({"id": template_id}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -1241,7 +1244,7 @@ async def get_template(template_id: str, current_user: dict = Depends(get_curren
 @router.post("/templates")
 async def create_template(
     body: LabelTemplateCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("settings:write")),
 ):
     now = _now()
     doc = {
@@ -1263,7 +1266,7 @@ async def create_template(
 async def update_template(
     template_id: str,
     body: LabelTemplateUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("settings:write")),
 ):
     existing = await db.label_templates.find_one({"id": template_id}, {"_id": 0})
     if not existing:
@@ -1303,7 +1306,10 @@ async def update_template(
 
 
 @router.delete("/templates/{template_id}")
-async def delete_template(template_id: str, current_user: dict = Depends(get_current_user)):
+async def delete_template(
+    template_id: str,
+    current_user: dict = Depends(require_permission("settings:write")),
+):
     existing = await db.label_templates.find_one({"id": template_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -1315,7 +1321,10 @@ async def delete_template(template_id: str, current_user: dict = Depends(get_cur
 
 
 @router.post("/templates/{template_id}/duplicate")
-async def duplicate_template(template_id: str, current_user: dict = Depends(get_current_user)):
+async def duplicate_template(
+    template_id: str,
+    current_user: dict = Depends(require_permission("settings:write")),
+):
     existing = await db.label_templates.find_one({"id": template_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Template not found")
@@ -1341,7 +1350,10 @@ async def duplicate_template(template_id: str, current_user: dict = Depends(get_
 # ==================== PREVIEW & PRINT ====================
 
 @router.post("/preview")
-async def preview_label(body: PreviewRequest, current_user: dict = Depends(get_current_user)):
+async def preview_label(
+    body: PreviewRequest,
+    current_user: dict = Depends(require_permission("settings:write")),
+):
     """Return a PDF preview. Accepts either a transient template (designer) or a saved template_id."""
     if body.template_id:
         tpl_doc = await db.label_templates.find_one({"id": body.template_id}, {"_id": 0})
@@ -1381,7 +1393,10 @@ async def preview_label(body: PreviewRequest, current_user: dict = Depends(get_c
 
 
 @router.post("/print")
-async def print_labels(body: PrintRequest, current_user: dict = Depends(get_current_user)):
+async def print_labels(
+    body: PrintRequest,
+    current_user: dict = Depends(require_permission("settings:write")),
+):
     """Render a print-ready PDF for one or many assets and record the job."""
     import logging
     logger = logging.getLogger("labels")
@@ -1512,7 +1527,7 @@ class RenderHtmlRequest(BaseModel):
 @router.post("/render-html")
 async def render_label_html(
     body: RenderHtmlRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_read),
 ):
     """Return the label as a standalone print-ready HTML page.
 
@@ -1552,7 +1567,7 @@ async def render_label_html(
 @router.get("/jobs")
 async def list_jobs(
     limit: int = Query(50, ge=1, le=500),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_settings_read),
 ):
     jobs = await db.label_print_jobs.find({}, {"_id": 0}).sort("created_at", -1).to_list(limit)
     for j in jobs:
@@ -1563,7 +1578,7 @@ async def list_jobs(
 # ==================== HELPERS FOR UI ====================
 
 @router.get("/presets")
-async def list_presets(current_user: dict = Depends(get_current_user)):
+async def list_presets(current_user: dict = Depends(_settings_read)):
     """Return the list of available preset layouts + default sizes for the UI."""
     return {
         "presets": [

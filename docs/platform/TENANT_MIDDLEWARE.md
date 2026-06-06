@@ -33,14 +33,20 @@ During rollout, legacy documents may lack `tenant_id`. Wave collections use a mi
 {"$or": [{"tenant_id": "<tid>"}, {"tenant_id": {"$exists": False}}]}
 ```
 
-This allows tenants to see their own data **plus** unmigrated legacy rows until backfill completes. Strict `{tenant_id: tid}` filtering applies only after migration.
+This allows tenants to see their own data **plus** unmigrated legacy rows until backfill completes.
+
+### Strict mode (post-migration)
+
+Set `TENANT_STRICT_MODE=true` to use strict `{tenant_id: tid}` filtering on all reads (no legacy `$exists: false` bleed).
 
 ### Helpers (`services/tenant_schema.py`)
 
-- `tenant_read_filter(user)` — migration-safe `$or` fragment
+- `tenant_read_filter(user)` — migration-safe or strict `$or` / exact match
 - `merge_tenant_filter(base_query, user)` — `$and` merge with existing query
 - `with_tenant_id(doc, user)` — attach `tenant_id` on writes
 - `tenant_filter(user)` — strict filter (pilot collections post-migration)
+- `prepend_tenant_match(pipeline, user)` — tenant `$match` for aggregations
+- `ensure_tenant_indexes(db)` — idempotent `{tenant_id: 1}` indexes
 
 ## Collection Rollout Waves
 
@@ -48,18 +54,32 @@ This allows tenants to see their own data **plus** unmigrated legacy rows until 
 |------|-------------|--------|
 | Pilot | `work_item_projections`, `reliability_context_snapshots`, `background_jobs`, `audit_log` | Active |
 | **Wave 1** | `equipment_nodes`, `threats`, `users` | Active |
-| **Wave 2** | `task_instances`, `scheduled_tasks`, `central_actions`, `maintenance_programs_v2`, `equipment_type_strategies` | Active (read filters on work-items merge path) |
-| Wave 3+ | Remaining domain collections | Planned |
+| **Wave 2** | `task_instances`, `scheduled_tasks`, `central_actions`, `maintenance_programs_v2`, `equipment_type_strategies` | Active |
+| **Wave 3** | `failure_modes`, `form_templates`, `form_submissions`, `investigations`, investigation sub-collections, `reliability_edges`, `pm_import_sessions` | Active |
+| Wave 4+ | Remaining domain collections | Planned |
 
-## Wave 1 Route Changes
+## Wave 3 Route / Service Changes
 
-- **equipment_nodes** — tenant filter on list/find; `with_tenant_id` on node create
-- **threats** — tenant filter merged into `build_threat_filter` results; `with_tenant_id` on threat updates
-- **users** — tenant scope on `get_users` / `pending`; `with_tenant_id` on admin user create
+- **failure_modes** — `get_all` / `create` tenant-scoped in `services/failure_modes/crud.py`
+- **form_templates** — `get_templates` / `create_template` in `form_service.py`
+- **investigations** — CRUD + sub-documents (`timeline_events`, `cause_nodes`, …) via `_inv_query` / `with_tenant_id`
+- **Analytics** — `intelligence_map`, `/stats`, `/reliability-scores`, executive KPIs merge tenant filters
+
+## Backfill
+
+```bash
+# Preview
+MONGO_URL=... python scripts/backfill_tenant_id.py --dry-run
+
+# Apply (optional default for docs without created_by user)
+MONGO_URL=... BACKFILL_TENANT_ID=co-default python scripts/backfill_tenant_id.py --create-indexes
+```
+
+Backfill resolves `tenant_id` from `created_by` / `user_id` / `owner_id` user records when possible.
 
 ## Index Strategy
 
-Pilot collections already carry compound indexes `(tenant_id, user_id, updated_at)`. Wave 1 collections should add `{tenant_id: 1}` indexes during backfill (see `scripts/create_indexes.py`).
+Run `ensure_tenant_indexes(db)` or backfill with `--create-indexes`. Wave collections should carry `{tenant_id: 1}` before strict mode.
 
 ## Middleware Wiring
 
@@ -72,4 +92,12 @@ app.add_middleware(TenantContextMiddleware)
 
 ## Testing
 
-`backend/tests/test_tenant_schema.py` covers helper behavior including migration-safe `$or` filters and `merge_tenant_filter` composition.
+`backend/tests/test_tenant_schema.py` covers helper behavior including migration-safe `$or` filters, strict mode, and `merge_tenant_filter` composition.
+
+## Work Execution (related)
+
+Hybrid work-item reads and bridge env flags are documented in [WORK_EXECUTION.md](./WORK_EXECUTION.md).
+
+## Rate Limiting (related)
+
+Global API limits use `DEFAULT_RATE_LIMIT` (default `120/minute`) and `RATE_LIMIT_ENABLED`. Health paths `/`, `/health`, `/api/health` are exempt. See `middleware/rate_limit.py`.

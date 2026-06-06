@@ -78,6 +78,7 @@ INDEX_DEFINITIONS = {
     
     # Investigations - linked to threats
     "investigations": [
+        {"keys": [("tenant_id", 1)]},
         {"keys": [("id", 1)], "unique": True},
         {"keys": [("threat_id", 1)]},
         {"keys": [("status", 1)]},
@@ -126,6 +127,7 @@ INDEX_DEFINITIONS = {
     
     # Form templates
     "form_templates": [
+        {"keys": [("tenant_id", 1)]},
         {"keys": [("id", 1)], "unique": True},
         {"keys": [("discipline", 1)]},
         {"keys": [("created_at", -1)]},
@@ -170,6 +172,7 @@ INDEX_DEFINITIONS = {
     
     # Failure modes library
     "failure_modes": [
+        {"keys": [("tenant_id", 1)]},
         {"keys": [("id", 1)], "unique": True},
         {"keys": [("failure_mode", 1)]},
         {"keys": [("category", 1)]},
@@ -352,6 +355,7 @@ INDEX_DEFINITIONS = {
         {"keys": [("status", 1), ("job_type", 1), ("tenant_id", 1), ("created_at", 1)]},
     ],
     "reliability_edges": [
+        {"keys": [("tenant_id", 1)]},
         {"keys": [("id", 1)], "unique": True},
         {"keys": [("equipment_id", 1), ("updated_at", -1)]},
         {"keys": [("equipment_type_id", 1)]},

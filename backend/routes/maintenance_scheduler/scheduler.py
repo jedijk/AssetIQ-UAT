@@ -7,7 +7,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends
 
 from database import db
-from auth import get_current_user
+from auth import require_permission
 from models.maintenance_scheduler import (
     ScheduledTask,
     TaskStatus,
@@ -98,6 +98,12 @@ async def schedule_program(program: dict, horizon_days: int = DEFAULT_HORIZON_DA
             status=TaskStatus.SCHEDULED,
             estimated_hours=program.get("estimated_duration_hours", 1.0),
             maintenance_program_id=program_id,
+            program_task_id=program.get("v2_task_id") or (
+                program_id if program.get("program_source") == "v2" else None
+            ),
+            v2_task_id=program.get("v2_task_id"),
+            v2_program_id=program.get("v2_program_id"),
+            program_source=program.get("program_source"),
             strategy_id=program.get("strategy_id"),
             strategy_version=program.get("strategy_version"),
             failure_mode_id=program.get("failure_mode_id"),
@@ -171,7 +177,7 @@ async def schedule_programs_for_equipment(equipment_ids: List[str], horizon_days
 @router.post("/cleanup-orphans")
 async def cleanup_orphan_scheduled_tasks(
     request: CleanupOrphansRequest = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("scheduler:write")),
 ):
     """
     Remove stale strategy schedule items, scheduled_tasks whose maintenance_program
@@ -201,7 +207,7 @@ async def cleanup_orphan_scheduled_tasks(
 @router.post("/run-scheduler")
 async def run_scheduler(
     request: RunSchedulerRequest = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("scheduler:write")),
 ):
     """
     Run the scheduler engine to generate scheduled tasks.

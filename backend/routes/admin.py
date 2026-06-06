@@ -9,17 +9,15 @@ import asyncio
 import logging
 
 from database import db, ai_usage_tracker
-from routes.auth import get_current_user
+from auth import require_roles, require_permission
 from services.ai_cost_guard import ai_cost_guard
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def require_admin(current_user: dict = Depends(get_current_user)):
+def require_admin(current_user: dict = Depends(require_roles("owner", "admin"))):
     """Dependency to require admin or owner role."""
-    if current_user.get("role") not in ["admin", "owner"]:
-        raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
 

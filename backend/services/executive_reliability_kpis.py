@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from database import db, installation_filter
+from services.tenant_schema import merge_tenant_filter
 
 
 async def _equipment_scope_filter(user: Optional[dict]) -> Dict[str, Any]:
@@ -47,35 +48,41 @@ async def compute_executive_reliability_kpis(
             "generated_at": now.isoformat(),
         }
 
-    threat_scope = {**scope, "status": {"$in": ["Open", "open", "In Progress", "in_progress"]}}
+    threat_scope = merge_tenant_filter(
+        {**scope, "status": {"$in": ["Open", "open", "In Progress", "in_progress"]}},
+        user,
+    )
     open_threats = await db.threats.count_documents(threat_scope)
 
-    high_risk_threats = await db.threats.count_documents({
-        **threat_scope,
+    high_risk_threats = await db.threats.count_documents(merge_tenant_filter({
+        **scope,
+        "status": {"$in": ["Open", "open", "In Progress", "in_progress"]},
         "risk_level": {"$in": ["High", "high", "Critical", "critical"]},
-    })
+    }, user))
 
     pm_scope: Dict[str, Any] = {}
     if scope.get("linked_equipment_id"):
         pm_scope["equipment_id"] = scope["linked_equipment_id"]
-    overdue_pm_scheduled = await db.scheduled_tasks.count_documents({
+    overdue_pm_scheduled = await db.scheduled_tasks.count_documents(merge_tenant_filter({
         **pm_scope,
         "status": {"$nin": ["completed", "cancelled"]},
         "due_date": {"$lt": today_iso},
-    })
+    }, user))
 
-    overdue_pm_instances = await db.task_instances.count_documents({
+    overdue_pm_instances = await db.task_instances.count_documents(merge_tenant_filter({
         **pm_scope,
         "status": {"$in": ["pending", "overdue", "scheduled"]},
         "due_date": {"$lt": now},
-    })
+    }, user))
 
     open_work_total = overdue_pm_scheduled + overdue_pm_instances
 
     # MTBF proxy: mean days between resolved threats per equipment (90d window)
     window_start = now - timedelta(days=90)
     equipment_ids = scope.get("linked_equipment_id", {}).get("$in") if scope else None
-    mtbf_by_equipment = await _mtbf_proxy_days(window_start, equipment_ids=equipment_ids)
+    mtbf_by_equipment = await _mtbf_proxy_days(
+        window_start, equipment_ids=equipment_ids, user=user
+    )
 
     fleet_mtbf_days = None
     if mtbf_by_equipment:
@@ -84,7 +91,7 @@ async def compute_executive_reliability_kpis(
         )
 
     worst_equipment = await _worst_mtbf_equipment(
-        window_start, limit=5, equipment_ids=equipment_ids
+        window_start, limit=5, equipment_ids=equipment_ids, user=user
     )
 
     return {
@@ -109,6 +116,7 @@ async def _mtbf_proxy_days(
     since: datetime,
     *,
     equipment_ids: Optional[List[str]] = None,
+    user: Optional[dict] = None,
 ) -> List[float]:
     """Return inter-failure intervals (days) per equipment from resolved threats."""
     match: Dict[str, Any] = {
@@ -119,6 +127,7 @@ async def _mtbf_proxy_days(
         match["linked_equipment_id"] = {"$in": equipment_ids}
     else:
         match["linked_equipment_id"] = {"$exists": True, "$ne": None}
+    match = merge_tenant_filter(match, user)
     pipeline = [
         {"$match": match},
         {"$sort": {"linked_equipment_id": 1, "created_at": 1}},
@@ -151,6 +160,7 @@ async def _worst_mtbf_equipment(
     *,
     limit: int = 5,
     equipment_ids: Optional[List[str]] = None,
+    user: Optional[dict] = None,
 ) -> List[dict]:
     """Equipment with shortest mean interval between failures (proxy)."""
     match: Dict[str, Any] = {
@@ -161,6 +171,7 @@ async def _worst_mtbf_equipment(
         match["linked_equipment_id"] = {"$in": equipment_ids}
     else:
         match["linked_equipment_id"] = {"$exists": True, "$ne": None}
+    match = merge_tenant_filter(match, user)
     pipeline = [
         {"$match": match},
         {"$sort": {"linked_equipment_id": 1, "created_at": 1}},

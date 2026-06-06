@@ -101,6 +101,58 @@ def _dedupe(ids: List[str]) -> List[str]:
     return out
 
 
+async def resolve_program_task_id(scheduled_task: Dict[str, Any]) -> Optional[str]:
+    """
+    Resolve the v2 nested program task id for graph edges from a scheduled_task.
+
+    Legacy rows store maintenance_programs.id in maintenance_program_id; v2 rows
+    store the nested tasks[].id (same field name, different semantics).
+    """
+    if not scheduled_task:
+        return None
+
+    explicit = scheduled_task.get("v2_task_id") or scheduled_task.get("program_task_id")
+    if explicit:
+        return str(explicit)
+
+    mp_id = scheduled_task.get("maintenance_program_id")
+    if not mp_id:
+        return None
+
+    if scheduled_task.get("program_source") == "v2":
+        return str(mp_id)
+
+    v2_hit = await db.maintenance_programs_v2.find_one(
+        {"tasks.id": mp_id},
+        {"_id": 0, "tasks.id": 1},
+    )
+    if v2_hit:
+        return str(mp_id)
+
+    legacy = await db.maintenance_programs.find_one(
+        {"id": mp_id},
+        {"_id": 0, "v2_task_id": 1},
+    )
+    if legacy and legacy.get("v2_task_id"):
+        return str(legacy["v2_task_id"])
+
+    equipment_id = scheduled_task.get("equipment_id")
+    task_name = (scheduled_task.get("task_name") or "").strip()
+    if equipment_id and task_name:
+        prog = await db.maintenance_programs_v2.find_one(
+            {"equipment_id": equipment_id},
+            {"_id": 0, "tasks": 1},
+        )
+        if prog:
+            name_lo = task_name.lower()
+            for task in prog.get("tasks") or []:
+                title = (task.get("task_title") or task.get("name") or "").strip().lower()
+                if title == name_lo and task.get("id"):
+                    return str(task["id"])
+
+    return None
+
+
 async def scheduler_program_ids_for_task_template(
     equipment_type_id: str,
     task_template_id: str,

@@ -63,7 +63,8 @@ async def get_form_templates(
         search=search,
         active_only=active_only,
         skip=skip,
-        limit=limit
+        limit=limit,
+        user=current_user,
     )
     
     if cache_key:
@@ -100,7 +101,7 @@ async def create_form_template(
 ):
     """Create a new form template."""
     from services.query_cache import query_cache
-    result = await form_service.create_template(data.model_dump(), current_user["id"])
+    result = await form_service.create_template(data.model_dump(), current_user["id"], user=current_user)
     query_cache.invalidate("form_templates")
     # Trigger auto-translation in background
     if result and result.get("id"):

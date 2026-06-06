@@ -6,20 +6,26 @@ from typing import Optional
 import logging
 import json
 from database import db, installation_filter
-from auth import get_current_user
+from auth import get_current_user, require_permission
 from failure_modes import FAILURE_MODES_LIBRARY
 from services.cache_service import cache
 from services.equipment_type_registry import equipment_type_id_set
+from services.tenant_schema import merge_tenant_filter, tenant_id_from_user
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Stats"])
 
+_tasks_read = require_permission("tasks:read")
+_observations_read = require_permission("observations:read")
+
+
 @router.get("/stats")
-async def get_stats(current_user: dict = Depends(get_current_user)):
+async def get_stats(current_user: dict = Depends(_tasks_read)):
     user_id = current_user["id"]
-    
+    tenant_key = tenant_id_from_user(current_user) or "legacy"
+
     # Check cache first
-    cache_key = f"stats:{user_id}"
+    cache_key = f"stats:{tenant_key}:{user_id}"
     cached = cache.get_stats(cache_key)
     if cached:
         return cached
@@ -49,6 +55,7 @@ async def get_stats(current_user: dict = Depends(get_current_user)):
     base_filter = installation_filter.build_threat_filter(
         user_id, equipment_ids, equipment_names
     )
+    base_filter = merge_tenant_filter(base_filter, current_user)
     
     if base_filter.get("_impossible"):
         result = {
@@ -89,7 +96,7 @@ async def get_stats(current_user: dict = Depends(get_current_user)):
 async def get_reliability_scores(
     node_id: Optional[str] = None,
     level: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_observations_read),
 ):
     """
     Calculate reliability performance scores across 6 dimensions:
@@ -103,10 +110,15 @@ async def get_reliability_scores(
     Returns scores per equipment and aggregated by hierarchy level.
     """
     user_id = current_user["id"]
-    
+    node_filter = merge_tenant_filter({"created_by": user_id}, current_user)
+    threat_filter = merge_tenant_filter({"created_by": user_id}, current_user)
+    inv_filter = merge_tenant_filter({"created_by": user_id}, current_user)
+    action_filter = merge_tenant_filter({"created_by": user_id}, current_user)
+    strategy_filter = merge_tenant_filter({}, current_user)
+
     # Get all hierarchy nodes with only needed fields
     nodes = await db.equipment_nodes.find(
-        {"created_by": user_id}, 
+        node_filter,
         {
             "_id": 0,
             "id": 1,
@@ -122,25 +134,25 @@ async def get_reliability_scores(
     
     # Get all threats with only needed fields
     threats = await db.threats.find(
-        {"created_by": user_id},
+        threat_filter,
         {"_id": 0, "id": 1, "asset_name": 1, "status": 1}
     ).to_list(1000)
     
     # Get all investigations with only needed fields
     investigations = await db.investigations.find(
-        {"created_by": user_id},
+        inv_filter,
         {"_id": 0, "id": 1, "threat_id": 1, "asset_name": 1}
     ).to_list(1000)
     
-    # Get all actions with only needed fields
-    actions = await db.actions.find(
-        {"created_by": user_id},
-        {"_id": 0, "id": 1, "threat_id": 1, "asset_name": 1, "status": 1}
+    # Get open/tracked actions (central_actions is canonical)
+    actions = await db.central_actions.find(
+        action_filter,
+        {"_id": 0, "id": 1, "source_id": 1, "source_name": 1, "status": 1, "threat_id": 1}
     ).to_list(1000)
     
     # Maintenance strategies (v2 canonical collection)
     strategies = await db.equipment_type_strategies.find(
-        {},
+        strategy_filter,
         {"_id": 0, "equipment_type_id": 1, "task_templates": 1, "status": 1},
     ).to_list(1000)
 
@@ -215,7 +227,15 @@ async def get_reliability_scores(
         
         # 5. Reactions Score (0-100)
         # Based on action plans and their completion
-        node_actions = [a for a in actions if node_name.lower() in (a.get("description", "") + a.get("source", "")).lower()]
+        node_actions = [
+            a for a in actions
+            if node_name.lower() in (
+                (a.get("description") or "")
+                + (a.get("source") or "")
+                + (a.get("source_name") or "")
+                + (a.get("title") or "")
+            ).lower()
+        ]
         completed_actions = [a for a in node_actions if a.get("status") == "completed"]
         
         if len(node_actions) > 0:

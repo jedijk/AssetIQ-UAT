@@ -14,12 +14,14 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from pydantic import BaseModel, Field
 
-from auth import get_current_user
+from auth import get_current_user, require_permission
 from database import db
 from services.storage_service import put_object_async, get_object_async, MIME_TYPES
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Granulometry"])
+
+_library_read = require_permission("library:read")
 
 FORM_TEMPLATE_NAME = "Granulometric analysis"
 
@@ -239,7 +241,7 @@ async def list_granulometry_form_records(
     bigBagNo: Optional[List[str]] = Query(None, description="Repeatable bag filter"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=250),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_library_read),
 ):
     # IMPORTANT:
     # Filter semantics should follow the *form's* "Date of test", not submitted_at.
@@ -291,7 +293,7 @@ async def list_granulometry_form_records(
 async def list_granulometry_form_big_bags(
     from_date: Optional[str] = Query(None, description="YYYY-MM-DD (filter by submitted_at date)"),
     to_date: Optional[str] = Query(None, description="YYYY-MM-DD (filter by submitted_at date)"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_library_read),
 ):
     res = await list_granulometry_form_records(
         from_date=from_date,
@@ -308,7 +310,7 @@ async def list_granulometry_form_big_bags(
 @router.post("/granulometry/records")
 async def create_granulometry_record(
     data: GranulometryCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("library:write")),
 ):
     now = datetime.now(timezone.utc).isoformat()
     rid = str(uuid.uuid4())
@@ -343,7 +345,7 @@ async def list_granulometry_records(
     bigBagNo: Optional[List[str]] = Query(None, description="Repeatable bag filter"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=250),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_library_read),
 ):
     query: Dict[str, Any] = {}
     if bigBagNo:
@@ -373,7 +375,7 @@ async def list_granulometry_records(
 @router.get("/granulometry/records/{record_id}")
 async def get_granulometry_record(
     record_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_library_read),
 ):
     doc = await db.granulometry_records.find_one({"id": record_id}, {"_id": 0})
     if not doc:
@@ -385,7 +387,7 @@ async def get_granulometry_record(
 async def update_granulometry_record(
     record_id: str,
     data: GranulometryUpdate,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("library:write")),
 ):
     existing = await db.granulometry_records.find_one({"id": record_id}, {"_id": 0})
     if not existing:
@@ -415,7 +417,7 @@ async def update_granulometry_record(
 @router.delete("/granulometry/records/{record_id}")
 async def delete_granulometry_record(
     record_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("library:write")),
 ):
     res = await db.granulometry_records.delete_one({"id": record_id})
     if res.deleted_count == 0:
@@ -427,7 +429,7 @@ async def delete_granulometry_record(
 async def list_big_bags(
     from_date: Optional[str] = Query(None, description="YYYY-MM-DD (filter by sampleDate)"),
     to_date: Optional[str] = Query(None, description="YYYY-MM-DD (filter by sampleDate)"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_library_read),
 ):
     query: Dict[str, Any] = {}
     if from_date or to_date:
@@ -459,7 +461,7 @@ MAX_IMAGE_SIZE = 8 * 1024 * 1024  # 8 MB
 @router.post("/granulometry/images/upload")
 async def upload_granulometry_image(
     file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_permission("library:write")),
 ):
     ext = file.filename.split(".")[-1].lower() if file.filename else "png"
     if ext not in ["jpg", "jpeg", "png", "gif", "webp"]:
@@ -489,7 +491,7 @@ async def upload_granulometry_image(
 @router.get("/granulometry/images/{image_id}")
 async def view_granulometry_image(
     image_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_library_read),
 ):
     doc = await db.granulometry_images.find_one({"id": image_id}, {"_id": 0})
     if not doc:

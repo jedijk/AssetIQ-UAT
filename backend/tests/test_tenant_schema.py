@@ -1,9 +1,13 @@
 """Tests for tenant_id pilot helpers."""
+import importlib
+
 from services.tenant_schema import (
     PILOT_COLLECTIONS,
     WAVE1_COLLECTIONS,
     WAVE2_COLLECTIONS,
+    WAVE3_COLLECTIONS,
     merge_tenant_filter,
+    prepend_tenant_match,
     tenant_filter,
     tenant_id_from_user,
     tenant_read_filter,
@@ -41,6 +45,30 @@ def test_wave2_collections():
     assert "task_instances" in WAVE2_COLLECTIONS
     assert "scheduled_tasks" in WAVE2_COLLECTIONS
     assert "central_actions" in WAVE2_COLLECTIONS
+
+
+def test_wave3_collections():
+    assert "failure_modes" in WAVE3_COLLECTIONS
+    assert "form_templates" in WAVE3_COLLECTIONS
+    assert "investigations" in WAVE3_COLLECTIONS
+    assert "reliability_edges" in WAVE3_COLLECTIONS
+
+
+def test_prepend_tenant_match():
+    user = {"company_id": "co-1"}
+    pip = prepend_tenant_match([{"$count": "c"}], user)
+    assert pip[0]["$match"]["$or"][0]["tenant_id"] == "co-1"
+
+
+def test_tenant_read_filter_strict_mode(monkeypatch):
+    monkeypatch.setenv("TENANT_STRICT_MODE", "true")
+    import importlib
+    import services.tenant_schema as ts
+
+    importlib.reload(ts)
+    assert ts.tenant_read_filter({"company_id": "co-1"}) == {"tenant_id": "co-1"}
+    monkeypatch.delenv("TENANT_STRICT_MODE", raising=False)
+    importlib.reload(ts)
 
 
 def test_tenant_read_filter_migration_safe():

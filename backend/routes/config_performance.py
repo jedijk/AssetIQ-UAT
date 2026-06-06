@@ -3,7 +3,8 @@ Optional server-driven overrides for client adaptive performance (lite vs full U
 """
 import os
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from auth import require_permission
 
 router = APIRouter(tags=["Config"])
 
@@ -14,7 +15,9 @@ def _env_bool(name: str) -> bool:
 
 
 @router.get("/config/performance")
-async def get_performance_config():
+async def get_performance_config(
+    current_user: dict = Depends(require_permission("settings:read")),
+):
     """
     Returns flags merged client-side with device detection.
     Defaults keep full UI unless deployment opts in via env.

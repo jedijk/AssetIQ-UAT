@@ -6,12 +6,15 @@ from datetime import datetime, timedelta, timezone
 
 from services.work_item_query import (
     _build_scheduled_task_query,
+    _merge_work_items_prefer_instances,
     _user_can_see_item,
+    _work_item_dedupe_key,
     serialize_scheduled_task_as_work_item,
     serialize_task,
     serialize_action_as_task,
     work_item_sort_key,
 )
+from services.work_execution_config import work_items_source_mode
 from services.tenant_schema import merge_tenant_filter
 
 
@@ -90,6 +93,58 @@ def test_scheduled_task_query_scoped_by_tenant():
     merged = merge_tenant_filter(base, {"company_id": "co-1"})
     assert "$and" in merged
     assert merged["$and"][1]["$or"][0]["tenant_id"] == "co-1"
+
+
+def test_work_item_dedupe_key_uses_scheduled_task_and_program():
+    inst = {
+        "scheduled_task_id": "st-1",
+        "equipment_id": "eq-1",
+        "v2_task_id": "task-1",
+        "due_date": "2026-06-10",
+    }
+    unbridged = {
+        "scheduled_task_id": "st-1",
+        "equipment_id": "eq-1",
+        "maintenance_program_id": "task-1",
+        "due_date": "2026-06-10",
+        "is_unbridged_maintenance": True,
+    }
+    assert _work_item_dedupe_key(inst) == _work_item_dedupe_key(unbridged)
+
+
+def test_merge_prefers_task_instance_over_unbridged_duplicate():
+    instance = serialize_task(
+        {
+            "_id": "ti-1",
+            "title": "From instance",
+            "scheduled_task_id": "st-9",
+            "equipment_id": "eq-1",
+            "v2_task_id": "prog-1",
+            "due_date": "2026-06-10",
+        }
+    )
+    unbridged = serialize_scheduled_task_as_work_item(
+        {
+            "id": "st-9",
+            "task_name": "Unbridged",
+            "due_date": "2026-06-10",
+            "equipment_id": "eq-1",
+            "maintenance_program_id": "prog-1",
+        }
+    )
+    merged = _merge_work_items_prefer_instances([instance], [unbridged])
+    assert len(merged) == 1
+    assert merged[0]["is_unbridged_maintenance"] is False
+
+
+def test_work_items_source_mode_defaults_hybrid(monkeypatch):
+    monkeypatch.delenv("WORK_ITEMS_SOURCE", raising=False)
+    assert work_items_source_mode() == "hybrid"
+
+
+def test_work_items_source_mode_v2_instances(monkeypatch):
+    monkeypatch.setenv("WORK_ITEMS_SOURCE", "v2_instances")
+    assert work_items_source_mode() == "v2_instances"
 
 
 def test_apply_strategy_handler_requires_payload():

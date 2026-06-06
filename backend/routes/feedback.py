@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from typing import Optional
 import uuid
 
-from auth import get_current_user
+from auth import get_current_user, require_permission, require_roles
 from services.ai_gateway import chat as ai_gateway_chat, user_context
 from models.feedback_models import (
     FeedbackCreate,
@@ -293,7 +293,7 @@ async def admin_get_unread_count(
 
 @router.post("/admin/mark-read")
 async def admin_mark_all_read(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("settings:write"))
 ):
     """Admin: Mark all feedback as read."""
     if current_user.get("role") not in ["admin", "manager", "owner"]:
@@ -324,7 +324,7 @@ async def admin_get_all_feedback(
 async def admin_update_feedback(
     feedback_id: str,
     update: FeedbackUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("settings:write"))
 ):
     """Admin: Update feedback status or add a response."""
     if current_user.get("role") not in ["admin", "manager", "owner"]:
@@ -343,7 +343,7 @@ async def admin_update_feedback(
 @router.delete("/admin/{feedback_id}")
 async def admin_delete_feedback(
     feedback_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("settings:write"))
 ):
     """Admin: Delete a feedback item."""
     if current_user.get("role") not in ["admin", "manager", "owner"]:
@@ -358,7 +358,7 @@ async def admin_delete_feedback(
 @router.post("/generate-prompt")
 async def generate_ai_prompt(
     data: dict,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(require_permission("settings:write"))
 ):
     """Generate an AI prompt from selected feedback items."""
     feedback_ids = data.get("feedback_ids", [])

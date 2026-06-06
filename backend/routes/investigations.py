@@ -24,8 +24,19 @@ from investigation_models import (
 from utils.auto_translate import translate_investigation
 from utils.mongo_regex import exact_case_insensitive
 from services.ai_gateway import chat as ai_gateway_chat, user_context
+from services.tenant_schema import merge_tenant_filter, with_tenant_id
 
 logger = logging.getLogger(__name__)
+
+
+def _inv_query(user: dict, *, inv_id: Optional[str] = None, extra: Optional[dict] = None) -> dict:
+    """Tenant-scoped investigation lookup filter."""
+    q: Dict[str, Any] = {"created_by": user["id"]}
+    if inv_id:
+        q["id"] = inv_id
+    if extra:
+        q.update(extra)
+    return merge_tenant_filter(q, user)
 
 # Defensive Reasoning Check System Prompt - Enhanced for better detection
 DEFENSIVE_REASONING_CHECK_PROMPT = """You are an expert in Root Cause Analysis (RCA) and reliability engineering. Your role is to help engineers write better problem statements by identifying and removing DEFENSIVE REASONING patterns that block effective investigation.
@@ -244,7 +255,7 @@ async def create_investigation(
         if similar_check["similar_incidents"]:
             linked_incident_id = similar_check["similar_incidents"][0]["id"]
     
-    inv_doc = {
+    inv_doc = with_tenant_id({
         "id": inv_id,
         "case_number": case_number,
         "title": data.title,
@@ -263,7 +274,7 @@ async def create_investigation(
         "created_by": current_user["id"],
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
-    }
+    }, current_user)
     
     await db.investigations.insert_one(inv_doc)
     inv_doc.pop("_id", None)
@@ -291,9 +302,10 @@ async def get_investigations(
     current_user: dict = Depends(_investigations_read)
 ):
     """Get all investigations for the current user."""
-    query = {"created_by": current_user["id"]}
+    base = {"created_by": current_user["id"]}
     if status:
-        query["status"] = status
+        base["status"] = status
+    query = merge_tenant_filter(base, current_user)
     
     investigations = await db.investigations.find(
         query, {"_id": 0}
@@ -357,7 +369,7 @@ async def get_investigation(
 ):
     """Get a specific investigation with all related data."""
     inv = await db.investigations.find_one(
-        {"id": inv_id, "created_by": current_user["id"]},
+        _inv_query(current_user, inv_id=inv_id),
         {"_id": 0}
     )
     if not inv:
@@ -410,7 +422,7 @@ async def update_investigation(
 ):
     """Update an investigation."""
     inv = await db.investigations.find_one(
-        {"id": inv_id, "created_by": current_user["id"]}
+        _inv_query(current_user, inv_id=inv_id)
     )
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
@@ -435,7 +447,7 @@ async def delete_investigation(
 ):
     """Delete an investigation and all related data. Optionally delete linked Central Actions."""
     inv = await db.investigations.find_one(
-        {"id": inv_id, "created_by": current_user["id"]}
+        _inv_query(current_user, inv_id=inv_id)
     )
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
@@ -475,13 +487,13 @@ async def create_timeline_event(
 ):
     """Add a timeline event to an investigation."""
     inv = await db.investigations.find_one(
-        {"id": inv_id, "created_by": current_user["id"]}
+        _inv_query(current_user, inv_id=inv_id)
     )
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
     
     event_id = str(uuid.uuid4())
-    event_doc = {
+    event_doc = with_tenant_id({
         "id": event_id,
         "investigation_id": inv_id,
         "event_time": data.event_time,
@@ -491,7 +503,7 @@ async def create_timeline_event(
         "confidence": data.confidence.value,
         "notes": data.notes,
         "created_at": datetime.now(timezone.utc).isoformat()
-    }
+    }, current_user)
     
     await db.timeline_events.insert_one(event_doc)
     event_doc.pop("_id", None)
@@ -546,13 +558,13 @@ async def create_failure_identification(
 ):
     """Add a failure identification to an investigation."""
     inv = await db.investigations.find_one(
-        {"id": inv_id, "created_by": current_user["id"]}
+        _inv_query(current_user, inv_id=inv_id)
     )
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
     
     failure_id = str(uuid.uuid4())
-    failure_doc = {
+    failure_doc = with_tenant_id({
         "id": failure_id,
         "investigation_id": inv_id,
         "asset_name": data.asset_name or "",
@@ -564,7 +576,7 @@ async def create_failure_identification(
         "failure_mode_id": data.failure_mode_id,
         "comment": data.comment or "",
         "created_at": datetime.now(timezone.utc).isoformat()
-    }
+    }, current_user)
     
     await db.failure_identifications.insert_one(failure_doc)
     failure_doc.pop("_id", None)
@@ -614,7 +626,7 @@ async def create_cause_node(
 ):
     """Add a cause node to the causal tree."""
     inv = await db.investigations.find_one(
-        {"id": inv_id, "created_by": current_user["id"]}
+        _inv_query(current_user, inv_id=inv_id)
     )
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
@@ -626,7 +638,7 @@ async def create_cause_node(
             raise HTTPException(status_code=400, detail="Parent cause node not found")
     
     cause_id = str(uuid.uuid4())
-    cause_doc = {
+    cause_doc = with_tenant_id({
         "id": cause_id,
         "investigation_id": inv_id,
         "description": data.description,
@@ -637,7 +649,7 @@ async def create_cause_node(
         "linked_event_id": data.linked_event_id,
         "linked_failure_id": data.linked_failure_id,
         "created_at": datetime.now(timezone.utc).isoformat()
-    }
+    }, current_user)
     
     await db.cause_nodes.insert_one(cause_doc)
     cause_doc.pop("_id", None)
@@ -705,7 +717,7 @@ async def create_action_item(
 ):
     """Add an action item to an investigation."""
     inv = await db.investigations.find_one(
-        {"id": inv_id, "created_by": current_user["id"]}
+        _inv_query(current_user, inv_id=inv_id)
     )
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
@@ -713,7 +725,7 @@ async def create_action_item(
     action_id = str(uuid.uuid4())
     action_number = await generate_action_number(inv_id)
     
-    action_doc = {
+    action_doc = with_tenant_id({
         "id": action_id,
         "investigation_id": inv_id,
         "action_number": action_number,
@@ -729,7 +741,7 @@ async def create_action_item(
         "completion_notes": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
-    }
+    }, current_user)
     
     await db.action_items.insert_one(action_doc)
     action_doc.pop("_id", None)
@@ -828,13 +840,13 @@ async def add_evidence(
 ):
     """Add evidence to an investigation."""
     inv = await db.investigations.find_one(
-        {"id": inv_id, "created_by": current_user["id"]}
+        _inv_query(current_user, inv_id=inv_id)
     )
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
     
     evidence_id = str(uuid.uuid4())
-    evidence_doc = {
+    evidence_doc = with_tenant_id({
         "id": evidence_id,
         "investigation_id": inv_id,
         "name": data.name,
@@ -844,7 +856,7 @@ async def add_evidence(
         "linked_event_id": data.linked_event_id,
         "linked_cause_id": data.linked_cause_id,
         "created_at": datetime.now(timezone.utc).isoformat()
-    }
+    }, current_user)
     
     await db.evidence_items.insert_one(evidence_doc)
     evidence_doc.pop("_id", None)
@@ -874,7 +886,7 @@ async def upload_investigation_file(
     """Upload a file to an investigation."""
     # Verify investigation exists
     inv = await db.investigations.find_one(
-        {"id": inv_id, "created_by": current_user["id"]}
+        _inv_query(current_user, inv_id=inv_id)
     )
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
@@ -998,7 +1010,7 @@ async def ai_problem_check(
     """
     # Verify investigation exists and user has access
     inv = await db.investigations.find_one(
-        {"id": inv_id, "created_by": current_user["id"]}
+        _inv_query(current_user, inv_id=inv_id)
     )
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
@@ -1060,7 +1072,7 @@ async def get_similar_incidents(
     Used to help identify recurring issues.
     """
     inv = await db.investigations.find_one(
-        {"id": inv_id, "created_by": current_user["id"]},
+        _inv_query(current_user, inv_id=inv_id),
         {"_id": 0}
     )
     if not inv:
@@ -1085,7 +1097,7 @@ async def get_linked_incident(
     Get the details of the linked previous incident for recurring analysis.
     """
     inv = await db.investigations.find_one(
-        {"id": inv_id, "created_by": current_user["id"]},
+        _inv_query(current_user, inv_id=inv_id),
         {"_id": 0}
     )
     if not inv:
@@ -1114,7 +1126,7 @@ async def update_recurring_quadrant(
     Update the IS/IS NOT quadrant data for recurring issue analysis.
     """
     inv = await db.investigations.find_one(
-        {"id": inv_id, "created_by": current_user["id"]}
+        _inv_query(current_user, inv_id=inv_id)
     )
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
@@ -1146,7 +1158,7 @@ async def link_incident(
     Link an investigation to a previous similar incident for recurring analysis.
     """
     inv = await db.investigations.find_one(
-        {"id": inv_id, "created_by": current_user["id"]}
+        _inv_query(current_user, inv_id=inv_id)
     )
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
@@ -1189,7 +1201,7 @@ async def unlink_incident(
     Remove the link to a previous incident.
     """
     inv = await db.investigations.find_one(
-        {"id": inv_id, "created_by": current_user["id"]}
+        _inv_query(current_user, inv_id=inv_id)
     )
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
