@@ -271,9 +271,14 @@ class BackgroundJobService:
 
     async def claim_next_pending(self, job_types: Optional[list] = None) -> Optional[dict]:
         """Atomically claim the oldest pending job for an external worker process."""
+        from services.worker_config import worker_tenant_id
+
         filt: dict = {"status": JobStatus.PENDING.value}
         if job_types:
             filt["job_type"] = {"$in": job_types}
+        tenant = worker_tenant_id()
+        if tenant:
+            filt["tenant_id"] = tenant
         try:
             return await self._collection().find_one_and_update(
                 filt,

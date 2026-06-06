@@ -9,6 +9,10 @@ own long-running Apply Strategy batches.
 Set ``USE_EXTERNAL_BACKGROUND_WORKER=true`` on the API so async Apply Strategy
 jobs are enqueued only (not executed in-process).
 
+Optional ``WORKER_TENANT_ID`` scopes the worker to jobs for one tenant
+(``company_id`` / ``organization_id`` on the job record). Leave unset to claim
+jobs for all tenants.
+
 Usage:
     cd backend && python scripts/run_background_worker.py
     cd backend && python scripts/run_background_worker.py --once

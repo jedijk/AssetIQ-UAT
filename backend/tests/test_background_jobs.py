@@ -78,3 +78,34 @@ async def test_create_record_omits_tenant_id_when_absent(job_service):
 
     doc = coll.insert_one.call_args[0][0]
     assert "tenant_id" not in doc
+
+
+@pytest.mark.asyncio
+async def test_claim_next_pending_filters_by_worker_tenant_id(job_service, monkeypatch):
+    coll = MagicMock()
+    coll.find_one_and_update = AsyncMock(return_value={"id": "job-1", "tenant_id": "tenant-a"})
+
+    monkeypatch.setenv("WORKER_TENANT_ID", "tenant-a")
+
+    with patch.object(job_service, "_collection", return_value=coll):
+        job = await job_service.claim_next_pending(["apply_strategy"])
+
+    assert job is not None
+    filt = coll.find_one_and_update.call_args[0][0]
+    assert filt["status"] == JobStatus.PENDING.value
+    assert filt["job_type"] == {"$in": ["apply_strategy"]}
+    assert filt["tenant_id"] == "tenant-a"
+
+
+@pytest.mark.asyncio
+async def test_claim_next_pending_omits_tenant_filter_when_env_unset(job_service, monkeypatch):
+    coll = MagicMock()
+    coll.find_one_and_update = AsyncMock(return_value=None)
+
+    monkeypatch.delenv("WORKER_TENANT_ID", raising=False)
+
+    with patch.object(job_service, "_collection", return_value=coll):
+        await job_service.claim_next_pending()
+
+    filt = coll.find_one_and_update.call_args[0][0]
+    assert "tenant_id" not in filt

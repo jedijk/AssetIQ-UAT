@@ -66,6 +66,8 @@ Exit `0` = all gates passed; `2` = one or more gates failed.
 
 **External background worker** — set `USE_EXTERNAL_BACKGROUND_WORKER=true` so the API only enqueues jobs to MongoDB; `run_background_worker.py` executes them (Railway sidecar).
 
+**Worker tenant scoping** — set `WORKER_TENANT_ID=<company_id>` on a dedicated worker instance to claim only that tenant's jobs (matches `tenant_id` on `background_jobs` records). Omit for a shared worker that processes all tenants.
+
 **Job polling** — async apply-strategy and PM Import AI review return `job_id`; poll:
 
 - `GET /maintenance-scheduler/jobs/{job_id}`

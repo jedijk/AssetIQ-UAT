@@ -422,6 +422,12 @@ async def get_application_metrics(
         from services.background_jobs import background_job_service
 
         queue_health = await background_job_service.get_queue_health()
+        from services.scheduler_config import (
+            should_read_legacy_maintenance_programs,
+            should_sync_legacy_maintenance_programs,
+        )
+        from services.worker_config import use_external_background_worker
+
         observability = {
             "redis": redis_status(),
             "slow_query_threshold_ms": SLOW_QUERY_MS,
@@ -430,6 +436,11 @@ async def get_application_metrics(
                 "script": "backend/scripts/run_background_worker.py",
                 "handlers": ["apply_strategy", "pm_import_ai_review"],
                 "external_mode_env": "USE_EXTERNAL_BACKGROUND_WORKER",
+            },
+            "maintenance_domain": {
+                "read_legacy_maintenance_programs": should_read_legacy_maintenance_programs(),
+                "sync_legacy_maintenance_programs": should_sync_legacy_maintenance_programs(),
+                "use_external_background_worker": use_external_background_worker(),
             },
         }
     except Exception as exc:

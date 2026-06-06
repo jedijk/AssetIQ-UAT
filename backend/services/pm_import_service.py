@@ -3731,6 +3731,27 @@ Respond with a JSON object:
             "failure_mode_id": mode_id_str,
         }
 
+    async def _sync_pm_import_graph_edge(
+        self,
+        task: Dict[str, Any],
+        task_id: str,
+        failure_mode_id: str,
+        apply_mode: str,
+    ) -> None:
+        try:
+            from services.reliability_graph import sync_edge_for_pm_import_task
+
+            equip_match = task.get("equipment_match") or {}
+            await sync_edge_for_pm_import_task(
+                task_id=task_id,
+                failure_mode_id=failure_mode_id,
+                equipment_id=equip_match.get("equipment_id") or task.get("equipment_id"),
+                equipment_type_id=equip_match.get("equipment_type_id"),
+                apply_mode=apply_mode,
+            )
+        except Exception as exc:
+            logger.warning("pm import graph edge sync failed: %s", exc)
+
     async def apply_task_to_failure_mode(
         self,
         session_id: str,
@@ -3785,19 +3806,12 @@ Respond with a JSON object:
             )
             if task.get("review_status") == "accepted":
                 task["review_status"] = "implemented"
-            try:
-                from services.reliability_graph import sync_edge_for_pm_import_task
-
-                equip_match = task.get("equipment_match") or {}
-                await sync_edge_for_pm_import_task(
-                    task_id=task_id,
-                    failure_mode_id=apply_res.get("failure_mode_id") or target_failure_mode_id,
-                    equipment_id=equip_match.get("equipment_id") or task.get("equipment_id"),
-                    equipment_type_id=equip_match.get("equipment_type_id"),
-                    apply_mode=apply_res.get("mode") or "added",
-                )
-            except Exception as exc:
-                logger.warning("pm import graph edge sync failed: %s", exc)
+            await self._sync_pm_import_graph_edge(
+                task,
+                task_id,
+                apply_res.get("failure_mode_id") or target_failure_mode_id,
+                apply_res.get("mode") or "added",
+            )
 
         await self.sessions_collection.update_one(
             {"session_id": session_id},
@@ -3876,6 +3890,12 @@ Respond with a JSON object:
                     )
                     if task.get("review_status") == "accepted":
                         task["review_status"] = "implemented"
+                    await self._sync_pm_import_graph_edge(
+                        task,
+                        task_id,
+                        apply_res.get("failure_mode_id") or target_failure_mode_id,
+                        apply_res.get("mode") or "existing",
+                    )
                     result["message"] = (
                         apply_res.get("message")
                         or "Updated existing failure mode task with type and discipline"
@@ -3898,6 +3918,12 @@ Respond with a JSON object:
                     )
                     if task.get("review_status") == "accepted":
                         task["review_status"] = "implemented"
+                    await self._sync_pm_import_graph_edge(
+                        task,
+                        task_id,
+                        apply_res.get("failure_mode_id") or target_failure_mode_id,
+                        apply_res.get("mode") or "added",
+                    )
         
         elif action == "new_failure_mode":
             # Create new failure mode — but prefer merge when a library match exists.
@@ -3939,6 +3965,12 @@ Respond with a JSON object:
                     )
                     if task.get("review_status") == "accepted":
                         task["review_status"] = "implemented"
+                    await self._sync_pm_import_graph_edge(
+                        task,
+                        task_id,
+                        apply_res.get("failure_mode_id") or merge_target_id,
+                        apply_res.get("mode") or "added",
+                    )
                     result["message"] = (
                         f"Linked to existing failure mode instead of creating new: {fm_name}"
                     )
@@ -3968,6 +4000,12 @@ Respond with a JSON object:
                     )
                     if task.get("review_status") == "accepted":
                         task["review_status"] = "implemented"
+                    await self._sync_pm_import_graph_edge(
+                        task,
+                        task_id,
+                        created_fm.get("id"),
+                        "new_failure_mode",
+                    )
                 else:
                     result["message"] = "Failed to create failure mode"
         
@@ -3994,6 +4032,12 @@ Respond with a JSON object:
                     )
                     if task.get("review_status") == "accepted":
                         task["review_status"] = "implemented"
+                    await self._sync_pm_import_graph_edge(
+                        task,
+                        task_id,
+                        apply_res.get("failure_mode_id") or target_failure_mode_id,
+                        apply_res.get("mode") or "added",
+                    )
             else:
                 result["message"] = "No target failure mode specified"
         
