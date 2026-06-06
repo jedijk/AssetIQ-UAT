@@ -123,6 +123,12 @@ import {
   PRODUCTION_DASH_INFO_ACTION_EDIT,
   PRODUCTION_DASH_INFO_ACTION_DELETE,
 } from "../dashboard/productionDashboardShared";
+import { ProductionDashboardHeader } from "./ProductionDashboardHeader";
+import { ProductionDashboardKPIs } from "./ProductionDashboardKPIs";
+import { ProductionShiftPanels } from "./ProductionShiftPanels";
+import { ProductionLogTable } from "./ProductionLogTable";
+import { ProductionDashboardModals } from "./ProductionDashboardModals";
+import { MooneyViscosityChart } from "./MooneyViscosityChart";
 
 // ──────────────────────────────────────────
 // Main component
