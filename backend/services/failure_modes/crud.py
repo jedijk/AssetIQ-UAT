@@ -1,0 +1,690 @@
+"""Failure mode CRUD and serialization."""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import Optional, List, Dict, Any, Tuple, Set
+import asyncio
+from bson import ObjectId
+from motor.motor_asyncio import AsyncIOMotorDatabase
+from difflib import SequenceMatcher
+import logging
+import re
+import time
+
+from utils.mongo_regex import escape_regex, exact_case_insensitive
+from services.ai_gateway import chat as ai_gateway_chat
+from services.failure_modes.cache import _cache, _invalidate_cache
+
+logger = logging.getLogger(__name__)
+
+
+class FailureModesMixin:
+    """Mixin — use only via FailureModesService."""
+
+    async def get_all(
+        self,
+        category: Optional[str] = None,
+        equipment: Optional[str] = None,
+        search: Optional[str] = None,
+        min_rpn: Optional[int] = None,
+        equipment_type_id: Optional[str] = None,
+        mechanism: Optional[str] = None,
+        is_validated: Optional[bool] = None,
+        failure_mode_type: Optional[str] = None,
+        recently_added_days: Optional[int] = None,
+        skip: int = 0,
+        limit: int = 500
+    ) -> Dict[str, Any]:
+        """Get failure modes with optional filters."""
+        import asyncio
+        from datetime import timedelta
+        
+        # Check if this is a default query (no filters, first page, default limit)
+        # NOTE: limit must equal the default exactly — a larger limit must bypass the
+        # cache so users with > 500 failure modes can actually load all of them.
+        is_default_query = (
+            not category or category.lower() == "all"
+        ) and not equipment and not search and not min_rpn and not equipment_type_id and not mechanism and is_validated is None and (
+            not failure_mode_type or failure_mode_type.lower() == "all"
+        ) and not recently_added_days and skip == 0 and limit == 500
+        
+        # Use cache for default unfiltered query
+        if is_default_query:
+            now = time.time()
+            if _cache["all_modes"] is not None and (now - _cache["all_modes_timestamp"]) < _cache["cache_ttl"]:
+                logger.debug("[FailureModesService] Returning cached failure modes")
+                return _cache["all_modes"]
+        
+        # Build query
+        query = {}
+        
+        if category and category.lower() != "all":
+            from utils.mongo_regex import exact_case_insensitive
+
+            query["category"] = exact_case_insensitive(category)
+        
+        if equipment:
+            from utils.mongo_regex import exact_case_insensitive
+
+            query["equipment"] = exact_case_insensitive(equipment)
+        
+        if min_rpn:
+            query["rpn"] = {"$gte": min_rpn}
+        
+        if equipment_type_id:
+            query["equipment_type_ids"] = equipment_type_id
+        
+        if mechanism:
+            from utils.mongo_regex import case_insensitive_contains
+
+            mechanism_match = case_insensitive_contains(mechanism)
+            if mechanism_match:
+                query["mechanism"] = mechanism_match
+        
+        if is_validated is not None:
+            query["is_validated"] = is_validated
+        
+        # Filter by failure mode type (generic vs customer_specific)
+        if failure_mode_type and failure_mode_type.lower() not in ["all", "recently_added"]:
+            query["failure_mode_type"] = failure_mode_type.lower()
+        
+        # Filter by recently added (within X days)
+        if recently_added_days or (failure_mode_type and failure_mode_type.lower() == "recently_added"):
+            days = recently_added_days or 30
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+            query["created_at"] = {"$gte": cutoff_date}
+        
+        # Text search across multiple fields
+        if search:
+            from utils.mongo_regex import or_search_fields
+
+            search_clause = or_search_fields(
+                search,
+                "failure_mode",
+                "equipment",
+                "category",
+                "keywords",
+                "recommended_actions",
+                "mechanism",
+            )
+            if search_clause:
+                query.update(search_clause)
+        
+        # Execute count and fetch in PARALLEL for performance
+        count_task = self.collection.count_documents(query) if query else self.collection.estimated_document_count()
+        fetch_task = self.collection.find(query).sort("rpn", -1).skip(skip).limit(limit).to_list(length=limit)
+        
+        total, raw_docs = await asyncio.gather(count_task, fetch_task)
+        
+        failure_modes = [self._serialize(doc) for doc in raw_docs]
+        
+        result = {
+            "total": total,
+            "failure_modes": failure_modes
+        }
+        
+        # Cache default query result
+        if is_default_query:
+            _cache["all_modes"] = result
+            _cache["all_modes_timestamp"] = time.time()
+            logger.info(f"[FailureModesService] Cached {total} failure modes")
+        
+        return result
+    
+    async def get_by_id(self, mode_id: str) -> Optional[Dict[str, Any]]:
+        """Get a failure mode by MongoDB _id or legacy_id."""
+        
+        # Try ObjectId first
+        if ObjectId.is_valid(mode_id):
+            doc = await self.collection.find_one({"_id": ObjectId(mode_id)})
+            if doc:
+                return self._serialize(doc)
+        
+        # Try legacy_id (integer)
+        try:
+            legacy_id = int(mode_id)
+            doc = await self.collection.find_one({"legacy_id": legacy_id})
+            if doc:
+                return self._serialize(doc)
+        except ValueError:
+            pass
+        
+        return None
+    
+    async def get_by_legacy_id(self, legacy_id: int) -> Optional[Dict[str, Any]]:
+        """Get a failure mode by its original legacy ID."""
+        doc = await self.collection.find_one({"legacy_id": legacy_id})
+        if doc:
+            return self._serialize(doc)
+        return None
+    
+    async def get_by_name(self, failure_mode_name: str) -> Optional[Dict[str, Any]]:
+        """Get a failure mode by exact name match (case-insensitive)."""
+        doc = await self.collection.find_one({
+            "failure_mode": exact_case_insensitive(failure_mode_name)
+        })
+        if doc:
+            return self._serialize(doc)
+        return None
+    
+    # Alias for find_by_name for semantic clarity
+    async def find_by_name(self, failure_mode_name: str) -> Optional[Dict[str, Any]]:
+        """Alias for get_by_name - checks if a failure mode with this name exists."""
+        return await self.get_by_name(failure_mode_name)
+    
+    async def search_by_keywords(self, keywords: List[str]) -> List[Dict[str, Any]]:
+        """Find failure modes matching any of the provided keywords."""
+        escaped = [escape_regex(k) for k in keywords if k]
+        keyword_or: List[Dict[str, Any]] = [
+            {"keywords": {"$in": [k.lower() for k in keywords]}},
+        ]
+        if escaped:
+            keyword_or.append(
+                {"failure_mode": {"$regex": "|".join(escaped), "$options": "i"}}
+            )
+        query = {"$or": keyword_or}
+        
+        cursor = self.collection.find(query).sort("rpn", -1)
+        results = []
+        async for doc in cursor:
+            results.append(self._serialize(doc))
+        return results
+    
+    async def get_categories(self) -> List[str]:
+        """Get all unique categories."""
+        categories = await self.collection.distinct("category")
+        return sorted(categories)
+    
+    async def get_equipment_types(self) -> List[str]:
+        """Get all unique equipment type IDs."""
+        # Aggregate to unwind and get distinct values
+        pipeline = [
+            {"$unwind": "$equipment_type_ids"},
+            {"$group": {"_id": "$equipment_type_ids"}},
+            {"$sort": {"_id": 1}}
+        ]
+        
+        types = []
+        async for doc in self.collection.aggregate(pipeline):
+            if doc["_id"]:
+                types.append(doc["_id"])
+        return types
+    
+    async def get_mechanisms(self) -> List[str]:
+        """Get all unique ISO 14224 mechanisms."""
+        mechanisms = await self.collection.distinct("mechanism")
+        return sorted([m for m in mechanisms if m])
+    
+    async def get_high_risk(self, threshold: int = 150) -> List[Dict[str, Any]]:
+        """Get failure modes with RPN above threshold."""
+        cursor = self.collection.find({"rpn": {"$gte": threshold}}).sort("rpn", -1)
+        
+        results = []
+        async for doc in cursor:
+            fm = self._serialize(doc)
+            fm["likelihood_score"] = min(100, fm["rpn"] // 10)
+            results.append(fm)
+        return results
+    
+    async def get_by_equipment_type(self, equipment_type_id: str) -> List[Dict[str, Any]]:
+        """Get all failure modes linked to a specific equipment type."""
+        cursor = self.collection.find({"equipment_type_ids": equipment_type_id}).sort("rpn", -1)
+        
+        results = []
+        async for doc in cursor:
+            results.append(self._serialize(doc))
+        return results
+    
+    # ============== WRITE OPERATIONS ==============
+    
+    async def create(self, data: Dict[str, Any], created_by: Optional[str] = None) -> Dict[str, Any]:
+        """Create a new failure mode."""
+        now = datetime.now(timezone.utc)
+        
+        # Calculate RPN
+        rpn = data["severity"] * data["occurrence"] * data["detectability"]
+        
+        # Get next legacy_id
+        max_doc = await self.collection.find_one(sort=[("legacy_id", -1)])
+        next_legacy_id = (max_doc.get("legacy_id", 0) if max_doc else 0) + 1
+        
+        doc = {
+            "legacy_id": next_legacy_id,
+            "category": data["category"],
+            "equipment": data["equipment"],
+            "failure_mode": data["failure_mode"],
+            "keywords": data.get("keywords", []),
+            "severity": data["severity"],
+            "occurrence": data["occurrence"],
+            "detectability": data["detectability"],
+            "rpn": rpn,
+            "recommended_actions": data.get("recommended_actions", []),
+            "equipment_type_ids": data.get("equipment_type_ids", []),
+            "mechanism": data.get("mechanism", "UNK - Unknown"),
+            "failure_mode_type": data.get("failure_mode_type", "generic"),
+            # New fields for failure mode enhancements
+            "process": data.get("process"),
+            "potential_effects": data.get("potential_effects"),
+            "potential_causes": data.get("potential_causes"),
+            "iso14224_mechanism": data.get("iso14224_mechanism"),
+            "is_validated": False,
+            "validated_by_name": None,
+            "validated_by_position": None,
+            "validated_at": None,
+            "is_custom": True,
+            "is_builtin": False,
+            "created_by": created_by,
+            "created_at": now,
+            "updated_at": now,
+        }
+        
+        result = await self.collection.insert_one(doc)
+        doc["_id"] = result.inserted_id
+        
+        # Invalidate cache after creation
+        _invalidate_cache()
+        
+        return self._serialize(doc)
+    
+    async def update(self, mode_id: str, data: Dict[str, Any], updated_by: Optional[str] = None, change_reason: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Update a failure mode with version history. Returns updated doc or None if not found."""
+        
+        # Find the document first
+        query = self._build_id_query(mode_id)
+        if not query:
+            return None
+        
+        existing = await self.collection.find_one(query)
+        if not existing:
+            return None
+        
+        # Save current state as a version before updating
+        await self._save_version(existing, updated_by, change_reason)
+        
+        # Build update
+        update_fields = {"updated_at": datetime.now(timezone.utc)}
+        
+        # Track version number
+        current_version = existing.get("version", 1)
+        update_fields["version"] = current_version + 1
+        
+        # Update allowed fields
+        allowed_fields = [
+            "category", "equipment", "failure_mode", "keywords",
+            "severity", "occurrence", "detectability",
+            "recommended_actions", "equipment_type_ids", "mechanism",
+            "failure_mode_type",
+            # New fields for failure mode enhancements
+            "process", "potential_effects", "potential_causes", "iso14224_mechanism",
+            # AI provenance
+            "ai_improved_at",
+        ]
+        
+        for field in allowed_fields:
+            if field in data and data[field] is not None:
+                update_fields[field] = data[field]
+        
+        # Recalculate RPN if FMEA scores changed
+        severity = data.get("severity", existing["severity"])
+        occurrence = data.get("occurrence", existing["occurrence"])
+        detectability = data.get("detectability", existing["detectability"])
+        update_fields["rpn"] = severity * occurrence * detectability
+        
+        # Check if FMEA scores changed (for propagation)
+        fmea_changed = (
+            data.get("severity") is not None or
+            data.get("occurrence") is not None or
+            data.get("detectability") is not None
+        )
+        
+        # Perform update
+        result = await self.collection.find_one_and_update(
+            query,
+            {"$set": update_fields},
+            return_document=True
+        )
+        
+        if result:
+            # Invalidate cache after update
+            _invalidate_cache()
+            serialized = self._serialize(result)
+            serialized["fmea_changed"] = fmea_changed
+            serialized["old_failure_mode_name"] = existing["failure_mode"]
+            return serialized
+        
+        return None
+    
+    async def _save_version(self, doc: Dict[str, Any], updated_by: Optional[str] = None, change_reason: Optional[str] = None) -> None:
+        """Save a version snapshot of the failure mode."""
+        
+        # Get the failure mode ID (could be ObjectId or legacy_id)
+        fm_id = str(doc["_id"])
+        
+        # Build version document
+        version_doc = {
+            "failure_mode_id": fm_id,
+            "version": doc.get("version", 1),
+            "snapshot": {
+                "category": doc.get("category"),
+                "equipment": doc.get("equipment"),
+                "failure_mode": doc.get("failure_mode"),
+                "keywords": doc.get("keywords", []),
+                "severity": doc.get("severity"),
+                "occurrence": doc.get("occurrence"),
+                "detectability": doc.get("detectability"),
+                "rpn": doc.get("rpn"),
+                "recommended_actions": doc.get("recommended_actions", []),
+                "equipment_type_ids": doc.get("equipment_type_ids", []),
+                "mechanism": doc.get("mechanism"),
+                "failure_mode_type": doc.get("failure_mode_type", "generic"),
+                "process": doc.get("process"),
+                "potential_effects": doc.get("potential_effects"),
+                "potential_causes": doc.get("potential_causes"),
+                "iso14224_mechanism": doc.get("iso14224_mechanism"),
+                "is_validated": doc.get("is_validated", False),
+                "validated_by_name": doc.get("validated_by_name"),
+                "validated_by_position": doc.get("validated_by_position"),
+                "validated_by_id": doc.get("validated_by_id"),
+                "validated_at": doc.get("validated_at"),
+            },
+            "updated_by": updated_by,
+            "change_reason": change_reason,
+            "created_at": datetime.now(timezone.utc),
+        }
+        
+        await self.versions_collection.insert_one(version_doc)
+    
+    async def get_versions(self, mode_id: str) -> List[Dict[str, Any]]:
+        """Get version history for a failure mode."""
+        
+        # Get current document to find the correct ID format
+        query = self._build_id_query(mode_id)
+        if not query:
+            return []
+        
+        existing = await self.collection.find_one(query)
+        if not existing:
+            return []
+        
+        fm_id = str(existing["_id"])
+        
+        # Fetch all versions sorted by version number descending
+        cursor = self.versions_collection.find(
+            {"failure_mode_id": fm_id}
+        ).sort("version", -1)
+        
+        versions = []
+        async for doc in cursor:
+            versions.append({
+                "id": str(doc["_id"]),
+                "version": doc["version"],
+                "snapshot": doc["snapshot"],
+                "updated_by": doc.get("updated_by"),
+                "change_reason": doc.get("change_reason"),
+                "created_at": doc["created_at"].isoformat() if doc.get("created_at") else None,
+            })
+        
+        return versions
+    
+    async def rollback_to_version(self, mode_id: str, version_id: str, rolled_back_by: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Rollback a failure mode to a specific version without creating a new version entry."""
+        
+        # Find the version
+        if not ObjectId.is_valid(version_id):
+            return None
+        
+        version_doc = await self.versions_collection.find_one({"_id": ObjectId(version_id)})
+        if not version_doc:
+            return None
+        
+        snapshot = version_doc.get("snapshot", {})
+        if not snapshot:
+            return None
+        
+        # Find the current document
+        query = self._build_id_query(mode_id)
+        if not query:
+            return None
+        
+        existing = await self.collection.find_one(query)
+        if not existing:
+            return None
+        
+        target_version = version_doc.get("version", 1)
+        
+        # Build rollback update — restore to the target version's state
+        rollback_fields = {
+            "category": snapshot.get("category"),
+            "equipment": snapshot.get("equipment"),
+            "failure_mode": snapshot.get("failure_mode"),
+            "keywords": snapshot.get("keywords", []),
+            "severity": snapshot.get("severity"),
+            "occurrence": snapshot.get("occurrence"),
+            "detectability": snapshot.get("detectability"),
+            "rpn": snapshot.get("rpn"),
+            "recommended_actions": snapshot.get("recommended_actions", []),
+            "equipment_type_ids": snapshot.get("equipment_type_ids", []),
+            "mechanism": snapshot.get("mechanism"),
+            "failure_mode_type": snapshot.get("failure_mode_type", "generic"),
+            "process": snapshot.get("process"),
+            "potential_effects": snapshot.get("potential_effects"),
+            "potential_causes": snapshot.get("potential_causes"),
+            "iso14224_mechanism": snapshot.get("iso14224_mechanism"),
+            "is_validated": snapshot.get("is_validated", False),
+            "validated_by_name": snapshot.get("validated_by_name"),
+            "validated_by_position": snapshot.get("validated_by_position"),
+            "validated_at": snapshot.get("validated_at"),
+            "updated_at": datetime.now(timezone.utc),
+            "version": target_version,
+            "rolled_back_from_version": target_version,
+            "rolled_back_by": rolled_back_by,
+            "rolled_back_at": datetime.now(timezone.utc).isoformat(),
+        }
+        
+        # Delete all version entries NEWER than the target version
+        await self.versions_collection.delete_many({
+            "failure_mode_id": mode_id,
+            "version": {"$gt": target_version}
+        })
+        
+        # Perform rollback — set version to the target version
+        result = await self.collection.find_one_and_update(
+            query,
+            {"$set": rollback_fields},
+            return_document=True
+        )
+        
+        if result:
+            # Invalidate cache after rollback
+            _invalidate_cache()
+            return self._serialize(result)
+        
+        return None
+    
+    async def validate(
+        self,
+        mode_id: str,
+        validated_by_name: str,
+        validated_by_position: str,
+        validated_by_id: str = None
+    ) -> Optional[Dict[str, Any]]:
+        """Mark a failure mode as validated."""
+        
+        query = self._build_id_query(mode_id)
+        if not query:
+            return None
+        
+        update = {
+            "$set": {
+                "is_validated": True,
+                "validated_by_name": validated_by_name,
+                "validated_by_position": validated_by_position,
+                "validated_by_id": validated_by_id,
+                "validated_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc),
+            }
+        }
+        
+        result = await self.collection.find_one_and_update(
+            query, update, return_document=True
+        )
+        
+        if result:
+            # Invalidate cache after validation
+            _invalidate_cache()
+            return self._serialize(result)
+        return None
+    
+    async def unvalidate(self, mode_id: str) -> Optional[Dict[str, Any]]:
+        """Remove validation from a failure mode."""
+        
+        query = self._build_id_query(mode_id)
+        if not query:
+            return None
+        
+        update = {
+            "$set": {
+                "is_validated": False,
+                "validated_by_name": None,
+                "validated_by_position": None,
+                "validated_at": None,
+                "updated_at": datetime.now(timezone.utc),
+            }
+        }
+        
+        result = await self.collection.find_one_and_update(
+            query, update, return_document=True
+        )
+        
+        if result:
+            # Invalidate cache after unvalidation
+            _invalidate_cache()
+            return self._serialize(result)
+        return None
+    
+    async def delete(self, mode_id: str) -> bool:
+        """Delete a failure mode. Any failure mode can be deleted."""
+        
+        query = self._build_id_query(mode_id)
+        if not query:
+            return False
+        
+        # Check if exists
+        existing = await self.collection.find_one(query)
+        if not existing:
+            return False
+        
+        # Save version before deleting (for potential recovery via undo)
+        await self._save_version(existing, updated_by="System", change_reason="Deleted")
+        
+        result = await self.collection.delete_one(query)
+        
+        # Invalidate cache after deletion
+        if result.deleted_count > 0:
+            _invalidate_cache()
+        
+        return result.deleted_count > 0
+    
+    # ============== HELPER METHODS ==============
+    
+    def _build_id_query(self, mode_id: str) -> Optional[Dict]:
+        """Build a query dict for finding by _id or legacy_id."""
+        
+        # Try ObjectId
+        if ObjectId.is_valid(mode_id):
+            return {"_id": ObjectId(mode_id)}
+        
+        # Try legacy_id
+        try:
+            return {"legacy_id": int(mode_id)}
+        except ValueError:
+            return None
+    
+    def _serialize(self, doc: Dict) -> Dict[str, Any]:
+        """Convert MongoDB document to API response format."""
+        
+        def safe_isoformat(val):
+            """Safely convert datetime to ISO string, handling already-string values."""
+            if val is None:
+                return None
+            if isinstance(val, str):
+                return val  # Already a string
+            if hasattr(val, 'isoformat'):
+                return val.isoformat()
+            return str(val)
+        
+        result = {
+            "id": str(doc["_id"]),
+            "legacy_id": doc.get("legacy_id"),
+            "category": doc["category"],
+            "equipment": doc["equipment"],
+            "failure_mode": doc["failure_mode"],
+            "keywords": doc.get("keywords", []),
+            "severity": doc["severity"],
+            "occurrence": doc["occurrence"],
+            "detectability": doc["detectability"],
+            "rpn": doc["rpn"],
+            "recommended_actions": doc.get("recommended_actions", []),
+            "equipment_type_ids": doc.get("equipment_type_ids", []),
+            # ISO 14224 enhanced fields
+            "mechanism": doc.get("mechanism", "UNK"),
+            "mechanism_description": doc.get("mechanism_description", "Unknown"),
+            "potential_effects": doc.get("potential_effects", []),
+            "potential_causes": doc.get("potential_causes", []),
+            # Legacy fields
+            "process": doc.get("process"),
+            "iso14224_mechanism": doc.get("iso14224_mechanism"),
+            "is_validated": doc.get("is_validated", False),
+            "validated_by_name": doc.get("validated_by_name"),
+            "validated_by_position": doc.get("validated_by_position"),
+            "validated_by_id": doc.get("validated_by_id"),
+            "validated_at": safe_isoformat(doc.get("validated_at")),
+            "is_custom": doc.get("is_custom", False),
+            "is_builtin": doc.get("is_builtin", True),
+            "failure_mode_type": doc.get("failure_mode_type", "generic"),
+            "version": doc.get("version", 1),
+            "rolled_back_from_version": doc.get("rolled_back_from_version"),
+            "ai_improved_at": safe_isoformat(doc.get("ai_improved_at")) if not isinstance(doc.get("ai_improved_at"), str) else doc.get("ai_improved_at"),
+            "created_at": safe_isoformat(doc.get("created_at")),
+            "updated_at": safe_isoformat(doc.get("updated_at")),
+        }
+        
+        return result
+
+    def _serialize_similarity_candidate(self, doc: Dict) -> Dict[str, Any]:
+        """Lean FM shape for library-wide similarity scan (tolerates partial Mongo docs)."""
+        doc_id = doc.get("id") or doc.get("_id")
+        severity = int(doc.get("severity") or 1)
+        occurrence = int(doc.get("occurrence") or 1)
+        detectability = int(doc.get("detectability") or 1)
+        rpn = doc.get("rpn")
+        if rpn is None:
+            rpn = severity * occurrence * detectability
+        return {
+            "id": str(doc_id),
+            "failure_mode": doc.get("failure_mode") or "",
+            "category": doc.get("category"),
+            "equipment": doc.get("equipment"),
+            "mechanism": doc.get("mechanism"),
+            "iso14224_mechanism": doc.get("iso14224_mechanism"),
+            "rpn": rpn,
+            "equipment_type_ids": doc.get("equipment_type_ids") or [],
+            "recommended_actions": doc.get("recommended_actions") or [],
+            "keywords": doc.get("keywords") or [],
+            "potential_effects": doc.get("potential_effects") or [],
+            "potential_causes": doc.get("potential_causes") or [],
+            "is_validated": bool(doc.get("is_validated", False)),
+        }
+
+    # ============== SIMILARITY & MERGE ==============
+
+    _FM_SIM_STOPWORDS = {
+        "the", "a", "an", "of", "in", "on", "and", "or", "by", "to", "for",
+        "from", "with", "without", "due", "failure", "fault", "issue", "problem",
+    }
+
+    _ACTION_SIM_STOPWORDS = {
+        "the", "a", "an", "of", "in", "on", "and", "or", "by", "to", "for",
+        "from", "with", "at", "per", "every", "each", "all", "check", "inspect",
+        "frequency", "monthly", "weekly", "annual", "task", "pm", "action",
+    }

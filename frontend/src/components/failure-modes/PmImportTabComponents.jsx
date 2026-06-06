@@ -13,6 +13,7 @@ import {
   Edit,
   Trash2,
   Target,
+  Link,
 } from "lucide-react";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { Input } from "../ui/input";

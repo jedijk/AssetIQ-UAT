@@ -24,7 +24,7 @@ _tasks_write = require_permission("tasks:write")
 router = APIRouter(prefix="/work-items", tags=["Work Items"])
 
 
-@router.get("/")
+@router.get("")
 async def list_work_items(
     filter: str = Query("open", description="open | today | overdue | recurring | adhoc | all"),
     date: Optional[str] = Query(None, description="Date for filtering (YYYY-MM-DD)"),

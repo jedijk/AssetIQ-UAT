@@ -503,6 +503,7 @@ const MyTasksPage = () => {
     refetchOnWindowFocus: true, // Refetch when window regains focus
     staleTime: 5000, // Consider data stale after 5 seconds for faster updates
     retry: offlineStatus.isOnline ? 3 : 0,
+    enabled: !!user,
   });
 
   // Trigger push notifications for new tasks assigned to this user
@@ -682,7 +683,7 @@ const MyTasksPage = () => {
   const { data: adhocPlansData, isLoading: adhocPlansLoading } = useQuery({
     queryKey: ["adhoc-plans"],
     queryFn: () => myTasksAPI.getAdhocPlans(),
-    enabled: activeFilter === "adhoc",
+    enabled: !!user && activeFilter === "adhoc",
     refetchInterval: 30000,
     staleTime: 10000, // Consider data fresh for 10 seconds
     refetchOnWindowFocus: true,

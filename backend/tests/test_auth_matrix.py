@@ -115,7 +115,11 @@ def test_translation_service_uses_gateway():
 
 
 def test_pm_import_service_uses_gateway():
-    source = (Path(__file__).resolve().parents[1] / "services" / "pm_import_service.py").read_text()
+    services_dir = Path(__file__).resolve().parents[1] / "services"
+    pkg = services_dir / "pm_import"
+    parts = [p.read_text() for p in sorted(pkg.glob("*.py"))]
+    parts.append((services_dir / "pm_import_service.py").read_text())
+    source = "\n".join(parts)
     assert "from services.ai_gateway import chat_with_images" in source
     assert "client.chat.completions.create" not in source
 
@@ -216,7 +220,8 @@ def test_ril_mutations_require_decision_engine_write():
 
 
 def test_production_mutations_require_forms_or_settings_write():
-    source = (Path(__file__).resolve().parents[1] / "routes" / "production.py").read_text()
+    pkg = Path(__file__).resolve().parents[1] / "routes" / "production"
+    source = "\n".join(p.read_text() for p in sorted(pkg.glob("*.py")))
     idx = source.index("async def create_production_event")
     assert "Depends(_forms_write)" in source[idx: idx + 250]
     idx_seed = source.index("async def clear_seed_data")
