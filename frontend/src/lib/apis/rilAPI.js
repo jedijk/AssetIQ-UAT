@@ -3,21 +3,20 @@
  * Provides functions to interact with all RIL backend endpoints.
  */
 
-import { getBackendUrl, getAuthHeaders } from '../apiConfig';
+import { getBackendUrl, getAuthFetchInit } from '../apiConfig';
 
 const BASE_URL = `${getBackendUrl()}/api/ril`;
 
 // Helper function for API calls
 async function rilFetch(endpoint, options = {}) {
   const url = `${BASE_URL}${endpoint}`;
-  const response = await fetch(url, {
+  const response = await fetch(url, getAuthFetchInit({
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-      ...options.headers,
+      ...(options.headers || {}),
     },
-  });
+  }));
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Request failed' }));
