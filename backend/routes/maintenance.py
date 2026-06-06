@@ -27,6 +27,20 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Maintenance Strategies"])
 
+_LEGACY_V1_SUNSET_HEADERS = {
+    "Deprecation": "true",
+    "Link": '</api/maintenance-strategies-v2>; rel="successor-version"',
+    "X-AssetIQ-Deprecated": "Use /api/maintenance-strategies-v2 instead",
+}
+
+
+def _block_legacy_v1_mutation() -> None:
+    raise HTTPException(
+        status_code=410,
+        detail="Legacy maintenance-strategies v1 mutations are retired. Use /api/maintenance-strategies-v2.",
+        headers=_LEGACY_V1_SUNSET_HEADERS,
+    )
+
 # ============= MAINTENANCE STRATEGY ENDPOINTS =============
 
 @router.get("/maintenance-strategies")
@@ -87,6 +101,7 @@ async def generate_maintenance_strategy(
     current_user: dict = Depends(get_current_user)
 ):
     """Auto-generate a maintenance strategy for ALL criticality levels from FMEA data"""
+    _block_legacy_v1_mutation()
     # Check if strategy already exists for this equipment type
     existing = await db.maintenance_strategies.find_one({
         "equipment_type_id": request.equipment_type_id
@@ -187,6 +202,7 @@ async def generate_all_maintenance_strategies(
     current_user: dict = Depends(get_current_user)
 ):
     """Generate maintenance strategies for ALL equipment types"""
+    _block_legacy_v1_mutation()
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="AI API key not configured")
@@ -315,6 +331,7 @@ async def create_maintenance_strategy(
     current_user: dict = Depends(get_current_user)
 ):
     """Create a new maintenance strategy manually"""
+    _block_legacy_v1_mutation()
     # Check if strategy already exists
     existing = await db.maintenance_strategies.find_one({
         "equipment_type_id": data.equipment_type_id
@@ -351,6 +368,7 @@ async def update_maintenance_strategy(
     current_user: dict = Depends(get_current_user)
 ):
     """Update an existing maintenance strategy"""
+    _block_legacy_v1_mutation()
     strategy = await db.maintenance_strategies.find_one({"id": strategy_id})
     if not strategy:
         raise HTTPException(status_code=404, detail="Maintenance strategy not found")
@@ -401,6 +419,7 @@ async def delete_maintenance_strategy(
     current_user: dict = Depends(get_current_user)
 ):
     """Delete a maintenance strategy"""
+    _block_legacy_v1_mutation()
     result = await db.maintenance_strategies.delete_one({"id": strategy_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Maintenance strategy not found")
@@ -414,6 +433,7 @@ async def increment_strategy_version(
     current_user: dict = Depends(get_current_user)
 ):
     """Increment the strategy version number"""
+    _block_legacy_v1_mutation()
     strategy = await db.maintenance_strategies.find_one({"id": strategy_id})
     if not strategy:
         raise HTTPException(status_code=404, detail="Maintenance strategy not found")

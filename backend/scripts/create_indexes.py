@@ -337,6 +337,13 @@ INDEX_DEFINITIONS = {
         {"keys": [("equipment_type_id", 1), ("status", 1)]},
         {"keys": [("due_date", 1), ("status", 1)]},
     ],
+    "reliability_edges": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("equipment_id", 1), ("updated_at", -1)]},
+        {"keys": [("equipment_type_id", 1)]},
+        {"keys": [("source_type", 1), ("source_id", 1)]},
+        {"keys": [("target_type", 1), ("target_id", 1)]},
+    ],
 }
 
 

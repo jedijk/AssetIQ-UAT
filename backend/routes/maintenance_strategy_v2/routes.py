@@ -10,6 +10,7 @@ import os
 
 from database import db
 from routes.auth import get_current_user
+from auth import require_permission
 from utils.auto_translate import translate_maintenance_task
 from services.background_jobs import schedule_tracked_job
 from models.maintenance_strategy_v2 import (
@@ -37,6 +38,12 @@ from routes.maintenance_strategy_v2.propagation import (
     _describe_task_change,
     _describe_fm_change,
     _bump_strategy_version,
+    _propagate_task_template_to_programs,
+    _sync_metadata_to_open_scheduled_tasks,
+    _deactivate_programs_for_task,
+    _cancel_open_scheduled_tasks_for_task,
+    _toggle_programs_for_failure_mode,
+    _cancel_open_scheduled_tasks_for_failure_mode,
 )
 from routes.maintenance_strategy_v2.strategy_helpers import (
     calculate_frequency_for_criticality,
@@ -54,6 +61,15 @@ from routes.maintenance_strategy_v2.strategy_helpers import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/maintenance-strategies-v2", tags=["Maintenance Strategies V2"])
+
+# Metadata-only task edits propagate immediately to v2 programs and open scheduled tasks.
+METADATA_PROPAGATION_KEYS = frozenset({
+    "name", "description", "task_type", "duration_hours", "discipline",
+    "frequency_matrix", "procedure_steps", "skills_required", "tools_required",
+    "spare_parts", "estimated_cost_eur",
+})
+
+_library_write = require_permission("library:write")
 
 
 # ============= Equipment Type Strategy Endpoints =============
@@ -202,7 +218,7 @@ async def get_equipment_type_strategy(
 @router.post("")
 async def create_equipment_type_strategy(
     request: CreateEquipmentTypeStrategyRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write),
 ):
     """Create a new equipment type strategy"""
     # Check if strategy already exists
@@ -326,7 +342,7 @@ async def create_equipment_type_strategy(
 async def update_equipment_type_strategy(
     equipment_type_id: str,
     request: UpdateEquipmentTypeStrategyRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Update an equipment type strategy"""
     strategy = await db.equipment_type_strategies.find_one({
@@ -399,7 +415,7 @@ async def update_equipment_type_strategy(
 @router.delete("/{equipment_type_id}")
 async def delete_equipment_type_strategy(
     equipment_type_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Delete an equipment type strategy AND fully clean up:
@@ -438,7 +454,7 @@ async def delete_equipment_type_strategy(
 @router.post("/{equipment_type_id}/sync")
 async def sync_equipment_type_strategy(
     equipment_type_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Sync strategy with library - adds new failure modes and tasks without overwriting existing ones.
@@ -756,7 +772,7 @@ async def update_failure_mode_strategy(
     equipment_type_id: str,
     failure_mode_id: str,
     request: UpdateFailureModeStrategyRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Update a specific failure mode's strategy"""
     strategy = await db.equipment_type_strategies.find_one({
@@ -815,6 +831,19 @@ async def update_failure_mode_strategy(
         user_id=current_user.get("user_id"),
     )
 
+    fm_propagation = {}
+    if request.enabled is not None:
+        toggled = await _toggle_programs_for_failure_mode(
+            equipment_type_id, failure_mode_id, request.enabled
+        )
+        fm_propagation["programs_toggled"] = toggled
+        if request.enabled is False:
+            fm_propagation["scheduled_tasks_cancelled"] = (
+                await _cancel_open_scheduled_tasks_for_failure_mode(
+                    equipment_type_id, failure_mode_id
+                )
+            )
+
     return {
         "message": "Failure mode strategy updated",
         "failure_mode_id": failure_mode_id,
@@ -823,6 +852,7 @@ async def update_failure_mode_strategy(
         "coverage_score": round(coverage_score, 1),
         "version": new_version,
         "strategy_needs_apply": True,
+        **fm_propagation,
     }
 
 
@@ -853,7 +883,7 @@ async def add_task_template(
     equipment_type_id: str,
     request: AddTaskTemplateRequest,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Add a new task template to an equipment type strategy"""
     strategy = await db.equipment_type_strategies.find_one({
@@ -921,9 +951,9 @@ async def update_task_template(
     task_id: str,
     updates: Dict[str, Any],
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
-    """Update a task template on the strategy document only (no schedule propagation)."""
+    """Update a task template; metadata-only changes propagate to programs and open scheduled tasks."""
     strategy = await db.equipment_type_strategies.find_one({
         "equipment_type_id": equipment_type_id
     })
@@ -968,6 +998,22 @@ async def update_task_template(
         user_id=current_user.get("user_id"),
     )
 
+    metadata_only = bool(updates) and set(updates.keys()).issubset(METADATA_PROPAGATION_KEYS)
+    propagation = {}
+    needs_apply = True
+    if metadata_only and updated_task:
+        propagation["programs_updated"] = await _propagate_task_template_to_programs(
+            equipment_type_id, updated_task, new_version
+        )
+        propagation["scheduled_tasks_updated"] = await _sync_metadata_to_open_scheduled_tasks(
+            equipment_type_id, updated_task
+        )
+        await clear_strategy_needs_apply(
+            equipment_type_id,
+            applied_version=new_version,
+        )
+        needs_apply = False
+
     # Auto-translate if name or description changed
     if any(k in updates for k in ["name", "description", "procedure_steps"]):
         schedule_tracked_job(
@@ -987,7 +1033,9 @@ async def update_task_template(
         "message": "Task template updated",
         "task_id": task_id,
         "version": new_version,
-        "strategy_needs_apply": True,
+        "strategy_needs_apply": needs_apply,
+        "metadata_propagated": metadata_only,
+        **propagation,
     }
 
 
@@ -995,9 +1043,9 @@ async def update_task_template(
 async def delete_task_template(
     equipment_type_id: str,
     task_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
-    """Delete a task template from the strategy document only (no schedule propagation)."""
+    """Delete a task template; deactivates v2 program tasks and cancels open scheduled tasks."""
     strategy = await db.equipment_type_strategies.find_one({
         "equipment_type_id": equipment_type_id
     })
@@ -1028,11 +1076,16 @@ async def delete_task_template(
         user_id=current_user.get("user_id"),
     )
 
+    programs_deactivated = await _deactivate_programs_for_task(equipment_type_id, task_id)
+    scheduled_cancelled = await _cancel_open_scheduled_tasks_for_task(equipment_type_id, task_id)
+
     return {
         "message": "Task template deleted",
         "task_id": task_id,
         "version": new_version,
         "strategy_needs_apply": True,
+        "programs_deactivated": programs_deactivated,
+        "scheduled_tasks_cancelled": scheduled_cancelled,
     }
 
 
@@ -1042,7 +1095,7 @@ async def delete_task_template(
 async def generate_tasks_for_equipment(
     equipment_type_id: str,
     request: GenerateTasksRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Generate maintenance tasks for a specific equipment asset based on its criticality"""
     strategy = await db.equipment_type_strategies.find_one({
@@ -1157,7 +1210,7 @@ async def override_equipment_task(
     equipment_id: str,
     task_id: str,
     updates: Dict[str, Any],
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Override a generated task at equipment level"""
     instance = await db.equipment_strategy_instances.find_one({
@@ -1208,7 +1261,7 @@ async def disable_failure_mode_for_equipment(
     equipment_id: str,
     failure_mode_id: str,
     reason: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Disable a specific failure mode for an equipment asset"""
     instance = await db.equipment_strategy_instances.find_one({
@@ -1254,7 +1307,7 @@ async def disable_failure_mode_for_equipment(
 async def regenerate_equipment_tasks(
     equipment_id: str,
     request: RegenerateStrategyRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Regenerate tasks for equipment after strategy template changes"""
     instance = await db.equipment_strategy_instances.find_one({
@@ -1374,7 +1427,7 @@ async def regenerate_equipment_tasks(
 async def add_local_task(
     equipment_id: str,
     request: AddTaskTemplateRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Add a local task to an equipment (not from template)"""
     instance = await db.equipment_strategy_instances.find_one({
@@ -1429,7 +1482,7 @@ async def add_local_task(
 async def delete_local_task(
     equipment_id: str,
     task_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Delete a local task from equipment and clean up its scheduled tasks + maintenance program."""
     result = await db.equipment_strategy_instances.update_one(
@@ -1472,7 +1525,7 @@ async def delete_local_task(
 async def enable_failure_mode_for_equipment(
     equipment_id: str,
     failure_mode_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Re-enable a previously disabled failure mode for an equipment asset"""
     instance = await db.equipment_strategy_instances.find_one({

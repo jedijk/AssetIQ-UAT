@@ -119,3 +119,30 @@ Observation → Investigation → Failure Mode Mapping → Root Cause → Correc
 ```
 Equipment Type → Failure Modes Library → Risk Assessment → Preventive Task Plans
 ```
+
+---
+
+## Maintenance Domain (v2 — canonical, 2026)
+
+```
+equipment_type_strategies (v2)
+    → Apply Strategy → maintenance_programs_v2 (1 doc / equipment, nested tasks)
+    → load_schedulable_programs() → scheduled_tasks (planner / Gantt)
+    → task_instance_bridge → task_instances (My Tasks execution)
+
+reliability_edges (graph)
+    equipment → strategy_type, program_task → failure_mode, equipment → program
+
+Legacy (retired for writes; optional read fallback via READ_LEGACY_MAINTENANCE_PROGRAMS):
+    maintenance_programs (flat rows)
+    maintenance_strategies + /api/maintenance-strategies v1 API (GET only; mutations → 410)
+```
+
+| Collection | Role |
+|------------|------|
+| `equipment_type_strategies` | Canonical strategy per equipment type |
+| `maintenance_programs_v2` | Canonical program per equipment |
+| `scheduled_tasks` | Horizon occurrences for maintenance planner |
+| `task_instances` | Field execution queue (My Tasks) |
+| `task_plans` | Form/ad-hoc tasks (separate domain) |
+| `reliability_edges` | Traversable relationships for RIL/AI |

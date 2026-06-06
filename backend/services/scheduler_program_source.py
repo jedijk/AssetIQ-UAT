@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from database import db
 from models.maintenance_program import TaskSource
+from services.scheduler_config import should_read_legacy_maintenance_programs
 from services.scheduler_helpers import (
     frequency_to_days,
     normalize_program_criticality,
@@ -139,6 +140,9 @@ async def load_schedulable_programs(
     v2_rows: List[Dict[str, Any]] = []
     for doc in v2_docs:
         v2_rows.extend(expand_v2_program_to_scheduler_rows(doc, active_strategy_types))
+
+    if not should_read_legacy_maintenance_programs():
+        return v2_rows
 
     covered_equipment = {row["equipment_id"] for row in v2_rows if row.get("equipment_id")}
 

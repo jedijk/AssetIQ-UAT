@@ -118,11 +118,19 @@ async def schedule_program(program: dict, horizon_days: int = DEFAULT_HORIZON_DA
                 {"id": program["v2_program_id"]},
                 {"$set": {"last_scheduled_date": today_str}},
             )
+            if program.get("v2_task_id"):
+                await db.maintenance_programs_v2.update_one(
+                    {"id": program["v2_program_id"], "tasks.id": program["v2_task_id"]},
+                    {"$set": {"tasks.$.next_due_date": last_created_iso}},
+                )
         elif program.get("program_source") != "v2":
-            await db.maintenance_programs.update_one(
-                {"id": program_id},
-                {"$set": {"last_scheduled_date": today_str}},
-            )
+            from services.scheduler_config import should_read_legacy_maintenance_programs
+
+            if should_read_legacy_maintenance_programs():
+                await db.maintenance_programs.update_one(
+                    {"id": program_id},
+                    {"$set": {"last_scheduled_date": today_str}},
+                )
 
     return created_ids
 

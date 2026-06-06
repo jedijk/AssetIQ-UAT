@@ -7,19 +7,20 @@ Equipment Maintenance Programs:
 import asyncio
 import logging
 import time
-from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from typing import Optional
 
 from database import db
 
 logger = logging.getLogger(__name__)
-from auth import get_current_user
+from auth import get_current_user, require_permission
 from models.maintenance_scheduler import ApplyStrategyRequest
 from services.maintenance_scheduler_sync import refresh_equipment_schedule
 from services.background_jobs import background_job_service, JobStatus
 
 router = APIRouter()
+
+_library_write = require_permission("library:write")
 
 APPLY_STRATEGY_ASYNC_THRESHOLD = 5
 
@@ -47,7 +48,7 @@ async def apply_strategy_to_equipment(
     equipment_type_id: str,
     request: ApplyStrategyRequest,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_library_write),
 ):
     """
     Apply maintenance strategy to selected equipment.
@@ -235,6 +236,14 @@ async def _apply_strategy_to_equipment_impl(
         applied_version=strategy_version,
     )
 
+    from services.reliability_graph import sync_edges_for_apply_strategy
+
+    graph_sync = await sync_edges_for_apply_strategy(
+        equipment_type_id=equipment_type_id,
+        equipment_ids=equipment_ids,
+        strategy_version=strategy_version,
+    )
+
     return {
         "message": f"Strategy applied to {len(equipment_list)} equipment",
         "equipment_count": len(equipment_list),
@@ -254,6 +263,7 @@ async def _apply_strategy_to_equipment_impl(
         "deselected_programs_removed": deselected_programs_removed,
         "deselected_v2_programs_removed": deselected_v2_programs_removed,
         "deselected_scheduled_tasks_removed": deselected_scheduled_tasks_removed,
+        "reliability_edges_upserted": graph_sync.get("edges_upserted", 0),
     }
 
 
@@ -264,17 +274,18 @@ async def get_maintenance_programs(
     is_active: bool = True,
     current_user: dict = Depends(get_current_user),
 ):
-    """Get all maintenance programs with optional filtering."""
-    query = {"is_active": is_active}
+    """Get schedulable maintenance program rows (canonical v2 source)."""
+    from services.scheduler_program_source import load_schedulable_programs
 
-    if equipment_type_id:
-        query["equipment_type_id"] = equipment_type_id
-    if equipment_id:
-        query["equipment_id"] = equipment_id
+    equipment_ids = [equipment_id] if equipment_id else None
+    programs = await load_schedulable_programs(
+        equipment_type_id=equipment_type_id,
+        equipment_ids=equipment_ids,
+    )
+    if is_active:
+        programs = [p for p in programs if p.get("is_active", True)]
 
-    programs = await db.maintenance_programs.find(query, {"_id": 0}).to_list(1000)
-
-    return {"programs": programs, "total": len(programs)}
+    return {"programs": programs, "total": len(programs), "source": "v2"}
 
 
 @router.get("/programs/{equipment_type_id}/summary")
@@ -282,34 +293,31 @@ async def get_programs_summary(
     equipment_type_id: str,
     current_user: dict = Depends(get_current_user),
 ):
-    """Get summary of maintenance programs for an equipment type."""
-    pipeline = [
-        {"$match": {"equipment_type_id": equipment_type_id, "is_active": True}},
-        {"$group": {
-            "_id": "$equipment_id",
-            "equipment_name": {"$first": "$equipment_name"},
-            "equipment_tag": {"$first": "$equipment_tag"},
-            "task_count": {"$sum": 1},
-        }},
-    ]
+    """Get summary of maintenance programs for an equipment type (v2)."""
+    programs = await db.maintenance_programs_v2.find(
+        {"equipment_type_id": equipment_type_id, "status": {"$in": ["active", "draft"]}},
+        {"_id": 0, "equipment_id": 1, "equipment_name": 1, "equipment_tag": 1, "tasks": 1},
+    ).to_list(500)
 
-    equipment_summary = await db.maintenance_programs.aggregate(pipeline).to_list(500)
-
-    total_programs = await db.maintenance_programs.count_documents({
-        "equipment_type_id": equipment_type_id,
-        "is_active": True,
-    })
-
-    today = datetime.utcnow().date().isoformat()
-    overdue_count = await db.maintenance_programs.count_documents({
-        "equipment_type_id": equipment_type_id,
-        "is_active": True,
-        "next_due_date": {"$lt": today},
-    })
+    equipment_summary = []
+    total_tasks = 0
+    for prog in programs:
+        active_tasks = [
+            t for t in (prog.get("tasks") or [])
+            if t.get("is_active", True)
+        ]
+        total_tasks += len(active_tasks)
+        equipment_summary.append({
+            "_id": prog.get("equipment_id"),
+            "equipment_name": prog.get("equipment_name"),
+            "equipment_tag": prog.get("equipment_tag"),
+            "task_count": len(active_tasks),
+        })
 
     return {
+        "equipment_type_id": equipment_type_id,
         "equipment_count": len(equipment_summary),
-        "total_programs": total_programs,
-        "overdue_count": overdue_count,
-        "equipment": equipment_summary,
+        "total_program_tasks": total_tasks,
+        "equipment_summary": equipment_summary,
+        "source": "maintenance_programs_v2",
     }

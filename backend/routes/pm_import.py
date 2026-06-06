@@ -17,8 +17,10 @@ import io
 import json
 
 from database import db
-from auth import get_current_user
+from auth import get_current_user, require_permission
 from services.pm_import_service import PMImportService
+
+_library_write = require_permission("library:write")
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +147,7 @@ async def download_pm_template():
 async def upload_pm_plan(
     file: UploadFile = File(...),
     background_tasks: BackgroundTasks = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write),
 ):
     """
     Upload a preventive maintenance plan for processing.
@@ -228,7 +230,7 @@ async def upload_pm_plan(
 @router.get("/session/{session_id}")
 async def get_session(
     session_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Get the status and results of a PM import session.
@@ -257,7 +259,7 @@ async def update_task(
     session_id: str,
     task_id: str,
     updates: TaskUpdateRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Update a specific task in the review session.
@@ -293,7 +295,7 @@ async def update_task(
 async def accept_task(
     session_id: str,
     task_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Mark a task as accepted for import."""
     
@@ -310,7 +312,7 @@ async def accept_task(
 async def reject_task(
     session_id: str,
     task_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Mark a task as rejected (won't be imported)."""
     
@@ -327,7 +329,7 @@ async def reject_task(
 async def delete_task(
     session_id: str,
     task_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Permanently remove a task from a session."""
     
@@ -350,7 +352,7 @@ async def update_task_mapping(
     session_id: str,
     task_id: str,
     body: TaskMappingRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Manually map an imported task to an equipment hierarchy node.
@@ -437,7 +439,7 @@ async def lookup_equipment(
 @router.post("/session/{session_id}/import-to-pm-tasks")
 async def import_session_to_pm_tasks(
     session_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Promote all `accepted` tasks from a session into the `pm_tasks` collection.
@@ -494,7 +496,7 @@ async def select_match(
     session_id: str,
     task_id: str,
     request: SelectMatchRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Select a failure mode match for a task (Scenario B).
@@ -526,7 +528,7 @@ async def approve_new_failure_mode(
     session_id: str,
     task_id: str,
     request: ApproveNewFMRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Approve creation of a new failure mode for a task (Scenario C).
@@ -564,7 +566,7 @@ async def approve_new_failure_mode(
 async def bulk_action(
     session_id: str,
     request: BulkActionRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Perform bulk actions on tasks.
@@ -612,7 +614,7 @@ async def bulk_action(
 async def import_to_library(
     session_id: str,
     request: ImportRequest = ImportRequest(),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Import accepted tasks to the Failure Mode Library.
@@ -756,7 +758,7 @@ async def export_review(
 @router.delete("/session/{session_id}")
 async def delete_session(
     session_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Delete a PM import session."""
     
@@ -802,7 +804,7 @@ async def list_sessions(
 
 @router.delete("/tasks")
 async def delete_all_tasks(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Delete ALL imported tasks across ALL sessions for the current user.
@@ -910,7 +912,7 @@ async def list_all_tasks(
 @router.post("/session/{session_id}/ai-review")
 async def ai_review_session(
     session_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Run AI review on all accepted tasks in a session.
@@ -959,7 +961,7 @@ async def apply_task_to_failure_mode(
     session_id: str,
     task_id: str,
     request: ApplyToFailureModeRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_library_write),
 ):
     """
     Apply an accepted PM Import task to a failure mode.
@@ -990,7 +992,7 @@ async def apply_ai_suggestion(
     session_id: str,
     task_id: str,
     request: ApplySuggestionRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """
     Apply an AI suggestion for a specific task.
@@ -1024,7 +1026,7 @@ async def apply_ai_suggestion(
 @router.post("/session/{session_id}/apply-all-suggestions")
 async def apply_all_suggestions(
     session_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_library_write)
 ):
     """Apply all AI suggestions that have action != 'keep_custom'."""
     pm_service = PMImportService(db)

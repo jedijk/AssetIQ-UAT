@@ -267,31 +267,64 @@ async def complete_task(
 
     await db.maintenance_history.insert_one(history.model_dump())
 
-    program = await db.maintenance_programs.find_one({
-        "id": task.get("maintenance_program_id")
-    })
-
+    program_id = task.get("maintenance_program_id")
     next_due = None
-    if program:
-        freq_days = program.get("frequency_days", 30)
-        next_due = (datetime.utcnow().date() + timedelta(days=freq_days)).isoformat()
+    freq_days = 30
 
-        await db.maintenance_programs.update_one(
-            {"id": program["id"]},
-            {"$set": {
-                "last_completion_date": today,
-                "next_due_date": next_due,
-                "updated_at": now,
-            }},
+    program_v2 = await db.maintenance_programs_v2.find_one(
+        {"tasks.id": program_id},
+        {"_id": 0},
+    )
+    if program_v2:
+        v2_task = next(
+            (t for t in (program_v2.get("tasks") or []) if t.get("id") == program_id),
+            None,
         )
-
-        # Auto-generate the next scheduled occurrence(s) so the calendar is
-        # always populated without needing a manual "Run Scheduler" click.
+        if v2_task:
+            freq_days = int(v2_task.get("frequency_days") or 30)
+        next_due = (datetime.utcnow().date() + timedelta(days=freq_days)).isoformat()
+        await db.maintenance_programs_v2.update_one(
+            {"tasks.id": program_id},
+            {
+                "$set": {
+                    "tasks.$.last_completion_date": today,
+                    "tasks.$.next_due_date": next_due,
+                    "updated_at": now,
+                }
+            },
+        )
         from routes.maintenance_scheduler.scheduler import schedule_program
-        # Refetch the program so it carries the freshly-updated next_due_date.
-        refreshed = await db.maintenance_programs.find_one({"id": program["id"]})
-        if refreshed:
-            await schedule_program(refreshed)
+        from services.scheduler_program_source import load_schedulable_programs
+
+        rows = await load_schedulable_programs(equipment_ids=[task.get("equipment_id")])
+        sched_row = next((r for r in rows if r.get("id") == program_id), None)
+        if sched_row:
+            sched_row = {**sched_row, "next_due_date": next_due}
+            await schedule_program(sched_row)
+    else:
+        from services.scheduler_config import should_read_legacy_maintenance_programs
+
+        program = None
+        if should_read_legacy_maintenance_programs():
+            program = await db.maintenance_programs.find_one({"id": program_id})
+
+        if program:
+            freq_days = program.get("frequency_days", 30)
+            next_due = (datetime.utcnow().date() + timedelta(days=freq_days)).isoformat()
+
+            await db.maintenance_programs.update_one(
+                {"id": program["id"]},
+                {"$set": {
+                    "last_completion_date": today,
+                    "next_due_date": next_due,
+                    "updated_at": now,
+                }},
+            )
+
+            from routes.maintenance_scheduler.scheduler import schedule_program
+            refreshed = await db.maintenance_programs.find_one({"id": program["id"]})
+            if refreshed:
+                await schedule_program(refreshed)
 
     return {
         "message": "Task completed",

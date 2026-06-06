@@ -281,3 +281,16 @@ async def get_data_quality_dashboard(
         },
         "generated_at": datetime.utcnow().isoformat()
     }
+
+
+@router.get("/equipment/{equipment_id}/reliability-edges")
+async def get_equipment_reliability_edges(
+    equipment_id: str,
+    limit: int = 200,
+    current_user: dict = Depends(get_current_user),
+):
+    """Traversable reliability graph edges for an equipment item."""
+    from services.reliability_graph import get_edges_for_equipment
+
+    edges = await get_edges_for_equipment(equipment_id, limit=limit)
+    return {"equipment_id": equipment_id, "edges": edges, "total": len(edges)}

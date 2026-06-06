@@ -9,7 +9,6 @@ export { equipmentHierarchyAPI } from "./apis/equipment";
 export { investigationAPI } from "./apis/investigations";
 export { actionsAPI } from "./apis/actions";
 export { aiRiskAPI } from "./apis/aiRisk";
-export { maintenanceStrategyAPI } from "./apis/maintenanceStrategies";
 export { maintenanceStrategyV2API } from "./apis/maintenanceStrategyV2";
 export {
   maintenanceSchedulerAPI,
