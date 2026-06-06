@@ -12,5 +12,8 @@ test.describe('Intelligence Map (library)', () => {
     await page.getByTestId('intelligence-map-tab').click();
     await expect(page.getByText('Intelligence Map', { exact: false }).first()).toBeVisible();
     await expect(page.getByText('Failure Modes', { exact: false }).first()).toBeVisible();
+    await expect(
+      page.getByTestId('intelligence-map-reliability-edges').or(page.getByText('Knowledge Graph').first())
+    ).toBeVisible();
   });
 });

@@ -14,5 +14,6 @@ test.describe('Reliability Intelligence Dashboard', () => {
     await expect(page.getByTestId('ril-executive-kpis')).toBeVisible();
     await expect(page.getByText('Reliability Score', { exact: false }).first()).toBeVisible();
     await expect(page.getByText('Strategy Coverage', { exact: false }).first()).toBeVisible();
+    await expect(page.getByTestId('ril-kpi-reliability-edges')).toBeVisible();
   });
 });

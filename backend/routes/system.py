@@ -442,6 +442,7 @@ async def get_application_metrics(
                 "sync_legacy_maintenance_programs": should_sync_legacy_maintenance_programs(),
                 "use_external_background_worker": use_external_background_worker(),
             },
+            "uat_gates_script": "backend/scripts/verify_uat_gates.py",
         }
     except Exception as exc:
         cache_stats = {"error": str(exc)[:120]}

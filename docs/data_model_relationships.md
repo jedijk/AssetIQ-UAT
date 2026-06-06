@@ -145,6 +145,7 @@ Month 3 ops (optional infrastructure):
     verify_v2_program_coverage.py → legacy program retirement gate
     verify_schedule_drift.py → strategy/program drift gate before prod cutover
     verify_uat_gates.py → runs drift + v2 coverage gates (UAT cutover checklist)
+    GET /api/admin/maintenance-readiness → read-only UAT cutover snapshot (flags, counts, queue health)
 
 reliability_edges (graph)
     equipment → strategy_type, program_task → failure_mode, equipment → program

@@ -212,6 +212,22 @@ class TestRBACRoutes:
         print(f"✓ RBAC roles endpoint working")
 
 
+class TestIntelligenceMapRoutes:
+    """Test intelligence map routes after refactoring"""
+
+    def test_get_stats_includes_reliability_edges(self, authenticated_client):
+        """GET /api/intelligence-map/stats - includes reliability graph edge count"""
+        response = authenticated_client.get(f"{BASE_URL}/api/intelligence-map/stats")
+        assert response.status_code == 200, f"Get intelligence map stats failed: {response.text}"
+        data = response.json()
+        assert "reliability_edges_total" in data, "reliability_edges_total not in response"
+        assert isinstance(data["reliability_edges_total"], int)
+        reliability_graph = data.get("insights", {}).get("reliability_graph", {})
+        assert "reliability_edges_total" in reliability_graph
+        assert reliability_graph["reliability_edges_total"] == data["reliability_edges_total"]
+        print(f"✓ Intelligence map stats includes {data['reliability_edges_total']} reliability edges")
+
+
 class TestRootEndpoint:
     """Test root endpoint"""
     

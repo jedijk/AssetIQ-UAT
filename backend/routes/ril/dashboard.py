@@ -118,6 +118,8 @@ async def get_executive_dashboard(
     strategy_coverage_pct = round(
         equipment_with_strategy / max(total_equipment, 1) * 100, 1
     )
+
+    reliability_edges_total = await db.reliability_edges.count_documents({})
     
     # Get cases by status
     cases_by_status = {}
@@ -154,6 +156,7 @@ async def get_executive_dashboard(
         "predicted_failures": at_risk_count,  # Equipment with low health score
         "open_threats": open_threats,
         "strategy_coverage_pct": strategy_coverage_pct,
+        "reliability_edges_total": reliability_edges_total,
         "open_cases": stats.get("open_cases", 0),
         "p1_cases": stats.get("p1_cases", 0),
         "p2_cases": stats.get("p2_cases", 0),

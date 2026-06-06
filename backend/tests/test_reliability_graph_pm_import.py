@@ -48,3 +48,54 @@ async def test_sync_edge_for_pm_import_task_passes_optional_fields():
         equipment_type_id="et-2",
         metadata={"apply_mode": "merged"},
     )
+
+
+@pytest.mark.asyncio
+async def test_apply_task_to_failure_mode_syncs_graph_edge_on_success():
+    """apply_task_to_failure_mode calls graph edge sync on the success path."""
+    from unittest.mock import MagicMock
+
+    from services.pm_import_service import PMImportService
+
+    mock_sessions = AsyncMock()
+    service = PMImportService(MagicMock())
+    service.sessions_collection = mock_sessions
+
+    task = {
+        "task_id": "task-1",
+        "review_status": "accepted",
+        "task_description": "Inspect bearing",
+        "equipment_match": {"equipment_id": "eq-1", "equipment_type_id": "et-1"},
+    }
+    mock_sessions.find_one = AsyncMock(
+        return_value={
+            "session_id": "sess-1",
+            "tasks_extracted": [task],
+            "created_by": "user-1",
+        }
+    )
+    mock_sessions.update_one = AsyncMock()
+
+    apply_result = {
+        "success": True,
+        "mode": "added",
+        "failure_mode_id": "fm-1",
+    }
+    mock_sync = AsyncMock()
+
+    with patch.object(service, "_apply_task_to_failure_mode", AsyncMock(return_value=apply_result)):
+        with patch.object(service, "_sync_pm_import_graph_edge", mock_sync):
+            result = await service.apply_task_to_failure_mode(
+                session_id="sess-1",
+                task_id="task-1",
+                target_failure_mode_id="fm-1",
+                user_id="user-1",
+            )
+
+    mock_sync.assert_awaited_once_with(
+        task,
+        "task-1",
+        "fm-1",
+        "added",
+    )
+    assert result["success"] is True

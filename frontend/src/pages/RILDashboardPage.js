@@ -66,7 +66,7 @@ const statusColors = {
 };
 
 // KPI Card component
-const KPICard = ({ title, value, subtitle, icon: Icon, trend, trendDirection, color = "blue" }) => {
+const KPICard = ({ title, value, subtitle, icon: Icon, trend, trendDirection, color = "blue", "data-testid": testId }) => {
   const colorClasses = {
     blue: "from-blue-500 to-blue-600",
     green: "from-green-500 to-green-600",
@@ -80,6 +80,7 @@ const KPICard = ({ title, value, subtitle, icon: Icon, trend, trendDirection, co
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 p-5 hover:shadow-md transition-shadow"
+      data-testid={testId}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
@@ -273,6 +274,14 @@ export default function RILDashboardPage() {
             subtitle="Low health score"
             icon={Zap}
             color="orange"
+          />
+          <KPICard
+            title="Knowledge Graph"
+            value={exec.reliability_edges_total ?? "—"}
+            subtitle="Reliability graph edges"
+            icon={Link2}
+            color="blue"
+            data-testid="ril-kpi-reliability-edges"
           />
         </div>
 

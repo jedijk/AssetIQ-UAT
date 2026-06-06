@@ -337,6 +337,11 @@ INDEX_DEFINITIONS = {
         {"keys": [("equipment_type_id", 1), ("status", 1)]},
         {"keys": [("due_date", 1), ("status", 1)]},
     ],
+    "background_jobs": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("status", 1), ("created_at", 1)]},
+        {"keys": [("status", 1), ("job_type", 1), ("tenant_id", 1), ("created_at", 1)]},
+    ],
     "reliability_edges": [
         {"keys": [("id", 1)], "unique": True},
         {"keys": [("equipment_id", 1), ("updated_at", -1)]},

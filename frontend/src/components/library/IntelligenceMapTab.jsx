@@ -38,6 +38,7 @@ import {
   Layers,
   Network,
   GitBranch,
+  Link2,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -163,7 +164,7 @@ const FlowArrow = ({ label, value, color = "slate" }) => {
 };
 
 // Insight Card for the right panel
-const InsightCard = ({ title, value, unit, description, icon: Icon, color = "blue", trend }) => {
+const InsightCard = ({ title, value, unit, description, icon: Icon, color = "blue", trend, ...rest }) => {
   const colorClasses = {
     blue: "border-blue-200 bg-blue-50/50",
     green: "border-green-200 bg-green-50/50",
@@ -181,13 +182,13 @@ const InsightCard = ({ title, value, unit, description, icon: Icon, color = "blu
   };
 
   return (
-    <div className={`p-3 rounded-lg border ${colorClasses[color]}`}>
+    <div className={`p-3 rounded-lg border ${colorClasses[color]}`} {...rest}>
       <div className="flex items-start justify-between mb-1">
         <span className="text-xs font-medium text-slate-600">{title}</span>
         {Icon && <Icon className={`w-4 h-4 ${iconClasses[color]}`} />}
       </div>
       <div className="flex items-baseline gap-1">
-        <span className="text-xl font-bold text-slate-900">{value}</span>
+        <span className="text-xl font-bold text-slate-900">{value?.toLocaleString?.() ?? value}</span>
         {unit && <span className="text-sm text-slate-500">{unit}</span>}
       </div>
       {description && (
@@ -481,6 +482,10 @@ const IntelligenceMapTab = () => {
   const pmSourceSplit = insights.pm_source_split || { generated: 0, imported: 0 };
   const scheduleHealth = insights.schedule_health?.missing_frequency || 0;
   const scheduleCompliance = insights.schedule_compliance?.value || 100;
+  const reliabilityEdgesTotal =
+    stats?.reliability_edges_total ??
+    insights.reliability_graph?.reliability_edges_total ??
+    0;
 
   return (
     <div className="space-y-6">
@@ -807,6 +812,20 @@ const IntelligenceMapTab = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              {/* Knowledge Graph */}
+              <InsightCard
+                title="Knowledge Graph"
+                value={reliabilityEdgesTotal}
+                unit="edges"
+                description={
+                  insights.reliability_graph?.description ||
+                  "Reliability graph edges linking entities"
+                }
+                icon={Link2}
+                color="blue"
+                data-testid="intelligence-map-reliability-edges"
+              />
+
               {/* Failure Mode Coverage */}
               <InsightCard
                 title="Failure Mode Coverage"

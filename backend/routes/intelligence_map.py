@@ -375,9 +375,12 @@ async def get_intelligence_map_stats(
         # Schedule Compliance: Schedules with valid frequency / Total schedules
         valid_schedules = schedules_count - schedules_missing_freq
         schedule_compliance = round((valid_schedules / schedules_count) * 100, 1) if schedules_count > 0 else 100
+
+        reliability_edges_total = await db.reliability_edges.count_documents({})
         
         # ========== BUILD RESPONSE ==========
         result = {
+            "reliability_edges_total": reliability_edges_total,
             # Main flow counts
             "failure_modes": {
                 "count": failure_modes_count,
@@ -512,6 +515,10 @@ async def get_intelligence_map_stats(
                     "value": schedule_compliance,
                     "unit": "%",
                     "description": "Schedules with Valid Frequency"
+                },
+                "reliability_graph": {
+                    "reliability_edges_total": reliability_edges_total,
+                    "description": "Knowledge graph edges linking reliability entities"
                 }
             },
             
