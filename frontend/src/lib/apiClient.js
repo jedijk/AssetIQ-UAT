@@ -1,6 +1,7 @@
 import axios from "axios";
 import { getApiUrl, getBackendUrl, AUTH_MODE, getCsrfToken } from "./apiConfig";
 import { debugLog } from "./debug";
+import { getDatabaseEnvironment } from "./databaseEnv";
 
 // Get API URL at initialization for static uses
 export const API_URL = getApiUrl();
@@ -12,7 +13,7 @@ function applyCookieAuthHeaders(config) {
     const csrf = getCsrfToken();
     if (csrf) config.headers["X-CSRF-Token"] = csrf;
   }
-  const dbEnv = localStorage.getItem("database_environment");
+  const dbEnv = getDatabaseEnvironment();
   if (dbEnv) config.headers["X-Database-Environment"] = dbEnv;
   return config;
 }
@@ -56,7 +57,7 @@ api.interceptors.request.use((config) => {
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    const dbEnv = localStorage.getItem("database_environment");
+    const dbEnv = getDatabaseEnvironment();
     if (dbEnv) {
       config.headers["X-Database-Environment"] = dbEnv;
     }
@@ -132,7 +133,7 @@ aiApi.interceptors.request.use((config) => {
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    const dbEnv = localStorage.getItem("database_environment");
+    const dbEnv = getDatabaseEnvironment();
     if (dbEnv) {
       config.headers["X-Database-Environment"] = dbEnv;
     }

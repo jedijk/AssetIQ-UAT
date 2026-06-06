@@ -6,6 +6,9 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import { useIsMobile } from "../../../hooks/useIsMobile";
 import { formatDateOnlyCompact, formatDateTimeCompact } from "../../../lib/dateUtils";
+import { isUatEnvironment } from "../../../lib/envDetection";
+import { getDatabaseEnvironment } from "../../../lib/databaseEnv";
+import { getErrorMessage } from "../../../lib/api";
 import {
   ChevronLeft,
   ChevronRight,
@@ -272,7 +275,7 @@ export default function ProductionDashboardPage() {
   });
 
   // Fetch dashboard data
-  const { data, isLoading, isFetching, refetch } = useProductionDashboardQuery({
+  const { data, isLoading, isFetching, isError, error, refetch } = useProductionDashboardQuery({
     fromStr,
     toStr,
     shift: shiftQueryKey,
@@ -915,6 +918,9 @@ export default function ProductionDashboardPage() {
   }, [data?.production_log, data?.viscosity_series, data?.viscosity_values, data?.screen_changes, data?.magnet_cleanings, chartSeries.screenChange, chartSeries.magnetCleaning, isMultiDay, period, fromDate]);
 
   const kpis = data?.kpis || {};
+  const activeDbEnv = getDatabaseEnvironment();
+  const showProdDbOnUatWarning = isUatEnvironment() && activeDbEnv === "production";
+  const dashboardEmpty = !isLoading && !isError && data && (data.submissions_count ?? 0) === 0;
   const wasteWeightThresholdKg = Number(data?.waste_weight_threshold_kg) > 0
     ? Number(data.waste_weight_threshold_kg)
     : 500;
@@ -971,6 +977,38 @@ export default function ProductionDashboardPage() {
         user={user}
         data={data}
       />
+      {showProdDbOnUatWarning && (
+        <div
+          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          data-testid="production-db-env-warning"
+        >
+          You are viewing the <strong>Production</strong> database on UAT. Production forms and KPIs
+          live in UAT are in the <strong>UAT</strong> database — use the DB switcher in the header
+          (beaker icon) to switch to UAT.
+        </div>
+      )}
+      {isError && (
+        <div
+          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
+          data-testid="production-dashboard-error"
+        >
+          Failed to load production data: {getErrorMessage(error, "Unknown error")}.{" "}
+          <button type="button" className="underline font-medium" onClick={() => refetch()}>
+            Retry
+          </button>
+        </div>
+      )}
+      {dashboardEmpty && (
+        <div
+          className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700"
+          data-testid="production-dashboard-empty"
+        >
+          No production submissions for <strong>{fromStr}</strong>
+          {shiftQueryKey ? ` (${shiftQueryKey.replace(/,/g, ", ")})` : ""}.
+          Try another date, include more shifts, or confirm the active database
+          ({activeDbEnv === "uat" ? "UAT" : "Production"}).
+        </div>
+      )}
       {/* ── Loading state ── */}
       {isLoading && (
         <div className="flex items-center justify-center py-20">

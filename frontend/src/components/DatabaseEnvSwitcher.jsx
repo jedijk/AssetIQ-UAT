@@ -20,6 +20,7 @@ import {
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 import api from "../lib/api";
+import { getDatabaseEnvironment } from "../lib/databaseEnv";
 
 const ENV_META = {
   production: { label: "Prod", name: "Production", color: "emerald", icon: Shield },
@@ -27,9 +28,7 @@ const ENV_META = {
 };
 
 export default function DatabaseEnvSwitcher() {
-  const [current, setCurrent] = useState(
-    () => localStorage.getItem("database_environment") || "production"
-  );
+  const [current, setCurrent] = useState(() => getDatabaseEnvironment());
   const [switching, setSwitching] = useState(false);
 
   // Keep in sync if another tab changes it
