@@ -3,49 +3,34 @@ import { Building2, ClipboardCheck, Activity } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
-import { getBackendUrl } from "../lib/apiConfig";
+import { api } from "../lib/api";
 import { publicAssetUrl } from "../lib/assetUrl";
 
 const haptic = () => {
   try {
     if (navigator.vibrate) {
       navigator.vibrate(25);
-    } else if (window.navigator && 'haptics' in window.navigator) {
-      window.navigator.haptics.play('click');
+    } else if (window.navigator && "haptics" in window.navigator) {
+      window.navigator.haptics.play("click");
     }
   } catch {}
 };
 
 function tasksFromMyTasksPayload(payload) {
   if (Array.isArray(payload)) return payload;
-  return payload?.tasks ?? [];
+  return payload?.tasks ?? payload?.items ?? [];
 }
 
 const fetchTaskCounts = async () => {
-  const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
-  const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
-  const headers = {
-    ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-  const base = `${getBackendUrl()}/api/my-tasks`;
   const [openRes, overdueRes] = await Promise.all([
-    fetch(`${base}?filter=open`, {
-      headers,
-      credentials: AUTH_MODE === "cookie" ? "include" : "omit",
-    }),
-    fetch(`${base}?filter=overdue`, {
-      headers,
-      credentials: AUTH_MODE === "cookie" ? "include" : "omit",
-    }),
+    api.get("/my-tasks", { params: { filter: "open" } }),
+    api.get("/my-tasks", { params: { filter: "overdue" } }),
   ]);
-  const openData = await openRes.json();
-  const overdueData = await overdueRes.json();
-  const openTasks = tasksFromMyTasksPayload(openData);
-  const overdueTasks = tasksFromMyTasksPayload(overdueData);
-  // open + overdue double-counts: e.g. pending tasks with past due_date appear in both lists (see my_tasks.py filters).
+  const openTasks = tasksFromMyTasksPayload(openRes.data);
+  const overdueTasks = tasksFromMyTasksPayload(overdueRes.data);
   const seenIds = new Set();
-  for (const t of [...openTasks, ...overdueTasks]) {
-    if (t?.id != null && t.id !== "") seenIds.add(String(t.id));
+  for (const task of [...openTasks, ...overdueTasks]) {
+    if (task?.id != null && task.id !== "") seenIds.add(String(task.id));
   }
   return {
     open: openTasks.length,

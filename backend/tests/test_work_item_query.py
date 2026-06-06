@@ -8,6 +8,9 @@ from services.work_item_query import (
     _build_scheduled_task_query,
     _user_can_see_item,
     serialize_scheduled_task_as_work_item,
+    serialize_task,
+    serialize_action_as_task,
+    work_item_sort_key,
 )
 
 
@@ -38,6 +41,25 @@ def test_user_visibility_matches_my_tasks():
     assert _user_can_see_item(None, "user-a") is True
     assert _user_can_see_item("user-a", "user-a") is True
     assert _user_can_see_item("user-b", "user-a") is False
+
+
+def test_serialize_task_marks_non_unbridged():
+    item = serialize_task({"_id": "abc", "title": "Check valve", "status": "pending"})
+    assert item["source_type"] == "task"
+    assert item["is_unbridged_maintenance"] is False
+
+
+def test_serialize_action_as_task_shape():
+    item = serialize_action_as_task({"id": "act-1", "title": "Fix leak", "status": "open"})
+    assert item["source_type"] == "action"
+    assert item["status"] == "planned"
+
+
+def test_work_item_sort_key_prioritizes_risk():
+    now = datetime(2026, 6, 5, 12, 0, tzinfo=timezone.utc)
+    high = work_item_sort_key({"risk_score": 90, "status": "planned", "priority": "low"}, now)
+    low = work_item_sort_key({"risk_score": 10, "status": "planned", "priority": "critical"}, now)
+    assert high < low
 
 
 def test_recurring_filter_excludes_maintenance_query():

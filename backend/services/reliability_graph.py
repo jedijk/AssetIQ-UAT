@@ -162,6 +162,107 @@ async def sync_edge_for_pm_import_task(
     )
 
 
+async def sync_edges_for_scheduled_task(
+    scheduled_task: dict,
+    *,
+    event: str,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, int]:
+    """
+    Materialize scheduled_task graph edges on lifecycle events.
+
+    Base edges (always):
+      scheduled_task → derived_from → program_task
+      scheduled_task → scheduled_for → equipment
+      scheduled_task → mitigates_failure_mode → failure_mode (when present)
+
+    Lifecycle edges:
+      completed → scheduled_task → completed_on → equipment
+      cancelled → scheduled_task → cancelled_for → program_task
+    """
+    task_id = scheduled_task.get("id")
+    if not task_id:
+        return {"edges_upserted": 0}
+
+    equipment_id = scheduled_task.get("equipment_id")
+    program_task_id = scheduled_task.get("maintenance_program_id")
+    failure_mode_id = scheduled_task.get("failure_mode_id")
+    equipment_type_id = scheduled_task.get("equipment_type_id")
+    upserted = 0
+    base_meta = {
+        "strategy_id": scheduled_task.get("strategy_id"),
+        "strategy_version": scheduled_task.get("strategy_version"),
+        "task_name": scheduled_task.get("task_name"),
+    }
+
+    if program_task_id:
+        await upsert_edge(
+            source_type="scheduled_task",
+            source_id=task_id,
+            relation="derived_from",
+            target_type="program_task",
+            target_id=program_task_id,
+            equipment_id=equipment_id,
+            equipment_type_id=equipment_type_id,
+            metadata=base_meta,
+        )
+        upserted += 1
+
+    if equipment_id:
+        await upsert_edge(
+            source_type="scheduled_task",
+            source_id=task_id,
+            relation="scheduled_for",
+            target_type="equipment",
+            target_id=equipment_id,
+            equipment_id=equipment_id,
+            equipment_type_id=equipment_type_id,
+            metadata=base_meta,
+        )
+        upserted += 1
+
+    if failure_mode_id:
+        await upsert_edge(
+            source_type="scheduled_task",
+            source_id=task_id,
+            relation="mitigates_failure_mode",
+            target_type="failure_mode",
+            target_id=failure_mode_id,
+            equipment_id=equipment_id,
+            equipment_type_id=equipment_type_id,
+            metadata=base_meta,
+        )
+        upserted += 1
+
+    event_meta = {**base_meta, **(metadata or {}), "event": event}
+    if event == "completed" and equipment_id:
+        await upsert_edge(
+            source_type="scheduled_task",
+            source_id=task_id,
+            relation="completed_on",
+            target_type="equipment",
+            target_id=equipment_id,
+            equipment_id=equipment_id,
+            equipment_type_id=equipment_type_id,
+            metadata=event_meta,
+        )
+        upserted += 1
+    elif event == "cancelled" and program_task_id:
+        await upsert_edge(
+            source_type="scheduled_task",
+            source_id=task_id,
+            relation="cancelled_for",
+            target_type="program_task",
+            target_id=program_task_id,
+            equipment_id=equipment_id,
+            equipment_type_id=equipment_type_id,
+            metadata=event_meta,
+        )
+        upserted += 1
+
+    return {"edges_upserted": upserted}
+
+
 async def get_edges_for_equipment(
     equipment_id: str,
     *,

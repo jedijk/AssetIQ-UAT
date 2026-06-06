@@ -1,4 +1,4 @@
-import { getBackendUrl } from '../lib/apiConfig';
+import { api } from '../lib/api';
 /**
  * useAnalyticsTracking - Hook for tracking user events
  * 
@@ -13,7 +13,6 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-const API_BASE_URL = getBackendUrl();
 const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 
 // Detect device type based on user agent and screen size
@@ -96,26 +95,14 @@ const getModuleFromPath = (pathname) => {
 
 // Track event API call
 const trackEventAPI = async (eventData) => {
-  const token = localStorage.getItem('token');
-  if (!token) return; // Not logged in
-  
   try {
-    // Add device type to all events
     const enrichedData = {
       ...eventData,
-      device_type: getDeviceType()
+      device_type: getDeviceType(),
     };
-    
-    await fetch(`${API_BASE_URL}/api/user-stats/track`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify(enrichedData)
-    });
+
+    await api.post("/user-stats/track", enrichedData);
   } catch (error) {
-    // Silently fail - tracking should not break the app
     console.debug('Analytics tracking failed:', error);
   }
 };

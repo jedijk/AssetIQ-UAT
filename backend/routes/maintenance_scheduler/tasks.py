@@ -216,6 +216,13 @@ async def update_task(
         {"$set": update_data},
     )
 
+    if request.status in (TaskStatus.COMPLETED, TaskStatus.CANCELLED):
+        from services.reliability_graph import sync_edges_for_scheduled_task
+
+        event = "completed" if request.status == TaskStatus.COMPLETED else "cancelled"
+        updated = {**task, **update_data, "status": request.status.value}
+        await sync_edges_for_scheduled_task(updated, event=event)
+
     return {"message": "Task updated", "task_id": task_id}
 
 
@@ -325,6 +332,23 @@ async def complete_task(
             refreshed = await db.maintenance_programs.find_one({"id": program["id"]})
             if refreshed:
                 await schedule_program(refreshed)
+
+    from services.reliability_graph import sync_edges_for_scheduled_task
+
+    completed_task = {
+        **task,
+        "status": TaskStatus.COMPLETED.value,
+        "completed_at": now,
+    }
+    await sync_edges_for_scheduled_task(
+        completed_task,
+        event="completed",
+        metadata={
+            "completed_at": now,
+            "actual_hours": request.actual_hours,
+            "failure_observed": request.failure_observed,
+        },
+    )
 
     return {
         "message": "Task completed",

@@ -91,41 +91,12 @@ import BackButton from "../components/BackButton";
 import { EquipmentTypeItem, EquipmentTypeFailureModesPanel, EQUIPMENT_ICONS, ICON_OPTIONS, DISCIPLINES, EQUIPMENT_CATEGORIES, DISCIPLINE_COLORS, MaintenanceScheduleManager } from "../components/library";
 import { FailureModeViewPanel } from "../components/library";
 import PMImportWizard from "../components/library/PMImportWizard";
-import AIFailureModeSuggestions from "../components/library/AIFailureModeSuggestions";
-import AINewEquipmentTypeSuggestions from "../components/library/AINewEquipmentTypeSuggestions";
-import AINewFailureModeSuggestions from "../components/library/AINewFailureModeSuggestions";
-import AIImproveFailureMode from "../components/library/AIImproveFailureMode";
-import BulkImproveFailureModes from "../components/library/BulkImproveFailureModes";
-import AIReviewActionDisciplines from "../components/library/AIReviewActionDisciplines";
-import AIFindSimilarFailureModes from "../components/library/AIFindSimilarFailureModes";
-import FindDuplicateActionsDialog from "../components/library/FindDuplicateActionsDialog";
 import IntelligenceMapTab from "../components/library/IntelligenceMapTab";
 import { CustomPMImportTab } from "../components/failure-modes/PmImportTabComponents";
+import { FailureModesListPanel } from "../components/failure-modes/FailureModesListPanel";
+import { FailureModesDetailPanel } from "../components/failure-modes/FailureModesDetailPanel";
+import { FailureModesAIPanel } from "../components/failure-modes/FailureModesAIPanel";
 
-
-const disciplineIcons = {
-  Rotating: Cog,
-  Static: Thermometer,
-  Piping: Activity,
-  Instrumentation: Zap,
-  Electrical: Zap,
-  Process: Activity,
-  Safety: Shield,
-  Environment: Leaf,
-  Extruder: Cog,
-};
-
-const disciplineColors = {
-  Rotating: "bg-blue-100 text-blue-700 border-blue-200",
-  Static: "bg-purple-100 text-purple-700 border-purple-200",
-  Piping: "bg-orange-100 text-orange-700 border-orange-200",
-  Instrumentation: "bg-cyan-100 text-cyan-700 border-cyan-200",
-  Electrical: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  Process: "bg-slate-100 text-slate-700 border-slate-200",
-  Safety: "bg-red-100 text-red-700 border-red-200",
-  Environment: "bg-green-100 text-green-700 border-green-200",
-  Extruder: "bg-indigo-100 text-indigo-700 border-indigo-200",
-};
 
 const FailureModesPage = () => {
   const queryClient = useQueryClient();
@@ -915,381 +886,53 @@ const FailureModesPage = () => {
 
         {/* Failure Modes Tab */}
         <TabsContent value="failure-modes" className="space-y-4">
-          {/* Compact Stats Row - Same as ThreatsPage */}
-          <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
-            <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
-              <div className="p-1.5 rounded-md bg-slate-100">
-                <AlertTriangle className="w-4 h-4 text-slate-600" />
-              </div>
-              <div>
-                <span className="text-lg font-bold text-slate-900">{displayedTotal}</span>
-                <span className="text-xs text-slate-500 ml-1">
-                  {highSeverityOnly ? "High Severity FMs" : t("library.failureModes")}
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
-              <div className="p-1.5 rounded-md bg-blue-50">
-                <Filter className="w-4 h-4 text-blue-600" />
-              </div>
-              <div>
-                <span className="text-lg font-bold text-blue-600">{totalCategories}</span>
-                <span className="text-xs text-slate-500 ml-1">Disciplines</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Toolbar - stacked into two rows:
-                Row 1: Search + filters (always visible on screen)
-                Row 2: AI / Action buttons (Export, Import, Suggest, Bulk Improve, Add) */}
-          <div className="mb-6 space-y-3" data-testid="filters">
-            {/* Row 1: Search + Filters */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative flex-1 min-w-[220px] sm:min-w-[260px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <Input
-                  placeholder={t("library.searchPlaceholder")}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 h-11 w-full"
-                  data-testid="search-input"
-                />
-              </div>
-              <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
-                <SelectTrigger className="w-44 h-11" data-testid="category-filter">
-                  <Filter className="w-4 h-4 mr-2 text-slate-400" />
-                  <SelectValue placeholder={t("disciplines.allDisciplines")} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("disciplines.allDisciplines")}</SelectItem>
-                  {DISCIPLINES.map((d) => (
-                    <SelectItem key={d} value={d}>{(t(`disciplines.${d}`) !== `disciplines.${d}` ? t(`disciplines.${d}`) : d)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-44 h-11" data-testid="type-filter">
-                  <SelectValue placeholder="All Types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">
-                    <span className="flex items-center gap-2">All Types</span>
-                  </SelectItem>
-                  <SelectItem value="generic">
-                    <span className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                      Generic (Industry)
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="customer_specific">
-                    <span className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-purple-500"></span>
-                      Customer Specific
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="recently_added">
-                    <span className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                      Recently Added (30 days)
-                    </span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                type="button"
-                onClick={() => setHighSeverityOnly((v) => !v)}
-                variant="outline"
-                className={`h-11 ${
-                  highSeverityOnly
-                    ? "border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
-                    : "border-slate-200 text-slate-700 hover:bg-slate-50"
-                }`}
-                data-testid="high-severity-toggle"
-                title="Show only failure modes with severity ≥ 8 (high), sorted by severity then RPN"
-                aria-pressed={highSeverityOnly}
-              >
-                <AlertTriangle className="w-4 h-4 mr-1" />
-                High Severity
-                {highSeverityOnly && (
-                  <span className="ml-1 text-xs font-semibold bg-red-100 text-red-700 px-1.5 rounded">
-                    {displayedFailureModes.length}
-                  </span>
-                )}
-              </Button>
-              <Button
-                type="button"
-                onClick={() => setHideAIImproved((v) => !v)}
-                variant="outline"
-                className={`h-11 ${
-                  hideAIImproved
-                    ? "border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100"
-                    : "border-slate-200 text-slate-700 hover:bg-slate-50"
-                } ${canUseAITools ? "" : "hidden"}`}
-                data-testid="hide-ai-improved-toggle"
-                title={`Hide failure modes already improved by AI (${aiImprovedCount} marked)`}
-                aria-pressed={hideAIImproved}
-              >
-                <Sparkles className="w-4 h-4 mr-1" />
-                Not improved yet
-                {aiImprovedCount > 0 && (
-                  <span
-                    className={`ml-1 text-xs font-semibold px-1.5 rounded ${
-                      hideAIImproved
-                        ? "bg-purple-100 text-purple-700"
-                        : "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {aiImprovedCount} done
-                  </span>
-                )}
-              </Button>
-              <Button
-                type="button"
-                onClick={() => setFilterLinkedToEquipment((v) => !v)}
-                variant="outline"
-                className={`h-11 ${
-                  filterLinkedToEquipment
-                    ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                    : "border-slate-200 text-slate-700 hover:bg-slate-50"
-                }`}
-                data-testid="linked-to-equipment-toggle-fm"
-                title={t("library.filterLinkedToEquipmentHint")}
-                aria-pressed={filterLinkedToEquipment}
-              >
-                <Cog className="w-4 h-4 mr-1" />
-                {t("library.filterLinkedToEquipment")}
-                {filterLinkedToEquipment && (
-                  <span className="ml-1 text-xs font-semibold bg-blue-100 text-blue-700 px-1.5 rounded">
-                    {displayedFailureModes.length}
-                  </span>
-                )}
-              </Button>
-            </div>
-            <div
-              className="flex flex-wrap items-center gap-2"
-              data-testid="action-bar"
-            >
-              <Button
-                onClick={handleExportExcel}
-                variant="outline"
-                className="h-11"
-                disabled={isExporting}
-                data-testid="export-excel-btn"
-              >
-                <Download className="w-4 h-4 mr-1" />
-                {isExporting ? (t("common.exporting") || "Exporting...") : (t("library.exportExcel") || "Export Excel")}
-              </Button>
-              <Button
-                onClick={() => setIsAINewFmOpen(true)}
-                variant="outline"
-                className={`h-11 border-purple-200 text-purple-700 hover:bg-purple-50 ${canUseAITools ? "" : "hidden"}`}
-                data-testid="ai-suggest-new-failure-modes-btn"
-                disabled={equipmentTypes.length === 0}
-                title="Let AI act as a reliability engineer and suggest failure modes missing from your library"
-              >
-                <Sparkles className="w-4 h-4 mr-1" />
-                Suggest Failure Modes
-              </Button>
-              <Button
-                onClick={() => setIsBulkImproveOpen(true)}
-                variant="outline"
-                className={`h-11 border-purple-200 text-purple-700 hover:bg-purple-50 ${canUseAITools ? "" : "hidden"}`}
-                data-testid="bulk-improve-fm-btn"
-                disabled={displayedFailureModes.length === 0}
-                title={`Run AI improvement and auto-apply changes for the ${displayedFailureModes.length} visible failure mode(s)`}
-              >
-                <Sparkles className="w-4 h-4 mr-1" />
-                Bulk Improve ({displayedFailureModes.length})
-              </Button>
-              <Button
-                onClick={() => setIsReviewDisciplinesOpen(true)}
-                variant="outline"
-                className={`h-11 border-purple-200 text-purple-700 hover:bg-purple-50 ${canUseAITools ? "" : "hidden"}`}
-                data-testid="review-action-disciplines-btn"
-                disabled={failureModes.length === 0}
-                title="Have AI re-classify the maintenance discipline of every recommended action in the library"
-              >
-                <Sparkles className="w-4 h-4 mr-1" />
-                Review Disciplines
-              </Button>
-              <Button
-                onClick={() => setIsFindSimilarOpen(true)}
-                variant="outline"
-                className={`h-11 border-purple-200 text-purple-700 hover:bg-purple-50 ${canUseAITools ? "" : "hidden"}`}
-                data-testid="find-similar-fm-btn"
-                disabled={failureModes.length === 0}
-                title="Find similar failure modes across the library and merge them"
-              >
-                <Sparkles className="w-4 h-4 mr-1" />
-                Find Similar
-              </Button>
-              <Button
-                onClick={() => setIsFindDuplicateActionsOpen(true)}
-                variant="outline"
-                className={`h-11 border-amber-200 text-amber-800 hover:bg-amber-50 ${isOwner ? "" : "hidden"}`}
-                data-testid="find-duplicate-actions-btn"
-                disabled={failureModes.length === 0}
-                title="Find duplicate recommended actions inside failure modes (owner only)"
-              >
-                <ClipboardList className="w-4 h-4 mr-1" />
-                Duplicate Actions
-              </Button>
-              <Button
-                onClick={() => { setEditingFm(null); resetFmForm(); setIsFmDialogOpen(true); }}
-                className="h-11 bg-blue-600 hover:bg-blue-700 ml-auto"
-                data-testid="add-failure-mode-btn"
-              >
-                <Plus className="w-4 h-4 mr-1" /> {t("library.addFailureMode")}
-              </Button>
-            </div>
-          </div>
-
-          {/* Two-Panel Layout: List + View Panel */}
           <div className="flex gap-4 h-[calc(100vh-340px)]">
-            {/* Left Panel: Failure Modes List */}
-            <div className={`${selectedFm ? 'w-1/2 lg:w-2/5' : 'w-full'} transition-all duration-300`}>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-16">
-                  <div className="loading-dots">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </div>
-                </div>
-              ) : displayedFailureModes.length === 0 ? (
-                <div className="empty-state py-16">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-                    <Info className="w-8 h-8 text-slate-400" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-slate-700 mb-2">{t("library.noMatches")}</h3>
-                  <p className="text-slate-500">
-                    {hideAIImproved && failureModes.some((fm) => fm.ai_improved_at)
-                      ? "All visible failure modes have already been improved by AI. Toggle off to see them again."
-                      : highSeverityOnly
-                      ? "No failure modes with severity ≥ 8. Toggle off to see all."
-                      : t("library.tryAdjusting")}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2 overflow-y-auto h-full pr-2" data-testid="failure-modes-list">
-                  {displayedFailureModes.map((fm, idx) => {
-                    const Icon = disciplineIcons[fm.discipline] || AlertTriangle;
-                    const colors = disciplineColors[fm.discipline] || "bg-slate-100 text-slate-700";
-                    const isSelected = selectedFm?.id === fm.id;
-                    
-                    return (
-                      <motion.div
-                        key={fm.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.02 }}
-                        className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all border ${
-                          isSelected 
-                            ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-200' 
-                            : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'
-                        }`}
-                        onClick={() => handleSelectFm(fm)}
-                        data-testid={`failure-mode-${fm.id}`}
-                      >
-                        {/* Category Icon */}
-                        <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${colors.split(' ')[0]}`}>
-                          <Icon className={`w-5 h-5 ${colors.split(' ')[1]}`} />
-                        </div>
-
-                        {/* Content */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <Badge className={`${colors} text-xs px-1.5 py-0`}>{(t(`disciplines.${fm.discipline}`) !== `disciplines.${fm.discipline}` ? t(`disciplines.${fm.discipline}`) : fm.discipline)}</Badge>
-                            {fm.failure_mode_type === "customer_specific" && (
-                              <Badge className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0">
-                                {(t("disciplines.Customer") !== "disciplines.Customer" ? t("disciplines.Customer") : "Customer")}
-                              </Badge>
-                            )}
-                          </div>
-                          <h3 className="font-medium text-slate-900 text-sm line-clamp-1">
-                            {fm.failure_mode}
-                          </h3>
-                          <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">
-                            {fm.equipment} • {fm.keywords?.slice(0, 2).join(", ")}
-                          </p>
-                        </div>
-
-                        {/* RPN Score Badge */}
-                        <div className="flex-shrink-0 flex flex-col items-center gap-1">
-                          <div className={`w-12 h-10 rounded-lg flex flex-col items-center justify-center text-sm font-bold ${
-                            fm.severity * fm.occurrence * fm.detectability >= 200 ? 'bg-red-100 text-red-700' :
-                            fm.severity * fm.occurrence * fm.detectability >= 125 ? 'bg-orange-100 text-orange-700' :
-                            fm.severity * fm.occurrence * fm.detectability >= 80 ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-green-100 text-green-700'
-                          }`}>
-                            <span className="text-lg leading-tight">{fm.severity * fm.occurrence * fm.detectability}</span>
-                            <span className="text-[9px] opacity-70">RPN</span>
-                          </div>
-                          {/* Validation indicator */}
-                          {fm.is_validated ? (
-                            <CheckCircle className="w-4 h-4 text-green-500" title={t("library.validated")} />
-                          ) : (
-                            <AlertTriangle className="w-4 h-4 text-amber-400" title={t("library.notValidated")} />
-                          )}
-                        </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Right Panel: View/Edit Panel */}
+            <FailureModesListPanel
+              t={t}
+              displayedTotal={displayedTotal}
+              totalCategories={totalCategories}
+              highSeverityOnly={highSeverityOnly}
+              setHighSeverityOnly={setHighSeverityOnly}
+              hideAIImproved={hideAIImproved}
+              setHideAIImproved={setHideAIImproved}
+              filterLinkedToEquipment={filterLinkedToEquipment}
+              setFilterLinkedToEquipment={setFilterLinkedToEquipment}
+              canUseAITools={canUseAITools}
+              aiImprovedCount={aiImprovedCount}
+              displayedFailureModes={displayedFailureModes}
+              failureModes={failureModes}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              disciplineFilter={disciplineFilter}
+              setDisciplineFilter={setDisciplineFilter}
+              typeFilter={typeFilter}
+              setTypeFilter={setTypeFilter}
+              isExporting={isExporting}
+              handleExportExcel={handleExportExcel}
+              equipmentTypes={equipmentTypes}
+              isOwner={isOwner}
+              isLoading={isLoading}
+              selectedFm={selectedFm}
+              onSelectFm={handleSelectFm}
+              onOpenNewFm={() => { setEditingFm(null); resetFmForm(); setIsFmDialogOpen(true); }}
+              onOpenAINewFm={() => setIsAINewFmOpen(true)}
+              onOpenBulkImprove={() => setIsBulkImproveOpen(true)}
+              onOpenReviewDisciplines={() => setIsReviewDisciplinesOpen(true)}
+              onOpenFindSimilar={() => setIsFindSimilarOpen(true)}
+              onOpenFindDuplicateActions={() => setIsFindDuplicateActionsOpen(true)}
+            />
             {selectedFm && !isViewPanelFullscreen && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="w-1/2 lg:w-3/5 h-full"
-              >
-                <FailureModeViewPanel
-                  fm={selectedFm}
-                  isEditing={isViewPanelEditing}
-                  formData={viewPanelForm}
-                  setFormData={setViewPanelForm}
-                  onStartEdit={handleStartViewPanelEdit}
-                  onSave={handleSaveViewPanelEdit}
-                  onCancel={handleCancelViewPanelEdit}
-                  onClose={() => { setSelectedFm(null); setIsViewPanelEditing(false); setViewPanelForm(null); setIsViewPanelFullscreen(false); }}
-                  onDelete={(id) => { 
-                    const fmToDelete = failureModes.find(fm => fm.id === id);
-                    setDeleteConfirmFm(fmToDelete);
-                  }}
-                  onValidate={handleValidateFm}
-                  onUnvalidate={handleUnvalidateFm}
-                  onShowVersionHistory={handleShowVersionHistory}
-                  onImproveWithAI={() => setIsAIImproveOpen(true)}
-                  equipmentTypes={equipmentTypes}
-                  categories={categories}
-                  currentUser={user}
-                  t={t}
-                  isFullscreen={false}
-                  onToggleFullscreen={() => setIsViewPanelFullscreen(true)}
-                />
-              </motion.div>
-            )}
-          </div>
-          
-          {/* Fullscreen View Panel Overlay */}
-          {selectedFm && isViewPanelFullscreen && (
-            <div className="fixed inset-0 z-50 bg-white overflow-hidden">
-              <FailureModeViewPanel
-                fm={selectedFm}
-                isEditing={isViewPanelEditing}
-                formData={viewPanelForm}
-                setFormData={setViewPanelForm}
+              <FailureModesDetailPanel
+                selectedFm={selectedFm}
+                isViewPanelFullscreen={false}
+                isViewPanelEditing={isViewPanelEditing}
+                viewPanelForm={viewPanelForm}
+                setViewPanelForm={setViewPanelForm}
                 onStartEdit={handleStartViewPanelEdit}
                 onSave={handleSaveViewPanelEdit}
                 onCancel={handleCancelViewPanelEdit}
                 onClose={() => { setSelectedFm(null); setIsViewPanelEditing(false); setViewPanelForm(null); setIsViewPanelFullscreen(false); }}
-                onDelete={(id) => { 
-                  const fmToDelete = failureModes.find(fm => fm.id === id);
-                  setDeleteConfirmFm(fmToDelete);
-                }}
+                onDelete={(id) => { const fmToDelete = failureModes.find(fm => fm.id === id); setDeleteConfirmFm(fmToDelete); }}
                 onValidate={handleValidateFm}
                 onUnvalidate={handleUnvalidateFm}
                 onShowVersionHistory={handleShowVersionHistory}
@@ -1298,13 +941,36 @@ const FailureModesPage = () => {
                 categories={categories}
                 currentUser={user}
                 t={t}
-                isFullscreen={true}
-                onToggleFullscreen={() => setIsViewPanelFullscreen(false)}
+                onToggleFullscreen={() => setIsViewPanelFullscreen(true)}
               />
-            </div>
+            )}
+          </div>
+          {selectedFm && isViewPanelFullscreen && (
+            <FailureModesDetailPanel
+              selectedFm={selectedFm}
+              isViewPanelFullscreen
+              isViewPanelEditing={isViewPanelEditing}
+              viewPanelForm={viewPanelForm}
+              setViewPanelForm={setViewPanelForm}
+              onStartEdit={handleStartViewPanelEdit}
+              onSave={handleSaveViewPanelEdit}
+              onCancel={handleCancelViewPanelEdit}
+              onClose={() => { setSelectedFm(null); setIsViewPanelEditing(false); setViewPanelForm(null); setIsViewPanelFullscreen(false); }}
+              onDelete={(id) => { const fmToDelete = failureModes.find(fm => fm.id === id); setDeleteConfirmFm(fmToDelete); }}
+              onValidate={handleValidateFm}
+              onUnvalidate={handleUnvalidateFm}
+              onShowVersionHistory={handleShowVersionHistory}
+              onImproveWithAI={() => setIsAIImproveOpen(true)}
+              equipmentTypes={equipmentTypes}
+              categories={categories}
+              currentUser={user}
+              t={t}
+              onToggleFullscreen={() => setIsViewPanelFullscreen(false)}
+            />
           )}
         </TabsContent>
 
+        
         {/* Equipment Types Tab */}
         <TabsContent value="libraries" className="space-y-6">
           <div className="flex gap-4 h-[calc(100vh-180px)]">
@@ -2280,97 +1946,42 @@ const FailureModesPage = () => {
         }}
       />
 
-      {/* AI Failure Mode Suggestions Dialog */}
-      <AIFailureModeSuggestions
-        isOpen={isAISuggestionsOpen}
-        onClose={() => setIsAISuggestionsOpen(false)}
+      <FailureModesAIPanel
+        t={t}
+        isOwner={isOwner}
+        isAISuggestionsOpen={isAISuggestionsOpen}
+        setIsAISuggestionsOpen={setIsAISuggestionsOpen}
+        isAINewTypesOpen={isAINewTypesOpen}
+        setIsAINewTypesOpen={setIsAINewTypesOpen}
+        isAINewFmOpen={isAINewFmOpen}
+        setIsAINewFmOpen={setIsAINewFmOpen}
+        isAIImproveOpen={isAIImproveOpen}
+        setIsAIImproveOpen={setIsAIImproveOpen}
+        isBulkImproveOpen={isBulkImproveOpen}
+        setIsBulkImproveOpen={setIsBulkImproveOpen}
+        isReviewDisciplinesOpen={isReviewDisciplinesOpen}
+        setIsReviewDisciplinesOpen={setIsReviewDisciplinesOpen}
+        isFindSimilarOpen={isFindSimilarOpen}
+        setIsFindSimilarOpen={setIsFindSimilarOpen}
+        isFindDuplicateActionsOpen={isFindDuplicateActionsOpen}
+        setIsFindDuplicateActionsOpen={setIsFindDuplicateActionsOpen}
         equipmentTypes={equipmentTypes}
         failureModes={failureModes}
-        onAcceptSuggestions={() => {
+        displayedFailureModes={displayedFailureModes}
+        hierarchyNodes={hierarchyNodes}
+        selectedFm={selectedFm}
+        onApplyAIImprovement={handleApplyAIImprovement}
+        onInvalidateFailureModes={() => {
           queryClient.invalidateQueries({ queryKey: ["failureModes"] });
-          queryClient.invalidateQueries({ queryKey: ["equipmentTypes"] });
         }}
-        t={t}
-      />
-
-      {/* AI Suggest NEW Equipment Types Dialog */}
-      <AINewEquipmentTypeSuggestions
-        isOpen={isAINewTypesOpen}
-        onClose={() => setIsAINewTypesOpen(false)}
-        nodes={hierarchyNodes}
-        equipmentTypes={equipmentTypes}
-        onCreated={() => {
+        onInvalidateEquipmentTypes={() => {
           queryClient.invalidateQueries({ queryKey: ["equipment-types"] });
         }}
-      />
-
-      {/* AI Suggest NEW Failure Modes Dialog (Reliability Engineer) */}
-      <AINewFailureModeSuggestions
-        isOpen={isAINewFmOpen}
-        onClose={() => setIsAINewFmOpen(false)}
-        equipmentTypes={equipmentTypes}
-        failureModes={failureModes}
-        onCreated={() => {
-          queryClient.invalidateQueries({ queryKey: ["failureModes"] });
-        }}
-        t={t}
-      />
-
-      {/* AI Improve Failure Mode (Reliability Engineer) */}
-      <AIImproveFailureMode
-        isOpen={isAIImproveOpen}
-        onClose={() => setIsAIImproveOpen(false)}
-        failureMode={selectedFm}
-        equipmentTypes={equipmentTypes}
-        onApply={handleApplyAIImprovement}
-      />
-
-      {/* Bulk Improve Failure Modes with AI */}
-      <BulkImproveFailureModes
-        isOpen={isBulkImproveOpen}
-        onClose={() => setIsBulkImproveOpen(false)}
-        failureModes={displayedFailureModes}
-        equipmentTypes={equipmentTypes}
-        onCompleted={() => {
-          queryClient.invalidateQueries({ queryKey: ["failureModes"] });
+        onSelectFailureMode={(fmId) => {
+          const fm = failureModes.find((f) => f.id === fmId);
+          if (fm) setSelectedFm(fm);
         }}
       />
-
-      {/* AI Review Action Disciplines — re-classify recommended_actions disciplines */}
-      <AIReviewActionDisciplines
-        open={isReviewDisciplinesOpen}
-        onClose={() => setIsReviewDisciplinesOpen(false)}
-        failureModes={failureModes}
-        onApplied={() => {
-          queryClient.invalidateQueries({ queryKey: ["failureModes"] });
-        }}
-      />
-
-      {/* AI Find Similar Failure Modes — semantic dedupe per equipment type */}
-      <AIFindSimilarFailureModes
-        open={isFindSimilarOpen}
-        onClose={() => setIsFindSimilarOpen(false)}
-        failureModes={failureModes}
-        equipmentTypes={equipmentTypes}
-        onApplied={() => {
-          queryClient.invalidateQueries({ queryKey: ["failureModes"] });
-        }}
-      />
-
-      {isOwner && (
-        <FindDuplicateActionsDialog
-          open={isFindDuplicateActionsOpen}
-          onClose={() => setIsFindDuplicateActionsOpen(false)}
-          failureModes={failureModes}
-          onSelectFailureMode={(fmId) => {
-            const fm = failureModes.find((f) => f.id === fmId);
-            if (fm) setSelectedFm(fm);
-          }}
-          onApplied={() => {
-            queryClient.invalidateQueries({ queryKey: ["failureModes"] });
-          }}
-        />
-      )}
     </div>
   );
 };

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
+import { api } from '../lib/api';
 import { useLanguage } from "../contexts/LanguageContext";
 import { AuthenticatedImage, useAuthenticatedMedia } from "../components/AuthenticatedMedia";
 import { toast } from "sonner";
@@ -472,18 +473,8 @@ export default function FormSubmissionsPage() {
   // Delete mutation - must be before any early returns
   const deleteMutation = useMutation({
     mutationFn: async (submissionId) => {
-      const headers = getAuthHeaders();
-      if (AUTH_MODE === "cookie") {
-        const csrf = getCookie("assetiq_csrf");
-        if (csrf) headers["X-CSRF-Token"] = csrf;
-      }
-      const response = await fetch(`${API_BASE_URL}/api/form-submissions/${submissionId}`, {
-        method: "DELETE",
-        headers,
-        credentials: FETCH_CREDENTIALS,
-      });
-      if (!response.ok) throw new Error("Failed to delete submission");
-      return response.json();
+      const response = await api.delete(`/form-submissions/${submissionId}`);
+      return response.data;
     },
     onSuccess: () => {
       toast.success(t("reports.deletedSuccess"));

@@ -7,6 +7,7 @@ import { usePermissions } from "../contexts/PermissionsContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { getBackendUrl } from "../lib/apiConfig";
+import { api } from "../lib/api";
 import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2, Server, HelpCircle, User, Camera, Briefcase, Save, Database, ScrollText, Gauge, Sparkles } from "lucide-react";
 import AnimatedDrawer from "./animations/AnimatedDrawer";
 import { pageTransition, pageVariants, springPresets } from "./animations/constants";
@@ -329,23 +330,7 @@ const Layout = () => {
   const handleSaveProfile = async () => {
     setIsSavingProfile(true);
     try {
-      const token = localStorage.getItem("token");
-      const backendUrl = getBackendUrl();
-      
-      const response = await fetch(`${backendUrl}/api/users/me/profile`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(profileForm),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Failed to update profile");
-      }
-
+      await api.patch("/users/me/profile", profileForm);
       // Refresh user data
       queryClient.invalidateQueries({ queryKey: ["user"] });
       toast.success(t("profile.updateSuccess") || "Profile updated successfully");
@@ -392,27 +377,16 @@ const Layout = () => {
     setIsUploadingAvatar(true);
     
     try {
-      const token = localStorage.getItem("token");
-      const backendUrl = getBackendUrl();
-      
       const formData = new FormData();
       formData.append("file", editedFile);
 
-      const response = await fetch(`${backendUrl}/api/users/me/avatar`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
+      await api.post("/users/me/avatar", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || "Failed to upload avatar");
-      }
-
-      // Refresh avatar
-      const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
+      const backendUrl = getBackendUrl();
+      const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer";
+      const token = localStorage.getItem("token");
       const avatarFetchUrl = AUTH_MODE === "cookie"
         ? `${backendUrl}/api/users/${user.id}/avatar?t=${Date.now()}`
         : `${backendUrl}/api/users/${user.id}/avatar?token=${token}&t=${Date.now()}`;
