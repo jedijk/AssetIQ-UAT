@@ -71,6 +71,15 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Railway/Emergent deployment - must return instantly."""
+    if route_load_error is not None:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "degraded",
+                "routes_loaded": False,
+                "route_load_error": route_load_error.get("error"),
+            },
+        )
     return {"status": "ok"}
 
 
@@ -93,16 +102,22 @@ async def api_health_check():
     
     routes_ok = route_load_error is None
     overall_ok = db_status == "connected" and routes_ok
-    
-    return {
+
+    payload = {
         "status": "ok" if overall_ok else "degraded",
         "database": db_status,
         "database_latency_ms": db_latency,
         "uptime_seconds": uptime,
         "ready": app.state.ready,
         "routes_loaded": routes_ok,
-        "version": APP_VERSION
+        "version": APP_VERSION,
     }
+    if route_load_error is not None:
+        payload["route_load_error"] = route_load_error.get("error")
+        payload["route_load_error_type"] = route_load_error.get("type")
+
+    status_code = 200 if overall_ok else 503
+    return JSONResponse(status_code=status_code, content=payload)
 
 
 # =============================================================================
@@ -205,7 +220,7 @@ try:
         api_router.include_router(router)
     
     app.include_router(api_router)
-    logger.info(f"Loaded {len(all_routers)} route modules")
+    logger.info("Loaded %s route modules — all API routes mounted", len(all_routers))
 except Exception as e:
     import traceback
     route_load_error = {
@@ -213,9 +228,11 @@ except Exception as e:
         "type": type(e).__name__,
         "traceback": traceback.format_exc()
     }
-    logger.error(f"Failed to load routes: {e}")
+    logger.error("ROUTE LOAD FAILED — API endpoints unavailable: %s (%s)", e, type(e).__name__)
     logger.error(traceback.format_exc())
     # App will still run with health endpoints
+else:
+    logger.info("Route loading complete — routes_loaded=true")
 
 
 # Debug endpoint to list routes (owner/admin only)
