@@ -20,6 +20,7 @@ import {
   Trash2,
   Tag,
   Wrench,
+  CalendarClock,
   Languages
 } from "lucide-react";
 import { Button } from "../components/ui/button";
@@ -142,6 +143,13 @@ const SETTINGS_SECTIONS = [
     sectionKey: "disciplines",
     icon: Wrench,
     path: "/settings/disciplines",
+    roles: ["owner", "admin"]
+  },
+  {
+    id: "task-generation",
+    sectionKey: "taskGeneration",
+    icon: CalendarClock,
+    path: "/settings/task-generation",
     roles: ["owner", "admin"]
   },
   {
