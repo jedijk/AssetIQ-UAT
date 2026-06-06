@@ -318,6 +318,24 @@ INDEX_DEFINITIONS = {
         {"keys": [("created_at", -1)]},
         {"keys": [("content_type", 1)]},
     ],
+
+    # Maintenance scheduler (Phase 2)
+    "maintenance_programs_v2": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("equipment_id", 1)], "unique": True},
+        {"keys": [("equipment_type_id", 1)]},
+    ],
+    "maintenance_programs": [
+        {"keys": [("equipment_id", 1), ("task_template_id", 1)]},
+        {"keys": [("equipment_id", 1), ("is_active", 1)]},
+        {"keys": [("equipment_id", 1), ("v2_task_id", 1)]},
+    ],
+    "scheduled_tasks": [
+        {"keys": [("maintenance_program_id", 1), ("status", 1)]},
+        {"keys": [("equipment_id", 1), ("status", 1), ("due_date", 1)]},
+        {"keys": [("equipment_type_id", 1), ("status", 1)]},
+        {"keys": [("due_date", 1), ("status", 1)]},
+    ],
 }
 
 

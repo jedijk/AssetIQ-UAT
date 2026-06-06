@@ -207,6 +207,7 @@ class MaintenanceHistory(BaseModel):
 class ApplyStrategyRequest(BaseModel):
     """Request to apply maintenance strategy to equipment"""
     equipment_ids: List[str]  # List of equipment IDs to apply strategy to
+    run_async: bool = False  # Queue as background job (recommended for large batches)
 
 
 class RunSchedulerRequest(BaseModel):

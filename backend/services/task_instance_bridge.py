@@ -73,22 +73,61 @@ async def _get_program_discipline(program_id: Optional[str]) -> Optional[str]:
 
 async def _build_default_assignees() -> Dict[str, Dict[str, Optional[str]]]:
     """Map canonical discipline value -> { user_id, user_name } if configured."""
-    out: Dict[str, Dict[str, Optional[str]]] = {}
-    cursor = db.disciplines.find(
+    discipline_rows = await db.disciplines.find(
         {"default_assignee_user_id": {"$ne": None}},
         {"_id": 0, "value": 1, "default_assignee_user_id": 1},
-    )
-    async for d in cursor:
+    ).to_list(500)
+    user_ids = [
+        d["default_assignee_user_id"]
+        for d in discipline_rows
+        if d.get("default_assignee_user_id")
+    ]
+    users_by_id: Dict[str, Dict[str, Any]] = {}
+    if user_ids:
+        users = await db.users.find(
+            {"id": {"$in": user_ids}},
+            {"_id": 0, "id": 1, "name": 1, "email": 1},
+        ).to_list(len(user_ids))
+        users_by_id = {u["id"]: u for u in users if u.get("id")}
+
+    out: Dict[str, Dict[str, Optional[str]]] = {}
+    for d in discipline_rows:
         uid = d.get("default_assignee_user_id")
         if not uid:
             continue
-        user = await db.users.find_one(
-            {"id": uid}, {"_id": 0, "id": 1, "name": 1, "email": 1}
-        )
+        user = users_by_id.get(uid) or {}
         out[d["value"]] = {
             "user_id": uid,
-            "user_name": (user or {}).get("name") or (user or {}).get("email") or None,
+            "user_name": user.get("name") or user.get("email") or None,
         }
+    return out
+
+
+async def _build_program_discipline_map(program_ids: List[str]) -> Dict[str, Optional[str]]:
+    """Batch-load discipline for maintenance programs referenced by scheduled tasks."""
+    if not program_ids:
+        return {}
+    unique_ids = list(dict.fromkeys(pid for pid in program_ids if pid))
+    out: Dict[str, Optional[str]] = {}
+
+    v2_rows = await db.maintenance_programs_v2.find(
+        {"id": {"$in": unique_ids}},
+        {"_id": 0, "id": 1, "discipline": 1},
+    ).to_list(len(unique_ids))
+    for row in v2_rows:
+        if row.get("id"):
+            out[row["id"]] = row.get("discipline")
+
+    missing = [pid for pid in unique_ids if pid not in out]
+    if missing:
+        legacy_rows = await db.maintenance_programs.find(
+            {"id": {"$in": missing}},
+            {"_id": 0, "id": 1, "discipline": 1},
+        ).to_list(len(missing))
+        for row in legacy_rows:
+            if row.get("id"):
+                out[row["id"]] = row.get("discipline")
+
     return out
 
 
@@ -134,6 +173,12 @@ async def sync_scheduled_tasks_to_instances(
 
     default_assignees = await _build_default_assignees()
     discipline_cache: Dict[str, str] = {}
+    program_ids = [
+        st.get("maintenance_program_id")
+        for st in candidate_tasks
+        if st.get("maintenance_program_id")
+    ]
+    program_disciplines = await _build_program_discipline_map(program_ids)
 
     created = 0
     skipped = 0
@@ -150,7 +195,7 @@ async def sync_scheduled_tasks_to_instances(
         try:
             # Discipline: prefer the program's discipline; fall back to whatever
             # is on the scheduled_task (unlikely today but future-proof).
-            program_disc = await _get_program_discipline(st.get("maintenance_program_id"))
+            program_disc = program_disciplines.get(st.get("maintenance_program_id"))
             raw_discipline = program_disc or st.get("discipline")
             canonical_discipline = await _resolve_discipline(raw_discipline, discipline_cache)
 

@@ -16,6 +16,17 @@ from fastapi import BackgroundTasks
 logger = logging.getLogger("assetiq.jobs")
 
 
+def _serialize_job_result(result: Any) -> Any:
+    """Persist JSON-friendly job output (dict/list/scalars only)."""
+    if result is None or isinstance(result, (str, int, float, bool)):
+        return result
+    if isinstance(result, dict):
+        return result
+    if isinstance(result, list):
+        return result
+    return {"value": str(result)[:2000]}
+
+
 class JobStatus(str, Enum):
     PENDING = "pending"
     RUNNING = "running"
@@ -92,7 +103,12 @@ class BackgroundJobService:
                     result = await fn(*args, **kwargs)
                 else:
                     result = fn(*args, **kwargs)
-                await self.update_record(job_id, status=JobStatus.COMPLETED.value, error=None)
+                await self.update_record(
+                    job_id,
+                    status=JobStatus.COMPLETED.value,
+                    error=None,
+                    result=_serialize_job_result(result),
+                )
                 self._in_memory["completed"] += 1
                 logger.info(
                     "job completed",
@@ -160,6 +176,39 @@ class BackgroundJobService:
             )
 
         background_tasks.add_task(_runner)
+
+    async def schedule_returning_job_id(
+        self,
+        background_tasks: BackgroundTasks,
+        job_type: str,
+        fn: Callable,
+        *args: Any,
+        user_id: Optional[str] = None,
+        payload: Optional[dict] = None,
+        max_retries: int = 1,
+        **kwargs: Any,
+    ) -> str:
+        """Create a job record, queue work, and return job_id immediately."""
+        job_id = await self.create_record(
+            job_type,
+            user_id=user_id,
+            payload=payload,
+            max_retries=max_retries,
+        )
+        self._in_memory["queued"] += 1
+
+        async def _runner() -> None:
+            await self.run_with_retries(
+                job_id,
+                job_type,
+                fn,
+                *args,
+                max_retries=max_retries,
+                **kwargs,
+            )
+
+        background_tasks.add_task(_runner)
+        return job_id
 
     async def get_job(self, job_id: str) -> Optional[dict]:
         try:

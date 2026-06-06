@@ -23,6 +23,13 @@ INDEX_SPECS = [
     ("background_jobs", "id", {"id": 1}, "Job status lookup", True),
     ("background_jobs", "status_created", [("status", 1), ("created_at", -1)], "Queue health metrics"),
     ("equipment_type_strategies", "equipment_type_id", {"equipment_type_id": 1}, "Strategy by equipment type", True),
+    ("maintenance_programs_v2", "equipment_id", {"equipment_id": 1}, "Program by equipment", True),
+    ("maintenance_programs_v2", "equipment_type_id", {"equipment_type_id": 1}, "Programs by equipment type"),
+    ("maintenance_programs", "equipment_task", [("equipment_id", 1), ("task_template_id", 1)], "Legacy program upsert"),
+    ("maintenance_programs", "equipment_active", [("equipment_id", 1), ("is_active", 1)], "Active programs per equipment"),
+    ("scheduled_tasks", "equipment_status_due", [("equipment_id", 1), ("status", 1), ("due_date", 1)], "Timeline and planner"),
+    ("scheduled_tasks", "equipment_type_status", [("equipment_type_id", 1), ("status", 1)], "Type-scoped schedule queries"),
+    ("failure_modes", "equipment_type_ids", {"equipment_type_ids": 1}, "FM library type filter"),
 ]
 
 

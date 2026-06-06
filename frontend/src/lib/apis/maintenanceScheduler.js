@@ -17,16 +17,63 @@ export async function refreshMaintenanceSchedulerQueries(queryClient) {
   });
 }
 
+export async function refreshMaintenanceSchedulerQueries(queryClient) {
+  await queryClient.invalidateQueries({ predicate: isMaintenanceSchedulerQuery });
+  await queryClient.refetchQueries({
+    predicate: isMaintenanceSchedulerQuery,
+    type: "active",
+  });
+}
+
+const APPLY_STRATEGY_ASYNC_THRESHOLD = 5;
+const JOB_POLL_INTERVAL_MS = 2000;
+const JOB_POLL_TIMEOUT_MS = 5 * 60 * 1000;
+
+export async function pollSchedulerJob(jobId, { intervalMs = JOB_POLL_INTERVAL_MS, timeoutMs = JOB_POLL_TIMEOUT_MS } = {}) {
+  const started = Date.now();
+  while Date.now() - started < timeoutMs) {
+    const response = await api.get(`/maintenance-scheduler/jobs/${jobId}`);
+    const job = response.data;
+    const status = job?.status;
+    if (status === "completed") {
+      return job.result ?? job;
+    }
+    if (status === "failed" || status === "dead_letter") {
+      const err = new Error(job?.error || "Apply strategy job failed");
+      err.job = job;
+      throw err;
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  throw new Error("Apply strategy timed out while waiting for background job");
+}
+
 export const maintenanceSchedulerAPI = {
   // ============= Equipment Maintenance Programs =============
   
   /**
-   * Apply maintenance strategy to equipment
+   * Apply maintenance strategy to equipment.
+   * Automatically uses background job + polling when batch is large.
    */
-  applyStrategy: async (equipmentTypeId, equipmentIds) => {
+  applyStrategy: async (equipmentTypeId, equipmentIds, options = {}) => {
+    const runAsync =
+      options.runAsync ??
+      (Array.isArray(equipmentIds) && equipmentIds.length >= APPLY_STRATEGY_ASYNC_THRESHOLD);
+
     const response = await api.post(`/maintenance-scheduler/apply-strategy/${equipmentTypeId}`, {
-      equipment_ids: equipmentIds
+      equipment_ids: equipmentIds,
+      run_async: runAsync,
     });
+    const data = response.data;
+
+    if (data?.job_id && data?.status === "pending") {
+      return pollSchedulerJob(data.job_id, options.poll);
+    }
+    return data;
+  },
+
+  getJob: async (jobId) => {
+    const response = await api.get(`/maintenance-scheduler/jobs/${jobId}`);
     return response.data;
   },
 

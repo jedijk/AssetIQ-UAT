@@ -8,7 +8,7 @@ import asyncio
 import logging
 import time
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from typing import Optional
 
 from database import db
@@ -17,20 +17,69 @@ logger = logging.getLogger(__name__)
 from auth import get_current_user
 from models.maintenance_scheduler import ApplyStrategyRequest
 from services.maintenance_scheduler_sync import refresh_equipment_schedule
+from services.background_jobs import background_job_service, JobStatus
 
 router = APIRouter()
+
+APPLY_STRATEGY_ASYNC_THRESHOLD = 5
+
+
+@router.get("/jobs/{job_id}")
+async def get_scheduler_job(
+    job_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Poll status of a maintenance scheduler background job."""
+    job = await background_job_service.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.get("user_id") and job["user_id"] != (
+        current_user.get("id") or current_user.get("user_id")
+    ):
+        role = current_user.get("role")
+        if role not in ("owner", "admin"):
+            raise HTTPException(status_code=403, detail="Not allowed to view this job")
+    return job
 
 
 @router.post("/apply-strategy/{equipment_type_id}")
 async def apply_strategy_to_equipment(
     equipment_type_id: str,
     request: ApplyStrategyRequest,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
 ):
     """
     Apply maintenance strategy to selected equipment.
     Creates maintenance program records for each equipment-task combination.
+
+    For large batches (>=5 equipment) or when run_async=true, returns immediately
+    with a job_id to poll via GET /maintenance-scheduler/jobs/{job_id}.
     """
+    use_async = request.run_async or len(request.equipment_ids) >= APPLY_STRATEGY_ASYNC_THRESHOLD
+    if use_async:
+        user_id = current_user.get("id") or current_user.get("user_id")
+        job_id = await background_job_service.schedule_returning_job_id(
+            background_tasks,
+            "apply_strategy",
+            _apply_strategy_to_equipment_impl,
+            equipment_type_id,
+            request,
+            current_user,
+            user_id=user_id,
+            payload={
+                "equipment_type_id": equipment_type_id,
+                "equipment_count": len(request.equipment_ids),
+            },
+            max_retries=1,
+        )
+        return {
+            "status": JobStatus.PENDING.value,
+            "job_id": job_id,
+            "message": "Apply strategy queued",
+            "equipment_count": len(request.equipment_ids),
+        }
+
     try:
         return await _apply_strategy_to_equipment_impl(
             equipment_type_id, request, current_user
