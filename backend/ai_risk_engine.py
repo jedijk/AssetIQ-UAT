@@ -562,6 +562,22 @@ EQUIPMENT INFORMATION:
         """Analyze threat and generate dynamic risk assessment"""
         try:
             context = self._build_threat_context(threat, equipment_data, historical_threats, equipment_history)
+            eq_id = threat.get("linked_equipment_id") or (equipment_data or {}).get("id")
+            if eq_id:
+                try:
+                    from services.reliability_graph_query import GraphTraversalService
+
+                    risk_paths = await GraphTraversalService().explain_risk(eq_id)
+                    if risk_paths.get("risk_paths"):
+                        context += "\n\nRELIABILITY GRAPH PATHS:\n"
+                        for path in risk_paths["risk_paths"][:8]:
+                            context += f"- {' '.join(path)}\n"
+                        context += (
+                            f"\nGraph-linked open threats: {risk_paths.get('graph_linked_threat_count', 0)}; "
+                            f"Overdue PM (scheduled): {risk_paths.get('overdue_pm_scheduled', 0)}\n"
+                        )
+                except Exception as graph_exc:
+                    logger.debug("graph risk context skipped: %s", graph_exc)
             
             response = await self._call_openai(RISK_ANALYSIS_PROMPT, f"Analyze this threat:\n{context}", 'risk_analysis')
             

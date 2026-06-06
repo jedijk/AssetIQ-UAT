@@ -278,6 +278,19 @@ async def create_investigation(
     
     await db.investigations.insert_one(inv_doc)
     inv_doc.pop("_id", None)
+
+    if data.threat_id:
+        from services.reliability_graph import _run_graph_sync, sync_investigation_edges
+
+        await _run_graph_sync(
+            sync_investigation_edges(
+                investigation_id=inv_id,
+                threat_id=data.threat_id,
+                equipment_id=data.asset_id,
+                tenant_id=inv_doc.get("tenant_id"),
+            ),
+            "investigation_create",
+        )
     
     # Auto-translate investigation title and description
     schedule_tracked_job(
@@ -653,6 +666,19 @@ async def create_cause_node(
     
     await db.cause_nodes.insert_one(cause_doc)
     cause_doc.pop("_id", None)
+
+    from services.reliability_graph import _run_graph_sync, sync_cause_edge
+
+    await _run_graph_sync(
+        sync_cause_edge(
+            investigation_id=inv_id,
+            cause_id=cause_id,
+            equipment_id=inv.get("asset_id"),
+            is_root_cause=data.is_root_cause,
+            tenant_id=cause_doc.get("tenant_id"),
+        ),
+        "investigation_cause",
+    )
     return cause_doc
 
 

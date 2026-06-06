@@ -11,7 +11,8 @@ from typing import Any, Dict, List, Optional
 
 from database import db
 from services.reliability_graph import get_edges_for_equipment
-from services.tenant_schema import merge_tenant_filter, tenant_filter, with_tenant_id
+from services.reliability_graph_query import GraphTraversalService
+from services.tenant_schema import merge_tenant_filter, tenant_filter, tenant_id_from_user, with_tenant_id
 from services.work_item_query import fetch_work_items
 
 logger = logging.getLogger(__name__)
@@ -67,7 +68,14 @@ async def build_reliability_context(
         return {"equipment_id": equipment_id, "found": False}
 
     equipment_type_id = equipment.get("equipment_type_id")
-    edges = await get_edges_for_equipment(equipment_id, limit=edge_limit)
+    tid = tenant_id_from_user(user)
+    traversal = GraphTraversalService()
+    chain = await traversal.get_chain(
+        equipment_id, depth=5, user=user, edge_limit=edge_limit
+    )
+    edges = chain.get("edges") or await get_edges_for_equipment(
+        equipment_id, limit=edge_limit, tenant_id=tid
+    )
     failure_modes = await _failure_modes_for_equipment_type(equipment_type_id)
 
     open_work = await fetch_work_items(
@@ -108,7 +116,10 @@ async def build_reliability_context(
             "edges": edges,
             "edge_count": len(edges),
             "relations": _summarize_relations(edges),
+            "paths": chain.get("paths", [])[:25],
+            "nodes_visited": chain.get("nodes_visited", 0),
         },
+        "graph_threat_edges": _count_graph_open_threats(edges),
         "failure_modes": failure_modes,
         "failure_mode_count": len(failure_modes),
         "open_work_items": open_work,
@@ -127,6 +138,16 @@ def _summarize_relations(edges: List[dict]) -> Dict[str, int]:
     return counts
 
 
+def _count_graph_open_threats(edges: List[dict]) -> int:
+    threat_ids = set()
+    for edge in edges:
+        if edge.get("relation") in ("escalated_to", "linked_to_threat") and edge.get("target_type") == "threat":
+            tid = edge.get("target_id")
+            if tid:
+                threat_ids.add(tid)
+    return len(threat_ids)
+
+
 def format_context_for_prompt(ctx: Dict[str, Any]) -> str:
     """Compact text block for LLM system/user prompts."""
     if not ctx.get("found"):
@@ -136,7 +157,17 @@ def format_context_for_prompt(ctx: Dict[str, Any]) -> str:
     eq = ctx.get("equipment") or {}
     lines.append(f"Equipment: {eq.get('name')} (tag={eq.get('tag')}, id={eq.get('id')})")
     lines.append(f"Program tasks: {ctx.get('program_task_count', 0)}; strategy v={ctx.get('strategy_version')}")
-    lines.append(f"Graph edges: {ctx.get('graph', {}).get('edge_count', 0)}")
+    graph = ctx.get("graph") or {}
+    lines.append(f"Graph edges: {graph.get('edge_count', 0)} (nodes visited: {graph.get('nodes_visited', 0)})")
+    relations = graph.get("relations") or {}
+    if relations:
+        top_rels = sorted(relations.items(), key=lambda x: -x[1])[:6]
+        lines.append("Graph relations: " + ", ".join(f"{k}={v}" for k, v in top_rels))
+    paths = graph.get("paths") or []
+    if paths:
+        lines.append("Sample chain paths:")
+        for path in paths[:4]:
+            lines.append(f"  - {' '.join(path)}")
 
     fms = ctx.get("failure_modes") or []
     if fms:

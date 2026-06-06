@@ -23,33 +23,76 @@ def _static_path_checks() -> list[str]:
     """Return list of static check failures."""
     failures: list[str] = []
 
-    task_service = BACKEND_ROOT / "services" / "task_service.py"
-    if not task_service.is_file():
-        failures.append("task_service.py not found")
-    else:
-        src = task_service.read_text()
-        if "sync_edges_for_scheduled_task" not in src:
-            failures.append("task_service.complete_task missing sync_edges_for_scheduled_task")
-        if "task_instance" not in src or "upsert_edge" not in src:
-            failures.append("task_service.complete_task missing task_instance graph edges")
+    checks = [
+        (
+            BACKEND_ROOT / "services" / "task_service.py",
+            ["sync_edges_for_scheduled_task", "sync_task_instance_completion_edges"],
+            "task_service graph sync",
+        ),
+        (
+            BACKEND_ROOT / "routes" / "maintenance_scheduler" / "programs.py",
+            ["sync_edges_for_apply_strategy"],
+            "programs apply strategy",
+        ),
+        (
+            BACKEND_ROOT / "services" / "pm_import" / "failure_mode_apply.py",
+            ["_sync_pm_import_graph_edge"],
+            "pm_import failure_mode_apply",
+        ),
+        (
+            BACKEND_ROOT / "routes" / "maintenance_scheduler" / "scheduler.py",
+            ['event="created"'],
+            "scheduler create-time sync",
+        ),
+        (
+            BACKEND_ROOT / "services" / "observation_service.py",
+            ["sync_observation_edges"],
+            "observation_service",
+        ),
+        (
+            BACKEND_ROOT / "routes" / "chat.py",
+            ["sync_threat_edges"],
+            "chat threat create",
+        ),
+        (
+            BACKEND_ROOT / "routes" / "investigations.py",
+            ["sync_investigation_edges", "sync_cause_edge"],
+            "investigations routes",
+        ),
+        (
+            BACKEND_ROOT / "routes" / "actions.py",
+            ["sync_action_edges", "sync_outcome_edges"],
+            "actions routes",
+        ),
+        (
+            BACKEND_ROOT / "services" / "reliability_graph_query.py",
+            ["class GraphTraversalService", "explain_risk"],
+            "GraphTraversalService",
+        ),
+        (
+            BACKEND_ROOT / "services" / "reliability_graph.py",
+            ["tenant_id", "retire_edges_for_entity", "sync_outcome_edges"],
+            "reliability_graph platform",
+        ),
+    ]
 
-    programs = BACKEND_ROOT / "routes" / "maintenance_scheduler" / "programs.py"
-    if programs.is_file():
-        if "sync_edges_for_apply_strategy" not in programs.read_text():
-            failures.append("programs route missing sync_edges_for_apply_strategy")
-    else:
-        failures.append("maintenance_scheduler/programs.py not found")
-
-    pm_import = BACKEND_ROOT / "services" / "pm_import_service.py"
-    if pm_import.is_file():
-        if "_sync_pm_import_graph_edge" not in pm_import.read_text():
-            failures.append("pm_import_service missing _sync_pm_import_graph_edge")
-    else:
-        failures.append("pm_import_service.py not found")
+    for path, needles, label in checks:
+        if not path.is_file():
+            failures.append(f"{label}: {path.name} not found")
+            continue
+        src = path.read_text()
+        for needle in needles:
+            if needle not in src:
+                failures.append(f"{label}: missing {needle}")
 
     audit_module = BACKEND_ROOT / "services" / "reliability_graph_audit.py"
     if not audit_module.is_file():
         failures.append("reliability_graph_audit.py not found")
+    else:
+        audit_src = audit_module.read_text()
+        for fn in ("audit_observation_edges", "audit_scheduled_task_created", "audit_investigation_chain"):
+            if fn not in audit_src:
+                failures.append(f"reliability_graph_audit missing {fn}")
 
     return failures
 
@@ -64,23 +107,40 @@ async def _db_sample_audit() -> tuple[bool, list[str]]:
     from motor.motor_asyncio import AsyncIOMotorClient
 
     client = AsyncIOMotorClient(mongo_url)
-    # Patch database.db for audit helpers
     import database
 
     database.db = client[db_name]
 
     from services.reliability_graph_audit import sample_db_audit
 
-    report = await sample_db_audit(limit=int(os.environ.get("GRAPH_AUDIT_SAMPLE_LIMIT", "50")))
+    tenant_id = os.environ.get("GRAPH_AUDIT_TENANT_ID")
+    report = await sample_db_audit(
+        limit=int(os.environ.get("GRAPH_AUDIT_SAMPLE_LIMIT", "50")),
+        tenant_id=tenant_id,
+    )
     client.close()
 
-    print(f"DB sample — apply_strategy checked: {report['apply_strategy']['checked']}")
-    print(f"DB sample — pm_import checked: {report['pm_import']['checked']}")
-    print(f"DB sample — task_complete checked: {report['task_complete']['checked']}")
+    for section in (
+        "apply_strategy",
+        "pm_import",
+        "task_complete",
+        "scheduled_created",
+        "observation",
+        "investigation",
+    ):
+        print(f"DB sample — {section} checked: {report[section]['checked']}")
+    print(f"DB sample — edges missing tenant_id: {report.get('tenant_edges_missing_id', 0)}")
     print(f"DB sample — total gaps: {report['total_gaps']}")
 
     if report["total_gaps"]:
-        for section in ("apply_strategy", "pm_import", "task_complete"):
+        for section in (
+            "apply_strategy",
+            "pm_import",
+            "task_complete",
+            "scheduled_created",
+            "observation",
+            "investigation",
+        ):
             for gap in report[section]["gaps"][:5]:
                 print(f"  GAP [{section}]: {gap}")
         return False, [f"{report['total_gaps']} edge gap(s) in DB sample"]

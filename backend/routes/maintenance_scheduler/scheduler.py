@@ -117,6 +117,13 @@ async def schedule_program(program: dict, horizon_days: int = DEFAULT_HORIZON_DA
 
     if new_tasks:
         await db.scheduled_tasks.insert_many(new_tasks)
+        from services.reliability_graph import _run_graph_sync, sync_edges_for_scheduled_task
+
+        for task_doc in new_tasks:
+            await _run_graph_sync(
+                sync_edges_for_scheduled_task(task_doc, event="created"),
+                "scheduled_task_created",
+            )
 
     if last_created_iso:
         if program.get("program_source") == "v2" and program.get("v2_program_id"):

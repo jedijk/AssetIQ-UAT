@@ -294,6 +294,17 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
 
     await db.threats.insert_one(threat_doc)
 
+    from services.reliability_graph import _run_graph_sync, sync_threat_edges
+
+    await _run_graph_sync(
+        sync_threat_edges(
+            threat_id=threat_id,
+            equipment_id=obs_data.get("equipment_id"),
+            failure_mode_id=obs_data.get("failure_mode_id"),
+        ),
+        "chat_threat_create",
+    )
+
     # Auto-create actions
     auto_created = []
     rec_actions = obs_data.get("recommended_actions", [])

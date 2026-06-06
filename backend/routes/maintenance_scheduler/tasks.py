@@ -352,6 +352,20 @@ async def complete_task(
         },
     )
 
+    if request.findings and request.findings.strip() and task.get("equipment_id"):
+        from services.reliability_graph import _sync_finding_from_completion
+
+        completion_id = f"st:{task_id}"
+        await _sync_finding_from_completion(
+            completion_id=completion_id,
+            equipment_id=task["equipment_id"],
+            source_type="scheduled_task",
+            source_id=task_id,
+            findings_text=request.findings.strip(),
+            tenant_id=None,
+            completed_at=now,
+        )
+
     return {
         "message": "Task completed",
         "task_id": task_id,

@@ -94,6 +94,18 @@ async def compute_executive_reliability_kpis(
         window_start, limit=5, equipment_ids=equipment_ids, user=user
     )
 
+    graph_kpis: Dict[str, Any] = {}
+    try:
+        from services.graph_kpi_aggregator import GraphKpiAggregator
+
+        graph_kpis = await GraphKpiAggregator().aggregate(user=user)
+    except Exception:
+        graph_kpis = {}
+
+    mtbf_from_graph = await _mtbf_from_reliability_impacts(
+        window_start, equipment_ids=equipment_ids, user=user
+    )
+
     return {
         "open_threats": open_threats,
         "high_risk_threats": high_risk_threats,
@@ -103,13 +115,36 @@ async def compute_executive_reliability_kpis(
             "total": open_work_total,
         },
         "mtbf_proxy": {
-            "fleet_mean_days": fleet_mtbf_days,
+            "fleet_mean_days": mtbf_from_graph or fleet_mtbf_days,
             "sample_equipment_count": len(mtbf_by_equipment),
             "window_days": 90,
             "worst_performers": worst_equipment,
+            "source": "reliability_impacts" if mtbf_from_graph else "threat_resolution",
         },
+        "graph_kpis": graph_kpis,
         "generated_at": now.isoformat(),
     }
+
+
+async def _mtbf_from_reliability_impacts(
+    since: datetime,
+    *,
+    equipment_ids: Optional[List[str]] = None,
+    user: Optional[dict] = None,
+) -> Optional[float]:
+    """Optional MTBF proxy from graph-backed reliability_impacts collection."""
+    query: Dict[str, Any] = {
+        "metric_type": "mtbf_proxy_days",
+        "created_at": {"$gte": since.isoformat()},
+    }
+    if equipment_ids:
+        query["equipment_id"] = {"$in": list(equipment_ids)}
+    query = merge_tenant_filter(query, user)
+    cursor = db.reliability_impacts.find(query, {"delta": 1})
+    deltas = [doc.get("delta") for doc in await cursor.to_list(500) if doc.get("delta") is not None]
+    if not deltas:
+        return None
+    return round(sum(deltas) / len(deltas), 1)
 
 
 async def _mtbf_proxy_days(

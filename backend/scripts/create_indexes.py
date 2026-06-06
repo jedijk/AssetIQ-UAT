@@ -361,6 +361,25 @@ INDEX_DEFINITIONS = {
         {"keys": [("equipment_type_id", 1)]},
         {"keys": [("source_type", 1), ("source_id", 1)]},
         {"keys": [("target_type", 1), ("target_id", 1)]},
+        {"keys": [("tenant_id", 1), ("equipment_id", 1), ("status", 1), ("updated_at", -1)]},
+        {"keys": [("tenant_id", 1), ("source_type", 1), ("source_id", 1)]},
+        {"keys": [("tenant_id", 1), ("target_type", 1), ("target_id", 1)]},
+        {"keys": [("tenant_id", 1), ("relation", 1)]},
+    ],
+    "findings": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("equipment_id", 1), ("created_at", -1)]},
+        {"keys": [("tenant_id", 1)]},
+    ],
+    "outcomes": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("action_id", 1)]},
+        {"keys": [("tenant_id", 1)]},
+    ],
+    "reliability_impacts": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("equipment_id", 1), ("created_at", -1)]},
+        {"keys": [("tenant_id", 1)]},
     ],
     "asset_health_documents": [
         {"keys": [("equipment_id", 1), ("snapshot_date", 1)], "unique": True},

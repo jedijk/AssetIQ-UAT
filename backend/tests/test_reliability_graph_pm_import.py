@@ -22,6 +22,7 @@ async def test_sync_edge_for_pm_import_task_calls_upsert_edge():
         target_id="fm-456",
         equipment_id=None,
         equipment_type_id=None,
+        tenant_id=None,
         metadata={"apply_mode": "added"},
     )
 
@@ -46,6 +47,7 @@ async def test_sync_edge_for_pm_import_task_passes_optional_fields():
         target_id="fm-abc",
         equipment_id="eq-1",
         equipment_type_id="et-2",
+        tenant_id=None,
         metadata={"apply_mode": "merged"},
     )
 

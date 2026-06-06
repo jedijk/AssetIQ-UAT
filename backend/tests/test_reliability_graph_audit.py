@@ -75,7 +75,10 @@ async def test_audit_scheduled_task_completed_all_edges():
         "maintenance_program_id": "pt-1",
         "failure_mode_id": "fm-1",
     }
-    with patch("services.reliability_graph_audit.db", mock_db):
+    with patch("services.reliability_graph_audit.db", mock_db), patch(
+        "services.reliability_graph_audit.resolve_program_task_id",
+        AsyncMock(return_value="pt-1"),
+    ):
         gaps = await audit_scheduled_task_completed(task)
     assert gaps == []
 

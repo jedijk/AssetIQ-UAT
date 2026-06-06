@@ -86,3 +86,23 @@ async def test_sync_edges_for_scheduled_task_cancelled_v2_source():
         if c.kwargs.get("relation") == "cancelled_for"
     ]
     assert cancelled[0].kwargs["target_id"] == "v2-task-9"
+
+
+@pytest.mark.asyncio
+async def test_sync_edges_for_scheduled_task_created_event():
+    mock_upsert = AsyncMock()
+    task = {
+        "id": "st-3",
+        "equipment_id": "eq-3",
+        "maintenance_program_id": "pt-3",
+        "v2_task_id": "pt-3",
+        "task_name": "Check filter",
+    }
+    with patch("services.reliability_graph.upsert_edge", mock_upsert):
+        result = await sync_edges_for_scheduled_task(task, event="created")
+
+    assert result["edges_upserted"] == 2
+    relations = {c.kwargs.get("relation") for c in mock_upsert.await_args_list}
+    assert "derived_from" in relations
+    assert "scheduled_for" in relations
+    assert "completed_on" not in relations

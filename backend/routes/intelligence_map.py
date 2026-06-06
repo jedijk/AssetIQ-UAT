@@ -403,11 +403,17 @@ async def get_intelligence_map_stats(
         valid_schedules = schedules_count - schedules_missing_freq
         schedule_compliance = round((valid_schedules / schedules_count) * 100, 1) if schedules_count > 0 else 100
 
-        reliability_edges_total = await db.reliability_edges.count_documents(scope({}))
+        reliability_edges_total = await db.reliability_edges.count_documents(
+            {**scope({}), "status": {"$ne": "retired"}}
+        )
+        from services.reliability_graph_query import count_edges_by_relation
+
+        edges_by_relation = await count_edges_by_relation(current_user, active_only=True)
         
         # ========== BUILD RESPONSE ==========
         result = {
             "reliability_edges_total": reliability_edges_total,
+            "reliability_edges_by_relation": edges_by_relation,
             # Main flow counts
             "failure_modes": {
                 "count": failure_modes_count,

@@ -1015,6 +1015,17 @@ async def create_investigation_from_threat(
     
     await db.investigations.insert_one(inv_doc)
     inv_doc.pop("_id", None)
+
+    from services.reliability_graph import _run_graph_sync, sync_investigation_edges
+
+    await _run_graph_sync(
+        sync_investigation_edges(
+            investigation_id=inv_id,
+            threat_id=threat_id,
+            equipment_id=threat.get("linked_equipment_id"),
+        ),
+        "threat_investigate",
+    )
     
     # ========== AUTO-CREATE TIMELINE EVENTS ==========
     timeline_events = []

@@ -320,7 +320,32 @@ async def get_equipment_reliability_edges(
     current_user: dict = Depends(_ril_read),
 ):
     """Traversable reliability graph edges for an equipment item."""
+    from services.tenant_schema import tenant_id_from_user
     from services.reliability_graph import get_edges_for_equipment
 
-    edges = await get_edges_for_equipment(equipment_id, limit=limit)
+    edges = await get_edges_for_equipment(
+        equipment_id, limit=limit, tenant_id=tenant_id_from_user(current_user)
+    )
     return {"equipment_id": equipment_id, "edges": edges, "total": len(edges)}
+
+
+@router.get("/equipment/{equipment_id}/reliability-chain")
+async def get_equipment_reliability_chain(
+    equipment_id: str,
+    depth: int = 5,
+    limit: int = 200,
+    current_user: dict = Depends(_ril_read),
+):
+    """Graph-backed reliability chain paths for an equipment item."""
+    from services.reliability_graph_query import GraphTraversalService
+
+    traversal = GraphTraversalService()
+    chain = await traversal.get_chain(
+        equipment_id, depth=depth, user=current_user, edge_limit=limit
+    )
+    risk = await traversal.explain_risk(equipment_id, user=current_user)
+    return {
+        "equipment_id": equipment_id,
+        "chain": chain,
+        "risk_explanation": risk,
+    }

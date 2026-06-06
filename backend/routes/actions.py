@@ -434,6 +434,26 @@ async def create_central_action(
     
     await db.central_actions.insert_one(action_doc)
     action_doc.pop("_id", None)
+
+    linked_equipment_id = None
+    if data.source_type == "threat":
+        threat = await db.threats.find_one({"id": data.source_id}, {"linked_equipment_id": 1})
+        linked_equipment_id = (threat or {}).get("linked_equipment_id")
+    elif data.source_type == "investigation":
+        inv = await db.investigations.find_one({"id": data.source_id}, {"asset_id": 1})
+        linked_equipment_id = (inv or {}).get("asset_id")
+
+    from services.reliability_graph import _run_graph_sync, sync_action_edges
+
+    await _run_graph_sync(
+        sync_action_edges(
+            action_id=action_id,
+            source_type=data.source_type,
+            source_id=data.source_id,
+            equipment_id=linked_equipment_id,
+        ),
+        "action_create",
+    )
     return action_doc
 
 
@@ -572,6 +592,29 @@ async def update_central_action(
                     "suggest_closure": True
                 }
     
+    if status_changed_to_completed:
+        from services.reliability_graph import _run_graph_sync, sync_outcome_edges
+        import uuid as _uuid
+
+        eq_id = updated.get("linked_equipment_id")
+        if not eq_id and updated.get("threat_id"):
+            threat = await db.threats.find_one(
+                {"id": updated["threat_id"]},
+                {"linked_equipment_id": 1},
+            )
+            eq_id = (threat or {}).get("linked_equipment_id")
+        if eq_id:
+            await _run_graph_sync(
+                sync_outcome_edges(
+                    action_id=updated.get("id") or action_id,
+                    outcome_id=str(_uuid.uuid4()),
+                    equipment_id=eq_id,
+                    verification_status="verified",
+                    effectiveness=updated.get("completion_notes"),
+                ),
+                "action_close_outcome",
+            )
+
     response = dict(updated)
     if completion_notification:
         response["completion_notification"] = completion_notification

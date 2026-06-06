@@ -257,6 +257,7 @@ async def _apply_strategy_to_equipment_impl(
         equipment_type_id=equipment_type_id,
         equipment_ids=equipment_ids,
         strategy_version=strategy_version,
+        tenant_id=tenant_id_from_user(current_user),
     )
 
     return {
