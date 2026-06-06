@@ -435,17 +435,14 @@ const IntelligenceMapTab = () => {
   const [systemId, setSystemId] = useState("all");
   const [equipmentTypeId, setEquipmentTypeId] = useState("all");
   const [equipmentId, setEquipmentId] = useState("all");
-  const [showLinkedOnly, setShowLinkedOnly] = useState(false);
-
   // Fetch stats
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery({
-    queryKey: ["intelligence-map-stats", plantId, systemId, equipmentTypeId, equipmentId, showLinkedOnly],
+    queryKey: ["intelligence-map-stats", plantId, systemId, equipmentTypeId, equipmentId],
     queryFn: () => intelligenceMapAPI.getStats({
       plantId: plantId !== "all" ? plantId : undefined,
       systemId: systemId !== "all" ? systemId : undefined,
       equipmentTypeId: equipmentTypeId !== "all" ? equipmentTypeId : undefined,
       equipmentId: equipmentId !== "all" ? equipmentId : undefined,
-      showLinkedOnly,
     }),
     staleTime: 30000, // 30 seconds
     refetchOnWindowFocus: false,
@@ -578,17 +575,6 @@ const IntelligenceMapTab = () => {
                 ))}
               </SelectContent>
             </Select>
-
-            <div className="flex items-center gap-2 ml-auto">
-              <Switch
-                id="show-linked"
-                checked={showLinkedOnly}
-                onCheckedChange={setShowLinkedOnly}
-              />
-              <Label htmlFor="show-linked" className="text-sm text-slate-600 cursor-pointer">
-                Show linked only
-              </Label>
-            </div>
           </div>
         </CardContent>
       </Card>
