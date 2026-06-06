@@ -3,7 +3,9 @@ AI Usage Tracking Service
 Tracks token consumption per installation for admin monitoring.
 """
 
+import asyncio
 import logging
+import threading
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional
 from motor.motor_asyncio import AsyncIOMotorDatabase
@@ -245,6 +247,54 @@ class AIUsageTracker:
             "features_used": result.get("features_used", []),
             "date_range": {"start": start_date, "end": end_date}
         }
+
+
+def schedule_log_usage(
+    *,
+    installation_id: str,
+    installation_name: str,
+    user_id: str,
+    model: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+    feature: str,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Persist AI usage to MongoDB from sync callers (fire-and-forget)."""
+
+    async def _log() -> None:
+        try:
+            from database import ai_usage_tracker as tracker
+
+            await tracker.log_usage(
+                installation_id=installation_id,
+                installation_name=installation_name,
+                user_id=user_id,
+                model=model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                feature=feature,
+                metadata=metadata,
+            )
+        except Exception as e:
+            logger.error("Failed to persist AI usage: %s", e)
+
+    try:
+        loop = asyncio.get_running_loop()
+        loop.create_task(_log())
+        return
+    except RuntimeError:
+        pass
+
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.run_coroutine_threadsafe(_log(), loop)
+            return
+    except Exception:
+        pass
+
+    threading.Thread(target=lambda: asyncio.run(_log()), daemon=True).start()
 
 
 # Singleton instance (initialized in database.py)

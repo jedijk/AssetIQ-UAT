@@ -9,6 +9,7 @@ import logging
 
 from database import db, ai_usage_tracker
 from routes.auth import get_current_user
+from services.ai_cost_guard import ai_cost_guard
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -42,10 +43,18 @@ async def get_ai_usage(
         start_date=start_date,
         end_date=end_date
     )
-    
+
+    company_id = (
+        current_user.get("company_id")
+        or current_user.get("organization_id")
+        or "default"
+    )
+    limits = ai_cost_guard.get_limits_and_usage(company_id)
+
     return {
         "installations": usage_by_installation,
-        "summary": summary
+        "summary": summary,
+        "limits": limits,
     }
 
 

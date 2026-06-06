@@ -413,6 +413,8 @@ async def get_application_metrics(
     try:
         from services.unified_cache import unified_cache
         from services.ai_cost_guard import ai_cost_guard
+        from services.redis_store import redis_status
+        from services.db_monitoring import SLOW_QUERY_MS
 
         cache_stats = unified_cache.get_stats()
         company_id = current_user.get("company_id") or current_user.get("organization_id") or "default"
@@ -420,10 +422,20 @@ async def get_application_metrics(
         from services.background_jobs import background_job_service
 
         queue_health = await background_job_service.get_queue_health()
+        observability = {
+            "redis": redis_status(),
+            "slow_query_threshold_ms": SLOW_QUERY_MS,
+            "slow_api_threshold_ms": int(__import__("os").environ.get("SLOW_API_MS", "1000")),
+            "background_worker": {
+                "script": "backend/scripts/run_background_worker.py",
+                "handlers": ["apply_strategy"],
+            },
+        }
     except Exception as exc:
         cache_stats = {"error": str(exc)[:120]}
         ai_daily = {}
         queue_health = {"status": "unknown", "error": str(exc)[:120]}
+        observability = {}
 
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -431,6 +443,7 @@ async def get_application_metrics(
         "cache": cache_stats,
         "ai_usage_daily": ai_daily,
         "queue": queue_health,
+        "observability": observability,
     }
 
 

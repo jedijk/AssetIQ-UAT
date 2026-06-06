@@ -1046,7 +1046,15 @@ async def cancel_chat_flow(current_user: dict = Depends(get_current_user)):
 @router.post("/voice/transcribe", response_model=VoiceTranscriptionResponse)
 async def transcribe_voice(audio_base64: str = Form(...),
                            current_user: dict = Depends(get_current_user)):
-    text = await transcribe_audio_with_ai(audio_base64)
+    text = await transcribe_audio_with_ai(
+        audio_base64,
+        user_id=current_user.get("id", "system"),
+        company_id=current_user.get("company_id")
+        or current_user.get("organization_id")
+        or "default",
+        installation_id=current_user.get("installation_id"),
+        installation_name=current_user.get("installation"),
+    )
     return VoiceTranscriptionResponse(text=text)
 
 
@@ -1061,7 +1069,15 @@ async def voice_send(
     session_id = f"user_{user_id}_{datetime.now(timezone.utc).strftime('%Y%m%d')}"
 
     audio_b64 = base64.b64encode(audio).decode("utf-8")
-    transcribed = await transcribe_audio_with_ai(audio_b64)
+    transcribed = await transcribe_audio_with_ai(
+        audio_b64,
+        user_id=user_id,
+        company_id=current_user.get("company_id")
+        or current_user.get("organization_id")
+        or "default",
+        installation_id=current_user.get("installation_id"),
+        installation_name=current_user.get("installation"),
+    )
 
     if not transcribed or not transcribed.strip():
         return {"message": "Could not transcribe voice - no text detected",

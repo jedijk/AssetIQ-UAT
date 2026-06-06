@@ -21,6 +21,9 @@ import {
   RefreshCw,
   Download,
   Filter,
+  Shield,
+  DollarSign,
+  Clock,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -148,7 +151,7 @@ export default function SettingsAIUsagePage() {
     );
   }
 
-  const { installations = [], summary = {} } = usageData || {};
+  const { installations = [], summary = {}, limits = {} } = usageData || {};
   const availableInstallations = installationsData?.installations || [];
 
   const formatNumber = (num) => {
@@ -156,6 +159,38 @@ export default function SettingsAIUsagePage() {
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
     return num?.toString() || "0";
   };
+
+  const formatUsd = (num) => `$${(num ?? 0).toFixed(2)}`;
+
+  const getUtilColor = (pct) => {
+    if (pct >= 90) return "bg-red-500";
+    if (pct >= 70) return "bg-amber-500";
+    return "bg-green-500";
+  };
+
+  const UtilProgress = ({ pct }) => {
+    const value = Math.min(pct ?? 0, 100);
+    return (
+      <div className="relative h-5 w-full overflow-hidden rounded-full bg-slate-200">
+        <div
+          className={`h-full transition-all ${getUtilColor(pct ?? 0)}`}
+          style={{ width: `${value}%` }}
+        />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-xs font-semibold text-white drop-shadow-sm">
+            {Math.round(value)}%
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  const {
+    rate_limit: rateLimit = {},
+    daily: dailyLimits = {},
+    usage_today: usageToday = {},
+    utilization = {},
+  } = limits;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -170,7 +205,9 @@ export default function SettingsAIUsagePage() {
                   <Brain className="w-6 h-6 text-purple-600" />
                   <h1 className="text-xl font-bold text-slate-900">{t("nav.aiUsage") || "AI Usage"}</h1>
                 </div>
-                <p className="text-sm text-slate-500 mt-0.5">Token consumption per installation</p>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  {t("settings.aiUsage.subtitle") || "Token consumption per installation"}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -207,6 +244,107 @@ export default function SettingsAIUsagePage() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-6 py-6">
+        {/* Configured Limits */}
+        {limits.rate_limit && (
+          <Card className="mb-6">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-indigo-600" />
+                <div>
+                  <CardTitle>{t("settings.aiUsage.limitsTitle") || "Configured Limits"}</CardTitle>
+                  <CardDescription>
+                    {t("settings.aiUsage.limitsDesc") ||
+                      "Rate limits and daily caps enforced by the AI cost guard"}
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Daily Spend Cap */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <DollarSign className="w-4 h-4 text-green-600" />
+                    {t("settings.aiUsage.dailySpendCap") || "Daily Spend Cap"}
+                  </div>
+                  {dailyLimits.spend_cap_usd > 0 ? (
+                    <>
+                      <UtilProgress pct={utilization.spend_pct} />
+                      <p className="text-sm text-slate-600">
+                        {formatUsd(usageToday.company_spend_usd)} of {formatUsd(dailyLimits.spend_cap_usd)}{" "}
+                        <span className="text-slate-400">
+                          ({t("settings.aiUsage.today") || "Today"})
+                        </span>
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-slate-500">No spend cap configured</p>
+                  )}
+                </div>
+
+                {/* Daily Request Limits */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <Brain className="w-4 h-4 text-purple-600" />
+                    {t("settings.aiUsage.dailyRequestLimits") || "Daily Request Limits"}
+                  </div>
+                  {dailyLimits.company_request_limit > 0 ? (
+                    <>
+                      <UtilProgress pct={utilization.company_requests_pct} />
+                      <p className="text-sm text-slate-600">
+                        {formatNumber(usageToday.company_requests)} / {formatNumber(dailyLimits.company_request_limit)}{" "}
+                        {t("settings.aiUsage.companyRequestsToday") || "Company requests today"}
+                      </p>
+                    </>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Badge variant="outline" className="text-xs">
+                      {t("settings.aiUsage.perUserLimit") || "Per-user limit"}:{" "}
+                      {formatNumber(dailyLimits.user_request_limit)}
+                    </Badge>
+                    <Badge variant="outline" className="text-xs">
+                      {t("settings.aiUsage.companyLimit") || "Company limit"}:{" "}
+                      {formatNumber(dailyLimits.company_request_limit)}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Rate Limits */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                    <Clock className="w-4 h-4 text-blue-600" />
+                    {t("settings.aiUsage.rateLimits") || "Rate Limits (per minute)"}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <p className="text-xs text-slate-500">{t("settings.aiUsage.perUser") || "Per user"}</p>
+                      <p className="text-xl font-bold text-slate-900">
+                        {rateLimit.user_per_minute}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {t("settings.aiUsage.requestsPerMin") || "requests/min"}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <p className="text-xs text-slate-500">{t("settings.aiUsage.perCompany") || "Per company"}</p>
+                      <p className="text-xl font-bold text-slate-900">
+                        {rateLimit.company_per_minute}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {t("settings.aiUsage.requestsPerMin") || "requests/min"}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    {t("settings.aiUsage.rateLimitNote") ||
+                      "Rate limits apply per rolling minute and reset continuously."}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <Card>

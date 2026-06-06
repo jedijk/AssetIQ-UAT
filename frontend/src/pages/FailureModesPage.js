@@ -302,7 +302,7 @@ const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrategy }) 
   }
   
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="pm-import-panel">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -1684,7 +1684,7 @@ const FailureModesPage = () => {
             <Calendar className="w-3.5 h-3.5" />
             {t("maintenance.maintenanceScheduleTitle")}
           </TabsTrigger>
-          <TabsTrigger value="pm-import" className="flex items-center gap-1.5 whitespace-nowrap">
+          <TabsTrigger value="pm-import" data-testid="pm-import-tab" className="flex items-center gap-1.5 whitespace-nowrap">
             <Upload className="w-3.5 h-3.5" />
             {t("library.customPmImport") || "PM Import"}
           </TabsTrigger>

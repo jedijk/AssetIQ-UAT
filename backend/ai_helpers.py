@@ -26,6 +26,9 @@ def chat_completions_create(
     *,
     user_id: str = "system",
     company_id: str = "default",
+    installation_id: Optional[str] = None,
+    installation_name: Optional[str] = None,
+    feature: Optional[str] = None,
     **create_kwargs,
 ):
     """OpenAI chat completion with rate limits and usage tracking."""
@@ -45,6 +48,9 @@ def chat_completions_create(
             prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
             completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
             model=create_kwargs.get("model", ""),
+            feature=feature or endpoint,
+            installation_id=installation_id,
+            installation_name=installation_name,
         )
     return response
 
@@ -596,7 +602,14 @@ def detect_audio_format(audio_data: bytes) -> str:
         return ".webm"
 
 
-async def transcribe_audio_with_ai(audio_base64: str) -> str:
+async def transcribe_audio_with_ai(
+    audio_base64: str,
+    *,
+    user_id: str = "system",
+    company_id: str = "default",
+    installation_id: Optional[str] = None,
+    installation_name: Optional[str] = None,
+) -> str:
     """Transcribe and translate audio to English using OpenAI Whisper."""
     temp_path = None
     try:
@@ -626,7 +639,20 @@ async def transcribe_audio_with_ai(audio_base64: str) -> str:
                 response_format="json"
             )
 
-        return response.text
+        transcript = response.text
+        completion_tokens = max(1, len(transcript or "") // 4)
+        record_ai_tokens(
+            user_id=user_id or "system",
+            company_id=company_id or "default",
+            endpoint="voice_transcription",
+            prompt_tokens=0,
+            completion_tokens=completion_tokens,
+            model="whisper-1",
+            feature="voice_transcription",
+            installation_id=installation_id,
+            installation_name=installation_name,
+        )
+        return transcript
 
     except Exception as e:
         logger.error(f"Transcription error: {e}")

@@ -179,25 +179,26 @@ async def get_intelligence_map_stats(
         equipment_ids_with_strategy_applied = set([p.get("equipment_id") for p in programs_with_strategy if p.get("equipment_id")])
         equipment_with_strategy_applied_count = len(equipment_ids_with_strategy_applied)
 
-        # ========== EQUIPMENT WITH ACCEPTED PM IMPORT TASKS ==========
-        # Pull distinct equipment ids from accepted PM import tasks. These count as
-        # equipment with an active program too (PM import → program).
+        # ========== EQUIPMENT WITH ACTIVE PM IMPORT TASKS ==========
+        # Accepted (pending apply) or finalized (applied/merged/legacy implemented).
+        pm_task_active_match = {
+            "tasks_extracted.equipment_match.equipment_id": {"$ne": None},
+            "$or": [
+                {"tasks_extracted.import_status": {"$in": ["applied", "merged", "implemented"]}},
+                {"tasks_extracted.review_status": {"$in": ["accepted", "edited"]}},
+            ],
+        }
         pm_equipment_pipeline = [
             {"$unwind": "$tasks_extracted"},
-            {"$match": {
-                "tasks_extracted.review_status": "accepted",
-                "tasks_extracted.equipment_match.equipment_id": {"$ne": None},
-            }},
+            {"$match": pm_task_active_match},
             {"$group": {"_id": "$tasks_extracted.equipment_match.equipment_id"}},
         ]
         pm_equipment_result = await db.pm_import_sessions.aggregate(pm_equipment_pipeline).to_list(1000)
         equipment_ids_with_pm_import = set(r["_id"] for r in pm_equipment_result if r.get("_id"))
 
-        # Count accepted PM tasks (each one is effectively an "active program" entry
-        # contributed by PM Import). Used to inflate the Programs / Schedules KPIs.
         pm_tasks_active_count = await db.pm_import_sessions.aggregate([
             {"$unwind": "$tasks_extracted"},
-            {"$match": {"tasks_extracted.review_status": "accepted"}},
+            {"$match": pm_task_active_match},
             {"$count": "c"},
         ]).to_list(1)
         pm_tasks_active_count = pm_tasks_active_count[0]["c"] if pm_tasks_active_count else 0

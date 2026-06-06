@@ -134,6 +134,12 @@ equipment_type_strategies (v2)
 Background jobs:
     apply_strategy → background_jobs → run_background_worker.py (optional sidecar)
 
+Month 3 ops (optional infrastructure):
+    REDIS_URL → distributed AI cost guard + shared rate limits (fallback: in-memory)
+    SLOW_QUERY_MS / SLOW_API_MS → Mongo + API slow-path logging (see /api/metrics observability)
+    verify_v2_program_coverage.py → legacy program retirement gate
+    verify_schedule_drift.py → strategy/program drift gate before prod cutover
+
 reliability_edges (graph)
     equipment → strategy_type, program_task → failure_mode, equipment → program
 
