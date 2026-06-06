@@ -63,6 +63,7 @@ async def list_unbridged_maintenance_work_items(
         filter_name=filter,
         equipment_id=equipment_id,
         discipline=discipline,
+        user=current_user,
     )
     return {"items": items, "count": len(items)}
 

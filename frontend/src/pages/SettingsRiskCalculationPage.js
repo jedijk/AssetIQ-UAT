@@ -21,9 +21,16 @@ import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import { useIsMobile } from "../hooks/useIsMobile";
-import { getBackendUrl, getAuthFetchInit } from "../lib/apiConfig";
+import { api } from "../lib/apiClient";
 
-const API_URL = getBackendUrl();
+function apiErrorMessage(error) {
+  const detail = error.response?.data?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((d) => d.msg || String(d)).join(", ");
+  }
+  return error.message || "Request failed";
+}
 
 const SettingsRiskCalculationPage = () => {
   const navigate = useNavigate();
@@ -42,32 +49,28 @@ const SettingsRiskCalculationPage = () => {
 
   const fetchRiskSettings = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/risk-settings`, getAuthFetchInit());
-      
-      if (response.ok) {
-        const data = await response.json();
-        setInstallations(data);
-        if (data.length > 0) {
-          setSelectedInstallation(data[0]);
-          setSettings({
-            criticality_weight: data[0].criticality_weight,
-            fmea_weight: data[0].fmea_weight,
-            critical_threshold: data[0].critical_threshold,
-            high_threshold: data[0].high_threshold,
-            medium_threshold: data[0].medium_threshold
-          });
-          setOriginalSettings({
-            criticality_weight: data[0].criticality_weight,
-            fmea_weight: data[0].fmea_weight,
-            critical_threshold: data[0].critical_threshold,
-            high_threshold: data[0].high_threshold,
-            medium_threshold: data[0].medium_threshold
-          });
-        }
+      const { data } = await api.get("/risk-settings");
+      setInstallations(data);
+      if (data.length > 0) {
+        setSelectedInstallation(data[0]);
+        setSettings({
+          criticality_weight: data[0].criticality_weight,
+          fmea_weight: data[0].fmea_weight,
+          critical_threshold: data[0].critical_threshold,
+          high_threshold: data[0].high_threshold,
+          medium_threshold: data[0].medium_threshold
+        });
+        setOriginalSettings({
+          criticality_weight: data[0].criticality_weight,
+          fmea_weight: data[0].fmea_weight,
+          critical_threshold: data[0].critical_threshold,
+          high_threshold: data[0].high_threshold,
+          medium_threshold: data[0].medium_threshold
+        });
       }
     } catch (error) {
       console.error("Failed to fetch risk settings:", error);
-      toast.error("Failed to load risk settings");
+      toast.error(apiErrorMessage(error) || "Failed to load risk settings");
     } finally {
       setLoading(false);
     }
@@ -106,27 +109,16 @@ const SettingsRiskCalculationPage = () => {
     
     setSaving(true);
     try {
-      const response = await fetch(
-        `${API_URL}/api/risk-settings/${selectedInstallation.installation_id}?recalculate=true`,
-        getAuthFetchInit({
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(settings),
-        })
+      const { data } = await api.put(
+        `/risk-settings/${selectedInstallation.installation_id}?recalculate=true`,
+        settings,
       );
-      
-      if (response.ok) {
-        const data = await response.json();
-        toast.success(`Settings saved! ${data.recalculation?.threats_updated || 0} observations recalculated.`);
-        setOriginalSettings({ ...settings });
-        fetchRiskSettings(); // Refresh the list
-      } else {
-        const error = await response.json();
-        toast.error(error.detail || "Failed to save settings");
-      }
+      toast.success(`Settings saved! ${data.recalculation?.threats_updated || 0} observations recalculated.`);
+      setOriginalSettings({ ...settings });
+      fetchRiskSettings();
     } catch (error) {
       console.error("Failed to save settings:", error);
-      toast.error("Failed to save settings");
+      toast.error(apiErrorMessage(error) || "Failed to save settings");
     } finally {
       setSaving(false);
     }
@@ -141,20 +133,13 @@ const SettingsRiskCalculationPage = () => {
     
     setRecalculating(true);
     try {
-      const response = await fetch(
-        `${API_URL}/api/risk-settings/${selectedInstallation.installation_id}?recalculate=true`,
-        getAuthFetchInit({ method: "DELETE" })
+      await api.delete(
+        `/risk-settings/${selectedInstallation.installation_id}?recalculate=true`,
       );
-      
-      if (response.ok) {
-        const data = await response.json();
-        toast.success("Settings reset to defaults");
-        fetchRiskSettings(); // Refresh
-      } else {
-        toast.error("Failed to reset settings");
-      }
+      toast.success("Settings reset to defaults");
+      fetchRiskSettings();
     } catch (error) {
-      toast.error("Failed to reset settings");
+      toast.error(apiErrorMessage(error) || "Failed to reset settings");
     } finally {
       setRecalculating(false);
     }
@@ -165,19 +150,12 @@ const SettingsRiskCalculationPage = () => {
     
     setRecalculating(true);
     try {
-      const response = await fetch(
-        `${API_URL}/api/risk-settings/${selectedInstallation.installation_id}/recalculate`,
-        getAuthFetchInit({ method: "POST" })
+      const { data } = await api.post(
+        `/risk-settings/${selectedInstallation.installation_id}/recalculate`,
       );
-      
-      if (response.ok) {
-        const data = await response.json();
-        toast.success(`Recalculated ${data.threats_updated} observations, ${data.actions_updated} actions`);
-      } else {
-        toast.error("Failed to recalculate");
-      }
+      toast.success(`Recalculated ${data.threats_updated} observations, ${data.actions_updated} actions`);
     } catch (error) {
-      toast.error("Failed to recalculate");
+      toast.error(apiErrorMessage(error) || "Failed to recalculate");
     } finally {
       setRecalculating(false);
     }

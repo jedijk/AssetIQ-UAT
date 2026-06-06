@@ -44,20 +44,15 @@ import { Badge } from "../components/ui/badge";
 import { Switch } from "../components/ui/switch";
 import { toast } from "sonner";
 import { SettingsSection, SettingsCard } from "./SettingsPage";
-import { getBackendUrl, getAuthFetchInit } from "../lib/apiConfig";
+import { api } from "../lib/apiClient";
 
-const API_BASE_URL = getBackendUrl();
-
-async function fetchJson(path, options = {}) {
-  const res = await fetch(`${API_BASE_URL}${path}`, getAuthFetchInit({
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options,
-  }));
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `${res.status} ${res.statusText}`);
+function apiErrorMessage(error) {
+  const detail = error.response?.data?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((d) => d.msg || String(d)).join(", ");
   }
-  return res.json();
+  return error.message || "Request failed";
 }
 
 // Tailwind palette swatches (label / color class pairs)
@@ -83,35 +78,31 @@ export default function SettingsDisciplinesConfiguratorPage() {
 
   const { data: list, isLoading: listLoading } = useQuery({
     queryKey: ["disciplines", "all"],
-    queryFn: () => fetchJson("/api/disciplines?include_inactive=true"),
+    queryFn: async () => (await api.get("/disciplines?include_inactive=true")).data,
   });
   const disciplines = list?.disciplines || [];
 
   const { data: cleanup, isLoading: cleanupLoading } = useQuery({
     queryKey: ["discipline-cleanup"],
-    queryFn: () => fetchJson("/api/disciplines/cleanup-suggestions"),
+    queryFn: async () => (await api.get("/disciplines/cleanup-suggestions")).data,
   });
   const suggestions = cleanup?.suggestions || [];
 
   const { data: users } = useQuery({
     queryKey: ["users-list-min"],
-    queryFn: () =>
-      fetchJson("/api/rbac/users?limit=200").catch(() => ({ users: [] })),
+    queryFn: async () =>
+      api.get("/rbac/users?limit=200").then((r) => r.data).catch(() => ({ users: [] })),
   });
   const userOptions = users?.users || users || [];
 
   const reorderMutation = useMutation({
-    mutationFn: (items) =>
-      fetchJson("/api/disciplines/reorder", {
-        method: "PATCH",
-        body: JSON.stringify(items),
-      }),
+    mutationFn: async (items) => (await api.patch("/disciplines/reorder", items)).data,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["disciplines"] }),
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toast.error(apiErrorMessage(e)),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => fetchJson(`/api/disciplines/${id}`, { method: "DELETE" }),
+    mutationFn: async (id) => (await api.delete(`/disciplines/${id}`)).data,
     onSuccess: (data) => {
       if (data.soft_deleted) {
         toast.warning(
@@ -123,20 +114,19 @@ export default function SettingsDisciplinesConfiguratorPage() {
       qc.invalidateQueries({ queryKey: ["disciplines"] });
       qc.invalidateQueries({ queryKey: ["discipline-cleanup"] });
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toast.error(apiErrorMessage(e)),
   });
 
   const mergeMutation = useMutation({
-    mutationFn: ({ variants, targetId, mode, dryRun }) =>
-      fetchJson("/api/disciplines/merge", {
-        method: "POST",
-        body: JSON.stringify({
+    mutationFn: async ({ variants, targetId, mode, dryRun }) =>
+      (
+        await api.post("/disciplines/merge", {
           variants,
           target_discipline_id: targetId,
           mode,
           dry_run: dryRun,
-        }),
-      }),
+        })
+      ).data,
     onSuccess: (data) => {
       if (data.dry_run) return; // dry-run only updates preview
       toast.success(
@@ -148,7 +138,7 @@ export default function SettingsDisciplinesConfiguratorPage() {
       qc.invalidateQueries({ queryKey: ["discipline-cleanup"] });
       setMergeTargetFor(null);
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toast.error(apiErrorMessage(e)),
   });
 
   const ordered = useMemo(
@@ -400,28 +390,26 @@ function DisciplineFormDialog({ open, initial, onClose, onSaved, userOptions }) 
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (isEdit) {
-        return fetchJson(`/api/disciplines/${initial.id}`, {
-          method: "PUT",
-          body: JSON.stringify({
+        return (
+          await api.put(`/disciplines/${initial.id}`, {
             label: form.label,
             color: form.color,
             aliases: form.aliases,
             default_assignee_user_id: form.default_assignee_user_id || null,
             is_active: form.is_active,
-          }),
-        });
+          })
+        ).data;
       }
-      return fetchJson("/api/disciplines", {
-        method: "POST",
-        body: JSON.stringify({
+      return (
+        await api.post("/disciplines", {
           value: form.value,
           label: form.label,
           color: form.color,
           aliases: form.aliases,
           default_assignee_user_id: form.default_assignee_user_id || null,
           is_active: form.is_active,
-        }),
-      });
+        })
+      ).data;
     },
     onSuccess: () => {
       toast.success(isEdit ? "Discipline updated" : "Discipline created");
@@ -429,7 +417,7 @@ function DisciplineFormDialog({ open, initial, onClose, onSaved, userOptions }) 
       onSaved?.();
       onClose();
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toast.error(apiErrorMessage(e)),
   });
 
   const addAlias = () => {

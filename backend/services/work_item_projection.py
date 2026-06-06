@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from database import db
-from services.tenant_schema import tenant_filter, with_tenant_id
+from services.tenant_schema import tenant_filter, tenant_id_from_user, with_tenant_id
 from services.work_item_query import fetch_work_items
 
 logger = logging.getLogger(__name__)
@@ -30,6 +30,7 @@ def _cache_key(
     equipment_id: Optional[str],
     status: Optional[str],
     discipline: Optional[str],
+    user: Optional[dict] = None,
 ) -> str:
     payload = {
         "user_id": user_id,
@@ -39,6 +40,9 @@ def _cache_key(
         "status": status,
         "discipline": discipline,
     }
+    tenant_id = tenant_id_from_user(user)
+    if tenant_id:
+        payload["tenant_id"] = tenant_id
     raw = json.dumps(payload, sort_keys=True, default=str)
     return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
@@ -63,6 +67,7 @@ async def get_projected_work_items(
         equipment_id=equipment_id,
         status=status,
         discipline=discipline,
+        user=user,
     )
     now = datetime.now(timezone.utc)
 

@@ -15,6 +15,7 @@ from bson import ObjectId
 
 from database import db
 from services.db_monitoring import timed_find
+from services.tenant_schema import merge_tenant_filter
 from utils.mongo_regex import case_insensitive_contains
 from services.task_instance_bridge import (
     STATUS_MAP,
@@ -157,6 +158,7 @@ async def fetch_unbridged_maintenance_work_items(
     equipment_id: Optional[str] = None,
     discipline: Optional[str] = None,
     now: Optional[datetime] = None,
+    user: Optional[dict] = None,
 ) -> List[dict]:
     """Load open scheduled_tasks not yet mirrored in task_instances."""
     now = now or datetime.now(timezone.utc)
@@ -173,6 +175,8 @@ async def fetch_unbridged_maintenance_work_items(
     if query is None:
         return []
 
+    query = merge_tenant_filter(query, user)
+
     cursor = await timed_find(db.scheduled_tasks, query, {"_id": 0})
     candidate_tasks = await cursor.sort("due_date", 1).to_list(MAX_UNBRIDGED_ITEMS * 2)
 
@@ -184,7 +188,10 @@ async def fetch_unbridged_maintenance_work_items(
     if candidate_ids:
         existing_cursor = await timed_find(
             db.task_instances,
-            {"scheduled_task_id": {"$in": candidate_ids}},
+            merge_tenant_filter(
+                {"scheduled_task_id": {"$in": candidate_ids}},
+                user,
+            ),
             {"_id": 0, "scheduled_task_id": 1},
         )
         existing = await existing_cursor.to_list(len(candidate_ids))
@@ -443,8 +450,6 @@ async def fetch_work_items(
     if status:
         query["status"] = status
 
-    from services.tenant_schema import merge_tenant_filter
-
     query = merge_tenant_filter(query, user)
 
     tasks_cursor = await timed_find(db.task_instances, query)
@@ -465,6 +470,7 @@ async def fetch_work_items(
                 equipment_id=equipment_id,
                 discipline=discipline,
                 now=now,
+                user=user,
             )
         )
 
@@ -490,7 +496,7 @@ async def fetch_work_items(
             return equip_map
         cursor = await timed_find(
             db.equipment_nodes,
-            {"id": {"$in": list(equipment_ids)}},
+            merge_tenant_filter({"id": {"$in": list(equipment_ids)}}, user),
             {"_id": 0, "id": 1, "name": 1, "tag": 1},
         )
         for eq in await cursor.to_list(len(equipment_ids)):
@@ -690,7 +696,10 @@ async def fetch_work_items(
                 {"due_date": {"$ne": ""}},
             ]
 
-        raw_actions = await db.central_actions.find(action_query, {"_id": 0}).to_list(length=MAX_ACTION_ITEMS)
+        raw_actions = await db.central_actions.find(
+            merge_tenant_filter(action_query, user),
+            {"_id": 0},
+        ).to_list(length=MAX_ACTION_ITEMS)
 
         threat_source_ids = set()
         investigation_source_ids = set()
@@ -727,7 +736,7 @@ async def fetch_work_items(
                 return result
             threats_cursor = await timed_find(
                 db.threats,
-                {"id": {"$in": list(threat_source_ids)}},
+                merge_tenant_filter({"id": {"$in": list(threat_source_ids)}}, user),
                 {"_id": 0, "id": 1, "fmea_rpn": 1, "risk_score": 1, "risk_level": 1, "linked_equipment_id": 1},
             )
             for threat in await threats_cursor.to_list(len(threat_source_ids)):
@@ -743,7 +752,7 @@ async def fetch_work_items(
         if threat_equipment_ids:
             equip_cursor = await timed_find(
                 db.equipment_nodes,
-                {"id": {"$in": list(threat_equipment_ids)}},
+                merge_tenant_filter({"id": {"$in": list(threat_equipment_ids)}}, user),
                 {"_id": 0, "id": 1, "tag": 1},
             )
             for eq in await equip_cursor.to_list(len(threat_equipment_ids)):

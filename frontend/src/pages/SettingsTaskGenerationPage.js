@@ -26,20 +26,15 @@ import {
 } from "../components/ui/dialog";
 import { toast } from "sonner";
 import { SettingsSection, SettingsCard } from "./SettingsPage";
-import { getBackendUrl, getAuthFetchInit } from "../lib/apiConfig";
+import { api } from "../lib/apiClient";
 
-const API_BASE_URL = getBackendUrl();
-
-async function fetchJson(path, options = {}) {
-  const res = await fetch(`${API_BASE_URL}${path}`, getAuthFetchInit({
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options,
-  }));
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `${res.status} ${res.statusText}`);
+function apiErrorMessage(error) {
+  const detail = error.response?.data?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((d) => d.msg || String(d)).join(", ");
   }
-  return res.json();
+  return error.message || "Request failed";
 }
 
 function formatDuration(ms) {
@@ -67,18 +62,15 @@ export default function SettingsTaskGenerationPage() {
 
   const { data: runsData, isLoading: runsLoading } = useQuery({
     queryKey: ["task-generation-runs"],
-    queryFn: () => fetchJson("/api/admin/task-generation/runs?limit=20"),
+    queryFn: async () => (await api.get("/admin/task-generation/runs?limit=20")).data,
     staleTime: 30 * 1000,
   });
   const runs = runsData?.runs || [];
   const lastLiveRun = runs.find((r) => !r.dry_run);
 
   const runMutation = useMutation({
-    mutationFn: ({ dryRun }) =>
-      fetchJson("/api/admin/task-generation/run", {
-        method: "POST",
-        body: JSON.stringify({ dry_run: dryRun }),
-      }),
+    mutationFn: async ({ dryRun }) =>
+      (await api.post("/admin/task-generation/run", { dry_run: dryRun })).data,
     onSuccess: (data) => {
       if (data.dry_run) {
         setDryRunPreview(data);
@@ -91,7 +83,7 @@ export default function SettingsTaskGenerationPage() {
         qc.invalidateQueries({ queryKey: ["task-generation-runs"] });
       }
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toast.error(apiErrorMessage(e)),
   });
 
   return (
@@ -315,7 +307,7 @@ const CRON_PRESETS = [
 function ScheduleEditor() {
   const { data: schedule, isLoading } = useQuery({
     queryKey: ["task-generation-schedule"],
-    queryFn: () => fetchJson("/api/admin/task-generation/schedule"),
+    queryFn: async () => (await api.get("/admin/task-generation/schedule")).data,
   });
 
   if (isLoading || !schedule) {
@@ -342,11 +334,8 @@ function ScheduleEditorForm({ schedule }) {
   const [previewError, setPreviewError] = useState(null);
 
   const previewMutation = useMutation({
-    mutationFn: (body) =>
-      fetchJson("/api/admin/task-generation/schedule/preview", {
-        method: "POST",
-        body: JSON.stringify(body),
-      }),
+    mutationFn: async (body) =>
+      (await api.post("/admin/task-generation/schedule/preview", body)).data,
     onSuccess: (data) => {
       setPreview(data);
       setPreviewError(null);
@@ -358,16 +347,13 @@ function ScheduleEditorForm({ schedule }) {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (body) =>
-      fetchJson("/api/admin/task-generation/schedule", {
-        method: "PUT",
-        body: JSON.stringify(body),
-      }),
+    mutationFn: async (body) =>
+      (await api.put("/admin/task-generation/schedule", body)).data,
     onSuccess: () => {
       toast.success("Schedule updated — scheduler reloaded");
       qc.invalidateQueries({ queryKey: ["task-generation-schedule"] });
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => toast.error(apiErrorMessage(e)),
   });
 
   const hasChanges =

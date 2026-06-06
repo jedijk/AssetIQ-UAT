@@ -2,7 +2,7 @@
 import asyncio
 
 import pytest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from services.work_item_query import (
     _build_scheduled_task_query,
@@ -12,6 +12,7 @@ from services.work_item_query import (
     serialize_action_as_task,
     work_item_sort_key,
 )
+from services.tenant_schema import merge_tenant_filter
 
 
 def test_serialize_scheduled_task_as_work_item_shape():
@@ -73,6 +74,22 @@ def test_recurring_filter_excludes_maintenance_query():
         today_end=today_end,
         equipment_id=None,
     ) is None
+
+
+def test_scheduled_task_query_scoped_by_tenant():
+    now = datetime(2026, 6, 5, 12, 0, tzinfo=timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today_start + timedelta(days=1)
+    base = _build_scheduled_task_query(
+        filter_name="open",
+        now=now,
+        today_start=today_start,
+        today_end=today_end,
+        equipment_id=None,
+    )
+    merged = merge_tenant_filter(base, {"company_id": "co-1"})
+    assert "$and" in merged
+    assert merged["$and"][1]["$or"][0]["tenant_id"] == "co-1"
 
 
 def test_apply_strategy_handler_requires_payload():

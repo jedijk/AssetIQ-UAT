@@ -48,7 +48,7 @@ This allows tenants to see their own data **plus** unmigrated legacy rows until 
 |------|-------------|--------|
 | Pilot | `work_item_projections`, `reliability_context_snapshots`, `background_jobs`, `audit_log` | Active |
 | **Wave 1** | `equipment_nodes`, `threats`, `users` | Active |
-| **Wave 2** | `task_instances`, `scheduled_tasks`, `central_actions`, `maintenance_programs_v2`, `equipment_type_strategies` | Active (read filters on work-items) |
+| **Wave 2** | `task_instances`, `scheduled_tasks`, `central_actions`, `maintenance_programs_v2`, `equipment_type_strategies` | Active (read filters on work-items merge path) |
 | Wave 3+ | Remaining domain collections | Planned |
 
 ## Wave 1 Route Changes

@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from database import db
 from services.reliability_graph import get_edges_for_equipment
-from services.tenant_schema import tenant_filter, with_tenant_id
+from services.tenant_schema import merge_tenant_filter, tenant_filter, with_tenant_id
 from services.work_item_query import fetch_work_items
 
 logger = logging.getLogger(__name__)
@@ -74,6 +74,7 @@ async def build_reliability_context(
         user_id,
         filter_name=work_filter,
         equipment_id=equipment_id,
+        user=user,
     )
 
     program = await db.maintenance_programs_v2.find_one(
@@ -92,7 +93,7 @@ async def build_reliability_context(
             ],
         }
         open_threats = await db.threats.find(
-            threat_query,
+            merge_tenant_filter(threat_query, user),
             {"_id": 0, "id": 1, "title": 1, "failure_mode": 1, "risk_score": 1, "risk_level": 1, "status": 1},
         ).sort("risk_score", -1).limit(15).to_list(15)
 
