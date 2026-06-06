@@ -12,8 +12,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from openai import AsyncOpenAI
-
 from models.translation import (
     EntityTranslation, TranslationStatus, EntityType, 
     DictionaryTerm, TranslationJob, Language
@@ -45,7 +43,6 @@ class TranslationService:
         self.db = db
         self.api_key = os.environ.get("OPENAI_API_KEY")
         self.model_name = "gpt-4o-mini"  # Fast and cost-effective for translations
-        self.client = AsyncOpenAI(api_key=self.api_key) if self.api_key else None
         
     async def get_dictionary(self) -> Dict[str, Dict[str, str]]:
         """
@@ -86,7 +83,10 @@ class TranslationService:
         source_language: str,
         target_language: str,
         context: str = "industrial maintenance and reliability",
-        use_dictionary: bool = True
+        use_dictionary: bool = True,
+        *,
+        user_id: str = "system",
+        company_id: str = "default",
     ) -> Tuple[str, float]:
         """
         Translate text using AI with dictionary validation
@@ -95,7 +95,7 @@ class TranslationService:
         if not text or not text.strip():
             return "", 1.0
         
-        if not self.client:
+        if not self.api_key:
             logger.error("No API key available for translation")
             raise ValueError("Translation API key not configured")
         
@@ -141,17 +141,20 @@ Guidelines:
 Respond ONLY with the translated text, nothing else."""
         
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model_name,
-                messages=[
+            from services.ai_gateway import chat as ai_gateway_chat
+
+            translation = await ai_gateway_chat(
+                [
                     {"role": "system", "content": system_message},
-                    {"role": "user", "content": text}
+                    {"role": "user", "content": text},
                 ],
-                temperature=0.3,  # Lower temperature for more consistent translations
-                max_tokens=2000
+                user_id=user_id,
+                company_id=company_id,
+                endpoint="translation.translate_text",
+                model=self.model_name,
+                temperature=0.3,
+                max_tokens=2000,
             )
-            
-            translation = response.choices[0].message.content
             
             # Apply dictionary post-processing
             if use_dictionary and dictionary:
@@ -206,7 +209,8 @@ Respond ONLY with the translated text, nothing else."""
                         text=str(source_value),
                         source_language="en",
                         target_language=language_code,
-                        context="industrial maintenance and reliability"
+                        context="industrial maintenance and reliability",
+                        user_id=created_by or "system",
                     )
                     
                     # Create translation record

@@ -2360,8 +2360,9 @@ async def generate_ai_insights(
     current_user: dict = Depends(get_current_user),
 ):
     """Generate AI-powered daily insights by analyzing the current production data."""
-    import os
-    from services.openai_service import chat_completion
+    from services.ai_gateway import chat as ai_gateway_chat, user_context
+
+    uid, cid = user_context(current_user)
 
     date = data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     production_log = data.get("production_log", [])
@@ -2409,10 +2410,13 @@ Format:
             {"role": "user", "content": prompt}
         ]
         
-        response = await chat_completion(
-            messages=messages,
+        response = await ai_gateway_chat(
+            messages,
+            user_id=uid,
+            company_id=cid,
+            endpoint="production.ai_insights",
             model="gpt-4o",
-            temperature=0.7
+            temperature=0.7,
         )
 
         # Parse JSON response
@@ -2465,7 +2469,9 @@ async def generate_machine_analysis(
 ):
     """AI-powered analysis of production data to determine optimal machine settings. Accepts optional date range."""
     import statistics
-    from services.openai_service import chat_completion
+    from services.ai_gateway import chat as ai_gateway_chat, user_context
+
+    uid, cid = user_context(current_user)
 
     data = data or {}
     start = data.get("start")
@@ -2656,10 +2662,13 @@ Return ONLY valid JSON with this structure:
             {"role": "user", "content": prompt}
         ]
 
-        response = await chat_completion(
-            messages=messages,
+        response = await ai_gateway_chat(
+            messages,
+            user_id=uid,
+            company_id=cid,
+            endpoint="production.machine_analysis",
             model="gpt-4o",
-            temperature=0.3
+            temperature=0.3,
         )
 
         # Parse JSON response

@@ -20,8 +20,9 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, B
 from pydantic import BaseModel
 from auth import get_current_user
 from database import db
-from openai import OpenAI
 from services.storage_service import put_object_async
+from services.background_jobs import schedule_tracked_job
+from services.ai_gateway import chat as ai_gateway_chat, user_context
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/production-logs", tags=["Production Logs"])
@@ -1021,7 +1022,14 @@ async def ingest_logs(
     )
 
     # Run ingestion in background
-    background_tasks.add_task(_run_ingestion, request.job_id, job)
+    schedule_tracked_job(
+        background_tasks,
+        "production_logs_ingest",
+        _run_ingestion,
+        request.job_id,
+        job,
+        user_id=current_user.get("id"),
+    )
 
     return {"job_id": request.job_id, "status": "processing", "message": "Ingestion started"}
 
@@ -1063,7 +1071,14 @@ async def batch_ingest_logs(
             }}
         )
         job["parse_template"] = template_dict
-        background_tasks.add_task(_run_ingestion, job_id, job)
+        schedule_tracked_job(
+            background_tasks,
+            "production_logs_batch_ingest",
+            _run_ingestion,
+            job_id,
+            job,
+            user_id=current_user.get("id"),
+        )
         started.append(job_id)
 
     return {
@@ -1456,7 +1471,14 @@ async def batch_ingest_with_saved_template(
             }}
         )
         job["parse_template"] = adjusted_template
-        background_tasks.add_task(_run_ingestion, job_id, job)
+        schedule_tracked_job(
+            background_tasks,
+            "production_logs_template_ingest",
+            _run_ingestion,
+            job_id,
+            job,
+            user_id=current_user.get("id"),
+        )
         started.append(job_id)
     
     # Update template usage count
@@ -1752,7 +1774,12 @@ async def run_aggregation(
     if total == 0:
         raise HTTPException(status_code=400, detail="No production logs to aggregate")
 
-    background_tasks.add_task(_run_aggregation)
+    schedule_tracked_job(
+        background_tasks,
+        "production_logs_aggregate",
+        _run_aggregation,
+        user_id=current_user.get("id"),
+    )
     return {"message": "Aggregation started", "total_source_records": total}
 
 
@@ -1950,6 +1977,8 @@ async def ai_parse_file(
     if not vision_key:
         raise HTTPException(status_code=400, detail="OPENAI_API_KEY not configured")
 
+    uid, cid = user_context(current_user)
+
     job = await db.log_ingestion_jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -1992,12 +2021,10 @@ async def ai_parse_file(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to read file: {e}")
 
-    # Call OpenAI to analyze the log structure
+    # Call AI to analyze the log structure
     try:
-        client = OpenAI(api_key=vision_key)
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
+        raw = await ai_gateway_chat(
+            [
                 {"role": "system", "content": """You are a production log analyst. Analyze the sample data and return a JSON object with:
 {
   "delimiter": "detected delimiter character (comma, semicolon, tab, pipe, or space)",
@@ -2014,13 +2041,16 @@ async def ai_parse_file(
   "notes": "brief description of the data structure"
 }
 Return ONLY valid JSON, no markdown."""},
-                {"role": "user", "content": f"Analyze this production log file sample:\n\n{sample_text}"}
+                {"role": "user", "content": f"Analyze this production log file sample:\n\n{sample_text}"},
             ],
-            max_completion_tokens=1000,
+            user_id=uid,
+            company_id=cid,
+            endpoint="production_logs.ai_parse",
+            model="gpt-4o",
+            max_tokens=1000,
             temperature=0.1,
         )
-
-        raw = response.choices[0].message.content.strip()
+        raw = raw.strip()
         # Strip markdown code fences if present
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]

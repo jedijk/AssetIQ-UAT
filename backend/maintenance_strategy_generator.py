@@ -184,18 +184,23 @@ class MaintenanceStrategyGenerator:
     def __init__(self, api_key: str):
         self.api_key = api_key
     
-    def _call_openai(self, user_message: str) -> str:
-        """Make a chat completion call to OpenAI"""
+    def _call_openai(self, user_message: str, user_id: str = "system") -> str:
+        """Make a chat completion call to OpenAI with cost guard and usage tracking."""
+        from ai_helpers import chat_completions_create, get_openai_client
+
         try:
-            client = OpenAI(api_key=self.api_key)
-            response = client.chat.completions.create(
+            client = get_openai_client()
+            response = chat_completions_create(
+                client,
+                "maintenance_strategy_generator.generate",
+                user_id=user_id,
                 model="gpt-4o",
                 messages=[
                     {"role": "system", "content": STRATEGY_GENERATION_PROMPT},
-                    {"role": "user", "content": user_message}
+                    {"role": "user", "content": user_message},
                 ],
                 max_tokens=4000,
-                temperature=0.5
+                temperature=0.5,
             )
             return response.choices[0].message.content
         except Exception as e:
@@ -469,7 +474,7 @@ Address each failure mode appropriately for each criticality level.
         try:
             context = self._build_fmea_context(equipment_type_name, failure_modes)
             
-            response = self._call_openai(context)
+            response = self._call_openai(context, user_id=user_id)
             data = self._parse_json_response(response)
             
             # Parse strategies for each criticality level

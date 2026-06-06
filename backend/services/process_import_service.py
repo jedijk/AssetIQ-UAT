@@ -197,6 +197,16 @@ class ProcessImportService:
         self.db = db
         self.sessions_collection = db["process_import_sessions"]
         self.equipment_collection = db["equipment_hierarchy"]
+
+    async def _ai_user_context(self, session_id: Optional[str] = None) -> Tuple[str, str]:
+        uid = "system"
+        if session_id:
+            session = await self.sessions_collection.find_one(
+                {"session_id": session_id}, {"created_by": 1}
+            )
+            if session and session.get("created_by"):
+                uid = str(session["created_by"])
+        return uid, "default"
     
     async def create_session_placeholder(
         self,
@@ -604,7 +614,9 @@ class ProcessImportService:
         
         all_items = []
         for img_info in images_b64:
-            items = await self._extract_from_image(img_info["data"], "png", img_info["page"])
+            items = await self._extract_from_image(
+                img_info["data"], "png", img_info["page"], session_id=session_id
+            )
             all_items.extend(items)
         
         return all_items
@@ -620,22 +632,24 @@ class ProcessImportService:
         await self._update_progress(session_id, 20, "Analyzing image with AI vision...")
         
         img_b64 = base64.b64encode(content).decode('utf-8')
-        return await self._extract_from_image(img_b64, file_type, 1)
+        return await self._extract_from_image(img_b64, file_type, 1, session_id=session_id)
     
     async def _extract_from_image(
         self,
         img_b64: str,
         file_type: str,
-        page_num: int
+        page_num: int,
+        *,
+        session_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Extract equipment and hierarchy from an image using GPT-4o Vision."""
-        from openai import OpenAI
-        
+        from services.ai_gateway import chat_with_images
+
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("OpenAI API key not configured")
-        
-        client = OpenAI(api_key=api_key)
+
+        user_id, company_id = await self._ai_user_context(session_id)
         
         mime_type = f"image/{file_type}" if file_type != "jpg" else "image/jpeg"
         
@@ -669,28 +683,18 @@ Focus on:
 Only return the JSON array, no other text."""
 
         try:
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:{mime_type};base64,{img_b64}",
-                                    "detail": "high"
-                                }
-                            }
-                        ]
-                    }
-                ],
-                max_tokens=4000,
-                temperature=0.1
-            )
-            
-            result_text = response.choices[0].message.content.strip()
+            result_text = (
+                await chat_with_images(
+                    prompt,
+                    image_base64_list=[{"media_type": mime_type, "data": img_b64}],
+                    user_id=user_id,
+                    company_id=company_id,
+                    endpoint="process_import.vision_extract",
+                    model="gpt-4o",
+                    temperature=0.1,
+                    max_tokens=4000,
+                )
+            ).strip()
             
             # Parse JSON
             import json
@@ -910,13 +914,13 @@ Only return the JSON array, no other text."""
         session_id: str
     ) -> List[Dict[str, Any]]:
         """Estimate criticality scores for equipment."""
-        from openai import OpenAI
-        
+        from services.ai_gateway import chat as ai_gateway_chat
+
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             return items
-        
-        client = OpenAI(api_key=api_key)
+
+        user_id, company_id = await self._ai_user_context(session_id)
         
         # Only estimate for Equipment Units
         equipment_items = [i for i in items if i.get("level") == "Equipment Unit"]
@@ -956,14 +960,17 @@ Return JSON array:
 Only return JSON array."""
 
         try:
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=2000,
-                temperature=0.2
-            )
-            
-            result_text = response.choices[0].message.content.strip()
+            result_text = (
+                await ai_gateway_chat(
+                    [{"role": "user", "content": prompt}],
+                    user_id=user_id,
+                    company_id=company_id,
+                    endpoint="process_import.estimate_criticality",
+                    model="gpt-4o-mini",
+                    max_tokens=2000,
+                    temperature=0.2,
+                )
+            ).strip()
             
             import json
             if result_text.startswith("```"):

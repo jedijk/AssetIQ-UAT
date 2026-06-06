@@ -42,8 +42,9 @@ async def _resolve_discipline(
     if raw_lo in discipline_cache:
         return discipline_cache[raw_lo]
     # Direct match on value or label
+    import re
     direct = await db.disciplines.find_one(
-        {"$or": [{"value": raw_lo}, {"label": {"$regex": f"^{raw}$", "$options": "i"}}]},
+        {"$or": [{"value": raw_lo}, {"label": {"$regex": f"^{re.escape(raw.strip())}$", "$options": "i"}}]},
         {"_id": 0, "value": 1},
     )
     if direct:

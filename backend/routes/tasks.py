@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from database import db, task_service
-from auth import get_current_user
+from auth import require_permission
 from models.task_models import (
     TaskTemplateCreate, TaskTemplateUpdate,
     TaskPlanCreate, TaskPlanUpdate,
@@ -21,12 +21,16 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Tasks"])
 
+_tasks_read = require_permission("tasks:read")
+_tasks_write = require_permission("tasks:write")
+_tasks_delete = require_permission("tasks:delete")
+
 # ============= FILE UPLOAD FOR TASK ATTACHMENTS =============
 
 @router.post("/tasks/upload-attachment")
 async def upload_task_attachment(
     file: UploadFile = File(...),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_write)
 ):
     """Upload an attachment file for task completion."""
     if not is_storage_available():
@@ -70,7 +74,7 @@ async def get_task_templates(
     active_only: bool = True,
     skip: int = 0,
     limit: int = 100,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_read)
 ):
     """Get task templates with optional filters."""
     from services.query_cache import query_cache
@@ -102,7 +106,7 @@ async def get_task_templates(
 @router.get("/task-templates/{template_id}")
 async def get_task_template(
     template_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_read)
 ):
     """Get a specific task template."""
     template = await task_service.get_template_by_id(template_id)
@@ -113,7 +117,7 @@ async def get_task_template(
 @router.post("/task-templates")
 async def create_task_template(
     data: TaskTemplateCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_write)
 ):
     """Create a new task template."""
     from services.query_cache import query_cache
@@ -125,7 +129,7 @@ async def create_task_template(
 async def update_task_template(
     template_id: str,
     data: TaskTemplateUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_write)
 ):
     """Update a task template."""
     from services.query_cache import query_cache
@@ -138,7 +142,7 @@ async def update_task_template(
 @router.delete("/task-templates/{template_id}")
 async def delete_task_template(
     template_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_delete)
 ):
     """Delete (deactivate) a task template."""
     from services.query_cache import query_cache
@@ -160,7 +164,7 @@ async def get_task_plans(
     active_only: bool = True,
     skip: int = 0,
     limit: int = 100,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_read)
 ):
     """Get task plans with optional filters."""
     return await task_service.get_plans(
@@ -174,7 +178,7 @@ async def get_task_plans(
 @router.get("/task-plans/due")
 async def get_due_task_plans(
     days: int = 7,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_read)
 ):
     """Get task plans due within specified days."""
     due_before = datetime.now(timezone.utc) + timedelta(days=days)
@@ -183,7 +187,7 @@ async def get_due_task_plans(
 @router.get("/task-plans/{plan_id}")
 async def get_task_plan(
     plan_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_read)
 ):
     """Get a specific task plan."""
     plan = await task_service.get_plan_by_id(plan_id)
@@ -194,7 +198,7 @@ async def get_task_plan(
 @router.post("/task-plans")
 async def create_task_plan(
     data: TaskPlanCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_write)
 ):
     """Create a task plan for specific equipment."""
     try:
@@ -206,7 +210,7 @@ async def create_task_plan(
 async def update_task_plan(
     plan_id: str,
     data: TaskPlanUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_write)
 ):
     """Update a task plan."""
     result = await task_service.update_plan(plan_id, data.model_dump(exclude_unset=True))
@@ -217,7 +221,7 @@ async def update_task_plan(
 @router.delete("/task-plans/{plan_id}")
 async def delete_task_plan(
     plan_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_delete)
 ):
     """Delete (deactivate) a task plan."""
     deleted = await task_service.delete_plan(plan_id)
@@ -237,7 +241,7 @@ async def get_task_instances(
     to_date: Optional[str] = None,
     skip: int = 0,
     limit: int = 50,  # Default pagination limit
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_read)
 ):
     """Get task instances with optional filters, timeout protection, and fallback."""
     import time
@@ -304,7 +308,7 @@ async def get_task_calendar(
     from_date: str,
     to_date: str,
     equipment_id: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_read)
 ):
     """Get tasks for calendar view."""
     from_dt = datetime.fromisoformat(from_date)
@@ -315,7 +319,7 @@ async def get_task_calendar(
 @router.get("/task-instances/{instance_id}")
 async def get_task_instance(
     instance_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_read)
 ):
     """Get a specific task instance."""
     instance = await task_service.get_instance_by_id(instance_id)
@@ -326,7 +330,7 @@ async def get_task_instance(
 @router.post("/task-instances")
 async def create_task_instance(
     data: TaskInstanceCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_write)
 ):
     """Manually create a task instance."""
     try:
@@ -337,7 +341,7 @@ async def create_task_instance(
 @router.post("/task-instances/adhoc")
 async def create_adhoc_task(
     data: AdhocTaskCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_write)
 ):
     """Create an ad-hoc task instance directly from a template (no plan/schedule required)."""
     try:
@@ -349,7 +353,7 @@ async def create_adhoc_task(
 async def update_task_instance(
     instance_id: str,
     data: TaskInstanceUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_write)
 ):
     """Update a task instance."""
     result = await task_service.update_instance(instance_id, data.model_dump(exclude_unset=True))
@@ -360,7 +364,7 @@ async def update_task_instance(
 @router.post("/task-instances/{instance_id}/start")
 async def start_task_instance(
     instance_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_write)
 ):
     """Mark a task as started."""
     result = await task_service.start_task(instance_id, current_user["id"])
@@ -372,7 +376,7 @@ async def start_task_instance(
 async def complete_task_instance(
     instance_id: str,
     data: TaskExecutionSubmit,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_write)
 ):
     """Mark a task as completed."""
     result = await task_service.complete_task(
@@ -388,7 +392,7 @@ async def complete_task_instance(
 @router.delete("/task-instances/{instance_id}")
 async def delete_task_instance(
     instance_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_delete)
 ):
     """Delete a task instance."""
     result = await task_service.delete_instance(instance_id)
@@ -402,7 +406,7 @@ async def delete_task_instance(
 async def generate_instances_for_plan(
     plan_id: str,
     horizon_days: int = 30,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_write)
 ):
     """Generate task instances for a specific plan."""
     instances = await task_service.generate_instances_for_plan(
@@ -417,7 +421,7 @@ async def generate_instances_for_plan(
 @router.post("/tasks/generate-all")
 async def generate_all_task_instances(
     horizon_days: int = 30,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_write)
 ):
     """Generate task instances for all active plans."""
     return await task_service.generate_all_due_instances(
@@ -426,7 +430,7 @@ async def generate_all_task_instances(
 
 @router.post("/tasks/mark-overdue")
 async def mark_overdue_tasks(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_write)
 ):
     """Mark all past-due tasks as overdue."""
     count = await task_service.mark_overdue_tasks()
@@ -436,7 +440,7 @@ async def mark_overdue_tasks(
 
 @router.get("/tasks/stats")
 async def get_task_stats(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_tasks_read)
 ):
     """Get task statistics."""
     return await task_service.get_task_stats(current_user["id"])

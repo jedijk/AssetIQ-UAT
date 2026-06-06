@@ -343,21 +343,24 @@ class AIRiskEngine:
     }
     
     def _call_openai(self, system_prompt: str, user_message: str, analysis_type: str = 'risk_analysis') -> str:
-        """Make a chat completion call to OpenAI"""
+        """Make a chat completion call to OpenAI with cost guard and usage tracking."""
+        from ai_helpers import chat_completions_create
+
         max_tokens = self.TOKEN_LIMITS.get(analysis_type, 3000)
-        # Use lower temperature for more focused, detailed analysis
         temperature = 0.3 if analysis_type == 'risk_analysis' else 0.4
         try:
             logger.info(f"Calling OpenAI with model gpt-4o, max_tokens={max_tokens}")
             client = get_openai_client()
-            response = client.chat.completions.create(
+            response = chat_completions_create(
+                client,
+                f"ai_risk_engine.{analysis_type}",
                 model="gpt-4o",
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message}
+                    {"role": "user", "content": user_message},
                 ],
                 max_completion_tokens=max_tokens,
-                temperature=temperature
+                temperature=temperature,
             )
             content = response.choices[0].message.content
             return content

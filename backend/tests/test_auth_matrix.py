@@ -79,3 +79,47 @@ def test_equipment_search_escapes_regex():
     source = (Path(__file__).resolve().parents[1] / "routes" / "equipment" / "equipment_utils.py").read_text()
     assert "case_insensitive_contains" in source
     assert '"$regex": q' not in source
+
+
+def test_tasks_mutations_require_tasks_write():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "tasks.py").read_text()
+    assert '_tasks_write = require_permission("tasks:write")' in source
+    idx = source.index("async def create_task_template")
+    block = source[idx: idx + 200]
+    assert "Depends(_tasks_write)" in block
+
+
+def test_tasks_reads_require_tasks_read():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "tasks.py").read_text()
+    idx = source.index("async def get_task_templates")
+    block = source[idx: idx + 500]
+    assert "Depends(_tasks_read)" in block
+
+
+def test_production_logs_ai_parse_uses_gateway():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "production_logs.py").read_text()
+    assert "from services.ai_gateway import chat as ai_gateway_chat" in source
+    idx = source.index("async def ai_parse_file")
+    block = source[idx: idx + 3500]
+    assert "ai_gateway_chat" in block
+    assert 'endpoint="production_logs.ai_parse"' in block
+
+
+def test_translation_service_uses_gateway():
+    source = (Path(__file__).resolve().parents[1] / "services" / "translation_service.py").read_text()
+    assert "from services.ai_gateway import chat as ai_gateway_chat" in source
+    assert "AsyncOpenAI" not in source
+
+
+def test_pm_import_service_uses_gateway():
+    source = (Path(__file__).resolve().parents[1] / "services" / "pm_import_service.py").read_text()
+    assert "from services.ai_gateway import chat_with_images" in source
+    assert "client.chat.completions.create" not in source
+
+
+def test_production_logs_ingest_uses_tracked_jobs():
+    source = (Path(__file__).resolve().parents[1] / "routes" / "production_logs.py").read_text()
+    assert "schedule_tracked_job" in source
+    idx = source.index("async def ingest_logs")
+    block = source[idx: idx + 1200]
+    assert "schedule_tracked_job" in block

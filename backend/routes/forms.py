@@ -9,6 +9,7 @@ from datetime import datetime
 from database import db, form_service
 from services.cache_service import cache
 from auth import get_current_user
+from services.background_jobs import schedule_tracked_job
 from services.ai_gateway import chat as ai_gateway_chat, user_context
 from models.form_models import (
     FormTemplateCreate, FormTemplateUpdate,
@@ -99,7 +100,9 @@ async def create_form_template(
     query_cache.invalidate("form_templates")
     # Trigger auto-translation in background
     if result and result.get("id"):
-        background_tasks.add_task(
+        schedule_tracked_job(
+            background_tasks,
+            "translate_form_template",
             translate_form_template,
             result["id"],
             {
@@ -107,6 +110,7 @@ async def create_form_template(
                 "description": result.get("description", "") or "",
             },
             current_user["id"],
+            user_id=current_user["id"],
         )
     return result
 
@@ -144,7 +148,9 @@ async def update_form_template(
         logger.info(f"[FormTemplateUpdate] success template_id={template_id} version={result.get('version')}")
         # Trigger auto-translation if name or description changed
         if any(k in update_data for k in ("name", "description")):
-            background_tasks.add_task(
+            schedule_tracked_job(
+                background_tasks,
+                "translate_form_template",
                 translate_form_template,
                 template_id,
                 {
@@ -152,6 +158,7 @@ async def update_form_template(
                     "description": result.get("description", "") or "",
                 },
                 current_user["id"],
+                user_id=current_user["id"],
             )
         return result
     except HTTPException:

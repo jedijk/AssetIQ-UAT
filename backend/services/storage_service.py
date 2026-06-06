@@ -291,7 +291,8 @@ async def list_objects_async(prefix: str = "", limit: int = 100) -> list:
 
     query = {}
     if prefix:
-        query["path"] = {"$regex": f"^{prefix}"}
+        import re
+        query["path"] = {"$regex": f"^{re.escape(prefix)}"}
 
     cursor = collection.find(
         query,

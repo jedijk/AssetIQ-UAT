@@ -18,6 +18,7 @@ from auth import hash_password, verify_password, create_token, get_current_user,
 from models.api_models import UserCreate, UserLogin, UserResponse, TokenResponse
 from pydantic import BaseModel, EmailStr, field_validator
 from utils.spam_protection import is_disposable_email, validate_honeypot, verify_recaptcha
+from utils.mongo_regex import exact_case_insensitive
 
 # Try to import resend for email functionality
 try:
@@ -121,7 +122,7 @@ async def record_login_attempt(email: str, success: bool, ip_address: str = None
         
         # Update last_login on user (case-insensitive email match)
         await db.users.update_one(
-            {"email": {"$regex": f"^{email_lower}$", "$options": "i"}},
+            {"email": exact_case_insensitive(email_lower)},
             {"$set": {"last_login": now.isoformat()}}
         )
         
@@ -320,7 +321,7 @@ async def login(request: Request, credentials: UserLogin, response: Response):
     try:
         # Case-insensitive email lookup
         user = await db.users.find_one(
-            {"email": {"$regex": f"^{credentials.email}$", "$options": "i"}}, 
+            {"email": exact_case_insensitive(credentials.email)},
             {"_id": 0}
         )
         logger.info(f"Login attempt for {credentials.email}: user_found={user is not None}")

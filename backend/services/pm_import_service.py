@@ -238,6 +238,17 @@ class PMImportService:
         self.db = db
         self.sessions_collection = db["pm_import_sessions"]
         self.failure_modes_collection = db["failure_modes"]
+
+    async def _ai_user_context(self, session_id: Optional[str] = None) -> Tuple[str, str]:
+        """Resolve user/company for AI cost attribution from import session."""
+        uid = "system"
+        if session_id:
+            session = await self.sessions_collection.find_one(
+                {"session_id": session_id}, {"created_by": 1}
+            )
+            if session and session.get("created_by"):
+                uid = str(session["created_by"])
+        return uid, "default"
     
     async def create_session_placeholder(
         self,
@@ -1598,13 +1609,13 @@ class PMImportService:
         session_id: str
     ) -> List[Dict[str, Any]]:
         """Use GPT-4o Vision to extract maintenance tasks from images/scanned documents."""
-        from openai import OpenAI
-        
+        from services.ai_gateway import chat_with_images
+
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("OpenAI API key not configured")
-        
-        client = OpenAI(api_key=api_key)
+
+        user_id, company_id = await self._ai_user_context(session_id)
         
         # Convert to base64
         if file_type == "pdf":
@@ -1659,28 +1670,18 @@ If the document is in Dutch, still extract the tasks but keep them in Dutch.
 Only return the JSON array, no other text."""
 
             try:
-                response = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": [
-                                {"type": "text", "text": prompt},
-                                {
-                                    "type": "image_url",
-                                    "image_url": {
-                                        "url": f"data:{mime_type};base64,{img_b64}",
-                                        "detail": "high"
-                                    }
-                                }
-                            ]
-                        }
-                    ],
-                    max_tokens=4000,
-                    temperature=0
-                )
-                
-                result_text = response.choices[0].message.content.strip()
+                result_text = (
+                    await chat_with_images(
+                        prompt,
+                        image_base64_list=[{"media_type": mime_type, "data": img_b64}],
+                        user_id=user_id,
+                        company_id=company_id,
+                        endpoint="pm_import.vision_ocr",
+                        model="gpt-4o",
+                        temperature=0,
+                        max_tokens=4000,
+                    )
+                ).strip()
                 
                 # Parse JSON response
                 import json
@@ -1767,7 +1768,9 @@ Only return the JSON array, no other text."""
             logger.info("No explicit discipline found in columns")
         
         # Step 4: AI enhancement
-        ai_analysis = await self._ai_analyze_task(task_text, task_type, rule_based_data)
+        ai_analysis = await self._ai_analyze_task(
+            task_text, task_type, rule_based_data, session_id=session_id
+        )
         
         # Build task object
         task_id = str(uuid.uuid4())
@@ -1973,11 +1976,13 @@ Only return the JSON array, no other text."""
         self,
         task_text: str,
         pre_classified_type: str,
-        rule_based_data: Dict[str, Any]
+        rule_based_data: Dict[str, Any],
+        *,
+        session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Use AI to enhance task analysis."""
-        from openai import OpenAI
-        
+        from services.ai_gateway import chat as ai_gateway_chat
+
         api_key = os.environ.get("OPENAI_API_KEY")
         if not api_key:
             return {
@@ -1988,8 +1993,8 @@ Only return the JSON array, no other text."""
                 "confidence": 60,
                 "reasoning": "AI analysis unavailable - using rule-based classification"
             }
-        
-        client = OpenAI(api_key=api_key)
+
+        user_id, company_id = await self._ai_user_context(session_id)
         
         prompt = f"""Analyze this preventive maintenance task and extract reliability intelligence.
 
@@ -2031,14 +2036,17 @@ Respond in JSON format:
 }}"""
 
         try:
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=800,
-                temperature=0.2
-            )
-            
-            result_text = response.choices[0].message.content.strip()
+            result_text = (
+                await ai_gateway_chat(
+                    [{"role": "user", "content": prompt}],
+                    user_id=user_id,
+                    company_id=company_id,
+                    endpoint="pm_import.analyze_task",
+                    model="gpt-4o-mini",
+                    max_tokens=800,
+                    temperature=0.2,
+                )
+            ).strip()
             
             # Parse JSON
             import json
