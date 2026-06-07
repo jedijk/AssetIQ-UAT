@@ -22,6 +22,7 @@ import {
 import { api } from "../../../lib/apiClient";
 import { formatDateTimeCompact } from "../../../lib/dateUtils";
 import { PERIOD_OPTIONS } from "../../../lib/production/dateRange";
+import KpiCalculationTooltip from "../../../components/ui/KpiCalculationTooltip";
 
 // ──────────────────────────────────────────
 // KPI Card
@@ -35,7 +36,8 @@ export const formatHoursMinutes = (hoursLike) => {
   return `${hh}h ${mm}m`;
 };
 
-export const KPICard = ({ icon: Icon, iconColor, label, value, unit, detail, detail2, trend, trendDirection }) => (
+export const KPICard = ({ icon: Icon, iconColor, label, value, unit, detail, detail2, trend, trendDirection, calculation }) => {
+  const card = (
   <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 flex flex-col gap-1 sm:gap-1.5 min-w-0" data-testid={`kpi-${label.toLowerCase().replace(/\s+/g, '-')}`}>
     <div className="flex items-center gap-2 mb-0.5 sm:mb-1">
       <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center ${iconColor || 'bg-slate-100'}`}>
@@ -55,7 +57,11 @@ export const KPICard = ({ icon: Icon, iconColor, label, value, unit, detail, det
       </span>
     )}
   </div>
-);
+  );
+
+  if (!calculation) return card;
+  return <KpiCalculationTooltip calculation={calculation}>{card}</KpiCalculationTooltip>;
+};
 
 // ──────────────────────────────────────────
 // Custom chart tooltip

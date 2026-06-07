@@ -42,6 +42,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { PMImportHelpModal } from "./PMImportHelpModal";
 import { AIReviewModal } from "./AIReviewModal";
 import { failureModesAPI } from "../../lib/apis/failureModes";
+import KpiCalculationTooltip from "../ui/KpiCalculationTooltip";
 
 // Task type colors
 const TASK_TYPE_COLORS = {
@@ -179,6 +180,15 @@ const ProcessingStep = ({ step, currentStep, label }) => {
 };
 
 // KPI Card
+const PM_IMPORT_KPI_CALCULATIONS = {
+  "Tasks Extracted": "Total tasks parsed from the uploaded PM spreadsheet for this import session.",
+  "Failure Modes": "Distinct failure modes identified or proposed across extracted tasks.",
+  "Existing Matches": "Tasks auto-matched to an existing failure mode in the library.",
+  "New Proposed": "Tasks proposing a new failure mode not yet in the library.",
+  "Low Confidence": "Tasks with AI confidence below the auto-accept threshold.",
+  "Manual Review": "Tasks flagged for manual review before acceptance.",
+};
+
 const KPICard = ({ label, value, icon: Icon, color = "blue" }) => {
   const colors = {
     blue: "bg-blue-50 text-blue-600",
@@ -188,8 +198,8 @@ const KPICard = ({ label, value, icon: Icon, color = "blue" }) => {
     purple: "bg-purple-50 text-purple-600",
     slate: "bg-slate-50 text-slate-600",
   };
-  
-  return (
+
+  const card = (
     <div className="bg-white rounded-lg border border-slate-200 p-3 flex items-center gap-3">
       <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colors[color]}`}>
         <Icon className="w-5 h-5" />
@@ -200,6 +210,10 @@ const KPICard = ({ label, value, icon: Icon, color = "blue" }) => {
       </div>
     </div>
   );
+
+  const calculation = PM_IMPORT_KPI_CALCULATIONS[label];
+  if (!calculation) return card;
+  return <KpiCalculationTooltip calculation={calculation}>{card}</KpiCalculationTooltip>;
 };
 
 // Picker dialog: search & select any existing failure mode, OR create a new one

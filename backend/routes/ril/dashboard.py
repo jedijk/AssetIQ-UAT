@@ -153,24 +153,66 @@ async def get_executive_dashboard(
     alerts_current = stats.get("alerts_7d", 0)
     alerts_trend = "up" if alerts_current > alerts_previous else ("down" if alerts_current < alerts_previous else "stable")
     
+    overdue_pm = reliability_kpis.get("overdue_pm", {})
+    mtbf_proxy = reliability_kpis.get("mtbf_proxy", {})
+    high_risk_threats = reliability_kpis.get("high_risk_threats", 0)
+    p1_cases = stats.get("p1_cases", 0)
+    p2_cases = stats.get("p2_cases", 0)
+
     return {
         "reliability_score": round(reliability_score, 1),
         "risk_exposure": at_risk_count,
         "predicted_failures": at_risk_count,  # Equipment with low health score
         "open_threats": open_threats,
-        "high_risk_threats": reliability_kpis.get("high_risk_threats", 0),
-        "overdue_pm": reliability_kpis.get("overdue_pm", {}),
-        "mtbf_proxy": reliability_kpis.get("mtbf_proxy", {}),
+        "high_risk_threats": high_risk_threats,
+        "overdue_pm": overdue_pm,
+        "mtbf_proxy": mtbf_proxy,
         "strategy_coverage_pct": strategy_coverage_pct,
         "reliability_edges_total": reliability_edges_total,
         "open_cases": stats.get("open_cases", 0),
-        "p1_cases": stats.get("p1_cases", 0),
-        "p2_cases": stats.get("p2_cases", 0),
+        "p1_cases": p1_cases,
+        "p2_cases": p2_cases,
         "cases_by_status": cases_by_status,
         "cases_resolved_30d": stats.get("cases_resolved_30d", 0),
         "trends": {
             "observations": {"current": obs_current, "previous": obs_previous, "direction": obs_trend},
             "alerts": {"current": alerts_current, "previous": alerts_previous, "direction": alerts_trend}
+        },
+        "calculations": {
+            "reliability_score": (
+                f"Base score 85 minus penalties: P1 cases ({p1_cases}) × 5 + P2 cases ({p2_cases}) × 2 "
+                f"+ alerts in last 7 days ({stats.get('alerts_7d', 0)}) × 0.5 (max 10) "
+                f"= {round(reliability_score, 1)}"
+            ),
+            "open_cases": "Count of RIL cases with status open, in progress, or under investigation.",
+            "risk_exposure": (
+                f"Equipment with predicted health score below 70 = {at_risk_count}"
+            ),
+            "open_threats": f"Active open observations/threats in reliability layer = {open_threats}",
+            "overdue_pm": (
+                f"Overdue scheduled PM tasks ({overdue_pm.get('scheduled_tasks', 0)}) "
+                f"+ overdue task instances ({overdue_pm.get('task_instances', 0)}) "
+                f"= {overdue_pm.get('total', 0)}"
+            ),
+            "mtbf_proxy": (
+                f"Mean days between failures across {mtbf_proxy.get('sample_equipment_count', 0)} assets "
+                f"in a {mtbf_proxy.get('window_days', 90)}-day window"
+                if mtbf_proxy.get("fleet_mean_days") is not None
+                else "Insufficient failure history for fleet MTBF proxy."
+            ),
+            "high_risk_threats": (
+                f"Open threats with critical or high risk level = {high_risk_threats}"
+            ),
+            "strategy_coverage_pct": (
+                f"Equipment whose type has a maintenance strategy ÷ total equipment "
+                f"= {equipment_with_strategy} ÷ {total_equipment} × 100 = {strategy_coverage_pct}%"
+            ),
+            "predicted_failures": (
+                f"Equipment with predicted health score below 70 = {at_risk_count}"
+            ),
+            "reliability_edges_total": (
+                f"Active tenant-scoped reliability graph edges = {reliability_edges_total}"
+            ),
         },
         "generated_at": datetime.utcnow().isoformat()
     }

@@ -50,6 +50,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/
 import { Progress } from "../ui/progress";
 import ReliabilityKnowledgeGraphDialog from "../ril/ReliabilityKnowledgeGraphDialog";
 import SchedulesMissingFrequencyDialog from "./SchedulesMissingFrequencyDialog";
+import KpiCalculationTooltip from "../ui/KpiCalculationTooltip";
 import { Skeleton } from "../ui/skeleton";
 
 // Flow card component for the main intelligence flow
@@ -166,7 +167,7 @@ const FlowArrow = ({ label, value, color = "slate" }) => {
 };
 
 // Insight Card for the right panel
-const InsightCard = ({ title, value, unit, description, icon: Icon, color = "blue", trend, onClick, className = "", ...rest }) => {
+const InsightCard = ({ title, value, unit, description, icon: Icon, color = "blue", trend, onClick, calculation, className = "", ...rest }) => {
   const colorClasses = {
     blue: "border-blue-200 bg-blue-50/50",
     green: "border-green-200 bg-green-50/50",
@@ -183,7 +184,7 @@ const InsightCard = ({ title, value, unit, description, icon: Icon, color = "blu
     purple: "text-purple-600",
   };
 
-  return (
+  const card = (
     <div
       className={`p-3 rounded-lg border ${colorClasses[color]} ${onClick ? "cursor-pointer hover:shadow-sm transition-shadow" : ""} ${className}`}
       onClick={onClick}
@@ -204,6 +205,14 @@ const InsightCard = ({ title, value, unit, description, icon: Icon, color = "blu
         <p className="text-[10px] text-slate-400 mt-1">{description}</p>
       )}
     </div>
+  );
+
+  if (!calculation) return card;
+
+  return (
+    <KpiCalculationTooltip calculation={calculation}>
+      {card}
+    </KpiCalculationTooltip>
   );
 };
 
@@ -857,6 +866,7 @@ const IntelligenceMapTab = () => {
                   insights.reliability_graph?.description ||
                   "Reliability graph edges linking entities · Click to view ontology"
                 }
+                calculation={insights.reliability_graph?.calculation}
                 icon={Link2}
                 color="blue"
                 onClick={() => setKnowledgeGraphOpen(true)}
@@ -869,11 +879,13 @@ const IntelligenceMapTab = () => {
                 value={failureModeCoverage}
                 unit="%"
                 description={`${insights.failure_mode_coverage?.numerator || 0} of ${insights.failure_mode_coverage?.denominator || 0} equipment`}
+                calculation={insights.failure_mode_coverage?.calculation}
                 icon={Target}
                 color={failureModeCoverage >= 80 ? "green" : failureModeCoverage >= 50 ? "amber" : "red"}
               />
 
               {/* Strategy Applied */}
+              <KpiCalculationTooltip calculation={insights.strategy_applied?.calculation}>
               <div className="p-3 rounded-lg border border-purple-200 bg-purple-50/50">
                 <div className="flex items-start justify-between mb-1">
                   <span className="text-xs font-medium text-slate-600">Strategy Applied</span>
@@ -893,6 +905,7 @@ const IntelligenceMapTab = () => {
                   />
                 )}
               </div>
+              </KpiCalculationTooltip>
 
               {/* Strategy Density */}
               <InsightCard
@@ -900,11 +913,13 @@ const IntelligenceMapTab = () => {
                 value={strategyDensity}
                 unit="per asset"
                 description="Average strategies per equipment"
+                calculation={insights.strategy_density?.calculation}
                 icon={Layers}
                 color="blue"
               />
 
               {/* PM Source Split */}
+              <KpiCalculationTooltip calculation={insights.pm_source_split?.calculation}>
               <div className="p-3 rounded-lg border border-slate-200 bg-slate-50/50">
                 <div className="flex items-start justify-between mb-2">
                   <span className="text-xs font-medium text-slate-600">PM Source Split</span>
@@ -923,6 +938,7 @@ const IntelligenceMapTab = () => {
                   <Progress value={pmSourceSplit.imported} className="h-1.5 [&>div]:bg-purple-500" />
                 </div>
               </div>
+              </KpiCalculationTooltip>
 
               {/* Schedule Health */}
               <InsightCard
@@ -933,6 +949,7 @@ const IntelligenceMapTab = () => {
                     ? "Click to view schedules requiring attention"
                     : "Schedules requiring attention"
                 }
+                calculation={insights.schedule_health?.calculation}
                 icon={AlertTriangle}
                 color={scheduleHealth === 0 ? "green" : scheduleHealth < 10 ? "amber" : "red"}
                 onClick={scheduleHealth > 0 ? () => setSchedulesMissingOpen(true) : undefined}
@@ -945,6 +962,7 @@ const IntelligenceMapTab = () => {
                 value={scheduleCompliance}
                 unit="%"
                 description="Schedules with valid frequency"
+                calculation={insights.schedule_compliance?.calculation}
                 icon={Shield}
                 color={scheduleCompliance >= 95 ? "green" : scheduleCompliance >= 80 ? "amber" : "red"}
               />

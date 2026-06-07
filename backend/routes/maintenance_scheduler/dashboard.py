@@ -76,5 +76,25 @@ async def get_scheduler_dashboard(
             "completed_on_time": completed_on_time,
             "total_completed": total_completed,
         },
+        "calculations": {
+            "open_tasks": (
+                "Count of scheduled preventive tasks that are not completed or cancelled "
+                "(reactive/corrective excluded)."
+            ),
+            "overdue_tasks": (
+                "Open preventive tasks with due date before today "
+                "(reactive/corrective excluded)."
+            ),
+            "upcoming_tasks": (
+                f"Open preventive tasks due between today and {week_end} "
+                "(reactive/corrective excluded)."
+            ),
+            "compliance": (
+                f"Tasks completed on or before due date in last 30 days ÷ all completed in last 30 days "
+                f"= {completed_on_time} ÷ {total_completed} × 100 = {round(compliance_rate, 1)}%"
+                if total_completed > 0
+                else "No completed tasks in the last 30 days — shown as 100%."
+            ),
+        },
         "priority_breakdown": {p["_id"]: p["count"] for p in priority_breakdown},
     }

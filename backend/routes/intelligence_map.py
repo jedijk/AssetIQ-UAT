@@ -678,40 +678,81 @@ async def get_intelligence_map_stats(
                     "unit": "%",
                     "description": "Equipment with linked Failure Modes",
                     "numerator": covered_equipment,
-                    "denominator": equipment_count
+                    "denominator": equipment_count,
+                    "calculation": (
+                        f"Equipment whose type has failure modes linked ÷ total equipment "
+                        f"= {covered_equipment} ÷ {equipment_count} × 100 = {failure_mode_coverage}%"
+                        if equipment_count > 0
+                        else "No equipment in scope."
+                    ),
                 },
                 "strategy_applied": {
                     "applied": equipment_with_strategy_applied_count,
                     "total": equipment_count,
                     "eligible": equipment_with_strategy_count,
-                    "description": "Equipment with Strategy Applied over all equipment"
+                    "description": "Equipment with Strategy Applied over all equipment",
+                    "calculation": (
+                        f"Equipment with a maintenance program containing strategy tasks "
+                        f"= {equipment_with_strategy_applied_count} of {equipment_count} total equipment"
+                    ),
                 },
                 "strategy_density": {
                     "value": strategy_density,
                     "unit": "per asset",
-                    "description": "Strategies per Equipment"
+                    "description": "Strategies per Equipment",
+                    "calculation": (
+                        f"Equipment type strategies ÷ equipment count "
+                        f"= {strategies_count} ÷ {equipment_count} = {strategy_density} per asset"
+                        if equipment_count > 0
+                        else "No equipment in scope."
+                    ),
                 },
                 "pm_source_split": {
                     "generated": generated_pct,
                     "imported": imported_pct,
                     "generated_count": generated_tasks,
                     "imported_count": imported_tasks_count,
+                    "total_count": total_pm_tasks,
                     "unit": "%",
-                    "description": "Generated vs Imported PMs"
+                    "description": "Generated vs Imported PMs",
+                    "calculation": (
+                        f"Generated = strategy ({program_stats.get('strategy_tasks', 0)}) + "
+                        f"AI ({program_stats.get('ai_tasks', 0)}) + manual ({program_stats.get('manual_tasks', 0)}) "
+                        f"= {generated_tasks}. Imported = non-rejected PM import tasks = {imported_tasks_count}. "
+                        f"Total = {total_pm_tasks}. "
+                        f"Generated {generated_pct}%, Imported {imported_pct}%."
+                    ),
                 },
                 "schedule_health": {
                     "missing_frequency": schedules_missing_freq,
-                    "description": "Schedules Missing Frequency"
+                    "total_schedules": schedules_count,
+                    "description": "Schedules Missing Frequency",
+                    "calculation": (
+                        f"Scheduled tasks with null or empty frequency field "
+                        f"= {schedules_missing_freq} of {schedules_count} total scheduled tasks"
+                    ),
                 },
                 "schedule_compliance": {
                     "value": schedule_compliance,
                     "unit": "%",
-                    "description": "Schedules with Valid Frequency"
+                    "description": "Schedules with Valid Frequency",
+                    "valid_count": valid_schedules,
+                    "total_count": schedules_count,
+                    "calculation": (
+                        f"Schedules with a defined frequency ÷ total schedules "
+                        f"= {valid_schedules} ÷ {schedules_count} × 100 = {schedule_compliance}%"
+                        if schedules_count > 0
+                        else "No schedules in scope — shown as 100%."
+                    ),
                 },
                 "reliability_graph": {
                     "reliability_edges_total": reliability_edges_total,
-                    "description": "Knowledge graph edges linking reliability entities"
-                }
+                    "description": "Knowledge graph edges linking reliability entities",
+                    "calculation": (
+                        "Count of active tenant-scoped reliability graph edges "
+                        f"linking failure modes, equipment, programs, tasks, and related entities = {reliability_edges_total}"
+                    ),
+                },
             },
             
             # Task source breakdown for programs

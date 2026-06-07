@@ -619,6 +619,7 @@ export default function DashboardPageMain({ initialTab }) {
           color="text-amber-600"
           bg="bg-amber-50"
           subtitle={`${openObservations} ${t("common.open") || "open"}`}
+          calculation={t("dashboard.totalObservationsCalculation")}
           clickable={true}
           onClick={() => navigate("/threats", { state: navState })}
         />
@@ -629,6 +630,7 @@ export default function DashboardPageMain({ initialTab }) {
           color="text-blue-600"
           bg="bg-blue-50"
           subtitle={`${completedActions} ${t("actionsPage.completed") || "completed"}`}
+          calculation={t("dashboard.totalActionsCalculation")}
           clickable={true}
           onClick={() => navigate("/actions", { state: navState })}
         />
@@ -639,6 +641,7 @@ export default function DashboardPageMain({ initialTab }) {
           color="text-purple-600"
           bg="bg-purple-50"
           subtitle={`${completedInvestigations} ${t("actionsPage.completed") || "completed"}`}
+          calculation={t("dashboard.investigationsCalculation")}
           clickable={true}
           onClick={() => navigate("/causal-engine", { state: navState })}
         />
@@ -649,6 +652,7 @@ export default function DashboardPageMain({ initialTab }) {
           color="text-green-600"
           bg="bg-green-50"
           subtitle={t("dashboard.totalAssets") || "total assets"}
+          calculation={t("dashboard.equipmentCalculation")}
           clickable={true}
           onClick={() => {
             if (window.innerWidth < 1024) {
@@ -668,6 +672,10 @@ export default function DashboardPageMain({ initialTab }) {
           total={observations.length}
           icon={Shield}
           color="bg-amber-500"
+          calculation={t("dashboard.observationResolutionCalculation")
+            .replace("{pct}", String(observations.length > 0 ? Math.round((closedObservations / observations.length) * 100) : 0))
+            .replace("{completed}", String(closedObservations))
+            .replace("{total}", String(observations.length))}
           clickable={true}
           onClick={() => navigate("/threats", { state: navState })}
         />
@@ -677,6 +685,10 @@ export default function DashboardPageMain({ initialTab }) {
           total={actions.length}
           icon={Target}
           color="bg-blue-500"
+          calculation={t("dashboard.actionCompletionCalculation")
+            .replace("{pct}", String(actions.length > 0 ? Math.round((completedActions / actions.length) * 100) : 0))
+            .replace("{completed}", String(completedActions))
+            .replace("{total}", String(actions.length))}
           clickable={true}
           onClick={() => navigate("/actions", { state: navState })}
         />
@@ -686,6 +698,10 @@ export default function DashboardPageMain({ initialTab }) {
           total={investigations.length}
           icon={GitBranch}
           color="bg-purple-500"
+          calculation={t("dashboard.investigationProgressCalculation")
+            .replace("{pct}", String(investigations.length > 0 ? Math.round((completedInvestigations / investigations.length) * 100) : 0))
+            .replace("{completed}", String(completedInvestigations))
+            .replace("{total}", String(investigations.length))}
           clickable={true}
           onClick={() => navigate("/causal-engine", { state: navState })}
         />

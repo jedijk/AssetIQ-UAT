@@ -48,6 +48,7 @@ import {
 } from "../components/ui/card";
 import RILCopilot from "../components/ril/RILCopilot";
 import ReliabilityKnowledgeGraphDialog from "../components/ril/ReliabilityKnowledgeGraphDialog";
+import KpiCalculationTooltip from "../components/ui/KpiCalculationTooltip";
 
 // Priority badge colors
 const priorityColors = {
@@ -67,7 +68,7 @@ const statusColors = {
 };
 
 // KPI Card component
-const KPICard = ({ title, value, subtitle, icon: Icon, trend, trendDirection, color = "blue", onClick, "data-testid": testId }) => {
+const KPICard = ({ title, value, subtitle, icon: Icon, trend, trendDirection, color = "blue", onClick, calculation, "data-testid": testId }) => {
   const colorClasses = {
     blue: "from-blue-500 to-blue-600",
     green: "from-green-500 to-green-600",
@@ -76,7 +77,7 @@ const KPICard = ({ title, value, subtitle, icon: Icon, trend, trendDirection, co
     purple: "from-purple-500 to-purple-600",
   };
 
-  return (
+  const card = (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -112,6 +113,9 @@ const KPICard = ({ title, value, subtitle, icon: Icon, trend, trendDirection, co
       </div>
     </motion.div>
   );
+
+  if (!calculation) return card;
+  return <KpiCalculationTooltip calculation={calculation}>{card}</KpiCalculationTooltip>;
 };
 
 // Health Score Gauge
@@ -187,6 +191,7 @@ export default function RILDashboardPage() {
   });
 
   const exec = executiveData || {};
+  const calc = exec.calculations || {};
   const intel = intelligenceData || {};
   const cases = casesData?.cases || [];
   const atRisk = atRiskData?.at_risk || [];
@@ -245,6 +250,7 @@ export default function RILDashboardPage() {
             title="Reliability Score"
             value={exec.reliability_score?.toFixed(1) || "—"}
             subtitle="Overall health"
+            calculation={calc.reliability_score}
             icon={Shield}
             color="green"
           />
@@ -252,6 +258,7 @@ export default function RILDashboardPage() {
             title="Open Cases"
             value={exec.open_cases || 0}
             subtitle={`P1: ${exec.p1_cases || 0} | P2: ${exec.p2_cases || 0}`}
+            calculation={calc.open_cases}
             icon={FileText}
             color="blue"
           />
@@ -259,6 +266,7 @@ export default function RILDashboardPage() {
             title="Risk Exposure"
             value={exec.risk_exposure || 0}
             subtitle="Equipment at risk"
+            calculation={calc.risk_exposure}
             icon={AlertTriangle}
             color="red"
           />
@@ -266,6 +274,7 @@ export default function RILDashboardPage() {
             title="Open Threats"
             value={exec.open_threats ?? 0}
             subtitle="Active observations"
+            calculation={calc.open_threats}
             icon={Target}
             color="orange"
           />
@@ -273,6 +282,7 @@ export default function RILDashboardPage() {
             title="Overdue PM"
             value={exec.overdue_pm?.total ?? 0}
             subtitle={`Scheduled: ${exec.overdue_pm?.scheduled_tasks ?? 0} | Instances: ${exec.overdue_pm?.task_instances ?? 0}`}
+            calculation={calc.overdue_pm}
             icon={Clock}
             color="red"
             data-testid="ril-kpi-overdue-pm"
@@ -281,6 +291,7 @@ export default function RILDashboardPage() {
             title="MTBF Proxy"
             value={exec.mtbf_proxy?.fleet_mean_days != null ? `${exec.mtbf_proxy.fleet_mean_days}d` : "—"}
             subtitle={`${exec.mtbf_proxy?.sample_equipment_count ?? 0} assets · ${exec.mtbf_proxy?.window_days ?? 90}d window`}
+            calculation={calc.mtbf_proxy}
             icon={TrendingUp}
             color="green"
             data-testid="ril-kpi-mtbf-proxy"
@@ -289,6 +300,7 @@ export default function RILDashboardPage() {
             title="High-Risk Threats"
             value={exec.high_risk_threats ?? 0}
             subtitle="Critical / high risk level"
+            calculation={calc.high_risk_threats}
             icon={AlertTriangle}
             color="orange"
           />
@@ -296,6 +308,7 @@ export default function RILDashboardPage() {
             title="Strategy Coverage"
             value={exec.strategy_coverage_pct != null ? `${exec.strategy_coverage_pct}%` : "—"}
             subtitle="Equipment with maintenance strategy"
+            calculation={calc.strategy_coverage_pct}
             icon={Layers}
             color="purple"
           />
@@ -303,6 +316,7 @@ export default function RILDashboardPage() {
             title="Predicted Failures"
             value={exec.predicted_failures || 0}
             subtitle="Low health score"
+            calculation={calc.predicted_failures}
             icon={Zap}
             color="orange"
           />
@@ -310,6 +324,7 @@ export default function RILDashboardPage() {
             title="Knowledge Graph"
             value={exec.reliability_edges_total ?? "—"}
             subtitle="Reliability graph edges · Click to view ontology"
+            calculation={calc.reliability_edges_total}
             icon={Link2}
             color="blue"
             onClick={() => setKnowledgeGraphOpen(true)}

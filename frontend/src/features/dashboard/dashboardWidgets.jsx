@@ -6,6 +6,7 @@ import { AuthenticatedImage } from "../../components/AuthenticatedMedia";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "../../components/ui/hover-card";
 import { Progress } from "../../components/ui/progress";
 import { Button } from "../../components/ui/button";
+import KpiCalculationTooltip from "../../components/ui/KpiCalculationTooltip";
 import { X, Download, ExternalLink, TrendingUp, TrendingDown, Briefcase } from "lucide-react";
 
 // Authenticated Lightbox component for viewing images with proper mobile auth
@@ -332,7 +333,8 @@ const MiniBarChart = ({ data, maxValue }) => {
 };
 
 // Stat card component - clickable with deep linking
-const StatCard = ({ label, value, icon: Icon, color, bg, subtitle, trend, trendUp, onClick, clickable = false }) => (
+const StatCard = ({ label, value, icon: Icon, color, bg, subtitle, trend, trendUp, onClick, clickable = false, calculation }) => {
+  const card = (
   <motion.div
     initial={{ opacity: 0, y: 10 }}
     animate={{ opacity: 1, y: 0 }}
@@ -362,12 +364,16 @@ const StatCard = ({ label, value, icon: Icon, color, bg, subtitle, trend, trendU
       </div>
     )}
   </motion.div>
-);
+  );
+
+  if (!calculation) return card;
+  return <KpiCalculationTooltip calculation={calculation}>{card}</KpiCalculationTooltip>;
+};
 
 // Progress card for completion metrics - clickable
-const ProgressCard = ({ title, completed, total, icon: Icon, color, onClick, clickable = false }) => {
+const ProgressCard = ({ title, completed, total, icon: Icon, color, onClick, clickable = false, calculation }) => {
   const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
-  return (
+  const card = (
     <div 
       className={`themed-card rounded-xl border p-4 transition-all ${
         clickable ? 'hover:shadow-md cursor-pointer active:scale-[0.98]' : ''
@@ -391,6 +397,9 @@ const ProgressCard = ({ title, completed, total, icon: Icon, color, onClick, cli
       <p className="text-right text-xs text-muted mt-1">{percentage}%</p>
     </div>
   );
+
+  if (!calculation) return card;
+  return <KpiCalculationTooltip calculation={calculation}>{card}</KpiCalculationTooltip>;
 };
 
 // Distribution card - clickable

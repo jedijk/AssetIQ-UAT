@@ -32,6 +32,7 @@ import { Input } from "../components/ui/input";
 import { Progress } from "../components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog";
 import { ScrollArea } from "../components/ui/scroll-area";
+import KpiCalculationTooltip from "../components/ui/KpiCalculationTooltip";
 
 // Level icons map
 const LEVEL_ICONS = {
@@ -48,12 +49,12 @@ const LEVEL_ICONS = {
 
 // Reliability dimensions with colors - shorter labels for chart
 const DIMENSIONS = [
-  { key: "criticality", label: "Criticality", shortLabel: "Criticality", icon: Shield, color: "text-amber-600", bg: "bg-amber-50" },
-  { key: "incidents", label: "Incidents", shortLabel: "Incidents", icon: AlertTriangle, color: "text-orange-600", bg: "bg-orange-50" },
-  { key: "investigations", label: "Investigations", shortLabel: "Investig.", icon: FileSearch, color: "text-teal-600", bg: "bg-teal-50" },
-  { key: "maintenance", label: "Maintenance", shortLabel: "Mainten.", icon: Wrench, color: "text-red-600", bg: "bg-red-50" },
-  { key: "reactions", label: "Reactions", shortLabel: "Reactions", icon: Activity, color: "text-purple-600", bg: "bg-purple-50" },
-  { key: "threats", label: "Threats", shortLabel: "Threats", icon: Target, color: "text-emerald-600", bg: "bg-emerald-50" },
+  { key: "criticality", label: "Criticality", shortLabel: "Criticality", icon: Shield, color: "text-amber-600", bg: "bg-amber-50", calculation: "Average equipment criticality score (0–100) across filtered assets." },
+  { key: "incidents", label: "Incidents", shortLabel: "Incidents", icon: AlertTriangle, color: "text-orange-600", bg: "bg-orange-50", calculation: "Incident frequency score derived from recorded failures and downtime events." },
+  { key: "investigations", label: "Investigations", shortLabel: "Investig.", icon: FileSearch, color: "text-teal-600", bg: "bg-teal-50", calculation: "Investigation completion and backlog score across filtered equipment." },
+  { key: "maintenance", label: "Maintenance", shortLabel: "Mainten.", icon: Wrench, color: "text-red-600", bg: "bg-red-50", calculation: "Preventive maintenance compliance and overdue task score." },
+  { key: "reactions", label: "Reactions", shortLabel: "Reactions", icon: Activity, color: "text-purple-600", bg: "bg-purple-50", calculation: "Reactive work response and closure score for corrective actions." },
+  { key: "threats", label: "Threats", shortLabel: "Threats", icon: Target, color: "text-emerald-600", bg: "bg-emerald-50", calculation: "Open observation/threat resolution score across filtered assets." },
 ];
 
 // Calculate radar points
@@ -462,8 +463,8 @@ const ReliabilitySnowflake = ({ scores = {}, overall = 0, itemCount = 0, alerts 
 };
 
 // Stat Card component - matching Threats page style, now clickable
-const StatCard = ({ label, value, icon: Icon, color, bg, onClick, clickable = false }) => {
-  return (
+const StatCard = ({ label, value, icon: Icon, color, bg, onClick, clickable = false, calculation }) => {
+  const card = (
     <div 
       className={`flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200 transition-all ${
         clickable ? 'cursor-pointer hover:border-slate-300 hover:shadow-sm active:scale-[0.98]' : ''
@@ -484,6 +485,9 @@ const StatCard = ({ label, value, icon: Icon, color, bg, onClick, clickable = fa
       )}
     </div>
   );
+
+  if (!calculation) return card;
+  return <KpiCalculationTooltip calculation={calculation}>{card}</KpiCalculationTooltip>;
 };
 
 // Mini spark line for equipment rows
@@ -714,6 +718,7 @@ export default function ReliabilityPerformancePage() {
             icon={dim.icon}
             color={dim.color}
             bg={dim.bg}
+            calculation={dim.calculation}
             clickable={true}
             onClick={() => handleDimensionClick(dim.key)}
           />

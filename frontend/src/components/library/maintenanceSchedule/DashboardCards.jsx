@@ -1,38 +1,14 @@
 import React from "react";
 import { ListChecks, AlertTriangle, Calendar, Target } from "lucide-react";
 import { Card, CardContent } from "../../ui/card";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "../../ui/tooltip";
+import KpiCalculationTooltip from "../../ui/KpiCalculationTooltip";
 import { useLanguage } from "../../../contexts/LanguageContext";
 
-function ComplianceTooltipContent({ compliance, t }) {
-  const onTime = compliance.completed_on_time ?? 0;
-  const total = compliance.total_completed ?? 0;
-  const rate = compliance.rate ?? 100;
-
-  if (total === 0) {
-    return (
-      <div className="space-y-1 text-xs leading-relaxed max-w-[240px]">
-        <p>{t("maintenance.complianceTooltipIntro")}</p>
-        <p>{t("maintenance.complianceTooltipEmpty")}</p>
-      </div>
-    );
-  }
-
-  const formula = t("maintenance.complianceTooltipFormula")
-    .replace("{onTime}", String(onTime))
-    .replace("{total}", String(total))
-    .replace("{rate}", String(rate));
-
+function KpiCard({ calculation, children, className = "" }) {
   return (
-    <div className="space-y-1 text-xs leading-relaxed max-w-[240px]">
-      <p>{t("maintenance.complianceTooltipIntro")}</p>
-      <p className="font-medium">{formula}</p>
-    </div>
+    <KpiCalculationTooltip calculation={calculation}>
+      <Card className={className}>{children}</Card>
+    </KpiCalculationTooltip>
   );
 }
 
@@ -55,10 +31,22 @@ export function DashboardCards({ dashboard, isLoading }) {
 
   const backlog = dashboard?.backlog || {};
   const compliance = dashboard?.compliance || {};
+  const calculations = dashboard?.calculations || {};
+
+  const complianceCalculation =
+    calculations.compliance ||
+    (compliance.total_completed === 0
+      ? t("maintenance.complianceTooltipEmpty")
+      : t("maintenance.complianceTooltipFormula")
+          .replace("{onTime}", String(compliance.completed_on_time ?? 0))
+          .replace("{total}", String(compliance.total_completed ?? 0))
+          .replace("{rate}", String(compliance.rate ?? 100)));
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <Card>
+      <KpiCard
+        calculation={calculations.open_tasks || t("maintenance.openTasksCalculation")}
+      >
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -68,9 +56,12 @@ export function DashboardCards({ dashboard, isLoading }) {
             <ListChecks className="w-8 h-8 text-blue-500" />
           </div>
         </CardContent>
-      </Card>
-      
-      <Card className={backlog.overdue_tasks > 0 ? "border-red-200 bg-red-50" : ""}>
+      </KpiCard>
+
+      <KpiCard
+        calculation={calculations.overdue_tasks || t("maintenance.overdueTasksCalculation")}
+        className={backlog.overdue_tasks > 0 ? "border-red-200 bg-red-50" : ""}
+      >
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -82,9 +73,11 @@ export function DashboardCards({ dashboard, isLoading }) {
             <AlertTriangle className={`w-8 h-8 ${backlog.overdue_tasks > 0 ? "text-red-500" : "text-slate-300"}`} />
           </div>
         </CardContent>
-      </Card>
-      
-      <Card>
+      </KpiCard>
+
+      <KpiCard
+        calculation={calculations.upcoming_tasks || t("maintenance.upcomingTasksCalculation")}
+      >
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -94,30 +87,21 @@ export function DashboardCards({ dashboard, isLoading }) {
             <Calendar className="w-8 h-8 text-amber-500" />
           </div>
         </CardContent>
-      </Card>
-      
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Card className="cursor-help">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-slate-500">{t("maintenance.compliance")}</p>
-                    <p className={`text-2xl font-bold ${compliance.rate >= 90 ? "text-green-600" : compliance.rate >= 70 ? "text-amber-600" : "text-red-600"}`}>
-                      {compliance.rate ?? 100}%
-                    </p>
-                  </div>
-                  <Target className="w-8 h-8 text-green-500" />
-                </div>
-              </CardContent>
-            </Card>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" align="end">
-            <ComplianceTooltipContent compliance={compliance} t={t} />
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      </KpiCard>
+
+      <KpiCard calculation={complianceCalculation}>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-slate-500">{t("maintenance.compliance")}</p>
+              <p className={`text-2xl font-bold ${compliance.rate >= 90 ? "text-green-600" : compliance.rate >= 70 ? "text-amber-600" : "text-red-600"}`}>
+                {compliance.rate ?? 100}%
+              </p>
+            </div>
+            <Target className="w-8 h-8 text-green-500" />
+          </div>
+        </CardContent>
+      </KpiCard>
     </div>
   );
-};
+}
