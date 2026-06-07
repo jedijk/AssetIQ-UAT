@@ -189,7 +189,7 @@ class PMImportMixin:
         ai_hint: Optional[str] = None,
     ) -> str:
         """Infer execution discipline from task text, component, and task type."""
-        from models.disciplines import normalize_discipline, DISCIPLINE_LIST
+        from models.disciplines import normalize_discipline, normalize_discipline_or_default, DISCIPLINE_LIST
         
         # 1) Honor explicit hint (from Excel column or AI) if it normalizes to a known discipline
         if ai_hint:
@@ -217,7 +217,7 @@ class PMImportMixin:
         # 3) Fall back to task-type default
         default = TASK_TYPE_DEFAULTS.get(task_type, TASK_TYPE_DEFAULTS["Unknown"])
         logger.debug(f"_infer_discipline: Falling back to task-type default '{default['discipline']}' for task_type '{task_type}'")
-        return default["discipline"]
+        return normalize_discipline_or_default(default["discipline"])
     
     def _extract_frequency(self, text: str) -> str:
         """Extract frequency information from text."""
@@ -334,7 +334,7 @@ Please analyze and provide:
    - "PM"  (Preventive — time/usage-based scheduled work)
    - "PDM" (Predictive — condition-based monitoring like vibration, oil, thermography)
    - "CM"  (Corrective — repair on failure)
-4. Discipline: Execution discipline — one of [Mechanical, Electrical, Instrumentation, Process, Inspection, Operations, Maintenance, Reliability]
+4. Discipline: Execution discipline — one of [Rotating, Static, Piping, Electrical, Instrumentation, Civil, Operations, Laboratory]
 5. Failure Modes: What failures is this task preventing? (list 2-4 specific failure modes)
 6. Mechanisms: What failure mechanisms are being addressed? (list 1-3)
 7. Detection Methods: How would failures be detected? (list 1-3)
@@ -434,8 +434,8 @@ Respond in JSON format:
         "One Time": None,
     }
     _DISCIPLINES = [
-        "Mechanical", "Electrical", "Instrumentation",
-        "Process", "Civil", "Operations", "HVAC",
+        "Rotating", "Static", "Piping", "Electrical", "Instrumentation",
+        "Civil", "Operations", "Laboratory",
     ]
     _TASK_TYPES = ["PM", "PDM", "CBM", "CM"]
     
@@ -523,12 +523,18 @@ Respond in JSON format:
                 tt = (ai.get("task_type") or "").upper().strip()
                 t["task_type"] = tt if tt in self._TASK_TYPES else "PM"
                 
-                # Discipline — clamp to allowed
+                # Discipline — clamp to allowed, then map to standard value
+                from models.disciplines import normalize_discipline_or_default
+
                 disc = (ai.get("discipline") or "").strip()
-                t["discipline"] = disc if disc in self._DISCIPLINES else (
-                    t.get("discipline") if t.get("discipline") in self._DISCIPLINES
-                    else "Mechanical"
-                )
+                if disc in self._DISCIPLINES:
+                    t["discipline"] = normalize_discipline_or_default(disc)
+                elif t.get("discipline") in self._DISCIPLINES:
+                    t["discipline"] = normalize_discipline_or_default(t.get("discipline"))
+                else:
+                    t["discipline"] = normalize_discipline_or_default(
+                        t.get("discipline") or "Rotating"
+                    )
                 
                 # Frequency — clamp to allowed
                 freq = (ai.get("frequency") or "").strip()
@@ -576,7 +582,7 @@ Respond in JSON format:
             # Task fields
             "task_description": task.get("task_description") or task.get("original_task") or "",
             "task_type": task.get("task_type") or "PM",
-            "discipline": task.get("discipline") or "Mechanical",
+            "discipline": normalize_pm_import_discipline(task.get("discipline")),
             "frequency": task.get("frequency") or "Monthly",
             "frequency_days": task.get("frequency_days"),
             "estimated_hours": task.get("estimated_hours") or 0.5,

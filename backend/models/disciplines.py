@@ -1,109 +1,95 @@
 """
-Unified Discipline Constants
-Used across the application for consistency in Actions, Tasks, AI Recommendations, and FMEA.
+Standard discipline values used across PM import, tasks, actions, and FMEA.
+
+Aligned with:
+- iso14224_models.Discipline
+- frontend/src/constants/disciplines.js
+- routes/disciplines.py SEED_DISCIPLINES
 """
 
 from enum import Enum
+from typing import Dict, List, Optional, Tuple
 
 
-class UnifiedDiscipline(str, Enum):
+class StandardDiscipline(str, Enum):
+    ROTATING = "rotating"
+    STATIC = "static"
+    PIPING = "piping"
+    ELECTRICAL = "electrical"
+    INSTRUMENTATION = "instrumentation"
+    CIVIL = "civil"
+    OPERATIONS = "operations"
+    LABORATORY = "laboratory"
+
+
+DISCIPLINE_LIST: List[str] = [d.value for d in StandardDiscipline]
+DEFAULT_DISCIPLINE = StandardDiscipline.ROTATING.value
+
+# (value, label, aliases) — keep in sync with SEED_DISCIPLINES / frontend constants
+_STANDARD_DISCIPLINE_ROWS: Tuple[Tuple[str, str, Tuple[str, ...]], ...] = (
+    ("rotating", "Rotating", ("mechanical", "rotating equipment", "mech", "td", "tech", "technisch", "werktuigbouw")),
+    ("static", "Static", ("static equipment",)),
+    ("piping", "Piping", ()),
+    ("electrical", "Electrical", ("e&i", "elec", "elektro")),
+    ("instrumentation", "Instrumentation", ("inst", "instr", "i&c")),
+    ("civil", "Civil", ()),
+    (
+        "operations",
+        "Operations",
+        (
+            "process",
+            "maintenance",
+            "safety",
+            "reliability",
+            "multi-discipline",
+            "multi_discipline",
+            "engineering",
+            "ops",
+            "op",
+            "oper",
+            "bediening",
+            "maint",
+            "onderhoud",
+            "hvac",
+        ),
+    ),
+    ("laboratory", "Laboratory", ("inspection", "lab")),
+)
+
+DISCIPLINE_LABELS: Dict[str, str] = {value: label for value, label, _ in _STANDARD_DISCIPLINE_ROWS}
+DISCIPLINE_LABEL_LIST: List[str] = [label for _, label, _ in _STANDARD_DISCIPLINE_ROWS]
+
+_ALIAS_TO_VALUE: Dict[str, str] = {}
+for value, label, aliases in _STANDARD_DISCIPLINE_ROWS:
+    _ALIAS_TO_VALUE[value] = value
+    _ALIAS_TO_VALUE[label.lower()] = value
+    _ALIAS_TO_VALUE[label.lower().replace(" ", "_")] = value
+    for alias in aliases:
+        _ALIAS_TO_VALUE[alias.lower()] = value
+        _ALIAS_TO_VALUE[alias.lower().replace(" ", "_").replace("-", "_")] = value
+
+
+def _lookup_key(value: str) -> str:
+    return value.strip().lower().replace(" ", "_").replace("-", "_")
+
+
+def normalize_discipline(value: Optional[str]) -> str:
     """
-    Unified discipline categories used across the application.
-    Aligned across:
-    - Equipment hierarchy (ISO 14224)
-    - Task management
-    - AI recommendations
-    - Action tracking
-    - FMEA library
+    Normalize a discipline string to a canonical lowercase value (e.g. rotating).
+    Returns empty string when input is blank or cannot be mapped.
     """
-    # Core Engineering Disciplines
-    MECHANICAL = "Mechanical"
-    ELECTRICAL = "Electrical"
-    INSTRUMENTATION = "Instrumentation"
-    PROCESS = "Process"
-    
-    # Operational Disciplines
-    OPERATIONS = "Operations"
-    MAINTENANCE = "Maintenance"
-    
-    # Safety & Quality
-    SAFETY = "Safety"
-    INSPECTION = "Inspection"
-    
-    # Specialized
-    RELIABILITY = "Reliability"
-    ROTATING_EQUIPMENT = "Rotating Equipment"
-    STATIC_EQUIPMENT = "Static Equipment"
-    MULTI_DISCIPLINE = "Multi-discipline"
-
-
-# List of all discipline values for dropdowns
-DISCIPLINE_LIST = [d.value for d in UnifiedDiscipline]
-
-# Mapping from legacy values to unified values
-DISCIPLINE_MAPPING = {
-    # Lowercase variants
-    "mechanical": UnifiedDiscipline.MECHANICAL.value,
-    "electrical": UnifiedDiscipline.ELECTRICAL.value,
-    "instrumentation": UnifiedDiscipline.INSTRUMENTATION.value,
-    "process": UnifiedDiscipline.PROCESS.value,
-    "operations": UnifiedDiscipline.OPERATIONS.value,
-    "maintenance": UnifiedDiscipline.MAINTENANCE.value,
-    "safety": UnifiedDiscipline.SAFETY.value,
-    "inspection": UnifiedDiscipline.INSPECTION.value,
-    "reliability": UnifiedDiscipline.RELIABILITY.value,
-    "rotating_equipment": UnifiedDiscipline.ROTATING_EQUIPMENT.value,
-    "static_equipment": UnifiedDiscipline.STATIC_EQUIPMENT.value,
-    "multi-discipline": UnifiedDiscipline.MULTI_DISCIPLINE.value,
-    "multi_discipline": UnifiedDiscipline.MULTI_DISCIPLINE.value,
-    # Legacy task disciplines
-    "lab": UnifiedDiscipline.INSPECTION.value,
-    "laboratory": UnifiedDiscipline.INSPECTION.value,
-    "engineering": UnifiedDiscipline.RELIABILITY.value,
-    # Piping maps to Static Equipment
-    "piping": UnifiedDiscipline.STATIC_EQUIPMENT.value,
-    "Piping": UnifiedDiscipline.STATIC_EQUIPMENT.value,
-    # Abbreviations - Operations
-    "ops": UnifiedDiscipline.OPERATIONS.value,
-    "op": UnifiedDiscipline.OPERATIONS.value,  # Common Dutch abbreviation
-    "oper": UnifiedDiscipline.OPERATIONS.value,
-    "bediening": UnifiedDiscipline.OPERATIONS.value,  # Dutch for Operations
-    # Abbreviations - Mechanical
-    "mech": UnifiedDiscipline.MECHANICAL.value,
-    "td": UnifiedDiscipline.MECHANICAL.value,  # Technical Department -> Mechanical
-    "tech": UnifiedDiscipline.MECHANICAL.value,
-    "technisch": UnifiedDiscipline.MECHANICAL.value,  # Dutch for Technical
-    "werktuigbouw": UnifiedDiscipline.MECHANICAL.value,  # Dutch for Mechanical Engineering
-    # Abbreviations - Electrical
-    "elec": UnifiedDiscipline.ELECTRICAL.value,
-    "elektro": UnifiedDiscipline.ELECTRICAL.value,  # Dutch for Electrical
-    "e&i": UnifiedDiscipline.ELECTRICAL.value,
-    # Abbreviations - Instrumentation
-    "inst": UnifiedDiscipline.INSTRUMENTATION.value,
-    "instr": UnifiedDiscipline.INSTRUMENTATION.value,
-    "i&c": UnifiedDiscipline.INSTRUMENTATION.value,
-    # Abbreviations - Maintenance
-    "maint": UnifiedDiscipline.MAINTENANCE.value,
-    "onderhoud": UnifiedDiscipline.MAINTENANCE.value,  # Dutch for Maintenance
-}
-
-
-def normalize_discipline(value: str) -> str:
-    """
-    Normalize a discipline value to the unified format.
-    Returns the input value if already valid, or maps legacy values.
-    """
-    if not value:
+    if not value or not str(value).strip():
         return ""
-    
-    # Check if already a valid unified discipline
-    if value in DISCIPLINE_LIST:
-        return value
-    
-    # Try mapping
-    mapped = DISCIPLINE_MAPPING.get(value.lower().replace(" ", "_"))
-    if mapped:
-        return mapped
-    
-    # Return title-cased version as fallback
-    return value.title()
+
+    raw = str(value).strip()
+    for key in (_lookup_key(raw), raw.lower()):
+        mapped = _ALIAS_TO_VALUE.get(key)
+        if mapped:
+            return mapped
+
+    return ""
+
+
+def normalize_discipline_or_default(value: Optional[str]) -> str:
+    """Normalize discipline; fall back to DEFAULT_DISCIPLINE when unknown."""
+    return normalize_discipline(value) or DEFAULT_DISCIPLINE

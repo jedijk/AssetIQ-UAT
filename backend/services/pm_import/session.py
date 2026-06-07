@@ -220,6 +220,11 @@ class PMImportMixin:
         tasks = session.get("tasks_extracted", [])
         for task in tasks:
             if task.get("task_id") == task_id:
+                if "discipline" in updates:
+                    from services.pm_import_constants import normalize_pm_import_discipline
+
+                    updates = dict(updates)
+                    updates["discipline"] = normalize_pm_import_discipline(updates.get("discipline"))
                 task.update(updates)
                 # Only set to "edited" if review_status is not explicitly being updated
                 if "review_status" not in updates:

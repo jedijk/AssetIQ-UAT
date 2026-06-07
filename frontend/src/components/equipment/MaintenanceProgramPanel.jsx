@@ -5,6 +5,7 @@
  * Shows tasks from all sources (strategy, imported, AI, manual) with full CRUD capabilities.
  */
 import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { maintenanceProgramAPI } from '../../lib/apis/maintenanceProgram';
 import { refreshMaintenanceSchedulerQueries } from '../../lib/apis/maintenanceScheduler';
@@ -69,8 +70,55 @@ const ProgramCriticalityBanner = ({ program, strategyUpdateAvailable, t }) => {
   const EquipIcon = equipConfig?.icon;
   const appliedVersion = program.applied_strategy_version || program.source_strategy_version;
   const latestVersion = program.latest_strategy_version;
-  const versionForHint = appliedVersion || latestVersion || '—';
+  const equipmentTypeId = program.equipment_type_id;
   const bandLabel = strategyBand ? strategyBandLabel(t, strategyBand) : null;
+
+  const strategyVersionHref = equipmentTypeId
+    ? `/library?tab=maintenance&equipment_type_id=${encodeURIComponent(equipmentTypeId)}`
+    : null;
+
+  const renderStrategyVersion = () => {
+    if (!appliedVersion && !latestVersion) return null;
+
+    const VersionLink = ({ version, className = '' }) => {
+      const label = `v${version}`;
+      if (!strategyVersionHref) {
+        return <span className={className}>{label}</span>;
+      }
+      return (
+        <Link
+          to={strategyVersionHref}
+          className={`text-blue-600 hover:text-blue-800 hover:underline ${className}`}
+          title={t('equipment.programViewStrategy')}
+        >
+          {label}
+        </Link>
+      );
+    };
+
+    if (appliedVersion && latestVersion && appliedVersion === latestVersion) {
+      return <VersionLink version={appliedVersion} />;
+    }
+
+    if (appliedVersion && latestVersion && appliedVersion !== latestVersion) {
+      return (
+        <>
+          <span>
+            {t('equipment.programStrategyVersionApplied')}{' '}
+            <VersionLink version={appliedVersion} />
+          </span>
+          <span className={strategyUpdateAvailable ? 'text-amber-600 font-medium' : ''}>
+            · {t('equipment.programStrategyVersionLatest')}{' '}
+            <VersionLink version={latestVersion} className={strategyUpdateAvailable ? 'text-amber-600' : ''} />
+          </span>
+        </>
+      );
+    }
+
+    return <VersionLink version={appliedVersion || latestVersion} />;
+  };
+
+  const versionForHint = appliedVersion || latestVersion || '—';
 
   if (!equipmentLevel && !strategyBand) return null;
 
@@ -108,19 +156,7 @@ const ProgramCriticalityBanner = ({ program, strategyUpdateAvailable, t }) => {
         {(appliedVersion || latestVersion) && (
           <div className="flex items-center gap-1.5 text-xs text-slate-600">
             <span className="text-slate-500">{t('equipment.programStrategyVersion')}:</span>
-            {appliedVersion && (
-              <span>
-                {t('equipment.programStrategyVersionApplied')} v{appliedVersion}
-              </span>
-            )}
-            {latestVersion && latestVersion !== appliedVersion && (
-              <span className={strategyUpdateAvailable ? 'text-amber-600 font-medium' : ''}>
-                · {t('equipment.programStrategyVersionLatest')} v{latestVersion}
-              </span>
-            )}
-            {!appliedVersion && latestVersion && (
-              <span>v{latestVersion}</span>
-            )}
+            {renderStrategyVersion()}
           </div>
         )}
       </div>
@@ -247,11 +283,6 @@ const TaskRow = ({ task, onEdit, onDelete, onToggleActive, isExpanded, onToggleE
             )}
             {task.is_overridden && (
               <Badge variant="outline" className="bg-orange-50 text-orange-600 text-xs">Overridden</Badge>
-            )}
-            {task.is_pm_import_pending && (
-              <Badge variant="outline" className="bg-purple-50 text-purple-700 text-xs">
-                PM Import{task.pm_import_review_status ? ` · ${task.pm_import_review_status}` : ''}
-              </Badge>
             )}
           </div>
           <div className="text-xs text-gray-500 mt-0.5 truncate">
@@ -865,18 +896,18 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
     enabled: !!equipmentId,
   });
   
-  // Create program mutation
-  const createProgramMutation = useMutation({
+  // Create / sync program mutation
+  const syncProgramMutation = useMutation({
     mutationFn: () => maintenanceProgramAPI.createProgram(equipmentId, { 
       generate_from_strategy: true 
     }),
     onSuccess: () => {
-      toast.success('Maintenance program created');
+      toast.success(t('equipment.programSyncSuccess'));
       queryClient.invalidateQueries({ queryKey: ['maintenance-program', equipmentId] });
       refreshMaintenanceSchedulerQueries(queryClient);
     },
     onError: (error) => {
-      toast.error(`Failed to create program: ${error.message}`);
+      toast.error(`${t('equipment.programSyncFailed')}: ${error.message}`);
     },
   });
 
@@ -1039,13 +1070,13 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
             </p>
           </div>
           <Button 
-            onClick={() => createProgramMutation.mutate()}
-            disabled={createProgramMutation.isPending}
+            onClick={() => syncProgramMutation.mutate()}
+            disabled={syncProgramMutation.isPending}
           >
-            {createProgramMutation.isPending ? (
-              <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Creating...</>
+            {syncProgramMutation.isPending ? (
+              <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> {t('equipment.programSyncing')}</>
             ) : (
-              <><Plus className="h-4 w-4 mr-2" /> Create Maintenance Program</>
+              <><Plus className="h-4 w-4 mr-2" /> {t('equipment.programCreateProgram')}</>
             )}
           </Button>
         </CardContent>
@@ -1155,13 +1186,13 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
           {pmImportOnly && (
             <Button
               variant="outline"
-              onClick={() => createProgramMutation.mutate()}
-              disabled={createProgramMutation.isPending}
+              onClick={() => syncProgramMutation.mutate()}
+              disabled={syncProgramMutation.isPending}
             >
-              {createProgramMutation.isPending ? (
-                <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> Creating...</>
+              {syncProgramMutation.isPending ? (
+                <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> {t('equipment.programSyncing')}</>
               ) : (
-                <><Plus className="h-4 w-4 mr-2" /> Create Program</>
+                <><RefreshCw className="h-4 w-4 mr-2" /> {t('equipment.programSync')}</>
               )}
             </Button>
           )}

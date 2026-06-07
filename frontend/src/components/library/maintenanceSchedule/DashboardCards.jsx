@@ -1,7 +1,40 @@
 import React from "react";
 import { ListChecks, AlertTriangle, Calendar, Target } from "lucide-react";
 import { Card, CardContent } from "../../ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../../ui/tooltip";
 import { useLanguage } from "../../../contexts/LanguageContext";
+
+function ComplianceTooltipContent({ compliance, t }) {
+  const onTime = compliance.completed_on_time ?? 0;
+  const total = compliance.total_completed ?? 0;
+  const rate = compliance.rate ?? 100;
+
+  if (total === 0) {
+    return (
+      <div className="space-y-1 text-xs leading-relaxed max-w-[240px]">
+        <p>{t("maintenance.complianceTooltipIntro")}</p>
+        <p>{t("maintenance.complianceTooltipEmpty")}</p>
+      </div>
+    );
+  }
+
+  const formula = t("maintenance.complianceTooltipFormula")
+    .replace("{onTime}", String(onTime))
+    .replace("{total}", String(total))
+    .replace("{rate}", String(rate));
+
+  return (
+    <div className="space-y-1 text-xs leading-relaxed max-w-[240px]">
+      <p>{t("maintenance.complianceTooltipIntro")}</p>
+      <p className="font-medium">{formula}</p>
+    </div>
+  );
+}
 
 export function DashboardCards({ dashboard, isLoading }) {
   const { t } = useLanguage();
@@ -63,19 +96,28 @@ export function DashboardCards({ dashboard, isLoading }) {
         </CardContent>
       </Card>
       
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">{t("maintenance.compliance")}</p>
-              <p className={`text-2xl font-bold ${compliance.rate >= 90 ? "text-green-600" : compliance.rate >= 70 ? "text-amber-600" : "text-red-600"}`}>
-                {compliance.rate || 100}%
-              </p>
-            </div>
-            <Target className="w-8 h-8 text-green-500" />
-          </div>
-        </CardContent>
-      </Card>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Card className="cursor-help">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-slate-500">{t("maintenance.compliance")}</p>
+                    <p className={`text-2xl font-bold ${compliance.rate >= 90 ? "text-green-600" : compliance.rate >= 70 ? "text-amber-600" : "text-red-600"}`}>
+                      {compliance.rate ?? 100}%
+                    </p>
+                  </div>
+                  <Target className="w-8 h-8 text-green-500" />
+                </div>
+              </CardContent>
+            </Card>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" align="end">
+            <ComplianceTooltipContent compliance={compliance} t={t} />
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </div>
   );
 };

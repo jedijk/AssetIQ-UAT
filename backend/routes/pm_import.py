@@ -20,6 +20,7 @@ from database import db
 from auth import get_current_user, require_permission
 from utils.mongo_regex import or_search_fields
 from services.pm_import_service import PMImportService, normalize_pm_import_display_status
+from services.pm_import_constants import normalize_pm_import_discipline
 from services.background_jobs import background_job_service, JobStatus, tenant_id_from_user
 from services.worker_config import use_external_background_worker
 
@@ -468,7 +469,7 @@ async def import_session_to_pm_tasks(
             "equipment_description": t.get("equipment_description") or em.get("name") or "",
             "task_description": t.get("task_description") or "",
             "task_type": t.get("task_type") or "PM",
-            "discipline": t.get("discipline") or "Mechanical",
+            "discipline": normalize_pm_import_discipline(t.get("discipline")),
             "frequency": t.get("frequency") or "Monthly",
             "frequency_days": t.get("frequency_days"),
             "estimated_hours": t.get("estimated_hours") or 0.5,
@@ -882,7 +883,7 @@ async def list_all_tasks(
                 "equipment_type_name": (equipment_match or {}).get("equipment_type_name") or "",
                 "task_description": task.get("task_description") or task.get("original_task") or "",
                 "task_type": task.get("task_type") or "PM",
-                "discipline": task.get("discipline") or "Mechanical",
+                "discipline": normalize_pm_import_discipline(task.get("discipline")),
                 "frequency": task.get("frequency") or "Monthly",
                 "frequency_days": task.get("frequency_days"),
                 "estimated_hours": task.get("estimated_hours") or 0.5,
@@ -902,6 +903,21 @@ async def list_all_tasks(
         "total": len(tasks),
         "session_count": session_count
     }
+
+
+class NormalizeDisciplinesRequest(BaseModel):
+    dry_run: bool = True
+
+
+@router.post("/admin/normalize-disciplines")
+async def normalize_pm_import_disciplines_admin(
+    request: NormalizeDisciplinesRequest,
+    current_user: dict = Depends(_library_write),
+):
+    """Backfill legacy PM import discipline values (e.g. Mechanical → rotating)."""
+    from services.normalize_pm_import_disciplines import normalize_pm_import_disciplines_backfill
+
+    return await normalize_pm_import_disciplines_backfill(db, dry_run=request.dry_run)
 
 
 @router.get("/jobs/{job_id}")

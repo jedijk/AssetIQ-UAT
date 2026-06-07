@@ -13,6 +13,8 @@ from typing import Optional, List, Dict, Any, Tuple
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from services.pm_import_constants import normalize_pm_import_discipline
+
 from services.pm_import_constants import (
     PM_IMPORT_DISPLAY_STATUSES,
     ACTION_TYPES,
@@ -76,7 +78,7 @@ class PMImportMixin:
                     "task_id": task.get("task_id"),
                     "equipment_tag": task.get("equipment_tag") or task.get("asset") or "",
                     "task_description": task.get("task_description") or task.get("original_task") or "",
-                    "discipline": task.get("discipline") or "Mechanical",
+                    "discipline": normalize_pm_import_discipline(task.get("discipline")),
                     "frequency": task.get("frequency") or "",
                     "task_type": task.get("task_type") or "PM",
                     "equipment_match": None,
@@ -122,7 +124,7 @@ class PMImportMixin:
         task_id = task.get("task_id")
         equipment_tag = task.get("equipment_tag") or task.get("asset") or ""
         task_description = task.get("task_description") or task.get("original_task") or ""
-        discipline = task.get("discipline") or "Mechanical"
+        discipline = normalize_pm_import_discipline(task.get("discipline"))
         frequency = task.get("frequency") or ""
         task_type = task.get("task_type") or "PM"
         
@@ -441,7 +443,7 @@ class PMImportMixin:
         import json
         
         task_description = task.get("task_description") or task.get("original_task") or ""
-        discipline = task.get("discipline") or "Mechanical"
+        discipline = normalize_pm_import_discipline(task.get("discipline"))
         frequency = task.get("frequency") or ""
         equipment_tag = task.get("equipment_tag") or ""
         
@@ -623,7 +625,7 @@ Respond with a JSON object:
             raw_type = "PM"
         allowed_types = {"PM", "PDM", "CBM", "CM"}
         action_type = raw_type if raw_type in allowed_types else "PM"
-        discipline = (task.get("discipline") or "Mechanical").strip() or "Mechanical"
+        discipline = normalize_pm_import_discipline((task.get("discipline") or "").strip() or None)
         return action_type, discipline
 
     def _merge_action_metadata(
@@ -639,7 +641,9 @@ Respond with a JSON object:
             merged = dict(action_entry)
         merged["action_type"] = action_entry.get("action_type") or merged.get("action_type") or "PM"
         merged["task_type"] = action_entry.get("task_type") or merged.get("task_type") or merged["action_type"]
-        merged["discipline"] = action_entry.get("discipline") or merged.get("discipline") or "Mechanical"
+        merged["discipline"] = normalize_pm_import_discipline(
+            action_entry.get("discipline") or merged.get("discipline")
+        )
         return merged
 
     def _build_recommended_action_from_task(

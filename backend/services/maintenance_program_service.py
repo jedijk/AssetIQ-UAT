@@ -1622,7 +1622,9 @@ Only include tasks that would genuinely improve reliability and are not redundan
             task_type,
             TaskCategory.PREVENTIVE_MAINTENANCE,
         )
-        discipline = (pm_task.get("discipline") or "Mechanical").strip() or "Mechanical"
+        from models.disciplines import normalize_discipline_or_default
+
+        discipline = normalize_discipline_or_default(pm_task.get("discipline"))
         frequency = MaintenanceProgramService._normalize_pm_import_frequency(
             pm_task.get("frequency")
         )

@@ -78,6 +78,7 @@ async def get_executive_dashboard(
     """
     from database import db
     from services.executive_reliability_kpis import compute_executive_reliability_kpis
+    from services.reliability_graph_query import count_active_reliability_edges
 
     owner_id = current_user.get("owner_id") or current_user.get("id")
     service = get_ril_service()
@@ -121,7 +122,7 @@ async def get_executive_dashboard(
         equipment_with_strategy / max(total_equipment, 1) * 100, 1
     )
 
-    reliability_edges_total = await db.reliability_edges.count_documents({})
+    reliability_edges_total = await count_active_reliability_edges(current_user)
     
     # Get cases by status
     cases_by_status = {}

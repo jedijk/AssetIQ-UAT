@@ -698,9 +698,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
             {t("common.clear")}
           </Button>
         )}
-      </div>
 
-      <div className="flex items-center gap-2 flex-wrap" data-testid="task-source-filter-row">
         <span className="text-sm font-medium text-slate-700">
           {t("maintenance.scheduleSourceFilter")}:
         </span>

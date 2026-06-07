@@ -47,6 +47,7 @@ RELATIONS: List[Dict[str, Any]] = [
     {"id": "observed_on", "label": "observed on", "source": "observation", "target": "equipment", "domain": "reactive"},
     {"id": "indicates_failure_mode", "label": "indicates failure mode", "source": "observation", "target": "failure_mode", "domain": "reactive"},
     {"id": "escalated_to", "label": "escalated to", "source": "observation", "target": "threat", "domain": "reactive"},
+    {"id": "linked_to_threat", "label": "linked to threat", "source": "observation", "target": "threat", "domain": "reactive"},
     {"id": "triggered_investigation", "label": "triggered investigation", "source": "threat", "target": "investigation", "domain": "reactive"},
     {"id": "identified_cause", "label": "identified cause", "source": "investigation", "target": "cause", "domain": "reactive"},
     {"id": "generated_action", "label": "generated action", "source": "investigation", "target": "action", "domain": "reactive"},
@@ -62,14 +63,24 @@ async def get_reliability_ontology_payload(user=None) -> Dict[str, Any]:
     from services.reliability_graph_query import count_edges_by_relation
 
     edges_by_relation = await count_edges_by_relation(user, active_only=True)
-    total_edges = sum(edges_by_relation.values())
+    known_relation_ids = {rel["id"] for rel in RELATIONS}
     relations = [
         {**rel, "edge_count": edges_by_relation.get(rel["id"], 0)}
         for rel in RELATIONS
     ]
+    other_relations = sorted(
+        [
+            {"id": rel_id, "edge_count": count}
+            for rel_id, count in edges_by_relation.items()
+            if rel_id and rel_id not in known_relation_ids
+        ],
+        key=lambda row: (-row["edge_count"], row["id"]),
+    )
+    total_edges = sum(edges_by_relation.values())
     return {
         "node_types": NODE_TYPES,
         "relations": relations,
+        "other_relations": other_relations,
         "edges_by_relation": edges_by_relation,
         "reliability_edges_total": total_edges,
     }

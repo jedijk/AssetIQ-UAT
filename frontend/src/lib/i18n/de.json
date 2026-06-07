@@ -1160,6 +1160,12 @@
     "programStrategyVersion": "Strategy version",
     "programStrategyVersionApplied": "Applied",
     "programStrategyVersionLatest": "Latest",
+    "programViewStrategy": "Wartungsstrategie anzeigen",
+    "programSync": "Synchronisieren",
+    "programSyncing": "Synchronisiere...",
+    "programSyncSuccess": "Wartungsprogramm synchronisiert",
+    "programSyncFailed": "Synchronisierung fehlgeschlagen",
+    "programCreateProgram": "Wartungsprogramm erstellen",
     "programCriticalityUsedHint": "Task frequencies use the {band} column of the maintenance strategy (v{version})."
   },
   "hierarchy": {
@@ -1469,6 +1475,9 @@
     "overdue": "Überfällig",
     "upcoming7Days": "Bevorstehend (7 Tage)",
     "compliance": "Compliance",
+    "complianceTooltipIntro": "Anteil präventiver geplanter Aufgaben, die in den letzten 30 Tagen bis zum Fälligkeitsdatum abgeschlossen wurden (reaktive/korrektive Aufgaben ausgeschlossen).",
+    "complianceTooltipFormula": "{onTime} von {total} fristgerecht abgeschlossen = {rate}%",
+    "complianceTooltipEmpty": "Keine abgeschlossenen Aufgaben in den letzten 30 Tagen — angezeigt als 100%.",
     "equipmentWithPrograms": "Anlagen mit Programmen",
     "totalPrograms": "Gesamtprogramme",
     "programsOverdue": "Überfällige Programme",

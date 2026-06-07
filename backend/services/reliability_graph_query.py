@@ -67,6 +67,12 @@ async def count_edges_by_relation(
     return {row["_id"]: row["count"] for row in rows if row.get("_id")}
 
 
+async def count_active_reliability_edges(user: Optional[dict] = None) -> int:
+    """Total active reliability edges for the tenant (matches sum of relation counts)."""
+    edges_by_relation = await count_edges_by_relation(user, active_only=True)
+    return sum(edges_by_relation.values())
+
+
 class GraphTraversalService:
     """Read-only bounded BFS traversal over reliability_edges."""
 

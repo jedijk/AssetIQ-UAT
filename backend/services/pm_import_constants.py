@@ -3,7 +3,7 @@
 import re
 import math
 from datetime import datetime, date
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 PM_IMPORT_DISPLAY_STATUSES = ("pending", "applied", "merged")
 
@@ -85,46 +85,54 @@ TASK_TYPES = [
 # Maintenance action type (CM / PM / PDM)
 ACTION_TYPES = ["PM", "PDM", "CM"]
 
-# Map task type → default action_type and discipline
+# Map task type → default action_type and discipline (standard taxonomy values)
 # PM = Preventive (time-based), PDM = Predictive (condition-based), CM = Corrective
 TASK_TYPE_DEFAULTS = {
-    "Inspection":   {"action_type": "PM",  "discipline": "Inspection"},
-    "Lubrication":  {"action_type": "PM",  "discipline": "Mechanical"},
-    "Calibration":  {"action_type": "PM",  "discipline": "Instrumentation"},
-    "Replacement":  {"action_type": "PM",  "discipline": "Mechanical"},
-    "Cleaning":     {"action_type": "PM",  "discipline": "Process"},
-    "Adjustment":   {"action_type": "PM",  "discipline": "Mechanical"},
-    "Monitoring":   {"action_type": "PDM", "discipline": "Reliability"},
-    "Unknown":      {"action_type": "PM",  "discipline": "Maintenance"},
+    "Inspection":   {"action_type": "PM",  "discipline": "laboratory"},
+    "Lubrication":  {"action_type": "PM",  "discipline": "rotating"},
+    "Calibration":  {"action_type": "PM",  "discipline": "instrumentation"},
+    "Replacement":  {"action_type": "PM",  "discipline": "rotating"},
+    "Cleaning":     {"action_type": "PM",  "discipline": "static"},
+    "Adjustment":   {"action_type": "PM",  "discipline": "rotating"},
+    "Monitoring":   {"action_type": "PDM", "discipline": "operations"},
+    "Unknown":      {"action_type": "PM",  "discipline": "operations"},
 }
 
 # Discipline detection via component keywords (overrides task-type defaults)
 DISCIPLINE_KEYWORDS = {
-    "Electrical": [
+    "electrical": [
         "cable", "wire", "switchgear", "transformer", "breaker", "fuse",
         "relay", "circuit", "panel", "motor winding", "vfd", "drive",
         "schakelaar", "kabel"
     ],
-    "Instrumentation": [
+    "instrumentation": [
         "sensor", "transmitter", "controller", "plc", "gauge", "indicator",
         "level switch", "flow meter", "pressure transmitter", "temperature transmitter",
         "calibrate", "calibration", "kalibreer", "control valve", "positioner"
     ],
-    "Process": [
-        "tank", "vessel", "column", "reactor", "exchanger", "heat exchanger",
-        "filter", "strainer", "separator", "scrubber", "drum",
-        "process line", "piping", "line", "leiding"
+    "piping": [
+        "process line", "piping", "line", "leiding", "strainer", "separator"
     ],
-    "Mechanical": [
+    "static": [
+        "tank", "vessel", "column", "reactor", "exchanger", "heat exchanger",
+        "filter", "scrubber", "drum"
+    ],
+    "rotating": [
         "pump", "compressor", "motor", "fan", "blower", "turbine",
         "bearing", "seal", "gear", "gearbox", "coupling", "shaft",
         "belt", "chain", "roller", "conveyor", "valve body",
         "pomp", "lager", "tandwiel", "ventilator"
     ],
-    "Operations": [
+    "operations": [
         "operator", "operation", "sample", "sampling", "round", "rounds", "walkthrough",
         "operator round", "shift check", "daily check", "process check", "visual round",
         "buitendienst", "bemonstering", "ronde", "operator check"
+    ],
+    "laboratory": [
+        "inspect", "inspection", "visual check", "examine", "verify", "controleer"
+    ],
+    "civil": [
+        "foundation", "structure", "concrete", "steelwork", "building"
     ],
 }
 
@@ -212,4 +220,11 @@ DURATION_PATTERNS = [
     (r'\b(\d+)\s*(?:minutes?|mins?|min|minuten)\b', 'minutes'),
     (r'\b(\d+)\s*m\b(?!o)', 'minutes'),  # "30m" but not "month"
 ]
+
+
+def normalize_pm_import_discipline(value: Optional[str]) -> str:
+    """Map PM import discipline text to the standard taxonomy (e.g. Mechanical → rotating)."""
+    from models.disciplines import normalize_discipline_or_default
+
+    return normalize_discipline_or_default(value)
 

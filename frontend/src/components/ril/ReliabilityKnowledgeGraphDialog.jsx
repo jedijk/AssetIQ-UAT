@@ -169,7 +169,11 @@ export default function ReliabilityKnowledgeGraphDialog({
 
   const nodeTypes = data?.node_types || [];
   const relationRows = data?.relations || [];
-  const totalEdges = totalEdgesProp ?? data?.reliability_edges_total ?? 0;
+  const otherRelationRows = data?.other_relations || [];
+  const totalEdges = data?.reliability_edges_total ?? totalEdgesProp ?? 0;
+  const listedEdgeSum =
+    relationRows.reduce((sum, rel) => sum + (rel.edge_count ?? 0), 0) +
+    otherRelationRows.reduce((sum, rel) => sum + (rel.edge_count ?? 0), 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -195,6 +199,9 @@ export default function ReliabilityKnowledgeGraphDialog({
               {totalEdges.toLocaleString()}
             </span>{" "}
             active graph edges in your tenant
+            {!isLoading && !isError && listedEdgeSum === totalEdges && (
+              <span className="text-slate-400"> · sum of relation counts below</span>
+            )}
           </span>
         </div>
 
@@ -238,6 +245,20 @@ export default function ReliabilityKnowledgeGraphDialog({
                       {(rel.edge_count ?? 0).toLocaleString()}
                     </Badge>
                   </button>
+                ))}
+                {otherRelationRows.map((rel) => (
+                  <div
+                    key={rel.id}
+                    className="flex items-center justify-between gap-2 rounded-md border border-dashed border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs"
+                    data-testid={`reliability-relation-other-${rel.id}`}
+                  >
+                    <span className="text-slate-600 truncate">
+                      Other · {rel.id.replace(/_/g, " ")}
+                    </span>
+                    <Badge variant="outline" className="shrink-0">
+                      {(rel.edge_count ?? 0).toLocaleString()}
+                    </Badge>
+                  </div>
                 ))}
               </div>
             </ScrollArea>

@@ -1160,6 +1160,12 @@
     "programStrategyVersion": "Strategy version",
     "programStrategyVersionApplied": "Applied",
     "programStrategyVersionLatest": "Latest",
+    "programViewStrategy": "View maintenance strategy",
+    "programSync": "Sync",
+    "programSyncing": "Syncing...",
+    "programSyncSuccess": "Maintenance program synced",
+    "programSyncFailed": "Failed to sync program",
+    "programCreateProgram": "Create Maintenance Program",
     "programCriticalityUsedHint": "Task frequencies use the {band} column of the maintenance strategy (v{version})."
   },
   "hierarchy": {
@@ -1480,6 +1486,9 @@
     "overdue": "Overdue",
     "upcoming7Days": "Upcoming (7 days)",
     "compliance": "Compliance",
+    "complianceTooltipIntro": "Share of preventive scheduled tasks completed on or before the due date in the last 30 days (reactive/corrective tasks excluded).",
+    "complianceTooltipFormula": "{onTime} of {total} completed on time = {rate}%",
+    "complianceTooltipEmpty": "No completed tasks in the last 30 days — shown as 100%.",
     "equipmentWithPrograms": "Equipment with Programs",
     "totalPrograms": "Total Programs",
     "programsOverdue": "Programs Overdue",

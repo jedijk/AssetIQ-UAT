@@ -26,6 +26,7 @@ from services.pm_import_constants import (
     TASK_TYPES,
     _sanitize_for_json,
     normalize_pm_import_display_status,
+    normalize_pm_import_discipline,
     is_pm_import_review_accepted,
 )
 
@@ -403,7 +404,7 @@ class PMImportMixin:
             
             task_description = task.get("task_description") or task.get("original_task") or ""
             equipment_tag = task.get("equipment_tag") or ""
-            discipline = task.get("discipline") or "Mechanical"
+            discipline = normalize_pm_import_discipline(task.get("discipline"))
             action_entry = self._build_recommended_action_from_task(task)
             
             new_fm = new_failure_mode_data or {}

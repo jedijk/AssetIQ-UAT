@@ -1160,6 +1160,12 @@
     "programStrategyVersion": "Strategieversie",
     "programStrategyVersionApplied": "Toegepast",
     "programStrategyVersionLatest": "Nieuwste",
+    "programViewStrategy": "Onderhoudsstrategie bekijken",
+    "programSync": "Synchroniseren",
+    "programSyncing": "Synchroniseren...",
+    "programSyncSuccess": "Onderhoudsprogramma gesynchroniseerd",
+    "programSyncFailed": "Synchroniseren mislukt",
+    "programCreateProgram": "Onderhoudsprogramma aanmaken",
     "programCriticalityUsedHint": "Taakfrequenties gebruiken de kolom {band} van de onderhoudsstrategie (v{version})."
   },
   "hierarchy": {
@@ -1469,6 +1475,9 @@
     "overdue": "Achterstallig",
     "upcoming7Days": "Aankomend (7 dagen)",
     "compliance": "Naleving",
+    "complianceTooltipIntro": "Aandeel preventieve geplande taken voltooid op of vóór de vervaldatum in de afgelopen 30 dagen (reactief/correctief uitgesloten).",
+    "complianceTooltipFormula": "{onTime} van {total} op tijd voltooid = {rate}%",
+    "complianceTooltipEmpty": "Geen voltooide taken in de afgelopen 30 dagen — weergegeven als 100%.",
     "equipmentWithPrograms": "Apparatuur met programma's",
     "totalPrograms": "Totaal programma's",
     "programsOverdue": "Achterstallige programma's",
