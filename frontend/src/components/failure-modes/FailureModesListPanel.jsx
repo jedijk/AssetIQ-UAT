@@ -10,6 +10,7 @@ import {
   Sparkles,
   ClipboardList,
   Plus,
+  ChevronDown,
 } from "lucide-react";
 import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
@@ -21,6 +22,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { DISCIPLINES } from "../library";
 import { disciplineIcons, disciplineColors } from "./disciplineStyles";
 
@@ -62,7 +69,7 @@ export function FailureModesListPanel({
     <div
       className={`${
         selectedFm ? "w-1/2 lg:w-2/5" : "w-full"
-      } transition-all duration-300 flex flex-col min-h-0 min-w-0`}
+      } transition-all duration-300 flex flex-col flex-1 h-full min-h-0 min-w-0`}
     >
       <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
         <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
@@ -220,56 +227,74 @@ export function FailureModesListPanel({
             <Download className="w-4 h-4 mr-1" />
             {isExporting ? t("common.exporting") || "Exporting..." : t("library.exportExcel") || "Export Excel"}
           </Button>
-          <Button
-            onClick={onOpenAINewFm}
-            variant="outline"
-            className={`h-11 border-purple-200 text-purple-700 hover:bg-purple-50 ${canUseAITools ? "" : "hidden"}`}
-            data-testid="ai-suggest-new-failure-modes-btn"
-            disabled={equipmentTypes.length === 0}
-          >
-            <Sparkles className="w-4 h-4 mr-1" />
-            Suggest Failure Modes
-          </Button>
-          <Button
-            onClick={onOpenBulkImprove}
-            variant="outline"
-            className={`h-11 border-purple-200 text-purple-700 hover:bg-purple-50 ${canUseAITools ? "" : "hidden"}`}
-            data-testid="bulk-improve-fm-btn"
-            disabled={displayedFailureModes.length === 0}
-          >
-            <Sparkles className="w-4 h-4 mr-1" />
-            Bulk Improve ({displayedFailureModes.length})
-          </Button>
-          <Button
-            onClick={onOpenReviewDisciplines}
-            variant="outline"
-            className={`h-11 border-purple-200 text-purple-700 hover:bg-purple-50 ${canUseAITools ? "" : "hidden"}`}
-            data-testid="review-action-disciplines-btn"
-            disabled={failureModes.length === 0}
-          >
-            <Sparkles className="w-4 h-4 mr-1" />
-            Review Disciplines
-          </Button>
-          <Button
-            onClick={onOpenFindSimilar}
-            variant="outline"
-            className={`h-11 border-purple-200 text-purple-700 hover:bg-purple-50 ${canUseAITools ? "" : "hidden"}`}
-            data-testid="find-similar-fm-btn"
-            disabled={failureModes.length === 0}
-          >
-            <Sparkles className="w-4 h-4 mr-1" />
-            Find Similar
-          </Button>
-          <Button
-            onClick={onOpenFindDuplicateActions}
-            variant="outline"
-            className={`h-11 border-amber-200 text-amber-800 hover:bg-amber-50 ${isOwner ? "" : "hidden"}`}
-            data-testid="find-duplicate-actions-btn"
-            disabled={failureModes.length === 0}
-          >
-            <ClipboardList className="w-4 h-4 mr-1" />
-            Duplicate Actions
-          </Button>
+          {(canUseAITools || isOwner) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-11 border-purple-200 text-purple-700 hover:bg-purple-50"
+                  data-testid="ai-actions-menu-btn"
+                >
+                  <Sparkles className="w-4 h-4 mr-1" />
+                  AI
+                  <ChevronDown className="w-4 h-4 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                {canUseAITools && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={onOpenAINewFm}
+                      disabled={equipmentTypes.length === 0}
+                      className="cursor-pointer"
+                      data-testid="ai-suggest-new-failure-modes-btn"
+                    >
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Suggest Failure Modes
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={onOpenBulkImprove}
+                      disabled={displayedFailureModes.length === 0}
+                      className="cursor-pointer"
+                      data-testid="bulk-improve-fm-btn"
+                    >
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Bulk Improve ({displayedFailureModes.length})
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={onOpenReviewDisciplines}
+                      disabled={failureModes.length === 0}
+                      className="cursor-pointer"
+                      data-testid="review-action-disciplines-btn"
+                    >
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Review Disciplines
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={onOpenFindSimilar}
+                      disabled={failureModes.length === 0}
+                      className="cursor-pointer"
+                      data-testid="find-similar-fm-btn"
+                    >
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Find Similar
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {isOwner && (
+                  <DropdownMenuItem
+                    onClick={onOpenFindDuplicateActions}
+                    disabled={failureModes.length === 0}
+                    className="cursor-pointer text-amber-800 focus:text-amber-800"
+                    data-testid="find-duplicate-actions-btn"
+                  >
+                    <ClipboardList className="w-4 h-4 mr-2" />
+                    Duplicate Actions
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           <Button
             onClick={onOpenNewFm}
             className="h-11 bg-blue-600 hover:bg-blue-700 ml-auto"
@@ -280,9 +305,9 @@ export function FailureModesListPanel({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {isLoading ? (
-          <div className="flex items-center justify-center py-16">
+          <div className="flex flex-1 items-center justify-center">
             <div className="loading-dots">
               <span />
               <span />
@@ -290,7 +315,7 @@ export function FailureModesListPanel({
             </div>
           </div>
         ) : displayedFailureModes.length === 0 ? (
-          <div className="empty-state py-16">
+          <div className="empty-state flex flex-1 items-center justify-center flex-col">
             <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
               <Info className="w-8 h-8 text-slate-400" />
             </div>
@@ -304,7 +329,7 @@ export function FailureModesListPanel({
             </p>
           </div>
         ) : (
-          <div className="space-y-2 overflow-y-auto h-full pr-2" data-testid="failure-modes-list">
+          <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-2" data-testid="failure-modes-list">
             {displayedFailureModes.map((fm, idx) => {
               const Icon = disciplineIcons[fm.discipline] || AlertTriangle;
               const colors = disciplineColors[fm.discipline] || "bg-slate-100 text-slate-700";

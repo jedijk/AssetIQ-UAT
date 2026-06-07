@@ -892,8 +892,8 @@ const FailureModesPage = () => {
         </TabsList>
 
         {/* Failure Modes Tab */}
-        <TabsContent value="failure-modes" className="space-y-4">
-          <div className="flex gap-4 h-[calc(100vh-340px)]">
+        <TabsContent value="failure-modes" className="h-[calc(100vh-200px)]">
+          <div className="flex gap-4 h-full min-h-0">
             <FailureModesListPanel
               t={t}
               displayedTotal={displayedTotal}
