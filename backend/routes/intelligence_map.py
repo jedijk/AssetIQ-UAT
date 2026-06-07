@@ -43,6 +43,149 @@ def _current_user_id(current_user: dict) -> str:
     return current_user.get("id") or current_user.get("user_id") or current_user.get("email", "unknown")
 
 
+# All non-rejected import tasks (aligns with PM Import tab / is_pm_import_review_accepted).
+PM_IMPORT_IMPORTED_TASK_MATCH = {
+    "tasks_extracted.review_status": {"$ne": "rejected"},
+}
+
+# Equipment-linked tasks used for schedule lineage and equipment_ids_with_pm_import.
+PM_IMPORT_EQUIPMENT_LINKED_TASK_MATCH = {
+    "tasks_extracted.equipment_match.equipment_id": {"$ne": None},
+    "tasks_extracted.review_status": {"$ne": "rejected"},
+    "$or": [
+        {"tasks_extracted.import_status": {"$in": ["applied", "merged", "implemented"]}},
+        {"tasks_extracted.review_status": {"$in": ["accepted", "edited", "implemented"]}},
+    ],
+}
+
+# Backward-compatible alias for equipment-linked matching.
+PM_IMPORT_ACTIVE_TASK_MATCH = PM_IMPORT_EQUIPMENT_LINKED_TASK_MATCH
+
+
+def _normalize_equipment_tags(tags: Optional[list]) -> list:
+    if not tags:
+        return []
+    return list({str(t).strip().upper() for t in tags if t and str(t).strip()})
+
+
+def _pm_import_imported_task_match(
+    equipment_ids: Optional[list] = None,
+    equipment_tags: Optional[list] = None,
+) -> dict:
+    """Match non-rejected PM import tasks, optionally scoped to equipment."""
+    match = dict(PM_IMPORT_IMPORTED_TASK_MATCH)
+    if equipment_ids is None:
+        return match
+
+    tags = _normalize_equipment_tags(equipment_tags)
+    scope_clauses: list = [
+        {"tasks_extracted.equipment_match.equipment_id": {"$in": equipment_ids}},
+    ]
+    if tags:
+        scope_clauses.extend([
+            {
+                "$expr": {
+                    "$in": [
+                        {"$toUpper": {"$ifNull": ["$tasks_extracted.equipment_tag", ""]}},
+                        tags,
+                    ]
+                }
+            },
+            {
+                "$expr": {
+                    "$in": [
+                        {"$toUpper": {"$ifNull": ["$tasks_extracted.asset", ""]}},
+                        tags,
+                    ]
+                }
+            },
+        ])
+    match["$or"] = scope_clauses
+    return match
+
+
+def _pm_import_equipment_linked_task_match(equipment_ids: Optional[list] = None) -> dict:
+    """Match equipment-linked PM import tasks for schedule / lineage counts."""
+    match = dict(PM_IMPORT_EQUIPMENT_LINKED_TASK_MATCH)
+    if equipment_ids is not None:
+        match["tasks_extracted.equipment_match.equipment_id"] = {"$in": equipment_ids}
+    return match
+
+
+def _pm_import_task_match(equipment_ids: Optional[list] = None) -> dict:
+    return _pm_import_equipment_linked_task_match(equipment_ids)
+
+
+async def _count_imported_pm_import_tasks(
+    user: dict,
+    equipment_ids: Optional[list] = None,
+    equipment_tags: Optional[list] = None,
+) -> int:
+    rows = await timed_aggregate(
+        db.pm_import_sessions,
+        _scope_pipeline([
+            {"$unwind": "$tasks_extracted"},
+            {"$match": _pm_import_imported_task_match(equipment_ids, equipment_tags)},
+            {"$count": "c"},
+        ], user),
+    )
+    return rows[0]["c"] if rows else 0
+
+
+def _intelligence_map_schedule_query(
+    equipment_type_id: Optional[str] = None,
+    equipment_id: Optional[str] = None,
+) -> dict:
+    """Build scheduled_tasks filter used by intelligence map stats (equipment scope only)."""
+    schedule_query: dict = {}
+    if equipment_type_id:
+        schedule_query["equipment_type_id"] = equipment_type_id
+    if equipment_id:
+        schedule_query["equipment_id"] = equipment_id
+    return schedule_query
+
+
+def _schedules_missing_frequency_filter(schedule_query: dict) -> dict:
+    """Match scheduled_tasks with null, empty, or missing frequency."""
+    return {
+        **schedule_query,
+        "$or": [
+            {"frequency": None},
+            {"frequency": ""},
+            {"frequency": {"$exists": False}},
+        ],
+    }
+
+
+def _serialize_scheduled_task_missing_frequency(doc: dict) -> dict:
+    return {
+        "id": doc.get("id"),
+        "task_name": doc.get("task_name") or "",
+        "equipment_name": doc.get("equipment_name") or "",
+        "equipment_tag": doc.get("equipment_tag"),
+        "equipment_id": doc.get("equipment_id"),
+        "status": doc.get("status"),
+        "task_source": doc.get("task_source"),
+        "due_date": doc.get("due_date"),
+        "maintenance_program_id": doc.get("maintenance_program_id"),
+    }
+
+
+async def _count_active_pm_import_tasks(
+    user: dict,
+    equipment_ids: Optional[list] = None,
+) -> int:
+    rows = await timed_aggregate(
+        db.pm_import_sessions,
+        _scope_pipeline([
+            {"$unwind": "$tasks_extracted"},
+            {"$match": _pm_import_equipment_linked_task_match(equipment_ids)},
+            {"$count": "c"},
+        ], user),
+    )
+    return rows[0]["c"] if rows else 0
+
+
 @router.get("/stats")
 async def get_intelligence_map_stats(
     plant_id: Optional[str] = None,
@@ -172,6 +315,25 @@ async def get_intelligence_map_stats(
             equipment_query["level"] = {"$in": equipment_levels}
         
         equipment_count = await db.equipment_nodes.count_documents(scope(equipment_query))
+
+        pm_import_equipment_ids = None
+        pm_import_equipment_tags = None
+        if equipment_id:
+            pm_import_equipment_ids = [equipment_id]
+        elif equipment_type_id or plant_id or system_id:
+            pm_import_equipment_ids = await db.equipment_nodes.distinct(
+                "id",
+                scope(equipment_query),
+            )
+        if pm_import_equipment_ids is not None:
+            raw_tags = await db.equipment_nodes.distinct(
+                "tag",
+                scope({
+                    **equipment_query,
+                    "tag": {"$exists": True, "$nin": [None, ""]},
+                }),
+            )
+            pm_import_equipment_tags = [t for t in raw_tags if t and str(t).strip()]
         
         # Count equipment with assigned equipment types
         equipment_with_type_query = {**equipment_query, "equipment_type_id": {"$ne": None, "$exists": True}}
@@ -199,14 +361,7 @@ async def get_intelligence_map_stats(
         equipment_with_strategy_applied_count = len(equipment_ids_with_strategy_applied)
 
         # ========== EQUIPMENT WITH ACTIVE PM IMPORT TASKS ==========
-        # Accepted (pending apply) or finalized (applied/merged/legacy implemented).
-        pm_task_active_match = {
-            "tasks_extracted.equipment_match.equipment_id": {"$ne": None},
-            "$or": [
-                {"tasks_extracted.import_status": {"$in": ["applied", "merged", "implemented"]}},
-                {"tasks_extracted.review_status": {"$in": ["accepted", "edited"]}},
-            ],
-        }
+        pm_task_active_match = _pm_import_equipment_linked_task_match(pm_import_equipment_ids)
         pm_equipment_pipeline = [
             {"$unwind": "$tasks_extracted"},
             {"$match": pm_task_active_match},
@@ -218,15 +373,15 @@ async def get_intelligence_map_stats(
         )
         equipment_ids_with_pm_import = set(r["_id"] for r in pm_equipment_result if r.get("_id"))
 
-        pm_tasks_active_rows = await timed_aggregate(
-            db.pm_import_sessions,
-            _scope_pipeline([
-                {"$unwind": "$tasks_extracted"},
-                {"$match": pm_task_active_match},
-                {"$count": "c"},
-            ], current_user),
+        pm_tasks_active_count = await _count_active_pm_import_tasks(
+            current_user,
+            pm_import_equipment_ids,
         )
-        pm_tasks_active_count = pm_tasks_active_rows[0]["c"] if pm_tasks_active_rows else 0
+        pm_imported_tasks_count = await _count_imported_pm_import_tasks(
+            current_user,
+            pm_import_equipment_ids,
+            pm_import_equipment_tags,
+        )
 
         # Combined: equipment with any "active program" (strategy applied OR PM imported)
         equipment_ids_with_active_program = (
@@ -270,11 +425,7 @@ async def get_intelligence_map_stats(
         }
         
         # ========== SCHEDULES (Scheduled Tasks) ==========
-        schedule_query = {}
-        if equipment_type_id:
-            schedule_query["equipment_type_id"] = equipment_type_id
-        if equipment_id:
-            schedule_query["equipment_id"] = equipment_id
+        schedule_query = _intelligence_map_schedule_query(equipment_type_id, equipment_id)
             
         schedules_count = await db.scheduled_tasks.count_documents(scope(schedule_query))
 
@@ -308,14 +459,9 @@ async def get_intelligence_map_stats(
         schedule_by_status = {s["_id"]: s["count"] for s in schedule_status if s["_id"]}
         
         # Count schedules missing frequency
-        schedules_missing_freq = await db.scheduled_tasks.count_documents(scope({
-            **schedule_query,
-            "$or": [
-                {"frequency": None},
-                {"frequency": ""},
-                {"frequency": {"$exists": False}}
-            ]
-        }))
+        schedules_missing_freq = await db.scheduled_tasks.count_documents(
+            scope(_schedules_missing_frequency_filter(schedule_query))
+        )
 
         # Actual scheduled_tasks record count scoped to equipment with an active program.
         # Used by the Data Lineage Sankey so the "Schedules" node reflects the real
@@ -388,13 +534,23 @@ async def get_intelligence_map_stats(
         strategy_density = round(strategies_count / equipment_count, 1) if equipment_count > 0 else 0
         
         # PM Source Split: Generated vs Imported
-        total_pm_tasks = program_stats.get("total_tasks", 0)
-        generated_tasks = program_stats.get("strategy_tasks", 0) + program_stats.get("ai_tasks", 0) + program_stats.get("manual_tasks", 0)
-        pm_imported_tasks = program_stats.get("imported_tasks", 0)
+        imported_tasks_count = max(
+            pm_imported_tasks_count,
+            program_stats.get("imported_tasks", 0),
+        )
+        generated_tasks = (
+            program_stats.get("strategy_tasks", 0)
+            + program_stats.get("ai_tasks", 0)
+            + program_stats.get("manual_tasks", 0)
+        )
+        total_pm_tasks = max(
+            program_stats.get("total_tasks", 0),
+            generated_tasks + imported_tasks_count,
+        )
         
         if total_pm_tasks > 0:
             generated_pct = round((generated_tasks / total_pm_tasks) * 100)
-            imported_pct = round((pm_imported_tasks / total_pm_tasks) * 100)
+            imported_pct = round((imported_tasks_count / total_pm_tasks) * 100)
         else:
             generated_pct = 0
             imported_pct = 0
@@ -403,13 +559,14 @@ async def get_intelligence_map_stats(
         valid_schedules = schedules_count - schedules_missing_freq
         schedule_compliance = round((valid_schedules / schedules_count) * 100, 1) if schedules_count > 0 else 100
 
-        reliability_edges_total = await db.reliability_edges.count_documents(
-            {**scope({}), "status": {"$ne": "retired"}}
+        from services.reliability_graph_query import (
+            count_active_reliability_edges,
+            count_edges_by_relation,
         )
-        from services.reliability_graph_query import count_edges_by_relation
 
+        reliability_edges_total = await count_active_reliability_edges(current_user)
         edges_by_relation = await count_edges_by_relation(current_user, active_only=True)
-        
+
         # ========== BUILD RESPONSE ==========
         result = {
             "reliability_edges_total": reliability_edges_total,
@@ -537,6 +694,8 @@ async def get_intelligence_map_stats(
                 "pm_source_split": {
                     "generated": generated_pct,
                     "imported": imported_pct,
+                    "generated_count": generated_tasks,
+                    "imported_count": imported_tasks_count,
                     "unit": "%",
                     "description": "Generated vs Imported PMs"
                 },
@@ -558,9 +717,9 @@ async def get_intelligence_map_stats(
             # Task source breakdown for programs
             "task_sources": {
                 "strategy": program_stats.get("strategy_tasks", 0),
-                "imported": program_stats.get("imported_tasks", 0),
+                "imported": imported_tasks_count,
                 "ai": program_stats.get("ai_tasks", 0),
-                "manual": program_stats.get("manual_tasks", 0)
+                "manual": program_stats.get("manual_tasks", 0),
             }
         }
         
@@ -571,6 +730,59 @@ async def get_intelligence_map_stats(
         
     except Exception:
         logger.exception("Error getting intelligence map stats")
+        raise
+
+
+@router.get("/schedules-missing-frequency")
+async def get_schedules_missing_frequency(
+    plant_id: Optional[str] = None,
+    system_id: Optional[str] = None,
+    equipment_type_id: Optional[str] = None,
+    equipment_id: Optional[str] = None,
+    limit: int = 100,
+    skip: int = 0,
+    current_user: dict = Depends(_library_read),
+):
+    """
+    List scheduled tasks missing a frequency value.
+
+    Uses the same equipment_type_id / equipment_id scope as GET /stats schedule counts.
+    plant_id and system_id are accepted for API parity but do not narrow schedule_query.
+    """
+    limit = max(1, min(limit, 500))
+    skip = max(0, skip)
+
+    try:
+        schedule_query = _intelligence_map_schedule_query(equipment_type_id, equipment_id)
+        query = _scope_query(_schedules_missing_frequency_filter(schedule_query), current_user)
+
+        total = await db.scheduled_tasks.count_documents(query)
+        cursor = (
+            db.scheduled_tasks.find(
+                query,
+                {
+                    "id": 1,
+                    "task_name": 1,
+                    "equipment_name": 1,
+                    "equipment_tag": 1,
+                    "equipment_id": 1,
+                    "status": 1,
+                    "task_source": 1,
+                    "due_date": 1,
+                    "maintenance_program_id": 1,
+                    "_id": 0,
+                },
+            )
+            .sort([("equipment_name", 1), ("task_name", 1)])
+            .skip(skip)
+            .limit(limit)
+        )
+        docs = await cursor.to_list(limit)
+        tasks = [_serialize_scheduled_task_missing_frequency(doc) for doc in docs]
+
+        return {"tasks": tasks, "total": total, "limit": limit, "skip": skip}
+    except Exception:
+        logger.exception("Error listing schedules missing frequency")
         raise
 
 

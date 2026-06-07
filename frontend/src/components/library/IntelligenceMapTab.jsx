@@ -49,6 +49,7 @@ import { Label } from "../ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { Progress } from "../ui/progress";
 import ReliabilityKnowledgeGraphDialog from "../ril/ReliabilityKnowledgeGraphDialog";
+import SchedulesMissingFrequencyDialog from "./SchedulesMissingFrequencyDialog";
 import { Skeleton } from "../ui/skeleton";
 
 // Flow card component for the main intelligence flow
@@ -465,6 +466,7 @@ const IntelligenceMapTab = () => {
   const [equipmentTypeId, setEquipmentTypeId] = useState("all");
   const [equipmentId, setEquipmentId] = useState("all");
   const [knowledgeGraphOpen, setKnowledgeGraphOpen] = useState(false);
+  const [schedulesMissingOpen, setSchedulesMissingOpen] = useState(false);
   // Fetch stats
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery({
     queryKey: ["intelligence-map-stats", plantId, systemId, equipmentTypeId, equipmentId],
@@ -506,6 +508,16 @@ const IntelligenceMapTab = () => {
   const pmSourceSplit = insights.pm_source_split || { generated: 0, imported: 0 };
   const scheduleHealth = insights.schedule_health?.missing_frequency || 0;
   const scheduleCompliance = insights.schedule_compliance?.value || 100;
+
+  const intelligenceMapFilters = useMemo(
+    () => ({
+      plantId: plantId !== "all" ? plantId : undefined,
+      systemId: systemId !== "all" ? systemId : undefined,
+      equipmentTypeId: equipmentTypeId !== "all" ? equipmentTypeId : undefined,
+      equipmentId: equipmentId !== "all" ? equipmentId : undefined,
+    }),
+    [plantId, systemId, equipmentTypeId, equipmentId]
+  );
   const reliabilityEdgesTotal =
     stats?.reliability_edges_total ??
     insights.reliability_graph?.reliability_edges_total ??
@@ -873,9 +885,6 @@ const IntelligenceMapTab = () => {
                 </div>
                 <p className="text-[10px] text-slate-400 mt-1">
                   Across all equipment
-                  {strategyApplied.eligible > 0 && (
-                    <> · {strategyApplied.eligible} eligible</>
-                  )}
                 </p>
                 {strategyApplied.total > 0 && (
                   <Progress 
@@ -919,9 +928,15 @@ const IntelligenceMapTab = () => {
               <InsightCard
                 title="Schedules Missing Frequency"
                 value={scheduleHealth}
-                description="Schedules requiring attention"
+                description={
+                  scheduleHealth > 0
+                    ? "Click to view schedules requiring attention"
+                    : "Schedules requiring attention"
+                }
                 icon={AlertTriangle}
                 color={scheduleHealth === 0 ? "green" : scheduleHealth < 10 ? "amber" : "red"}
+                onClick={scheduleHealth > 0 ? () => setSchedulesMissingOpen(true) : undefined}
+                data-testid="intelligence-map-schedules-missing-frequency"
               />
 
               {/* Schedule Compliance */}
@@ -967,6 +982,13 @@ const IntelligenceMapTab = () => {
         open={knowledgeGraphOpen}
         onOpenChange={setKnowledgeGraphOpen}
         totalEdges={reliabilityEdgesTotal}
+      />
+
+      <SchedulesMissingFrequencyDialog
+        open={schedulesMissingOpen}
+        onOpenChange={setSchedulesMissingOpen}
+        filters={intelligenceMapFilters}
+        totalCount={scheduleHealth}
       />
     </div>
   );

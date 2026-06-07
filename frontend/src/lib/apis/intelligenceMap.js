@@ -39,4 +39,32 @@ export const intelligenceMapAPI = {
     const response = await api.get("/intelligence-map/filters");
     return response.data;
   },
+
+  /**
+   * List scheduled tasks missing frequency (Schedule Health insight drill-down)
+   *
+   * @param {Object} params - Filter and pagination parameters
+   * @param {string} [params.plantId]
+   * @param {string} [params.systemId]
+   * @param {string} [params.equipmentTypeId]
+   * @param {string} [params.equipmentId]
+   * @param {number} [params.limit]
+   * @param {number} [params.skip]
+   */
+  getSchedulesMissingFrequency: async (params = {}) => {
+    const queryParams = new URLSearchParams();
+
+    if (params.plantId) queryParams.append("plant_id", params.plantId);
+    if (params.systemId) queryParams.append("system_id", params.systemId);
+    if (params.equipmentTypeId) queryParams.append("equipment_type_id", params.equipmentTypeId);
+    if (params.equipmentId) queryParams.append("equipment_id", params.equipmentId);
+    if (params.limit !== undefined) queryParams.append("limit", params.limit);
+    if (params.skip !== undefined) queryParams.append("skip", params.skip);
+
+    const queryString = queryParams.toString();
+    const url = `/intelligence-map/schedules-missing-frequency${queryString ? `?${queryString}` : ""}`;
+
+    const response = await api.get(url);
+    return response.data;
+  },
 };
