@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from database import db
 from auth import require_permission
 from services.task_instance_bridge import sync_scheduled_tasks_to_instances, next_monday
+from services.flush_my_tasks_overdue import flush_overdue_my_tasks_backlog
 from services.scheduler_job import (
     get_task_generation_config,
     save_task_generation_config,
@@ -28,6 +29,12 @@ class GenerateRequest(BaseModel):
     week_start: Optional[str] = None  # YYYY-MM-DD, defaults to next Monday
     look_ahead_days: int = 7  # 7-day window per the agreed plan
     dry_run: bool = False
+
+
+class FlushOverdueMyTasksRequest(BaseModel):
+    dry_run: bool = True
+    include_actions: bool = True
+    tenant_id: Optional[str] = None
 
 
 @router.post("/run")
@@ -52,6 +59,20 @@ async def generate_tasks(
         triggered_by_user_id=current_user.get("id") or current_user.get("user_id"),
     )
     return result
+
+
+@router.post("/flush-overdue-my-tasks")
+async def flush_overdue_my_tasks(
+    payload: FlushOverdueMyTasksRequest,
+    current_user: dict = Depends(_admin_dep),
+):
+    """One-off: cancel overdue rows that appear in My Tasks (dry-run by default)."""
+    return await flush_overdue_my_tasks_backlog(
+        db,
+        dry_run=payload.dry_run,
+        tenant_id=payload.tenant_id,
+        include_actions=payload.include_actions,
+    )
 
 
 @router.get("/runs")
