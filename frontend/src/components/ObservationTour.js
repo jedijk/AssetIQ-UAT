@@ -169,6 +169,207 @@ const TOUR_STEPS = [
   },
 ];
 
+const MOBILE_LAYOUT_TOUR_STEPS = [
+  {
+    id: "welcome",
+    title: "Report an Observation",
+    description: "On mobile you can report from the + button or by tapping equipment in the hierarchy. Let's walk through both!",
+    icon: Sparkles,
+    target: null,
+    position: "center",
+    ensureChat: "closed",
+    ensureHierarchy: "closed",
+    prefill: null,
+    preview: null,
+  },
+  {
+    id: "way-fab",
+    title: "Way 1 — The + Button",
+    description: "Tap the blue + button in the bottom-right corner. It's always visible while you browse the app.",
+    icon: Plus,
+    target: '[data-testid="fab-report-observation"]',
+    position: "center",
+    ensureChat: "closed",
+    ensureHierarchy: "closed",
+    reserveBottom: 88,
+    prefill: null,
+    preview: null,
+  },
+  {
+    id: "way-hierarchy",
+    title: "Way 2 — From Equipment",
+    description: "Open the hierarchy, then tap an equipment name to open its menu and choose Report Observation. The equipment will be pre-filled!",
+    icon: Layers,
+    target: '[data-testid="mobile-hierarchy-panel"]',
+    position: "center",
+    ensureChat: "closed",
+    ensureHierarchy: "open",
+    prefill: null,
+    preview: "mobile-context-menu",
+  },
+  ...TOUR_STEPS.slice(3, -1).map((step) => ({
+    ...step,
+    position: step.position === "left" || step.position === "right" ? "center" : step.position,
+    reserveBottom: step.id === "input" || step.id === "attach-voice" || step.id === "send" ? 24 : 0,
+  })),
+  TOUR_STEPS[TOUR_STEPS.length - 1],
+];
+
+const MOBILE_APP_TOUR_STEPS = [
+  {
+    id: "welcome",
+    title: "Report an Observation",
+    description: "Use the Report button in the bottom nav or pick equipment on Home. We'll show the mobile reporting flow.",
+    icon: Sparkles,
+    target: null,
+    position: "center",
+    ensureChat: "closed",
+    ensureHierarchy: "closed",
+    ensureMobileTab: "home",
+    prefill: null,
+    preview: null,
+  },
+  {
+    id: "way-report",
+    title: "Way 1 — Report Button",
+    description: "Tap the orange Report button in the bottom navigation to open the observation chat.",
+    icon: Plus,
+    target: '[data-testid="mobile-nav-post"]',
+    position: "center",
+    ensureChat: "closed",
+    ensureHierarchy: "closed",
+    ensureMobileTab: "home",
+    reserveBottom: 96,
+    prefill: null,
+    preview: null,
+  },
+  {
+    id: "way-equipment",
+    title: "Way 2 — From Equipment",
+    description: "On the Home tab, tap any equipment name to open its menu, then choose Report Observation.",
+    icon: Layers,
+    target: '[data-testid="mobile-hierarchy"]',
+    position: "center",
+    ensureChat: "closed",
+    ensureHierarchy: "closed",
+    ensureMobileTab: "home",
+    prefill: null,
+    preview: "mobile-context-menu",
+  },
+  {
+    id: "shared-flow-intro",
+    title: "Describe What You Saw",
+    description: "The Report flow opens a full-screen chat where you describe the issue in plain language.",
+    icon: MessageSquare,
+    target: '[data-testid="mobile-chat"]',
+    position: "center",
+    ensureChat: "open",
+    ensureHierarchy: "closed",
+    ensureMobileTab: "home",
+    prefill: null,
+    preview: null,
+  },
+  {
+    id: "input",
+    title: "Describe Your Observation",
+    description: "Type what you observed — include equipment, location, and symptoms.",
+    icon: MessageSquare,
+    target: '[data-testid="chat-input"]',
+    position: "center",
+    ensureChat: "open",
+    ensureHierarchy: "closed",
+    prefill: "Compressor C-201 has high vibration on the drive end bearing",
+    preview: null,
+    reserveBottom: 120,
+  },
+  {
+    id: "attach-voice",
+    title: "Record Voice",
+    description: "Tap the microphone to dictate your observation instead of typing.",
+    icon: Mic,
+    target: '[data-testid="voice-btn"]',
+    position: "center",
+    ensureChat: "open",
+    ensureHierarchy: "closed",
+    prefill: null,
+    preview: "attach-legend",
+    reserveBottom: 120,
+  },
+  {
+    id: "send",
+    title: "Send Your Message",
+    description: "Tap send when ready. The AI will process your observation and ask follow-up questions if needed.",
+    icon: Send,
+    target: '[data-testid="send-btn"]',
+    position: "center",
+    ensureChat: "open",
+    ensureHierarchy: "closed",
+    prefill: null,
+    preview: null,
+    reserveBottom: 120,
+  },
+  {
+    id: "confirm-preview",
+    title: "Confirm Your Observation",
+    description: "The AI summarizes what it understood. Confirm with Yes, Revise, or Cancel.",
+    icon: CheckCircle,
+    target: null,
+    position: "center",
+    ensureChat: "open",
+    ensureHierarchy: "closed",
+    prefill: null,
+    preview: "confirm",
+  },
+  {
+    id: "equipment-picker-preview",
+    title: "Select Equipment",
+    description: "Pick the correct equipment match, or tap I don't know if you're unsure.",
+    icon: Target,
+    target: null,
+    position: "center",
+    ensureChat: "open",
+    ensureHierarchy: "closed",
+    prefill: null,
+    preview: "equipment-picker",
+  },
+  {
+    id: "fm-preview",
+    title: "Link to Failure Mode",
+    description: "Select the best failure mode match. RPN shows the risk level.",
+    icon: AlertTriangle,
+    target: null,
+    position: "center",
+    ensureChat: "open",
+    ensureHierarchy: "closed",
+    prefill: null,
+    preview: "fm-picker",
+  },
+  {
+    id: "recorded-preview",
+    title: "Observation Recorded!",
+    description: "Your observation is saved and linked to the equipment reliability data.",
+    icon: CheckCircle,
+    target: null,
+    position: "center",
+    ensureChat: "open",
+    ensureHierarchy: "closed",
+    prefill: null,
+    preview: "recorded",
+  },
+  {
+    id: "complete",
+    title: "You're Ready!",
+    description: "Replay this tour anytime from Help → Tour: Report Observation on desktop, or the ? button on mobile.",
+    icon: Sparkles,
+    target: null,
+    position: "center",
+    ensureChat: "closed",
+    ensureHierarchy: "closed",
+    prefill: null,
+    preview: null,
+  },
+];
+
 // Static preview components for different steps
 const ConfirmPreview = () => (
   <div className="bg-white rounded-lg border border-slate-200 p-4 shadow-sm">
@@ -281,6 +482,20 @@ const RightClickPreview = () => (
   </div>
 );
 
+const MobileContextMenuPreview = () => (
+  <div className="bg-white rounded-lg border border-slate-200 shadow-lg p-1 w-52">
+    <div className="text-xs text-slate-500 px-3 py-1.5 border-b border-slate-100">Tap equipment name → menu</div>
+    <button className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 rounded flex items-center gap-2 text-blue-600">
+      <Plus className="w-4 h-4" />
+      Report Observation
+    </button>
+    <button className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 rounded flex items-center gap-2 text-slate-600">
+      <Activity className="w-4 h-4" />
+      Show Details
+    </button>
+  </div>
+);
+
 const AttachLegend = () => (
   <div className="bg-white rounded-lg border border-slate-200 p-3 shadow-sm">
     <div className="flex items-center gap-4">
@@ -313,6 +528,8 @@ const PreviewRenderer = ({ previewId }) => {
       return <RecordedPreview />;
     case "right-click":
       return <RightClickPreview />;
+    case "mobile-context-menu":
+      return <MobileContextMenuPreview />;
     case "attach-legend":
       return <AttachLegend />;
     default:
@@ -321,15 +538,95 @@ const PreviewRenderer = ({ previewId }) => {
 };
 
 const TOOLTIP_WIDTH = 380;
-const VIEWPORT_PADDING = 20;
+const VIEWPORT_PADDING = 12;
 const SPOTLIGHT_INSET = 8;
 const CHAT_SIDEBAR_SELECTOR = '[data-testid="chat-sidebar"]';
 const MOBILE_BREAKPOINT = 640;
 
-const getAnchorSelector = (step) => {
+const resolveTourMode = (modeProp) => {
+  if (modeProp === "mobile-app") return "mobile-app";
+  if (modeProp === "desktop") return "desktop";
+  if (document.querySelector('[data-testid="mobile-app"]')) return "mobile-app";
+  if (window.innerWidth < MOBILE_BREAKPOINT) return "mobile-layout";
+  return "desktop";
+};
+
+const getStepsForMode = (mode) => {
+  if (mode === "mobile-app") return MOBILE_APP_TOUR_STEPS;
+  if (mode === "mobile-layout") return MOBILE_LAYOUT_TOUR_STEPS;
+  return TOUR_STEPS;
+};
+
+const getAnchorSelector = (step, mode) => {
   if (step?.target) return step.target;
-  if (step?.ensureChat === "open") return CHAT_SIDEBAR_SELECTOR;
+  if (step?.ensureChat === "open") {
+    return mode === "mobile-app" ? '[data-testid="mobile-chat"]' : CHAT_SIDEBAR_SELECTOR;
+  }
   return null;
+};
+
+const computeMobileTooltipStyle = ({
+  anchorRect,
+  tooltipHeight,
+  tooltipWidth,
+  viewportWidth,
+  viewportHeight,
+  reserveBottom = 0,
+}) => {
+  const bottomInset = Math.max(reserveBottom, 72) + VIEWPORT_PADDING;
+  const maxHeight = viewportHeight - VIEWPORT_PADDING * 2;
+  const width = Math.min(tooltipWidth, viewportWidth - VIEWPORT_PADDING * 2);
+  const left = (viewportWidth - width) / 2;
+
+  if (!anchorRect) {
+    const top = Math.max(
+      VIEWPORT_PADDING,
+      Math.min(
+        (viewportHeight - bottomInset - tooltipHeight) / 2,
+        viewportHeight - bottomInset - tooltipHeight - VIEWPORT_PADDING
+      )
+    );
+    return {
+      position: "fixed",
+      top: `${top}px`,
+      left: `${left}px`,
+      width: `${width}px`,
+      maxHeight: `${Math.min(maxHeight, viewportHeight - top - VIEWPORT_PADDING)}px`,
+      transform: "none",
+    };
+  }
+
+  const spaceAbove = anchorRect.top - VIEWPORT_PADDING;
+  const spaceBelow = viewportHeight - anchorRect.top - anchorRect.height - bottomInset;
+  let top;
+
+  if (spaceBelow >= tooltipHeight + VIEWPORT_PADDING && spaceBelow >= spaceAbove) {
+    top = anchorRect.top + anchorRect.height + VIEWPORT_PADDING;
+  } else if (spaceAbove >= tooltipHeight + VIEWPORT_PADDING) {
+    top = anchorRect.top - tooltipHeight - VIEWPORT_PADDING;
+  } else {
+    top = Math.max(
+      VIEWPORT_PADDING,
+      Math.min(
+        anchorRect.top + anchorRect.height + VIEWPORT_PADDING,
+        viewportHeight - bottomInset - tooltipHeight - VIEWPORT_PADDING
+      )
+    );
+  }
+
+  top = Math.max(
+    VIEWPORT_PADDING,
+    Math.min(top, viewportHeight - bottomInset - tooltipHeight - VIEWPORT_PADDING)
+  );
+
+  return {
+    position: "fixed",
+    top: `${top}px`,
+    left: `${left}px`,
+    width: `${width}px`,
+    maxHeight: `${Math.min(maxHeight, viewportHeight - top - VIEWPORT_PADDING)}px`,
+    transform: "none",
+  };
 };
 
 // Main ObservationTour component
@@ -338,14 +635,26 @@ export const ObservationTour = ({
   onClose, 
   setChatOpen, 
   setChatPrefillMessage, 
-  setHierarchyOpen 
+  setHierarchyOpen,
+  setMobileTab,
+  mode = "auto",
 }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [spotlightRect, setSpotlightRect] = useState(null);
   const [tooltipStyle, setTooltipStyle] = useState({});
+  const [tourMode, setTourMode] = useState("desktop");
   const tooltipRef = useRef(null);
-  
-  const step = TOUR_STEPS[currentStep];
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const syncMode = () => setTourMode(resolveTourMode(mode));
+    syncMode();
+    window.addEventListener("resize", syncMode);
+    return () => window.removeEventListener("resize", syncMode);
+  }, [isOpen, mode]);
+
+  const steps = getStepsForMode(tourMode);
+  const step = steps[currentStep];
   const StepIcon = step?.icon || HelpCircle;
   
   // Reset step when opening
@@ -354,10 +663,20 @@ export const ObservationTour = ({
       setCurrentStep(0);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (currentStep >= steps.length) {
+      setCurrentStep(0);
+    }
+  }, [currentStep, steps.length]);
   
-  // Handle sidebar states based on step config
+  // Handle sidebar / tab states based on step config
   useEffect(() => {
     if (!isOpen || !step) return;
+
+    if (step.ensureMobileTab && setMobileTab) {
+      setMobileTab(step.ensureMobileTab);
+    }
     
     // Ensure chat state
     if (step.ensureChat === "open") {
@@ -366,8 +685,12 @@ export const ObservationTour = ({
       setChatOpen(false);
     }
     
-    // Ensure hierarchy state
-    if (step.ensureHierarchy === "open") {
+    // Ensure hierarchy state (desktop / responsive layout overlay)
+    if (tourMode === "mobile-app") {
+      if (step.ensureHierarchy === "open" && setMobileTab) {
+        setMobileTab("home");
+      }
+    } else if (step.ensureHierarchy === "open") {
       setHierarchyOpen(true);
     } else if (step.ensureHierarchy === "closed") {
       setHierarchyOpen(false);
@@ -376,16 +699,18 @@ export const ObservationTour = ({
     // Handle prefill
     if (step.prefill) {
       setChatPrefillMessage(step.prefill);
+    } else if (step.ensureChat === "open") {
+      setChatPrefillMessage(null);
     }
-  }, [isOpen, currentStep, step, setChatOpen, setHierarchyOpen, setChatPrefillMessage]);
+  }, [isOpen, currentStep, step, setChatOpen, setHierarchyOpen, setChatPrefillMessage, setMobileTab, tourMode]);
   
   const updatePositions = useCallback(() => {
     if (!isOpen || !step) return;
 
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
-    const isMobileView = viewportWidth < MOBILE_BREAKPOINT;
-    const anchorSelector = getAnchorSelector(step);
+    const isCompactView = tourMode !== "desktop";
+    const anchorSelector = getAnchorSelector(step, tourMode);
     let anchorRect = null;
 
     if (anchorSelector) {
@@ -403,10 +728,24 @@ export const ObservationTour = ({
 
     setSpotlightRect(anchorRect);
 
-    const tooltipHeight = tooltipRef.current?.offsetHeight ?? 300;
+    const tooltipHeight = tooltipRef.current?.offsetHeight ?? 280;
     const tooltipWidth = Math.min(TOOLTIP_WIDTH, viewportWidth - VIEWPORT_PADDING * 2);
 
-    if (step.position === "center" || !anchorRect) {
+    if (step.position === "center" || !anchorRect || isCompactView) {
+      if (isCompactView) {
+        setTooltipStyle(
+          computeMobileTooltipStyle({
+            anchorRect: step.position === "center" || !anchorRect ? null : anchorRect,
+            tooltipHeight,
+            tooltipWidth,
+            viewportWidth,
+            viewportHeight,
+            reserveBottom: step.reserveBottom || 0,
+          })
+        );
+        return;
+      }
+
       setTooltipStyle({
         position: "fixed",
         top: "50%",
@@ -415,35 +754,6 @@ export const ObservationTour = ({
         width: `${tooltipWidth}px`,
         maxHeight: `${viewportHeight - VIEWPORT_PADDING * 2}px`,
       });
-      return;
-    }
-
-    if (isMobileView) {
-      const targetCenterY = anchorRect.top + anchorRect.height / 2;
-      if (targetCenterY < viewportHeight / 3) {
-        setTooltipStyle({
-          position: "fixed",
-          top: "auto",
-          bottom: "25%",
-          left: "5vw",
-          right: "5vw",
-          width: "90vw",
-          maxWidth: "90vw",
-          transform: "none",
-          maxHeight: `${viewportHeight - VIEWPORT_PADDING * 2}px`,
-        });
-      } else {
-        setTooltipStyle({
-          position: "fixed",
-          top: "20%",
-          left: "5vw",
-          right: "5vw",
-          width: "90vw",
-          maxWidth: "90vw",
-          transform: "none",
-          maxHeight: `${viewportHeight - VIEWPORT_PADDING * 2}px`,
-        });
-      }
       return;
     }
 
@@ -470,17 +780,19 @@ export const ObservationTour = ({
       width: `${tooltipWidth}px`,
       maxHeight: `${viewportHeight - VIEWPORT_PADDING * 2}px`,
     });
-  }, [isOpen, step]);
+  }, [isOpen, step, tourMode]);
 
   useLayoutEffect(() => {
     if (!isOpen) return;
     updatePositions();
-  }, [isOpen, currentStep, step, updatePositions]);
+    const raf = requestAnimationFrame(updatePositions);
+    return () => cancelAnimationFrame(raf);
+  }, [isOpen, currentStep, step, tourMode, updatePositions]);
 
   useEffect(() => {
     if (!isOpen) return;
 
-    const timer = setTimeout(updatePositions, 300);
+    const timer = setTimeout(updatePositions, 320);
     window.addEventListener("resize", updatePositions);
     window.addEventListener("scroll", updatePositions, true);
 
@@ -489,7 +801,7 @@ export const ObservationTour = ({
       window.removeEventListener("resize", updatePositions);
       window.removeEventListener("scroll", updatePositions, true);
     };
-  }, [isOpen, currentStep, updatePositions]);
+  }, [isOpen, currentStep, tourMode, updatePositions]);
 
   const handleClose = useCallback(() => {
     setChatOpen(false);
@@ -499,12 +811,12 @@ export const ObservationTour = ({
   }, [setChatOpen, setChatPrefillMessage, setHierarchyOpen, onClose]);
 
   const handleNext = useCallback(() => {
-    if (currentStep < TOUR_STEPS.length - 1) {
+    if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
       handleClose();
     }
-  }, [currentStep, handleClose]);
+  }, [currentStep, handleClose, steps.length]);
 
   const handleBack = useCallback(() => {
     if (currentStep > 0) {
@@ -593,7 +905,7 @@ export const ObservationTour = ({
                     <div>
                       <h3 className="font-semibold text-lg">{step.title}</h3>
                       <p className="text-sm text-blue-100">
-                        Step {currentStep + 1} of {TOUR_STEPS.length}
+                        Step {currentStep + 1} of {steps.length}
                       </p>
                     </div>
                   </div>
@@ -622,7 +934,7 @@ export const ObservationTour = ({
               {/* Progress bar */}
               <div className="px-5 pb-2">
                 <div className="flex gap-1">
-                  {TOUR_STEPS.map((_, idx) => (
+                  {steps.map((_, idx) => (
                     <div
                       key={idx}
                       className={`h-1 flex-1 rounded-full transition-colors ${
@@ -653,7 +965,7 @@ export const ObservationTour = ({
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                   data-testid="observation-tour-next-btn"
                 >
-                  {currentStep === TOUR_STEPS.length - 1 ? (
+                  {currentStep === steps.length - 1 ? (
                     <>
                       <Play className="w-4 h-4 mr-1" />
                       Start Reporting

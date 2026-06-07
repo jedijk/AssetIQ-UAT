@@ -4,12 +4,19 @@ import { chatAPI, voiceAPI } from "../lib/api";
 import { X, Send, Mic, MicOff, Loader2, Trash2, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 
-const MobileChat = ({ onClose }) => {
+const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
   const [message, setMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const messagesEndRef = useRef(null);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (prefillMessage) {
+      setMessage(prefillMessage);
+      onPrefillConsumed?.();
+    }
+  }, [prefillMessage, onPrefillConsumed]);
 
   const { data: messages = [] } = useQuery({
     queryKey: ["chatHistory"],
