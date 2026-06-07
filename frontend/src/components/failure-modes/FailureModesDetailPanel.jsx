@@ -58,7 +58,7 @@ export function FailureModesDetailPanel({
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="w-1/2 lg:w-3/5 h-full"
+      className="w-1/2 lg:w-3/5 h-full min-h-0"
     >
       <FailureModeViewPanel {...panelProps} isFullscreen={false} />
     </motion.div>
