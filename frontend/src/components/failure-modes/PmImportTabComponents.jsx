@@ -149,9 +149,7 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
     });
     return Array.from(set).sort();
   }, [allTasks]);
-  
-  }, [allTasks]);
-  
+
   const toggleDiscipline = (value) => {
     setSelectedDisciplines((prev) =>
       prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value]
