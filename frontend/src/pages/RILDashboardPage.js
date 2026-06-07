@@ -47,6 +47,7 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import RILCopilot from "../components/ril/RILCopilot";
+import ReliabilityKnowledgeGraphDialog from "../components/ril/ReliabilityKnowledgeGraphDialog";
 
 // Priority badge colors
 const priorityColors = {
@@ -66,7 +67,7 @@ const statusColors = {
 };
 
 // KPI Card component
-const KPICard = ({ title, value, subtitle, icon: Icon, trend, trendDirection, color = "blue", "data-testid": testId }) => {
+const KPICard = ({ title, value, subtitle, icon: Icon, trend, trendDirection, color = "blue", onClick, "data-testid": testId }) => {
   const colorClasses = {
     blue: "from-blue-500 to-blue-600",
     green: "from-green-500 to-green-600",
@@ -79,8 +80,14 @@ const KPICard = ({ title, value, subtitle, icon: Icon, trend, trendDirection, co
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 p-5 hover:shadow-md transition-shadow"
+      className={`bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 p-5 transition-shadow ${
+        onClick ? "cursor-pointer hover:shadow-md" : "hover:shadow-md"
+      }`}
       data-testid={testId}
+      onClick={onClick}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(e); } } : undefined}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
@@ -151,6 +158,7 @@ const HealthScoreGauge = ({ score }) => {
 export default function RILDashboardPage() {
   const navigate = useNavigate();
   const [copilotOpen, setCopilotOpen] = useState(false);
+  const [knowledgeGraphOpen, setKnowledgeGraphOpen] = useState(false);
 
   // Fetch executive dashboard data
   const { data: executiveData, isLoading: execLoading, refetch: refetchExec } = useQuery({
@@ -301,9 +309,10 @@ export default function RILDashboardPage() {
           <KPICard
             title="Knowledge Graph"
             value={exec.reliability_edges_total ?? "—"}
-            subtitle="Reliability graph edges"
+            subtitle="Reliability graph edges · Click to view ontology"
             icon={Link2}
             color="blue"
+            onClick={() => setKnowledgeGraphOpen(true)}
             data-testid="ril-kpi-reliability-edges"
           />
         </div>
@@ -606,6 +615,11 @@ export default function RILDashboardPage() {
 
       {/* Copilot Sidebar */}
       <RILCopilot open={copilotOpen} onClose={() => setCopilotOpen(false)} />
+      <ReliabilityKnowledgeGraphDialog
+        open={knowledgeGraphOpen}
+        onOpenChange={setKnowledgeGraphOpen}
+        totalEdges={exec.reliability_edges_total ?? 0}
+      />
     </div>
   );
 }

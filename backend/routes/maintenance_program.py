@@ -202,7 +202,16 @@ async def get_maintenance_program(
             "exists": False,
             "equipment_id": equipment_id,
             "pm_import_tasks_included": 0,
+            "strategy_tasks_included": 0,
         }
+
+    program, strategy_added = (
+        await MaintenanceProgramService.enrich_program_response_with_strategy_tasks(
+            program,
+            equipment_id,
+            user_id=user_id,
+        )
+    )
 
     equipment = await db.equipment_nodes.find_one(
         {"id": equipment_id},
@@ -233,6 +242,7 @@ async def get_maintenance_program(
         "equipment_id": equipment_id,
         "strategy_update_available": strategy_update_available,
         "pm_import_tasks_included": pm_added,
+        "strategy_tasks_included": strategy_added,
         "has_tasks": len(program.get("tasks") or []) > 0,
     }
 

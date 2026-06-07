@@ -149,6 +149,8 @@ export const rilDashboardAPI = {
   getIntelligence: async () => rilGet("/dashboard/intelligence"),
 
   getDataQuality: async () => rilGet("/dashboard/data-quality"),
+
+  getReliabilityGraphOntology: async () => rilGet("/dashboard/reliability-graph/ontology"),
 };
 
 // Export all APIs as a single object

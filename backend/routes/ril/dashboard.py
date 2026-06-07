@@ -349,3 +349,17 @@ async def get_equipment_reliability_chain(
         "chain": chain,
         "risk_explanation": risk,
     }
+
+
+@router.get("/reliability-graph/ontology")
+async def get_reliability_graph_ontology(
+    current_user: dict = Depends(_ril_read),
+):
+    """Reliability knowledge graph ontology schema and live edge counts."""
+    from services.reliability_ontology import get_reliability_ontology_payload
+
+    payload = await get_reliability_ontology_payload(current_user)
+    return {
+        **payload,
+        "generated_at": datetime.utcnow().isoformat(),
+    }

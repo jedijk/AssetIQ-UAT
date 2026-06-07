@@ -1,0 +1,75 @@
+"""
+Reliability knowledge graph ontology — node types, relations, and read API payload.
+"""
+from __future__ import annotations
+
+from typing import Any, Dict, List
+
+NODE_TYPES: List[Dict[str, Any]] = [
+    {"id": "equipment", "label": "Equipment", "domain": "shared", "color": "#3B82F6"},
+    {"id": "failure_mode", "label": "Failure Mode", "domain": "maintenance", "color": "#EF4444"},
+    {"id": "equipment_type_strategy", "label": "Strategy", "domain": "maintenance", "color": "#8B5CF6"},
+    {"id": "maintenance_program_v2", "label": "Program", "domain": "maintenance", "color": "#6366F1"},
+    {"id": "program_task", "label": "Program Task", "domain": "maintenance", "color": "#818CF8"},
+    {"id": "strategy_task_template", "label": "Task Template", "domain": "maintenance", "color": "#A78BFA"},
+    {"id": "scheduled_task", "label": "Scheduled Task", "domain": "maintenance", "color": "#14B8A6"},
+    {"id": "task_instance", "label": "Task Instance", "domain": "maintenance", "color": "#0D9488"},
+    {"id": "task_completion", "label": "Task Completion", "domain": "reactive", "color": "#64748B"},
+    {"id": "pm_import_task", "label": "PM Import", "domain": "maintenance", "color": "#A855F7"},
+    {"id": "finding", "label": "Finding", "domain": "reactive", "color": "#F59E0B"},
+    {"id": "observation", "label": "Observation", "domain": "reactive", "color": "#F97316"},
+    {"id": "threat", "label": "Threat", "domain": "reactive", "color": "#DC2626"},
+    {"id": "investigation", "label": "Investigation", "domain": "reactive", "color": "#7C3AED"},
+    {"id": "cause", "label": "Cause", "domain": "reactive", "color": "#9333EA"},
+    {"id": "action", "label": "Action", "domain": "reactive", "color": "#2563EB"},
+    {"id": "outcome", "label": "Outcome", "domain": "reactive", "color": "#059669"},
+    {"id": "reliability_impact", "label": "Reliability Impact", "domain": "reactive", "color": "#10B981"},
+]
+
+RELATIONS: List[Dict[str, Any]] = [
+    {"id": "has_failure_mode", "label": "has failure mode", "source": "equipment", "target": "failure_mode", "domain": "maintenance"},
+    {"id": "has_strategy_type", "label": "has strategy", "source": "equipment", "target": "equipment_type_strategy", "domain": "maintenance"},
+    {"id": "has_program", "label": "has program", "source": "equipment", "target": "maintenance_program_v2", "domain": "maintenance"},
+    {"id": "governed_by", "label": "governed by", "source": "maintenance_program_v2", "target": "equipment_type_strategy", "domain": "maintenance"},
+    {"id": "contains_task", "label": "contains task", "source": "maintenance_program_v2", "target": "program_task", "domain": "maintenance"},
+    {"id": "derived_from_template", "label": "derived from template", "source": "program_task", "target": "strategy_task_template", "domain": "maintenance"},
+    {"id": "mitigates_failure_mode", "label": "mitigates", "source": "program_task", "target": "failure_mode", "domain": "maintenance"},
+    {"id": "applied_to", "label": "applied to", "source": "pm_import_task", "target": "failure_mode", "domain": "maintenance"},
+    {"id": "derived_from", "label": "derived from", "source": "scheduled_task", "target": "program_task", "domain": "maintenance"},
+    {"id": "scheduled_for", "label": "scheduled for", "source": "scheduled_task", "target": "equipment", "domain": "maintenance"},
+    {"id": "instantiated_as", "label": "instantiated as", "source": "scheduled_task", "target": "task_instance", "domain": "maintenance"},
+    {"id": "executed_on", "label": "executed on", "source": "task_instance", "target": "equipment", "domain": "maintenance"},
+    {"id": "completed_on", "label": "completed on", "source": "scheduled_task", "target": "equipment", "domain": "maintenance"},
+    {"id": "cancelled_for", "label": "cancelled for", "source": "scheduled_task", "target": "program_task", "domain": "maintenance"},
+    {"id": "yielded_finding", "label": "yielded finding", "source": "task_completion", "target": "finding", "domain": "reactive"},
+    {"id": "found_on", "label": "found on", "source": "finding", "target": "equipment", "domain": "reactive"},
+    {"id": "raised_observation", "label": "raised observation", "source": "finding", "target": "observation", "domain": "reactive"},
+    {"id": "observed_on", "label": "observed on", "source": "observation", "target": "equipment", "domain": "reactive"},
+    {"id": "indicates_failure_mode", "label": "indicates failure mode", "source": "observation", "target": "failure_mode", "domain": "reactive"},
+    {"id": "escalated_to", "label": "escalated to", "source": "observation", "target": "threat", "domain": "reactive"},
+    {"id": "triggered_investigation", "label": "triggered investigation", "source": "threat", "target": "investigation", "domain": "reactive"},
+    {"id": "identified_cause", "label": "identified cause", "source": "investigation", "target": "cause", "domain": "reactive"},
+    {"id": "generated_action", "label": "generated action", "source": "investigation", "target": "action", "domain": "reactive"},
+    {"id": "assigned_to_equipment", "label": "assigned to equipment", "source": "action", "target": "equipment", "domain": "reactive"},
+    {"id": "resulted_in", "label": "resulted in", "source": "action", "target": "outcome", "domain": "reactive"},
+    {"id": "impacted_reliability", "label": "impacted reliability", "source": "outcome", "target": "reliability_impact", "domain": "reactive"},
+    {"id": "affects_equipment", "label": "affects equipment", "source": "reliability_impact", "target": "equipment", "domain": "reactive"},
+]
+
+
+async def get_reliability_ontology_payload(user=None) -> Dict[str, Any]:
+    """Return ontology schema plus live edge counts for visualization."""
+    from services.reliability_graph_query import count_edges_by_relation
+
+    edges_by_relation = await count_edges_by_relation(user, active_only=True)
+    total_edges = sum(edges_by_relation.values())
+    relations = [
+        {**rel, "edge_count": edges_by_relation.get(rel["id"], 0)}
+        for rel in RELATIONS
+    ]
+    return {
+        "node_types": NODE_TYPES,
+        "relations": relations,
+        "edges_by_relation": edges_by_relation,
+        "reliability_edges_total": total_edges,
+    }

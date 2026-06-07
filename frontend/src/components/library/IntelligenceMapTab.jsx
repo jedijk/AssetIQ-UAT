@@ -48,6 +48,7 @@ import { Switch } from "../ui/switch";
 import { Label } from "../ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { Progress } from "../ui/progress";
+import ReliabilityKnowledgeGraphDialog from "../ril/ReliabilityKnowledgeGraphDialog";
 import { Skeleton } from "../ui/skeleton";
 
 // Flow card component for the main intelligence flow
@@ -164,7 +165,7 @@ const FlowArrow = ({ label, value, color = "slate" }) => {
 };
 
 // Insight Card for the right panel
-const InsightCard = ({ title, value, unit, description, icon: Icon, color = "blue", trend, ...rest }) => {
+const InsightCard = ({ title, value, unit, description, icon: Icon, color = "blue", trend, onClick, className = "", ...rest }) => {
   const colorClasses = {
     blue: "border-blue-200 bg-blue-50/50",
     green: "border-green-200 bg-green-50/50",
@@ -182,7 +183,14 @@ const InsightCard = ({ title, value, unit, description, icon: Icon, color = "blu
   };
 
   return (
-    <div className={`p-3 rounded-lg border ${colorClasses[color]}`} {...rest}>
+    <div
+      className={`p-3 rounded-lg border ${colorClasses[color]} ${onClick ? "cursor-pointer hover:shadow-sm transition-shadow" : ""} ${className}`}
+      onClick={onClick}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(e); } } : undefined}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      {...rest}
+    >
       <div className="flex items-start justify-between mb-1">
         <span className="text-xs font-medium text-slate-600">{title}</span>
         {Icon && <Icon className={`w-4 h-4 ${iconClasses[color]}`} />}
@@ -456,6 +464,7 @@ const IntelligenceMapTab = () => {
   const [systemId, setSystemId] = useState("all");
   const [equipmentTypeId, setEquipmentTypeId] = useState("all");
   const [equipmentId, setEquipmentId] = useState("all");
+  const [knowledgeGraphOpen, setKnowledgeGraphOpen] = useState(false);
   // Fetch stats
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery({
     queryKey: ["intelligence-map-stats", plantId, systemId, equipmentTypeId, equipmentId],
@@ -834,10 +843,11 @@ const IntelligenceMapTab = () => {
                 unit="edges"
                 description={
                   insights.reliability_graph?.description ||
-                  "Reliability graph edges linking entities"
+                  "Reliability graph edges linking entities · Click to view ontology"
                 }
                 icon={Link2}
                 color="blue"
+                onClick={() => setKnowledgeGraphOpen(true)}
                 data-testid="intelligence-map-reliability-edges"
               />
 
@@ -952,6 +962,12 @@ const IntelligenceMapTab = () => {
           </Card>
         </div>
       </div>
+
+      <ReliabilityKnowledgeGraphDialog
+        open={knowledgeGraphOpen}
+        onOpenChange={setKnowledgeGraphOpen}
+        totalEdges={reliabilityEdgesTotal}
+      />
     </div>
   );
 };

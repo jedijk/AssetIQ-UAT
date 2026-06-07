@@ -16,4 +16,11 @@ test.describe('Intelligence Map (library)', () => {
       page.getByTestId('intelligence-map-reliability-edges').or(page.getByText('Knowledge Graph').first())
     ).toBeVisible();
   });
+
+  test('knowledge graph card opens ontology dialog', async ({ page }) => {
+    await page.getByTestId('intelligence-map-tab').click();
+    await page.getByTestId('intelligence-map-reliability-edges').click();
+    await expect(page.getByTestId('reliability-knowledge-graph-dialog')).toBeVisible();
+    await expect(page.getByTestId('reliability-knowledge-graph-svg')).toBeVisible();
+  });
 });

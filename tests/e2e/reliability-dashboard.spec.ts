@@ -16,4 +16,10 @@ test.describe('Reliability Intelligence Dashboard', () => {
     await expect(page.getByText('Strategy Coverage', { exact: false }).first()).toBeVisible();
     await expect(page.getByTestId('ril-kpi-reliability-edges')).toBeVisible();
   });
+
+  test('knowledge graph KPI opens ontology dialog', async ({ page }) => {
+    await page.getByTestId('ril-kpi-reliability-edges').click();
+    await expect(page.getByTestId('reliability-knowledge-graph-dialog')).toBeVisible();
+    await expect(page.getByTestId('reliability-knowledge-graph-svg')).toBeVisible();
+  });
 });
