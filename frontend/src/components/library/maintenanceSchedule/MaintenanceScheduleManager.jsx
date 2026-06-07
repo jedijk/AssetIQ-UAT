@@ -75,6 +75,14 @@ import { TaskListView } from "./TaskListView";
 import { ApplyStrategyDialog } from "./ApplyStrategyDialog";
 import { PlannerView } from "./PlannerView";
 import { TaskDetailsDialog } from "./TaskDetailsDialog";
+import { matchesMaintenanceSourceFilter } from "./taskSourceFilter";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../ui/select";
 
 export function MaintenanceScheduleManager({ equipmentType }) {
   const { t } = useLanguage();
@@ -90,6 +98,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
   const [unitFilterOpen, setUnitFilterOpen] = useState(false);
   const [selectedDisciplines, setSelectedDisciplines] = useState([]);
   const [disciplineFilterOpen, setDisciplineFilterOpen] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState("all");
 
   const equipmentTypeId = equipmentType?.id;
   const equipmentTypeName = equipmentType?.name || t("equipment.allEquipment");
@@ -215,8 +224,9 @@ export function MaintenanceScheduleManager({ equipmentType }) {
   const filterTask = useCallback((task) => {
     if (!task) return false;
     if (filteredEquipmentIds && !filteredEquipmentIds.has(task.equipment_id)) return false;
-    return matchesDisciplineFilter(task);
-  }, [filteredEquipmentIds, matchesDisciplineFilter]);
+    if (!matchesDisciplineFilter(task)) return false;
+    return matchesMaintenanceSourceFilter(task, sourceFilter);
+  }, [filteredEquipmentIds, matchesDisciplineFilter, sourceFilter]);
 
   const applyTaskListFilter = useCallback((items) => {
     if (!Array.isArray(items)) return items;
@@ -256,7 +266,8 @@ export function MaintenanceScheduleManager({ equipmentType }) {
     if (!timeline) return timeline;
     const hasUnitFilter = !!filteredEquipmentIds;
     const hasDisciplineFilter = selectedDisciplines.length > 0;
-    if (!hasUnitFilter && !hasDisciplineFilter) return timeline;
+    const hasSourceFilter = sourceFilter !== "all";
+    if (!hasUnitFilter && !hasDisciplineFilter && !hasSourceFilter) return timeline;
 
     const filterEquipmentList = (list) => {
       if (!Array.isArray(list)) return list;
@@ -274,7 +285,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
       timeline: filterEquipmentList(timeline.timeline),
       equipment: filterEquipmentList(timeline.equipment),
     };
-  }, [timeline, filteredEquipmentIds, selectedDisciplines, applyTaskListFilter]);
+  }, [timeline, filteredEquipmentIds, selectedDisciplines, sourceFilter, applyTaskListFilter]);
 
   const filteredTasksList = useMemo(
     () => applyTaskListFilter(tasksData?.tasks),
@@ -682,6 +693,40 @@ export function MaintenanceScheduleManager({ equipmentType }) {
             onClick={() => setSelectedDisciplines([])}
             className="h-8 text-xs"
             data-testid="clear-discipline-filter"
+          >
+            <X className="w-3.5 h-3.5 mr-1" />
+            {t("common.clear")}
+          </Button>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap" data-testid="task-source-filter-row">
+        <span className="text-sm font-medium text-slate-700">
+          {t("maintenance.scheduleSourceFilter")}:
+        </span>
+        <Select value={sourceFilter} onValueChange={setSourceFilter}>
+          <SelectTrigger className="w-44 h-9" data-testid="task-source-filter">
+            <SelectValue placeholder={t("maintenance.scheduleSourceAll")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all" data-testid="task-source-filter-all">
+              {t("maintenance.scheduleSourceAll")}
+            </SelectItem>
+            <SelectItem value="import" data-testid="task-source-filter-import">
+              {t("maintenance.scheduleSourceImport")}
+            </SelectItem>
+            <SelectItem value="strategy" data-testid="task-source-filter-strategy">
+              {t("maintenance.scheduleSourceStrategy")}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        {sourceFilter !== "all" && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setSourceFilter("all")}
+            className="h-8 text-xs"
+            data-testid="clear-task-source-filter"
           >
             <X className="w-3.5 h-3.5 mr-1" />
             {t("common.clear")}

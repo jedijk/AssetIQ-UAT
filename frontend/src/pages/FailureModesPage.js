@@ -126,7 +126,6 @@ const FailureModesPage = () => {
   const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all"); // generic, customer_specific, all
   const [highSeverityOnly, setHighSeverityOnly] = useState(false); // filter to severity >= 8
-  const [hideAIImproved, setHideAIImproved] = useState(false); // filter out FMs already improved by AI
   const [mainTab, setMainTab] = useState(() => searchParams.get("tab") || "failure-modes");
   const [libraryTab, setLibraryTab] = useState("equipment");
   const [strategyEquipmentTypeId, setStrategyEquipmentTypeId] = useState(
@@ -346,9 +345,6 @@ const FailureModesPage = () => {
   // Sort by severity desc, then RPN desc, so the most critical FMs surface first.
   const displayedFailureModes = useMemo(() => {
     let list = failureModes;
-    if (hideAIImproved) {
-      list = list.filter((fm) => !fm.ai_improved_at);
-    }
     if (filterLinkedToEquipment) {
       list = list.filter(isFailureModeLinkedToEquipment);
     }
@@ -362,12 +358,8 @@ const FailureModesPage = () => {
       });
     }
     return list;
-  }, [failureModes, highSeverityOnly, hideAIImproved, filterLinkedToEquipment, isFailureModeLinkedToEquipment]);
-  const displayedTotal = highSeverityOnly || hideAIImproved || filterLinkedToEquipment ? displayedFailureModes.length : totalModes;
-  const aiImprovedCount = useMemo(
-    () => failureModes.filter((fm) => fm.ai_improved_at).length,
-    [failureModes],
-  );
+  }, [failureModes, highSeverityOnly, filterLinkedToEquipment, isFailureModeLinkedToEquipment]);
+  const displayedTotal = highSeverityOnly || filterLinkedToEquipment ? displayedFailureModes.length : totalModes;
   const linkedFailureModeCount = useMemo(
     () => failureModes.filter(isFailureModeLinkedToEquipment).length,
     [failureModes, isFailureModeLinkedToEquipment],
@@ -904,13 +896,10 @@ const FailureModesPage = () => {
               totalCategories={totalCategories}
               highSeverityOnly={highSeverityOnly}
               setHighSeverityOnly={setHighSeverityOnly}
-              hideAIImproved={hideAIImproved}
-              setHideAIImproved={setHideAIImproved}
               filterLinkedToEquipment={filterLinkedToEquipment}
               setFilterLinkedToEquipment={setFilterLinkedToEquipment}
               linkedFailureModeCount={linkedFailureModeCount}
               canUseAITools={canUseAITools}
-              aiImprovedCount={aiImprovedCount}
               displayedFailureModes={displayedFailureModes}
               failureModes={failureModes}
               searchQuery={searchQuery}

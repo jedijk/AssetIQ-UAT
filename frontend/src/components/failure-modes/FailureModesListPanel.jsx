@@ -36,13 +36,10 @@ export function FailureModesListPanel({
   totalCategories,
   highSeverityOnly,
   setHighSeverityOnly,
-  hideAIImproved,
-  setHideAIImproved,
   filterLinkedToEquipment,
   setFilterLinkedToEquipment,
   linkedFailureModeCount,
   canUseAITools,
-  aiImprovedCount,
   displayedFailureModes,
   failureModes,
   searchQuery,
@@ -114,21 +111,20 @@ export function FailureModesListPanel({
         </label>
       </div>
 
-      <div className="mb-6 space-y-3" data-testid="filters">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[220px] sm:min-w-[260px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+      <div className="mb-6 flex flex-wrap items-center gap-2" data-testid="filters">
+          <div className="relative w-[148px] sm:w-[168px] shrink-0">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input
               placeholder={t("library.searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-11 w-full"
+              className="pl-8 h-9 w-full text-sm"
               data-testid="search-input"
             />
           </div>
           <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
-            <SelectTrigger className="w-44 h-11" data-testid="category-filter">
-              <Filter className="w-4 h-4 mr-2 text-slate-400" />
+            <SelectTrigger className="w-[132px] h-9 text-sm" data-testid="category-filter">
+              <Filter className="w-3.5 h-3.5 mr-1.5 text-slate-400 shrink-0" />
               <SelectValue placeholder={t("disciplines.allDisciplines")} />
             </SelectTrigger>
             <SelectContent>
@@ -141,7 +137,7 @@ export function FailureModesListPanel({
             </SelectContent>
           </Select>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-44 h-11" data-testid="type-filter">
+            <SelectTrigger className="w-[132px] h-9 text-sm" data-testid="type-filter">
               <SelectValue placeholder="All Types" />
             </SelectTrigger>
             <SelectContent>
@@ -172,7 +168,7 @@ export function FailureModesListPanel({
             type="button"
             onClick={() => setHighSeverityOnly((v) => !v)}
             variant="outline"
-            className={`h-11 ${
+            className={`h-9 px-2.5 text-sm shrink-0 ${
               highSeverityOnly
                 ? "border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
                 : "border-slate-200 text-slate-700 hover:bg-slate-50"
@@ -181,7 +177,7 @@ export function FailureModesListPanel({
             title="Show only failure modes with severity ≥ 8 (high), sorted by severity then RPN"
             aria-pressed={highSeverityOnly}
           >
-            <AlertTriangle className="w-4 h-4 mr-1" />
+            <AlertTriangle className="w-3.5 h-3.5 mr-1" />
             High Severity
             {highSeverityOnly && (
               <span className="ml-1 text-xs font-semibold bg-red-100 text-red-700 px-1.5 rounded">
@@ -189,30 +185,27 @@ export function FailureModesListPanel({
               </span>
             )}
           </Button>
-        </div>
-        <div className="flex flex-wrap items-start gap-2" data-testid="action-bar">
           <Button
             onClick={handleExportExcel}
             variant="outline"
-            className="h-11"
+            className="h-9 px-2.5 text-sm shrink-0"
             disabled={isExporting}
             data-testid="export-excel-btn"
           >
-            <Download className="w-4 h-4 mr-1" />
+            <Download className="w-3.5 h-3.5 mr-1" />
             {isExporting ? t("common.exporting") || "Exporting..." : t("library.exportExcel") || "Export Excel"}
           </Button>
           {(canUseAITools || isOwner) && (
-            <div className="flex flex-col gap-2 w-fit">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  className="h-11 w-full border-purple-200 text-purple-700 hover:bg-purple-50"
+                  className="h-9 px-2.5 text-sm shrink-0 border-purple-200 text-purple-700 hover:bg-purple-50"
                   data-testid="ai-actions-menu-btn"
                 >
-                  <Sparkles className="w-4 h-4 mr-1" />
+                  <Sparkles className="w-3.5 h-3.5 mr-1" />
                   AI
-                  <ChevronDown className="w-4 h-4 ml-1" />
+                  <ChevronDown className="w-3.5 h-3.5 ml-1" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56">
@@ -269,43 +262,14 @@ export function FailureModesListPanel({
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
-            {canUseAITools && (
-              <Button
-                type="button"
-                onClick={() => setHideAIImproved((v) => !v)}
-                variant="outline"
-                className={`h-11 w-full justify-start ${
-                  hideAIImproved
-                    ? "border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100"
-                    : "border-slate-200 text-slate-700 hover:bg-slate-50"
-                }`}
-                data-testid="hide-ai-improved-toggle"
-                title={`Hide failure modes already improved by AI (${aiImprovedCount} marked)`}
-                aria-pressed={hideAIImproved}
-              >
-                <Sparkles className="w-4 h-4 mr-1" />
-                Not improved yet
-                {aiImprovedCount > 0 && (
-                  <span
-                    className={`ml-1 text-xs font-semibold px-1.5 rounded ${
-                      hideAIImproved ? "bg-purple-100 text-purple-700" : "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {aiImprovedCount} done
-                  </span>
-                )}
-              </Button>
-            )}
-            </div>
           )}
           <Button
             onClick={onOpenNewFm}
-            className="h-11 bg-blue-600 hover:bg-blue-700 ml-auto"
+            className="h-9 px-2.5 text-sm bg-blue-600 hover:bg-blue-700 shrink-0 ml-auto"
             data-testid="add-failure-mode-btn"
           >
-            <Plus className="w-4 h-4 mr-1" /> {t("library.addFailureMode")}
+            <Plus className="w-3.5 h-3.5 mr-1" /> {t("library.addFailureMode")}
           </Button>
-        </div>
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -324,9 +288,7 @@ export function FailureModesListPanel({
             </div>
             <h3 className="text-xl font-semibold text-slate-700 mb-2">{t("library.noMatches")}</h3>
             <p className="text-slate-500">
-              {hideAIImproved && failureModes.some((fm) => fm.ai_improved_at)
-                ? "All visible failure modes have already been improved by AI. Toggle off to see them again."
-                : highSeverityOnly
+              {highSeverityOnly
                 ? "No failure modes with severity ≥ 8. Toggle off to see all."
                 : t("library.tryAdjusting")}
             </p>

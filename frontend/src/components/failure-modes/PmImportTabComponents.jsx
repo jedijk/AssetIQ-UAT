@@ -9,6 +9,7 @@ import {
   Brain,
   ChevronDown,
   CheckCircle,
+  Check,
   X,
   Edit,
   Trash2,
@@ -36,6 +37,19 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+  PopoverTrigger,
+} from "../ui/popover";
+import { cn } from "../../lib/utils";
+import {
+  DISCIPLINES,
+  getDisciplineColor,
+  getDisciplineLabel,
+  normalizeDiscipline,
+} from "../../constants/disciplines";
 import { toast } from "sonner";
 import { pmImportAPI, isPmImportFinalized, isPmImportReviewAccepted, getPmImportStatusDisplay } from "../../lib/apis/pmImport";
 import { AIReviewModal } from "../library/AIReviewModal";
@@ -54,7 +68,8 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
   const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterDiscipline, setFilterDiscipline] = useState('all');
+  const [selectedDisciplines, setSelectedDisciplines] = useState([]);
+  const [disciplineFilterOpen, setDisciplineFilterOpen] = useState(false);
   const [filterFrequency, setFilterFrequency] = useState('all');
   const [editingTask, setEditingTask] = useState(null);
   const [mappingTask, setMappingTask] = useState(null); // {task, mode: 'equipment'|'equipment-type'|'failure-modes'}
@@ -126,15 +141,7 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
     return Array.from(sessionMap.values()).filter(s => s.accepted > 0);
   }, [allTasks]);
   
-  // Get unique disciplines and frequencies for filters
-  const disciplines = useMemo(() => {
-    const set = new Set();
-    allTasks.forEach(task => {
-      if (task.discipline) set.add(task.discipline);
-    });
-    return Array.from(set).sort();
-  }, [allTasks]);
-  
+  // Get unique frequencies for filters
   const frequencies = useMemo(() => {
     const set = new Set();
     allTasks.forEach(task => {
@@ -143,6 +150,34 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
     return Array.from(set).sort();
   }, [allTasks]);
   
+  }, [allTasks]);
+  
+  const toggleDiscipline = (value) => {
+    setSelectedDisciplines((prev) =>
+      prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value]
+    );
+  };
+
+  const getDisciplineFilterLabel = () => {
+    if (selectedDisciplines.length === 0) {
+      return t("disciplines.allDisciplines");
+    }
+    if (selectedDisciplines.length === 1) {
+      return getDisciplineLabel(selectedDisciplines[0]);
+    }
+    return `${getDisciplineLabel(selectedDisciplines[0])} +${selectedDisciplines.length - 1}`;
+  };
+
+  const matchesDisciplineFilter = (task) => {
+    if (selectedDisciplines.length === 0) return true;
+    const disc = normalizeDiscipline(task?.discipline) || (task?.discipline || "").toLowerCase();
+    if (!disc) return false;
+    return selectedDisciplines.some((d) => {
+      const dl = d.toLowerCase();
+      return disc === dl || disc.includes(dl) || dl.includes(disc);
+    });
+  };
+
   // Filter tasks
   const filteredTasks = useMemo(() => {
     return allTasks.filter(task => {
@@ -153,6 +188,7 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
           task.equipment?.toLowerCase().includes(term) ||
           task.description?.toLowerCase().includes(term) ||
           task.discipline?.toLowerCase().includes(term) ||
+          getDisciplineLabel(task.discipline).toLowerCase().includes(term) ||
           task.equipment_tag?.toLowerCase().includes(term) ||
           task.equipment_description?.toLowerCase().includes(term) ||
           task.task_description?.toLowerCase().includes(term) ||
@@ -160,8 +196,8 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
           task.equipment_match?.equipment_type_name?.toLowerCase().includes(term);
         if (!matchesSearch) return false;
       }
-      
-      if (filterDiscipline !== 'all' && task.discipline !== filterDiscipline) {
+
+      if (!matchesDisciplineFilter(task)) {
         return false;
       }
       
@@ -171,7 +207,7 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
       
       return true;
     });
-  }, [allTasks, searchTerm, filterDiscipline, filterFrequency]);
+  }, [allTasks, searchTerm, selectedDisciplines, filterFrequency]);
   
   // Stats
   const totalTasks = allTasks.length;
@@ -179,16 +215,12 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
   
   const getDisciplineBadge = (discipline) => {
     if (!discipline) return null;
-    const colors = {
-      mechanical: 'bg-blue-100 text-blue-700',
-      electrical: 'bg-yellow-100 text-yellow-700',
-      instrumentation: 'bg-purple-100 text-purple-700',
-      rotating: 'bg-orange-100 text-orange-700',
-      static: 'bg-teal-100 text-teal-700',
-      process: 'bg-green-100 text-green-700',
-    };
-    const color = colors[discipline.toLowerCase()] || 'bg-gray-100 text-gray-700';
-    return <Badge variant="outline" className={`${color} text-xs`}>{discipline}</Badge>;
+    const color = getDisciplineColor(discipline);
+    return (
+      <Badge variant="outline" className={`${color} text-xs`}>
+        {getDisciplineLabel(discipline)}
+      </Badge>
+    );
   };
   
   const getFrequencyBadge = (frequency) => {
@@ -300,8 +332,8 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
       </div>
       
       {/* Filters */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1">
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             value={searchTerm}
@@ -310,18 +342,92 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
             className="pl-9"
           />
         </div>
-        
-        <Select value={filterDiscipline} onValueChange={setFilterDiscipline}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Discipline" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Disciplines</SelectItem>
-            {disciplines.map(d => (
-              <SelectItem key={d} value={d}>{d}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+
+        <Popover open={disciplineFilterOpen} onOpenChange={setDisciplineFilterOpen} modal={false}>
+          <PopoverAnchor asChild>
+            <div className="w-52">
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={disciplineFilterOpen}
+                  className="w-full justify-between font-normal h-10"
+                  data-testid="pm-import-discipline-filter"
+                >
+                  <span
+                    className={cn(
+                      "truncate",
+                      selectedDisciplines.length > 0 ? "text-slate-900" : "text-slate-500"
+                    )}
+                  >
+                    {getDisciplineFilterLabel()}
+                  </span>
+                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+            </div>
+          </PopoverAnchor>
+          <PopoverContent
+            className="w-[var(--radix-popover-trigger-width)] p-0"
+            align="start"
+            side="bottom"
+            sideOffset={4}
+            avoidCollisions={false}
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
+            <div className="p-2 border-b border-slate-100">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start h-8 text-sm"
+                onClick={() => setSelectedDisciplines([])}
+                data-testid="pm-import-discipline-filter-all"
+              >
+                {t("disciplines.allDisciplines")}
+              </Button>
+            </div>
+            <ScrollArea className="max-h-64">
+              <div className="p-1">
+                {DISCIPLINES.map((disc) => {
+                  const isSelected = selectedDisciplines.includes(disc.value);
+                  return (
+                    <button
+                      key={disc.value}
+                      type="button"
+                      onClick={() => toggleDiscipline(disc.value)}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 sm:py-2 rounded-md hover:bg-slate-50 text-left"
+                      data-testid={`pm-import-discipline-filter-${disc.value}`}
+                    >
+                      <span
+                        aria-hidden
+                        className={cn(
+                          "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-slate-300",
+                          isSelected && "border-primary bg-primary text-primary-foreground"
+                        )}
+                      >
+                        {isSelected ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
+                      </span>
+                      <span className="text-sm text-slate-700 flex-1">{disc.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          </PopoverContent>
+        </Popover>
+        {selectedDisciplines.length > 0 && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setSelectedDisciplines([])}
+            className="h-8 text-xs"
+            data-testid="pm-import-clear-discipline-filter"
+          >
+            <X className="w-3.5 h-3.5 mr-1" />
+            {t("common.clear")}
+          </Button>
+        )}
         
         <Select value={filterFrequency} onValueChange={setFilterFrequency}>
           <SelectTrigger className="w-40">
@@ -674,7 +780,6 @@ const PMTaskEditDialog = ({ task, onClose, onSave, saving }) => {
   const [form, setForm] = useState({});
   
   const TASK_TYPES = ['PM', 'PDM', 'CBM', 'CM'];
-  const DISCIPLINES = ['Mechanical', 'Electrical', 'Instrumentation', 'Process', 'Civil', 'Operations', 'HVAC'];
   const FREQUENCIES = ['Daily', 'Weekly', 'Biweekly', 'Monthly', 'Quarterly', 'Semi-Annual', 'Annual', 'Every 2 Years', 'Every 3 Years', 'Condition Based', 'One Time'];
   
   useEffect(() => {
@@ -684,7 +789,7 @@ const PMTaskEditDialog = ({ task, onClose, onSave, saving }) => {
         equipment_description: task.equipment_description || '',
         task_description: task.task_description || '',
         task_type: (task.task_type || 'PM').toUpperCase(),
-        discipline: task.discipline || 'Mechanical',
+        discipline: normalizeDiscipline(task.discipline) || 'rotating',
         frequency: task.frequency || 'Monthly',
         estimated_hours: task.estimated_hours ?? 0.5,
       });
@@ -748,15 +853,15 @@ const PMTaskEditDialog = ({ task, onClose, onSave, saving }) => {
             <div>
               <Label>Discipline</Label>
               <Select
-                value={form.discipline || 'Mechanical'}
+                value={form.discipline || 'rotating'}
                 onValueChange={(v) => setForm({ ...form, discipline: v })}
               >
                 <SelectTrigger data-testid="pm-edit-discipline">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {DISCIPLINES.map(d => (
-                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                  {DISCIPLINES.map((d) => (
+                    <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
