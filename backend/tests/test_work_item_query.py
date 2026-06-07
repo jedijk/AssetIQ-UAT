@@ -12,10 +12,11 @@ from services.work_item_query import (
     serialize_scheduled_task_as_work_item,
     serialize_task,
     serialize_action_as_task,
-    should_exclude_pm_import_overdue_from_my_tasks,
+    should_exclude_pm_import_from_my_tasks,
+    should_exclude_unbridged_scheduled_task_from_my_tasks,
     work_item_sort_key,
 )
-from services.work_execution_config import work_items_source_mode
+from services.work_execution_config import should_include_unbridged_work_items, work_items_source_mode
 from services.tenant_schema import merge_tenant_filter
 
 
@@ -148,8 +149,7 @@ def test_work_items_source_mode_v2_instances(monkeypatch):
     assert work_items_source_mode() == "v2_instances"
 
 
-def test_pm_import_overdue_scheduled_task_excluded_from_my_tasks():
-    now = datetime(2026, 6, 5, 12, 0, tzinfo=timezone.utc)
+def test_pm_import_excluded_from_my_tasks():
     overdue = {
         "pm_import_task_id": "pm-1",
         "task_source": "customer_imported",
@@ -160,17 +160,23 @@ def test_pm_import_overdue_scheduled_task_excluded_from_my_tasks():
         "task_source": "customer_imported",
         "due_date": "2026-06-10",
     }
-    native_overdue = {
+    native = {
         "task_source": "maintenance_v2",
         "due_date": "2026-06-01",
     }
-    assert should_exclude_pm_import_overdue_from_my_tasks(scheduled_task=overdue, now=now)
-    assert not should_exclude_pm_import_overdue_from_my_tasks(scheduled_task=upcoming, now=now)
-    assert not should_exclude_pm_import_overdue_from_my_tasks(scheduled_task=native_overdue, now=now)
+    assert should_exclude_pm_import_from_my_tasks(scheduled_task=overdue)
+    assert should_exclude_pm_import_from_my_tasks(scheduled_task=upcoming)
+    assert not should_exclude_pm_import_from_my_tasks(scheduled_task=native)
 
 
-def test_pm_import_overdue_task_instance_excluded_from_my_tasks():
-    now = datetime(2026, 6, 5, 12, 0, tzinfo=timezone.utc)
+def test_program_unbridged_scheduled_tasks_excluded_from_my_tasks():
+    strategy = {"task_source": "strategy_generated", "due_date": "2026-06-10"}
+    manual = {"task_source": "manual", "due_date": "2026-06-10"}
+    assert should_exclude_unbridged_scheduled_task_from_my_tasks(strategy)
+    assert should_exclude_unbridged_scheduled_task_from_my_tasks(manual)
+
+
+def test_pm_import_task_instances_excluded_from_my_tasks():
     overdue = {
         "source_type": "customer_imported",
         "status": "overdue",
@@ -182,14 +188,19 @@ def test_pm_import_overdue_task_instance_excluded_from_my_tasks():
         "status": "pending",
         "due_date": datetime(2026, 6, 10, tzinfo=timezone.utc),
     }
-    native_overdue = {
+    native = {
         "source_type": "maintenance",
-        "status": "overdue",
-        "due_date": datetime(2026, 6, 1, tzinfo=timezone.utc),
+        "status": "pending",
+        "due_date": datetime(2026, 6, 10, tzinfo=timezone.utc),
     }
-    assert should_exclude_pm_import_overdue_from_my_tasks(task_instance=overdue, now=now)
-    assert not should_exclude_pm_import_overdue_from_my_tasks(task_instance=upcoming, now=now)
-    assert not should_exclude_pm_import_overdue_from_my_tasks(task_instance=native_overdue, now=now)
+    assert should_exclude_pm_import_from_my_tasks(task_instance=overdue)
+    assert should_exclude_pm_import_from_my_tasks(task_instance=upcoming)
+    assert not should_exclude_pm_import_from_my_tasks(task_instance=native)
+
+
+def test_unbridged_work_items_off_by_default(monkeypatch):
+    monkeypatch.delenv("WORK_ITEMS_INCLUDE_UNBRIDGED", raising=False)
+    assert asyncio.run(should_include_unbridged_work_items()) is False
 
 
 def test_parse_scheduled_work_item_id():

@@ -52,13 +52,13 @@ async def should_include_unbridged_work_items() -> bool:
 
     WORK_ITEMS_INCLUDE_UNBRIDGED:
       - true: always include (when source mode is hybrid)
-      - false: never include
-      - auto (default): include only when bridge is disabled or has not synced recently
+      - false: never include (default — wait for bridge cron / task_instances)
+      - auto: include only when bridge is disabled or has not synced recently
     """
     if work_items_source_mode() == "v2_instances":
         return False
 
-    raw = (os.getenv("WORK_ITEMS_INCLUDE_UNBRIDGED") or "true").strip().lower()
+    raw = (os.getenv("WORK_ITEMS_INCLUDE_UNBRIDGED") or "false").strip().lower()
     if raw in ("0", "false", "no"):
         return False
     if raw in ("1", "true", "yes"):

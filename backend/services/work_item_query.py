@@ -79,14 +79,30 @@ def _is_pm_import_task_instance(task: dict) -> bool:
     return False
 
 
-def _task_instance_is_overdue(task: dict, today_start: datetime) -> bool:
-    if task.get("status") == "overdue":
-        return True
-    due = task.get("due_date")
-    if isinstance(due, datetime):
-        due_cmp = due if due.tzinfo else due.replace(tzinfo=timezone.utc)
-        return due_cmp < today_start
+def should_exclude_pm_import_from_my_tasks(
+    *,
+    scheduled_task: Optional[dict] = None,
+    task_instance: Optional[dict] = None,
+) -> bool:
+    """PM Import belongs on Maintenance Schedule — never show in My Tasks."""
+    if scheduled_task is not None:
+        return _is_pm_import_scheduled_task(scheduled_task)
+    if task_instance is not None:
+        return _is_pm_import_task_instance(task_instance)
     return False
+
+
+def _is_program_scheduled_task(scheduled_task: dict) -> bool:
+    """Strategy/program PM rows should only appear after the bridge cron creates instances."""
+    if _is_pm_import_scheduled_task(scheduled_task):
+        return True
+    source = (scheduled_task.get("task_source") or "strategy_generated").lower()
+    return source in ("strategy_generated", "customer_imported", "manual")
+
+
+def should_exclude_unbridged_scheduled_task_from_my_tasks(scheduled_task: dict) -> bool:
+    """Unbridged scheduled_tasks are planning artifacts until task_instances exist."""
+    return _is_program_scheduled_task(scheduled_task)
 
 
 def should_exclude_pm_import_overdue_from_my_tasks(
@@ -95,19 +111,11 @@ def should_exclude_pm_import_overdue_from_my_tasks(
     task_instance: Optional[dict] = None,
     now: Optional[datetime] = None,
 ) -> bool:
-    """PM Import schedule rows are planning artifacts — hide when overdue in My Tasks."""
-    now = now or datetime.now(timezone.utc)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    if scheduled_task is not None:
-        if not _is_pm_import_scheduled_task(scheduled_task):
-            return False
-        due = _parse_due_date(scheduled_task.get("due_date"))
-        return due is not None and due < now
-    if task_instance is not None:
-        if not _is_pm_import_task_instance(task_instance):
-            return False
-        return _task_instance_is_overdue(task_instance, today_start)
-    return False
+    """Deprecated alias — PM import is excluded from My Tasks entirely."""
+    return should_exclude_pm_import_from_my_tasks(
+        scheduled_task=scheduled_task,
+        task_instance=task_instance,
+    )
 
 
 def serialize_scheduled_task_as_work_item(
@@ -353,7 +361,7 @@ async def fetch_unbridged_maintenance_work_items(
         if not sched_id or sched_id in existing_set:
             continue
 
-        if should_exclude_pm_import_overdue_from_my_tasks(scheduled_task=st, now=now):
+        if should_exclude_unbridged_scheduled_task_from_my_tasks(st):
             continue
 
         fp = _work_item_dedupe_key(
@@ -781,7 +789,7 @@ async def fetch_work_items(
 
     items: List[dict] = []
     for task in raw_tasks:
-        if should_exclude_pm_import_overdue_from_my_tasks(task_instance=task, now=now):
+        if should_exclude_pm_import_from_my_tasks(task_instance=task):
             continue
         if task.get("equipment_id"):
             eid = str(task["equipment_id"])
