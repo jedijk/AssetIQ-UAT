@@ -20,6 +20,8 @@ export function PlannerView({ equipmentTypeId, onTaskClick, filteredEquipmentIds
     return list.filter((t) => t && filteredEquipmentIds.has(t.equipment_id));
   };
 
+  const shouldFilterTasks = Boolean(filterTask || filteredEquipmentIds);
+
   // ---- Daily uses dedicated endpoint (overdue / today / tomorrow buckets) ----
   const { data: dailyData, isLoading: dailyLoading } = useQuery({
     queryKey: ["maintenance-scheduler-daily-planner", equipmentTypeId || "all"],
@@ -188,7 +190,7 @@ export function PlannerView({ equipmentTypeId, onTaskClick, filteredEquipmentIds
           {horizon === "daily" && (
             <DailyPlanner
               data={
-                dailyData && filteredEquipmentIds
+                dailyData && shouldFilterTasks
                   ? {
                       ...dailyData,
                       overdue: dailyData.overdue
@@ -209,7 +211,7 @@ export function PlannerView({ equipmentTypeId, onTaskClick, filteredEquipmentIds
           {horizon === "weekly" && (
             <WeeklyGrid
               days={
-                filteredEquipmentIds
+                shouldFilterTasks
                   ? (weeklyData?.days || []).map((d) => ({
                       ...d,
                       tasks: filterTasks(d.tasks || []),
