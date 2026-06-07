@@ -12,7 +12,6 @@ import { publicAssetUrl } from "../lib/assetUrl";
 import { authAPI } from "../lib/apis/auth";
 import { parseAuthError, formatCountdown, buildUnlockMailto } from "../lib/authErrors";
 import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
-import EnvironmentRibbon from "../components/EnvironmentRibbon";
 
 const OIDC_STATE_KEY = "oidc_state";
 
@@ -264,7 +263,6 @@ const LoginPage = () => {
 
   return (
     <>
-      <EnvironmentRibbon />
       <div className="login-page-container">
       {/* Mobile Video Background - positioned at container level */}
       <video 

@@ -85,7 +85,6 @@ import {
   DialogDescription,
 } from "../components/ui/dialog";
 import { Label } from "../components/ui/label";
-import { Checkbox } from "../components/ui/checkbox";
 import { Calendar } from "../components/ui/calendar";
 import {
   Popover,
@@ -1120,16 +1119,19 @@ const MyTasksPage = () => {
                         key={disc.value}
                         type="button"
                         onClick={() => toggleDiscipline(disc.value)}
-                        className="w-full px-3 py-2 flex items-center gap-2 hover:bg-slate-50 transition-colors text-left"
+                        className="w-full px-3 py-1.5 sm:py-2 flex items-center gap-2 hover:bg-slate-50 transition-colors text-left"
                         data-testid={`discipline-option-${disc.value}`}
                       >
-                        <Checkbox
-                          checked={isSelected}
-                          className="pointer-events-none"
+                        <span
                           aria-hidden
-                        />
+                          className={cn(
+                            "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-slate-300",
+                            isSelected && "border-primary bg-primary text-primary-foreground"
+                          )}
+                        >
+                          {isSelected ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
+                        </span>
                         <span className="text-sm text-slate-700 flex-1">{disc.label}</span>
-                        {isSelected && <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />}
                       </button>
                     );
                   })}

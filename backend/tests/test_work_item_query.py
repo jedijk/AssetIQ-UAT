@@ -12,6 +12,7 @@ from services.work_item_query import (
     serialize_scheduled_task_as_work_item,
     serialize_task,
     serialize_action_as_task,
+    should_exclude_pm_import_overdue_from_my_tasks,
     work_item_sort_key,
 )
 from services.work_execution_config import work_items_source_mode
@@ -145,6 +146,50 @@ def test_work_items_source_mode_defaults_hybrid(monkeypatch):
 def test_work_items_source_mode_v2_instances(monkeypatch):
     monkeypatch.setenv("WORK_ITEMS_SOURCE", "v2_instances")
     assert work_items_source_mode() == "v2_instances"
+
+
+def test_pm_import_overdue_scheduled_task_excluded_from_my_tasks():
+    now = datetime(2026, 6, 5, 12, 0, tzinfo=timezone.utc)
+    overdue = {
+        "pm_import_task_id": "pm-1",
+        "task_source": "customer_imported",
+        "due_date": "2026-06-01",
+    }
+    upcoming = {
+        "pm_import_task_id": "pm-2",
+        "task_source": "customer_imported",
+        "due_date": "2026-06-10",
+    }
+    native_overdue = {
+        "task_source": "maintenance_v2",
+        "due_date": "2026-06-01",
+    }
+    assert should_exclude_pm_import_overdue_from_my_tasks(scheduled_task=overdue, now=now)
+    assert not should_exclude_pm_import_overdue_from_my_tasks(scheduled_task=upcoming, now=now)
+    assert not should_exclude_pm_import_overdue_from_my_tasks(scheduled_task=native_overdue, now=now)
+
+
+def test_pm_import_overdue_task_instance_excluded_from_my_tasks():
+    now = datetime(2026, 6, 5, 12, 0, tzinfo=timezone.utc)
+    overdue = {
+        "source_type": "customer_imported",
+        "status": "overdue",
+        "due_date": datetime(2026, 6, 1, tzinfo=timezone.utc),
+        "form_data": {"pm_import_task_id": "pm-1"},
+    }
+    upcoming = {
+        "v2_task_id": "pm-import:prog-1",
+        "status": "pending",
+        "due_date": datetime(2026, 6, 10, tzinfo=timezone.utc),
+    }
+    native_overdue = {
+        "source_type": "maintenance",
+        "status": "overdue",
+        "due_date": datetime(2026, 6, 1, tzinfo=timezone.utc),
+    }
+    assert should_exclude_pm_import_overdue_from_my_tasks(task_instance=overdue, now=now)
+    assert not should_exclude_pm_import_overdue_from_my_tasks(task_instance=upcoming, now=now)
+    assert not should_exclude_pm_import_overdue_from_my_tasks(task_instance=native_overdue, now=now)
 
 
 def test_apply_strategy_handler_requires_payload():

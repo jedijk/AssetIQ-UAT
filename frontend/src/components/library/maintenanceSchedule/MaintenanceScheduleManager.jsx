@@ -43,6 +43,7 @@ import {
 } from "../../ui/tooltip";
 import {
   Popover,
+  PopoverAnchor,
   PopoverContent,
   PopoverTrigger,
 } from "../../ui/popover";
@@ -55,7 +56,6 @@ import {
   CommandList,
 } from "../../ui/command";
 import { ScrollArea } from "../../ui/scroll-area";
-import { Checkbox } from "../../ui/checkbox";
 import { cn } from "../../../lib/utils";
 import {
   DISCIPLINES,
@@ -495,13 +495,15 @@ export function MaintenanceScheduleManager({ equipmentType }) {
       {/* Equipment Unit Filter (searchable by name OR tag) */}
       <div className="flex items-center gap-2 flex-wrap" data-testid="equipment-unit-filter-row">
         <span className="text-sm font-medium text-slate-700">{t("maintenance.equipmentUnit")}:</span>
-        <Popover open={unitFilterOpen} onOpenChange={setUnitFilterOpen}>
+        <Popover open={unitFilterOpen} onOpenChange={setUnitFilterOpen} modal={false}>
+          <PopoverAnchor asChild>
+            <div className="w-72">
           <PopoverTrigger asChild>
             <Button
               variant="outline"
               role="combobox"
               aria-expanded={unitFilterOpen}
-              className="w-72 justify-between font-normal"
+              className="w-full justify-between font-normal"
               data-testid="equipment-unit-filter"
             >
               {selectedUnitId ? (() => {
@@ -523,7 +525,16 @@ export function MaintenanceScheduleManager({ equipmentType }) {
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-72 p-0" align="start">
+            </div>
+          </PopoverAnchor>
+          <PopoverContent
+            className="w-[var(--radix-popover-trigger-width)] p-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[side=bottom]:slide-in-from-top-1 duration-150"
+            align="start"
+            side="bottom"
+            sideOffset={4}
+            avoidCollisions={false}
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
             <Command
               filter={(value, search) => {
                 // value carries "name|tag" — match either substring
@@ -589,13 +600,15 @@ export function MaintenanceScheduleManager({ equipmentType }) {
         )}
 
         <span className="text-sm font-medium text-slate-700">{t("maintenance.discipline")}:</span>
-        <Popover open={disciplineFilterOpen} onOpenChange={setDisciplineFilterOpen}>
+        <Popover open={disciplineFilterOpen} onOpenChange={setDisciplineFilterOpen} modal={false}>
+          <PopoverAnchor asChild>
+            <div className="w-56">
           <PopoverTrigger asChild>
             <Button
               variant="outline"
               role="combobox"
               aria-expanded={disciplineFilterOpen}
-              className="w-56 justify-between font-normal"
+              className="w-full justify-between font-normal"
               data-testid="discipline-filter"
             >
               <span
@@ -609,7 +622,16 @@ export function MaintenanceScheduleManager({ equipmentType }) {
               <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-56 p-0" align="start">
+            </div>
+          </PopoverAnchor>
+          <PopoverContent
+            className="w-[var(--radix-popover-trigger-width)] p-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[side=bottom]:slide-in-from-top-1 duration-150"
+            align="start"
+            side="bottom"
+            sideOffset={4}
+            avoidCollisions={false}
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
             <div className="p-2 border-b border-slate-100">
               <Button
                 type="button"
@@ -631,14 +653,21 @@ export function MaintenanceScheduleManager({ equipmentType }) {
                       key={disc.value}
                       type="button"
                       onClick={() => toggleDiscipline(disc.value)}
-                      className="w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-slate-50 text-left"
+                      className="w-full flex items-center gap-2 px-2 py-1.5 sm:py-2 rounded-md hover:bg-slate-50 text-left"
                       data-testid={`discipline-filter-option-${disc.value}`}
                     >
-                      <Checkbox checked={isSelected} className="pointer-events-none" aria-hidden />
+                      <span
+                        aria-hidden
+                        className={cn(
+                          "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-slate-300",
+                          isSelected && "border-primary bg-primary text-primary-foreground"
+                        )}
+                      >
+                        {isSelected ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
+                      </span>
                       <span className="text-sm text-slate-700 flex-1">
                         {getDisciplineOptionLabel(disc.value)}
                       </span>
-                      {isSelected && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
                     </button>
                   );
                 })}

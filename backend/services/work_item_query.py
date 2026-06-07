@@ -60,6 +60,56 @@ def _safe_iso(value: Any) -> Optional[str]:
     return str(value)
 
 
+def _is_pm_import_scheduled_task(scheduled_task: dict) -> bool:
+    if scheduled_task.get("pm_import_task_id"):
+        return True
+    return (scheduled_task.get("task_source") or "").lower() == "customer_imported"
+
+
+def _is_pm_import_task_instance(task: dict) -> bool:
+    if (task.get("source_type") or "").lower() == "customer_imported":
+        return True
+    form_data = task.get("form_data") or {}
+    if form_data.get("pm_import_task_id"):
+        return True
+    for key in ("v2_task_id", "maintenance_program_id", "task_plan_id"):
+        value = task.get(key) or ""
+        if isinstance(value, str) and value.startswith("pm-import:"):
+            return True
+    return False
+
+
+def _task_instance_is_overdue(task: dict, today_start: datetime) -> bool:
+    if task.get("status") == "overdue":
+        return True
+    due = task.get("due_date")
+    if isinstance(due, datetime):
+        due_cmp = due if due.tzinfo else due.replace(tzinfo=timezone.utc)
+        return due_cmp < today_start
+    return False
+
+
+def should_exclude_pm_import_overdue_from_my_tasks(
+    *,
+    scheduled_task: Optional[dict] = None,
+    task_instance: Optional[dict] = None,
+    now: Optional[datetime] = None,
+) -> bool:
+    """PM Import schedule rows are planning artifacts — hide when overdue in My Tasks."""
+    now = now or datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if scheduled_task is not None:
+        if not _is_pm_import_scheduled_task(scheduled_task):
+            return False
+        due = _parse_due_date(scheduled_task.get("due_date"))
+        return due is not None and due < now
+    if task_instance is not None:
+        if not _is_pm_import_task_instance(task_instance):
+            return False
+        return _task_instance_is_overdue(task_instance, today_start)
+    return False
+
+
 def serialize_scheduled_task_as_work_item(
     scheduled_task: dict,
     *,
@@ -301,6 +351,9 @@ async def fetch_unbridged_maintenance_work_items(
     for st in candidate_tasks:
         sched_id = st.get("id")
         if not sched_id or sched_id in existing_set:
+            continue
+
+        if should_exclude_pm_import_overdue_from_my_tasks(scheduled_task=st, now=now):
             continue
 
         fp = _work_item_dedupe_key(
@@ -728,6 +781,8 @@ async def fetch_work_items(
 
     items: List[dict] = []
     for task in raw_tasks:
+        if should_exclude_pm_import_overdue_from_my_tasks(task_instance=task, now=now):
+            continue
         if task.get("equipment_id"):
             eid = str(task["equipment_id"])
             eq_data = equipment_map.get(eid, {})
