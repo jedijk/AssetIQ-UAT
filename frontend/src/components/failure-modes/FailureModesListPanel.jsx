@@ -3,7 +3,6 @@ import {
   Search,
   Filter,
   AlertTriangle,
-  Cog,
   Info,
   CheckCircle,
   Download,
@@ -41,6 +40,7 @@ export function FailureModesListPanel({
   setHideAIImproved,
   filterLinkedToEquipment,
   setFilterLinkedToEquipment,
+  linkedFailureModeCount,
   canUseAITools,
   aiImprovedCount,
   displayedFailureModes,
@@ -71,7 +71,8 @@ export function FailureModesListPanel({
         selectedFm ? "w-1/2 lg:w-2/5" : "w-full"
       } transition-all duration-300 flex flex-col flex-1 h-full min-h-0 min-w-0`}
     >
-      <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 mb-4">
+        <div className="flex flex-wrap gap-2 sm:gap-3">
         <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
           <div className="p-1.5 rounded-md bg-slate-100">
             <AlertTriangle className="w-4 h-4 text-slate-600" />
@@ -92,6 +93,25 @@ export function FailureModesListPanel({
             <span className="text-xs text-slate-500 ml-1">Disciplines</span>
           </div>
         </div>
+        </div>
+        <label
+          className="flex items-center gap-2 text-sm cursor-pointer bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors shrink-0"
+          title={t("library.filterLinkedToEquipmentHint")}
+        >
+          <input
+            type="checkbox"
+            checked={filterLinkedToEquipment}
+            onChange={(e) => setFilterLinkedToEquipment(e.target.checked)}
+            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            data-testid="linked-to-equipment-toggle-fm"
+          />
+          <span className="text-slate-600 whitespace-nowrap">{t("library.filterLinkedToEquipment")}</span>
+          {filterLinkedToEquipment && (
+            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">
+              {linkedFailureModeCount}
+            </span>
+          )}
+        </label>
       </div>
 
       <div className="mb-6 space-y-3" data-testid="filters">
@@ -169,54 +189,8 @@ export function FailureModesListPanel({
               </span>
             )}
           </Button>
-          <Button
-            type="button"
-            onClick={() => setHideAIImproved((v) => !v)}
-            variant="outline"
-            className={`h-11 ${
-              hideAIImproved
-                ? "border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100"
-                : "border-slate-200 text-slate-700 hover:bg-slate-50"
-            } ${canUseAITools ? "" : "hidden"}`}
-            data-testid="hide-ai-improved-toggle"
-            title={`Hide failure modes already improved by AI (${aiImprovedCount} marked)`}
-            aria-pressed={hideAIImproved}
-          >
-            <Sparkles className="w-4 h-4 mr-1" />
-            Not improved yet
-            {aiImprovedCount > 0 && (
-              <span
-                className={`ml-1 text-xs font-semibold px-1.5 rounded ${
-                  hideAIImproved ? "bg-purple-100 text-purple-700" : "bg-slate-100 text-slate-600"
-                }`}
-              >
-                {aiImprovedCount} done
-              </span>
-            )}
-          </Button>
-          <Button
-            type="button"
-            onClick={() => setFilterLinkedToEquipment((v) => !v)}
-            variant="outline"
-            className={`h-11 ${
-              filterLinkedToEquipment
-                ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                : "border-slate-200 text-slate-700 hover:bg-slate-50"
-            }`}
-            data-testid="linked-to-equipment-toggle-fm"
-            title={t("library.filterLinkedToEquipmentHint")}
-            aria-pressed={filterLinkedToEquipment}
-          >
-            <Cog className="w-4 h-4 mr-1" />
-            {t("library.filterLinkedToEquipment")}
-            {filterLinkedToEquipment && (
-              <span className="ml-1 text-xs font-semibold bg-blue-100 text-blue-700 px-1.5 rounded">
-                {displayedFailureModes.length}
-              </span>
-            )}
-          </Button>
         </div>
-        <div className="flex flex-wrap items-center gap-2" data-testid="action-bar">
+        <div className="flex flex-wrap items-start gap-2" data-testid="action-bar">
           <Button
             onClick={handleExportExcel}
             variant="outline"
@@ -228,11 +202,12 @@ export function FailureModesListPanel({
             {isExporting ? t("common.exporting") || "Exporting..." : t("library.exportExcel") || "Export Excel"}
           </Button>
           {(canUseAITools || isOwner) && (
+            <div className="flex flex-col gap-2 w-fit">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  className="h-11 border-purple-200 text-purple-700 hover:bg-purple-50"
+                  className="h-11 w-full border-purple-200 text-purple-700 hover:bg-purple-50"
                   data-testid="ai-actions-menu-btn"
                 >
                   <Sparkles className="w-4 h-4 mr-1" />
@@ -294,6 +269,34 @@ export function FailureModesListPanel({
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
+            {canUseAITools && (
+              <Button
+                type="button"
+                onClick={() => setHideAIImproved((v) => !v)}
+                variant="outline"
+                className={`h-11 w-full justify-start ${
+                  hideAIImproved
+                    ? "border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100"
+                    : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                }`}
+                data-testid="hide-ai-improved-toggle"
+                title={`Hide failure modes already improved by AI (${aiImprovedCount} marked)`}
+                aria-pressed={hideAIImproved}
+              >
+                <Sparkles className="w-4 h-4 mr-1" />
+                Not improved yet
+                {aiImprovedCount > 0 && (
+                  <span
+                    className={`ml-1 text-xs font-semibold px-1.5 rounded ${
+                      hideAIImproved ? "bg-purple-100 text-purple-700" : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {aiImprovedCount} done
+                  </span>
+                )}
+              </Button>
+            )}
+            </div>
           )}
           <Button
             onClick={onOpenNewFm}

@@ -368,6 +368,10 @@ const FailureModesPage = () => {
     () => failureModes.filter((fm) => fm.ai_improved_at).length,
     [failureModes],
   );
+  const linkedFailureModeCount = useMemo(
+    () => failureModes.filter(isFailureModeLinkedToEquipment).length,
+    [failureModes, isFailureModeLinkedToEquipment],
+  );
   
   // Calculate connected failure modes count for each equipment type
   const getConnectedFmCount = useCallback(
@@ -904,6 +908,7 @@ const FailureModesPage = () => {
               setHideAIImproved={setHideAIImproved}
               filterLinkedToEquipment={filterLinkedToEquipment}
               setFilterLinkedToEquipment={setFilterLinkedToEquipment}
+              linkedFailureModeCount={linkedFailureModeCount}
               canUseAITools={canUseAITools}
               aiImprovedCount={aiImprovedCount}
               displayedFailureModes={displayedFailureModes}
