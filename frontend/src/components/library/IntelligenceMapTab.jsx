@@ -259,15 +259,14 @@ const SankeyDiagram = ({ data, isLoading }) => {
       });
     }
     if (relationships.programs_to_equipment?.value > 0) {
-      // Direct programs → schedules now (equipment node removed)
-      // Use the ACTUAL scheduled_tasks record count (data lineage), not the count
-      // of task templates with a frequency.
+      // Match the flow cards: active schedule frequencies (task templates), not every
+      // scheduled_tasks row (historical + future occurrences can be thousands).
       links.push({
         source: "maintenance_programs",
         target: "schedules",
         value:
-          data?.schedules?.actual_for_applied ||
           data?.schedules?.for_applied ||
+          relationships.equipment_to_schedules?.value ||
           relationships.programs_to_equipment.value,
       });
     }
@@ -302,6 +301,19 @@ const SankeyDiagram = ({ data, isLoading }) => {
     }
 
     return { nodes, links };
+  }, [data, isLoading]);
+
+  const nodeDisplayCounts = useMemo(() => {
+    if (!data || isLoading) return {};
+    return {
+      failure_modes: data.failure_modes?.count,
+      equipment_types: data.equipment_types?.in_use,
+      strategies: data.strategies?.count,
+      maintenance_programs: data.maintenance_programs?.active,
+      schedules: data.schedules?.for_applied,
+      planned_work: data.planned_work?.for_applied,
+      pm_imports: data.pm_imports?.accepted_no_fm,
+    };
   }, [data, isLoading]);
 
   const sankeyLayout = useMemo(() => {
@@ -410,7 +422,10 @@ const SankeyDiagram = ({ data, isLoading }) => {
                 fontWeight={600}
                 className="pointer-events-none"
               >
-                {node.value?.toLocaleString() || 0}
+                {(
+                  nodeDisplayCounts[node.id] ??
+                  node.value
+                )?.toLocaleString() || 0}
               </text>
               <text
                 x={(node.x1 - node.x0) / 2}
@@ -793,7 +808,7 @@ const IntelligenceMapTab = () => {
                 Data Lineage Visualization
               </CardTitle>
               <CardDescription className="text-xs">
-                Flow width represents connected record count
+                Flow width matches the Intelligence Flow cards above (programs, active frequencies, planned tasks)
               </CardDescription>
             </CardHeader>
             <CardContent>

@@ -9,14 +9,14 @@ import { FourteenDayGrid } from "./FourteenDayGrid";
 import { NinetyDayGrid } from "./NinetyDayGrid";
 import { useLanguage } from "../../../contexts/LanguageContext";
 
-export function PlannerView({ equipmentTypeId, onTaskClick, filteredEquipmentIds }) {
+export function PlannerView({ equipmentTypeId, onTaskClick, filteredEquipmentIds, filterTask }) {
   const { t } = useLanguage();
   const [horizon, setHorizon] = useState("daily"); // daily | weekly | "14" | "90"
 
-  // Apply the Equipment Unit filter to a list of tasks. `filteredEquipmentIds`
-  // is a Set<string> | null — null means no filter.
-  const filterTasksByUnit = (list) => {
-    if (!filteredEquipmentIds || !Array.isArray(list)) return list;
+  const filterTasks = (list) => {
+    if (!Array.isArray(list)) return list;
+    if (filterTask) return list.filter((task) => filterTask(task));
+    if (!filteredEquipmentIds) return list;
     return list.filter((t) => t && filteredEquipmentIds.has(t.equipment_id));
   };
 
@@ -72,7 +72,7 @@ export function PlannerView({ equipmentTypeId, onTaskClick, filteredEquipmentIds
   // ---- Group tasks by day for 14-day, by week for 90-day ----
   const groupedRange = useMemo(() => {
     if (!rangeData?.tasks) return [];
-    const tasks = filterTasksByUnit(rangeData.tasks);
+    const tasks = filterTasks(rangeData.tasks);
 
     if (horizon === "14") {
       // 14 daily buckets
@@ -132,7 +132,7 @@ export function PlannerView({ equipmentTypeId, onTaskClick, filteredEquipmentIds
     }
 
     return [];
-  }, [rangeData, horizon, totalDailyCapacityHours, filteredEquipmentIds]);
+  }, [rangeData, horizon, totalDailyCapacityHours, filteredEquipmentIds, filterTask]);
 
   // ---- Renderers ----
   const isLoading =
@@ -192,13 +192,13 @@ export function PlannerView({ equipmentTypeId, onTaskClick, filteredEquipmentIds
                   ? {
                       ...dailyData,
                       overdue: dailyData.overdue
-                        ? { ...dailyData.overdue, tasks: filterTasksByUnit(dailyData.overdue.tasks || []) }
+                        ? { ...dailyData.overdue, tasks: filterTasks(dailyData.overdue.tasks || []) }
                         : dailyData.overdue,
                       today: dailyData.today
-                        ? { ...dailyData.today, tasks: filterTasksByUnit(dailyData.today.tasks || []) }
+                        ? { ...dailyData.today, tasks: filterTasks(dailyData.today.tasks || []) }
                         : dailyData.today,
                       tomorrow: dailyData.tomorrow
-                        ? { ...dailyData.tomorrow, tasks: filterTasksByUnit(dailyData.tomorrow.tasks || []) }
+                        ? { ...dailyData.tomorrow, tasks: filterTasks(dailyData.tomorrow.tasks || []) }
                         : dailyData.tomorrow,
                     }
                   : dailyData
@@ -212,8 +212,8 @@ export function PlannerView({ equipmentTypeId, onTaskClick, filteredEquipmentIds
                 filteredEquipmentIds
                   ? (weeklyData?.days || []).map((d) => ({
                       ...d,
-                      tasks: filterTasksByUnit(d.tasks || []),
-                      total_hours: (filterTasksByUnit(d.tasks || []) || []).reduce(
+                      tasks: filterTasks(d.tasks || []),
+                      total_hours: (filterTasks(d.tasks || []) || []).reduce(
                         (sum, t) => sum + (t.estimated_hours || 1),
                         0,
                       ),

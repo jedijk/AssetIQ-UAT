@@ -1,7 +1,7 @@
 /**
  * Maintenance Schedule Manager — orchestrates dashboard, timeline, planner, and task dialogs.
  */
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Calendar,
@@ -20,6 +20,7 @@ import {
   X,
   Check,
   ChevronsUpDown,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "../../ui/card";
@@ -54,7 +55,13 @@ import {
   CommandList,
 } from "../../ui/command";
 import { ScrollArea } from "../../ui/scroll-area";
+import { Checkbox } from "../../ui/checkbox";
 import { cn } from "../../../lib/utils";
+import {
+  DISCIPLINES,
+  getDisciplineLabel,
+  normalizeDiscipline,
+} from "../../../constants/disciplines";
 import {
   maintenanceSchedulerAPI,
   refreshMaintenanceSchedulerQueries,
@@ -81,6 +88,8 @@ export function MaintenanceScheduleManager({ equipmentType }) {
   // Filter: Equipment Unit (ISO 14224 level). "" = all units.
   const [selectedUnitId, setSelectedUnitId] = useState("");
   const [unitFilterOpen, setUnitFilterOpen] = useState(false);
+  const [selectedDisciplines, setSelectedDisciplines] = useState([]);
+  const [disciplineFilterOpen, setDisciplineFilterOpen] = useState(false);
 
   const equipmentTypeId = equipmentType?.id;
   const equipmentTypeName = equipmentType?.name || t("equipment.allEquipment");
@@ -193,33 +202,83 @@ export function MaintenanceScheduleManager({ equipmentType }) {
     return included;
   }, [selectedUnitId, allNodes]);
 
-  // Helper to filter any list of tasks/items by the selected Equipment Unit
-  const applyUnitFilter = (items) => {
-    if (!filteredEquipmentIds || !Array.isArray(items)) return items;
-    return items.filter(it => it && filteredEquipmentIds.has(it.equipment_id));
+  const matchesDisciplineFilter = useCallback((item) => {
+    if (selectedDisciplines.length === 0) return true;
+    const disc = normalizeDiscipline(item?.discipline) || (item?.discipline || "").toLowerCase();
+    if (!disc) return false;
+    return selectedDisciplines.some((d) => {
+      const dl = d.toLowerCase();
+      return disc === dl || disc.includes(dl) || dl.includes(disc);
+    });
+  }, [selectedDisciplines]);
+
+  const filterTask = useCallback((task) => {
+    if (!task) return false;
+    if (filteredEquipmentIds && !filteredEquipmentIds.has(task.equipment_id)) return false;
+    return matchesDisciplineFilter(task);
+  }, [filteredEquipmentIds, matchesDisciplineFilter]);
+
+  const applyTaskListFilter = useCallback((items) => {
+    if (!Array.isArray(items)) return items;
+    return items.filter(filterTask);
+  }, [filterTask]);
+
+  const toggleDiscipline = (value) => {
+    setSelectedDisciplines((prev) =>
+      prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value]
+    );
+  };
+
+  const getDisciplineFilterLabel = () => {
+    if (selectedDisciplines.length === 0) {
+      return t("disciplines.allDisciplines");
+    }
+    if (selectedDisciplines.length === 1) {
+      const key = `disciplines.${selectedDisciplines[0]}`;
+      const translated = t(key);
+      return translated !== key ? translated : getDisciplineLabel(selectedDisciplines[0]);
+    }
+    const first = selectedDisciplines[0];
+    const key = `disciplines.${first}`;
+    const translated = t(key);
+    const firstLabel = translated !== key ? translated : getDisciplineLabel(first);
+    return `${firstLabel} +${selectedDisciplines.length - 1}`;
+  };
+
+  const getDisciplineOptionLabel = (value) => {
+    const key = `disciplines.${value}`;
+    const translated = t(key);
+    return translated !== key ? translated : getDisciplineLabel(value);
   };
 
   // Filtered views passed to children
   const filteredTimeline = useMemo(() => {
     if (!timeline) return timeline;
-    if (!filteredEquipmentIds) return timeline;
-    // The Gantt TimelineView iterates `timeline.timeline` (an array of
-    // { equipment_id, equipment_name, tasks: [...] }); the legacy
-    // `timeline.equipment` shape is preserved for backwards-compat.
+    const hasUnitFilter = !!filteredEquipmentIds;
+    const hasDisciplineFilter = selectedDisciplines.length > 0;
+    if (!hasUnitFilter && !hasDisciplineFilter) return timeline;
+
+    const filterEquipmentList = (list) => {
+      if (!Array.isArray(list)) return list;
+      return list
+        .filter((e) => !hasUnitFilter || filteredEquipmentIds.has(e.equipment_id))
+        .map((e) => ({
+          ...e,
+          tasks: applyTaskListFilter(e.tasks || []),
+        }))
+        .filter((e) => (e.tasks || []).length > 0);
+    };
+
     return {
       ...timeline,
-      timeline: Array.isArray(timeline.timeline)
-        ? timeline.timeline.filter(e => filteredEquipmentIds.has(e.equipment_id))
-        : timeline.timeline,
-      equipment: Array.isArray(timeline.equipment)
-        ? timeline.equipment.filter(e => filteredEquipmentIds.has(e.equipment_id))
-        : timeline.equipment,
+      timeline: filterEquipmentList(timeline.timeline),
+      equipment: filterEquipmentList(timeline.equipment),
     };
-  }, [timeline, filteredEquipmentIds]);
+  }, [timeline, filteredEquipmentIds, selectedDisciplines, applyTaskListFilter]);
 
   const filteredTasksList = useMemo(
-    () => applyUnitFilter(tasksData?.tasks),
-    [tasksData, filteredEquipmentIds]
+    () => applyTaskListFilter(tasksData?.tasks),
+    [tasksData, applyTaskListFilter]
   );
 
   // ============= Mutations =============
@@ -528,6 +587,77 @@ export function MaintenanceScheduleManager({ equipmentType }) {
             {t("common.clear")}
           </Button>
         )}
+
+        <span className="text-sm font-medium text-slate-700">{t("maintenance.discipline")}:</span>
+        <Popover open={disciplineFilterOpen} onOpenChange={setDisciplineFilterOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={disciplineFilterOpen}
+              className="w-56 justify-between font-normal"
+              data-testid="discipline-filter"
+            >
+              <span
+                className={cn(
+                  "truncate",
+                  selectedDisciplines.length > 0 ? "text-slate-900" : "text-slate-500"
+                )}
+              >
+                {getDisciplineFilterLabel()}
+              </span>
+              <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-0" align="start">
+            <div className="p-2 border-b border-slate-100">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start h-8 text-sm"
+                onClick={() => setSelectedDisciplines([])}
+                data-testid="discipline-filter-option-all"
+              >
+                {t("disciplines.allDisciplines")}
+              </Button>
+            </div>
+            <ScrollArea className="max-h-64">
+              <div className="p-1">
+                {DISCIPLINES.map((disc) => {
+                  const isSelected = selectedDisciplines.includes(disc.value);
+                  return (
+                    <button
+                      key={disc.value}
+                      type="button"
+                      onClick={() => toggleDiscipline(disc.value)}
+                      className="w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-slate-50 text-left"
+                      data-testid={`discipline-filter-option-${disc.value}`}
+                    >
+                      <Checkbox checked={isSelected} className="pointer-events-none" aria-hidden />
+                      <span className="text-sm text-slate-700 flex-1">
+                        {getDisciplineOptionLabel(disc.value)}
+                      </span>
+                      {isSelected && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+          </PopoverContent>
+        </Popover>
+        {selectedDisciplines.length > 0 && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setSelectedDisciplines([])}
+            className="h-8 text-xs"
+            data-testid="clear-discipline-filter"
+          >
+            <X className="w-3.5 h-3.5 mr-1" />
+            {t("common.clear")}
+          </Button>
+        )}
       </div>
 
       {/* Programs Summary */}
@@ -601,7 +731,11 @@ export function MaintenanceScheduleManager({ equipmentType }) {
 
         {/* Planner Tab */}
         <TabsContent value="planner" className="mt-4">
-          <PlannerView equipmentTypeId={equipmentTypeId} onTaskClick={handleTaskClick} filteredEquipmentIds={filteredEquipmentIds} />
+          <PlannerView
+            equipmentTypeId={equipmentTypeId}
+            onTaskClick={handleTaskClick}
+            filterTask={filterTask}
+          />
         </TabsContent>
 
         {/* Tasks Tab */}

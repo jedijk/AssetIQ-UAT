@@ -37,7 +37,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { toast } from "sonner";
-import { pmImportAPI, resolvePmImportStatus, isPmImportFinalized } from "../../lib/apis/pmImport";
+import { pmImportAPI, isPmImportFinalized, isPmImportReviewAccepted, getPmImportStatusDisplay } from "../../lib/apis/pmImport";
 import { AIReviewModal } from "../library/AIReviewModal";
 import PMApplyFailureModeDialog from "../library/PMApplyFailureModeDialog";
 
@@ -118,7 +118,7 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
         }
         const session = sessionMap.get(task.session_id);
         session.total++;
-        if (task.review_status === 'accepted') {
+        if (isPmImportReviewAccepted(task)) {
           session.accepted++;
         }
       }
@@ -175,7 +175,7 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
   
   // Stats
   const totalTasks = allTasks.length;
-  const acceptedTasks = allTasks.filter(t => t.review_status === 'accepted').length;
+  const acceptedTasks = allTasks.filter(isPmImportReviewAccepted).length;
   
   const getDisciplineBadge = (discipline) => {
     if (!discipline) return null;
@@ -197,20 +197,10 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
   };
   
   const getImportStatusBadge = (task) => {
-    const status = resolvePmImportStatus(task);
-    const styles = {
-      pending: "bg-gray-50 text-gray-600",
-      applied: "bg-emerald-50 text-emerald-700",
-      merged: "bg-blue-50 text-blue-700",
-    };
-    const labels = {
-      pending: "Pending",
-      applied: "Applied",
-      merged: "Merged",
-    };
+    const { label, className } = getPmImportStatusDisplay(task);
     return (
-      <Badge variant="outline" className={`${styles[status] || styles.pending} text-xs`}>
-        {labels[status] || "Pending"}
+      <Badge variant="outline" className={`${className} text-xs`}>
+        {label}
       </Badge>
     );
   };
@@ -449,7 +439,7 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
                           variant="ghost"
                           className="h-7 px-2 text-purple-600 hover:bg-purple-50"
                           title="Apply to failure mode"
-                          disabled={isPmImportFinalized(task) || (task.review_status !== 'accepted' && task.review_status !== 'implemented')}
+                          disabled={isPmImportFinalized(task) || !isPmImportReviewAccepted(task)}
                           onClick={() => setApplyToFmTask(task)}
                           data-testid={`pm-task-apply-fm-${task.task_id}`}
                         >
@@ -460,7 +450,7 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
                           variant="ghost"
                           className="h-7 px-2 text-green-600 hover:bg-green-50"
                           title="Accept"
-                          disabled={task.review_status === 'accepted' || task.review_status === 'implemented' || isPmImportFinalized(task)}
+                          disabled={isPmImportReviewAccepted(task) || isPmImportFinalized(task)}
                           onClick={() => acceptMutation.mutate(task)}
                           data-testid={`pm-task-accept-${task.task_id}`}
                         >

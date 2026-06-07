@@ -63,14 +63,12 @@ def calculate_priority(criticality: str, days_until_due: int, is_overdue: bool) 
 async def ensure_imported_pm_tasks_scheduled(
     equipment_type_id: Optional[str] = None,
     *,
-    schedule: bool = False,
+    schedule: bool = True,
     force: bool = False,
 ) -> None:
     """
-    Sync accepted Custom PM Import program tasks into legacy maintenance_programs.
-
-    Read endpoints call this with schedule=False and a cooldown so opening the schedule
-    view does not regenerate a year of occurrences on every request.
+    Sync accepted Custom PM Import program tasks into legacy maintenance_programs
+    and generate scheduled occurrences (cooldown-limited on read endpoints).
     """
     from services.maintenance_program_service import MaintenanceProgramService
 

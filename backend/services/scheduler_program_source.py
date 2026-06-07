@@ -119,6 +119,124 @@ async def get_active_strategy_type_ids() -> Set[str]:
     return ids
 
 
+async def load_pm_import_scheduler_rows(
+    *,
+    equipment_type_id: Optional[str] = None,
+    equipment_ids: Optional[List[str]] = None,
+    covered_pm_refs: Optional[Set[str]] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Build scheduler rows from Custom PM Import sessions.
+
+    These tasks are merged into Equipment Manager responses but are not stored on
+    maintenance_programs_v2 until a strategy is applied — the schedule view must
+    load them directly from pm_import_sessions.
+    """
+    from services.maintenance_program_service import MaintenanceProgramService
+    from services.pm_import_constants import is_pm_import_review_accepted
+
+    covered_pm_refs = covered_pm_refs or set()
+    equipment_filter = set(equipment_ids) if equipment_ids else None
+    rows: List[Dict[str, Any]] = []
+    equipment_cache: Dict[str, Optional[Dict[str, Any]]] = {}
+
+    async def _equipment(equipment_id: str) -> Optional[Dict[str, Any]]:
+        if equipment_id not in equipment_cache:
+            equipment_cache[equipment_id] = await db.equipment_nodes.find_one(
+                {"id": equipment_id},
+                {
+                    "_id": 0,
+                    "id": 1,
+                    "name": 1,
+                    "tag": 1,
+                    "criticality": 1,
+                    "equipment_type_id": 1,
+                    "equipment_type_name": 1,
+                },
+            )
+        return equipment_cache[equipment_id]
+
+    async for session in db.pm_import_sessions.find(
+        {},
+        {"_id": 0, "session_id": 1, "file_name": 1, "tasks_extracted": 1},
+    ):
+        for pm_task in session.get("tasks_extracted") or []:
+            if not is_pm_import_review_accepted(pm_task):
+                continue
+            em = pm_task.get("equipment_match") or {}
+            equipment_id = em.get("equipment_id")
+            if not equipment_id:
+                continue
+            if equipment_filter is not None and equipment_id not in equipment_filter:
+                continue
+
+            program_task = MaintenanceProgramService._pm_import_task_to_program_dict(
+                pm_task, session
+            )
+            if not MaintenanceProgramService._is_scheduleable_imported_pm_task(program_task):
+                continue
+
+            trace = program_task.get("traceability") or {}
+            pm_ref = trace.get("pm_import_task_id")
+            if pm_ref and pm_ref in covered_pm_refs:
+                continue
+
+            equipment = await _equipment(equipment_id)
+            if not equipment:
+                continue
+            eq_type_id = equipment.get("equipment_type_id") or ""
+            if equipment_type_id and eq_type_id != equipment_type_id:
+                continue
+
+            task_id = program_task.get("id")
+            if not task_id:
+                continue
+
+            frequency, freq_days = _frequency_for_scheduler(program_task)
+            if not frequency or freq_days <= 0:
+                continue
+
+            task_type = _task_type_for_scheduler(program_task)
+            if task_type in ("reactive", "corrective"):
+                continue
+
+            rows.append(
+                {
+                    "id": task_id,
+                    "program_source": "pm_import",
+                    "v2_program_id": None,
+                    "v2_task_id": task_id,
+                    "equipment_id": equipment_id,
+                    "equipment_name": equipment.get("name") or em.get("name") or "",
+                    "equipment_tag": equipment.get("tag") or em.get("tag"),
+                    "equipment_type_id": eq_type_id,
+                    "equipment_type_name": equipment.get("equipment_type_name") or "",
+                    "task_name": program_task.get("task_title") or "Imported PM Task",
+                    "task_description": program_task.get("task_description"),
+                    "task_type": task_type,
+                    "frequency": frequency,
+                    "frequency_days": freq_days,
+                    "criticality": normalize_program_criticality(equipment.get("criticality")),
+                    "estimated_duration_hours": float(
+                        program_task.get("estimated_duration_hours") or 1.0
+                    ),
+                    "next_due_date": None,
+                    "strategy_id": eq_type_id or "pm_import",
+                    "strategy_version": "pm_import",
+                    "failure_mode_id": trace.get("failure_mode_id"),
+                    "failure_mode_name": trace.get("failure_mode_name"),
+                    "task_source": TaskSource.CUSTOMER_IMPORTED.value,
+                    "discipline": program_task.get("discipline"),
+                    "pm_import_task_id": pm_ref,
+                    "is_active": True,
+                }
+            )
+            if pm_ref:
+                covered_pm_refs.add(pm_ref)
+
+    return rows
+
+
 async def load_schedulable_programs(
     *,
     equipment_type_id: Optional[str] = None,
@@ -138,8 +256,21 @@ async def load_schedulable_programs(
 
     v2_docs = await db.maintenance_programs_v2.find(v2_query).to_list(5000)
     v2_rows: List[Dict[str, Any]] = []
+    covered_pm_refs: Set[str] = set()
     for doc in v2_docs:
-        v2_rows.extend(expand_v2_program_to_scheduler_rows(doc, active_strategy_types))
+        doc_rows = expand_v2_program_to_scheduler_rows(doc, active_strategy_types)
+        for row in doc_rows:
+            pm_ref = row.get("pm_import_task_id")
+            if pm_ref:
+                covered_pm_refs.add(pm_ref)
+        v2_rows.extend(doc_rows)
+
+    pm_import_rows = await load_pm_import_scheduler_rows(
+        equipment_type_id=equipment_type_id,
+        equipment_ids=equipment_ids,
+        covered_pm_refs=covered_pm_refs,
+    )
+    v2_rows.extend(pm_import_rows)
 
     if not should_read_legacy_maintenance_programs():
         return v2_rows

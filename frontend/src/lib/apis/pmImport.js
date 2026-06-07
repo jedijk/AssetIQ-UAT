@@ -63,6 +63,25 @@ export const isPmImportFinalized = (task) => {
   return status === "applied" || status === "merged";
 };
 
+/** Imported tasks are accepted by default unless explicitly rejected. */
+export const isPmImportReviewAccepted = (task) => {
+  if (!task) return false;
+  const status = (task.review_status || "pending").toLowerCase();
+  return status !== "rejected";
+};
+
+/** User-facing label/style for the PM Import status column. */
+export const getPmImportStatusDisplay = (task) => {
+  const status = resolvePmImportStatus(task);
+  if (status === "pending") {
+    return { label: "Accepted", className: "bg-green-50 text-green-700" };
+  }
+  if (status === "merged") {
+    return { label: "Merged", className: "bg-blue-50 text-blue-700" };
+  }
+  return { label: "Applied", className: "bg-emerald-50 text-emerald-700" };
+};
+
 /**
  * PM Intelligence Import API
  * 

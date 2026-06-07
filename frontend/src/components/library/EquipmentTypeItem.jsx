@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Edit, Trash2, Cog, AlertTriangle, Link, Search, X, ChevronRight, CheckCircle } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -165,7 +165,11 @@ export function EquipmentTypeFailureModesPanel({
   const { t: tHook } = useLanguage();
   const t = tProp || tHook;
   const [searchQuery, setSearchQuery] = useState("");
-  const [showOnlyConnected, setShowOnlyConnected] = useState(false);
+  const [showOnlyConnected, setShowOnlyConnected] = useState(true);
+
+  useEffect(() => {
+    setShowOnlyConnected(true);
+  }, [equipmentType?.id]);
   
   const Icon = EQUIPMENT_ICONS[equipmentType?.icon] || Cog;
   const colors = DISCIPLINE_COLORS[equipmentType?.discipline] || DISCIPLINE_COLORS["Mechanical"];

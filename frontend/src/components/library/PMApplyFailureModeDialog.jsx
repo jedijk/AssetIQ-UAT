@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { failureModesAPI } from '../../lib/apis/failureModes';
-import { pmImportAPI, isPmImportFinalized, resolvePmImportStatus } from '../../lib/apis/pmImport';
+import { pmImportAPI, isPmImportFinalized, resolvePmImportStatus, isPmImportReviewAccepted } from '../../lib/apis/pmImport';
 import { toast } from 'sonner';
 import { Loader2, Target, GitMerge, Plus } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -84,7 +84,7 @@ const PMApplyFailureModeDialog = ({ task, onClose, onSuccess }) => {
       toast.error('This task has already been applied or merged');
       return;
     }
-    if (task.review_status !== 'accepted' && task.review_status !== 'implemented') {
+    if (!isPmImportReviewAccepted(task)) {
       toast.error('Accept the task before applying to a failure mode');
       return;
     }

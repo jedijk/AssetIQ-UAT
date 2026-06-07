@@ -10,7 +10,7 @@ from typing import Optional, List, Dict, Any
 
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from services.pm_import_constants import normalize_pm_import_display_status
+from services.pm_import_constants import normalize_pm_import_display_status, is_pm_import_review_accepted
 from services.pm_import.session import PMImportMixin as _SessionMixin
 from services.pm_import.import_library import PMImportMixin as _ImportLibraryMixin
 from services.pm_import.file_parsing import PMImportMixin as _FileParsingMixin
@@ -21,7 +21,7 @@ from services.pm_import.failure_mode_apply import PMImportMixin as _FailureModeA
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["PMImportService", "normalize_pm_import_display_status"]
+__all__ = ["PMImportService", "normalize_pm_import_display_status", "is_pm_import_review_accepted"]
 
 
 class PMImportService(

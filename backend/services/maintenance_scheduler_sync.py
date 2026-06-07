@@ -741,6 +741,10 @@ async def cleanup_schedules_without_strategy(
             "_id": 0,
         },
     ):
+        if prog.get("pm_import_task_id"):
+            continue
+        if (prog.get("task_source") or "").lower() == "customer_imported":
+            continue
         # Check if program has a strategy_id or equipment_type_id that no longer exists
         has_missing_strategy = False
         for key in ("strategy_id", "equipment_type_id"):
@@ -774,7 +778,20 @@ async def cleanup_schedules_without_strategy(
     if missing_strategy_ids:
         strategy_task_filter: Dict[str, Any] = {
             "strategy_id": {"$in": list(missing_strategy_ids)},
-            # Removed task_source exclusion - delete ALL orphan tasks
+            "$and": [
+                {
+                    "$or": [
+                        {"pm_import_task_id": {"$exists": False}},
+                        {"pm_import_task_id": None},
+                    ]
+                },
+                {
+                    "$or": [
+                        {"task_source": {"$exists": False}},
+                        {"task_source": {"$nin": ["customer_imported"]}},
+                    ]
+                },
+            ],
         }
         if scoped_equipment_ids:
             strategy_task_filter["equipment_id"] = {"$in": list(scoped_equipment_ids)}

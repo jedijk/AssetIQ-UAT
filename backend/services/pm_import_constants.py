@@ -24,6 +24,12 @@ def normalize_pm_import_display_status(task: Dict[str, Any]) -> str:
     return "pending"
 
 
+def is_pm_import_review_accepted(task: Dict[str, Any]) -> bool:
+    """Imported tasks are accepted by default unless explicitly rejected."""
+    status = (task.get("review_status") or "pending").lower()
+    return status != "rejected"
+
+
 def _sanitize_for_json(value: Any) -> Any:
     """Recursively convert MongoDB / Python values to JSON-safe types."""
     if value is None or isinstance(value, bool):

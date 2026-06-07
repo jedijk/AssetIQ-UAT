@@ -26,6 +26,7 @@ from services.pm_import_constants import (
     TASK_TYPES,
     _sanitize_for_json,
     normalize_pm_import_display_status,
+    is_pm_import_review_accepted,
 )
 
 logger = logging.getLogger(__name__)
@@ -245,7 +246,7 @@ class PMImportMixin:
         if not task:
             raise ValueError(f"Task {task_id} not found in session")
 
-        if task.get("review_status") not in ("accepted", "implemented"):
+        if not is_pm_import_review_accepted(task):
             return {
                 "success": False,
                 "message": "Task must be accepted before applying to a failure mode",
@@ -275,7 +276,7 @@ class PMImportMixin:
                 apply_res.get("mode") or "added",
                 replace_action_index=apply_res.get("replaced_index"),
             )
-            if task.get("review_status") == "accepted":
+            if task.get("review_status") != "implemented" and is_pm_import_review_accepted(task):
                 task["review_status"] = "implemented"
             await self._sync_pm_import_graph_edge(
                 task,
@@ -359,7 +360,7 @@ class PMImportMixin:
                         apply_res.get("mode") or "existing",
                         replace_action_index=apply_res.get("replaced_index"),
                     )
-                    if task.get("review_status") == "accepted":
+                    if task.get("review_status") != "implemented" and is_pm_import_review_accepted(task):
                         task["review_status"] = "implemented"
                     await self._sync_pm_import_graph_edge(
                         task,
@@ -387,7 +388,7 @@ class PMImportMixin:
                         apply_res.get("mode") or "added",
                         replace_action_index=apply_res.get("replaced_index"),
                     )
-                    if task.get("review_status") == "accepted":
+                    if task.get("review_status") != "implemented" and is_pm_import_review_accepted(task):
                         task["review_status"] = "implemented"
                     await self._sync_pm_import_graph_edge(
                         task,
@@ -434,7 +435,7 @@ class PMImportMixin:
                         apply_res.get("mode") or "added",
                         replace_action_index=apply_res.get("replaced_index"),
                     )
-                    if task.get("review_status") == "accepted":
+                    if task.get("review_status") != "implemented" and is_pm_import_review_accepted(task):
                         task["review_status"] = "implemented"
                     await self._sync_pm_import_graph_edge(
                         task,
@@ -469,7 +470,7 @@ class PMImportMixin:
                     self._mark_task_implemented(
                         task, created_fm.get("id"), "new_failure_mode"
                     )
-                    if task.get("review_status") == "accepted":
+                    if task.get("review_status") != "implemented" and is_pm_import_review_accepted(task):
                         task["review_status"] = "implemented"
                     await self._sync_pm_import_graph_edge(
                         task,
@@ -501,7 +502,7 @@ class PMImportMixin:
                         apply_res.get("mode") or "added",
                         replace_action_index=apply_res.get("replaced_index"),
                     )
-                    if task.get("review_status") == "accepted":
+                    if task.get("review_status") != "implemented" and is_pm_import_review_accepted(task):
                         task["review_status"] = "implemented"
                     await self._sync_pm_import_graph_edge(
                         task,
