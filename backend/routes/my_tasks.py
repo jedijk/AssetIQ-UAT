@@ -18,6 +18,7 @@ from services.work_item_query import (
     serialize_task,
     _user_can_see_item,
 )
+from services.task_instance_bridge import resolve_task_instance
 
 logger = logging.getLogger(__name__)
 
@@ -138,37 +139,32 @@ async def get_my_tasks(
     }
 
 
-@router.get("/my-tasks/{task_id}")
-async def get_my_task_detail(
-    task_id: str,
-    current_user: dict = Depends(_tasks_read)
-):
-    """Get detailed information about a specific task."""
-    user_id = current_user["id"]
-    try:
-        task = await db.task_instances.find_one({"_id": ObjectId(task_id)})
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid task ID")
-    
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-
+async def _load_task_instance_detail(task: dict, user_id: str) -> dict:
+    """Enrich a task_instances document for My Tasks detail/start responses."""
     _ensure_user_can_execute_task(task, user_id)
-    
-    # Enrich with related data
+
     if task.get("equipment_id"):
         equipment = await db.equipment.find_one({"_id": task["equipment_id"]})
+        if not equipment:
+            equipment = await db.equipment_nodes.find_one({"id": task["equipment_id"]})
         if equipment:
             task["equipment_name"] = equipment.get("name", "Unknown")
             task["equipment_tag"] = equipment.get("tag", "")
-    
-    # Get plan and template details
+
     if task.get("task_plan_id"):
-        plan = await db.task_plans.find_one({"_id": task["task_plan_id"]})
+        plan_oid = task["task_plan_id"]
+        try:
+            if isinstance(plan_oid, str):
+                plan_oid = ObjectId(plan_oid)
+        except Exception:
+            plan_oid = task["task_plan_id"]
+        plan = await db.task_plans.find_one({"_id": plan_oid})
+        if not plan and isinstance(task.get("task_plan_id"), str):
+            plan = await db.maintenance_programs_v2.find_one({"id": task["task_plan_id"]})
         if plan:
             task["is_recurring"] = True
             task["frequency_display"] = f"Every {plan.get('interval_value', 0)} {plan.get('interval_unit', 'days')}"
-            
+
             if plan.get("task_template_id"):
                 template = await db.task_templates.find_one({"_id": plan["task_template_id"]})
                 if template:
@@ -181,22 +177,35 @@ async def get_my_task_detail(
                         "tools_required": template.get("tools_required", []),
                     }
                     task["mitigation_strategy"] = template.get("mitigation_strategy", "")
-            
-            # Get form template
+
             form_template_id = plan.get("form_template_id")
             if form_template_id:
                 form_template = await db.form_templates.find_one({"_id": ObjectId(form_template_id)})
                 if form_template:
                     task["form_fields"] = form_template.get("fields", [])
-    
-    # Get last completion info
+
     last_execution = await db.task_executions.find_one(
         {"task_plan_id": task.get("task_plan_id"), "status": "completed"},
-        sort=[("completed_at", -1)]
+        sort=[("completed_at", -1)],
     )
     if last_execution:
         task["last_completed"] = last_execution.get("completed_at")
-    
+
+    return task
+
+
+@router.get("/my-tasks/{task_id}")
+async def get_my_task_detail(
+    task_id: str,
+    current_user: dict = Depends(_tasks_read)
+):
+    """Get detailed information about a specific task."""
+    user_id = current_user["id"]
+    task = await resolve_task_instance(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    task = await _load_task_instance_detail(task, user_id)
     return serialize_task(task)
 
 
@@ -207,25 +216,20 @@ async def start_my_task(
 ):
     """Mark a task as started/in-progress."""
     user_id = current_user["id"]
-    try:
-        task = await db.task_instances.find_one({"_id": ObjectId(task_id)})
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid task ID")
-    
+    task = await resolve_task_instance(task_id, triggered_by_user_id=user_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
     _ensure_user_can_execute_task(task, user_id)
-    
-    # Update status - handle both ObjectId and UUID user IDs
+
     now = datetime.now(timezone.utc)
     try:
         user_id_value = ObjectId(user_id)
     except Exception:
         user_id_value = user_id
-    
+
     await db.task_instances.update_one(
-        {"_id": ObjectId(task_id)},
+        {"_id": task["_id"]},
         {
             "$set": {
                 "status": "in_progress",
@@ -233,55 +237,11 @@ async def start_my_task(
                 "started_by": user_id_value,
                 "updated_at": now,
             }
-        }
+        },
     )
-    
-    # Return updated task
-    updated_task = await db.task_instances.find_one({"_id": ObjectId(task_id)})
-    
-    # Enrich with equipment name
-    if updated_task.get("equipment_id"):
-        equipment = await db.equipment.find_one({"_id": updated_task["equipment_id"]})
-        if equipment:
-            updated_task["equipment_name"] = equipment.get("name", "Unknown")
-    
-    # Enrich with form fields from plan
-    task_plan_id = updated_task.get("task_plan_id")
-    if task_plan_id:
-        try:
-            if isinstance(task_plan_id, str):
-                plan_oid = ObjectId(task_plan_id)
-            else:
-                plan_oid = task_plan_id
-            plan = await db.task_plans.find_one({"_id": plan_oid})
-            if plan:
-                updated_task["is_recurring"] = True
-                interval = plan.get("interval_value", 0)
-                unit = plan.get("interval_unit", "days")
-                updated_task["frequency_display"] = f"Every {interval} {unit}"
-                
-                # Get template name
-                if plan.get("task_template_id"):
-                    template = await db.task_templates.find_one({"_id": plan["task_template_id"]})
-                    if template:
-                        if not updated_task.get("title"):
-                            updated_task["title"] = template.get("name", "")
-                        updated_task["task_template_name"] = template.get("name", "")
-                        updated_task["mitigation_strategy"] = template.get("mitigation_strategy", "")
-                
-                # Get form template
-                form_template_id = plan.get("form_template_id")
-                if form_template_id:
-                    try:
-                        form_template = await db.form_templates.find_one({"_id": ObjectId(str(form_template_id))})
-                        if form_template:
-                            updated_task["form_fields"] = form_template.get("fields", [])
-                            updated_task["form_template_name"] = form_template.get("name", "")
-                    except Exception as e:
-                        logger.warning(f"Failed to fetch form template: {e}")
-        except Exception as e:
-            logger.warning(f"Failed to fetch plan for task: {e}")
-    
+
+    updated_task = await db.task_instances.find_one({"_id": task["_id"]})
+    updated_task = await _load_task_instance_detail(updated_task, user_id)
     return serialize_task(updated_task)
 
 

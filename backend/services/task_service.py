@@ -693,17 +693,19 @@ class TaskService:
     
     async def get_instance_by_id(self, instance_id: str) -> Optional[Dict[str, Any]]:
         """Get a specific instance."""
-        if not ObjectId.is_valid(instance_id):
-            return None
-        
-        doc = await self.instances.find_one({"_id": ObjectId(instance_id)})
+        from services.task_instance_bridge import resolve_task_instance
+
+        doc = await resolve_task_instance(instance_id)
         if doc:
             return self._serialize_instance(doc)
         return None
     
     async def update_instance(self, instance_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update a task instance."""
-        if not ObjectId.is_valid(instance_id):
+        from services.task_instance_bridge import resolve_task_instance
+
+        instance = await resolve_task_instance(instance_id)
+        if not instance:
             return None
         
         update = {"updated_at": datetime.now(timezone.utc)}
@@ -719,7 +721,7 @@ class TaskService:
                 update[field] = data[field]
         
         result = await self.instances.find_one_and_update(
-            {"_id": ObjectId(instance_id)},
+            {"_id": instance["_id"]},
             {"$set": update},
             return_document=True
         )
@@ -730,24 +732,12 @@ class TaskService:
     
     async def start_task(self, instance_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         """Mark a task as started."""
-        # Build query to find by either ObjectId or string 'id' field
-        query = None
-        if ObjectId.is_valid(instance_id):
-            query = {"_id": ObjectId(instance_id)}
-        
-        # Try ObjectId first
-        instance = None
-        if query:
-            instance = await self.instances.find_one(query)
-        
-        # If not found, try by 'id' field (UUID string)
-        if not instance:
-            query = {"id": instance_id}
-            instance = await self.instances.find_one(query)
-        
+        from services.task_instance_bridge import resolve_task_instance
+
+        instance = await resolve_task_instance(instance_id, triggered_by_user_id=user_id)
         if not instance:
             return None
-        
+
         result = await self.instances.find_one_and_update(
             {"_id": instance["_id"]},
             {"$set": {
@@ -758,26 +748,19 @@ class TaskService:
             }},
             return_document=True
         )
-        
+
         if result:
             return self._serialize_instance(result)
         return None
     
     async def complete_task(self, instance_id: str, data: Dict[str, Any], completed_by_id: str = None, completed_by_name: str = None) -> Optional[Dict[str, Any]]:
         """Mark a task as completed and update plan."""
-        # Try to find the task instance by ObjectId first, then by string 'id' field
-        instance = None
-        query = None
-        
-        if ObjectId.is_valid(instance_id):
-            query = {"_id": ObjectId(instance_id)}
-            instance = await self.instances.find_one(query)
-        
-        # If not found by ObjectId, try by 'id' field (UUID string)
-        if not instance:
-            query = {"id": instance_id}
-            instance = await self.instances.find_one(query)
-        
+        from services.task_instance_bridge import resolve_task_instance
+
+        instance = await resolve_task_instance(
+            instance_id,
+            triggered_by_user_id=completed_by_id,
+        )
         if not instance:
             return None
         
@@ -1166,8 +1149,13 @@ class TaskService:
     
     async def delete_instance(self, instance_id: str) -> bool:
         """Delete a task instance."""
+        from services.task_instance_bridge import resolve_task_instance
+
         try:
-            result = await self.instances.delete_one({"_id": ObjectId(instance_id)})
+            instance = await resolve_task_instance(instance_id)
+            if not instance:
+                return False
+            result = await self.instances.delete_one({"_id": instance["_id"]})
             return result.deleted_count > 0
         except Exception:
             return False

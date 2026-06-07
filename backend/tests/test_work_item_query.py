@@ -192,6 +192,17 @@ def test_pm_import_overdue_task_instance_excluded_from_my_tasks():
     assert not should_exclude_pm_import_overdue_from_my_tasks(task_instance=native_overdue, now=now)
 
 
+def test_parse_scheduled_work_item_id():
+    from services.task_instance_bridge import parse_scheduled_work_item_id
+
+    assert parse_scheduled_work_item_id("sched:st-1") == "st-1"
+    assert parse_scheduled_work_item_id("sched:e4f28776-3181-4172-b9e3-3f70a2a99a53") == (
+        "e4f28776-3181-4172-b9e3-3f70a2a99a53"
+    )
+    assert parse_scheduled_work_item_id("507f1f77bcf86cd799439011") is None
+    assert parse_scheduled_work_item_id("sched:") is None
+
+
 def test_apply_strategy_handler_requires_payload():
     from services.job_handlers import handle_apply_strategy
 

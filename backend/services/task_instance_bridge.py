@@ -18,6 +18,8 @@ from services.scheduler_config import should_read_legacy_maintenance_programs
 
 logger = logging.getLogger(__name__)
 
+SCHED_WORK_ITEM_PREFIX = "sched:"
+
 # Map scheduled_tasks.status -> task_instances.status
 STATUS_MAP = {
     "scheduled": "pending",
@@ -146,6 +148,129 @@ async def _build_program_discipline_map(program_ids: List[str]) -> Dict[str, Opt
     return out
 
 
+def parse_scheduled_work_item_id(task_id: str) -> Optional[str]:
+    """Return scheduled_task id when ``task_id`` is a synthetic My Tasks key (``sched:…``)."""
+    if not task_id or not task_id.startswith(SCHED_WORK_ITEM_PREFIX):
+        return None
+    sched_id = task_id[len(SCHED_WORK_ITEM_PREFIX) :]
+    return sched_id or None
+
+
+async def build_instance_from_scheduled_task(
+    st: dict,
+    *,
+    triggered_by_user_id: Optional[str] = None,
+    started_at: Optional[datetime] = None,
+    default_assignees: Optional[Dict[str, Dict[str, Optional[str]]]] = None,
+    program_disciplines: Optional[Dict[str, Optional[str]]] = None,
+    discipline_cache: Optional[Dict[str, str]] = None,
+) -> dict:
+    """Build a task_instances document from a scheduled_tasks row."""
+    started_at = started_at or datetime.now(timezone.utc)
+    if default_assignees is None:
+        default_assignees = await _build_default_assignees()
+    if discipline_cache is None:
+        discipline_cache = {}
+    if program_disciplines is None:
+        program_id = st.get("maintenance_program_id")
+        program_disciplines = await _build_program_discipline_map(
+            [program_id] if program_id else []
+        )
+
+    program_disc = program_disciplines.get(st.get("maintenance_program_id"))
+    raw_discipline = program_disc or st.get("discipline")
+    canonical_discipline = await _resolve_discipline(raw_discipline, discipline_cache)
+
+    week_start_iso = (st.get("due_date") or started_at.date().isoformat())
+    try:
+        due_dt = datetime.fromisoformat(week_start_iso).replace(tzinfo=timezone.utc)
+    except Exception:
+        due_dt = started_at
+
+    assignee_meta = default_assignees.get(canonical_discipline or "") or {}
+
+    return {
+        "id": str(uuid4()),
+        "scheduled_task_id": st.get("id"),
+        "task_plan_id": st.get("maintenance_program_id"),
+        "task_template_id": None,
+        "task_template_name": None,
+        "title": st.get("task_name") or "Maintenance task",
+        "description": st.get("task_description") or "",
+        "discipline": canonical_discipline,
+        "priority": st.get("priority") or "medium",
+        "status": STATUS_MAP.get(st.get("status"), "pending"),
+        "source": "maintenance",
+        "source_type": st.get("task_source") or "strategy_generated",
+        "due_date": due_dt,
+        "scheduled_date": due_dt,
+        "equipment_id": st.get("equipment_id"),
+        "equipment_name": st.get("equipment_name"),
+        "assigned_user_id": assignee_meta.get("user_id"),
+        "assignee": assignee_meta.get("user_name") or "",
+        "is_adhoc": False,
+        "follow_up_required": False,
+        "attachments": [],
+        "issues_found": [],
+        "form_data": {
+            "failure_mode_id": st.get("failure_mode_id"),
+            "failure_mode_name": st.get("failure_mode_name"),
+            "strategy_id": st.get("strategy_id"),
+            "pm_import_task_id": st.get("pm_import_task_id"),
+        },
+        "form_fields": [],
+        "form_documents": [],
+        "created_at": started_at,
+        "updated_at": started_at,
+        "created_by": triggered_by_user_id,
+    }
+
+
+async def ensure_task_instance_for_scheduled_task(
+    scheduled_task_id: str,
+    *,
+    triggered_by_user_id: Optional[str] = None,
+) -> Optional[dict]:
+    """Return an existing or newly created task_instance for a scheduled_task id."""
+    existing = await db.task_instances.find_one({"scheduled_task_id": scheduled_task_id})
+    if existing:
+        return existing
+
+    st = await db.scheduled_tasks.find_one({"id": scheduled_task_id}, {"_id": 0})
+    if not st or st.get("status") in ("completed", "cancelled"):
+        return None
+
+    instance = await build_instance_from_scheduled_task(
+        st,
+        triggered_by_user_id=triggered_by_user_id,
+    )
+    await db.task_instances.insert_one(instance)
+    return await db.task_instances.find_one({"scheduled_task_id": scheduled_task_id})
+
+
+async def resolve_task_instance(
+    task_id: str,
+    *,
+    triggered_by_user_id: Optional[str] = None,
+) -> Optional[dict]:
+    """Resolve My Tasks / work-items id to a task_instances document."""
+    from bson import ObjectId
+
+    sched_id = parse_scheduled_work_item_id(task_id)
+    if sched_id:
+        return await ensure_task_instance_for_scheduled_task(
+            sched_id,
+            triggered_by_user_id=triggered_by_user_id,
+        )
+
+    if ObjectId.is_valid(task_id):
+        doc = await db.task_instances.find_one({"_id": ObjectId(task_id)})
+        if doc:
+            return doc
+
+    return await db.task_instances.find_one({"id": task_id})
+
+
 async def sync_scheduled_tasks_to_instances(
     week_start: datetime,
     week_end: datetime,
@@ -208,58 +333,16 @@ async def sync_scheduled_tasks_to_instances(
             continue
 
         try:
-            # Discipline: prefer the program's discipline; fall back to whatever
-            # is on the scheduled_task (unlikely today but future-proof).
-            program_disc = program_disciplines.get(st.get("maintenance_program_id"))
-            raw_discipline = program_disc or st.get("discipline")
-            canonical_discipline = await _resolve_discipline(raw_discipline, discipline_cache)
-
-            # Due date: scheduled_tasks stores ISO strings; task_instances uses datetime.
-            try:
-                due_dt = datetime.fromisoformat(st.get("due_date") or week_start_iso).replace(
-                    tzinfo=timezone.utc
-                )
-            except Exception:
-                due_dt = week_start
-
-            assignee_meta = default_assignees.get(canonical_discipline or "") or {}
-
-            instance = {
-                "id": str(uuid4()),
-                "scheduled_task_id": sched_id,
-                "task_plan_id": st.get("maintenance_program_id"),
-                "task_template_id": None,
-                "task_template_name": None,
-                "title": st.get("task_name") or "Maintenance task",
-                "description": st.get("task_description") or "",
-                "discipline": canonical_discipline,
-                "priority": st.get("priority") or "medium",
-                "status": STATUS_MAP.get(st.get("status"), "pending"),
-                "source": "maintenance",
-                "source_type": st.get("task_source") or "strategy_generated",
-                "due_date": due_dt,
-                "scheduled_date": due_dt,
-                "equipment_id": st.get("equipment_id"),
-                "equipment_name": st.get("equipment_name"),
-                "assigned_user_id": assignee_meta.get("user_id"),
-                "assignee": assignee_meta.get("user_name") or "",
-                "is_adhoc": False,
-                "follow_up_required": False,
-                "attachments": [],
-                "issues_found": [],
-                "form_data": {
-                    "failure_mode_id": st.get("failure_mode_id"),
-                    "failure_mode_name": st.get("failure_mode_name"),
-                    "strategy_id": st.get("strategy_id"),
-                    "pm_import_task_id": st.get("pm_import_task_id"),
-                },
-                "form_fields": [],
-                "form_documents": [],
-                "created_at": started_at,
-                "updated_at": started_at,
-                "created_by": triggered_by_user_id,
-            }
+            instance = await build_instance_from_scheduled_task(
+                st,
+                triggered_by_user_id=triggered_by_user_id,
+                started_at=started_at,
+                default_assignees=default_assignees,
+                program_disciplines=program_disciplines,
+                discipline_cache=discipline_cache,
+            )
             to_insert.append(instance)
+            canonical_discipline = instance.get("discipline")
             by_discipline[canonical_discipline or "_unknown"] = (
                 by_discipline.get(canonical_discipline or "_unknown", 0) + 1
             )
