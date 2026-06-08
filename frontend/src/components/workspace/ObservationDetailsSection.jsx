@@ -789,20 +789,8 @@ const ObservationDetailsSection = ({ threatId }) => {
         )}
       </div>
 
-      {/* Probable Cause */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4" data-testid="workspace-cause">
-        <h3 className="font-semibold text-slate-900 text-sm mb-2">Probable Cause</h3>
-        {isEditing ? (
-          <Textarea
-            value={editForm.cause || ""}
-            onChange={(e) => setEditForm({ ...editForm, cause: e.target.value })}
-            placeholder="Enter probable cause…"
-            rows={3}
-          />
-        ) : (
-          <p className="text-slate-600 text-sm whitespace-pre-wrap">{threat.cause || translateEnum("Not specified")}</p>
-        )}
-      </div>
+      {/* Probable Cause section removed per user request. The `cause` field is still
+          editable via the Edit form (kept in editForm.cause for backwards compatibility). */}
 
       {/* Delete confirmation — opened from the hero ••• menu */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
