@@ -164,7 +164,17 @@ const RiskSummaryCard = ({ riskSummary }) => {
   };
 
   return (
-    <div className={`rounded-xl border px-3 py-2 ${getRiskColor()}`}>
+    <div
+      className={`rounded-xl border px-3 py-2 cursor-context-menu ${getRiskColor()}`}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("workspace:show-score-calc", {
+          detail: { x: e.clientX, y: e.clientY },
+        }));
+      }}
+      title="Right-click for score calculation details"
+      data-testid="kpi-risk-card"
+    >
       <div className="flex items-center gap-1.5 mb-0.5">
         <AlertTriangle className="w-3.5 h-3.5" />
         <span className="text-[10px] font-medium uppercase tracking-wide">Risk</span>
