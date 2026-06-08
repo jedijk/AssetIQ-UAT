@@ -174,6 +174,22 @@ def calculate_environmental_exposure(observation: dict, criticality: dict) -> di
     }
 
 
+def calculate_reputation_exposure(observation: dict, criticality: dict) -> dict:
+    """Calculate reputation exposure based on criticality.reputation_impact (1-5)."""
+    rep_impact = criticality.get("reputation_impact", 0) if criticality else 0
+    impact_mapping = {
+        1: "Negligible",
+        2: "Low",
+        3: "Medium",
+        4: "High",
+        5: "Critical",
+    }
+    return {
+        "impact_rating": impact_mapping.get(rep_impact, "Low"),
+        "reputation_impact_score": rep_impact,
+    }
+
+
 async def calculate_alarp_progress(observation_id: str, actions: list, investigation: dict = None) -> dict:
     """
     Calculate ALARP progress based on:
@@ -824,12 +840,14 @@ async def get_observation_workspace(
     production_exposure = calculate_production_exposure(observation, criticality)
     safety_exposure = calculate_safety_exposure(observation, criticality)
     environmental_exposure = calculate_environmental_exposure(observation, criticality)
+    reputation_exposure = calculate_reputation_exposure(observation, criticality)
     alarp_progress = await calculate_alarp_progress(observation_id, action_plan, investigation)
     
     exposure_data = {
         "production": production_exposure,
         "safety": safety_exposure,
         "environmental": environmental_exposure,
+        "reputation": reputation_exposure,
         "alarp": alarp_progress,
         "risk_summary": {
             "risk_score": observation.get("risk_score", 0),

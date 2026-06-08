@@ -444,7 +444,9 @@ async def get_risk_insights(
         {"_id": 0}
     )
     if not insight:
-        raise HTTPException(status_code=404, detail="No AI insights available for this threat. Run analysis first.")
+        # Return null (200) rather than 404 so the UI can quietly render the
+        # "no analysis yet" empty state without console noise.
+        return None
 
     # Backfill/link onto the threat doc (handles older cached insights + ensures UI can show state)
     try:
@@ -653,7 +655,9 @@ async def get_causal_analysis(
         {"_id": 0}
     )
     if not analysis:
-        raise HTTPException(status_code=404, detail="No causal analysis available. Generate one first.")
+        # Return null (200) rather than 404 so the UI can quietly render the
+        # "no analysis yet" empty state without console noise.
+        return None
     return analysis
 
 

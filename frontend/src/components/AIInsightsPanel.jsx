@@ -302,8 +302,9 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
     analyzeMutation.mutate();
   };
   
-  // No insights yet - show analyze button
-  if (insightsError && !analyzeMutation.isPending && !analyzeMutation.data) {
+  // No insights yet (either 404 error or backend returned null/empty) - show analyze button
+  const hasInsights = insights && (insights.dynamic_risk || insights.summary || insights.risk_drivers);
+  if ((insightsError || !hasInsights) && !analyzeMutation.isPending && !analyzeMutation.data && !loadingInsights) {
     return (
       <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-200 p-4">
         <div className="flex items-center justify-between mb-3">

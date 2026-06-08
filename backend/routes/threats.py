@@ -2,7 +2,7 @@
 Threats routes.
 """
 from fastapi import APIRouter, Depends, HTTPException, Body, Query, BackgroundTasks
-from typing import List, Optional
+from typing import List, Optional, Union
 from datetime import datetime, timezone
 import uuid
 import logging
@@ -850,7 +850,8 @@ async def link_threat_to_equipment(
 @router.post("/threats/{threat_id}/link-failure-mode")
 async def link_threat_to_failure_mode(
     threat_id: str,
-    failure_mode_id: int = Body(..., embed=True),
+    # Accept either UUID strings (user-created DB failure modes) or ints (static library entries).
+    failure_mode_id: Union[int, str] = Body(..., embed=True),
     current_user: dict = Depends(_threats_write)
 ):
     """
@@ -865,7 +866,7 @@ async def link_threat_to_failure_mode(
     # Find the failure mode - check database first, then static library
     matched_fm = None
     
-    # Check database for user-created failure modes
+    # Check database for user-created failure modes (UUID strings)
     db_fm = await db.failure_modes.find_one({"id": str(failure_mode_id)})
     if db_fm:
         db_fm.pop("_id", None)
@@ -884,11 +885,16 @@ async def link_threat_to_failure_mode(
             "cause": db_fm.get("cause", ""),
         }
     else:
-        # Fall back to static library
-        for fm in FAILURE_MODES_LIBRARY:
-            if fm["id"] == failure_mode_id:
-                matched_fm = fm
-                break
+        # Fall back to static library (integer ids)
+        try:
+            int_id = int(failure_mode_id)
+        except (TypeError, ValueError):
+            int_id = None
+        if int_id is not None:
+            for fm in FAILURE_MODES_LIBRARY:
+                if fm["id"] == int_id:
+                    matched_fm = fm
+                    break
     
     if not matched_fm:
         raise HTTPException(status_code=404, detail="Failure mode not found in library")

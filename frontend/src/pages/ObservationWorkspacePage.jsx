@@ -86,7 +86,21 @@ import CausalIntelligencePanel from "../components/CausalIntelligencePanel";
 /**
  * Exposure Card - Shows production, safety, environmental exposure
  */
-const ExposureCard = ({ type, data, icon: Icon, color }) => {
+const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, criticalityDefs }) => {
+  const [popup, setPopup] = useState({ show: false, x: 0, y: 0 });
+  const popupRef = useRef(null);
+
+  useEffect(() => {
+    if (!popup.show) return;
+    const handler = (e) => {
+      if (popupRef.current && !popupRef.current.contains(e.target)) {
+        setPopup({ show: false, x: 0, y: 0 });
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [popup.show]);
+
   const colorClasses = {
     amber: "bg-amber-50 border-amber-200 text-amber-700",
     red: "bg-red-50 border-red-200 text-red-700",
@@ -95,22 +109,79 @@ const ExposureCard = ({ type, data, icon: Icon, color }) => {
     purple: "bg-purple-50 border-purple-200 text-purple-700",
   };
 
+  // The field name on each criticality definition row that holds this dimension's description.
+  const fieldByDim = { safety: "safety", production: "production", environmental: "environment", reputation: "reputation" };
+  const field = fieldByDim[dimension];
+
+  // Sorted list of all 5 rank rows for the popover.
+  const scaleRows = (criticalityDefs || [])
+    .slice()
+    .sort((a, b) => (a.rank || 0) - (b.rank || 0))
+    .filter((d) => field && d[field]);
+
   return (
-    <div className={`rounded-xl border px-3 py-2 ${colorClasses[color]}`}>
-      <div className="flex items-center gap-1.5 mb-0.5">
-        <Icon className="w-3.5 h-3.5" />
-        <span className="text-[10px] font-medium uppercase tracking-wide">{type}</span>
+    <>
+      <div
+        className={`rounded-xl border px-3 py-2 ${dimension ? "cursor-context-menu" : ""} ${colorClasses[color]}`}
+        onContextMenu={dimension ? (e) => {
+          e.preventDefault();
+          setPopup({ show: true, x: e.clientX, y: e.clientY });
+        } : undefined}
+        title={dimension ? "Right-click for full criticality definition" : undefined}
+        data-testid={dimension ? `exposure-card-${dimension}` : undefined}
+      >
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <Icon className="w-3.5 h-3.5" />
+          <span className="text-[10px] font-medium uppercase tracking-wide">{type}</span>
+        </div>
+        {data.primary && (
+          <div className="text-lg font-bold leading-tight">{data.primary}</div>
+        )}
+        {data.secondary && (
+          <div className="text-[11px] opacity-80 leading-tight">{data.secondary}</div>
+        )}
+        {data.tertiary && (
+          <div className="text-[11px] opacity-70 leading-tight">{data.tertiary}</div>
+        )}
       </div>
-      {data.primary && (
-        <div className="text-lg font-bold leading-tight">{data.primary}</div>
+
+      {/* Criticality definition popover (right-click) */}
+      {popup.show && (
+        <div
+          ref={popupRef}
+          className="fixed z-50 w-80 bg-white border border-slate-200 rounded-xl shadow-2xl"
+          style={{
+            left: Math.min(Math.max(popup.x, 16), window.innerWidth - 336),
+            top: Math.min(Math.max(popup.y, 16), window.innerHeight - 100),
+          }}
+        >
+          <div className="flex items-center justify-between px-3 py-2 border-b">
+            <h3 className="font-semibold text-sm text-slate-800 capitalize">{dimension} criticality scale</h3>
+            <button onClick={() => setPopup({ show: false, x: 0, y: 0 })} className="p-1 hover:bg-slate-100 rounded">
+              <X className="w-4 h-4 text-slate-400" />
+            </button>
+          </div>
+          <div className="p-2 max-h-72 overflow-y-auto space-y-1">
+            {scaleRows.length > 0 ? scaleRows.map((d) => (
+              <div
+                key={d.rank}
+                className={`flex gap-2 p-2 rounded ${score === d.rank ? "bg-blue-50 border border-blue-200" : "border border-transparent"}`}
+              >
+                <div className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${score === d.rank ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"}`}>
+                  {d.rank}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-slate-800">{d.label || `Level ${d.rank}`}</div>
+                  <div className="text-[11px] text-slate-600 leading-snug whitespace-pre-wrap">{d[field]}</div>
+                </div>
+              </div>
+            )) : (
+              <div className="text-xs text-slate-400 italic p-2">No criticality definition available for this dimension.</div>
+            )}
+          </div>
+        </div>
       )}
-      {data.secondary && (
-        <div className="text-[11px] opacity-80 leading-tight">{data.secondary}</div>
-      )}
-      {data.tertiary && (
-        <div className="text-[11px] opacity-70 leading-tight">{data.tertiary}</div>
-      )}
-    </div>
+    </>
   );
 };
 
