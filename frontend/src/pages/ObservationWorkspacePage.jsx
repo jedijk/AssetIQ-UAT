@@ -949,41 +949,60 @@ const ObservationWorkspacePage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-12">
-      {/* Header */}
+      {/* Hero header — title, risk score & status/share/edit action bar */}
       <div className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm">
         <div className="container mx-auto px-4 max-w-7xl">
-          <div className="flex items-center gap-4 py-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/threats")}
-              className="p-2"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <RiskBadge level={observation?.risk_level} size="sm" />
-                <span className="text-xs text-slate-500 font-mono">
-                  {observation?.threat_number}
-                </span>
+          <div className="flex flex-col gap-3 py-3">
+            {/* Top row: back, title + risk badge, risk score, threat number */}
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/threats")}
+                className="p-2 flex-shrink-0"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <RiskBadge level={observation?.risk_level} size="sm" />
+                  <span className="text-xs text-slate-500 font-mono">
+                    {observation?.threat_number}
+                  </span>
+                </div>
+                <h1 className="font-semibold text-lg text-slate-900 truncate">
+                  {observation?.title}
+                </h1>
               </div>
-              <h1 className="font-semibold text-lg text-slate-900 truncate">
-                {observation?.title}
-              </h1>
+
+              {/* Risk Score in hero */}
+              <div
+                className={`flex-shrink-0 flex flex-col items-center justify-center min-w-[68px] px-3 py-1.5 rounded-lg border-l-4 ${
+                  observation?.risk_level === "Critical" ? "border-l-red-500 bg-red-50"
+                  : observation?.risk_level === "High" ? "border-l-orange-500 bg-orange-50"
+                  : observation?.risk_level === "Medium" ? "border-l-yellow-500 bg-yellow-50"
+                  : "border-l-green-500 bg-green-50"
+                }`}
+                title="Risk Score (right-click the card below for calculation details)"
+                data-testid="hero-risk-score"
+              >
+                <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500 leading-none">
+                  Risk
+                </div>
+                <div className={`text-2xl font-bold leading-tight ${
+                  observation?.risk_level === "Critical" ? "text-red-700"
+                  : observation?.risk_level === "High" ? "text-orange-700"
+                  : observation?.risk_level === "Medium" ? "text-yellow-700"
+                  : "text-green-700"
+                }`}>
+                  {observation?.risk_score ?? "—"}
+                </div>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate(`/threats/${id}`)}
-              >
-                <ExternalLink className="w-4 h-4 mr-1" />
-                Classic View
-              </Button>
-            </div>
+            {/* Action bar slot — ObservationDetailsSection portals status/share/edit/••• into here */}
+            <div id="workspace-hero-slot" className="border-t border-slate-100 pt-2" />
           </div>
         </div>
       </div>

@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -102,7 +103,9 @@ const LIKELIHOOD_OPTIONS = ["Rare", "Unlikely", "Possible", "Likely", "Almost Ce
 const DETECTABILITY_OPTIONS = ["Easy", "Moderate", "Difficult", "Very Difficult", "Almost Impossible"];
 const FREQUENCY_OPTIONS = ["Once", "Rarely", "Occasionally", "Frequently", "Constantly"];
 const IMPACT_OPTIONS = ["Minor", "Moderate", "Significant", "Major", "Catastrophic"];
-const STATUS_OPTIONS = ["Open", "In Progress", "Parked", "Closed"];
+// Work-process stages (match Process Journey at the bottom of the workspace).
+// Source: /app/backend/routes/observation_workspace.py get_process_journey().
+const STATUS_OPTIONS = ["Observation", "Assessment", "Planning", "Investigation", "Action", "ALARP", "Learning"];
 
 const ObservationDetailsSection = ({ threatId }) => {
   const navigate = useNavigate();
@@ -353,6 +356,13 @@ const ObservationDetailsSection = ({ threatId }) => {
     }
   }, [scoreCalcPopup.show]);
 
+  // The action bar (status + edit + share + ••• + RPN + tag + datetime) is rendered
+  // into the page hero via portal, so it appears inside the workspace header.
+  const [heroSlot, setHeroSlot] = useState(null);
+  useEffect(() => {
+    setHeroSlot(document.getElementById("workspace-hero-slot"));
+  }, [threat]);
+
   if (!threat) return null;
 
   // --- Helpers --------------------------------------------------------------
@@ -419,92 +429,98 @@ const ObservationDetailsSection = ({ threatId }) => {
   ];
 
   // --- Render ---------------------------------------------------------------
+  const actionBar = (
+    <div className="flex items-center justify-between flex-wrap gap-3 w-full" data-testid="workspace-actions-bar">
+      <div className="flex items-center gap-2 flex-wrap">
+        {threat.equipment_tag && (
+          <span className="text-xs text-slate-500 font-mono bg-slate-50 px-2 py-1 rounded">
+            {threat.equipment_tag}
+          </span>
+        )}
+        {threat.created_at && (
+          <span className="flex items-center gap-1 text-xs text-slate-500">
+            <Clock className="w-3 h-3" />
+            {formatDateTime(threat.created_at)}
+          </span>
+        )}
+        {rpnValue && (
+          <span
+            className={`text-xs font-semibold px-2 py-1 rounded ${
+              rpnValue >= 300 ? "bg-red-100 text-red-700"
+              : rpnValue >= 200 ? "bg-orange-100 text-orange-700"
+              : rpnValue >= 100 ? "bg-yellow-100 text-yellow-700"
+              : "bg-green-100 text-green-700"
+            }`}
+            title="Risk Priority Number"
+          >
+            RPN {rpnValue}
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2">
+        {isEditing ? (
+          <>
+            <Button size="sm" variant="outline" onClick={cancelEditing} data-testid="cancel-edit-btn">
+              <X className="w-3 h-3 mr-1" /> Cancel
+            </Button>
+            <Button size="sm" onClick={saveChanges} disabled={updateMutation.isPending} className="bg-green-600 hover:bg-green-700" data-testid="save-edit-btn">
+              {updateMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}
+              Save
+            </Button>
+          </>
+        ) : (
+          <>
+            <Select
+              value={threat.status}
+              onValueChange={(v) => updateMutation.mutate({ status: v })}
+              disabled={updateMutation.isPending}
+            >
+              <SelectTrigger className="h-8 min-w-[8.5rem] text-xs" data-testid="workspace-status-select">
+                <SelectValue>{translateEnum(threat.status)}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_OPTIONS.map((s) => (
+                  <SelectItem key={s} value={s}>{translateEnum(s)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button size="sm" variant="ghost" onClick={shareLink} title="Share" data-testid="workspace-share-btn">
+              <Share2 className="w-4 h-4" />
+            </Button>
+            <Button size="sm" variant="outline" onClick={startEditing} data-testid="workspace-edit-btn">
+              <Edit className="w-3 h-3 mr-1" /> Edit
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" data-testid="workspace-more-menu">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setShowLinkEquipmentDialog(true)} data-testid="menu-link-equipment">
+                  <LinkIcon className="w-4 h-4 mr-2" /> Link Equipment
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowLinkFailureModeDialog(true)} data-testid="menu-link-failure-mode">
+                  <AlertTriangle className="w-4 h-4 mr-2" /> Link Failure Mode
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate(`/threats/${threatId}`)}>
+                  Open Classic View
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
-      {/* Action bar: Status / Edit / Share / RPN / Delete */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center justify-between flex-wrap gap-3" data-testid="workspace-actions-bar">
-        <div className="flex items-center gap-2 flex-wrap">
-          {threat.equipment_tag && (
-            <span className="text-xs text-slate-500 font-mono bg-slate-50 px-2 py-1 rounded">
-              {threat.equipment_tag}
-            </span>
-          )}
-          {threat.created_at && (
-            <span className="flex items-center gap-1 text-xs text-slate-500">
-              <Clock className="w-3 h-3" />
-              {formatDateTime(threat.created_at)}
-            </span>
-          )}
-          {rpnValue && (
-            <span
-              className={`text-xs font-semibold px-2 py-1 rounded ${
-                rpnValue >= 300 ? "bg-red-100 text-red-700"
-                : rpnValue >= 200 ? "bg-orange-100 text-orange-700"
-                : rpnValue >= 100 ? "bg-yellow-100 text-yellow-700"
-                : "bg-green-100 text-green-700"
-              }`}
-              title="Risk Priority Number"
-            >
-              RPN {rpnValue}
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          {isEditing ? (
-            <>
-              <Button size="sm" variant="outline" onClick={cancelEditing} data-testid="cancel-edit-btn">
-                <X className="w-3 h-3 mr-1" /> Cancel
-              </Button>
-              <Button size="sm" onClick={saveChanges} disabled={updateMutation.isPending} className="bg-green-600 hover:bg-green-700" data-testid="save-edit-btn">
-                {updateMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}
-                Save
-              </Button>
-            </>
-          ) : (
-            <>
-              <Select
-                value={threat.status}
-                onValueChange={(v) => updateMutation.mutate({ status: v })}
-                disabled={updateMutation.isPending}
-              >
-                <SelectTrigger className="h-8 w-32 text-xs" data-testid="workspace-status-select">
-                  <SelectValue>{translateEnum(threat.status)}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map((s) => (
-                    <SelectItem key={s} value={s}>{translateEnum(s)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button size="sm" variant="ghost" onClick={shareLink} title="Share" data-testid="workspace-share-btn">
-                <Share2 className="w-4 h-4" />
-              </Button>
-              <Button size="sm" variant="outline" onClick={startEditing} data-testid="workspace-edit-btn">
-                <Edit className="w-3 h-3 mr-1" /> Edit
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0" data-testid="workspace-more-menu">
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setShowLinkEquipmentDialog(true)} data-testid="menu-link-equipment">
-                    <LinkIcon className="w-4 h-4 mr-2" /> Link Equipment
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setShowLinkFailureModeDialog(true)} data-testid="menu-link-failure-mode">
-                    <AlertTriangle className="w-4 h-4 mr-2" /> Link Failure Mode
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate(`/threats/${threatId}`)}>
-                    Open Classic View
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </>
-          )}
-        </div>
-      </div>
+      {/* Action bar — rendered into the page hero via portal when the slot exists; falls back to inline if no slot found. */}
+      {heroSlot ? createPortal(actionBar, heroSlot) : (
+        <div className="bg-white rounded-xl border border-slate-200 p-4">{actionBar}</div>
+      )}
 
       {/* Risk Score + Equipment Criticality (right-click on score → calc popup) */}
       <motion.div
