@@ -57,7 +57,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
   const [manualLanguage, setManualLanguage] = useState(null);
   const [showLangPicker, setShowLangPicker] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
-  const [transcriptionPreview, setTranscriptionPreview] = useState(null); // Preview transcribed text before adding
+  const [isListening, setIsListening] = useState(false); // Real-time speech recognition
+  const [interimTranscript, setInterimTranscript] = useState(""); // Partial transcript while speaking
   const [autoSkipCountdown, setAutoSkipCountdown] = useState(null); // Countdown timer for auto-skip
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -66,6 +67,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
   const documentInputRef = useRef(null);
   const textareaRef = useRef(null);
   const recordingTimerRef = useRef(null);
+  const recognitionRef = useRef(null); // Speech recognition instance
   const newFailureModeInputRef = useRef(null);
   const autoSkipTimerRef = useRef(null);
   /** Wall-clock deadline (ms) for auto-skip; survives closing/reopening the sidebar for the same prompt. */
@@ -522,8 +524,17 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
       
       if (result?.transcribed_text) {
         const transcribedText = result.transcribed_text.trim();
-        // Show preview instead of directly adding
-        setTranscriptionPreview(transcribedText);
+        // Append directly to message so user immediately sees it
+        setMessage(prev => (prev.trim() ? prev.trim() + " " : "") + transcribedText);
+        // Focus textarea and scroll to bottom so latest text is visible
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.focus();
+            const len = textareaRef.current.value.length;
+            try { textareaRef.current.setSelectionRange(len, len); } catch (_) {}
+            resizeAndScrollTextarea();
+          }
+        }, 50);
       } else {
         toast.error("Could not transcribe voice - no text detected");
       }
@@ -534,32 +545,105 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
     }
   };
 
-  // Add transcribed text to message
-  const addTranscriptionToMessage = () => {
-    if (!transcriptionPreview) return;
-    
-    const existingText = message.trim();
-    if (existingText) {
-      setMessage(existingText + " " + transcriptionPreview);
-    } else {
-      setMessage(transcriptionPreview);
-    }
-    setTranscriptionPreview(null);
-    
-    // Resize textarea after adding text
-    setTimeout(() => {
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-        const newHeight = Math.max(40, Math.min(textareaRef.current.scrollHeight, 150));
-        textareaRef.current.style.height = newHeight + 'px';
-        textareaRef.current.focus();
-      }
-    }, 100);
+  // Helper: resize textarea to fit content and scroll caret-end into view
+  const resizeAndScrollTextarea = () => {
+    if (!textareaRef.current) return;
+    const ta = textareaRef.current;
+    ta.style.height = 'auto';
+    const newHeight = Math.max(40, Math.min(ta.scrollHeight, 150));
+    ta.style.height = newHeight + 'px';
+    // Scroll to bottom so newly transcribed text is always visible
+    ta.scrollTop = ta.scrollHeight;
   };
 
-  // Discard transcription preview
-  const discardTranscription = () => {
-    setTranscriptionPreview(null);
+  // Real-time speech recognition (types as you speak)
+  const startListening = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      toast.error("Speech recognition not supported in this browser");
+      return;
+    }
+    
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = manualLanguage === 'nl' ? 'nl-NL' : 'en-US';
+    
+    recognition.onstart = () => {
+      setIsListening(true);
+      setInterimTranscript("");
+      // Focus the textarea so user sees the cursor & growing text
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          // Move caret to end
+          const len = textareaRef.current.value.length;
+          try { textareaRef.current.setSelectionRange(len, len); } catch (_) {}
+          resizeAndScrollTextarea();
+        }
+      }, 50);
+    };
+    
+    recognition.onresult = (event) => {
+      let interim = "";
+      let final = "";
+      
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          final += transcript + " ";
+        } else {
+          interim += transcript;
+        }
+      }
+      
+      // Update interim transcript for display
+      setInterimTranscript(interim);
+      
+      // Add final transcript to message
+      if (final) {
+        setMessage(prev => prev + final);
+      }
+      
+      // Always resize + scroll textarea to bottom so user sees latest words
+      requestAnimationFrame(resizeAndScrollTextarea);
+    };
+    
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error:", event.error);
+      if (event.error !== 'no-speech') {
+        toast.error("Speech recognition error: " + event.error);
+      }
+      setIsListening(false);
+      setInterimTranscript("");
+    };
+    
+    recognition.onend = () => {
+      setIsListening(false);
+      setInterimTranscript("");
+      recognitionRef.current = null;
+    };
+    
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+  
+  const stopListening = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+    setInterimTranscript("");
+  };
+  
+  const toggleListening = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
   };
 
   // Format recording time
@@ -577,6 +661,19 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
       }
     };
   }, []);
+
+  // Keep textarea auto-sized & scrolled-to-bottom whenever message or interim transcript changes
+  // so dictated words are always visible to the user.
+  useEffect(() => {
+    if (!textareaRef.current) return;
+    const ta = textareaRef.current;
+    ta.style.height = 'auto';
+    const newHeight = Math.max(40, Math.min(ta.scrollHeight, 150));
+    ta.style.height = newHeight + 'px';
+    if (isListening) {
+      ta.scrollTop = ta.scrollHeight;
+    }
+  }, [message, interimTranscript, isListening]);
 
   // Render message content
   const renderMessageContent = (msg, isInteractive = true) => {
@@ -1456,41 +1553,13 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               </div>
             )}
             
-            {/* Transcription Preview */}
-            {transcriptionPreview && (
-              <div className="mb-2 p-3 bg-blue-50 border border-blue-200 rounded-xl">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-2 text-blue-700 text-xs font-medium">
-                    <Mic className="w-3.5 h-3.5" />
-                    <span>Voice transcription:</span>
-                  </div>
-                </div>
-                <p className="text-sm text-slate-700 mb-3">{transcriptionPreview}</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={addTranscriptionToMessage}
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    Add to message
-                  </button>
-                  <button
-                    onClick={discardTranscription}
-                    className="px-3 py-1.5 bg-white border border-slate-300 text-slate-600 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors"
-                  >
-                    Discard
-                  </button>
-                </div>
-              </div>
-            )}
-            
             {/* Recording indicator */}
             {isRecording && (
               <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
                 <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
                 <span className="text-sm text-red-700 font-medium">Recording... {formatTime(recordingTime)}</span>
                 <button
-                  onClick={stopRecording}
+                  onClick={cancelRecording}
                   className="ml-auto px-3 py-1 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors"
                 >
                   Stop
@@ -1502,7 +1571,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
             {isTranscribing && (
               <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3">
                 <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-                <span className="text-sm text-blue-700">Transcribing voice...</span>
+                <span className="text-sm text-blue-700">Transcribing voice…</span>
               </div>
             )}
             
@@ -1561,44 +1630,60 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               </div>
 
               {/* Input Container */}
-              <div className="flex-1 bg-white rounded-3xl border border-slate-200 flex items-center overflow-visible shadow-sm min-h-[44px] focus-within:border-slate-300">
+              <div className={`relative flex-1 bg-white rounded-3xl border flex items-center overflow-visible shadow-sm min-h-[44px] transition-all ${
+                isListening 
+                  ? 'border-red-400 ring-2 ring-red-200' 
+                  : 'border-slate-200 focus-within:border-slate-300'
+              }`}>
                 <textarea
                   ref={textareaRef}
-                  value={message}
+                  value={message + (interimTranscript ? interimTranscript : "")}
                   onChange={(e) => {
-                    setMessage(e.target.value);
+                    // Only update if not from interim transcript
+                    if (!isListening) {
+                      setMessage(e.target.value);
+                    } else {
+                      // When listening, only update the non-interim part
+                      const newValue = e.target.value;
+                      const interimLength = interimTranscript.length;
+                      setMessage(newValue.slice(0, -interimLength || undefined));
+                    }
                     // Auto-resize to fit content
                     e.target.style.height = 'auto';
                     const newHeight = Math.max(40, Math.min(e.target.scrollHeight, 150));
                     e.target.style.height = newHeight + 'px';
                   }}
                   onKeyDown={handleKeyPress}
-                  placeholder="Type or record voice..."
+                  placeholder={isListening ? "Listening… speak now" : "Type or tap mic to dictate..."}
                   className="flex-1 px-4 py-3 text-sm bg-transparent border-none outline-none resize-none placeholder:text-slate-400 leading-5 scrollbar-thin focus:ring-0 focus:outline-none"
                   rows={1}
                   style={{ 
                     minHeight: '40px',
                     maxHeight: '150px',
-                    overflowY: message && message.length > 100 ? 'auto' : 'hidden'
+                    overflowY: (message.length + interimTranscript.length) > 100 ? 'auto' : 'hidden'
                   }}
                   data-testid="sidebar-chat-message-input"
                 />
-                {/* Mic button inside input */}
+                {/* Listening pill above input */}
+                {isListening && (
+                  <div className="absolute -top-7 left-3 flex items-center gap-1.5 bg-red-500 text-white text-[11px] font-medium px-2 py-0.5 rounded-full shadow-sm">
+                    <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                    Listening
+                  </div>
+                )}
+                {/* Mic button inside input - real-time speech */}
                 <button
-                  onClick={isRecording ? stopRecording : startRecording}
-                  disabled={isSending || isTranscribing}
+                  onClick={toggleListening}
+                  disabled={isSending}
                   className={`flex-shrink-0 w-8 h-8 mr-2 rounded-full flex items-center justify-center transition-all ${
-                    isRecording 
-                      ? 'bg-red-500 text-white animate-pulse' 
-                      : isTranscribing
-                        ? 'bg-blue-100 text-blue-400'
-                        : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'
+                    isListening 
+                      ? 'bg-red-500 text-white animate-pulse shadow-md shadow-red-300' 
+                      : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'
                   }`}
-                  title={isRecording ? "Stop recording" : isTranscribing ? "Transcribing..." : "Record voice"}
+                  title={isListening ? "Stop dictation" : "Start dictation"}
+                  data-testid="sidebar-voice-record-button"
                 >
-                  {isTranscribing ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : isRecording ? (
+                  {isListening ? (
                     <Square className="w-3.5 h-3.5 fill-current" />
                   ) : (
                     <Mic className="w-4 h-4" />

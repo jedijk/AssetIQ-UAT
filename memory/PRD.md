@@ -7,7 +7,14 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
-- [Jun 2026] **Weekly Task Generation — Phase P3 cron + live schedule editor (VERIFIED)**:
+- [Feb 2026] **Chat Sidebar — Voice dictation visibility fix (VERIFIED via lint + compile)**:
+  - Real-time speech recognition (`startListening`) now auto-focuses the textarea, moves the caret to end, and triggers `resizeAndScrollTextarea()` on every result so the latest transcribed words are always visible to the user.
+  - Added a dedicated `useEffect([message, interimTranscript, isListening])` that resizes the textarea to fit content and scrolls to bottom whenever dictation appends words.
+  - Visual cues while listening: red ring on the input container, red pulsing dot above the input ("Listening" pill), red pulsing mic button with shadow.
+  - Removed dead UI/state references (`transcriptionPreview`, `addTranscriptionToMessage`, `discardTranscription`, dangling `stopRecording` button) — `sendRecording` (Whisper STT path) now appends transcribed text directly to the input and focuses/scrolls it.
+  - Files: `/app/frontend/src/components/ChatSidebar.js`.
+
+## Recent Changes
   - APScheduler `AsyncIOScheduler` started in `background_startup()` (FastAPI lifespan) via `services/scheduler_job.init_scheduler()`. Default cron `0 2 * * sun` plant-local (`Europe/Amsterdam`), look-ahead 7 days. Config persisted in `app_settings.task_generation`. Misfire grace = 1h, `coalesce=True` for single missed-run catchup.
   - Admin endpoints: `GET/PUT /api/admin/task-generation/schedule`, `POST /api/admin/task-generation/schedule/preview` (validates timezone + cron, returns 400 on either), `GET /runs`, `POST /run` (manual / dry-run). All gated to owner/admin.
   - Settings → Task Generation page: live cron expression editor with 5 presets (Sunday 02:00 default), timezone dropdown (19 zones), look-ahead input, enable/disable toggle, "Preview next runs" + "Save & reload scheduler" buttons, and a live "Next runs (active/preview)" panel with a "Scheduler running" badge. Editor pattern: `ScheduleEditor` (data gate) + `ScheduleEditorForm` (draft state from prop, remount via `key` on save) — avoids set-state-in-render.
