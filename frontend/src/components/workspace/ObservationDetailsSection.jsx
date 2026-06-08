@@ -443,6 +443,21 @@ const ObservationDetailsSection = ({ threatId }) => {
             {formatDateTime(threat.created_at)}
           </span>
         )}
+        {/* Risk Score badge */}
+        {(threat.risk_score !== undefined && threat.risk_score !== null) && (
+          <span
+            className={`text-xs font-semibold px-2 py-1 rounded ${
+              threat.risk_level === "Critical" ? "bg-red-100 text-red-700"
+              : threat.risk_level === "High" ? "bg-orange-100 text-orange-700"
+              : threat.risk_level === "Medium" ? "bg-yellow-100 text-yellow-700"
+              : "bg-green-100 text-green-700"
+            }`}
+            title="Risk Score (right-click the card below for calculation details)"
+            data-testid="hero-risk-score"
+          >
+            Risk {threat.risk_score}
+          </span>
+        )}
         {rpnValue && (
           <span
             className={`text-xs font-semibold px-2 py-1 rounded ${

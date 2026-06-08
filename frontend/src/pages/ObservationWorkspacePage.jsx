@@ -975,30 +975,6 @@ const ObservationWorkspacePage = () => {
                   {observation?.title}
                 </h1>
               </div>
-
-              {/* Risk Score in hero */}
-              <div
-                className={`flex-shrink-0 flex flex-col items-center justify-center min-w-[68px] px-3 py-1.5 rounded-lg border-l-4 ${
-                  observation?.risk_level === "Critical" ? "border-l-red-500 bg-red-50"
-                  : observation?.risk_level === "High" ? "border-l-orange-500 bg-orange-50"
-                  : observation?.risk_level === "Medium" ? "border-l-yellow-500 bg-yellow-50"
-                  : "border-l-green-500 bg-green-50"
-                }`}
-                title="Risk Score (right-click the card below for calculation details)"
-                data-testid="hero-risk-score"
-              >
-                <div className="text-[10px] font-medium uppercase tracking-wide text-slate-500 leading-none">
-                  Risk
-                </div>
-                <div className={`text-2xl font-bold leading-tight ${
-                  observation?.risk_level === "Critical" ? "text-red-700"
-                  : observation?.risk_level === "High" ? "text-orange-700"
-                  : observation?.risk_level === "Medium" ? "text-yellow-700"
-                  : "text-green-700"
-                }`}>
-                  {observation?.risk_score ?? "—"}
-                </div>
-              </div>
             </div>
 
             {/* Action bar slot — ObservationDetailsSection portals status/share/edit/••• into here */}
