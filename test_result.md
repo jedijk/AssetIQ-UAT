@@ -1155,7 +1155,7 @@ backend:
     status_history:
       - working: true
         agent: "testing"
-        comment: "TESTED: All filtering parameters working correctly. (1) plant_id filter: Successfully filtered stats by plant_id=5fb4f269-191f-47d1-b190-e865a6430c7e, returned 228 equipment (vs 242 unfiltered). (2) equipment_type_id filter: Successfully filtered stats by equipment_type_id=motor_electric, returned 11 equipment with that type. (3) show_linked_only parameter: Successfully applied show_linked_only=true filter, returned 242 equipment. All filter combinations work correctly and return valid response structures."
+        comment: "TESTED: All filtering parameters working correctly. (1) plant_id filter: Successfully filtered stats by plant_id=observation-hub-2, returned 228 equipment (vs 242 unfiltered). (2) equipment_type_id filter: Successfully filtered stats by equipment_type_id=motor_electric, returned 11 equipment with that type. (3) show_linked_only parameter: Successfully applied show_linked_only=true filter, returned 242 equipment. All filter combinations work correctly and return valid response structures."
 
 metadata:
   created_by: "testing_agent"

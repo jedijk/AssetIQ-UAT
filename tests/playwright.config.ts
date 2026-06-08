@@ -13,7 +13,7 @@ export default defineConfig({
   use: {
     baseURL: process.env.CI
       ? (process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000')
-      : (process.env.REACT_APP_BACKEND_URL || 'https://asset-intelligence-21.preview.emergentagent.com'),
+      : (process.env.REACT_APP_BACKEND_URL || 'https://observation-hub-2.preview.emergentagent.com'),
     screenshot: 'on',
     trace: 'on-first-retry',
     headless: true,

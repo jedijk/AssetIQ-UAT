@@ -1,6 +1,6 @@
 import requests
 
-BASE_URL = "https://asset-intelligence-21.preview.emergentagent.com/api"
+BASE_URL = "https://observation-hub-2.preview.emergentagent.com/api"
 TEST_EMAIL = "jedijk@gmail.com"
 TEST_PASSWORD = "Jaap8019@"
 
