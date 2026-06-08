@@ -127,18 +127,18 @@ const ALARPCard = ({ alarp }) => {
   };
 
   return (
-    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <Target className="w-4 h-4 text-indigo-600" />
-          <span className="text-xs font-medium text-indigo-700 uppercase tracking-wide">Mitigated</span>
+    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl px-3 py-2">
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-1.5">
+          <Target className="w-3.5 h-3.5 text-indigo-600" />
+          <span className="text-[10px] font-medium text-indigo-700 uppercase tracking-wide">Mitigated</span>
         </div>
-        <Badge variant="outline" className={`text-xs ${getStatusColor()}`}>
+        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${getStatusColor()}`}>
           {status}
         </Badge>
       </div>
-      <div className="text-4xl font-bold text-indigo-700 mb-2">{percentage}%</div>
-      <div className="w-full h-2 bg-indigo-100 rounded-full overflow-hidden">
+      <div className="text-lg font-bold text-indigo-700 leading-tight mb-1">{percentage}%</div>
+      <div className="w-full h-1.5 bg-indigo-100 rounded-full overflow-hidden">
         <div 
           className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
           style={{ width: `${percentage}%` }}
@@ -164,17 +164,17 @@ const RiskSummaryCard = ({ riskSummary }) => {
   };
 
   return (
-    <div className={`rounded-xl border p-4 ${getRiskColor()}`}>
-      <div className="flex items-center gap-2 mb-2">
-        <AlertTriangle className="w-4 h-4" />
-        <span className="text-xs font-medium uppercase tracking-wide">Risk</span>
+    <div className={`rounded-xl border px-3 py-2 ${getRiskColor()}`}>
+      <div className="flex items-center gap-1.5 mb-0.5">
+        <AlertTriangle className="w-3.5 h-3.5" />
+        <span className="text-[10px] font-medium uppercase tracking-wide">Risk</span>
       </div>
-      <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-bold">{riskScore}</span>
+      <div className="flex items-baseline gap-2 leading-tight">
+        <span className="text-lg font-bold">{riskScore}</span>
         <RiskBadge level={riskLevel} size="sm" />
       </div>
       {rpn && (
-        <div className="text-xs mt-1 opacity-70">RPN: {rpn}</div>
+        <div className="text-[11px] mt-0.5 opacity-70 leading-tight">RPN: {rpn}</div>
       )}
     </div>
   );
