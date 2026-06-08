@@ -949,36 +949,33 @@ const ObservationWorkspacePage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-12">
-      {/* Hero header — title, risk score & status/share/edit action bar */}
+      {/* Hero header — compact single-row like classic */}
       <div className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm">
-        <div className="container mx-auto px-4 max-w-7xl">
-          <div className="flex flex-col gap-3 py-3">
-            {/* Top row: back, title + risk badge, risk score, threat number */}
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/threats")}
-                className="p-2 flex-shrink-0"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
+        <div className="container mx-auto px-3 sm:px-4 max-w-7xl">
+          <div className="flex items-center gap-2 sm:gap-3 py-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/threats")}
+              className="p-1 -ml-1 flex-shrink-0"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <RiskBadge level={observation?.risk_level} size="sm" />
-                  <span className="text-xs text-slate-500 font-mono">
-                    {observation?.threat_number}
-                  </span>
-                </div>
-                <h1 className="font-semibold text-lg text-slate-900 truncate">
-                  {observation?.title}
-                </h1>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <RiskBadge level={observation?.risk_level} size="sm" />
+                <span className="text-[11px] text-slate-400 font-mono">
+                  {observation?.threat_number}
+                </span>
               </div>
+              <h1 className="font-semibold text-sm sm:text-base text-slate-900 truncate leading-tight">
+                {observation?.title}
+              </h1>
             </div>
 
             {/* Action bar slot — ObservationDetailsSection portals status/share/edit/••• into here */}
-            <div id="workspace-hero-slot" className="border-t border-slate-100 pt-2" />
+            <div id="workspace-hero-slot" className="flex-shrink-0" />
           </div>
         </div>
       </div>
