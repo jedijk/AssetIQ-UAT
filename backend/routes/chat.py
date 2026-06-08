@@ -370,24 +370,24 @@ def _issue_confirm_no(text: str) -> bool:
 
 
 def _issue_confirm_assistant_text(detected_lang: str, summary: str) -> str:
-    """Generate confirmation message with improved summary and clear action options."""
+    """Generate confirmation message with professional summary and clear action options."""
     if detected_lang == "nl":
         return (
-            f"📋 **Samenvatting van uw melding:**\n\n"
+            f"📋 **Observatie Samenvatting**\n\n"
             f"{summary}\n\n"
             f"---\n"
-            f"Kies een actie:\n"
-            f"• **Accepteren** - Maak de melding aan\n"
-            f"• **Aanpassen** - Typ uw wijzigingen\n"
+            f"**Kies een actie:**\n"
+            f"• **Accepteren** - Maak de melding aan met bovenstaande gegevens\n"
+            f"• **Aanpassen** - Typ uw wijzigingen hieronder\n"
             f"• **Annuleren** - Stop en begin opnieuw"
         )
     return (
-        f"📋 **Summary of your report:**\n\n"
+        f"📋 **Observation Summary**\n\n"
         f"{summary}\n\n"
         f"---\n"
-        f"Choose an action:\n"
-        f"• **Accept** - Create the observation\n"
-        f"• **Revise** - Type your changes\n"
+        f"**Choose an action:**\n"
+        f"• **Accept** - Create observation with above details\n"
+        f"• **Revise** - Type your changes below\n"
         f"• **Cancel** - Stop and start over"
     )
 

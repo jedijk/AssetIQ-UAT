@@ -232,39 +232,52 @@ async def classify_user_intent(message: str, session_id: str) -> dict:
 
 async def summarize_issue_description(text: str, language: str = "en") -> str:
     """
-    Short summary of the operator's issue text for a confirmation step before
-    equipment mapping + failure mode selection.
+    Rewrite the operator's issue description as a professional reliability engineer would,
+    and identify the equipment and potential failure mode.
+    Returns a structured summary with equipment/failure mode clearly visible.
     """
     from services.ai_gateway import chat as ai_gateway_chat
 
     t = (text or "").strip()
     if not t:
         return ""
-    if len(t) <= 160:
-        return t
+    
     try:
         lang_note = "Dutch" if language == "nl" else "English"
         out = await ai_gateway_chat(
             [
                 {
                     "role": "system",
-                    "content": (
-                        f"In 1–2 short sentences ({lang_note}), summarize the equipment issue below "
-                        "for operator confirmation. Output only the summary, no preamble."
-                    ),
+                    "content": f"""You are a reliability engineer creating a professional observation summary.
+
+Rewrite the user's issue report in {lang_note} as a professional reliability observation. Be concise but technical.
+
+Output format (in {lang_note}):
+**Equipment:** [Identified equipment name/tag, or "To be confirmed" if unclear]
+**Issue Type:** [Failure mode category - e.g., Bearing Failure, Vibration, Leak, Noise, Overheating, etc.]
+**Description:** [1-2 sentences professionally describing the issue]
+
+Rules:
+- Extract equipment name/tag if mentioned (e.g., "Pump P-101", "Compressor C-201")
+- Identify the likely failure mode category
+- Write the description as a reliability engineer would document it
+- Keep it concise - max 3 lines total
+- Output only the formatted summary, no preamble""",
                 },
                 {"role": "user", "content": t[:4000]},
             ],
             endpoint="ai_helpers.summarize_issue_description",
             model=os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
             temperature=0.2,
-            max_tokens=150,
+            max_tokens=250,
         )
         out = (out or "").strip()
         if out:
             return out
     except Exception as e:
         logger.warning("summarize_issue_description fallback: %s", e)
+    
+    # Fallback: return original text
     return t[:280] + ("…" if len(t) > 280 else "")
 
 

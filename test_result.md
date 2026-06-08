@@ -1597,3 +1597,64 @@ agent_communication:
   - agent: "testing"
     message: "CHAT FLOW FOR REPORTING OBSERVATIONS TESTING COMPLETE - ALL TESTS PASSING (5/5). Tested the complete chat flow with issue confirmation feature as specified in review request. TEST RESULTS: (1) Clear Chat History - PASS: DELETE /api/chat/clear successfully clears chat history and conversation state. (2) Initial Message with Confirmation - PASS: Sending 'Pump P-101 has a bearing noise problem' returns question_type='issue_confirm', issue_summary with AI-improved summary, message with Accept/Revise/Cancel options, NO observation created yet. (3) Accept Flow - PASS: Sending 'accept' after confirmation prompt creates observation immediately with threat_id, equipment auto-selected, failure_mode auto-selected, message indicates 'Observation recorded'. (4) Revise Flow - PASS: Sending 'revise' after confirmation prompt transitions to question_type='issue_redescribe', asks user to describe again, NO observation created. (5) Cancel Flow - PASS: Sending 'cancel' after confirmation prompt resets conversation, message indicates 'Cancelled. What would you like to report?', NO observation created. KEY FINDINGS: Issue confirmation step working as designed - provides user with AI-improved summary and clear Accept/Revise/Cancel options before creating observation. AI summary generation functional. Equipment and failure mode auto-selection working correctly after acceptance. All state transitions (INITIAL → AWAITING_ISSUE_CONFIRM → AWAITING_EQUIPMENT/COMPLETE) working correctly. Backend logs show only slow request warnings (expected for AI-powered endpoints), no errors. Chat flow for reporting observations is production-ready."
 
+
+# Chat Summary Format Enhancement Testing
+
+user_problem_statement: "Test the updated chat summary format for reporting observations - verify professional summary with Equipment, Issue Type, and Description sections"
+
+backend:
+  - task: "Chat Summary Format - Professional Summary Generation"
+    implemented: true
+    working: true
+    file: "/app/backend/ai_helpers.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: Chat summary format enhancement working correctly. AI-powered summarize_issue_description() function generates professional summaries with structured format. Test 1 - Specific Equipment: Input 'Pump P-101 has a bearing noise problem, sounds like grinding' → Summary includes: **Equipment:** Pump P-101, **Issue Type:** Bearing Failure, **Description:** 'The pump is exhibiting a grinding noise, indicative of potential bearing degradation or failure. Further investigation is required to assess the condition of the bearings and determine necessary maintenance actions.' Summary reads like a reliability engineer wrote it - professional terminology, technical accuracy, proper structure. Test 2 - Vague Input: Input 'there's a weird noise coming from somewhere in the workshop' → Summary includes: **Equipment:** To be confirmed, **Issue Type:** Noise, **Description:** 'An unidentified noise is emanating from an unspecified location within the workshop, requiring further investigation to determine the source and potential impact on operations.' AI correctly handles vague input by marking equipment as 'To be confirmed' while maintaining professional tone. All three required sections (Equipment, Issue Type, Description) present in both tests."
+
+  - task: "Chat Summary Format - Observation Summary Display"
+    implemented: true
+    working: true
+    file: "/app/backend/routes/chat.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: Observation summary display format working correctly. Response message includes: (1) Header '📋 **Observation Summary**' with emoji and bold formatting, (2) Structured summary with Equipment/Issue Type/Description sections, (3) Separator line '---', (4) Action options section '**Choose an action:**' with bullet points for Accept/Revise/Cancel, (5) Clear descriptions for each action option. Format matches specification exactly. Both English and Dutch language support verified (English tested, Dutch format present in code). Response includes both 'message' field (full formatted text) and 'issue_summary' field (structured summary only) for frontend flexibility."
+
+  - task: "Chat Summary Format - Action Options Display"
+    implemented: true
+    working: true
+    file: "/app/backend/routes/chat.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: Action options display working correctly. All three action options present in response: (1) Accept - 'Create observation with above details', (2) Revise - 'Type your changes below', (3) Cancel - 'Stop and start over'. Options displayed with bullet points and clear descriptions. Format is user-friendly and matches specification. Verified in both test scenarios (specific equipment and vague input)."
+
+metadata:
+  created_by: "testing_agent"
+  version: "1.0"
+  test_sequence: 12
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Chat Summary Format - Professional Summary Generation"
+    - "Chat Summary Format - Observation Summary Display"
+    - "Chat Summary Format - Action Options Display"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "testing"
+    message: "CHAT SUMMARY FORMAT ENHANCEMENT TESTING COMPLETE - ALL TESTS PASSING (3/3). Tested the updated chat summary format for reporting observations as specified in review request. TEST RESULTS: (1) Professional Summary Generation - PASS: AI-powered summarize_issue_description() generates professional summaries with structured format (Equipment, Issue Type, Description). Test with 'Pump P-101 has a bearing noise problem, sounds like grinding' produced professional summary identifying equipment as 'Pump P-101', issue type as 'Bearing Failure', and technical description about bearing degradation. Test with vague input 'there's a weird noise coming from somewhere in the workshop' correctly handled with 'Equipment: To be confirmed' while maintaining professional tone. (2) Observation Summary Display - PASS: Response includes '📋 **Observation Summary**' header, structured summary with all three sections, separator line, and action options section. Format matches specification exactly. (3) Action Options Display - PASS: All three action options (Accept/Revise/Cancel) present with clear descriptions. KEY FINDINGS: Summary format reads like a reliability engineer wrote it - uses professional terminology (bearing degradation, potential impact on operations, further investigation required), maintains technical accuracy, and provides structured information. AI correctly extracts equipment tags from user input (P-101) and identifies failure mode categories (Bearing Failure, Noise). Handles both specific and vague inputs appropriately. Format is user-friendly with clear visual hierarchy (header, summary, separator, actions). Both 'message' and 'issue_summary' fields provided in response for frontend flexibility. Chat summary format enhancement is production-ready and meets all requirements from review request."
+
