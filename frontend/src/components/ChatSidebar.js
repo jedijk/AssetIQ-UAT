@@ -557,90 +557,104 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
     ta.scrollTop = ta.scrollHeight;
   };
 
-  // Real-time speech recognition (types as you speak)
-  const startListening = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (!SpeechRecognition) {
-      toast.error("Speech recognition not supported in this browser");
-      return;
-    }
-    
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    // Use the active language: manual selection > detected > app default. Supports EN-US and NL-NL.
-    const activeLang = manualLanguage || detectedLanguage || appLanguage || 'en';
-    recognition.lang = activeLang === 'nl' ? 'nl-NL' : 'en-US';
-    
-    recognition.onstart = () => {
+  // Real-time speech recognition replaced with Whisper-based recording.
+  // The mic button toggles a lightweight inline recording — the audio is sent to the backend
+  // (OpenAI Whisper) which transcribes the original spoken language(s), including mixed
+  // Dutch + English in the same utterance. The browser's built-in SpeechRecognition is
+  // locale-locked and would mistranscribe mixed-language speech.
+  const inlineRecorderRef = useRef(null);
+  const inlineChunksRef = useRef([]);
+  const inlineStreamRef = useRef(null);
+
+  const startListening = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      inlineStreamRef.current = stream;
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
+            ? 'audio/ogg;codecs=opus'
+            : 'audio/webm';
+      const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 32000 });
+      inlineChunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) inlineChunksRef.current.push(e.data);
+      };
+      recorder.onstop = async () => {
+        // Release mic
+        try { stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+        inlineStreamRef.current = null;
+        const chunks = inlineChunksRef.current;
+        inlineChunksRef.current = [];
+        if (!chunks.length) {
+          setIsTranscribing(false);
+          return;
+        }
+        const blob = new Blob(chunks, { type: mimeType });
+        setIsTranscribing(true);
+        try {
+          const activeLang = manualLanguage || detectedLanguage || appLanguage || null;
+          const result = await voiceAPI.sendVoice(blob, activeLang, true);
+          if (result?.detected_language) {
+            setDetectedLanguage(result.detected_language);
+            const lang = result.detected_language;
+            if ((lang === "en" || lang === "nl") && lang !== appLanguage) {
+              setAppLanguage(lang);
+            }
+          }
+          if (result?.transcribed_text) {
+            const transcribedText = result.transcribed_text.trim();
+            setMessage(prev => (prev.trim() ? prev.trim() + " " : "") + transcribedText);
+            setTimeout(() => {
+              if (textareaRef.current) {
+                textareaRef.current.focus();
+                const len = textareaRef.current.value.length;
+                try { textareaRef.current.setSelectionRange(len, len); } catch (_) {}
+                resizeAndScrollTextarea();
+              }
+            }, 50);
+          } else {
+            toast.error("No speech detected");
+          }
+        } catch (e) {
+          toast.error("Voice transcription failed");
+        } finally {
+          setIsTranscribing(false);
+        }
+      };
+      inlineRecorderRef.current = recorder;
+      recorder.start(250);
       setIsListening(true);
       setInterimTranscript("");
-      // Focus the textarea so user sees the cursor & growing text
+      // Focus textarea so the input feels active
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.focus();
-          // Move caret to end
           const len = textareaRef.current.value.length;
           try { textareaRef.current.setSelectionRange(len, len); } catch (_) {}
-          resizeAndScrollTextarea();
         }
       }, 50);
-    };
-    
-    recognition.onresult = (event) => {
-      let interim = "";
-      let final = "";
-      
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          final += transcript + " ";
-        } else {
-          interim += transcript;
-        }
-      }
-      
-      // Update interim transcript for display
-      setInterimTranscript(interim);
-      
-      // Add final transcript to message
-      if (final) {
-        setMessage(prev => prev + final);
-      }
-      
-      // Always resize + scroll textarea to bottom so user sees latest words
-      requestAnimationFrame(resizeAndScrollTextarea);
-    };
-    
-    recognition.onerror = (event) => {
-      console.error("Speech recognition error:", event.error);
-      if (event.error !== 'no-speech') {
-        toast.error("Speech recognition error: " + event.error);
-      }
+    } catch (error) {
+      toast.error("Could not access microphone");
       setIsListening(false);
-      setInterimTranscript("");
-    };
-    
-    recognition.onend = () => {
-      setIsListening(false);
-      setInterimTranscript("");
-      recognitionRef.current = null;
-    };
-    
-    recognitionRef.current = recognition;
-    recognition.start();
-  };
-  
-  const stopListening = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
     }
+  };
+
+  const stopListening = () => {
+    const recorder = inlineRecorderRef.current;
+    inlineRecorderRef.current = null;
     setIsListening(false);
     setInterimTranscript("");
+    if (recorder && recorder.state !== "inactive") {
+      try { recorder.stop(); } catch (_) {}
+    } else if (inlineStreamRef.current) {
+      try { inlineStreamRef.current.getTracks().forEach((t) => t.stop()); } catch (_) {}
+      inlineStreamRef.current = null;
+    }
   };
-  
+
   const toggleListening = () => {
     if (isListening) {
       stopListening();
@@ -677,17 +691,6 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
       ta.scrollTop = ta.scrollHeight;
     }
   }, [message, interimTranscript, isListening]);
-
-  // If the user switches language while dictating, restart recognition with the new locale
-  useEffect(() => {
-    if (isListening && recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch (_) {}
-      // onend will set isListening=false; restart with new lang shortly after
-      const t = setTimeout(() => { startListening(); }, 250);
-      return () => clearTimeout(t);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [manualLanguage]);
 
   // Render message content
   const renderMessageContent = (msg, isInteractive = true) => {
@@ -1673,8 +1676,9 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                     e.target.style.height = newHeight + 'px';
                   }}
                   onKeyDown={handleKeyPress}
-                  placeholder={isListening ? "Listening… speak now" : "Type or tap mic to dictate..."}
-                  className="flex-1 px-4 py-3 text-sm bg-transparent border-none outline-none resize-none placeholder:text-slate-400 leading-5 scrollbar-thin focus:ring-0 focus:outline-none"
+                  placeholder={isListening ? "Recording… tap mic to stop" : (isTranscribing ? "Transcribing your voice…" : "Type or tap mic to dictate...")}
+                  disabled={isTranscribing}
+                  className="flex-1 px-4 py-3 text-sm bg-transparent border-none outline-none resize-none placeholder:text-slate-400 leading-5 scrollbar-thin focus:ring-0 focus:outline-none disabled:opacity-60"
                   rows={1}
                   style={{ 
                     minHeight: '40px',
@@ -1683,27 +1687,37 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                   }}
                   data-testid="sidebar-chat-message-input"
                 />
-                {/* Listening pill above input */}
+                {/* Listening / Transcribing pill above input */}
                 {isListening && (
                   <div className="absolute -top-7 left-3 flex items-center gap-1.5 bg-red-500 text-white text-[11px] font-medium px-2 py-0.5 rounded-full shadow-sm">
                     <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                    Listening
+                    Recording — tap mic to stop
                   </div>
                 )}
-                {/* Mic button inside input - real-time speech */}
+                {!isListening && isTranscribing && (
+                  <div className="absolute -top-7 left-3 flex items-center gap-1.5 bg-blue-600 text-white text-[11px] font-medium px-2 py-0.5 rounded-full shadow-sm">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Transcribing…
+                  </div>
+                )}
+                {/* Mic button inside input - records audio, sent to backend Whisper on stop */}
                 <button
                   onClick={toggleListening}
-                  disabled={isSending}
+                  disabled={isSending || isTranscribing}
                   className={`flex-shrink-0 w-8 h-8 mr-2 rounded-full flex items-center justify-center transition-all ${
                     isListening 
                       ? 'bg-red-500 text-white animate-pulse shadow-md shadow-red-300' 
-                      : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'
+                      : isTranscribing
+                        ? 'bg-blue-100 text-blue-600'
+                        : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'
                   }`}
-                  title={isListening ? "Stop dictation" : "Start dictation"}
+                  title={isListening ? "Stop & transcribe" : (isTranscribing ? "Transcribing…" : "Tap to record")}
                   data-testid="sidebar-voice-record-button"
                 >
                   {isListening ? (
                     <Square className="w-3.5 h-3.5 fill-current" />
+                  ) : isTranscribing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
                     <Mic className="w-4 h-4" />
                   )}
