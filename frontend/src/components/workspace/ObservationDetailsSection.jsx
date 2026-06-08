@@ -627,19 +627,18 @@ const ObservationDetailsSection = ({ threatId }) => {
         );
       })()}
 
-      {/* Info Grid — 8 attributes (editable) */}
+      {/* Info Grid — 4 attributes (compact, editable) */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="grid grid-cols-2 md:grid-cols-4 gap-3"
+        className="grid grid-cols-2 md:grid-cols-4 gap-2"
         data-testid="workspace-info-grid"
       >
         {infoItems.map((item) => (
-          <div key={item.label} className="bg-white rounded-xl border border-slate-200 p-3">
-            <div className="flex items-center gap-1.5 text-slate-500 text-xs mb-1">
-              <item.icon className="w-3 h-3" />
-              <span className="truncate">{item.label}</span>
-            </div>
+          <div key={item.label} className="bg-white rounded-lg border border-slate-200 px-3 py-1.5 flex items-center gap-2 min-h-[36px]">
+            <item.icon className="w-3 h-3 text-slate-400 flex-shrink-0" />
+            <span className="text-[10px] uppercase tracking-wide text-slate-500 truncate flex-shrink-0 hidden sm:inline">{item.label}</span>
+            <div className="flex-1 min-w-0 text-right sm:text-left">
             {isEditing ? (
               item.type === "searchable" ? (
                 <SearchableCombobox
@@ -653,7 +652,7 @@ const ObservationDetailsSection = ({ threatId }) => {
                 />
               ) : item.type === "select" ? (
                 <Select value={editForm[item.field] || ""} onValueChange={(v) => setEditForm({ ...editForm, [item.field]: v })}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {item.options.map((o) => <SelectItem key={o} value={o}>{translateEnum(o)}</SelectItem>)}
                   </SelectContent>
@@ -669,7 +668,7 @@ const ObservationDetailsSection = ({ threatId }) => {
                     }
                   }}
                 >
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Owner" /></SelectTrigger>
+                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Owner" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_none">Not assigned</SelectItem>
                     {usersList.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
@@ -679,17 +678,18 @@ const ObservationDetailsSection = ({ threatId }) => {
                 <Input
                   value={editForm[item.field] || ""}
                   onChange={(e) => setEditForm({ ...editForm, [item.field]: e.target.value })}
-                  className="h-8 text-xs"
+                  className="h-7 text-xs"
                 />
               )
             ) : (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 justify-end sm:justify-start">
                 <span className="font-semibold text-slate-900 text-sm truncate">{item.value}</span>
                 {item.field === "failure_mode" && threat.is_new_failure_mode && (
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">NEW</span>
                 )}
               </div>
             )}
+            </div>
           </div>
         ))}
 
