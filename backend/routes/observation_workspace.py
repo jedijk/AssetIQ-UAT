@@ -92,7 +92,9 @@ class ProcessStage(BaseModel):
 
 def calculate_production_exposure(observation: dict, criticality: dict) -> dict:
     """Calculate production exposure based on criticality and observation data"""
-    production_impact = criticality.get("production_impact", 0) if criticality else 0
+    if not criticality or criticality.get("production_impact") is None:
+        return {"not_assessed": True, "production_impact_score": None, "formatted_value": "Not Assessed"}
+    production_impact = criticality.get("production_impact", 0)
     
     # Base exposure calculation
     # Production impact 1-5 scale maps to monetary exposure
@@ -130,7 +132,9 @@ def calculate_production_exposure(observation: dict, criticality: dict) -> dict:
 
 def calculate_safety_exposure(observation: dict, criticality: dict) -> dict:
     """Calculate safety exposure based on criticality"""
-    safety_impact = criticality.get("safety_impact", 0) if criticality else 0
+    if not criticality or criticality.get("safety_impact") is None:
+        return {"not_assessed": True, "safety_impact_score": None, "severity": "Not Assessed"}
+    safety_impact = criticality.get("safety_impact", 0)
     
     # Map safety impact to personnel exposure
     personnel_mapping = {
@@ -158,7 +162,9 @@ def calculate_safety_exposure(observation: dict, criticality: dict) -> dict:
 
 def calculate_environmental_exposure(observation: dict, criticality: dict) -> dict:
     """Calculate environmental exposure"""
-    env_impact = criticality.get("environmental_impact", 0) if criticality else 0
+    if not criticality or criticality.get("environmental_impact") is None:
+        return {"not_assessed": True, "environmental_impact_score": None, "impact_rating": "Not Assessed"}
+    env_impact = criticality.get("environmental_impact", 0)
     
     impact_mapping = {
         1: "Negligible",
@@ -176,7 +182,9 @@ def calculate_environmental_exposure(observation: dict, criticality: dict) -> di
 
 def calculate_reputation_exposure(observation: dict, criticality: dict) -> dict:
     """Calculate reputation exposure based on criticality.reputation_impact (1-5)."""
-    rep_impact = criticality.get("reputation_impact", 0) if criticality else 0
+    if not criticality or criticality.get("reputation_impact") is None:
+        return {"not_assessed": True, "reputation_impact_score": None, "impact_rating": "Not Assessed"}
+    rep_impact = criticality.get("reputation_impact", 0)
     impact_mapping = {
         1: "Negligible",
         2: "Low",
@@ -790,16 +798,25 @@ async def get_observation_workspace(
     if not observation:
         raise HTTPException(status_code=404, detail="Observation not found")
     
-    # Get equipment criticality data
+    # Get equipment criticality data — try linked_equipment_id first, then fall back
+    # to matching by equipment_tag, then by asset name, so observations created via
+    # chat (where the equipment isn't formally linked) still pull in their criticality.
     criticality = None
     equipment_node = None
+    lookup_filters = []
     if observation.get("linked_equipment_id"):
-        equipment_node = await db.equipment_nodes.find_one(
-            {"id": observation.get("linked_equipment_id")},
-            {"_id": 0}
-        )
+        lookup_filters.append({"id": observation["linked_equipment_id"]})
+    if observation.get("equipment_tag"):
+        lookup_filters.append({"tag": observation["equipment_tag"]})
+        lookup_filters.append({"equipment_tag": observation["equipment_tag"]})
+    if observation.get("asset"):
+        lookup_filters.append({"name": observation["asset"]})
+    for f in lookup_filters:
+        equipment_node = await db.equipment_nodes.find_one(f, {"_id": 0})
         if equipment_node:
             criticality = equipment_node.get("criticality")
+            if criticality:
+                break
     
     # Get failure mode data
     failure_mode_data = None

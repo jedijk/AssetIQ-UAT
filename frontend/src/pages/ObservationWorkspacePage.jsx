@@ -120,29 +120,37 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
     .sort((a, b) => (a.rank || 0) - (b.rank || 0))
     .filter((d) => field && d[field]);
 
+  const isNotAssessed = data?.not_assessed === true || (dimension && (score === null || score === undefined || score === 0));
+
   return (
     <>
       <div
-        className={`rounded-xl border px-3 py-2 ${dimension ? "cursor-context-menu" : ""} ${colorClasses[color]}`}
+        className={`rounded-xl border px-3 py-2 ${dimension ? "cursor-context-menu" : ""} ${isNotAssessed ? "bg-slate-50 border-slate-200 text-slate-500" : colorClasses[color]}`}
         onContextMenu={dimension ? (e) => {
           e.preventDefault();
           setPopup({ show: true, x: e.clientX, y: e.clientY });
         } : undefined}
-        title={dimension ? "Right-click for full criticality definition" : undefined}
+        title={dimension ? "Right-click for criticality definition" : undefined}
         data-testid={dimension ? `exposure-card-${dimension}` : undefined}
       >
         <div className="flex items-center gap-1.5 mb-0.5">
           <Icon className="w-3.5 h-3.5" />
           <span className="text-[10px] font-medium uppercase tracking-wide">{type}</span>
         </div>
-        {data.primary && (
-          <div className="text-lg font-bold leading-tight">{data.primary}</div>
-        )}
-        {data.secondary && (
-          <div className="text-[11px] opacity-80 leading-tight">{data.secondary}</div>
-        )}
-        {data.tertiary && (
-          <div className="text-[11px] opacity-70 leading-tight">{data.tertiary}</div>
+        {isNotAssessed ? (
+          <div className="text-sm font-semibold leading-tight italic">Not Assessed</div>
+        ) : (
+          <>
+            {data.primary && (
+              <div className="text-lg font-bold leading-tight">{data.primary}</div>
+            )}
+            {data.secondary && (
+              <div className="text-[11px] opacity-80 leading-tight">{data.secondary}</div>
+            )}
+            {data.tertiary && (
+              <div className="text-[11px] opacity-70 leading-tight">{data.tertiary}</div>
+            )}
+          </>
         )}
       </div>
 
