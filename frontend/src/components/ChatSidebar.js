@@ -760,15 +760,15 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                     
                     {/* Action Buttons */}
                     {isInteractive && (
-                      <div className="flex flex-wrap gap-2 pt-2 border-t border-orange-100">
+                      <div className="flex gap-2 pt-2 border-t border-orange-100">
                         <button
                           type="button"
                           onClick={() => sendMutation.mutate({ content: "accept", image: null })}
                           disabled={isSending}
-                          className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
+                          className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
                           data-testid="issue-confirm-accept-btn"
                         >
-                          <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                          <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
                           {isNl ? "Accepteren" : "Accept"}
                         </button>
                         <button
@@ -778,7 +778,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                             setMessage(isNl ? "Wijzig: " : "Change: ");
                           }}
                           disabled={isSending}
-                          className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white border border-orange-300 text-orange-700 text-sm font-medium hover:bg-orange-50 disabled:opacity-50 transition-colors"
+                          className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-white border border-orange-300 text-orange-700 text-xs font-medium hover:bg-orange-50 disabled:opacity-50 transition-colors"
                           data-testid="issue-confirm-revise-btn"
                         >
                           {isNl ? "Aanpassen" : "Revise"}
@@ -798,7 +798,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                             }
                           }}
                           disabled={isSending}
-                          className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white border border-red-300 text-red-600 text-sm font-medium hover:bg-red-50 disabled:opacity-50 transition-colors"
+                          className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-white border border-red-300 text-red-600 text-xs font-medium hover:bg-red-50 disabled:opacity-50 transition-colors"
                           data-testid="issue-confirm-cancel-btn"
                         >
                           {isNl ? "Annuleren" : "Cancel"}
@@ -1482,7 +1482,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               </div>
 
               {/* Input Container */}
-              <div className="flex-1 bg-white rounded-3xl border border-slate-200 flex items-center overflow-visible shadow-sm min-h-[44px]">
+              <div className="flex-1 bg-white rounded-3xl border border-slate-200 flex items-center overflow-visible shadow-sm min-h-[44px] focus-within:border-slate-300">
                 <textarea
                   ref={textareaRef}
                   value={message}
@@ -1495,7 +1495,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                   }}
                   onKeyDown={handleKeyPress}
                   placeholder="Type a message..."
-                  className="flex-1 px-4 py-3 text-sm bg-transparent border-none outline-none resize-none placeholder:text-slate-400 leading-5 scrollbar-thin"
+                  className="flex-1 px-4 py-3 text-sm bg-transparent border-none outline-none resize-none placeholder:text-slate-400 leading-5 scrollbar-thin focus:ring-0 focus:outline-none"
                   rows={1}
                   style={{ 
                     minHeight: '40px',
