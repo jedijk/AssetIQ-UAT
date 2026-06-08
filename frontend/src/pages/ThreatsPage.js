@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useNotificationTriggers } from "../hooks/useNotificationTriggers";
 import { useTranslatedObservations, useEquipmentTypeNameMap, useEquipmentNodeNameMap } from "../hooks/useTranslatedEntities";
+import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { 
   AlertTriangle, 
   TrendingUp, 
@@ -74,6 +75,29 @@ const STATUS_OPTIONS = [
   { value: "Parked", label: "Parked", color: "bg-slate-500", textColor: "text-slate-700", bgColor: "bg-slate-100" },
   { value: "Closed", label: "Closed", color: "bg-slate-400", textColor: "text-slate-600", bgColor: "bg-slate-50" },
 ];
+
+// Format registration date for display
+const formatRegistrationDate = (dateStr) => {
+  if (!dateStr) return null;
+  try {
+    const date = typeof dateStr === 'string' ? parseISO(dateStr) : dateStr;
+    const now = new Date();
+    const diffHours = Math.floor((now - date) / (1000 * 60 * 60));
+    
+    // If less than 24 hours, show relative time
+    if (diffHours < 24) {
+      return formatDistanceToNow(date, { addSuffix: true });
+    }
+    // If less than 7 days, show "X days ago"
+    if (diffHours < 168) {
+      return formatDistanceToNow(date, { addSuffix: true });
+    }
+    // Otherwise show formatted date and time
+    return format(date, "MMM d, yyyy 'at' h:mm a");
+  } catch {
+    return null;
+  }
+};
 
 // Equipment type to icon mapping
 const getEquipmentIcon = (equipmentType, asset) => {
@@ -792,7 +816,7 @@ const ThreatsPage = () => {
                       {threat.equipment_tag && (
                         <div className="text-xs text-slate-400 font-mono mb-1">{threat.equipment_tag}</div>
                       )}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="hidden sm:inline">
                           <RiskBadge level={threat.risk_level} size="sm" />
                         </span>
@@ -800,6 +824,14 @@ const ThreatsPage = () => {
                           <span className="sm:hidden">{threat.equipment_name || translateEquipmentTypeName(threat.asset)}</span>
                           <span className="hidden sm:inline">{translateEquipmentTypeName(threat.asset)}</span>
                         </span>
+                        {/* Registration Date */}
+                        {threat.created_at && (
+                          <span className="flex items-center gap-1 text-xs text-slate-400">
+                            <Clock className="w-3 h-3" />
+                            <span className="hidden sm:inline">{formatRegistrationDate(threat.created_at)}</span>
+                            <span className="sm:hidden">{formatRegistrationDate(threat.created_at)}</span>
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -894,7 +926,7 @@ const ThreatsPage = () => {
                 {threat.equipment_tag && (
                   <div className="text-xs text-slate-400 font-mono mb-1">{threat.equipment_tag}</div>
                 )}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {/* Risk Badge - Hidden on mobile */}
                   <span className="hidden sm:inline">
                     <RiskBadge level={threat.risk_level} size="sm" />
@@ -904,6 +936,14 @@ const ThreatsPage = () => {
                     <span className="sm:hidden">{translateEquipmentTypeName(threat.asset) || threat.title}</span>
                     <span className="hidden sm:inline">{translateEquipmentTypeName(threat.asset)}</span>
                   </span>
+                  {/* Registration Date */}
+                  {threat.created_at && (
+                    <span className="flex items-center gap-1 text-xs text-slate-400">
+                      <Clock className="w-3 h-3" />
+                      <span className="hidden sm:inline">{formatRegistrationDate(threat.created_at)}</span>
+                      <span className="sm:hidden">{formatRegistrationDate(threat.created_at)}</span>
+                    </span>
+                  )}
                 </div>
               </div>
 

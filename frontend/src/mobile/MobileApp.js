@@ -15,14 +15,11 @@ import MobileActions from "./MobileActions";
 import MobileChat from "./MobileChat";
 import MobileAnalytics from "./MobileAnalytics";
 import MobileExecutiveKPIs from "./MobileExecutiveKPIs";
-import ObservationTour from "../components/ObservationTour";
-import { HelpCircle } from "lucide-react";
 
 const MobileApp = () => {
   const { hasPermission, userRole } = usePermissions();
   const [activeTab, setActiveTab] = useState("home");
   const [showChat, setShowChat] = useState(false);
-  const [observationTourOpen, setObservationTourOpen] = useState(false);
   const [chatPrefillMessage, setChatPrefillMessage] = useState(null);
 
   const tabs = useMemo(() => {
@@ -83,15 +80,6 @@ const MobileApp = () => {
       <div className="status-bar">
         <span className="time">9:41</span>
         <div className="status-icons">
-          <button
-            type="button"
-            className="mobile-tour-help-btn"
-            onClick={() => setObservationTourOpen(true)}
-            aria-label="Observation tour"
-            data-testid="mobile-observation-tour-button"
-          >
-            <HelpCircle size={18} />
-          </button>
           <svg width="17" height="10" viewBox="0 0 17 10" fill="currentColor">
             <path d="M0 3a2 2 0 012-2h1a2 2 0 012 2v4a2 2 0 01-2 2H2a2 2 0 01-2-2V3zm5 0a2 2 0 012-2h1a2 2 0 012 2v4a2 2 0 01-2 2H7a2 2 0 01-2-2V3zm5 0a2 2 0 012-2h1a2 2 0 012 2v4a2 2 0 01-2 2h-1a2 2 0 01-2-2V3z"/>
           </svg>
@@ -117,16 +105,6 @@ const MobileApp = () => {
           onPrefillConsumed={() => setChatPrefillMessage(null)}
         />
       )}
-
-      <ObservationTour
-        isOpen={observationTourOpen}
-        onClose={() => setObservationTourOpen(false)}
-        setChatOpen={setShowChat}
-        setChatPrefillMessage={setChatPrefillMessage}
-        setHierarchyOpen={() => setActiveTab("home")}
-        setMobileTab={setActiveTab}
-        mode="mobile-app"
-      />
 
       {/* LinkedIn-style Bottom Navigation */}
       <nav className="mobile-nav" data-testid="mobile-nav">

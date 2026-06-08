@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Menu, X, PanelLeftOpen, PanelLeftClose, Settings, HelpCircle, LogOut, User, Shield,
-  Info, BookOpen, MessageCircleQuestion, Tag,
+  Info, MessageCircleQuestion, Tag,
 } from "lucide-react";
 import AnimatedDrawer from "../animations/AnimatedDrawer";
 import { springPresets } from "../animations/constants";
@@ -231,14 +231,6 @@ export default function LayoutHeader({
                   Replay Tour
                 </DropdownMenuItem>
                 )}
-                <DropdownMenuItem 
-                  onClick={() => setObservationTourOpen(true)}
-                  className="cursor-pointer text-sm"
-                  data-testid="observation-tour-menu-item"
-                >
-                  <BookOpen className="w-3.5 h-3.5 mr-2" />
-                  Tour: Report Observation
-                </DropdownMenuItem>
                 <DropdownMenuItem 
                   onClick={() => navigate("/settings/feedback")}
                   className="cursor-pointer text-sm"
