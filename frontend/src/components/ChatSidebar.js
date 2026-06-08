@@ -670,39 +670,58 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
           </div>
         )}
         
-        {/* Issue summary confirm — structured summary + Yes / Revise */}
+        {/* Issue summary confirm — structured summary + Accept / Revise / Cancel */}
         {!msg.threat_id && msg.question_type === "issue_confirm" && msg.issue_summary && (
           <div className="space-y-2">
             {(() => {
-              const chunks = (msg.content || "").split(/\n\n+/);
-              const intro = chunks[0] || "";
-              const promptText = chunks.slice(1).join("\n\n").trim();
               const isNl = msg.issue_confirm_language === "nl";
+              // Parse the new structured format with summary included
+              const content = msg.content || "";
+              
               return (
                 <>
-                  <p className="text-slate-800 whitespace-pre-wrap">{intro}</p>
-                  <p className="text-green-600 font-semibold text-[15px] leading-snug">
-                    {msg.issue_summary}
-                  </p>
-                  {promptText ? (
-                    <p className="text-slate-600 text-sm whitespace-pre-wrap">{promptText}</p>
-                  ) : null}
+                  {/* Display the full message with markdown-like formatting */}
+                  <div className="text-slate-800 whitespace-pre-wrap">
+                    {content.split('\n').map((line, i) => {
+                      // Bold text between ** markers
+                      if (line.includes('**')) {
+                        const parts = line.split(/\*\*([^*]+)\*\*/g);
+                        return (
+                          <p key={i} className={line.startsWith('•') ? 'ml-2' : ''}>
+                            {parts.map((part, j) => 
+                              j % 2 === 1 ? <strong key={j}>{part}</strong> : part
+                            )}
+                          </p>
+                        );
+                      }
+                      if (line === '---') {
+                        return <hr key={i} className="my-2 border-slate-200" />;
+                      }
+                      return <p key={i} className={line.startsWith('•') ? 'ml-2 text-sm text-slate-600' : ''}>{line}</p>;
+                    })}
+                  </div>
+                  
                   {isInteractive && (
-                    <div className="flex flex-wrap gap-2 mt-3">
+                    <div className="flex flex-wrap gap-2 mt-4">
                       <button
                         type="button"
-                        onClick={() => sendMutation.mutate({ content: "yes", image: null })}
+                        onClick={() => sendMutation.mutate({ content: "accept", image: null })}
                         disabled={isSending}
-                        className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors"
-                        data-testid="issue-confirm-yes-btn"
+                        className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
+                        data-testid="issue-confirm-accept-btn"
                       >
-                        {isNl ? "Ja" : "Yes"}
+                        <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                        {isNl ? "Accepteren" : "Accept"}
                       </button>
                       <button
                         type="button"
-                        onClick={() => sendMutation.mutate({ content: "revise", image: null })}
+                        onClick={() => {
+                          // Focus the input for revising
+                          textareaRef.current?.focus();
+                          setMessage(isNl ? "Wijzig: " : "Change: ");
+                        }}
                         disabled={isSending}
-                        className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                        className="inline-flex items-center justify-center px-4 py-2.5 rounded-lg bg-white border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-50 transition-colors"
                         data-testid="issue-confirm-revise-btn"
                       >
                         {isNl ? "Aanpassen" : "Revise"}
@@ -722,19 +741,12 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                           }
                         }}
                         disabled={isSending}
-                        className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white border border-red-300 text-red-600 text-sm font-medium hover:bg-red-50 disabled:opacity-50 transition-colors"
+                        className="inline-flex items-center justify-center px-4 py-2.5 rounded-lg bg-white border border-red-300 text-red-600 text-sm font-medium hover:bg-red-50 disabled:opacity-50 transition-colors"
                         data-testid="issue-confirm-cancel-btn"
                       >
                         {isNl ? "Annuleren" : "Cancel"}
                       </button>
                     </div>
-                  )}
-                  {isInteractive && (
-                    <p className="text-xs text-slate-500 mt-2">
-                      {isNl
-                        ? "Of typ hieronder wat er aangepast moet worden — we werken je beschrijving en samenvatting bij."
-                        : "Or type below what to change — we'll update your description and summary."}
-                    </p>
                   )}
                 </>
               );

@@ -2,7 +2,6 @@ import React, { useState, useMemo } from "react";
 import { 
   Home, 
   ClipboardList, 
-  Plus, 
   AlertTriangle, 
   CheckSquare,
   BarChart3
@@ -31,7 +30,6 @@ const MobileApp = () => {
         icon: BarChart3,
         visible: hasPermission("library", "read") || hasPermission("statistics", "read"),
       },
-      { id: "post", label: "Report", icon: Plus, visible: hasPermission("observations", "write") },
       { id: "tasks", label: "Tasks", icon: ClipboardList, visible: hasPermission("tasks", "read") },
       { id: "observations", label: "Alerts", icon: AlertTriangle, visible: hasPermission("observations", "read") },
     ];
@@ -45,11 +43,7 @@ const MobileApp = () => {
   }, [tabs, activeTab]);
 
   const handleTabClick = (tabId) => {
-    if (tabId === "post") {
-      setShowChat(true);
-    } else {
-      setActiveTab(tabId);
-    }
+    setActiveTab(tabId);
   };
 
   const renderContent = () => {
@@ -111,26 +105,17 @@ const MobileApp = () => {
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
-          const isPost = tab.id === "post";
 
           return (
             <button
               key={tab.id}
               onClick={() => handleTabClick(tab.id)}
-              className={`mobile-nav-item ${isActive ? "active" : ""} ${isPost ? "post-btn" : ""}`}
+              className={`mobile-nav-item ${isActive ? "active" : ""}`}
               data-testid={`mobile-nav-${tab.id}`}
             >
-              {isPost ? (
-                <div className="post-icon-wrapper">
-                  <Icon size={20} strokeWidth={2.5} />
-                </div>
-              ) : (
-                <>
-                  <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
-                  <span className="nav-label">{tab.label}</span>
-                  {isActive && <div className="active-indicator" />}
-                </>
-              )}
+              <Icon size={22} strokeWidth={isActive ? 2.5 : 2} />
+              <span className="nav-label">{tab.label}</span>
+              {isActive && <div className="active-indicator" />}
             </button>
           );
         })}

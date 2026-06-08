@@ -11,10 +11,7 @@ import {
   GitBranch,
   Settings,
   Sparkles,
-  CheckCircle2,
-  Menu,
-  Plus,
-  MessageSquare
+  CheckCircle2
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { api } from "../lib/apiClient";
@@ -64,18 +61,10 @@ const DESKTOP_STEPS = [
   {
     id: "hierarchy",
     title: "Equipment Hierarchy",
-    description: "Browse your assets organized by location, system, and equipment type. Right-click for quick actions.",
+    description: "Browse your assets organized by location, system, and equipment type. Select any equipment to report an observation - AI will auto-fill the details!",
     icon: GitBranch,
     target: '[data-testid="hierarchy-sidebar"], [data-testid="hierarchy-toggle"]',
     position: "right"
-  },
-  {
-    id: "quick-add",
-    title: "Quick Add",
-    description: "Tap the + button to quickly report a new observation from anywhere in the app. You can also use voice input.",
-    icon: Plus,
-    target: '[data-testid="fab-report-observation"]',
-    position: "left"
   },
   {
     id: "settings",
@@ -107,72 +96,45 @@ const MOBILE_STEPS = [
     mobileAction: null
   },
   {
-    id: "menu-button",
-    title: "Open the Menu",
-    description: "Tap the menu icon in the top-left corner to access all navigation options.",
-    icon: Menu,
-    target: '[data-testid="mobile-menu-toggle"]',
+    id: "home-hierarchy",
+    title: "Home - Equipment Hierarchy",
+    description: "Browse your equipment organized by location. Tap any equipment to report an observation - AI will auto-fill the details!",
+    icon: GitBranch,
+    target: '[data-testid="mobile-nav-home"]',
     position: "center",
-    mobileAction: "highlight-menu-button"
+    mobileAction: "highlight-nav"
   },
   {
-    id: "menu-dashboard",
-    title: "Dashboard",
-    description: "View your operational metrics, risk scores, and recent activity at a glance.",
-    icon: LayoutDashboard,
-    target: '[data-testid="mobile-nav-dashboard"]',
-    position: "center",
-    mobileAction: "open-menu"
-  },
-  {
-    id: "menu-observations",
-    title: "Observations",
-    description: "Track equipment issues and safety concerns. Each observation is automatically risk-scored.",
-    icon: AlertTriangle,
-    target: '[data-testid="mobile-nav-observations"]',
-    position: "center",
-    mobileAction: "keep-menu-open"
-  },
-  {
-    id: "menu-actions",
-    title: "Actions",
-    description: "Manage corrective and preventive actions assigned to your team.",
-    icon: ClipboardList,
-    target: '[data-testid="mobile-nav-actions"]',
-    position: "center",
-    mobileAction: "keep-menu-open"
-  },
-  {
-    id: "menu-tasks",
+    id: "tasks",
     title: "My Tasks",
     description: "View and complete your assigned inspections and form submissions.",
     icon: ClipboardList,
-    target: '[data-testid="mobile-nav-my-tasks"]',
+    target: '[data-testid="mobile-nav-tasks"]',
     position: "center",
-    mobileAction: "keep-menu-open"
+    mobileAction: "highlight-nav"
   },
   {
-    id: "close-menu",
-    title: "Close Menu",
-    description: "Tap the X or anywhere outside to close the menu.",
-    icon: X,
-    target: null,
+    id: "observations",
+    title: "Observations",
+    description: "View all reported observations. Track equipment issues and safety concerns - each is automatically risk-scored.",
+    icon: AlertTriangle,
+    target: '[data-testid="mobile-nav-observations"]',
     position: "center",
-    mobileAction: "close-menu"
+    mobileAction: "highlight-nav"
   },
   {
-    id: "quick-add",
-    title: "Quick Add",
-    description: "Tap the + button to quickly report a new observation. You can also use voice input!",
-    icon: Plus,
-    target: '[data-testid="fab-report-observation"]',
+    id: "analytics",
+    title: "Analytics",
+    description: "View operational metrics, KPIs, and equipment performance data at a glance.",
+    icon: LayoutDashboard,
+    target: '[data-testid="mobile-nav-analytics"]',
     position: "center",
-    mobileAction: "highlight-fab"
+    mobileAction: "highlight-nav"
   },
   {
     id: "complete",
     title: "You're Ready!",
-    description: "Start exploring AssetIQ on mobile. Some advanced features like Causal Engine are available on desktop.",
+    description: "Start exploring AssetIQ! To report an observation, go to Home and select an equipment. Some advanced features like Causal Engine are available on desktop.",
     icon: CheckCircle2,
     target: null,
     position: "center",

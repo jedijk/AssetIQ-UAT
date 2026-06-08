@@ -368,14 +368,26 @@ def _issue_confirm_no(text: str) -> bool:
     }
 
 
-def _issue_confirm_assistant_text(detected_lang: str) -> str:
-    return (
-        "Dit is wat ik begreep:\n\nKlopt dit? Kies hieronder een optie, of typ wat er aangepast moet worden."
-        if detected_lang == "nl"
-        else (
-            "Here's what I understood:\n\n"
-            "Is this correct? Choose an option below, or type what you'd like changed."
+def _issue_confirm_assistant_text(detected_lang: str, summary: str) -> str:
+    """Generate confirmation message with improved summary and clear action options."""
+    if detected_lang == "nl":
+        return (
+            f"📋 **Samenvatting van uw melding:**\n\n"
+            f"{summary}\n\n"
+            f"---\n"
+            f"Kies een actie:\n"
+            f"• **Accepteren** - Maak de melding aan\n"
+            f"• **Aanpassen** - Typ uw wijzigingen\n"
+            f"• **Annuleren** - Stop en begin opnieuw"
         )
+    return (
+        f"📋 **Summary of your report:**\n\n"
+        f"{summary}\n\n"
+        f"---\n"
+        f"Choose an action:\n"
+        f"• **Accept** - Create the observation\n"
+        f"• **Revise** - Type your changes\n"
+        f"• **Cancel** - Stop and start over"
     )
 
 
@@ -716,7 +728,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
         ic_ui_lang = _issue_confirm_ui_lang_from_copy(
             summary, updated_issue, pending_data.get("chat_ui_language") or detected_lang
         )
-        reply = _issue_confirm_assistant_text(ic_ui_lang)
+        reply = _issue_confirm_assistant_text(ic_ui_lang, summary)
         ic_lang = _issue_confirm_language_code(ic_ui_lang)
         await _store_assistant_msg(
             user_id, reply,
@@ -754,7 +766,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
         ic_ui_lang = _issue_confirm_ui_lang_from_copy(
             summary, content, pending_data.get("chat_ui_language") or detected_lang
         )
-        reply = _issue_confirm_assistant_text(ic_ui_lang)
+        reply = _issue_confirm_assistant_text(ic_ui_lang, summary)
         ic_lang = _issue_confirm_language_code(ic_ui_lang)
         await _store_assistant_msg(
             user_id, reply,
@@ -949,12 +961,39 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             await _store_assistant_msg(user_id, answer, chat_state=ChatState.INITIAL, is_data_query=True)
             return ChatResponse(message=answer, question_type="data_query", detected_language=detected_lang)
 
-        # QUICK REPORT MODE: Skip issue confirmation step
-        # Go directly to the state machine which will create the observation immediately
-        # with AI auto-selecting equipment and failure mode
-        # User can edit the observation details later if needed
-        logger.info("Quick report mode: Skipping confirmation, proceeding directly to observation creation")
-        # Fall through to section 6 (state machine processing)
+        # Generate improved summary for user confirmation
+        summary = await summarize_issue_description(content, detected_lang)
+        await _write_conv(
+            user_id,
+            state=ChatState.AWAITING_ISSUE_CONFIRM,
+            pending_data={},
+            equipment_suggestions=None,
+            failure_mode_suggestions=None,
+            original_message=None,
+            awaiting_context_for_threat=None,
+            issue_description=content,
+            issue_summary=summary,
+        )
+        ic_ui_lang = _issue_confirm_ui_lang_from_copy(
+            summary, content, pending_data.get("chat_ui_language") or detected_lang
+        )
+        reply = _issue_confirm_assistant_text(ic_ui_lang, summary)
+        ic_lang = _issue_confirm_language_code(ic_ui_lang)
+        await _store_assistant_msg(
+            user_id, reply,
+            chat_state=ChatState.AWAITING_ISSUE_CONFIRM,
+            question_type="issue_confirm",
+            issue_summary=summary,
+            issue_confirm_language=ic_lang,
+        )
+        return ChatResponse(
+            message=reply,
+            follow_up_question=reply,
+            question_type="issue_confirm",
+            detected_language=detected_lang,
+            issue_summary=summary,
+            issue_confirm_language=ic_lang,
+        )
 
     # ------------------------------------------------------------------
     # 6. Process with state machine (equipment / failure mode flow)
