@@ -743,13 +743,13 @@ async def get_process_journey(observation: dict, actions: list, investigation: d
         alarp_status = "not_started"
     
     stages.append({
-        "stage": "ALARP",
+        "stage": "Mitigated",
         "status": alarp_status,
         "date": None,
         "owner": None
     })
     
-    # 7. Learning - only if ALARP achieved
+    # 7. Learning - only if mitigated
     learning_status = "completed" if alarp_status == "completed" else "not_started"
     
     stages.append({

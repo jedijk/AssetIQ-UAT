@@ -105,7 +105,7 @@ const FREQUENCY_OPTIONS = ["Once", "Rarely", "Occasionally", "Frequently", "Cons
 const IMPACT_OPTIONS = ["Minor", "Moderate", "Significant", "Major", "Catastrophic"];
 // Work-process stages (match Process Journey at the bottom of the workspace).
 // Source: /app/backend/routes/observation_workspace.py get_process_journey().
-const STATUS_OPTIONS = ["Observation", "Assessment", "Planning", "Investigation", "Action", "ALARP", "Learning"];
+const STATUS_OPTIONS = ["Observation", "Assessment", "Planning", "Investigation", "Action", "Mitigated", "Learning"];
 
 const ObservationDetailsSection = ({ threatId }) => {
   const navigate = useNavigate();

@@ -94,19 +94,19 @@ const ExposureCard = ({ type, data, icon: Icon, color }) => {
   };
 
   return (
-    <div className={`rounded-xl border p-4 ${colorClasses[color]}`}>
-      <div className="flex items-center gap-2 mb-2">
-        <Icon className="w-4 h-4" />
-        <span className="text-xs font-medium uppercase tracking-wide">{type}</span>
+    <div className={`rounded-xl border px-3 py-2 ${colorClasses[color]}`}>
+      <div className="flex items-center gap-1.5 mb-0.5">
+        <Icon className="w-3.5 h-3.5" />
+        <span className="text-[10px] font-medium uppercase tracking-wide">{type}</span>
       </div>
       {data.primary && (
-        <div className="text-2xl font-bold mb-1">{data.primary}</div>
+        <div className="text-lg font-bold leading-tight">{data.primary}</div>
       )}
       {data.secondary && (
-        <div className="text-xs opacity-80">{data.secondary}</div>
+        <div className="text-[11px] opacity-80 leading-tight">{data.secondary}</div>
       )}
       {data.tertiary && (
-        <div className="text-xs opacity-70">{data.tertiary}</div>
+        <div className="text-[11px] opacity-70 leading-tight">{data.tertiary}</div>
       )}
     </div>
   );
@@ -131,7 +131,7 @@ const ALARPCard = ({ alarp }) => {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Target className="w-4 h-4 text-indigo-600" />
-          <span className="text-xs font-medium text-indigo-700 uppercase tracking-wide">ALARP</span>
+          <span className="text-xs font-medium text-indigo-700 uppercase tracking-wide">Mitigated</span>
         </div>
         <Badge variant="outline" className={`text-xs ${getStatusColor()}`}>
           {status}
