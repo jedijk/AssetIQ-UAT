@@ -33,6 +33,7 @@ import {
   MapPin,
   MessageSquare,
   MoreVertical,
+  Paperclip,
   Save,
   Search,
   Share2,
@@ -179,6 +180,7 @@ const ObservationDetailsSection = ({ threatId }) => {
   const [failureModeSearch, setFailureModeSearch] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const attachmentInputRef = useRef(null);
 
   // --- Mutations ------------------------------------------------------------
   const updateMutation = useMutation({
@@ -715,53 +717,8 @@ const ObservationDetailsSection = ({ threatId }) => {
       {/* AI Insights and Causal Intelligence are now rendered inside the
           Reliability Intelligence column (Row 3, Column 1) of the workspace. */}
 
-      {/* Attachments */}
-      {(isEditing || (threat.attachments && threat.attachments.length > 0)) && (
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <AttachmentsPanel
-            title="Attachments"
-            items={isEditing ? editForm.attachments : (threat.attachments || [])}
-            editable={isEditing}
-            isUploading={uploadingPhoto}
-            getKey={(a) => a?.id}
-            getName={(a) => a?.name || a?.filename || "Attachment"}
-            getUrl={(a) => a?.data}
-            getContentType={(a) => a?.mime || a?.content_type || a?.type}
-            onAddFiles={async (files) => {
-              for (const file of files) {
-                await new Promise((resolve, reject) => {
-                  const reader = new FileReader();
-                  reader.onloadend = () => resolve(reader.result);
-                  reader.onerror = () => reject(new Error("Failed to read file"));
-                  reader.readAsDataURL(file);
-                }).then((dataUrl) => {
-                  const isImage = (file.type || "").startsWith("image/");
-                  const ext = file.name?.includes(".") ? file.name.split(".").pop().toLowerCase() : "";
-                  const newAttachment = {
-                    id: `att-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                    type: isImage ? "image" : "file",
-                    name: file.name,
-                    mime: file.type || "application/octet-stream",
-                    size: file.size,
-                    ext,
-                    data: dataUrl,
-                    created_at: new Date().toISOString(),
-                  };
-                  setEditForm((prev) => ({ ...prev, attachments: [...(prev.attachments || []), newAttachment] }));
-                });
-              }
-            }}
-            onRemove={(_raw, idToRemove) => {
-              setEditForm((prev) => ({
-                ...prev,
-                attachments: (prev.attachments || []).filter((a) => a?.id !== idToRemove),
-              }));
-            }}
-          />
-        </div>
-      )}
-
-      {/* Description — populated from what the user typed/dictated during the chat recording (user_context). Editable. */}
+      {/* Description — populated from what the user typed/dictated during the chat recording (user_context).
+          Now also hosts inline attachment management via a paperclip icon in the header. */}
       <div className="bg-white rounded-xl border border-slate-200 p-4" data-testid="workspace-description">
         <div className="flex items-center gap-2 mb-2">
           <MessageSquare className="w-4 h-4 text-green-600" />
@@ -769,6 +726,48 @@ const ObservationDetailsSection = ({ threatId }) => {
           {threat.context_added_at && !isEditing && (
             <span className="text-xs text-slate-400">added {formatDateTime(threat.context_added_at)}</span>
           )}
+          {/* Paperclip — attach files without leaving the page. In view mode the upload is committed
+              immediately; in edit mode it stages in editForm.attachments until Save. */}
+          <button
+            type="button"
+            onClick={() => attachmentInputRef.current?.click()}
+            className="ml-auto inline-flex items-center gap-1 text-slate-500 hover:text-blue-600 text-xs px-2 py-1 rounded-md hover:bg-slate-50 transition-colors"
+            title="Attach files"
+            data-testid="description-attach-btn"
+          >
+            <Paperclip className="w-3.5 h-3.5" />
+            Attach
+          </button>
+          <input
+            ref={attachmentInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={async (e) => {
+              const files = Array.from(e.target.files || []);
+              if (!files.length) return;
+              const newAtts = await Promise.all(files.map((file) => new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve({
+                  id: `att-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                  type: (file.type || "").startsWith("image/") ? "image" : "file",
+                  name: file.name,
+                  mime: file.type || "application/octet-stream",
+                  size: file.size,
+                  ext: file.name?.includes(".") ? file.name.split(".").pop().toLowerCase() : "",
+                  data: reader.result,
+                  created_at: new Date().toISOString(),
+                });
+                reader.readAsDataURL(file);
+              })));
+              if (isEditing) {
+                setEditForm((prev) => ({ ...prev, attachments: [...(prev.attachments || []), ...newAtts] }));
+              } else {
+                updateMutation.mutate({ attachments: [...(threat.attachments || []), ...newAtts] });
+              }
+              e.target.value = "";
+            }}
+          />
         </div>
         {isEditing ? (
           <Textarea
@@ -784,6 +783,34 @@ const ObservationDetailsSection = ({ threatId }) => {
           </div>
         ) : (
           <p className="text-slate-400 text-sm italic">No description recorded.</p>
+        )}
+        {/* Attachments list (below description) */}
+        {((isEditing ? editForm.attachments : threat.attachments) || []).length > 0 && (
+          <div className="mt-3 pt-3 border-t border-slate-100">
+            <AttachmentsPanel
+              title=""
+              items={isEditing ? editForm.attachments : (threat.attachments || [])}
+              editable={isEditing}
+              isUploading={uploadingPhoto}
+              getKey={(a) => a?.id}
+              getName={(a) => a?.name || a?.filename || "Attachment"}
+              getUrl={(a) => a?.data}
+              getContentType={(a) => a?.mime || a?.content_type || a?.type}
+              onAddFiles={() => attachmentInputRef.current?.click()}
+              onRemove={(_raw, idToRemove) => {
+                if (isEditing) {
+                  setEditForm((prev) => ({
+                    ...prev,
+                    attachments: (prev.attachments || []).filter((a) => a?.id !== idToRemove),
+                  }));
+                } else {
+                  updateMutation.mutate({
+                    attachments: (threat.attachments || []).filter((a) => a?.id !== idToRemove),
+                  });
+                }
+              }}
+            />
+          </div>
         )}
       </div>
 

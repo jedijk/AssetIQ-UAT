@@ -233,42 +233,35 @@ const TimelineEventCard = ({ event, isCurrent }) => {
 
   return (
     <div 
-      className={`flex flex-col items-center cursor-pointer group min-w-[140px] ${
-        isCurrent ? "scale-110" : ""
-      }`}
+      className="flex flex-col items-center cursor-pointer group flex-shrink-0 w-32"
       onClick={handleClick}
     >
       {/* Date */}
-      <div className="text-xs text-slate-500 mb-2 font-medium">
+      <div className="text-[11px] text-slate-500 mb-2 font-medium h-4 leading-4">
         {formatDate(event.date)}
       </div>
       
-      {/* Event Circle */}
-      <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-transform group-hover:scale-110 ${
+      {/* Event Circle — fixed size; ring indicates current */}
+      <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-transform group-hover:scale-105 ring-offset-2 ring-offset-white ${
         isCurrent 
-          ? "bg-blue-600 text-white ring-4 ring-blue-200"
+          ? "bg-blue-600 text-white ring-2 ring-blue-300"
           : `bg-${config.color}-100 text-${config.color}-600`
       }`}>
-        <Icon className="w-5 h-5" />
+        <Icon className="w-4 h-4" />
       </div>
       
       {/* Event Title */}
-      <div className={`text-xs font-medium mt-2 text-center max-w-[120px] truncate ${
-        isCurrent ? "text-blue-700" : "text-slate-700"
+      <div className={`text-[11px] font-medium mt-2 text-center max-w-[120px] truncate leading-tight ${
+        isCurrent ? "text-blue-700 font-semibold" : "text-slate-700"
       }`}>
         {event.title?.substring(0, 25) || config.label}
       </div>
       
       {/* Reference ID */}
       {event.reference_id && (
-        <div className="text-[10px] text-slate-400 mt-0.5">
+        <div className="text-[10px] text-slate-400 mt-0.5 leading-none">
           {event.reference_id}
         </div>
-      )}
-      
-      {/* Current indicator */}
-      {isCurrent && (
-        <Badge className="mt-1 text-[10px] bg-blue-600">Current</Badge>
       )}
     </div>
   );
@@ -285,15 +278,15 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
   const currentEvent = events?.find(e => e.is_current);
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6">
+    <div className="bg-white rounded-xl border border-slate-200 p-4">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-slate-100 rounded-lg">
             <History className="w-5 h-5 text-slate-600" />
           </div>
           <div>
-            <h3 className="font-semibold text-slate-900">Equipment Reliability Story</h3>
+            <h3 className="font-semibold text-slate-900">Equipment History</h3>
             <p className="text-xs text-slate-500">Historical context for the asset</p>
           </div>
         </div>
@@ -323,24 +316,19 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
 
       {/* Timeline View */}
       {viewMode === "timeline" && events && events.length > 0 ? (
-        <div className="relative">
-          {/* Timeline Line */}
-          <div className="absolute top-[52px] left-0 right-0 h-0.5 bg-slate-200" />
+        <div className="relative px-2">
+          {/* Horizontal connector — aligned with the centre of the event circles.
+              Position math: date row (16px text + mb-2 = 8px) + half of circle (40/2 = 20px) = 44px. */}
+          <div className="pointer-events-none absolute left-0 right-0 h-px bg-slate-200" style={{ top: "44px" }} />
           
           {/* Events */}
-          <div className="flex overflow-x-auto pb-4 gap-4 scrollbar-thin scrollbar-thumb-slate-300">
+          <div className="flex items-start overflow-x-auto pb-2 gap-4 scrollbar-thin scrollbar-thumb-slate-300">
             {events.slice(0, 10).map((event, index) => (
-              <React.Fragment key={event.id || index}>
-                <TimelineEventCard 
-                  event={event} 
-                  isCurrent={event.is_current}
-                />
-                {index < events.length - 1 && index < 9 && (
-                  <div className="flex items-center self-center mt-6">
-                    <ChevronRight className="w-4 h-4 text-slate-300" />
-                  </div>
-                )}
-              </React.Fragment>
+              <TimelineEventCard 
+                key={event.id || index}
+                event={event} 
+                isCurrent={event.is_current}
+              />
             ))}
           </div>
         </div>
