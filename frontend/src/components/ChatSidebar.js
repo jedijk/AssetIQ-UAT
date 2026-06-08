@@ -1419,50 +1419,57 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
             )}
             <div className="flex items-end gap-2">
               {/* Attachment Button with Menu */}
-              <Popover open={showAttachMenu} onOpenChange={setShowAttachMenu}>
-                <PopoverTrigger asChild>
-                  <button
-                    className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-200 transition-colors"
-                    title="Attach file"
-                  >
-                    <Paperclip className="w-5 h-5" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent align="start" side="top" className="w-48 p-1" sideOffset={8}>
-                  <div className="flex flex-col">
-                    <button
-                      onClick={() => {
-                        setShowAttachMenu(false);
-                        cameraInputRef.current?.click();
-                      }}
-                      className="flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                    >
-                      <Camera className="w-4 h-4 text-blue-600" />
-                      <span>Take Photo</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowAttachMenu(false);
-                        fileInputRef.current?.click();
-                      }}
-                      className="flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                    >
-                      <ImagePlus className="w-4 h-4 text-green-600" />
-                      <span>Attach from Library</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowAttachMenu(false);
-                        documentInputRef.current?.click();
-                      }}
-                      className="flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                    >
-                      <FileUp className="w-4 h-4 text-purple-600" />
-                      <span>Add File</span>
-                    </button>
-                  </div>
-                </PopoverContent>
-              </Popover>
+              <div className="relative">
+                <button
+                  onClick={() => setShowAttachMenu(!showAttachMenu)}
+                  className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-200 transition-colors"
+                  title="Attach file"
+                >
+                  <Paperclip className="w-5 h-5" />
+                </button>
+                {showAttachMenu && (
+                  <>
+                    {/* Backdrop to close menu */}
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setShowAttachMenu(false)}
+                    />
+                    {/* Menu */}
+                    <div className="absolute bottom-12 left-0 z-50 w-48 bg-white rounded-lg border border-slate-200 shadow-lg p-1">
+                      <button
+                        onClick={() => {
+                          setShowAttachMenu(false);
+                          cameraInputRef.current?.click();
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                      >
+                        <Camera className="w-4 h-4 text-blue-600" />
+                        <span>Take Photo</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowAttachMenu(false);
+                          fileInputRef.current?.click();
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                      >
+                        <ImagePlus className="w-4 h-4 text-green-600" />
+                        <span>Attach from Library</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowAttachMenu(false);
+                          documentInputRef.current?.click();
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                      >
+                        <FileUp className="w-4 h-4 text-purple-600" />
+                        <span>Add File</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
 
               {/* Input Container */}
               <div className="flex-1 bg-white rounded-3xl border border-slate-200 flex items-end overflow-hidden shadow-sm">
