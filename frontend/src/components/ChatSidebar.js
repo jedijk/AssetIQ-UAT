@@ -511,8 +511,9 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
     setMediaRecorder(null);
     
     try {
-      // Get transcription from voice
-      const result = await voiceAPI.sendVoice(blob, manualLanguage, true); // true = transcribe only, don't process chat
+      // Get transcription from voice. Pass active language (manual > detected > app default) so Whisper uses the right hint.
+      const activeLang = manualLanguage || detectedLanguage || appLanguage || null;
+      const result = await voiceAPI.sendVoice(blob, activeLang, true); // true = transcribe only, don't process chat
       
       if (result?.detected_language) {
         setDetectedLanguage(result.detected_language);
@@ -568,7 +569,9 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = manualLanguage === 'nl' ? 'nl-NL' : 'en-US';
+    // Use the active language: manual selection > detected > app default. Supports EN-US and NL-NL.
+    const activeLang = manualLanguage || detectedLanguage || appLanguage || 'en';
+    recognition.lang = activeLang === 'nl' ? 'nl-NL' : 'en-US';
     
     recognition.onstart = () => {
       setIsListening(true);
@@ -674,6 +677,17 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
       ta.scrollTop = ta.scrollHeight;
     }
   }, [message, interimTranscript, isListening]);
+
+  // If the user switches language while dictating, restart recognition with the new locale
+  useEffect(() => {
+    if (isListening && recognitionRef.current) {
+      try { recognitionRef.current.stop(); } catch (_) {}
+      // onend will set isListening=false; restart with new lang shortly after
+      const t = setTimeout(() => { startListening(); }, 250);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manualLanguage]);
 
   // Render message content
   const renderMessageContent = (msg, isInteractive = true) => {
@@ -1499,27 +1513,32 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
             </div>
           ) : (
             <>
-            {/* Language Detection Badge */}
-            {(detectedLanguage || manualLanguage) && (
-              <div className="flex items-center mb-2">
-                <Popover open={showLangPicker} onOpenChange={setShowLangPicker}>
-                  <PopoverTrigger asChild>
-                    <button
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 transition-colors"
-                      data-testid="chat-language-selector"
-                    >
-                      <Globe className="w-3 h-3" />
-                      {LANGUAGE_OPTIONS.find(l => l.code === (manualLanguage || detectedLanguage))?.flag || (manualLanguage || detectedLanguage)?.toUpperCase()}
-                      {!manualLanguage && <span className="text-slate-400">detected</span>}
-                      <ChevronDown className="w-3 h-3 text-slate-400" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="w-44 p-1" sideOffset={4}>
-                    {LANGUAGE_OPTIONS.map(lang => (
+            {/* Language Selector — always visible so user can pick EN/NL before dictating */}
+            <div className="flex items-center mb-2">
+              <Popover open={showLangPicker} onOpenChange={setShowLangPicker}>
+                <PopoverTrigger asChild>
+                  <button
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 transition-colors"
+                    data-testid="chat-language-selector"
+                    title="Language for typing & voice dictation"
+                  >
+                    <Globe className="w-3 h-3" />
+                    {(() => {
+                      const active = manualLanguage || detectedLanguage || appLanguage || "en";
+                      return LANGUAGE_OPTIONS.find(l => l.code === active)?.flag || active.toUpperCase();
+                    })()}
+                    {!manualLanguage && detectedLanguage && <span className="text-slate-400">detected</span>}
+                    <ChevronDown className="w-3 h-3 text-slate-400" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-44 p-1" sideOffset={4}>
+                  {LANGUAGE_OPTIONS.map(lang => {
+                    const active = manualLanguage || detectedLanguage || appLanguage;
+                    return (
                       <button
                         key={lang.code}
                         className={`w-full flex items-center gap-2 px-3 py-2 rounded text-sm hover:bg-slate-100 transition-colors ${
-                          (manualLanguage || detectedLanguage) === lang.code ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-700"
+                          active === lang.code ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-700"
                         }`}
                         onClick={() => {
                           setManualLanguage(lang.code);
@@ -1533,25 +1552,25 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                         <span className="text-xs font-bold w-6">{lang.flag}</span>
                         {lang.label}
                       </button>
-                    ))}
-                    {manualLanguage && (
-                      <>
-                        <div className="border-t border-slate-100 my-1" />
-                        <button
-                          className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-slate-500 hover:bg-slate-100"
-                          onClick={() => {
-                            setManualLanguage(null);
-                            setShowLangPicker(false);
-                          }}
-                        >
-                          Auto-detect
-                        </button>
-                      </>
-                    )}
-                  </PopoverContent>
-                </Popover>
-              </div>
-            )}
+                    );
+                  })}
+                  {manualLanguage && (
+                    <>
+                      <div className="border-t border-slate-100 my-1" />
+                      <button
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-slate-500 hover:bg-slate-100"
+                        onClick={() => {
+                          setManualLanguage(null);
+                          setShowLangPicker(false);
+                        }}
+                      >
+                        Auto-detect
+                      </button>
+                    </>
+                  )}
+                </PopoverContent>
+              </Popover>
+            </div>
             
             {/* Recording indicator */}
             {isRecording && (
