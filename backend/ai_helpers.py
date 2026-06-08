@@ -637,8 +637,13 @@ async def transcribe_audio_with_ai(
     company_id: str = "default",
     installation_id: Optional[str] = None,
     installation_name: Optional[str] = None,
+    language: Optional[str] = None,
 ) -> str:
-    """Transcribe and translate audio to English using OpenAI Whisper."""
+    """Transcribe audio in the original spoken language using OpenAI Whisper.
+    
+    Supports mixed languages (e.g. Dutch + English technical terms) by NOT forcing translation.
+    If `language` is provided (e.g. 'en', 'nl'), Whisper uses it as a hint; otherwise it auto-detects.
+    """
     temp_path = None
     try:
         guard_ai_request(
@@ -659,19 +664,26 @@ async def transcribe_audio_with_ai(
         # Determine file extension based on magic bytes
         suffix = detect_audio_format(audio_data)
         
-        logger.info(f"Detected audio format: {suffix}, data size: {len(audio_data)} bytes")
+        logger.info(f"Detected audio format: {suffix}, data size: {len(audio_data)} bytes, language hint: {language}")
 
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
             f.write(audio_data)
             temp_path = f.name
 
         with open(temp_path, "rb") as audio_file:
-            # Use translations endpoint to auto-translate any language to English
-            response = client.audio.translations.create(
-                model="whisper-1",
-                file=audio_file,
-                response_format="json"
-            )
+            # Use transcriptions endpoint to preserve the original spoken language(s).
+            # This handles mixed-language input (e.g. Dutch sentences with English technical terms)
+            # far better than the translations endpoint, which forces output to English.
+            kwargs = {
+                "model": "whisper-1",
+                "file": audio_file,
+                "response_format": "json",
+                # A short domain prompt helps Whisper bias toward technical reliability vocabulary
+                "prompt": "Reliability and maintenance observation. Equipment, failure mode, sensor, valve, pump, bearing, vibration, leak.",
+            }
+            if language in ("en", "nl"):
+                kwargs["language"] = language
+            response = client.audio.transcriptions.create(**kwargs)
 
         transcript = response.text
         completion_tokens = max(1, len(transcript or "") // 4)

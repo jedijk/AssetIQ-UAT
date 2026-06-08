@@ -1109,6 +1109,7 @@ async def voice_send(
         or "default",
         installation_id=current_user.get("installation_id"),
         installation_name=current_user.get("installation"),
+        language=language,
     )
 
     if not transcribed or not transcribed.strip():
