@@ -90,7 +90,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto';
-          textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+          const newHeight = Math.max(36, Math.min(textareaRef.current.scrollHeight, 150));
+          textareaRef.current.style.height = newHeight + 'px';
         }
       }, 50);
     }
@@ -1435,15 +1436,21 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                   value={message}
                   onChange={(e) => {
                     setMessage(e.target.value);
-                    // Auto-resize
+                    // Auto-resize to fit content
                     e.target.style.height = 'auto';
-                    e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+                    const newHeight = Math.max(36, Math.min(e.target.scrollHeight, 150));
+                    e.target.style.height = newHeight + 'px';
                   }}
                   onKeyDown={handleKeyPress}
                   placeholder="Type a message..."
-                  className="flex-1 px-4 py-3 text-sm bg-transparent border-none outline-none resize-none min-h-[44px] max-h-[120px] placeholder:text-slate-400"
+                  className="flex-1 px-4 py-2 text-sm bg-transparent border-none outline-none resize-none placeholder:text-slate-400 leading-5"
                   rows={1}
-                  style={{ height: '44px' }}
+                  style={{ 
+                    height: message ? 'auto' : '36px',
+                    minHeight: '36px',
+                    maxHeight: '150px',
+                    overflowY: 'auto'
+                  }}
                   data-testid="sidebar-chat-message-input"
                 />
               </div>
