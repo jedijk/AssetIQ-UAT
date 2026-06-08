@@ -92,9 +92,9 @@ class ProcessStage(BaseModel):
 
 def calculate_production_exposure(observation: dict, criticality: dict) -> dict:
     """Calculate production exposure based on criticality and observation data"""
-    if not criticality or criticality.get("production_impact") is None:
+    production_impact = (criticality or {}).get("production_impact") or 0
+    if not production_impact:  # None or 0 → not rated on the 1-5 scale
         return {"not_assessed": True, "production_impact_score": None, "formatted_value": "Not Assessed"}
-    production_impact = criticality.get("production_impact", 0)
     
     # Base exposure calculation
     # Production impact 1-5 scale maps to monetary exposure
@@ -132,9 +132,9 @@ def calculate_production_exposure(observation: dict, criticality: dict) -> dict:
 
 def calculate_safety_exposure(observation: dict, criticality: dict) -> dict:
     """Calculate safety exposure based on criticality"""
-    if not criticality or criticality.get("safety_impact") is None:
+    safety_impact = (criticality or {}).get("safety_impact") or 0
+    if not safety_impact:
         return {"not_assessed": True, "safety_impact_score": None, "severity": "Not Assessed"}
-    safety_impact = criticality.get("safety_impact", 0)
     
     # Map safety impact to personnel exposure
     personnel_mapping = {
@@ -162,9 +162,9 @@ def calculate_safety_exposure(observation: dict, criticality: dict) -> dict:
 
 def calculate_environmental_exposure(observation: dict, criticality: dict) -> dict:
     """Calculate environmental exposure"""
-    if not criticality or criticality.get("environmental_impact") is None:
+    env_impact = (criticality or {}).get("environmental_impact") or 0
+    if not env_impact:
         return {"not_assessed": True, "environmental_impact_score": None, "impact_rating": "Not Assessed"}
-    env_impact = criticality.get("environmental_impact", 0)
     
     impact_mapping = {
         1: "Negligible",
@@ -182,9 +182,9 @@ def calculate_environmental_exposure(observation: dict, criticality: dict) -> di
 
 def calculate_reputation_exposure(observation: dict, criticality: dict) -> dict:
     """Calculate reputation exposure based on criticality.reputation_impact (1-5)."""
-    if not criticality or criticality.get("reputation_impact") is None:
+    rep_impact = (criticality or {}).get("reputation_impact") or 0
+    if not rep_impact:
         return {"not_assessed": True, "reputation_impact_score": None, "impact_rating": "Not Assessed"}
-    rep_impact = criticality.get("reputation_impact", 0)
     impact_mapping = {
         1: "Negligible",
         2: "Low",
