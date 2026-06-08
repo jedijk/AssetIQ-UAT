@@ -355,9 +355,10 @@ def _issue_confirm_yes(text: str) -> bool:
     if t in {
         "yes", "y", "yeah", "yep", "correct", "ok", "okay", "sure", "fine",
         "ja", "klopt", "akkoord", "precies", "continue", "proceed", "next", "go",
+        "accept", "accepteren", "confirm", "bevestig", "bevestigen",
     }:
         return True
-    return t.startswith("yes") or t.startswith("ja ") or t.startswith("ja,") or t.startswith("ok ")
+    return t.startswith("yes") or t.startswith("ja ") or t.startswith("ja,") or t.startswith("ok ") or t.startswith("accept")
 
 
 def _issue_confirm_no(text: str) -> bool:
