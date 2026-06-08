@@ -428,11 +428,18 @@ const ObservationDetailsSection = ({ threatId }) => {
     }
   };
 
+  const disciplineDisplay = (() => {
+    const v = threat.discipline;
+    if (!v) return translateEnum("Not specified");
+    const found = DISCIPLINES.find((d) => d.value === v || d.label === v);
+    return found?.label || v;
+  })();
+
   const infoItems = [
     { label: t("observations.equipmentType"), value: translateEquipmentTypeName(threat.equipment_type), icon: Target, field: "equipment_type", type: "searchable", options: equipmentTypeOptions },
     { label: t("observations.failureMode"), value: translateFailureModeName(threat.failure_mode), icon: AlertTriangle, field: "failure_mode", type: "searchable", options: failureModeOptions },
     { label: t("observations.frequency"), value: translateEnum(threat.frequency), icon: Clock, field: "frequency", type: "select", options: FREQUENCY_OPTIONS },
-    { label: translateEnum("Owner"), value: threat.owner_name || translateEnum("Not assigned"), icon: User, field: "owner_id", type: "user-select" },
+    { label: "Discipline", value: disciplineDisplay, icon: Cog, field: "discipline", type: "discipline-select" },
   ];
 
   // --- Render ---------------------------------------------------------------
@@ -545,7 +552,7 @@ const ObservationDetailsSection = ({ threatId }) => {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Action bar — rendered into the page hero via portal when the slot exists; falls back to inline if no slot found. */}
       {heroSlot ? createPortal(actionBar, heroSlot) : (
         <div className="bg-white rounded-xl border border-slate-200 p-4">{actionBar}</div>
@@ -674,6 +681,17 @@ const ObservationDetailsSection = ({ threatId }) => {
                     {usersList.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
+              ) : item.type === "discipline-select" ? (
+                <Select
+                  value={editForm.discipline || "_none"}
+                  onValueChange={(v) => setEditForm({ ...editForm, discipline: v === "_none" ? "" : v })}
+                >
+                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Discipline" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">Not specified</SelectItem>
+                    {DISCIPLINES.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               ) : (
                 <Input
                   value={editForm[item.field] || ""}
@@ -692,26 +710,6 @@ const ObservationDetailsSection = ({ threatId }) => {
             </div>
           </div>
         ))}
-
-        {/* Discipline (extra editable field, full row on its own line) */}
-        {isEditing && (
-          <div className="bg-white rounded-xl border border-slate-200 p-3 col-span-2 md:col-span-2">
-            <div className="flex items-center gap-1.5 text-slate-500 text-xs mb-1">
-              <Cog className="w-3 h-3" />
-              <span>Discipline</span>
-            </div>
-            <Select
-              value={editForm.discipline || "_none"}
-              onValueChange={(v) => setEditForm({ ...editForm, discipline: v === "_none" ? "" : v })}
-            >
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select discipline" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_none">Not specified</SelectItem>
-                {DISCIPLINES.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
       </motion.div>
 
       {/* AI Insights and Causal Intelligence are now rendered inside the
