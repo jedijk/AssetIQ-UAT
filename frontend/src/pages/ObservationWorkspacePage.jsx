@@ -959,8 +959,8 @@ const ObservationWorkspacePage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-12">
-      {/* Hero header — compact single-row like classic */}
-      <div className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm">
+      {/* Hero header — compact single-row like classic; stays fixed below the 48px app header */}
+      <div className="sticky top-12 z-20 bg-white border-b border-slate-200 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 max-w-7xl">
           <div className="flex items-center gap-2 sm:gap-3 py-2">
             <Button
