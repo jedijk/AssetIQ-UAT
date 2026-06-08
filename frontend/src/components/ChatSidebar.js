@@ -79,10 +79,18 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
   useEffect(() => {
     if (prefillEquipment && isOpen) {
       // More explicit format to help AI extract the asset name correctly
-      setMessage(`Reporting issue for equipment "${prefillEquipment}": `);
-      // Focus the textarea after a short delay
+      const prefillText = `Reporting issue for equipment "${prefillEquipment}": `;
+      setMessage(prefillText);
+      // Focus the textarea and resize after a short delay
       setTimeout(() => {
-        textareaRef.current?.focus();
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          const newHeight = Math.max(40, Math.min(textareaRef.current.scrollHeight, 150));
+          textareaRef.current.style.height = newHeight + 'px';
+          textareaRef.current.focus();
+          // Place cursor at end
+          textareaRef.current.setSelectionRange(prefillText.length, prefillText.length);
+        }
       }, 100);
     }
   }, [prefillEquipment, isOpen]);
@@ -91,14 +99,16 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
   useEffect(() => {
     if (prefillMessage !== null && prefillMessage !== undefined) {
       setMessage(prefillMessage);
-      // Trigger auto-resize of textarea
+      // Trigger auto-resize of textarea after DOM update
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto';
-          const newHeight = Math.max(36, Math.min(textareaRef.current.scrollHeight, 150));
+          const newHeight = Math.max(40, Math.min(textareaRef.current.scrollHeight, 150));
           textareaRef.current.style.height = newHeight + 'px';
+          // Scroll to bottom of textarea to show all content
+          textareaRef.current.scrollTop = 0;
         }
-      }, 50);
+      }, 100);
     }
   }, [prefillMessage]);
 
@@ -1472,7 +1482,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               </div>
 
               {/* Input Container */}
-              <div className="flex-1 bg-white rounded-3xl border border-slate-200 flex items-end overflow-hidden shadow-sm">
+              <div className="flex-1 bg-white rounded-3xl border border-slate-200 flex items-center overflow-visible shadow-sm min-h-[44px]">
                 <textarea
                   ref={textareaRef}
                   value={message}
@@ -1480,18 +1490,17 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                     setMessage(e.target.value);
                     // Auto-resize to fit content
                     e.target.style.height = 'auto';
-                    const newHeight = Math.max(36, Math.min(e.target.scrollHeight, 150));
+                    const newHeight = Math.max(40, Math.min(e.target.scrollHeight, 150));
                     e.target.style.height = newHeight + 'px';
                   }}
                   onKeyDown={handleKeyPress}
                   placeholder="Type a message..."
-                  className="flex-1 px-4 py-2 text-sm bg-transparent border-none outline-none resize-none placeholder:text-slate-400 leading-5"
+                  className="flex-1 px-4 py-3 text-sm bg-transparent border-none outline-none resize-none placeholder:text-slate-400 leading-5 scrollbar-thin"
                   rows={1}
                   style={{ 
-                    height: message ? 'auto' : '36px',
-                    minHeight: '36px',
+                    minHeight: '40px',
                     maxHeight: '150px',
-                    overflowY: 'auto'
+                    overflowY: message && message.length > 100 ? 'auto' : 'hidden'
                   }}
                   data-testid="sidebar-chat-message-input"
                 />
