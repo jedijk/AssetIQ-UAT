@@ -1510,7 +1510,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                     e.target.style.height = newHeight + 'px';
                   }}
                   onKeyDown={handleKeyPress}
-                  placeholder="Type a message..."
+                  placeholder="Type or record voice..."
                   className="flex-1 px-4 py-3 text-sm bg-transparent border-none outline-none resize-none placeholder:text-slate-400 leading-5 scrollbar-thin focus:ring-0 focus:outline-none"
                   rows={1}
                   style={{ 
@@ -1520,38 +1520,47 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                   }}
                   data-testid="sidebar-chat-message-input"
                 />
-              </div>
-
-              {/* Mic or Send Button */}
-              {message.trim() || imageBase64 || isSending ? (
+                {/* Mic button inside input */}
                 <button
-                  onClick={handleSend}
-                  disabled={isSending}
-                  className={`flex-shrink-0 w-11 h-11 rounded-full text-white flex items-center justify-center shadow-lg transition-all active:scale-95 disabled:opacity-70 ${
-                    isSending 
-                      ? 'bg-blue-400' 
-                      : 'bg-blue-600 hover:bg-blue-700'
+                  onClick={isRecording ? stopRecording : startRecording}
+                  disabled={isSending || isTranscribing}
+                  className={`flex-shrink-0 w-8 h-8 mr-2 rounded-full flex items-center justify-center transition-all ${
+                    isRecording 
+                      ? 'bg-red-500 text-white animate-pulse' 
+                      : isTranscribing
+                        ? 'bg-blue-100 text-blue-400'
+                        : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'
                   }`}
-                  data-testid="sidebar-send-message-button"
-                  title="Send message"
+                  title={isRecording ? "Stop recording" : isTranscribing ? "Transcribing..." : "Record voice"}
                 >
-                  {isSending ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                  {isTranscribing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : isRecording ? (
+                    <Square className="w-3.5 h-3.5 fill-current" />
                   ) : (
-                    <Send className="w-5 h-5" />
+                    <Mic className="w-4 h-4" />
                   )}
                 </button>
-              ) : (
-                <button
-                  onClick={startRecording}
-                  disabled={isSending}
-                  className="flex-shrink-0 w-11 h-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center shadow-lg transition-all active:scale-95 disabled:opacity-70"
-                  data-testid="sidebar-voice-record-button"
-                  title="Hold to record voice"
-                >
-                  <Mic className="w-5 h-5" />
-                </button>
-              )}
+              </div>
+
+              {/* Send Button - always visible */}
+              <button
+                onClick={handleSend}
+                disabled={isSending || (!message.trim() && !imageBase64)}
+                className={`flex-shrink-0 w-11 h-11 rounded-full text-white flex items-center justify-center shadow-lg transition-all active:scale-95 disabled:opacity-50 ${
+                  isSending 
+                    ? 'bg-blue-400' 
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+                data-testid="sidebar-send-message-button"
+                title="Send message"
+              >
+                {isSending ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Send className="w-5 h-5" />
+                )}
+              </button>
             </div>
             </>
           )}
