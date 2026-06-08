@@ -1575,7 +1575,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               </div>
             )}
             
-            <div className="flex items-end gap-2">
+            <div className="flex items-center gap-2">
               {/* Attachment Button with Menu */}
               <div className="relative">
                 <button
