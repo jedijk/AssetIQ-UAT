@@ -5,7 +5,7 @@
  * Asset History → Reliability Intelligence → Exposure → Recommended Actions → Action Plan → ALARP → Learning
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -33,6 +33,7 @@ import {
   Wrench,
   FileSearch,
   Shield,
+  Star,
   Cog,
   Sparkles,
   TrendingUp,
@@ -942,6 +943,14 @@ const ObservationWorkspacePage = () => {
     staleTime: 30 * 1000, // 30 seconds
   });
 
+  // Fetch default criticality definitions (used for the right-click popovers on exposure cards).
+  const { data: definitionsData } = useQuery({
+    queryKey: ["criticality-definitions-defaults"],
+    queryFn: () => import("../lib/apis/definitions").then((m) => m.definitionsAPI.getDefaults()),
+    staleTime: 10 * 60 * 1000,
+  });
+  const criticalityDefs = definitionsData?.criticality || [];
+
   // Add recommendation to plan mutation
   const addRecommendationMutation = useMutation({
     mutationFn: (recommendation) => observationWorkspaceAPI.addRecommendation(id, recommendation),
@@ -1046,7 +1055,7 @@ const ObservationWorkspacePage = () => {
       <div className="container mx-auto px-4 max-w-7xl py-3 space-y-3">
         
         {/* Row 1: Risk & Exposure Header */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <ExposureCard
             type="Production Exposure"
             data={{
@@ -1058,6 +1067,9 @@ const ObservationWorkspacePage = () => {
             }}
             icon={DollarSign}
             color="amber"
+            dimension="production"
+            score={exposure?.production?.production_impact_score}
+            criticalityDefs={criticalityDefs}
           />
           
           <ExposureCard
@@ -1068,6 +1080,9 @@ const ObservationWorkspacePage = () => {
             }}
             icon={Users}
             color="red"
+            dimension="safety"
+            score={exposure?.safety?.safety_impact_score}
+            criticalityDefs={criticalityDefs}
           />
           
           <ExposureCard
@@ -1077,6 +1092,21 @@ const ObservationWorkspacePage = () => {
             }}
             icon={Leaf}
             color="green"
+            dimension="environmental"
+            score={exposure?.environmental?.environmental_impact_score}
+            criticalityDefs={criticalityDefs}
+          />
+
+          <ExposureCard
+            type="Reputation Impact"
+            data={{
+              primary: exposure?.reputation?.impact_rating || "Low",
+            }}
+            icon={Star}
+            color="purple"
+            dimension="reputation"
+            score={exposure?.reputation?.reputation_impact_score}
+            criticalityDefs={criticalityDefs}
           />
           
           <ALARPCard alarp={exposure?.alarp} />
