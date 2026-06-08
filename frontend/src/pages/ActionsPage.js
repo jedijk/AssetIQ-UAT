@@ -144,7 +144,7 @@ export default function ActionsPage() {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [riskLevelFilter, setRiskLevelFilter] = useState("all"); // Filter by risk level (Critical/High/Medium/Low)
-  const [sortBy, setSortBy] = useState("risk_score"); // Sort by risk_score or rpn
+  const [sortBy, setSortBy] = useState("latest"); // Sort by latest first by default
   const [disciplineFilter, setDisciplineFilter] = useState("all");
   const [editingAction, setEditingAction] = useState(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
