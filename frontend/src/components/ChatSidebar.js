@@ -57,6 +57,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
   const [manualLanguage, setManualLanguage] = useState(null);
   const [showLangPicker, setShowLangPicker] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [transcriptionPreview, setTranscriptionPreview] = useState(null); // Preview transcribed text before adding
   const [autoSkipCountdown, setAutoSkipCountdown] = useState(null); // Countdown timer for auto-skip
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -521,25 +522,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
       
       if (result?.transcribed_text) {
         const transcribedText = result.transcribed_text.trim();
-        // Combine with existing text if any
-        const existingText = message.trim();
-        if (existingText) {
-          // Append transcribed text to existing text
-          setMessage(existingText + " " + transcribedText);
-        } else {
-          // Just set the transcribed text
-          setMessage(transcribedText);
-        }
-        // Resize textarea after adding text
-        setTimeout(() => {
-          if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-            const newHeight = Math.max(40, Math.min(textareaRef.current.scrollHeight, 150));
-            textareaRef.current.style.height = newHeight + 'px';
-            textareaRef.current.focus();
-          }
-        }, 100);
-        toast.success("Voice transcribed - edit or send");
+        // Show preview instead of directly adding
+        setTranscriptionPreview(transcribedText);
       } else {
         toast.error("Could not transcribe voice - no text detected");
       }
@@ -548,6 +532,34 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
     } finally {
       setIsTranscribing(false);
     }
+  };
+
+  // Add transcribed text to message
+  const addTranscriptionToMessage = () => {
+    if (!transcriptionPreview) return;
+    
+    const existingText = message.trim();
+    if (existingText) {
+      setMessage(existingText + " " + transcriptionPreview);
+    } else {
+      setMessage(transcriptionPreview);
+    }
+    setTranscriptionPreview(null);
+    
+    // Resize textarea after adding text
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+        const newHeight = Math.max(40, Math.min(textareaRef.current.scrollHeight, 150));
+        textareaRef.current.style.height = newHeight + 'px';
+        textareaRef.current.focus();
+      }
+    }, 100);
+  };
+
+  // Discard transcription preview
+  const discardTranscription = () => {
+    setTranscriptionPreview(null);
   };
 
   // Format recording time
@@ -1443,6 +1455,57 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 </Popover>
               </div>
             )}
+            
+            {/* Transcription Preview */}
+            {transcriptionPreview && (
+              <div className="mb-2 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 text-blue-700 text-xs font-medium">
+                    <Mic className="w-3.5 h-3.5" />
+                    <span>Voice transcription:</span>
+                  </div>
+                </div>
+                <p className="text-sm text-slate-700 mb-3">{transcriptionPreview}</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={addTranscriptionToMessage}
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add to message
+                  </button>
+                  <button
+                    onClick={discardTranscription}
+                    className="px-3 py-1.5 bg-white border border-slate-300 text-slate-600 text-xs font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    Discard
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {/* Recording indicator */}
+            {isRecording && (
+              <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
+                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                <span className="text-sm text-red-700 font-medium">Recording... {formatTime(recordingTime)}</span>
+                <button
+                  onClick={stopRecording}
+                  className="ml-auto px-3 py-1 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Stop
+                </button>
+              </div>
+            )}
+            
+            {/* Transcribing indicator */}
+            {isTranscribing && (
+              <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3">
+                <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
+                <span className="text-sm text-blue-700">Transcribing voice...</span>
+              </div>
+            )}
+            
             <div className="flex items-end gap-2">
               {/* Attachment Button with Menu */}
               <div className="relative">
