@@ -95,8 +95,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import AIInsightsPanel from "../AIInsightsPanel";
-import CausalIntelligencePanel from "../CausalIntelligencePanel";
 import AttachmentsPanel from "../attachments/AttachmentsPanel";
 
 const LIKELIHOOD_OPTIONS = ["Rare", "Unlikely", "Possible", "Likely", "Almost Certain"];
@@ -712,11 +710,8 @@ const ObservationDetailsSection = ({ threatId }) => {
         )}
       </motion.div>
 
-      {/* AI Insights + Causal Intelligence */}
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <AIInsightsPanel threatId={threatId} threatData={threat} />
-        <CausalIntelligencePanel threatId={threatId} threatData={threat} />
-      </motion.div>
+      {/* AI Insights and Causal Intelligence are now rendered inside the
+          Reliability Intelligence column (Row 3, Column 1) of the workspace. */}
 
       {/* Attachments */}
       {(isEditing || (threat.attachments && threat.attachments.length > 0)) && (

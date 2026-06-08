@@ -76,6 +76,8 @@ import { observationWorkspaceAPI, actionsAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 import RiskBadge from "../components/RiskBadge";
 import ObservationDetailsSection from "../components/workspace/ObservationDetailsSection";
+import AIInsightsPanel from "../components/AIInsightsPanel";
+import CausalIntelligencePanel from "../components/CausalIntelligencePanel";
 
 // ============================================================================
 // SUB-COMPONENTS
@@ -432,7 +434,7 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
 /**
  * Reliability Intelligence Panel
  */
-const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis }) => {
+const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threatId, threatData }) => {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -525,12 +527,20 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis }) => {
       {/* View Full Analysis Button */}
       <Button 
         variant="outline" 
-        className="w-full"
+        className="w-full mb-4"
         onClick={onViewFullAnalysis}
       >
         <Eye className="w-4 h-4 mr-2" />
         View Full Analysis
       </Button>
+
+      {/* AI Risk Analysis + Causal Intelligence — embedded inside Reliability Intelligence */}
+      {threatId && (
+        <div className="space-y-4 pt-4 border-t border-slate-200">
+          <AIInsightsPanel threatId={threatId} threatData={threatData} />
+          <CausalIntelligencePanel threatId={threatId} threatData={threatData} />
+        </div>
+      )}
     </div>
   );
 };
@@ -1047,6 +1057,8 @@ const ObservationWorkspacePage = () => {
           <ReliabilityIntelligencePanel 
             intelligence={reliability_intelligence}
             onViewFullAnalysis={handleViewFullAnalysis}
+            threatId={id}
+            threatData={observation}
           />
 
           {/* Column 2: Recommended Actions */}
