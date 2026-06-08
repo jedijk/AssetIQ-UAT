@@ -667,6 +667,15 @@ const ThreatDetailPage = () => {
                 <span className="text-xs text-slate-400 font-mono">{threat.equipment_tag}</span>
               </div>
             )}
+            {/* Created date display */}
+            {threat.created_at && (
+              <div className="pl-7 mt-0.5">
+                <span className="flex items-center gap-1 text-[10px] text-slate-400">
+                  <Clock className="w-3 h-3" />
+                  {formatDateTime(threat.created_at)}
+                </span>
+              </div>
+            )}
             {/* Row 2: Scores + Status + Menu */}
             <div className="flex items-center justify-between pl-7">
               <div className="flex items-center gap-2">
@@ -765,9 +774,17 @@ const ThreatDetailPage = () => {
               <h1 className="font-semibold text-base text-slate-900 truncate">
                 {buildTranslatedTitle(threat.title, threat.asset, threat.failure_mode)}
               </h1>
-              {threat.equipment_tag && (
-                <span className="text-xs text-slate-400 font-mono">{threat.equipment_tag}</span>
-              )}
+              <div className="flex items-center gap-2 flex-wrap">
+                {threat.equipment_tag && (
+                  <span className="text-xs text-slate-400 font-mono">{threat.equipment_tag}</span>
+                )}
+                {threat.created_at && (
+                  <span className="flex items-center gap-1 text-xs text-slate-400">
+                    <Clock className="w-3 h-3" />
+                    {formatDateTime(threat.created_at)}
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">
