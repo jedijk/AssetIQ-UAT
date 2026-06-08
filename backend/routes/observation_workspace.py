@@ -544,8 +544,11 @@ async def get_reliability_intelligence(observation: dict, failure_mode_data: dic
 async def get_recommended_actions(observation: dict, failure_mode_data: dict = None) -> List[dict]:
     """
     Get recommended actions from two sources:
-    1. Failure Mode Library - existing actions linked to the failure mode
-    2. AI Generated - based on equipment history and analysis
+    1. Failure Mode Library - existing actions linked to the failure mode (strategy)
+    2. AI Generated - actual recommendations from the cached AI risk insights, if the
+       user has run the AI Reliability Analysis for this observation. Returns nothing
+       under "ai_generated" when the analysis has not yet been run, so the UI can show
+       a "Generate AI recommendations" CTA.
     """
     recommendations = []
     
@@ -574,57 +577,44 @@ async def get_recommended_actions(observation: dict, failure_mode_data: dict = N
                 "failure_mode_id": failure_mode_data.get("id"),
                 "why_recommended": f"Recommended because this action is part of the standard mitigation strategy for '{failure_mode_data.get('failure_mode', 'this failure mode')}'."
             })
-    
-    # Source 2: AI Generated Actions (based on equipment history)
-    # These are context-specific recommendations
-    equipment_type = observation.get("equipment_type", "")
-    # Note: failure_mode could be used for more targeted recommendations
-    # failure_mode = observation.get("failure_mode", "")
-    
-    # AI-generated recommendations based on patterns
-    ai_recommendations = []
-    
-    # Generic AI recommendations based on equipment type
-    if equipment_type:
-        eq_type_lower = equipment_type.lower()
-        
-        if "pump" in eq_type_lower:
-            ai_recommendations = [
-                {"title": "Install Vibration Monitoring", "type": "PDM", "impact": "35% detection improvement", "confidence": 75},
-                {"title": "Review Seal Maintenance Procedure", "type": "PM", "impact": "Reduced seal failures", "confidence": 70},
-                {"title": "Implement Oil Analysis Program", "type": "PDM", "impact": "Early bearing failure detection", "confidence": 72}
-            ]
-        elif "motor" in eq_type_lower:
-            ai_recommendations = [
-                {"title": "Add Thermal Monitoring", "type": "PDM", "impact": "30% earlier fault detection", "confidence": 78},
-                {"title": "Update Insulation Testing Schedule", "type": "PM", "impact": "Prevent winding failures", "confidence": 71},
-                {"title": "Review Startup Procedures", "type": "OP", "impact": "Reduced inrush damage", "confidence": 68}
-            ]
-        elif "conveyor" in eq_type_lower or "belt" in eq_type_lower:
-            ai_recommendations = [
-                {"title": "Install Belt Tracking Sensors", "type": "PDM", "impact": "40% faster misalignment detection", "confidence": 74},
-                {"title": "Review Belt Tensioning Procedure", "type": "OP", "impact": "Extended belt life", "confidence": 76},
-                {"title": "Implement Pulley Inspection Program", "type": "PM", "impact": "Prevent belt damage", "confidence": 70}
-            ]
-        else:
-            ai_recommendations = [
-                {"title": "Implement Condition Monitoring", "type": "PDM", "impact": "Early failure detection", "confidence": 70},
-                {"title": "Review Maintenance Procedures", "type": "PM", "impact": "Improved reliability", "confidence": 68},
-                {"title": "Update Operating Standards", "type": "OP", "impact": "Reduced operator-induced failures", "confidence": 65}
-            ]
-    
-    for i, rec in enumerate(ai_recommendations[:3]):  # Limit to 3 AI recommendations
-        recommendations.append({
-            "id": f"ai-{observation.get('id', 'unknown')}-{i}",
-            "action_type": rec.get("type", "PM"),
-            "title": rec.get("title", ""),
-            "source": "ai_generated",
-            "source_display": "AI Reliability Analysis",
-            "expected_impact": rec.get("impact", ""),
-            "confidence": rec.get("confidence", 70),
-            "failure_mode_id": None,
-            "why_recommended": f"Recommended based on analysis of similar equipment and historical failure patterns. {rec.get('impact', '')}"
-        })
+
+    # Source 2: AI Generated Actions — pulled from the cached AI Risk Insights for this threat.
+    # If the user hasn't run the AI Reliability Analysis yet, this section is empty and the
+    # frontend renders a "Generate AI Recommendations" call-to-action.
+    threat_id = observation.get("id")
+    if threat_id:
+        try:
+            insights = await db.ai_risk_insights.find_one({"threat_id": threat_id}, {"_id": 0})
+        except Exception:
+            insights = None
+        ai_recs = (insights or {}).get("recommendations", []) or []
+        for i, rec in enumerate(ai_recs[:6]):
+            if isinstance(rec, dict):
+                title = rec.get("action") or rec.get("title") or rec.get("description", "")
+                action_type = (rec.get("action_type") or rec.get("type") or "PM").upper()
+                impact = rec.get("impact") or rec.get("expected_impact", "")
+                confidence = rec.get("confidence")
+                discipline = rec.get("discipline")
+            else:
+                title = str(rec)
+                action_type = "PM"
+                impact = ""
+                confidence = None
+                discipline = None
+            if not title:
+                continue
+            recommendations.append({
+                "id": f"ai-{threat_id}-{i}",
+                "action_type": action_type if action_type in ["PM", "CM", "PDM", "OP"] else "PM",
+                "title": title,
+                "source": "ai_generated",
+                "source_display": "AI Reliability Analysis",
+                "expected_impact": impact,
+                "confidence": confidence,
+                "failure_mode_id": None,
+                "discipline": discipline,
+                "why_recommended": "Generated by the AI Reliability Analysis for this observation based on historical patterns and the linked failure mode."
+            })
     
     return recommendations
 
@@ -921,6 +911,9 @@ async def get_observation_workspace(
         },
         "reliability_intelligence": reliability_intelligence,
         "recommended_actions": recommended_actions,
+        # Has the user already run the AI risk analysis for this threat? Drives the
+        # "Generate AI Recommendations" CTA in the Recommended Actions panel.
+        "ai_insights_available": any(r.get("source") == "ai_generated" for r in recommended_actions),
         "action_plan": action_plan,
         "process_journey": process_journey,
         "investigation": {

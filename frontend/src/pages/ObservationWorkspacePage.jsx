@@ -481,7 +481,7 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6 h-full">
+    <div className="bg-white rounded-xl border border-slate-200 p-6 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <div className="p-2 bg-purple-100 rounded-lg">
@@ -567,23 +567,16 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
         </div>
       </div>
 
-      {/* View Full Analysis Button */}
+      {/* View Full Analysis Button — opens combined AI Risk + Causal dialog */}
       <Button 
-        variant="outline" 
-        className="w-full mb-4"
+        variant="default"
+        className="w-full bg-purple-600 hover:bg-purple-700"
         onClick={onViewFullAnalysis}
+        data-testid="open-full-analysis-btn"
       >
         <Eye className="w-4 h-4 mr-2" />
         View Full Analysis
       </Button>
-
-      {/* AI Risk Analysis + Causal Intelligence — embedded inside Reliability Intelligence */}
-      {threatId && (
-        <div className="space-y-4 pt-4 border-t border-slate-200">
-          <AIInsightsPanel threatId={threatId} threatData={threatData} />
-          <CausalIntelligencePanel threatId={threatId} threatData={threatData} />
-        </div>
-      )}
     </div>
   );
 };
@@ -693,7 +686,7 @@ const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding 
 /**
  * Recommended Actions Panel
  */
-const RecommendedActionsPanel = ({ recommendations, onAddToPlan, onAddToStrategy }) => {
+const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddToPlan, onAddToStrategy, onGenerateAI, isGeneratingAI }) => {
   const [addingId, setAddingId] = useState(null);
 
   // Separate by source
@@ -710,7 +703,7 @@ const RecommendedActionsPanel = ({ recommendations, onAddToPlan, onAddToStrategy
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6 h-full">
+    <div className="bg-white rounded-xl border border-slate-200 p-6 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <div className="p-2 bg-blue-100 rounded-lg">
@@ -803,7 +796,7 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onValidateAction })
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6 h-full">
+    <div className="bg-white rounded-xl border border-slate-200 p-6 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -979,13 +972,10 @@ const ObservationWorkspacePage = () => {
   };
 
   const handleViewFullAnalysis = () => {
-    // Navigate to causal engine or open analysis dialog
-    if (workspace?.investigation?.id) {
-      navigate(`/causal-engine?id=${workspace.investigation.id}`);
-    } else {
-      toast.info("Start an investigation for full analysis");
-    }
+    setShowAnalysisDialog(true);
   };
+
+  const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
 
   // Loading state
   if (isLoading) {
@@ -1151,6 +1141,22 @@ const ObservationWorkspacePage = () => {
         <ProcessJourney stages={process_journey} />
 
       </div>
+
+      {/* Full Analysis Dialog — Causal Intelligence + AI Risk Analysis (without recommended actions) */}
+      <Dialog open={showAnalysisDialog} onOpenChange={setShowAnalysisDialog}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto" data-testid="full-analysis-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Brain className="w-5 h-5 text-purple-600" />
+              Full Reliability Analysis
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
+            <CausalIntelligencePanel threatId={id} threatData={observation} />
+            <AIInsightsPanel threatId={id} threatData={observation} hideRecommendations />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

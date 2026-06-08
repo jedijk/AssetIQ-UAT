@@ -162,7 +162,7 @@ const ForecastChart = ({ forecasts, t, currentScore = 60 }) => {
   );
 };
 
-export default function AIInsightsPanel({ threatId, threatData, compact = false }) {
+export default function AIInsightsPanel({ threatId, threatData, compact = false, hideRecommendations = false }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { t } = useLanguage();
@@ -545,7 +545,7 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false 
               )}
               
               {/* Recommendations */}
-              {displayRecommendations.length > 0 && (
+              {!hideRecommendations && displayRecommendations.length > 0 && (
                 <div>
                   <h5 className="text-xs font-medium text-slate-500 mb-2 flex items-center gap-1">
                     <Zap className="w-3 h-3" />
