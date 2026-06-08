@@ -146,42 +146,47 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
         )}
       </div>
 
-      {/* Criticality definition popover (right-click) */}
-      {popup.show && (
-        <div
-          ref={popupRef}
-          className="fixed z-50 w-80 bg-white border border-slate-200 rounded-xl shadow-2xl"
-          style={{
-            left: Math.min(Math.max(popup.x, 16), window.innerWidth - 336),
-            top: Math.min(Math.max(popup.y, 16), window.innerHeight - 100),
-          }}
-        >
-          <div className="flex items-center justify-between px-3 py-2 border-b">
-            <h3 className="font-semibold text-sm text-slate-800 capitalize">{dimension} criticality scale</h3>
-            <button onClick={() => setPopup({ show: false, x: 0, y: 0 })} className="p-1 hover:bg-slate-100 rounded">
-              <X className="w-4 h-4 text-slate-400" />
-            </button>
-          </div>
-          <div className="p-2 max-h-72 overflow-y-auto space-y-1">
-            {scaleRows.length > 0 ? scaleRows.map((d) => (
-              <div
-                key={d.rank}
-                className={`flex gap-2 p-2 rounded ${score === d.rank ? "bg-blue-50 border border-blue-200" : "border border-transparent"}`}
-              >
-                <div className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${score === d.rank ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"}`}>
-                  {d.rank}
+      {/* Criticality definition popover (right-click) — only shows the current rank's definition */}
+      {popup.show && (() => {
+        const currentRow = scaleRows.find((d) => d.rank === score);
+        return (
+          <div
+            ref={popupRef}
+            className="fixed z-50 w-80 bg-white border border-slate-200 rounded-xl shadow-2xl"
+            style={{
+              left: Math.min(Math.max(popup.x, 16), window.innerWidth - 336),
+              top: Math.min(Math.max(popup.y, 16), window.innerHeight - 100),
+            }}
+          >
+            <div className="flex items-center justify-between px-3 py-2 border-b">
+              <h3 className="font-semibold text-sm text-slate-800 capitalize">{dimension} criticality</h3>
+              <button onClick={() => setPopup({ show: false, x: 0, y: 0 })} className="p-1 hover:bg-slate-100 rounded">
+                <X className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-3">
+              {currentRow ? (
+                <div className="flex gap-2">
+                  <div className="flex-shrink-0 w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold">
+                    {currentRow.rank}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-slate-800">{currentRow.label || `Level ${currentRow.rank}`}</div>
+                    <div className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap mt-1">{currentRow[field]}</div>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold text-slate-800">{d.label || `Level ${d.rank}`}</div>
-                  <div className="text-[11px] text-slate-600 leading-snug whitespace-pre-wrap">{d[field]}</div>
+              ) : (
+                <div className="flex items-center gap-2 py-1">
+                  <div className="flex-shrink-0 w-9 h-9 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
+                    <AlertTriangle className="w-4 h-4" />
+                  </div>
+                  <div className="text-sm text-slate-500 italic">Not Assessed</div>
                 </div>
-              </div>
-            )) : (
-              <div className="text-xs text-slate-400 italic p-2">No criticality definition available for this dimension.</div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </>
   );
 };
