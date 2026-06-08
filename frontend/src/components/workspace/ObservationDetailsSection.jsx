@@ -87,7 +87,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "../ui/alert-dialog";
 import {
   DropdownMenu,
@@ -178,6 +177,7 @@ const ObservationDetailsSection = ({ threatId }) => {
   const [showLinkFailureModeDialog, setShowLinkFailureModeDialog] = useState(false);
   const [selectedFailureModeId, setSelectedFailureModeId] = useState(null);
   const [failureModeSearch, setFailureModeSearch] = useState("");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // --- Mutations ------------------------------------------------------------
@@ -392,6 +392,7 @@ const ObservationDetailsSection = ({ threatId }) => {
       owner_id: threat.owner_id || "",
       owner_name: threat.owner_name || "",
       discipline: threat.discipline || "",
+      user_context: threat.user_context || "",
       attachments: threat.attachments || [],
     });
     setIsEditing(true);
@@ -430,11 +431,7 @@ const ObservationDetailsSection = ({ threatId }) => {
   const infoItems = [
     { label: t("observations.equipmentType"), value: translateEquipmentTypeName(threat.equipment_type), icon: Target, field: "equipment_type", type: "searchable", options: equipmentTypeOptions },
     { label: t("observations.failureMode"), value: translateFailureModeName(threat.failure_mode), icon: AlertTriangle, field: "failure_mode", type: "searchable", options: failureModeOptions },
-    { label: t("observations.impact"), value: translateEnum(threat.impact), icon: Activity, field: "impact", type: "select", options: IMPACT_OPTIONS },
     { label: t("observations.frequency"), value: translateEnum(threat.frequency), icon: Clock, field: "frequency", type: "select", options: FREQUENCY_OPTIONS },
-    { label: t("observations.likelihood"), value: translateEnum(threat.likelihood), icon: Activity, field: "likelihood", type: "select", options: LIKELIHOOD_OPTIONS },
-    { label: t("observations.detectability"), value: translateEnum(threat.detectability), icon: Eye, field: "detectability", type: "select", options: DETECTABILITY_OPTIONS },
-    { label: t("observations.location"), value: threat.location || translateEnum("Not specified"), icon: MapPin, field: "location", type: "text" },
     { label: translateEnum("Owner"), value: threat.owner_name || translateEnum("Not assigned"), icon: User, field: "owner_id", type: "user-select" },
   ];
 
@@ -531,6 +528,13 @@ const ObservationDetailsSection = ({ threatId }) => {
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate(`/threats/${threatId}`)}>
                   Open Classic View
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={(e) => { e.preventDefault(); setShowDeleteDialog(true); }}
+                  className="text-red-600 focus:text-red-700 focus:bg-red-50"
+                  data-testid="menu-delete-observation"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" /> Delete Observation
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -759,21 +763,31 @@ const ObservationDetailsSection = ({ threatId }) => {
         </div>
       )}
 
-      {/* Field Notes / user_context */}
-      {threat.user_context && (
-        <div className="bg-white rounded-xl border border-slate-200 p-4" data-testid="workspace-field-notes">
-          <div className="flex items-center gap-2 mb-2">
-            <MessageSquare className="w-4 h-4 text-green-600" />
-            <h3 className="font-semibold text-slate-900 text-sm">Field Notes</h3>
-            {threat.context_added_at && (
-              <span className="text-xs text-slate-400">added {formatDateTime(threat.context_added_at)}</span>
-            )}
-          </div>
+      {/* Description — populated from what the user typed/dictated during the chat recording (user_context). Editable. */}
+      <div className="bg-white rounded-xl border border-slate-200 p-4" data-testid="workspace-description">
+        <div className="flex items-center gap-2 mb-2">
+          <MessageSquare className="w-4 h-4 text-green-600" />
+          <h3 className="font-semibold text-slate-900 text-sm">Description</h3>
+          {threat.context_added_at && !isEditing && (
+            <span className="text-xs text-slate-400">added {formatDateTime(threat.context_added_at)}</span>
+          )}
+        </div>
+        {isEditing ? (
+          <Textarea
+            value={editForm.user_context || ""}
+            onChange={(e) => setEditForm({ ...editForm, user_context: e.target.value })}
+            placeholder="What did you observe? (this is the text you typed or dictated when reporting the observation)"
+            rows={4}
+            className="text-sm"
+          />
+        ) : threat.user_context ? (
           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
             <p className="text-slate-700 whitespace-pre-wrap text-sm">{threat.user_context}</p>
           </div>
-        </div>
-      )}
+        ) : (
+          <p className="text-slate-400 text-sm italic">No description recorded.</p>
+        )}
+      </div>
 
       {/* Probable Cause */}
       <div className="bg-white rounded-xl border border-slate-200 p-4" data-testid="workspace-cause">
@@ -790,31 +804,23 @@ const ObservationDetailsSection = ({ threatId }) => {
         )}
       </div>
 
-      {/* Delete */}
-      <div className="pt-4 mt-2 border-t border-slate-200">
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="outline" className="w-full text-red-600 border-red-200 hover:bg-red-50" data-testid="workspace-delete-btn">
-              <Trash2 className="w-4 h-4 mr-2" />
-              Delete Observation
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Observation</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure? This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => deleteMutation.mutate()} className="bg-red-600 hover:bg-red-700" data-testid="confirm-delete-btn">
-                {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
+      {/* Delete confirmation — opened from the hero ••• menu */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Observation</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteMutation.mutate()} className="bg-red-600 hover:bg-red-700" data-testid="confirm-delete-btn">
+              {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Share Dialog */}
       <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
