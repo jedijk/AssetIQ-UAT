@@ -1267,3 +1267,88 @@ test_plan:
 agent_communication:
   - agent: "testing"
     message: "INTELLIGENCE MAP DASHBOARD UI TESTING COMPLETE - ALL 5 COMPONENTS TESTED AND WORKING (100%). CRITICAL BUGS FOUND AND FIXED: (1) SelectItem empty string value bug - Fixed by changing filter state from '' to 'all' and updating SelectItem values. (2) Sankey diagram node filtering bug - Fixed by filtering out unconnected nodes and adding error handling. TESTING RESULTS: Successfully tested complete Intelligence Map dashboard with login (jedijk@gmail.com), navigation to /library?tab=intelligence-map, and verification of all components. COMPONENT STATUS: (1) Intelligence Map Tab - Loads successfully without crashes, all sections render correctly. (2) Header & Description - 'Maintenance Intelligence Map' header visible, description text visible, Refresh button working. (3) Filter Bar - All 4 filters working (Plant, System, Equipment Type dropdowns + Show linked only toggle), Plant filter dropdown opens with 2 options, filter interaction tested successfully. (4) Intelligence Flow Section - 6/7 flow cards visible and working (Failure Modes: 483, Strategies: 25, Equipment Types: 0, Equipment: 242, Programs: 1, Schedules visible), card navigation tested (Failure Modes card navigates to failure-modes tab), arrow connectors display relationship counts, tooltips show relationship descriptions. (5) PM Import Integration - Purple styled section visible, PM Imports card shows 0 sessions (expected for test environment), flow description text visible. (6) Data Lineage Visualization - Sankey diagram section visible, shows 'No data available' message (expected because relationships are all 0 in test environment), SVG element present and responsive, error handling prevents crashes. (7) Reliability Intelligence Insights Panel - All 5 KPI cards working (Failure Mode Coverage: 0%, Strategy Density: 0.1, PM Source Split: 100%/0%, Schedules Missing Frequency: 2659, Schedule Compliance: 100%), Task Sources breakdown visible (Strategy: 1, Imported: 0, AI: 0, Manual: 0), color coding working correctly (red for critical, green for good). API INTEGRATION: Both API endpoints working correctly (GET /api/intelligence-map/stats returns 200 with complete data, GET /api/intelligence-map/filters returns 200 with plants/systems/equipment_types). MINOR ISSUES: Sankey diagram shows 'No data available' because test environment has zero relationship values - this is expected behavior and will work correctly with real data. Intelligence Map dashboard is production-ready and fully functional."
+
+user_problem_statement: "Test the new Observation Workspace API endpoints"
+
+backend:
+  - task: "Observation Workspace GET Endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/routes/observation_workspace.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented GET /api/observation-workspace/{observation_id} endpoint. Returns comprehensive workspace data including: observation details, equipment with criticality, failure mode with RPN, exposure calculations (production/safety/environmental/ALARP), equipment timeline events, reliability intelligence (most likely cause, supporting evidence, contributing factors, AI confidence), recommended actions from library and AI, action plan, process journey stages, and investigation details."
+      - working: true
+        agent: "testing"
+        comment: "TESTED: GET /api/observation-workspace/{observation_id} endpoint working correctly. All required sections present and valid: (1) Observation section - includes id, title, threat_number, status, asset, equipment_type, failure_mode, description, timestamps. Tested with observation 'Condensation Vessel - Sludge Build up'. (2) Equipment section - includes id, name, tag, equipment_type, criticality. Equipment 'Condensation Vessel' returned correctly. (3) Failure mode section - includes id, name, rpn, severity, occurrence, detectability, recommended_actions. Failure mode 'Sludge Build up' returned correctly. (4) Exposure section - All subsections present: production exposure (value: $0, formatted_value, estimated_downtime_hours, deferred_production), safety exposure (personnel_exposed, severity, safety_impact_score), environmental exposure (impact_rating, environmental_impact_score), ALARP progress (percentage: 45%, status: 'In Progress', components breakdown), risk_summary (risk_score, risk_level, rpn). Exposure calculations return reasonable values. (5) Timeline section - 4 events returned, properly structured with id/date/event_type/title/reference_id/status fields. Timeline events properly sorted by date (most recent first). Event types include observation, failure, work_order, inspection, repair, investigation. (6) Reliability intelligence section - Complete with most_likely_cause (name, confidence: 70%), supporting_evidence (historical_events: 4, similar_assets, previous_failures, work_orders), contributing_factors array, ai_confidence: 70%. (7) Recommended actions section - 3 recommendations returned with proper structure (id, action_type, title, source, expected_impact, confidence, why_recommended, failure_mode_id). Sources include failure_mode_library and ai_generated. (8) Action plan section - 0 existing actions (empty array as expected for test observation). (9) Process journey section - 7 stages returned with correct sequence: Observation (completed), Assessment (in_progress), Planning (not_started), Investigation (not_started), Action (not_started), ALARP (not_started), Learning (not_started). Process journey stages calculated correctly based on observation state. All response structures match expected models. API endpoint production-ready."
+
+  - task: "Observation Workspace Timeline Endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/routes/observation_workspace.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented GET /api/observation-workspace/{observation_id}/timeline endpoint. Returns enhanced equipment timeline with events from multiple sources: observations, failures (closed observations), work orders (from actions), inspections (from scheduled tasks), and investigations. Events are sorted by date (most recent first) and include event_type, title, reference_id, status, severity."
+      - working: true
+        agent: "testing"
+        comment: "TESTED: GET /api/observation-workspace/{observation_id}/timeline endpoint working correctly. Response structure valid with 'events' array and 'total' count. Retrieved 4 timeline events for test observation. Event structure valid with all required fields: id, date, event_type, title, reference_id (optional), status (optional), severity (optional). Event types correctly classified (observation, failure, work_order, inspection, repair, investigation). Timeline events properly sorted by date (most recent first) - verified sorting logic works correctly across multiple events. First event: 'observation - Condensation Vessel - Sludge Build up'. Limit parameter working correctly (tested with limit=20). API endpoint production-ready."
+
+  - task: "Observation Workspace Add Action Endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/routes/observation_workspace.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented POST /api/observation-workspace/{observation_id}/add-action endpoint. Creates a new action in the central actions system linked to the observation. Accepts title, description, action_type, priority, due_date, owner_id, owner_name. Generates action_number (ACT-XXXXX format), links to observation via source_id/observation_id/threat_id, links to equipment, sets status to 'open', tracks created_by and timestamps."
+      - working: true
+        agent: "testing"
+        comment: "TESTED: POST /api/observation-workspace/{observation_id}/add-action endpoint working correctly. Successfully created action with payload: {title: 'Test Action from Workspace', description: 'Created via workspace API test', action_type: 'corrective', priority: 'medium'}. Response indicates success with success=true. Action created with action_number: ACT-00006, title: 'Test Action from Workspace'. Action structure valid with all required fields: id, action_number, title, description, action_type, status, priority, source, source_id, observation_id, threat_id, linked_equipment_id, equipment_name, due_date, owner_id, owner_name, created_at, updated_at, created_by, created_by_name. Action correctly linked to observation (observation_id matches). Action status set to 'open' as expected. Action type 'corrective' preserved correctly. Priority 'medium' preserved correctly. API endpoint production-ready."
+
+  - task: "Observation Workspace Add Recommendation Endpoint"
+    implemented: true
+    working: true
+    file: "/app/backend/routes/observation_workspace.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented POST /api/observation-workspace/{observation_id}/add-recommendation endpoint. Converts a recommended action into an actual action in the central actions system. Maps action_type (PM/CM/PDM/OP) to action_type (preventive/corrective/predictive/operational). Preserves recommendation metadata: expected_impact, confidence, failure_mode_id, recommendation_id. Links to observation and equipment."
+      - working: true
+        agent: "testing"
+        comment: "TESTED: POST /api/observation-workspace/{observation_id}/add-recommendation endpoint working correctly. Successfully converted recommendation to action with payload: {id: 'test-rec-1', action_type: 'PM', title: 'Test Recommendation Action', source: 'ai_generated', expected_impact: 'Test impact', confidence: 75}. Response indicates success with success=true. Recommendation added as action with action_number: ACT-00007, title: 'Test Recommendation Action'. Action structure valid with all required fields. Action type correctly mapped: PM -> preventive (mapping working correctly). Expected impact preserved: 'Test impact'. Confidence score preserved: 75. Recommendation metadata correctly stored in action (recommendation_id, expected_impact, confidence, failure_mode_id fields present). Action correctly linked to observation. Source field set to 'ai_generated' as provided. API endpoint production-ready."
+
+metadata:
+  created_by: "testing_agent"
+  version: "1.0"
+  test_sequence: 14
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Observation Workspace GET Endpoint"
+    - "Observation Workspace Timeline Endpoint"
+    - "Observation Workspace Add Action Endpoint"
+    - "Observation Workspace Add Recommendation Endpoint"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Implemented Observation Workspace API endpoints for the Reliability Intelligence Workspace redesign. Created 4 new endpoints: (1) GET /api/observation-workspace/{observation_id} - Returns comprehensive workspace data including observation, equipment, failure mode, exposure calculations, timeline, reliability intelligence, recommended actions, action plan, and process journey. (2) GET /api/observation-workspace/{observation_id}/timeline - Returns enhanced equipment timeline with events from observations, failures, work orders, inspections, and investigations. (3) POST /api/observation-workspace/{observation_id}/add-action - Creates new action linked to observation. (4) POST /api/observation-workspace/{observation_id}/add-recommendation - Converts recommendation to action. Please test all endpoints."
+  - agent: "testing"
+    message: "OBSERVATION WORKSPACE API TESTING COMPLETE - ALL 4 ENDPOINTS TESTED AND WORKING (100%). Successfully tested all Observation Workspace API endpoints with test observation 'Condensation Vessel - Sludge Build up' (ID: 16584b99-8cc5-42a1-a5ec-0298db5436b8). TEST RESULTS: (1) GET /api/observation-workspace/{observation_id} - ✅ All 9 required sections present and valid (observation, equipment, failure_mode, exposure, timeline, reliability_intelligence, recommended_actions, action_plan, process_journey). Exposure calculations return reasonable values (production: $0, safety: personnel_exposed, environmental: impact_rating, ALARP: 45% In Progress). Timeline has 4 events properly sorted by date. Reliability intelligence complete with 70% AI confidence, 4 historical events. 3 recommended actions from library and AI. Process journey has 7 stages calculated correctly. (2) GET /api/observation-workspace/{observation_id}/timeline - ✅ Timeline events properly structured with all required fields (id, date, event_type, title). 4 events returned, sorted by date (most recent first). Event types correctly classified. (3) POST /api/observation-workspace/{observation_id}/add-action - ✅ Action created successfully (ACT-00006 - Test Action from Workspace). Action structure valid with all required fields. Action correctly linked to observation. Status set to 'open', priority 'medium', action_type 'corrective' all preserved correctly. (4) POST /api/observation-workspace/{observation_id}/add-recommendation - ✅ Recommendation converted to action successfully (ACT-00007 - Test Recommendation Action). Action type correctly mapped (PM -> preventive). Expected impact and confidence score preserved (75%). Recommendation metadata stored correctly. All response structures match expected models. All endpoints production-ready. No issues found."

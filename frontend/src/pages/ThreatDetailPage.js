@@ -803,6 +803,16 @@ const ThreatDetailPage = () => {
                   <Button size="sm" variant="ghost" onClick={shareLink} className="h-7 px-2 text-slate-500 hover:text-slate-700" title={t("observations.shareLink")}>
                     <Share2 className="w-3.5 h-3.5" />
                   </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={() => navigate(`/threats/${id}/workspace`)}
+                    className="h-7 px-2 text-xs bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
+                    title="Open Reliability Intelligence Workspace"
+                  >
+                    <Brain className="w-3 h-3 mr-1" />
+                    Workspace
+                  </Button>
                   <Button size="sm" variant="outline" onClick={startEditing} className="h-7 px-2 text-xs">
                     <Edit className="w-3 h-3 mr-1" />
                     {t("common.edit")}

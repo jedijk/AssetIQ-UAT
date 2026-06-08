@@ -39,6 +39,7 @@ import FormSubmissionsPage from "./pages/FormSubmissionsPage";
 import QRScanPage from "./pages/QRScanPage";
 
 const ThreatDetailPage = lazy(() => import("./pages/ThreatDetailPage"));
+const ObservationWorkspacePage = lazy(() => import("./pages/ObservationWorkspacePage"));
 const ActionDetailPage = lazy(() => import("./pages/ActionDetailPage"));
 const EquipmentManagerPage = lazy(() => import("./pages/EquipmentManagerPage"));
 const CausalEnginePage = lazy(() => import("./pages/CausalEnginePage"));
@@ -435,6 +436,7 @@ function App() {
                 <Route path="definitions" element={<Suspense fallback={<RouteFallback />}><DefinitionsPage /></Suspense>} />
                 <Route path="threats" element={<Suspense fallback={<RouteFallback />}><ThreatsPage /></Suspense>} />
                 <Route path="threats/:id" element={<Suspense fallback={<RouteFallback />}><ThreatDetailPage /></Suspense>} />
+                <Route path="threats/:id/workspace" element={<Suspense fallback={<RouteFallback />}><ObservationWorkspacePage /></Suspense>} />
                 <Route path="actions" element={<Suspense fallback={<RouteFallback />}><ActionsPage /></Suspense>} />
                 <Route path="actions/:actionId" element={<Suspense fallback={<RouteFallback />}><ActionDetailPage /></Suspense>} />
                 <Route path="library" element={<Suspense fallback={<RouteFallback />}><FailureModesPage /></Suspense>} />

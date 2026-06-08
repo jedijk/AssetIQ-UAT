@@ -52,6 +52,7 @@ from routes.intelligence_map import router as intelligence_map_router
 from routes.disciplines import router as disciplines_router
 from routes.task_generation_admin import router as task_generation_admin_router
 from routes.work_items import router as work_items_router
+from routes.observation_workspace import router as observation_workspace_router
 
 all_routers = [
     auth_router,
@@ -105,4 +106,5 @@ all_routers = [
     disciplines_router,
     task_generation_admin_router,
     work_items_router,
+    observation_workspace_router,
 ]
