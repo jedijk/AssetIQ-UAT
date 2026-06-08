@@ -672,32 +672,97 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
         
         {/* Issue summary confirm — structured summary + Accept / Revise / Cancel */}
         {!msg.threat_id && msg.question_type === "issue_confirm" && msg.issue_summary && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {(() => {
               const isNl = msg.issue_confirm_language === "nl";
-              // Parse the new structured format with summary included
               const content = msg.content || "";
               
               return (
                 <>
-                  {/* Display the full message with markdown-like formatting */}
-                  <div className="text-slate-800 whitespace-pre-wrap">
+                  {/* Display the full message with enhanced markdown formatting */}
+                  <div className="text-slate-800">
                     {content.split('\n').map((line, i) => {
-                      // Bold text between ** markers
+                      // Header line with emoji
+                      if (line.startsWith('📋')) {
+                        const parts = line.split(/\*\*([^*]+)\*\*/g);
+                        return (
+                          <div key={i} className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                            {parts.map((part, j) => 
+                              j % 2 === 1 ? <span key={j}>{part}</span> : part
+                            )}
+                          </div>
+                        );
+                      }
+                      // Equipment/Issue Type/Description lines - make them stand out
+                      if (line.includes('**Equipment:**') || line.includes('**Apparatuur:**')) {
+                        const parts = line.split(/\*\*([^*]+)\*\*/g);
+                        return (
+                          <div key={i} className="flex items-start gap-2 py-1.5 px-3 bg-blue-50 rounded-lg mb-2">
+                            <span className="text-blue-600 font-medium">{parts[1]}</span>
+                            <span className="text-blue-800 font-semibold">{parts[2]}</span>
+                          </div>
+                        );
+                      }
+                      if (line.includes('**Issue Type:**') || line.includes('**Type storing:**') || line.includes('**Storingstype:**')) {
+                        const parts = line.split(/\*\*([^*]+)\*\*/g);
+                        return (
+                          <div key={i} className="flex items-start gap-2 py-1.5 px-3 bg-amber-50 rounded-lg mb-2">
+                            <span className="text-amber-600 font-medium">{parts[1]}</span>
+                            <span className="text-amber-800 font-semibold">{parts[2]}</span>
+                          </div>
+                        );
+                      }
+                      if (line.includes('**Description:**') || line.includes('**Beschrijving:**')) {
+                        const parts = line.split(/\*\*([^*]+)\*\*/g);
+                        return (
+                          <div key={i} className="py-2 px-3 bg-slate-50 rounded-lg mb-2">
+                            <span className="text-slate-500 font-medium text-sm">{parts[1]}</span>
+                            <p className="text-slate-700 mt-1">{parts[2]}</p>
+                          </div>
+                        );
+                      }
+                      // Separator line
+                      if (line === '---') {
+                        return <hr key={i} className="my-3 border-slate-200" />;
+                      }
+                      // Action header
+                      if (line.includes('**Choose an action:**') || line.includes('**Kies een actie:**')) {
+                        const parts = line.split(/\*\*([^*]+)\*\*/g);
+                        return (
+                          <p key={i} className="font-medium text-slate-700 mt-2">
+                            {parts.map((part, j) => 
+                              j % 2 === 1 ? <span key={j}>{part}</span> : part
+                            )}
+                          </p>
+                        );
+                      }
+                      // Bullet points for action descriptions
+                      if (line.startsWith('•')) {
+                        const parts = line.split(/\*\*([^*]+)\*\*/g);
+                        return (
+                          <p key={i} className="ml-2 text-sm text-slate-500 py-0.5">
+                            {parts.map((part, j) => 
+                              j % 2 === 1 ? <strong key={j} className="text-slate-700">{part}</strong> : part
+                            )}
+                          </p>
+                        );
+                      }
+                      // Regular bold text
                       if (line.includes('**')) {
                         const parts = line.split(/\*\*([^*]+)\*\*/g);
                         return (
-                          <p key={i} className={line.startsWith('•') ? 'ml-2' : ''}>
+                          <p key={i}>
                             {parts.map((part, j) => 
                               j % 2 === 1 ? <strong key={j}>{part}</strong> : part
                             )}
                           </p>
                         );
                       }
-                      if (line === '---') {
-                        return <hr key={i} className="my-2 border-slate-200" />;
+                      // Empty lines
+                      if (!line.trim()) {
+                        return <div key={i} className="h-1" />;
                       }
-                      return <p key={i} className={line.startsWith('•') ? 'ml-2 text-sm text-slate-600' : ''}>{line}</p>;
+                      return <p key={i}>{line}</p>;
                     })}
                   </div>
                   
