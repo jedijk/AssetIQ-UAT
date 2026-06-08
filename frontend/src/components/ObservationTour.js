@@ -13,6 +13,8 @@ import {
   CheckCircle,
   HelpCircle,
   Activity,
+  AlertTriangle,
+  Target,
   Sparkles,
   Layers,
   Play
