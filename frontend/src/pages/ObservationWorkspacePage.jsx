@@ -75,6 +75,7 @@ import {
 import { observationWorkspaceAPI, actionsAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 import RiskBadge from "../components/RiskBadge";
+import ObservationDetailsSection from "../components/workspace/ObservationDetailsSection";
 
 // ============================================================================
 // SUB-COMPONENTS
@@ -1028,6 +1029,9 @@ const ObservationWorkspacePage = () => {
           
           <RiskSummaryCard riskSummary={exposure?.risk_summary} />
         </div>
+
+        {/* Observation details — all classic features (edit, status, share, delete, info grid, attachments, AI panels, link equipment / failure mode, score calc popup, cause, field notes) */}
+        <ObservationDetailsSection threatId={id} />
 
         {/* Row 2: Equipment Reliability Timeline */}
         <EquipmentReliabilityTimeline 

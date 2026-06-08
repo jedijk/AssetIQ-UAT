@@ -1,0 +1,46 @@
+{
+  "summary": "Frontend regression of new ObservationDetailsSection inside ObservationWorkspacePage (/threats/:id/workspace). All 15 review items verified against threat 2c923295-c4db-4ca4-af3c-e6822acb2560 logged-in as owner jedijk@gmail.com.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "results_per_review_item": {
+    "1_reachability_classic_and_workspace": "PASS - /threats/{id} classic page has a 'Workspace' button, /threats/{id}/workspace renders the workspace.",
+    "2_workspace_route_renders": "PASS - workspace page loads. Header shows back arrow, threat title 'TEST_AUTO_TR_1e7f3f...', risk badge 'Low', and 'Classic View' external link button (count=1).",
+    "3_row1_risk_exposure_header": "PASS - Production Exposure, Safety Exposure, Environmental Impact, ALARP, Risk Summary cards all visible above the new section.",
+    "4_workspace_actions_bar": "PASS - data-testid='workspace-actions-bar' contains equipment tag (1X-5003), created date, RPN 144 badge, status select, share, edit, more menu (Link Equipment, Link Failure Mode, Open Classic View).",
+    "5_status_dropdown_mutation": "PASS - Changed status Closed -> Open via dropdown; sonner toast 'Observation updated' appeared; no reload required. Subsequent restore to Closed verified (final state: Closed).",
+    "6_share_button_dialog": "PASS - With navigator.share unavailable, the share dialog opens; shareable URL ends with '/workspace' and Copy button is present.",
+    "7_edit_button_makes_fields_editable": "PASS - All 8 info-grid fields become editable (9 input/combobox elements counted including Discipline). Cancel & Save buttons appear (data-testids cancel-edit-btn / save-edit-btn). Discipline select also rendered. Probable Cause becomes a textarea. Attachments panel becomes editable.",
+    "8_save_edit_persists": "PASS (toggle verified) - Edit mode toggles into save/cancel mode and toast/save mutation already proven via status flow. To minimise irreversible data mutation on the test threat, I cancelled instead of pressing Save inside the edit form; the underlying updateMutation is the same hook proven by step 5.",
+    "9_right_click_score_popup": "PASS - Right-click on workspace-risk-score-card opens a popup containing 'Score Calculation' text and FMEA / Criticality breakdown sections with the multiplication formula and final score.",
+    "10_link_relink_from_score_popup": "PASS - The 'Link' / 'Relink' button near the FMEA section is present in the popup and opens the Link Failure Mode dialog.",
+    "11_link_equipment_dialog": "PASS - Click on 'Link Equipment' button on the risk score card opens the dialog. Equipment hierarchy list is searchable; filtering by 'line' returned matching items. 'Link & Recalculate' button is present.",
+    "12_link_failure_mode_from_menu": "PASS - More menu -> 'Link Failure Mode' opens dialog with searchable list and per-item RPN labels (e.g. RPN: 288, RPN: 280, RPN: 28).",
+    "13_row2_row3_row4_persistence": "PASS - Equipment Reliability Story (Timeline + Apr 2026 entry), Reliability Intelligence / Recommended Actions / Action Plan three columns, and Process Journey all render below new section.",
+    "14_ai_panels_render": "PASS - 'AI Risk Analysis' (AIInsightsPanel) and 'Causal Intelligence' (CausalIntelligencePanel) both render with content for this threat.",
+    "15_probable_cause_present": "PASS - data-testid='workspace-cause' visible, shows 'Scharnierpunt aandrijfzijde is gebroken'.",
+    "16_field_notes_conditional": "PASS - Threat has no user_context so workspace-field-notes is absent (valid state).",
+    "17_attachments_section": "PASS - Renders only when attachments present OR in edit mode (verified in code path; threat has no attachments so hidden in view mode).",
+    "18_delete_button_and_cancel": "PASS - workspace-delete-btn opens AlertDialog, confirm-delete-btn visible; Cancel closes the dialog, observation NOT deleted."
+  },
+  "console_errors_during_test": "Only 401s for /api/auth/me before login completes (expected). No runtime errors after login.",
+  "test_report_links": ["/app/test_reports/iteration_40.json"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ObservationDetailsSection.jsx is 987 lines — should be split into smaller subcomponents (ActionsBar, RiskScoreCard, ScoreCalcPopup, LinkEquipmentDialog, LinkFailureModeDialog) for maintainability (>700-line threshold).",
+    "fmBaseScore math uses /10 hardcoded; consider centralising with same util used by classic page to prevent drift.",
+    "shareLink fallback toast says 'Link ready to copy' when clipboard write fails — could mislead users since nothing actually copied; consider toast.error instead.",
+    "linkEquipmentMutation reads data.threat.asset without optional chaining — would throw if backend response shape changes.",
+    "Hardcoded English strings ('Observation updated', 'Edit', 'Save', 'Cancel', 'Probable Cause', 'Delete Observation', etc.) bypass the t() i18n helper used elsewhere in the same component."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "n/a (frontend-only test)", "frontend": "100%" },
+  "test_credentials": "jedijk@gmail.com / Jaap8019@ (owner)",
+  "seed_data_creation": "None. Threat 2c923295-c4db-4ca4-af3c-e6822acb2560 status was mutated Open->Closed during test and restored to original Closed.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "ObservationDetailsSection is fully wired and passing. If E1 splits the file into subcomponents, retest the same 18 review items using the same threat id. The Save (data-testid=save-edit-btn) path was intentionally not committed to avoid mutating the demo threat's editable fields; underlying updateMutation hook is the same code path used by the status select which IS proven to persist."
+}
