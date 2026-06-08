@@ -231,20 +231,33 @@ const TimelineEventCard = ({ event, isCurrent }) => {
     }
   };
 
+  // Compose a full tooltip showing all available context for the event.
+  const tooltipParts = [];
+  if (event.title) tooltipParts.push(event.title);
+  if (event.date) {
+    try { tooltipParts.push(format(parseISO(event.date), "PPP")); } catch (_) { tooltipParts.push(event.date); }
+  }
+  if (config.label) tooltipParts.push(config.label);
+  if (event.reference_id) tooltipParts.push(event.reference_id);
+  if (event.status) tooltipParts.push(`Status: ${event.status}`);
+  if (event.description) tooltipParts.push(event.description);
+  const tooltip = tooltipParts.join("\n");
+
   return (
     <div 
       className="flex flex-col items-center cursor-pointer group flex-shrink-0 w-32"
       onClick={handleClick}
+      title={tooltip}
     >
       {/* Date */}
       <div className="text-[11px] text-slate-500 mb-2 font-medium h-4 leading-4">
         {formatDate(event.date)}
       </div>
       
-      {/* Event Circle — fixed size; ring indicates current */}
-      <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-transform group-hover:scale-105 ring-offset-2 ring-offset-white ${
+      {/* Event Circle — sits above the connector line; bg-white outer ring punches through the rail */}
+      <div className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center transition-transform group-hover:scale-105 ring-2 ring-white ${
         isCurrent 
-          ? "bg-blue-600 text-white ring-2 ring-blue-300"
+          ? "bg-blue-600 text-white shadow-md shadow-blue-200"
           : `bg-${config.color}-100 text-${config.color}-600`
       }`}>
         <Icon className="w-4 h-4" />
@@ -383,36 +396,6 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
         <div className="text-center py-8 text-slate-500">
           <History className="w-12 h-12 mx-auto mb-2 opacity-30" />
           <p className="text-sm">No historical events found</p>
-        </div>
-      )}
-
-      {/* AI Evidence Banner */}
-      {aiEvidence && (
-        <div className="mt-6 flex items-center gap-6 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
-          <div className="flex items-center gap-2">
-            <Brain className="w-5 h-5 text-purple-600" />
-            <span className="font-medium text-purple-700 text-sm">AI Analysis Based On:</span>
-          </div>
-          <div className="flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-1">
-              <span className="font-bold text-purple-700">{aiEvidence.historical_events || 0}</span>
-              <span className="text-purple-600">Historical Events</span>
-            </div>
-            <div className="h-4 w-px bg-purple-200" />
-            <div className="flex items-center gap-1">
-              <span className="font-bold text-purple-700">{aiEvidence.similar_assets || 0}</span>
-              <span className="text-purple-600">Similar Assets</span>
-            </div>
-            <div className="h-4 w-px bg-purple-200" />
-            <div className="flex items-center gap-1">
-              <span className="font-bold text-purple-700">{aiEvidence.previous_failures || 0}</span>
-              <span className="text-purple-600">Previous Failures</span>
-            </div>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
-            <span className="text-sm text-purple-600">Confidence:</span>
-            <Badge className="bg-purple-600">{aiEvidence.confidence || 0}%</Badge>
-          </div>
         </div>
       )}
     </div>
