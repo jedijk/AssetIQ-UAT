@@ -508,8 +508,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
     setMediaRecorder(null);
     
     try {
-      // Single request: transcribe + process chat in one call
-      const result = await voiceAPI.sendVoice(blob, manualLanguage);
+      // Get transcription from voice
+      const result = await voiceAPI.sendVoice(blob, manualLanguage, true); // true = transcribe only, don't process chat
       
       if (result?.detected_language) {
         setDetectedLanguage(result.detected_language);
@@ -520,15 +520,31 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
       }
       
       if (result?.transcribed_text) {
-        // Refresh chat history to show both user message and response
-        queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
-        queryClient.invalidateQueries({ queryKey: ["threats"] });
-        queryClient.invalidateQueries({ queryKey: ["stats"] });
+        const transcribedText = result.transcribed_text.trim();
+        // Combine with existing text if any
+        const existingText = message.trim();
+        if (existingText) {
+          // Append transcribed text to existing text
+          setMessage(existingText + " " + transcribedText);
+        } else {
+          // Just set the transcribed text
+          setMessage(transcribedText);
+        }
+        // Resize textarea after adding text
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            const newHeight = Math.max(40, Math.min(textareaRef.current.scrollHeight, 150));
+            textareaRef.current.style.height = newHeight + 'px';
+            textareaRef.current.focus();
+          }
+        }, 100);
+        toast.success("Voice transcribed - edit or send");
       } else {
         toast.error("Could not transcribe voice - no text detected");
       }
     } catch (error) {
-      toast.error("Failed to process voice message");
+      toast.error("Failed to transcribe voice");
     } finally {
       setIsTranscribing(false);
     }

@@ -1089,9 +1089,14 @@ async def transcribe_voice(audio_base64: str = Form(...),
 async def voice_send(
     audio: bytes = File(...),
     language: Optional[str] = Form(None),
+    transcribe_only: Optional[str] = Form(None),
     current_user: dict = Depends(require_permission("tasks:read")),
 ):
-    """Transcribe audio then process as chat message (single round-trip)."""
+    """Transcribe audio then optionally process as chat message.
+    
+    If transcribe_only=true, only transcribe and return the text without processing.
+    This allows combining voice with typed text before sending.
+    """
     user_id = current_user["id"]
     session_id = f"user_{user_id}_{datetime.now(timezone.utc).strftime('%Y%m%d')}"
 
@@ -1111,6 +1116,14 @@ async def voice_send(
                 "transcribed_text": "", "detected_language": None}
 
     detected_lang = language or detect_language(transcribed)
+
+    # If transcribe_only, just return the transcription without processing
+    if transcribe_only and transcribe_only.lower() == "true":
+        return {
+            "message": "Transcription complete",
+            "transcribed_text": transcribed,
+            "detected_language": detected_lang,
+        }
 
     # Reuse the same core processing as text chat
     resp = await _core_chat_process(user_id, transcribed, session_id, detected_lang)
