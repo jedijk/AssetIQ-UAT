@@ -678,150 +678,127 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
         
         {/* Issue summary confirm — structured summary + Accept / Revise / Cancel */}
         {!msg.threat_id && msg.question_type === "issue_confirm" && msg.issue_summary && (
-          <div className="space-y-3">
-            {(() => {
-              const isNl = msg.issue_confirm_language === "nl";
-              const content = msg.content || "";
-              
-              return (
-                <>
-                  {/* Display the full message with enhanced markdown formatting */}
-                  <div className="text-slate-800">
-                    {content.split('\n').map((line, i) => {
-                      // Header line with emoji
-                      if (line.startsWith('📋')) {
-                        const parts = line.split(/\*\*([^*]+)\*\*/g);
-                        return (
-                          <div key={i} className="text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                            {parts.map((part, j) => 
-                              j % 2 === 1 ? <span key={j}>{part}</span> : part
-                            )}
-                          </div>
-                        );
-                      }
-                      // Equipment/Issue Type/Description lines - make them stand out
-                      if (line.includes('**Equipment:**') || line.includes('**Apparatuur:**')) {
-                        const parts = line.split(/\*\*([^*]+)\*\*/g);
-                        return (
-                          <div key={i} className="flex items-start gap-2 py-1.5 px-3 bg-blue-50 rounded-lg mb-2">
-                            <span className="text-blue-600 font-medium">{parts[1]}</span>
-                            <span className="text-blue-800 font-semibold">{parts[2]}</span>
-                          </div>
-                        );
-                      }
-                      if (line.includes('**Issue Type:**') || line.includes('**Type storing:**') || line.includes('**Storingstype:**')) {
-                        const parts = line.split(/\*\*([^*]+)\*\*/g);
-                        return (
-                          <div key={i} className="flex items-start gap-2 py-1.5 px-3 bg-amber-50 rounded-lg mb-2">
-                            <span className="text-amber-600 font-medium">{parts[1]}</span>
-                            <span className="text-amber-800 font-semibold">{parts[2]}</span>
-                          </div>
-                        );
-                      }
-                      if (line.includes('**Description:**') || line.includes('**Beschrijving:**')) {
-                        const parts = line.split(/\*\*([^*]+)\*\*/g);
-                        return (
-                          <div key={i} className="py-2 px-3 bg-slate-50 rounded-lg mb-2">
-                            <span className="text-slate-500 font-medium text-sm">{parts[1]}</span>
-                            <p className="text-slate-700 mt-1">{parts[2]}</p>
-                          </div>
-                        );
-                      }
-                      // Separator line
-                      if (line === '---') {
-                        return <hr key={i} className="my-3 border-slate-200" />;
-                      }
-                      // Action header
-                      if (line.includes('**Choose an action:**') || line.includes('**Kies een actie:**')) {
-                        const parts = line.split(/\*\*([^*]+)\*\*/g);
-                        return (
-                          <p key={i} className="font-medium text-slate-700 mt-2">
-                            {parts.map((part, j) => 
-                              j % 2 === 1 ? <span key={j}>{part}</span> : part
-                            )}
-                          </p>
-                        );
-                      }
-                      // Bullet points for action descriptions
-                      if (line.startsWith('•')) {
-                        const parts = line.split(/\*\*([^*]+)\*\*/g);
-                        return (
-                          <p key={i} className="ml-2 text-sm text-slate-500 py-0.5">
-                            {parts.map((part, j) => 
-                              j % 2 === 1 ? <strong key={j} className="text-slate-700">{part}</strong> : part
-                            )}
-                          </p>
-                        );
-                      }
-                      // Regular bold text
-                      if (line.includes('**')) {
-                        const parts = line.split(/\*\*([^*]+)\*\*/g);
-                        return (
-                          <p key={i}>
-                            {parts.map((part, j) => 
-                              j % 2 === 1 ? <strong key={j}>{part}</strong> : part
-                            )}
-                          </p>
-                        );
-                      }
-                      // Empty lines
-                      if (!line.trim()) {
-                        return <div key={i} className="h-1" />;
-                      }
-                      return <p key={i}>{line}</p>;
-                    })}
-                  </div>
-                  
-                  {isInteractive && (
-                    <div className="flex flex-wrap gap-2 mt-4">
-                      <button
-                        type="button"
-                        onClick={() => sendMutation.mutate({ content: "accept", image: null })}
-                        disabled={isSending}
-                        className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
-                        data-testid="issue-confirm-accept-btn"
-                      >
-                        <CheckCircle2 className="w-4 h-4 mr-1.5" />
-                        {isNl ? "Accepteren" : "Accept"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          // Focus the input for revising
-                          textareaRef.current?.focus();
-                          setMessage(isNl ? "Wijzig: " : "Change: ");
-                        }}
-                        disabled={isSending}
-                        className="inline-flex items-center justify-center px-4 py-2.5 rounded-lg bg-white border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50 disabled:opacity-50 transition-colors"
-                        data-testid="issue-confirm-revise-btn"
-                      >
-                        {isNl ? "Aanpassen" : "Revise"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            setIsSending(true);
-                            await chatAPI.cancelFlow();
-                            queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
-                            queryClient.invalidateQueries({ queryKey: ["threats"] });
-                          } catch (e) {
-                            toast.error("Cancel failed");
-                          } finally {
-                            setIsSending(false);
-                          }
-                        }}
-                        disabled={isSending}
-                        className="inline-flex items-center justify-center px-4 py-2.5 rounded-lg bg-white border border-red-300 text-red-600 text-sm font-medium hover:bg-red-50 disabled:opacity-50 transition-colors"
-                        data-testid="issue-confirm-cancel-btn"
-                      >
-                        {isNl ? "Annuleren" : "Cancel"}
-                      </button>
+          <div className="bg-gradient-to-b from-orange-50 to-white rounded-lg border border-orange-200 overflow-hidden">
+            {/* Header - Draft indicator */}
+            <div className="flex items-center gap-2 text-orange-700 px-3 py-2 bg-orange-100/50 border-b border-orange-200">
+              <AlertTriangle className="w-4 h-4" />
+              <span className="font-semibold text-sm">{msg.issue_confirm_language === "nl" ? "Concept Observatie" : "Draft Observation"}</span>
+              <span className="ml-auto text-xs bg-orange-200 text-orange-800 px-2 py-0.5 rounded-full font-medium">
+                {msg.issue_confirm_language === "nl" ? "Te bevestigen" : "Pending"}
+              </span>
+            </div>
+            
+            {/* Observation Details */}
+            <div className="p-3">
+              {(() => {
+                const isNl = msg.issue_confirm_language === "nl";
+                const content = msg.content || "";
+                const summary = msg.issue_summary || "";
+                
+                // Parse the summary to extract Equipment, Issue Type, Description
+                const lines = summary.split('\n');
+                let equipment = "";
+                let issueType = "";
+                let description = "";
+                
+                lines.forEach(line => {
+                  if (line.includes('**Equipment:**') || line.includes('**Apparatuur:**')) {
+                    equipment = line.replace(/\*\*Equipment:\*\*|\*\*Apparatuur:\*\*/g, '').trim();
+                  } else if (line.includes('**Issue Type:**') || line.includes('**Type storing:**') || line.includes('**Storingstype:**')) {
+                    issueType = line.replace(/\*\*Issue Type:\*\*|\*\*Type storing:\*\*|\*\*Storingstype:\*\*/g, '').trim();
+                  } else if (line.includes('**Description:**') || line.includes('**Beschrijving:**')) {
+                    description = line.replace(/\*\*Description:\*\*|\*\*Beschrijving:\*\*/g, '').trim();
+                  }
+                });
+                
+                return (
+                  <>
+                    {/* Title/Issue Type */}
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h4 className="font-semibold text-slate-900 text-sm leading-tight">
+                        {issueType || (isNl ? "Nieuwe Observatie" : "New Observation")}
+                      </h4>
+                      <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
+                        {isNl ? "Concept" : "Draft"}
+                      </span>
                     </div>
-                  )}
-                </>
-              );
-            })()}
+                    
+                    {/* Details */}
+                    <div className="space-y-1.5 text-xs text-slate-600 mb-3">
+                      {equipment && (
+                        <div className="flex items-center gap-1.5">
+                          <Wrench className="w-3.5 h-3.5 text-orange-400" />
+                          <span><strong>{isNl ? "Apparatuur:" : "Equipment:"}</strong> {equipment}</span>
+                        </div>
+                      )}
+                      {issueType && (
+                        <div className="flex items-center gap-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5 text-orange-400" />
+                          <span><strong>{isNl ? "Storingstype:" : "Issue Type:"}</strong> {issueType}</span>
+                        </div>
+                      )}
+                      {description && (
+                        <div className="flex items-start gap-1.5 mt-2">
+                          <MessageSquare className="w-3.5 h-3.5 text-orange-400 mt-0.5" />
+                          <div>
+                            <strong>{isNl ? "Beschrijving:" : "Description:"}</strong>
+                            <p className="text-slate-700 mt-0.5">{description}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    {isInteractive && (
+                      <div className="flex flex-wrap gap-2 pt-2 border-t border-orange-100">
+                        <button
+                          type="button"
+                          onClick={() => sendMutation.mutate({ content: "accept", image: null })}
+                          disabled={isSending}
+                          className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
+                          data-testid="issue-confirm-accept-btn"
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                          {isNl ? "Accepteren" : "Accept"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            textareaRef.current?.focus();
+                            setMessage(isNl ? "Wijzig: " : "Change: ");
+                          }}
+                          disabled={isSending}
+                          className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white border border-orange-300 text-orange-700 text-sm font-medium hover:bg-orange-50 disabled:opacity-50 transition-colors"
+                          data-testid="issue-confirm-revise-btn"
+                        >
+                          {isNl ? "Aanpassen" : "Revise"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              setIsSending(true);
+                              await chatAPI.cancelFlow();
+                              queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
+                              queryClient.invalidateQueries({ queryKey: ["threats"] });
+                            } catch (e) {
+                              toast.error("Cancel failed");
+                            } finally {
+                              setIsSending(false);
+                            }
+                          }}
+                          disabled={isSending}
+                          className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white border border-red-300 text-red-600 text-sm font-medium hover:bg-red-50 disabled:opacity-50 transition-colors"
+                          data-testid="issue-confirm-cancel-btn"
+                        >
+                          {isNl ? "Annuleren" : "Cancel"}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
           </div>
         )}
         {/* Show content for non-threat messages */}
