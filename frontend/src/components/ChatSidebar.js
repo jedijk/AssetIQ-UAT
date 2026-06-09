@@ -761,7 +761,13 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 {msg.threat_failure_mode && (
                   <div className="flex items-center gap-1.5">
                     <AlertTriangle className="w-3 h-3 text-slate-400" />
-                    <span><strong>Issue:</strong> {msg.threat_failure_mode}</span>
+                    <span><strong>Failure Mode:</strong> {msg.threat_failure_mode}</span>
+                  </div>
+                )}
+                {msg.threat_description && (
+                  <div className="flex items-start gap-1.5 mt-1">
+                    <MessageSquare className="w-3 h-3 text-slate-400 mt-0.5" />
+                    <span><strong>What's happening:</strong> {msg.threat_description}</span>
                   </div>
                 )}
                 {msg.threat_risk_score && (
@@ -911,7 +917,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                           data-testid="issue-confirm-accept-btn"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                          {isNl ? "Bevestig" : "Looks Good"}
+                          {isNl ? "Accepteren" : "Accept"}
                         </button>
                         <button
                           type="button"
@@ -923,7 +929,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                           className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-white border border-orange-300 text-orange-700 text-xs font-medium hover:bg-orange-50 disabled:opacity-50 transition-colors"
                           data-testid="issue-confirm-revise-btn"
                         >
-                          {isNl ? "Aanpassen" : "Edit"}
+                          {isNl ? "Aanpassen" : "Revise"}
                         </button>
                         <button
                           type="button"
