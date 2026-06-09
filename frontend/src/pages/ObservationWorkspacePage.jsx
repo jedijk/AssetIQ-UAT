@@ -300,6 +300,10 @@ const TimelineEventCard = ({ event, isCurrent }) => {
   const config = getEventConfig(event.event_type);
   const Icon = config.icon;
   
+  // For actions/work orders, show the action_type (PM, CM, PDM, etc.)
+  const isAction = event.event_type === "action" || event.event_type === "work_order";
+  const actionType = event.action_type || event.task_type || event.type;
+  
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
     try {
@@ -324,6 +328,7 @@ const TimelineEventCard = ({ event, isCurrent }) => {
     try { tooltipParts.push(format(parseISO(event.date), "PPP")); } catch (_) { tooltipParts.push(event.date); }
   }
   if (config.label) tooltipParts.push(config.label);
+  if (actionType) tooltipParts.push(`Type: ${actionType}`);
   if (event.reference_id) tooltipParts.push(event.reference_id);
   if (event.status) tooltipParts.push(`Status: ${event.status}`);
   if (event.description) tooltipParts.push(event.description);
@@ -349,8 +354,15 @@ const TimelineEventCard = ({ event, isCurrent }) => {
         <Icon className="w-4 h-4" />
       </div>
       
+      {/* Action Type Badge (for actions/work orders) */}
+      {isAction && actionType && (
+        <div className="text-[9px] font-semibold mt-1 px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+          {actionType}
+        </div>
+      )}
+      
       {/* Event Title */}
-      <div className={`text-[11px] font-medium mt-2 text-center max-w-[120px] truncate leading-tight ${
+      <div className={`text-[11px] font-medium ${isAction && actionType ? 'mt-1' : 'mt-2'} text-center max-w-[120px] truncate leading-tight ${
         isCurrent ? "text-blue-700 font-semibold" : "text-slate-700"
       }`}>
         {event.title?.substring(0, 25) || config.label}
@@ -433,15 +445,19 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
         <div className="space-y-2 max-h-[300px] overflow-y-auto">
           {events?.map((event, index) => {
             const config = {
-              observation: { icon: AlertTriangle, color: "amber" },
-              failure: { icon: XCircle, color: "red" },
-              work_order: { icon: Wrench, color: "blue" },
-              action: { icon: Wrench, color: "blue" },
-              inspection: { icon: Eye, color: "green" },
-              repair: { icon: Wrench, color: "purple" },
-              investigation: { icon: FileSearch, color: "indigo" },
-            }[event.event_type] || { icon: CircleDot, color: "slate" };
+              observation: { icon: AlertTriangle, color: "amber", label: "Observation" },
+              failure: { icon: XCircle, color: "red", label: "Failure" },
+              work_order: { icon: Wrench, color: "blue", label: "Action" },
+              action: { icon: Wrench, color: "blue", label: "Action" },
+              inspection: { icon: Eye, color: "green", label: "Inspection" },
+              repair: { icon: Wrench, color: "purple", label: "Repair" },
+              investigation: { icon: FileSearch, color: "indigo", label: "Investigation" },
+            }[event.event_type] || { icon: CircleDot, color: "slate", label: "Event" };
             const Icon = config.icon;
+            
+            // For actions/work orders, show the action_type (PM, CM, PDM, etc.)
+            const isAction = event.event_type === "action" || event.event_type === "work_order";
+            const actionType = event.action_type || event.task_type || event.type;
             
             return (
               <div 
@@ -461,6 +477,16 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
                   <Icon className={`w-4 h-4 text-${config.color}-600`} />
                 </div>
                 <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    {isAction && actionType && (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                        {actionType}
+                      </span>
+                    )}
+                    {!isAction && (
+                      <span className="text-[10px] text-slate-500">{config.label}</span>
+                    )}
+                  </div>
                   <div className="font-medium text-sm text-slate-900 truncate">{event.title}</div>
                   <div className="text-xs text-slate-500">
                     {event.date && format(parseISO(event.date), "MMM d, yyyy")}
