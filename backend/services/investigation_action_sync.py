@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Optional
 import uuid
 
-from db import db
+from database import db
 
 
 INVESTIGATION_ACTION_TITLE = "Complete causal investigation"

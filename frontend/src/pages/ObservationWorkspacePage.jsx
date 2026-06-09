@@ -1294,11 +1294,15 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
           {actions.slice(0, 5).map((action) => {
             const status = statusConfig[action.status?.toLowerCase()] || statusConfig.open;
             const actionType = normalizeActionType(action.action_type);
+            const isInvestigationAction = !!action.linked_investigation_id;
 
             return (
               <div 
                 key={action.id}
-                className="p-2 rounded-lg bg-slate-50 border border-slate-100 hover:border-slate-200 transition-colors group"
+                className={`p-2 rounded-lg bg-slate-50 border border-slate-100 hover:border-slate-200 transition-colors group ${isInvestigationAction ? "cursor-pointer hover:bg-purple-50" : ""}`}
+                onClick={isInvestigationAction ? () => navigate(`/causal-engine?id=${action.linked_investigation_id}`) : undefined}
+                title={isInvestigationAction ? "Open linked investigation" : undefined}
+                data-testid={`action-plan-item-${action.id}`}
               >
                 <div className="flex items-start gap-2">
                   {/* Left: Info */}

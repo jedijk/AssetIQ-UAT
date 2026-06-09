@@ -741,6 +741,7 @@ async def get_action_plan(observation_id: str) -> List[dict]:
             "due_date": action.get("due_date", ""),
             "comments": action.get("comments", ""),
             "recommendation_id": action.get("recommendation_id"),
+            "linked_investigation_id": action.get("linked_investigation_id"),
         })
     
     return action_plan

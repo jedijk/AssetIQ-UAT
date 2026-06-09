@@ -993,8 +993,16 @@ async def create_investigation_from_threat(
     await _assert_threat_installation_scope(current_user, threat)
     
     # Check if investigation already exists for this threat
-    existing = await db.investigations.find_one({"threat_id": threat_id})
+    existing = await db.investigations.find_one({"threat_id": threat_id}, {"_id": 0})
     if existing:
+        # Ensure the linked "Complete causal investigation" action exists for this
+        # threat (idempotent — no-op if it already does). Handles legacy
+        # investigations created before the auto-action wiring was in place.
+        try:
+            from services.investigation_action_sync import create_investigation_action
+            await create_investigation_action(existing.get("id"), threat_id, current_user)
+        except Exception as e:
+            logger.warning(f"Failed to backfill linked investigation action: {e}")
         return {"investigation": existing, "message": "Investigation already exists for this threat"}
     
     inv_id = str(uuid.uuid4())
@@ -1268,6 +1276,14 @@ async def create_investigation_from_threat(
     
     if action_items:
         await db.action_items.insert_many(action_items)
+    
+    # Auto-create the "Complete causal investigation" action linked to this
+    # investigation so it appears in the observation's action plan.
+    try:
+        from services.investigation_action_sync import create_investigation_action
+        await create_investigation_action(inv_id, threat_id, current_user)
+    except Exception as e:
+        logger.warning(f"Failed to create linked investigation action for {inv_id}: {e}")
     
     return {
         "investigation": inv_doc, 

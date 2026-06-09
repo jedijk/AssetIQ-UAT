@@ -456,6 +456,15 @@ async def update_investigation(
         update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
         await db.investigations.update_one({"id": inv_id}, {"$set": update_data})
     
+    # Sync the linked "Complete causal investigation" action's status whenever
+    # the investigation moves to in_progress / completed / closed.
+    if "status" in update_data:
+        try:
+            from services.investigation_action_sync import sync_action_to_investigation_status
+            await sync_action_to_investigation_status(inv_id, update_data["status"])
+        except Exception as e:
+            logger.warning(f"Failed to sync action status for investigation {inv_id}: {e}")
+    
     updated = await db.investigations.find_one({"id": inv_id}, {"_id": 0})
     return updated
 
@@ -475,14 +484,27 @@ async def delete_investigation(
     
     deleted_actions_count = 0
     
-    # Optionally delete linked Central Actions
+    # Per workspace policy: when the investigation is deleted, the linked
+    # "Complete causal investigation" action MUST be deleted too (regardless of
+    # the optional `delete_central_actions` flag, which still controls
+    # deletion of any *other* central actions linked to the investigation).
+    try:
+        from services.investigation_action_sync import delete_investigation_action
+        deleted_actions_count = await delete_investigation_action(inv_id)
+        if deleted_actions_count:
+            logger.info(f"Deleted {deleted_actions_count} linked investigation action(s) for {inv_id}")
+    except Exception as e:
+        logger.warning(f"Failed to delete linked investigation action for {inv_id}: {e}")
+    
+    # Optionally delete additional linked Central Actions (legacy flag — kept for
+    # backwards compatibility with callers that link multiple actions).
     if delete_central_actions:
         result = await db.central_actions.delete_many({
             "source_type": "investigation",
             "source_id": inv_id
         })
-        deleted_actions_count = result.deleted_count
-        logger.info(f"Deleted {deleted_actions_count} central actions linked to investigation {inv_id}")
+        deleted_actions_count += result.deleted_count
+        logger.info(f"Deleted {result.deleted_count} additional central actions linked to investigation {inv_id}")
     
     # Delete all related internal data (action_items are investigation-specific, not Central Actions)
     await db.timeline_events.delete_many({"investigation_id": inv_id})
