@@ -525,29 +525,28 @@ async def generate_translations(
     return {"success": True, "job_id": job.id, "status": "queued", "total": len(request.entity_ids)}
 
 
-@router.post("/generate-all/{entity_type}")
-async def generate_all_translations(
-    entity_type: EntityType,
-    background_tasks: BackgroundTasks,
-    target_languages: List[str] = ["nl", "de"],
-    only_missing: bool = True,
-    current_user: dict = Depends(_library_write)
-):
-    """
-    Bulk-translate ALL existing entities of a given type to the target languages.
-    Useful for legacy data that was created before auto-translation was enabled.
-    """
-    # Collect entity IDs from the appropriate source collection
+LEGACY_BULK_ENTITY_TYPES = [
+    EntityType.FAILURE_MODE,
+    EntityType.EQUIPMENT_TYPE,
+    EntityType.EQUIPMENT_NODE,
+    EntityType.MAINTENANCE_TASK_TEMPLATE,
+    EntityType.OBSERVATION,
+    EntityType.INVESTIGATION,
+    EntityType.FORM_TEMPLATE,
+    EntityType.ACTION,
+]
+
+
+async def _collect_entity_ids(entity_type: EntityType) -> List[str]:
+    """Collect entity IDs from source collections for bulk translation."""
     entity_ids: List[str] = []
-    
+
     if entity_type == EntityType.FAILURE_MODE:
-        # Use failure_mode NAME as the canonical entity_id (matches existing storage scheme)
         async for fm in db.failure_modes.find({}, {"failure_mode": 1, "_id": 0}):
             name = fm.get("failure_mode")
             if name:
                 entity_ids.append(name)
     elif entity_type == EntityType.EQUIPMENT_TYPE:
-        # Include built-in iso14224 types
         try:
             from iso14224_models import EQUIPMENT_TYPES as _BUILTIN_EQ_TYPES
             for et in _BUILTIN_EQ_TYPES:
@@ -561,7 +560,6 @@ async def generate_all_translations(
         async for et in db.equipment_types.find({}, {"id": 1, "_id": 0}):
             if et.get("id"):
                 entity_ids.append(et["id"])
-        # Deduplicate
         entity_ids = list(dict.fromkeys(entity_ids))
     elif entity_type == EntityType.EQUIPMENT_NODE:
         async for n in db.equipment_nodes.find({}, {"id": 1, "_id": 0}):
@@ -590,66 +588,146 @@ async def generate_all_translations(
                 entity_ids.append(ft["id"])
     else:
         raise HTTPException(status_code=400, detail=f"Bulk translation not supported for entity_type {entity_type}")
-    
-    # Optionally filter out IDs that already have FULL field coverage in all target languages
+
+    return entity_ids
+
+
+async def _filter_only_missing_entities(
+    entity_type: EntityType,
+    entity_ids: List[str],
+    target_languages: List[str],
+) -> List[str]:
+    """Return entity IDs that still lack full translation coverage."""
+    from services.translation_service import TRANSLATABLE_FIELDS
+
+    expected_fields = set(TRANSLATABLE_FIELDS.get(entity_type, []))
+    complete_ids: set = set()
+    if expected_fields:
+        coverage_map: Dict[str, Dict[str, set]] = {}
+        pipeline = [
+            {"$match": {
+                "entity_type": entity_type.value,
+                "entity_id": {"$in": entity_ids},
+                "language_code": {"$in": target_languages},
+            }},
+            {"$group": {
+                "_id": {"entity_id": "$entity_id", "language_code": "$language_code"},
+                "fields": {"$addToSet": "$field_name"},
+            }},
+        ]
+        async for doc in db.entity_translations.aggregate(pipeline):
+            eid = doc["_id"]["entity_id"]
+            lang = doc["_id"]["language_code"]
+            coverage_map.setdefault(eid, {})[lang] = set(doc.get("fields", []))
+        for eid, lang_map in coverage_map.items():
+            if all(
+                expected_fields.issubset(lang_map.get(lang, set()))
+                for lang in target_languages
+            ):
+                complete_ids.add(eid)
+    else:
+        pipeline = [
+            {"$match": {
+                "entity_type": entity_type.value,
+                "entity_id": {"$in": entity_ids},
+                "language_code": {"$in": target_languages},
+            }},
+            {"$group": {
+                "_id": "$entity_id",
+                "langs": {"$addToSet": "$language_code"},
+            }},
+        ]
+        async for doc in db.entity_translations.aggregate(pipeline):
+            if set(target_languages).issubset(set(doc.get("langs", []))):
+                complete_ids.add(doc["_id"])
+    return [eid for eid in entity_ids if eid not in complete_ids]
+
+
+async def _enqueue_bulk_translation(
+    entity_type: EntityType,
+    target_languages: List[str],
+    only_missing: bool,
+    background_tasks: BackgroundTasks,
+    current_user: dict,
+) -> Dict[str, Any]:
+    entity_ids = await _collect_entity_ids(entity_type)
     if only_missing and entity_ids:
-        # Field config drives which fields need translating (see translation_service.TRANSLATION_FIELDS)
-        from services.translation_service import TRANSLATABLE_FIELDS
-        expected_fields = set(TRANSLATABLE_FIELDS.get(entity_type, []))
-        complete_ids: set = set()
-        if expected_fields:
-            # entity_id -> {language_code -> set(field_name)}
-            coverage_map: Dict[str, Dict[str, set]] = {}
-            pipeline = [
-                {"$match": {
-                    "entity_type": entity_type.value,
-                    "entity_id": {"$in": entity_ids},
-                    "language_code": {"$in": target_languages},
-                }},
-                {"$group": {
-                    "_id": {"entity_id": "$entity_id", "language_code": "$language_code"},
-                    "fields": {"$addToSet": "$field_name"},
-                }},
-            ]
-            async for doc in db.entity_translations.aggregate(pipeline):
-                eid = doc["_id"]["entity_id"]
-                lang = doc["_id"]["language_code"]
-                coverage_map.setdefault(eid, {})[lang] = set(doc.get("fields", []))
-            # An entity is "complete" only when every target lang has every expected field
-            for eid, lang_map in coverage_map.items():
-                if all(
-                    expected_fields.issubset(lang_map.get(lang, set()))
-                    for lang in target_languages
-                ):
-                    complete_ids.add(eid)
-        else:
-            # Fallback to legacy behaviour: any translation in all target langs means complete
-            pipeline = [
-                {"$match": {
-                    "entity_type": entity_type.value,
-                    "entity_id": {"$in": entity_ids},
-                    "language_code": {"$in": target_languages},
-                }},
-                {"$group": {
-                    "_id": "$entity_id",
-                    "langs": {"$addToSet": "$language_code"},
-                }},
-            ]
-            async for doc in db.entity_translations.aggregate(pipeline):
-                if set(target_languages).issubset(set(doc.get("langs", []))):
-                    complete_ids.add(doc["_id"])
-        entity_ids = [eid for eid in entity_ids if eid not in complete_ids]
-    
+        entity_ids = await _filter_only_missing_entities(entity_type, entity_ids, target_languages)
+
     if not entity_ids:
-        return {"success": True, "message": "Nothing to translate – everything is up to date", "total": 0}
-    
-    # Re-use the standard /generate endpoint logic
+        return {
+            "entity_type": entity_type.value,
+            "total": 0,
+            "status": "skipped",
+            "message": "Nothing to translate – everything is up to date",
+        }
+
     req = GenerateTranslationsRequest(
         entity_type=entity_type,
         entity_ids=entity_ids,
         target_languages=target_languages,
     )
-    return await generate_translations(req, background_tasks, current_user)
+    result = await generate_translations(req, background_tasks, current_user)
+    return {
+        "entity_type": entity_type.value,
+        "total": result.get("total") or len(entity_ids),
+        "status": result.get("status", "queued"),
+        "job_id": result.get("job_id") or (result.get("job") or {}).get("id"),
+    }
+
+
+@router.post("/generate-all/{entity_type}")
+async def generate_all_translations(
+    entity_type: EntityType,
+    background_tasks: BackgroundTasks,
+    target_languages: List[str] = ["nl", "de"],
+    only_missing: bool = True,
+    current_user: dict = Depends(_library_write)
+):
+    """
+    Bulk-translate ALL existing entities of a given type to the target languages.
+    Useful for legacy data that was created before auto-translation was enabled.
+    Set only_missing=false to rebuild translations for every legacy record.
+    """
+    result = await _enqueue_bulk_translation(
+        entity_type, target_languages, only_missing, background_tasks, current_user
+    )
+    if result.get("status") == "skipped":
+        return {"success": True, "message": result["message"], "total": 0}
+    return {
+        "success": True,
+        "job_id": result.get("job_id"),
+        "status": result.get("status", "queued"),
+        "total": result.get("total", 0),
+    }
+
+
+@router.post("/build-legacy")
+async def build_legacy_translations(
+    background_tasks: BackgroundTasks,
+    target_languages: List[str] = ["nl", "de"],
+    only_missing: bool = False,
+    current_user: dict = Depends(_library_write)
+):
+    """
+    Queue translation jobs for all legacy entity types in the database.
+    Defaults to only_missing=false so every existing record is (re)translated.
+    """
+    summaries = []
+    total_queued = 0
+    for entity_type in LEGACY_BULK_ENTITY_TYPES:
+        result = await _enqueue_bulk_translation(
+            entity_type, target_languages, only_missing, background_tasks, current_user
+        )
+        summaries.append(result)
+        total_queued += result.get("total") or 0
+
+    return {
+        "success": True,
+        "only_missing": only_missing,
+        "total_queued": total_queued,
+        "summaries": summaries,
+    }
 
 
 
@@ -823,9 +901,22 @@ async def get_translation_coverage(
     _ensure("failure_mode")
     coverage["failure_mode"]["total"] = fm_count
 
-    et_count = await db.custom_equipment_types.count_documents({})
+    et_ids: set = set()
+    try:
+        from iso14224_models import EQUIPMENT_TYPES as _BUILTIN_EQ_TYPES
+        for et in _BUILTIN_EQ_TYPES:
+            if et.get("id"):
+                et_ids.add(et["id"])
+    except Exception:
+        pass
+    async for et in db.custom_equipment_types.find({}, {"id": 1}):
+        if et.get("id"):
+            et_ids.add(et["id"])
+    async for et in db.equipment_types.find({}, {"id": 1}):
+        if et.get("id"):
+            et_ids.add(et["id"])
     _ensure("equipment_type")
-    coverage["equipment_type"]["total"] = et_count
+    coverage["equipment_type"]["total"] = len(et_ids)
 
     task_count = 0
     async for strategy in db.equipment_type_strategies.find({}):
@@ -848,6 +939,10 @@ async def get_translation_coverage(
     form_count = await db.form_templates.count_documents({})
     _ensure("form_template")
     coverage["form_template"]["total"] = form_count
+
+    action_count = await db.central_actions.count_documents({})
+    _ensure("action")
+    coverage["action"]["total"] = action_count
 
     # Cap by_language[L] at total so we never exceed 100% (e.g. stale orphan translations)
     for et in coverage:

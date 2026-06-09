@@ -26,6 +26,7 @@ const ENTITY_TYPES = [
   { id: "maintenance_task_template", label: "Maintenance Tasks" },
   { id: "observation",               label: "Observations" },
   { id: "investigation",             label: "Investigations" },
+  { id: "action",                    label: "Actions" },
   { id: "form_template",             label: "Form Templates" },
 ];
 
@@ -73,6 +74,7 @@ function CoverageCard({ entityType, data, languages }) {
 function CoverageTab() {
   const queryClient = useQueryClient();
   const [generating, setGenerating] = useState(null); // entity_type id while bulk generation in flight
+  const [buildingLegacy, setBuildingLegacy] = useState(false);
 
   const { data: covData, isLoading: covLoading, refetch: refetchCov } = useQuery({
     queryKey: ["translation-coverage"],
@@ -88,12 +90,14 @@ function CoverageTab() {
   });
 
   const generateAll = useMutation({
-    mutationFn: async (entityType) => {
-      const r = await api.post(`/translations/generate-all/${entityType}?only_missing=true&target_languages=nl&target_languages=de`);
+    mutationFn: async ({ entityType, onlyMissing = true }) => {
+      const r = await api.post(
+        `/translations/generate-all/${entityType}?only_missing=${onlyMissing}&target_languages=nl&target_languages=de`
+      );
       return r.data;
     },
-    onMutate: (entityType) => setGenerating(entityType),
-    onSuccess: (data, entityType) => {
+    onMutate: ({ entityType }) => setGenerating(entityType),
+    onSuccess: (data, { entityType }) => {
       const total = data?.total;
       const msg = total === 0
         ? `${entityType}: nothing to translate – already up to date`
@@ -104,10 +108,33 @@ function CoverageTab() {
       queryClient.invalidateQueries({ queryKey: ["translation-coverage"] });
       queryClient.invalidateQueries({ queryKey: ["translation-jobs"] });
     },
-    onError: (e, entityType) => {
+    onError: (e, { entityType }) => {
       toast.error(`Failed to start ${entityType}: ${e.response?.data?.detail || e.message}`);
     },
     onSettled: () => setGenerating(null),
+  });
+
+  const buildLegacy = useMutation({
+    mutationFn: async () => {
+      const r = await api.post("/translations/build-legacy?only_missing=false&target_languages=nl&target_languages=de");
+      return r.data;
+    },
+    onMutate: () => setBuildingLegacy(true),
+    onSuccess: (data) => {
+      const total = data?.total_queued ?? 0;
+      const skipped = (data?.summaries || []).filter(s => s.status === "skipped").length;
+      if (total === 0) {
+        toast.success("All legacy data is already translated");
+      } else {
+        toast.success(`Queued ${total} legacy entities across ${ENTITY_TYPES.length - skipped} entity types`);
+      }
+      queryClient.invalidateQueries({ queryKey: ["translation-coverage"] });
+      queryClient.invalidateQueries({ queryKey: ["translation-jobs"] });
+    },
+    onError: (e) => {
+      toast.error(`Failed to build legacy translations: ${e.response?.data?.detail || e.message}`);
+    },
+    onSettled: () => setBuildingLegacy(false),
   });
 
   const coverage = covData?.coverage || {};
@@ -116,6 +143,28 @@ function CoverageTab() {
 
   return (
     <div className="space-y-6">
+      <div className="border border-blue-200 rounded-lg p-4 bg-blue-50/60">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">Build legacy translations</h3>
+            <p className="text-xs text-slate-600 mt-0.5">
+              Queue AI translation for every existing record in the database (NL + DE), including records that already have translations.
+            </p>
+          </div>
+          <Button
+            onClick={() => buildLegacy.mutate()}
+            disabled={buildingLegacy || buildLegacy.isPending}
+            data-testid="build-legacy-btn"
+          >
+            {buildingLegacy ? (
+              <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Building…</>
+            ) : (
+              <><Sparkles className="w-3.5 h-3.5 mr-1.5" /> Build all legacy</>
+            )}
+          </Button>
+        </div>
+      </div>
+
       {/* Summary */}
       <div>
         <div className="flex items-center justify-between mb-3">
@@ -134,20 +183,32 @@ function CoverageTab() {
             {ENTITY_TYPES.map(et => (
               <div key={et.id} className="space-y-2">
                 <CoverageCard entityType={et} data={coverage[et.id]} languages={targetLanguages} />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full text-xs"
-                  disabled={generating === et.id || generateAll.isPending}
-                  onClick={() => generateAll.mutate(et.id)}
-                  data-testid={`generate-all-${et.id}`}
-                >
-                  {generating === et.id ? (
-                    <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Queuing…</>
-                  ) : (
-                    <><Sparkles className="w-3.5 h-3.5 mr-1.5" /> Translate missing</>
-                  )}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-xs"
+                    disabled={generating === et.id || generateAll.isPending || buildingLegacy}
+                    onClick={() => generateAll.mutate({ entityType: et.id, onlyMissing: true })}
+                    data-testid={`generate-all-${et.id}`}
+                  >
+                    {generating === et.id ? (
+                      <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Queuing…</>
+                    ) : (
+                      <><Sparkles className="w-3.5 h-3.5 mr-1.5" /> Missing only</>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-xs"
+                    disabled={generating === et.id || generateAll.isPending || buildingLegacy}
+                    onClick={() => generateAll.mutate({ entityType: et.id, onlyMissing: false })}
+                    data-testid={`rebuild-all-${et.id}`}
+                  >
+                    Rebuild all
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

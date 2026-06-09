@@ -13,7 +13,7 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Form, File
+from fastapi import APIRouter, Depends, Form, File, HTTPException
 from database import db, failure_modes_service
 from auth import get_current_user, require_permission
 from models.api_models import (
@@ -273,7 +273,11 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
         "rank": rank,
         "total_threats": total,
         "status": "Open",
-        "recommended_actions": obs_data.get("recommended_actions", (fmea_data.get("recommended_actions", []) if isinstance(fmea_data, dict) else [])),
+        "recommended_actions": (
+            obs_data.get("recommended_actions")
+            or (fmea_data.get("recommended_actions", []) if isinstance(fmea_data, dict) else [])
+            or []
+        ),
         "created_by": user_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "occurrence_count": 1,
@@ -426,6 +430,26 @@ def _issue_confirm_language_code(detected_lang: str) -> str:
     return "nl" if detected_lang == "nl" else "en"
 
 
+def _threat_to_response(threat: dict) -> ThreatResponse:
+    """Normalize a threat document before Pydantic validation."""
+    data = dict(threat or {})
+    if isinstance(data.get("risk_score"), float):
+        data["risk_score"] = int(data["risk_score"])
+    if data.get("recommended_actions") is None:
+        data["recommended_actions"] = []
+    data.setdefault("rank", 1)
+    data.setdefault("total_threats", 1)
+    data.setdefault("occurrence_count", 1)
+    data.setdefault("impact", "Equipment Damage")
+    data.setdefault("frequency", "First Time")
+    data.setdefault("likelihood", "Possible")
+    data.setdefault("detectability", "Moderate")
+    data.setdefault("status", "Open")
+    data.setdefault("created_by", "")
+    data.setdefault("created_at", datetime.now(timezone.utc).isoformat())
+    return ThreatResponse(**data)
+
+
 def _issue_confirm_ui_lang_from_copy(summary: str, issue_body: str, fallback: str) -> str:
     """
     Match issue-confirm chrome (intro + buttons) to the language users actually read
@@ -567,7 +591,7 @@ async def _finalize_chat_machine_result(
 
         return ChatResponse(
             message=context_prompt,
-            threat=ThreatResponse(**threat),
+            threat=_threat_to_response(threat),
             follow_up_question=context_prompt,
             question_type="context",
             awaiting_context_for_threat=new_threat_id,
@@ -1100,9 +1124,22 @@ async def send_chat_message(
 ):
     session_id = f"user_{current_user['id']}_{datetime.now(timezone.utc).strftime('%Y%m%d')}"
     detected_lang = message.language or detect_language(message.content)
-    return await _core_chat_process(
-        current_user["id"], message.content, session_id, detected_lang, message.image_base64
-    )
+    try:
+        return await _core_chat_process(
+            current_user["id"], message.content, session_id, detected_lang, message.image_base64
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(
+            "chat/send failed for user %s: %s",
+            current_user.get("id"),
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Chat processing failed. Please try again.",
+        ) from exc
 
 
 @router.get("/chat/history")

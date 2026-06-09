@@ -103,6 +103,28 @@ const translationsAPI = {
     const response = await api.post('/translations/generate', request);
     return response.data;
   },
+
+  /**
+   * Bulk-translate all entities of a given type
+   */
+  generateAll: async (entityType, { onlyMissing = true, targetLanguages = ['nl', 'de'] } = {}) => {
+    const params = new URLSearchParams();
+    params.set('only_missing', String(onlyMissing));
+    targetLanguages.forEach((lang) => params.append('target_languages', lang));
+    const response = await api.post(`/translations/generate-all/${entityType}?${params.toString()}`);
+    return response.data;
+  },
+
+  /**
+   * Queue translation jobs for all legacy entity types in the database
+   */
+  buildLegacy: async ({ onlyMissing = false, targetLanguages = ['nl', 'de'] } = {}) => {
+    const params = new URLSearchParams();
+    params.set('only_missing', String(onlyMissing));
+    targetLanguages.forEach((lang) => params.append('target_languages', lang));
+    const response = await api.post(`/translations/build-legacy?${params.toString()}`);
+    return response.data;
+  },
   
   /**
    * Update a translation
