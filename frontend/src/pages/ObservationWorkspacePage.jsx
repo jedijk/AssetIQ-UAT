@@ -835,7 +835,6 @@ const EditActionDialog = ({ action, open, onClose, onSave, isSaving }) => {
   // Re-initialise form once the full action data arrives
   useEffect(() => {
     if (fullAction) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm({
         title: fullAction.title || "",
         description: fullAction.description || "",
