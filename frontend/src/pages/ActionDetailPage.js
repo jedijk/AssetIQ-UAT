@@ -264,6 +264,18 @@ export default function ActionDetailPage() {
               >
                 <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </Button>
+
+              {/* Delete Button — icon-only */}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setDeleteConfirm(true)}
+                className="h-7 sm:h-8 px-2 text-red-500 hover:text-red-700 hover:bg-red-50"
+                title="Delete action"
+                data-testid="action-delete-icon-btn"
+              >
+                <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </Button>
               
               {/* Quick Status Buttons */}
               {action.status !== "completed" && (
@@ -308,49 +320,6 @@ export default function ActionDetailPage() {
             
             {/* LEFT COLUMN - Main content (spans 7 cols on desktop) */}
             <div className="lg:col-span-7 space-y-3">
-              {/* Source & Scores + Status Row - Compact header */}
-              <div className="bg-white rounded-lg border border-slate-200 p-3">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  {/* Source Link */}
-                  {action.source_type && action.source_id && (
-                    <button
-                      onClick={() => {
-                        if (action.source_type === "investigation") navigate(`/causal-engine?inv=${action.source_id}`);
-                        else if (action.source_type === "threat" || action.source_type === "ai_recommendation") navigate(`/threats/${action.source_id}`);
-                      }}
-                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-50 hover:bg-slate-100 transition-colors text-xs text-slate-600"
-                    >
-                      <SourceIcon className={`w-3 h-3 ${sourceConfig[action.source_type]?.color}`} />
-                      <span className="font-medium">{sourceConfig[action.source_type]?.label}:</span>
-                      <span className="truncate max-w-[120px] lg:max-w-[200px]">{action.source_name || "Unknown"}</span>
-                      <ExternalLink className="w-2.5 h-2.5 text-slate-400" />
-                    </button>
-                  )}
-                  
-                  {/* Scores */}
-                  <div className="flex items-center gap-3">
-                    {action.threat_risk_score != null && (
-                      <div className="text-center">
-                        <div className="text-[10px] text-slate-400 uppercase">Score</div>
-                        <div className={`text-sm font-bold ${
-                          action.threat_risk_score >= 70 ? "text-red-600" :
-                          action.threat_risk_score >= 50 ? "text-orange-500" : "text-green-500"
-                        }`}>{action.threat_risk_score}</div>
-                      </div>
-                    )}
-                    {action.threat_rpn != null && (
-                      <div className="text-center">
-                        <div className="text-[10px] text-slate-400 uppercase">RPN</div>
-                        <div className={`text-sm font-bold ${
-                          action.threat_rpn >= 200 ? "text-red-600" :
-                          action.threat_rpn >= 100 ? "text-orange-500" : "text-blue-500"
-                        }`}>{action.threat_rpn}</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
               {/* Title & Description - Compact */}
               <div className="bg-white rounded-lg border border-slate-200 p-3 space-y-2">
                 <div>
@@ -372,31 +341,19 @@ export default function ActionDetailPage() {
                 </div>
               </div>
 
-              {/* Comments & Completion Notes - Side by side on desktop */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                <div className="bg-white rounded-lg border border-slate-200 p-3">
-                  <label className="text-[10px] font-medium text-slate-400 uppercase mb-0.5 block">Comments</label>
-                  <Textarea
-                    value={editForm.comments}
-                    onChange={(e) => setEditForm({ ...editForm, comments: e.target.value })}
-                    placeholder="Notes..."
-                    rows={2}
-                    className="text-sm resize-none min-h-[50px]"
-                  />
-                </div>
-                <div className="bg-white rounded-lg border border-slate-200 p-3">
-                  <label className="text-[10px] font-medium text-slate-400 uppercase mb-0.5 block flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3 text-green-500" />
-                    Completion Notes
-                  </label>
-                  <Textarea
-                    value={editForm.completion_notes}
-                    onChange={(e) => setEditForm({ ...editForm, completion_notes: e.target.value })}
-                    placeholder="How was this resolved?"
-                    rows={2}
-                    className="text-sm resize-none min-h-[50px]"
-                  />
-                </div>
+              {/* Completion Notes — full width */}
+              <div className="bg-white rounded-lg border border-slate-200 p-3">
+                <label className="text-[10px] font-medium text-slate-400 uppercase mb-0.5 block flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-green-500" />
+                  Completion Notes
+                </label>
+                <Textarea
+                  value={editForm.completion_notes}
+                  onChange={(e) => setEditForm({ ...editForm, completion_notes: e.target.value })}
+                  placeholder="How was this resolved?"
+                  rows={3}
+                  className="text-sm resize-none min-h-[70px]"
+                />
               </div>
 
               {/* Attachments Section - Compact */}
@@ -458,37 +415,19 @@ export default function ActionDetailPage() {
 
             {/* RIGHT COLUMN - Metadata & Actions (spans 5 cols on desktop) */}
             <div className="lg:col-span-5 space-y-3 mt-3 lg:mt-0">
-              {/* Status & Priority - Inline */}
+              {/* Status */}
               <div className="bg-white rounded-lg border border-slate-200 p-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] font-medium text-slate-400 uppercase mb-0.5 block">Status</label>
-                    <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="open">Open</SelectItem>
-                        <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-medium text-slate-400 uppercase mb-0.5 block">Priority</label>
-                    <Select value={editForm.priority} onValueChange={(v) => setEditForm({ ...editForm, priority: v })}>
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="critical">Critical</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="low">Low</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                <label className="text-[10px] font-medium text-slate-400 uppercase mb-0.5 block">Status</label>
+                <Select value={editForm.status} onValueChange={(v) => setEditForm({ ...editForm, status: v })}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="in_progress">In Progress</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Type & Discipline - Inline */}
@@ -558,9 +497,9 @@ export default function ActionDetailPage() {
               </div>
 
               {/* Action Buttons */}
-              <div className="space-y-2 pt-2 border-t border-slate-200">
-                {/* Create Recurring Task Button - Only for PM actions */}
-                {editForm.action_type === "PM" && (
+              {editForm.action_type === "PM" && (
+                <div className="pt-2 border-t border-slate-200">
+                  {/* Create Recurring Task Button - Only for PM actions */}
                   <Button
                     variant="outline"
                     size="sm"
@@ -584,19 +523,8 @@ export default function ActionDetailPage() {
                     <CalendarClock className="w-3 h-3 mr-1.5" />
                     Create Recurring Task
                   </Button>
-                )}
-
-                {/* Delete Button */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full text-red-600 border-red-200 hover:bg-red-50 h-8 text-xs"
-                  onClick={() => setDeleteConfirm(true)}
-                >
-                  <Trash2 className="w-3 h-3 mr-1.5" />
-                  Delete Action
-                </Button>
-              </div>
+                </div>
+              )}
             </div>
           </div>
         </motion.div>
