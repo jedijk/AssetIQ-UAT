@@ -456,21 +456,21 @@ const ObservationDetailsSection = ({ threatId }) => {
   };
   
   const actionBar = (
-    <div className="flex items-center justify-between flex-wrap gap-3 w-full" data-testid="workspace-actions-bar">
-      <div className="flex items-center gap-2 flex-wrap">
+    <div className="flex items-center justify-between flex-wrap gap-1.5 sm:gap-3 w-full" data-testid="workspace-actions-bar">
+      <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
         {threat.equipment_tag && (
           <button
             onClick={() => handleTagClick(threat.equipment_tag)}
-            className="text-xs text-slate-600 font-mono bg-slate-100 px-2 py-1 rounded hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-pointer flex items-center gap-1"
+            className="text-[10px] sm:text-xs text-slate-600 font-mono bg-slate-100 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-pointer flex items-center gap-1"
             title="Click to find in hierarchy"
           >
-            <Search className="w-3 h-3" />
+            <Search className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
             {threat.equipment_tag}
           </button>
         )}
         {threat.created_at && (
-          <span className="flex items-center gap-1 text-xs text-slate-500">
-            <Clock className="w-3 h-3" />
+          <span className="flex items-center gap-1 text-[10px] sm:text-xs text-slate-500">
+            <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
             {formatDateTime(threat.created_at)}
           </span>
         )}
@@ -504,7 +504,7 @@ const ObservationDetailsSection = ({ threatId }) => {
         )}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 sm:gap-2">
         {isEditing ? (
           <>
             <Button size="sm" variant="outline" onClick={cancelEditing} data-testid="cancel-edit-btn">
@@ -536,8 +536,8 @@ const ObservationDetailsSection = ({ threatId }) => {
                 ))}
               </SelectContent>
             </Select>
-            <Button size="sm" variant="ghost" onClick={shareLink} title="Share" data-testid="workspace-share-btn" className="h-8 w-8 p-0">
-              <Share2 className="w-4 h-4" />
+            <Button size="sm" variant="ghost" onClick={shareLink} title="Share" data-testid="workspace-share-btn" className="h-6 w-6 sm:h-8 sm:w-8 p-0">
+              <Share2 className="w-3 h-3 sm:w-4 sm:h-4" />
             </Button>
             <Button
               size="sm"
@@ -545,9 +545,9 @@ const ObservationDetailsSection = ({ threatId }) => {
               onClick={startEditing}
               data-testid="workspace-edit-btn"
               title="Edit observation"
-              className="h-8 w-8 sm:w-auto p-0 sm:px-3"
+              className="h-6 w-6 sm:h-8 sm:w-auto p-0 sm:px-3"
             >
-              <Edit className="w-3.5 h-3.5 sm:mr-1" />
+              <Edit className="w-3 h-3 sm:w-3.5 sm:h-3.5 sm:mr-1" />
               <span className="hidden sm:inline">Edit</span>
             </Button>
             <Button
@@ -556,14 +556,14 @@ const ObservationDetailsSection = ({ threatId }) => {
               onClick={() => setShowDeleteDialog(true)}
               title="Delete observation"
               data-testid="workspace-delete-btn"
-              className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+              className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" data-testid="workspace-more-menu">
-                  <MoreVertical className="w-4 h-4" />
+                <Button size="sm" variant="ghost" className="h-6 w-6 sm:h-8 sm:w-8 p-0" data-testid="workspace-more-menu">
+                  <MoreVertical className="w-3 h-3 sm:w-4 sm:h-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
