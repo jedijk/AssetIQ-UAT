@@ -95,7 +95,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import AttachmentsPanel from "../attachments/AttachmentsPanel";
 
 const LIKELIHOOD_OPTIONS = ["Rare", "Unlikely", "Possible", "Likely", "Almost Certain"];
 const DETECTABILITY_OPTIONS = ["Easy", "Moderate", "Difficult", "Very Difficult", "Almost Impossible"];
@@ -181,6 +180,8 @@ const ObservationDetailsSection = ({ threatId }) => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const attachmentInputRef = useRef(null);
+  const [showAttList, setShowAttList] = useState(false);
+  const [previewAtt, setPreviewAtt] = useState(null);
 
   // --- Mutations ------------------------------------------------------------
   const updateMutation = useMutation({
@@ -443,6 +444,8 @@ const ObservationDetailsSection = ({ threatId }) => {
     { label: t("observations.frequency"), value: translateEnum(threat.frequency), icon: Clock, field: "frequency", type: "select", options: FREQUENCY_OPTIONS },
     { label: "Discipline", value: disciplineDisplay, icon: Cog, field: "discipline", type: "discipline-select" },
   ];
+
+  const attachmentCount = ((isEditing ? editForm.attachments : threat.attachments) || []).length;
 
   // --- Render ---------------------------------------------------------------
   const actionBar = (
@@ -726,18 +729,69 @@ const ObservationDetailsSection = ({ threatId }) => {
           {threat.context_added_at && !isEditing && (
             <span className="text-xs text-slate-400">added {formatDateTime(threat.context_added_at)}</span>
           )}
-          {/* Paperclip — attach files without leaving the page. In view mode the upload is committed
-              immediately; in edit mode it stages in editForm.attachments until Save. */}
-          <button
-            type="button"
-            onClick={() => attachmentInputRef.current?.click()}
-            className="ml-auto inline-flex items-center gap-1 text-slate-500 hover:text-blue-600 text-xs px-2 py-1 rounded-md hover:bg-slate-50 transition-colors"
-            title="Attach files"
-            data-testid="description-attach-btn"
-          >
-            <Paperclip className="w-3.5 h-3.5" />
-            Attach
-          </button>
+          {/* Paperclip badge — shows attachment count; click to expand list. */}
+          <div className="ml-auto relative">
+            <button
+              type="button"
+              onClick={() => setShowAttList((s) => !s)}
+              className="inline-flex items-center gap-1 text-slate-500 hover:text-blue-600 text-xs px-2 py-1 rounded-md hover:bg-slate-50 transition-colors relative"
+              title={attachmentCount ? `${attachmentCount} attachment${attachmentCount > 1 ? "s" : ""}` : "Attach files"}
+              data-testid="description-attach-btn"
+            >
+              <Paperclip className="w-3.5 h-3.5" />
+              {attachmentCount > 0 ? (
+                <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-semibold bg-blue-600 text-white">
+                  {attachmentCount}
+                </span>
+              ) : (
+                <span>Attach</span>
+              )}
+            </button>
+            {/* List of attachment titles */}
+            {showAttList && attachmentCount > 0 && (
+              <div className="absolute right-0 top-full mt-1 z-30 w-64 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
+                <div className="max-h-64 overflow-y-auto py-1">
+                  {((isEditing ? editForm.attachments : threat.attachments) || []).map((a) => (
+                    <div
+                      key={a.id}
+                      className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 text-xs group"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => { setPreviewAtt(a); setShowAttList(false); }}
+                        className="flex-1 min-w-0 flex items-center gap-2 text-left text-slate-700 hover:text-blue-600"
+                      >
+                        <Paperclip className="w-3 h-3 flex-shrink-0 opacity-60" />
+                        <span className="truncate">{a.name || a.filename || "Attachment"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const filtered = ((isEditing ? editForm.attachments : threat.attachments) || []).filter((x) => x.id !== a.id);
+                          if (isEditing) {
+                            setEditForm((prev) => ({ ...prev, attachments: filtered }));
+                          } else {
+                            updateMutation.mutate({ attachments: filtered });
+                          }
+                        }}
+                        className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500"
+                        title="Remove"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { attachmentInputRef.current?.click(); setShowAttList(false); }}
+                  className="w-full px-3 py-2 text-xs text-blue-600 hover:bg-blue-50 border-t border-slate-100 flex items-center gap-1"
+                >
+                  <Paperclip className="w-3 h-3" /> Attach more files
+                </button>
+              </div>
+            )}
+          </div>
           <input
             ref={attachmentInputRef}
             type="file"
@@ -784,35 +838,55 @@ const ObservationDetailsSection = ({ threatId }) => {
         ) : (
           <p className="text-slate-400 text-sm italic">No description recorded.</p>
         )}
-        {/* Attachments list (below description) */}
-        {((isEditing ? editForm.attachments : threat.attachments) || []).length > 0 && (
-          <div className="mt-3 pt-3 border-t border-slate-100">
-            <AttachmentsPanel
-              title=""
-              items={isEditing ? editForm.attachments : (threat.attachments || [])}
-              editable={isEditing}
-              isUploading={uploadingPhoto}
-              getKey={(a) => a?.id}
-              getName={(a) => a?.name || a?.filename || "Attachment"}
-              getUrl={(a) => a?.data}
-              getContentType={(a) => a?.mime || a?.content_type || a?.type}
-              onAddFiles={() => attachmentInputRef.current?.click()}
-              onRemove={(_raw, idToRemove) => {
-                if (isEditing) {
-                  setEditForm((prev) => ({
-                    ...prev,
-                    attachments: (prev.attachments || []).filter((a) => a?.id !== idToRemove),
-                  }));
-                } else {
-                  updateMutation.mutate({
-                    attachments: (threat.attachments || []).filter((a) => a?.id !== idToRemove),
-                  });
-                }
-              }}
-            />
-          </div>
-        )}
+        {/* Attachments are now shown only as a count badge on the paperclip; clicking
+            a file title opens a preview dialog. No mini-thumbnails. */}
       </div>
+
+      {/* Attachment preview dialog */}
+      {previewAtt && (
+        <Dialog open={!!previewAtt} onOpenChange={(o) => !o && setPreviewAtt(null)}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Paperclip className="w-4 h-4 text-blue-600" />
+                <span className="truncate">{previewAtt.name || previewAtt.filename || "Attachment"}</span>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 overflow-auto flex items-center justify-center bg-slate-50 rounded-lg">
+              {(() => {
+                const ct = previewAtt.mime || previewAtt.content_type || previewAtt.type || "";
+                const url = previewAtt.data;
+                if (!url) return <div className="text-sm text-slate-400 p-8">No preview available</div>;
+                if (ct.startsWith("image/")) {
+                  return <img src={url} alt={previewAtt.name} className="max-w-full max-h-[70vh] object-contain" />;
+                }
+                if (ct.includes("pdf")) {
+                  return <iframe src={url} title={previewAtt.name} className="w-full h-[70vh] bg-white" />;
+                }
+                if (ct.startsWith("video/")) {
+                  return <video src={url} controls className="max-w-full max-h-[70vh]" />;
+                }
+                if (ct.startsWith("audio/")) {
+                  return <audio src={url} controls className="w-full" />;
+                }
+                return (
+                  <div className="text-center p-8 text-sm text-slate-500">
+                    <Paperclip className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <div>Preview not available for this file type.</div>
+                    <a
+                      href={url}
+                      download={previewAtt.name}
+                      className="inline-block mt-3 px-3 py-1.5 bg-blue-600 text-white rounded-md text-xs font-medium hover:bg-blue-700"
+                    >
+                      Download
+                    </a>
+                  </div>
+                );
+              })()}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Probable Cause section removed per user request. The `cause` field is still
           editable via the Edit form (kept in editForm.cause for backwards compatibility). */}
