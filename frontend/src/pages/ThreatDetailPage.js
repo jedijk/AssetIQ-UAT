@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { threatsAPI, actionsAPI, equipmentHierarchyAPI, failureModesAPI, usersAPI } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useEquipmentNodeNameMap, useEquipmentTypeNameMap, useFailureModeNameMap } from "../hooks/useTranslatedEntities";
@@ -252,7 +253,7 @@ const ThreatDetailPage = () => {
 
   // Fetch threat - refetch on mount to get latest criticality
   const { data: threat, isLoading, error, refetch: refetchThreat } = useQuery({
-    queryKey: ["threat", id],
+    queryKey: queryKeys.threats.legacyDetail(id),
     queryFn: () => threatsAPI.getById(id),
     refetchOnMount: "always", // Always refetch when component mounts
     staleTime: 0, // Consider data always stale
@@ -262,7 +263,7 @@ const ThreatDetailPage = () => {
 
   // Fetch equipment hierarchy nodes for Asset dropdown
   const { data: equipmentNodesData } = useQuery({
-    queryKey: ["equipment-nodes"],
+    queryKey: queryKeys.equipment.nodes(),
     queryFn: equipmentHierarchyAPI.getNodes,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
@@ -270,7 +271,7 @@ const ThreatDetailPage = () => {
 
   // Fetch equipment types for Equipment Type dropdown
   const { data: equipmentTypesData } = useQuery({
-    queryKey: ["equipment-types"],
+    queryKey: queryKeys.equipment.types(),
     queryFn: equipmentHierarchyAPI.getEquipmentTypes,
     staleTime: 5 * 60 * 1000,
   });
@@ -278,7 +279,7 @@ const ThreatDetailPage = () => {
 
   // Fetch failure modes for Failure Mode dropdown
   const { data: failureModesData } = useQuery({
-    queryKey: ["failure-modes-all"],
+    queryKey: queryKeys.failureModes.allForLookup(),
     queryFn: () => failureModesAPI.getAll({}),
     staleTime: 5 * 60 * 1000,
   });
@@ -286,7 +287,7 @@ const ThreatDetailPage = () => {
   
   // Fetch users for Owner dropdown
   const { data: usersData } = useQuery({
-    queryKey: ["rbac-users"],
+    queryKey: queryKeys.users.rbac(),
     queryFn: usersAPI.getAll,
     staleTime: 5 * 60 * 1000,
   });
@@ -416,16 +417,18 @@ const ThreatDetailPage = () => {
         data: { oldData, newData: variables },
         undo: async () => {
           await threatsAPI.update(id, oldData);
-          queryClient.invalidateQueries({ queryKey: ["threat", id] });
-          queryClient.invalidateQueries({ queryKey: ["threats"] });
-          queryClient.invalidateQueries({ queryKey: ["threatTimeline", id] });
-          queryClient.invalidateQueries({ queryKey: ["stats"] });
+          queryClient.invalidateQueries({ queryKey: queryKeys.threats.legacyDetail(id) });
+          queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+          queryClient.invalidateQueries({ queryKey: queryKeys.threats.timeline(id) });
+          queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(id) });
+          queryClient.invalidateQueries({ queryKey: queryKeys.stats.all() });
         },
       });
-      queryClient.invalidateQueries({ queryKey: ["threat", id] });
-      queryClient.invalidateQueries({ queryKey: ["threats"] });
-      queryClient.invalidateQueries({ queryKey: ["threatTimeline", id] });
-      queryClient.invalidateQueries({ queryKey: ["stats"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.legacyDetail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.timeline(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all() });
       toast.success(t("observations.observationUpdated"));
       setIsEditing(false);
     },
@@ -438,8 +441,8 @@ const ThreatDetailPage = () => {
   const deleteMutation = useMutation({
     mutationFn: () => threatsAPI.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["threats"] });
-      queryClient.invalidateQueries({ queryKey: ["stats"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all() });
       toast.success(t("observations.observationDeleted"));
       navigate("/threats");
     },
@@ -452,9 +455,10 @@ const ThreatDetailPage = () => {
   const linkEquipmentMutation = useMutation({
     mutationFn: ({ threatId, equipmentNodeId }) => threatsAPI.linkToEquipment(threatId, equipmentNodeId),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["threat", id] });
-      queryClient.invalidateQueries({ queryKey: ["threats"] });
-      queryClient.invalidateQueries({ queryKey: ["threatTimeline", id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.legacyDetail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.timeline(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(id) });
       toast.success(
         t("observations.linkedEquipmentToast")
           .replace("{asset}", data.threat.asset)
@@ -482,9 +486,10 @@ const ThreatDetailPage = () => {
   const linkFailureModeMutation = useMutation({
     mutationFn: ({ threatId, failureModeId }) => threatsAPI.linkToFailureMode(threatId, failureModeId),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["threat", id] });
-      queryClient.invalidateQueries({ queryKey: ["threats"] });
-      queryClient.invalidateQueries({ queryKey: ["threatTimeline", id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.legacyDetail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.timeline(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(id) });
       toast.success(
         t("observations.linkedFailureModeToast")
           .replace("{failureMode}", data.threat.failure_mode)

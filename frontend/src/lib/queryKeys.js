@@ -14,6 +14,8 @@ export const queryKeys = {
   actions: {
     all: () => ["actions"],
     detail: (id) => ["actions", id],
+    /** Legacy singular key used by action detail page */
+    legacyDetail: (id) => ["action", id],
     linked: (threatId) => ["actions", "linked", threatId],
     linkedToThreat: (threatId) => ["linked-actions", threatId],
   },
@@ -30,10 +32,19 @@ export const queryKeys = {
   equipment: {
     nodes: () => ["equipment-nodes"],
     types: () => ["equipment-types"],
+    files: (nodeId) => ["equipment-files", nodeId],
   },
   users: {
     rbac: () => ["rbac-users"],
     preferences: () => ["user-preferences"],
+  },
+  stats: {
+    all: () => ["stats"],
+  },
+  equipmentHistory: {
+    /** Prefix invalidation for all equipment history queries */
+    all: () => ["equipmentHistory"],
+    detail: (equipmentId) => ["equipmentHistory", equipmentId],
   },
   failureModes: {
     list: () => ["failure-modes-list"],

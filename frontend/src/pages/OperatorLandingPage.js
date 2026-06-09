@@ -14,6 +14,7 @@ import {
   getApiDisciplineParam,
   resolveMyTasksDisciplines,
 } from "../lib/myTasksFilterUtils";
+import { queryKeys } from "../lib/queryKeys";
 
 const haptic = () => {
   try {
@@ -43,7 +44,7 @@ export default function OperatorLandingPage() {
   
   // Fetch user preferences to get discipline filter
   const { data: preferences } = useQuery({
-    queryKey: ["user-preferences"],
+    queryKey: queryKeys.users.preferences(),
     queryFn: preferencesAPI.getPreferences,
     staleTime: 60000,
   });

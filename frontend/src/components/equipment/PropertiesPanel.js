@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useEquipmentNodeIdMap } from "../../hooks/useTranslatedEntities";
 import { failureModesAPI, qrCodeAPI, equipmentHierarchyAPI, definitionsAPI } from "../../lib/api";
+import { queryKeys } from "../../lib/queryKeys";
 import {
   Settings, Cog, Check, Edit, GripVertical, Trash2, ChevronDown, Sparkles, Eye, Search, AlertTriangle, QrCode, Info,
   Paperclip, Upload, Download, FileText, Image, File as FileIcon, X, ClipboardList,
@@ -227,7 +228,7 @@ function EquipmentFiles({ equipmentId }) {
   const [previewFile, setPreviewFile] = useState(null);
 
   const { data } = useQuery({
-    queryKey: ["equipment-files", equipmentId],
+    queryKey: queryKeys.equipment.files(equipmentId),
     queryFn: () => equipmentHierarchyAPI.getEquipmentFiles(equipmentId),
     enabled: !!equipmentId,
   });
@@ -235,7 +236,7 @@ function EquipmentFiles({ equipmentId }) {
   const uploadMutation = useMutation({
     mutationFn: (file) => equipmentHierarchyAPI.uploadEquipmentFile(equipmentId, file),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["equipment-files", equipmentId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.equipment.files(equipmentId) });
       toast.success(t("equipment.fileUploaded"));
     },
     onError: (e) => toast.error(e.response?.data?.detail || t("equipment.uploadFailed")),
@@ -244,7 +245,7 @@ function EquipmentFiles({ equipmentId }) {
   const deleteMutation = useMutation({
     mutationFn: (fileId) => equipmentHierarchyAPI.deleteEquipmentFile(fileId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["equipment-files", equipmentId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.equipment.files(equipmentId) });
       toast.success(t("equipment.fileDeleted"));
     },
     onError: () => toast.error(t("equipment.deleteFailed")),

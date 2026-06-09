@@ -779,49 +779,49 @@ button:active:not(:disabled), [role="button"]:active:not(:disabled), .btn:active
     display: none;  /* Chrome, Safari and Opera */
 }
 
-/* Workspace recommended-actions AI button glow */
+/* Workspace recommended-actions AI button glow (subtle purple pulse) */
 .ai-recommendation-glow-ring {
     position: absolute;
-    inset: -4px;
+    inset: -0.8px;
     border-radius: 0.5rem;
-    background: linear-gradient(135deg, #818cf8, #a78bfa, #6366f1);
-    opacity: 0.55;
-    animation: aiRecommendationRing 2.2s ease-in-out infinite;
+    background: linear-gradient(135deg, #c084fc, #a855f7, #9333ea);
+    opacity: 0.35;
+    animation: aiRecommendationRing 3.14s ease-in-out infinite;
     z-index: 0;
     pointer-events: none;
 }
 
 .ai-recommendation-glow-btn {
-    animation: aiRecommendationGlow 2.2s ease-in-out infinite;
+    animation: aiRecommendationGlow 3.14s ease-in-out infinite;
 }
 
 .ai-recommendation-sparkle-icon {
-    animation: aiRecommendationSparkle 2.2s ease-in-out infinite;
+    animation: aiRecommendationSparkle 3.14s ease-in-out infinite;
 }
 
 @keyframes aiRecommendationRing {
     0%, 100% {
         transform: scale(1);
-        opacity: 0.4;
-        filter: blur(2px);
+        opacity: 0.25;
+        filter: blur(0.5px);
     }
     50% {
-        transform: scale(1.2);
-        opacity: 0.75;
-        filter: blur(5px);
+        transform: scale(1.04);
+        opacity: 0.45;
+        filter: blur(1px);
     }
 }
 
 @keyframes aiRecommendationGlow {
     0%, 100% {
         box-shadow:
-            0 0 0 0 rgba(99, 102, 241, 0.45),
-            0 0 10px rgba(129, 140, 248, 0.35);
+            0 0 0 0 rgba(147, 51, 234, 0.3),
+            0 0 2px rgba(168, 85, 247, 0.25);
     }
     50% {
         box-shadow:
-            0 0 0 6px rgba(99, 102, 241, 0),
-            0 0 20px rgba(167, 139, 250, 0.6);
+            0 0 0 1.2px rgba(147, 51, 234, 0),
+            0 0 4px rgba(192, 132, 252, 0.4);
     }
 }
 
@@ -831,8 +831,8 @@ button:active:not(:disabled), [role="button"]:active:not(:disabled), .btn:active
         opacity: 1;
     }
     50% {
-        transform: scale(1.15);
-        opacity: 0.9;
+        transform: scale(1.03);
+        opacity: 0.95;
     }
 }
 
@@ -844,7 +844,7 @@ button:active:not(:disabled), [role="button"]:active:not(:disabled), .btn:active
     }
 
     .ai-recommendation-glow-btn {
-        box-shadow: 0 0 10px rgba(129, 140, 248, 0.4);
+        box-shadow: 0 0 2px rgba(168, 85, 247, 0.35);
     }
 }
 

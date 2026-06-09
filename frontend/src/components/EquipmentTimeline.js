@@ -32,6 +32,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { equipmentHierarchyAPI, threatsAPI } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { useLanguage } from "../contexts/LanguageContext";
 
 // Timeline item colors and icons - lighter colors
@@ -343,7 +344,9 @@ const EquipmentTimeline = ({ equipmentId, equipmentName, threatId }) => {
   
   // Fetch from threat timeline if threatId provided, otherwise equipment history
   const { data, isLoading, error } = useQuery({
-    queryKey: threatId ? ["threatTimeline", threatId] : ["equipmentHistory", equipmentId],
+    queryKey: threatId
+      ? queryKeys.threats.timeline(threatId)
+      : queryKeys.equipmentHistory.detail(equipmentId),
     queryFn: () => threatId 
       ? threatsAPI.getTimeline(threatId)
       : equipmentHierarchyAPI.getEquipmentHistory(equipmentId),

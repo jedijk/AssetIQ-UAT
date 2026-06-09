@@ -815,7 +815,7 @@ const RecommendedActionsPanel = ({ recommendations, onAddToPlan, onAddToStrategy
                       size="sm"
                       onClick={onGenerateAI}
                       disabled={isGeneratingAI}
-                      className={`relative z-10 flex-shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white h-8 w-8 p-0 ${
+                      className={`relative z-10 flex-shrink-0 bg-purple-600 hover:bg-purple-700 text-white h-8 w-8 p-0 ${
                         isGeneratingAI ? "" : "ai-recommendation-glow-btn"
                       }`}
                       aria-label={t("ai.generateAiq")}

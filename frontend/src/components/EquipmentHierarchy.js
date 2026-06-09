@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { equipmentHierarchyAPI, threatsAPI } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useEquipmentNodeIdMap } from "../hooks/useTranslatedEntities";
 import { toast } from "sonner";
@@ -556,20 +557,20 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
   const levelLabel = getEquipmentLevelLabel(t, node.level, normalizeLevel);
 
   const { data: filesData } = useQuery({
-    queryKey: ["equipment-files", node.id],
+    queryKey: queryKeys.equipment.files(node.id),
     queryFn: () => equipmentHierarchyAPI.getEquipmentFiles(node.id),
     enabled: open && !!node.id,
   });
 
   const uploadMutation = useMutation({
     mutationFn: (file) => equipmentHierarchyAPI.uploadEquipmentFile(node.id, file),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["equipment-files", node.id] }); toast.success("File uploaded"); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.equipment.files(node.id) }); toast.success("File uploaded"); },
     onError: (e) => toast.error(e.response?.data?.detail || "Upload failed"),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (fileId) => equipmentHierarchyAPI.deleteEquipmentFile(fileId),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["equipment-files", node.id] }); toast.success("Deleted"); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: queryKeys.equipment.files(node.id) }); toast.success("Deleted"); },
     onError: () => toast.error("Delete failed"),
   });
 
@@ -911,21 +912,21 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, in
 
   // Fetch equipment hierarchy nodes
   const { data: nodesData, isLoading: nodesLoading } = useQuery({
-    queryKey: ["equipment-nodes"],
+    queryKey: queryKeys.equipment.nodes(),
     queryFn: equipmentHierarchyAPI.getNodes,
     staleTime: 30000,
   });
 
   // Fetch equipment types for details popup
   const { data: typesData } = useQuery({
-    queryKey: ["equipment-types"],
+    queryKey: queryKeys.equipment.types(),
     queryFn: equipmentHierarchyAPI.getEquipmentTypes,
     staleTime: 60000,
   });
 
   // Fetch threats to show counts
   const { data: threats = [] } = useQuery({
-    queryKey: ["threats"],
+    queryKey: queryKeys.threats.all(),
     queryFn: () => threatsAPI.getAll(),
   });
 

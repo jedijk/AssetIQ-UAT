@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { threatsAPI, statsAPI } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { useLanguage } from "../contexts/LanguageContext";
 import { usePermissions } from "../contexts/PermissionsContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -273,13 +274,13 @@ const ThreatsPage = () => {
 
   // Fetch stats
   const { data: stats } = useQuery({
-    queryKey: ["stats"],
+    queryKey: queryKeys.stats.all(),
     queryFn: statsAPI.get,
   });
 
   // Fetch threats (fetch all, filter client-side for multi-select)
   const { data: rawThreats = [], isLoading, error: threatsError, isFetching, refetch: refetchThreats } = useQuery({
-    queryKey: ["threats"],
+    queryKey: queryKeys.threats.all(),
     queryFn: async () => {
       const result = await threatsAPI.getAll(null);
       // Ensure we always return an array
@@ -341,7 +342,7 @@ const ThreatsPage = () => {
         // Stagger prefetch requests by 200ms each to avoid concurrent load
         setTimeout(() => {
           queryClient.prefetchQuery({
-            queryKey: ["threat", threat.id],
+            queryKey: queryKeys.threats.legacyDetail(threat.id),
             queryFn: () => threatsAPI.getById(threat.id),
             staleTime: 5 * 60 * 1000, // Keep prefetched data fresh for 5 minutes
           });
@@ -376,12 +377,12 @@ const ThreatsPage = () => {
   const deleteMutation = useMutation({
     mutationFn: ({ id, options }) => threatsAPI.delete(id, options),
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ["threats"] });
-      queryClient.invalidateQueries({ queryKey: ["stats"] });
-      queryClient.invalidateQueries({ queryKey: ["actions"] });
-      queryClient.invalidateQueries({ queryKey: ["investigations"] });
-      queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
-      queryClient.invalidateQueries({ queryKey: ["equipmentHistory"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.actions.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.timelineAll() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.equipmentHistory.all() });
       const actionsDeleted = result?.deleted_actions || 0;
       const investigationsDeleted = result?.deleted_investigations || 0;
       let msg = t("observations.deletedSuccess");
@@ -805,7 +806,7 @@ const ThreatsPage = () => {
 
                 const handleMouseEnter = () => {
                   queryClient.prefetchQuery({
-                    queryKey: ["threat", threat.id],
+                    queryKey: queryKeys.threats.legacyDetail(threat.id),
                     queryFn: () => threatsAPI.getById(threat.id),
                     staleTime: 5 * 60 * 1000,
                   });
@@ -912,7 +913,7 @@ const ThreatsPage = () => {
             // Prefetch threat details on hover
             const handleMouseEnter = () => {
               queryClient.prefetchQuery({
-                queryKey: ["threat", threat.id],
+                queryKey: queryKeys.threats.legacyDetail(threat.id),
                 queryFn: () => threatsAPI.getById(threat.id),
                 staleTime: 5 * 60 * 1000,
               });

@@ -47,6 +47,7 @@ import {
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
 import { actionsAPI } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { DocumentViewer } from "../components/DocumentViewer";
@@ -128,7 +129,7 @@ export default function ActionDetailPage() {
 
   // Fetch action details
   const { data: action, isLoading, error } = useQuery({
-    queryKey: ["action", actionId],
+    queryKey: queryKeys.actions.legacyDetail(actionId),
     queryFn: () => actionsAPI.getById(actionId),
     enabled: !!actionId,
   });
@@ -169,8 +170,8 @@ export default function ActionDetailPage() {
   const updateMutation = useMutation({
     mutationFn: (data) => actionsAPI.update(actionId, data),
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ["action", actionId] });
-      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.actions.legacyDetail(actionId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.actions.all() });
       toast.success("Action updated successfully");
       
       // Check if all actions for the source are now completed
@@ -185,7 +186,7 @@ export default function ActionDetailPage() {
   const deleteMutation = useMutation({
     mutationFn: () => actionsAPI.delete(actionId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.actions.all() });
       toast.success("Action deleted");
       navigate("/actions");
     },

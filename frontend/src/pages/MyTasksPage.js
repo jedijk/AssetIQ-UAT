@@ -110,6 +110,7 @@ import {
   preferenceFromDisciplines,
   resolveMyTasksDisciplines,
 } from "../lib/myTasksFilterUtils";
+import { queryKeys } from "../lib/queryKeys";
 import TaskExecutionFrame from "../components/task-execution/TaskExecutionFrame";
 import TaskCard, { SortableTaskCard } from "../components/task-execution/TaskCard";
 import { useSortable } from "@dnd-kit/sortable";
@@ -317,7 +318,7 @@ const MyTasksPage = () => {
   const userChangedDisciplineRef = useRef(false);
 
   const { data: preferences } = useQuery({
-    queryKey: ["user-preferences"],
+    queryKey: queryKeys.users.preferences(),
     queryFn: preferencesAPI.getPreferences,
     staleTime: 60000,
   });
@@ -325,7 +326,7 @@ const MyTasksPage = () => {
   const updateDisciplinePreference = useMutation({
     mutationFn: (discipline) => preferencesAPI.updatePreferences({ discipline }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["user-preferences"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.users.preferences() });
       queryClient.invalidateQueries({ queryKey: ["operatorTaskCounts"] });
     },
   });

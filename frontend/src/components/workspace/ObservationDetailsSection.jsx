@@ -198,14 +198,14 @@ const ObservationDetailsSection = ({ threatId }) => {
           queryClient.invalidateQueries({ queryKey: queryKeys.threats.legacyDetail(threatId) });
           queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
           queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(threatId) });
-          queryClient.invalidateQueries({ queryKey: ["stats"] });
+          queryClient.invalidateQueries({ queryKey: queryKeys.stats.all() });
         },
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.threats.legacyDetail(threatId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
       queryClient.invalidateQueries({ queryKey: queryKeys.threats.timeline(threatId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(threatId) });
-      queryClient.invalidateQueries({ queryKey: ["stats"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all() });
       toast.success(t("observations.observationUpdated"));
       setIsEditing(false);
     },
@@ -216,7 +216,7 @@ const ObservationDetailsSection = ({ threatId }) => {
     mutationFn: () => threatsAPI.delete(threatId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
-      queryClient.invalidateQueries({ queryKey: ["stats"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all() });
       toast.success(t("observations.observationDeleted"));
       navigate("/threats");
     },
