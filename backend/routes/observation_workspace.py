@@ -813,6 +813,7 @@ async def get_observation_workspace(
         lookup_filters.append({"equipment_tag": observation["equipment_tag"]})
     if observation.get("asset"):
         lookup_filters.append({"name": observation["asset"]})
+    
     for f in lookup_filters:
         equipment_node = await db.equipment_nodes.find_one(f, {"_id": 0})
         if equipment_node:
