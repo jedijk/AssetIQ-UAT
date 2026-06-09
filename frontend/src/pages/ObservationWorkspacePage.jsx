@@ -338,41 +338,41 @@ const TimelineEventCard = ({ event, isCurrent }) => {
 
   return (
     <div 
-      className="flex flex-col items-center cursor-pointer group flex-shrink-0 w-32"
+      className="flex flex-col items-center cursor-pointer group flex-shrink-0 w-16"
       onClick={handleClick}
       title={tooltip}
     >
       {/* Date */}
-      <div className="text-[11px] text-slate-500 mb-2 font-medium h-4 leading-4">
+      <div className="text-[9px] text-slate-500 mb-1 font-medium h-3 leading-3">
         {formatDate(event.date)}
       </div>
       
       {/* Event Circle — sits above the connector line; bg-white outer ring punches through the rail */}
-      <div className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center transition-transform group-hover:scale-105 ring-2 ring-white ${
+      <div className={`relative z-10 w-5 h-5 rounded-full flex items-center justify-center transition-transform group-hover:scale-105 ring-2 ring-white ${
         isCurrent 
-          ? "bg-blue-600 text-white shadow-md shadow-blue-200"
+          ? "bg-blue-600 text-white shadow-sm shadow-blue-200"
           : `bg-${config.color}-100 text-${config.color}-600`
       }`}>
-        <Icon className="w-4 h-4" />
+        <Icon className="w-2.5 h-2.5" />
       </div>
       
       {/* Action Type Badge (for actions/work orders) */}
       {isAction && actionType && (
-        <div className="text-[9px] font-semibold mt-1 px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+        <div className="text-[8px] font-semibold mt-0.5 px-1 py-px rounded bg-blue-100 text-blue-700">
           {actionType}
         </div>
       )}
       
       {/* Event Title */}
-      <div className={`text-[11px] font-medium ${isAction && actionType ? 'mt-1' : 'mt-2'} text-center max-w-[120px] truncate leading-tight ${
+      <div className={`text-[9px] font-medium ${isAction && actionType ? 'mt-0.5' : 'mt-1'} text-center max-w-[60px] truncate leading-tight ${
         isCurrent ? "text-blue-700 font-semibold" : "text-slate-700"
       }`}>
-        {event.title?.substring(0, 25) || config.label}
+        {event.title?.substring(0, 18) || config.label}
       </div>
       
       {/* Reference ID */}
       {event.reference_id && (
-        <div className="text-[10px] text-slate-400 mt-0.5 leading-none">
+        <div className="text-[8px] text-slate-400 mt-px leading-none">
           {event.reference_id}
         </div>
       )}
@@ -391,35 +391,35 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
   const currentEvent = events?.find(e => e.is_current);
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-3">
-      {/* Header - Compact */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <History className="w-4 h-4 text-slate-500" />
-          <h3 className="font-medium text-sm text-slate-700">Equipment History</h3>
+    <div className="bg-white rounded-lg border border-slate-200 px-2 py-1.5">
+      {/* Header — ultra compact */}
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-1.5">
+          <History className="w-3 h-3 text-slate-500" />
+          <h3 className="font-medium text-[11px] text-slate-700">Equipment History</h3>
           {events && events.length > 0 && (
-            <span className="text-xs text-slate-400">({events.length} events)</span>
+            <span className="text-[10px] text-slate-400">({events.length})</span>
           )}
         </div>
         
-        {/* View Toggle - Compact */}
-        <div className="flex items-center gap-1">
+        {/* View Toggle — ultra compact */}
+        <div className="flex items-center gap-0.5">
           <Button
             variant={viewMode === "timeline" ? "default" : "ghost"}
             size="sm"
             onClick={() => setViewMode("timeline")}
-            className="h-6 px-2 text-xs"
+            className="h-5 px-1.5 text-[10px]"
           >
-            <Calendar className="w-3 h-3 mr-1" />
+            <Calendar className="w-2.5 h-2.5 mr-0.5" />
             Timeline
           </Button>
           <Button
             variant={viewMode === "list" ? "default" : "ghost"}
             size="sm"
             onClick={() => setViewMode("list")}
-            className="h-6 px-2 text-xs"
+            className="h-5 px-1.5 text-[10px]"
           >
-            <List className="w-3 h-3 mr-1" />
+            <List className="w-2.5 h-2.5 mr-0.5" />
             List
           </Button>
         </div>
@@ -427,13 +427,13 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
 
       {/* Timeline View */}
       {viewMode === "timeline" && events && events.length > 0 ? (
-        <div className="relative px-2">
-          {/* Horizontal connector — aligned with the centre of the event circles.
-              Position math: date row (16px text + mb-2 = 8px) + half of circle (40/2 = 20px) = 44px. */}
-          <div className="pointer-events-none absolute left-0 right-0 h-px bg-slate-200" style={{ top: "44px" }} />
+        <div className="relative px-1">
+          {/* Horizontal connector — aligned with the centre of the (smaller) event circles.
+              Position math: date row (12px text + mb-1 = 4px) + half of circle (20/2 = 10px) = 26px. */}
+          <div className="pointer-events-none absolute left-0 right-0 h-px bg-slate-200" style={{ top: "26px" }} />
           
           {/* Events */}
-          <div className="flex items-start overflow-x-auto pb-2 gap-4 scrollbar-thin scrollbar-thumb-slate-300">
+          <div className="flex items-start overflow-x-auto pb-1 gap-2 scrollbar-thin scrollbar-thumb-slate-300">
             {events.slice(0, 10).map((event, index) => (
               <TimelineEventCard 
                 key={event.id || index}
@@ -444,7 +444,7 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
           </div>
         </div>
       ) : viewMode === "list" ? (
-        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+        <div className="space-y-1 max-h-[200px] overflow-y-auto">
           {events?.map((event, index) => {
             const config = {
               observation: { icon: AlertTriangle, color: "amber", label: "Observation" },
