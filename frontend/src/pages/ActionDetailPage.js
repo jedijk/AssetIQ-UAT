@@ -284,17 +284,16 @@ export default function ActionDetailPage() {
       >
         <Share2 className="w-4 h-4" />
       </Button>
-      {isMobile && (
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => setDeleteConfirm(true)}
-          className="h-9 w-9 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-          title="Delete action"
-        >
-          <Trash2 className="w-4 h-4" />
-        </Button>
-      )}
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={() => setDeleteConfirm(true)}
+        className="h-9 w-9 sm:h-8 sm:w-auto sm:px-2 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+        title="Delete action"
+        data-testid="action-delete-icon-btn"
+      >
+        <Trash2 className="w-4 h-4" />
+      </Button>
       {action.status !== "completed" && (
         <Button
           size="sm"
@@ -611,16 +610,6 @@ export default function ActionDetailPage() {
                   </Button>
                 )}
 
-                {/* Delete Button - desktop only (mobile uses header icon) */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`w-full text-red-600 border-red-200 hover:bg-red-50 h-9 sm:h-8 text-xs ${isMobile ? "hidden" : ""}`}
-                  onClick={() => setDeleteConfirm(true)}
-                >
-                  <Trash2 className="w-3 h-3 mr-1.5" />
-                  Delete Action
-                </Button>
               </div>
             </div>
 

@@ -1,26 +1,17 @@
 import { normalizeDiscipline } from "../constants/disciplines";
 
-export const TECHNICAL_DISCIPLINES = [
-  "rotating",
-  "static",
-  "piping",
-  "electrical",
-  "instrumentation",
-  "civil",
-  "laboratory",
-];
+/** Map stored preference to My Tasks multi-select state. */
+export function disciplinesFromPreference(discipline) {
+  if (!discipline) return [];
+  const normalized = normalizeDiscipline(discipline);
+  return normalized ? [normalized] : [discipline];
+}
 
-/** Default discipline filter for a user (matches My Tasks auto-seed). */
-export function getDefaultDisciplinesForUser(user) {
-  const raw = (user?.discipline || user?.department || user?.position || "")
-    .toString()
-    .trim()
-    .toLowerCase();
-  const isMaintenance = !!raw && /maintenance|onderhoud|wartung/.test(raw);
-  if (isMaintenance) return [...TECHNICAL_DISCIPLINES];
-  if (!raw) return [];
-  const normalized = normalizeDiscipline(raw);
-  return normalized ? [normalized] : [];
+/** Map My Tasks selection to preference API value; undefined = skip persist (multi-select). */
+export function preferenceFromDisciplines(selectedDisciplines) {
+  if (!selectedDisciplines?.length) return "all";
+  if (selectedDisciplines.length === 1) return selectedDisciplines[0];
+  return undefined;
 }
 
 export function itemMatchesDisciplines(item, selectedDisciplines) {

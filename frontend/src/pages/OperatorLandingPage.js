@@ -51,7 +51,7 @@ export default function OperatorLandingPage() {
   
   // Fetch user preferences to get discipline filter
   const { data: preferences } = useQuery({
-    queryKey: ["userPreferences"],
+    queryKey: ["user-preferences"],
     queryFn: preferencesAPI.getPreferences,
     staleTime: 60000,
   });

@@ -99,13 +99,15 @@ import {
 } from "../components/ui/dropdown-menu";
 import { cn } from "../lib/utils";
 import { useIsMobile } from "../hooks/useIsMobile";
-import { imageAnalysisAPI } from "../lib/api";
+import { imageAnalysisAPI, preferencesAPI } from "../lib/api";
 import { offlineStorage, useOfflineStatus } from "../services/offlineStorage";
-import { DISCIPLINES, getDisciplineLabel, normalizeDiscipline } from "../constants/disciplines";
+import { DISCIPLINES, getDisciplineLabel } from "../constants/disciplines";
 import {
+  disciplinesFromPreference,
   filterActiveWorkItems,
   getApiDisciplineParam,
   itemMatchesDisciplines,
+  preferenceFromDisciplines,
 } from "../lib/myTasksFilterUtils";
 import TaskExecutionFrame from "../components/task-execution/TaskExecutionFrame";
 import TaskCard, { SortableTaskCard } from "../components/task-execution/TaskCard";
@@ -310,6 +312,31 @@ const MyTasksPage = () => {
   const [viewMode, setViewMode] = useState("list"); // "list" or "execution"
   const [selectedDisciplines, setSelectedDisciplines] = useState([]);
   const [disciplineDropdownOpen, setDisciplineDropdownOpen] = useState(false);
+  const userChangedDisciplineRef = useRef(false);
+
+  const { data: preferences } = useQuery({
+    queryKey: ["user-preferences"],
+    queryFn: preferencesAPI.getPreferences,
+    staleTime: 60000,
+  });
+
+  const updateDisciplinePreference = useMutation({
+    mutationFn: (discipline) => preferencesAPI.updatePreferences({ discipline }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["user-preferences"] });
+      queryClient.invalidateQueries({ queryKey: ["operatorTaskCounts"] });
+    },
+  });
+
+  const persistDisciplineSelection = useCallback(
+    (nextDisciplines) => {
+      const discipline = preferenceFromDisciplines(nextDisciplines);
+      if (discipline !== undefined) {
+        updateDisciplinePreference.mutate(discipline);
+      }
+    },
+    [updateDisciplinePreference]
+  );
 
   const isMobileView = useIsMobile();
   const uaTouch =
@@ -450,26 +477,22 @@ const MyTasksPage = () => {
   // Available disciplines for filtering (from unified constants)
   const disciplines = DISCIPLINES;
 
-  // Auto-discipline filter based on the logged-in user.
-  // - If user is a "maintenance" role → covers ALL technical disciplines
-  //   (rotating, static, piping, electrical, instrumentation, civil, laboratory).
-  // - Otherwise → that single normalised discipline.
-  // The field is read from user.discipline (or user.department/position as fallback).
-  // User can still override via the dropdown — auto only seeds the initial filter.
-  const TECHNICAL_DISCIPLINES = ["rotating", "static", "piping", "electrical", "instrumentation", "civil", "laboratory"];
-  const userDisciplineRaw = (user?.discipline || user?.department || user?.position || "").toString().trim().toLowerCase();
-  const isMaintenanceUser = !!userDisciplineRaw && /maintenance|onderhoud|wartung/.test(userDisciplineRaw);
-  const userNormalisedDiscipline = !isMaintenanceUser && userDisciplineRaw
-    ? normalizeDiscipline(userDisciplineRaw)
-    : "";
-
   const toggleDiscipline = (value) => {
-    setSelectedDisciplines((prev) =>
-      prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value]
-    );
+    userChangedDisciplineRef.current = true;
+    setSelectedDisciplines((prev) => {
+      const next = prev.includes(value)
+        ? prev.filter((d) => d !== value)
+        : [...prev, value];
+      persistDisciplineSelection(next);
+      return next;
+    });
   };
 
-  const clearDisciplineFilter = () => setSelectedDisciplines([]);
+  const clearDisciplineFilter = () => {
+    userChangedDisciplineRef.current = true;
+    setSelectedDisciplines([]);
+    persistDisciplineSelection([]);
+  };
 
   const getDisciplineDisplayText = () => {
     if (selectedDisciplines.length === 0) return "All Disciplines";
@@ -481,18 +504,13 @@ const MyTasksPage = () => {
 
   const matchesDisciplineFilter = (item) => itemMatchesDisciplines(item, selectedDisciplines);
 
-  // Seed selectedDisciplines once from user discipline unless they already picked.
+  // Seed discipline filter from user preferences (shared with operator landing badge).
   useEffect(() => {
-    if (selectedDisciplines.length > 0) return;
-    if (isMaintenanceUser) {
-      setSelectedDisciplines(TECHNICAL_DISCIPLINES);
+    if (!preferences || userChangedDisciplineRef.current || selectedDisciplines.length > 0) {
       return;
     }
-    if (userNormalisedDiscipline) {
-      setSelectedDisciplines([userNormalisedDiscipline]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+    setSelectedDisciplines(disciplinesFromPreference(preferences.discipline));
+  }, [preferences, selectedDisciplines.length]);
   
   // Fetch tasks with offline caching
   const { data: tasksData, isLoading: tasksLoading, error: tasksError, refetch: refetchTasks } = useQuery({
