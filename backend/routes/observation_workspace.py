@@ -338,16 +338,20 @@ async def calculate_alarp_progress(observation_id: str, actions: list, investiga
 
     progress = min(progress, 100)
 
-    if progress >= 100:
+    # Status label reflects the furthest journey stage reached rather than an
+    # arbitrary percentage bucket — easier for the user to read at a glance.
+    if learning_done:
         status = "Learning Complete"
-    elif progress >= 90:
-        status = "ALARP Achieved"
-    elif progress >= 70:
-        status = "Approaching ALARP"
-    elif progress >= 40:
-        status = "In Progress"
+    elif total_actions > 0 and completed_count == total_actions:
+        status = "Mitigated"
+    elif total_actions > 0 and completed_count > 0:
+        status = "In Action"
+    elif planning_done:
+        status = "In Planning"
+    elif assessment_done:
+        status = "In Assessment"
     else:
-        status = "Not Started"
+        status = "Observation"
 
     return {
         "percentage": progress,

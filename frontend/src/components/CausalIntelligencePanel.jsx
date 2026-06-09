@@ -157,7 +157,7 @@ const CauseCard = ({ cause, index, t }) => {
   );
 };
 
-export default function CausalIntelligencePanel({ threatId, threatData }) {
+export default function CausalIntelligencePanel({ threatId, threatData, autoGenerate = false }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { t } = useLanguage();
@@ -316,6 +316,20 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
   const handleGenerate = () => {
     generateMutation.mutate();
   };
+
+  // Auto-trigger generation when autoGenerate is true and no analysis exists yet
+  useEffect(() => {
+    if (
+      autoGenerate &&
+      !loadingCausal &&
+      !causalData &&
+      !generateMutation.isPending &&
+      !generateMutation.data
+    ) {
+      generateMutation.mutate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoGenerate, loadingCausal, causalData]);
 
   const handleStartInvestigation = () => {
     const displayData = generateMutation.data || causalData;
