@@ -97,30 +97,30 @@ export default function OperatorLandingPage() {
         </div>
       </div>
 
-      <div className="operator-landing-actions flex flex-col gap-4 px-6 pb-8 w-full max-w-xs mx-auto">
-        <div className="operator-landing-my-tasks-slot">
-          <button
-            onClick={handleClick(() => navigate("/my-tasks"))}
-            className="flex items-center justify-center gap-3 rounded-2xl p-6 bg-orange-400 text-white w-full shadow-lg shadow-orange-400/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
-            data-testid="operator-btn-my-tasks"
-          >
-            <ClipboardCheck className="w-8 h-8" strokeWidth={2} />
-            <span className="text-sm font-semibold tracking-wide">{t("nav.myTasks")}</span>
-          </button>
-          <span
-            className={`operator-landing-tasks-badge text-xs font-bold rounded-full min-w-[24px] h-6 flex items-center justify-center px-1.5 shadow-md ${
-              badge > 0
-                ? "bg-red-500 text-white"
-                : "bg-white/90 text-orange-700 border border-orange-200/80"
-            }`}
-            data-testid="tasks-badge"
-            aria-label={t("simpleMode.openTasksAria").replace("{count}", badge)}
-          >
-            {badge > 99 ? "99+" : badge}
-          </span>
-        </div>
+      <div className="operator-landing-actions px-6 pb-8 w-full max-w-xs mx-auto">
+        <div className="grid grid-cols-2 gap-4 w-full pt-2">
+          <div className="operator-landing-my-tasks-slot col-span-2">
+            <button
+              onClick={handleClick(() => navigate("/my-tasks"))}
+              className="flex items-center justify-center gap-3 rounded-2xl p-6 bg-orange-400 text-white w-full shadow-lg shadow-orange-400/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
+              data-testid="operator-btn-my-tasks"
+            >
+              <ClipboardCheck className="w-8 h-8" strokeWidth={2} />
+              <span className="text-sm font-semibold tracking-wide">{t("nav.myTasks")}</span>
+            </button>
+            <span
+              className={`operator-landing-tasks-badge text-xs font-bold rounded-full min-w-[24px] h-6 flex items-center justify-center px-1.5 shadow-md ${
+                badge > 0
+                  ? "bg-red-500 text-white"
+                  : "bg-white/90 text-orange-700 border border-orange-200/80"
+              }`}
+              data-testid="tasks-badge"
+              aria-label={t("simpleMode.openTasksAria").replace("{count}", badge)}
+            >
+              {badge > 99 ? "99+" : badge}
+            </span>
+          </div>
 
-        <div className="grid grid-cols-2 gap-4">
           <button
             onClick={handleClick(() => window.dispatchEvent(new CustomEvent("open-hierarchy")))}
             className="flex flex-col items-center justify-center gap-3 rounded-2xl p-6 bg-blue-600 text-white shadow-lg shadow-blue-600/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"

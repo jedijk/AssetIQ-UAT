@@ -1086,18 +1086,16 @@ a, button, input, select, textarea {
   padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px));
 }
 
-/* Reserve corner space so the task-count badge is never clipped by overflow scrollports */
+/* Badge sits on the button corner without shrinking the button width */
 .operator-landing-my-tasks-slot {
   position: relative;
   overflow: visible;
-  padding-top: 0.75rem;
-  padding-right: 0.75rem;
 }
 
 .operator-landing-tasks-badge {
   position: absolute;
-  top: 0;
-  right: 0;
+  top: -0.5rem;
+  right: -0.5rem;
   z-index: 2;
   pointer-events: none;
 }
