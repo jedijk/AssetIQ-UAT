@@ -917,6 +917,17 @@ async def background_startup():
             except Exception as e:
                 logger.warning(f"Observation status migration skipped: {e}")
 
+            # One-shot: backfill `discipline` on legacy central_actions whose
+            # discipline was never persisted (e.g. created before the add-rec
+            # endpoint copied discipline from the recommendation).
+            try:
+                from scripts.backfill_action_disciplines import backfill_action_disciplines
+                d_stats = await backfill_action_disciplines(db)
+                if d_stats["updated"] > 0:
+                    logger.info(f"Action discipline backfill: {d_stats}")
+            except Exception as e:
+                logger.warning(f"Action discipline backfill skipped: {e}")
+
             # Start the task-generation cron (Sunday 02:00 plant-local by default).
             # Reads cron + timezone from app_settings.task_generation.
             try:
