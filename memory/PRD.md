@@ -664,3 +664,27 @@ See `/app/memory/test_credentials.md`
 - Manual UI verification of edit popup save + delete flow (user testing pending)
 - Optional: extend `EditActionDialog` to support attachment uploads (reuses `actionsAPI.uploadAttachment`)
 
+
+
+---
+
+## 2026-02-09 (later) — Status filter & migration aligned with Process Journey
+
+### Completed
+- **Observation status migration** — new one-shot script `/app/backend/scripts/migrate_observation_statuses.py` runs on backend startup. It rewrites every legacy `Open` / `In Progress` / `Parked` / `Closed` value to the new model (`Observation`, `Assessment`, `Planning`, `Investigation`, `Action`, `Mitigated`, `Learning`) using the same logic as `get_process_journey`. Idempotent — skips observations already on the new model.
+- **Production run result:** 13 scanned → 10 migrated, 3 skipped. Distribution after migration: Assessment 6, Planning 3, Learning 4. No legacy values remain.
+- **Threats list (`ThreatsPage.js`) `STATUS_OPTIONS`** rebuilt to the 7 journey stages with distinct color tokens (blue → cyan → purple → indigo → amber → green → slate).
+- **Default status filter** changed from `["Open", "In Progress"]` to all six active stages (everything except the terminal `Learning`).
+- **Terminal-state styling** (left border + mobile badge) now keyed on `Mitigated` / `Learning` instead of `Mitigated` / `Closed`.
+- **Production exposure ranges** realigned with default Production Criticality definitions: L1 = 0h, L2 = <8h, L3 = 8–24h, L4 = 24–72h, **L5 = >72h (open-ended, "More than €X" instead of "Up to")**.
+- **Edit Action popup** now fetches the full action via `actionsAPI.getById(id)`; Type dropdown maps legacy backend values (`preventive`/`corrective`/`predictive`/`operational`) to short codes; **Assignee + Priority fields removed** per user request.
+
+### Files Touched
+- `/app/backend/scripts/migrate_observation_statuses.py` (new)
+- `/app/backend/server.py` (calls migration after disciplines seed)
+- `/app/backend/routes/observation_workspace.py` (production exposure ranges + open-ended L5)
+- `/app/frontend/src/pages/ThreatsPage.js` (STATUS_OPTIONS, default filter, terminal-state checks)
+- `/app/frontend/src/pages/ObservationWorkspacePage.jsx` (EditActionDialog fetches full action, removed Assignee/Priority)
+
+### Notes
+- The workspace endpoint already auto-syncs each observation's status to the current journey stage on view, so future drift between status and journey is impossible.

@@ -906,6 +906,17 @@ async def background_startup():
             except Exception as e:
                 logger.warning(f"Disciplines seeding skipped: {e}")
 
+            # One-shot: migrate any legacy observation statuses to the new
+            # process-journey based status model (Observation, Assessment,
+            # Planning, Investigation, Action, Mitigated, Learning).
+            try:
+                from scripts.migrate_observation_statuses import migrate_observation_statuses
+                mig_stats = await migrate_observation_statuses(db)
+                if mig_stats["migrated"] > 0:
+                    logger.info(f"Observation status migration: {mig_stats}")
+            except Exception as e:
+                logger.warning(f"Observation status migration skipped: {e}")
+
             # Start the task-generation cron (Sunday 02:00 plant-local by default).
             # Reads cron + timezone from app_settings.task_generation.
             try:

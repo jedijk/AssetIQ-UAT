@@ -68,12 +68,16 @@ import { VirtualList } from "../components/ui/VirtualList";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useCapabilities } from "../core/performance";
 
-// Status options with colors and icons
+// Status options aligned with the Observation Workspace process-journey model.
+// Stages: Observation → Assessment → Planning → Investigation → Action → Mitigated → Learning
 const STATUS_OPTIONS = [
-  { value: "Open", label: "Open", color: "bg-blue-500", textColor: "text-blue-700", bgColor: "bg-blue-100" },
-  { value: "In Progress", label: "In Progress", color: "bg-amber-500", textColor: "text-amber-700", bgColor: "bg-amber-100" },
-  { value: "Parked", label: "Parked", color: "bg-slate-500", textColor: "text-slate-700", bgColor: "bg-slate-100" },
-  { value: "Closed", label: "Closed", color: "bg-slate-400", textColor: "text-slate-600", bgColor: "bg-slate-50" },
+  { value: "Observation",   label: "Observation",   color: "bg-blue-500",    textColor: "text-blue-700",    bgColor: "bg-blue-100" },
+  { value: "Assessment",    label: "Assessment",    color: "bg-cyan-500",    textColor: "text-cyan-700",    bgColor: "bg-cyan-100" },
+  { value: "Planning",      label: "Planning",      color: "bg-purple-500",  textColor: "text-purple-700",  bgColor: "bg-purple-100" },
+  { value: "Investigation", label: "Investigation", color: "bg-indigo-500",  textColor: "text-indigo-700",  bgColor: "bg-indigo-100" },
+  { value: "Action",        label: "Action",        color: "bg-amber-500",   textColor: "text-amber-700",   bgColor: "bg-amber-100" },
+  { value: "Mitigated",     label: "Mitigated",     color: "bg-green-500",   textColor: "text-green-700",   bgColor: "bg-green-100" },
+  { value: "Learning",      label: "Learning",      color: "bg-slate-400",   textColor: "text-slate-600",   bgColor: "bg-slate-100" },
 ];
 
 // Format registration date for display
@@ -160,7 +164,10 @@ const ThreatsPage = () => {
   })();
   const caps = useCapabilities();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [statusFilter, setStatusFilter] = useState(["Open", "In Progress"]); // Default: only show active observations
+  // Default: show all stages except the terminal "Learning" state
+  const [statusFilter, setStatusFilter] = useState([
+    "Observation", "Assessment", "Planning", "Investigation", "Action", "Mitigated",
+  ]);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [riskFilter, setRiskFilter] = useState("all"); // Filter by risk level
   const [sortBy, setSortBy] = useState("latest"); // Default: newest observations on top
@@ -772,13 +779,13 @@ const ThreatsPage = () => {
                     onClick={() => navigate(`/threats/${threat.id}`)}
                     onMouseEnter={handleMouseEnter}
                     className={`priority-item group relative ${
-                      threat.status === "Mitigated" || threat.status === "Closed" 
+                      threat.status === "Mitigated" || threat.status === "Learning" 
                         ? "sm:opacity-100 border-l-4 " + (threat.status === "Mitigated" ? "border-l-green-500 bg-green-50/30" : "border-l-slate-400 bg-slate-50/50")
                         : ""
                     }`}
                     data-testid={`threat-item-${threat.id}`}
                   >
-                    {(threat.status === "Mitigated" || threat.status === "Closed") && (
+                    {(threat.status === "Mitigated" || threat.status === "Learning") && (
                       <div className="sm:hidden absolute top-2 right-2">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
                           threat.status === "Mitigated" 
@@ -877,14 +884,14 @@ const ThreatsPage = () => {
               onClick={() => navigate(`/threats/${threat.id}`)}
               onMouseEnter={handleMouseEnter}
               className={`priority-item group relative ${
-                threat.status === "Mitigated" || threat.status === "Closed" 
+                threat.status === "Mitigated" || threat.status === "Learning" 
                   ? "sm:opacity-100 border-l-4 " + (threat.status === "Mitigated" ? "border-l-green-500 bg-green-50/30" : "border-l-slate-400 bg-slate-50/50")
                   : ""
               }`}
               data-testid={`threat-item-${threat.id}`}
             >
-              {/* Mobile Status Indicator - Only visible on mobile for Mitigated/Closed */}
-              {(threat.status === "Mitigated" || threat.status === "Closed") && (
+              {/* Mobile Status Indicator - Only visible on mobile for Mitigated/Learning */}
+              {(threat.status === "Mitigated" || threat.status === "Learning") && (
                 <div className="sm:hidden absolute top-2 right-2">
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
                     threat.status === "Mitigated" 
