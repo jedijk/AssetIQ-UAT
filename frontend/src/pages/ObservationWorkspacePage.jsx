@@ -1624,30 +1624,35 @@ const ObservationWorkspacePage = () => {
       {/* Hero header — compact single-row like classic; stays fixed below the 48px app header */}
       <div className="sticky top-12 z-20 bg-white border-b border-slate-200 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 max-w-7xl">
-          <div className="flex items-center gap-2 sm:gap-3 py-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/threats")}
-              className="p-1 -ml-1 flex-shrink-0"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
+          {/* Mobile: title row + action bar row stack vertically.
+              Desktop: everything inline on a single row. */}
+          <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-3 py-2">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/threats")}
+                className="p-1 -ml-1 flex-shrink-0"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <RiskBadge level={observation?.risk_level} size="sm" />
-                <span className="text-[11px] text-slate-400 font-mono">
-                  {observation?.threat_number}
-                </span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <RiskBadge level={observation?.risk_level} size="sm" />
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    {observation?.threat_number}
+                  </span>
+                </div>
+                <h1 className="font-semibold text-sm sm:text-base text-slate-900 truncate leading-tight">
+                  {observation?.title}
+                </h1>
               </div>
-              <h1 className="font-semibold text-sm sm:text-base text-slate-900 truncate leading-tight">
-                {observation?.title}
-              </h1>
             </div>
 
-            {/* Action bar slot — ObservationDetailsSection portals status/share/edit/••• into here */}
-            <div id="workspace-hero-slot" className="flex-shrink-0" />
+            {/* Action bar slot — ObservationDetailsSection portals status/share/edit/••• into here.
+                Wraps naturally on mobile (full-width below the title row). */}
+            <div id="workspace-hero-slot" className="flex-1 lg:flex-shrink-0 lg:flex-none min-w-0 overflow-x-auto lg:overflow-visible" />
           </div>
         </div>
       </div>
