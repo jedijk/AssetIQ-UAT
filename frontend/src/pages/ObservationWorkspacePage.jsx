@@ -613,13 +613,13 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
       </div>
 
       {/* View Full Analysis Button — opens combined AI Risk + Causal dialog */}
-      <Button 
-        variant="default"
-        className="w-full bg-purple-600 hover:bg-purple-700"
+      <Button
+        size="sm"
+        className="w-full h-7 text-xs bg-purple-600 hover:bg-purple-700"
         onClick={onViewFullAnalysis}
         data-testid="open-full-analysis-btn"
       >
-        <Eye className="w-4 h-4 mr-2" />
+        <Eye className="w-3.5 h-3.5 mr-1.5" />
         View Full Analysis
       </Button>
       </div>
