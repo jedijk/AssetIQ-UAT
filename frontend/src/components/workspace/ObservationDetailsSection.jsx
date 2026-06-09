@@ -720,7 +720,16 @@ const ObservationDetailsSection = ({ threatId }) => {
               <div className="flex items-center gap-1 justify-end sm:justify-start">
                 {item.field === "failure_mode" && item.value ? (
                   <button
-                    onClick={() => navigate(`/library?search=${encodeURIComponent(threat.failure_mode)}`)}
+                    onClick={() => {
+                      // Navigate to library with fm_id to select the specific failure mode
+                      const fmId = linkedFmData?.id;
+                      if (fmId) {
+                        navigate(`/library?fm_id=${fmId}`);
+                      } else {
+                        // Fallback to search if no ID available
+                        navigate(`/library?search=${encodeURIComponent(threat.failure_mode)}`);
+                      }
+                    }}
                     className="font-semibold text-slate-900 text-sm truncate hover:text-blue-600 hover:underline transition-colors cursor-pointer"
                     title="Click to view in Failure Modes Library"
                   >
