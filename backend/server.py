@@ -106,9 +106,10 @@ async def api_health_check():
     uptime = round(time.time() - app.state.start_time, 2)
     
     routes_ok = route_load_error is None
-    overall_ok = db_status == "connected" and routes_ok
-    if redis_status == "unavailable":
-        overall_ok = False
+    ready = bool(getattr(app.state, "ready", False))
+    critical_ok = db_status == "connected" and routes_ok and ready
+    redis_degraded = redis_status == "unavailable"
+    overall_ok = critical_ok and not redis_degraded
 
     payload = {
         "status": "ok" if overall_ok else "degraded",
@@ -125,7 +126,9 @@ async def api_health_check():
         payload["route_load_error"] = route_load_error.get("error")
         payload["route_load_error_type"] = route_load_error.get("type")
 
-    status_code = 200 if overall_ok else 503
+    # 503 only when the API cannot serve traffic (DB/routes/startup). Redis gaps
+    # stay in the JSON payload so ops can alert without breaking clients.
+    status_code = 200 if critical_ok else 503
     return JSONResponse(status_code=status_code, content=payload)
 
 

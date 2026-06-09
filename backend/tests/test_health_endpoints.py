@@ -62,6 +62,31 @@ def test_api_health_503_when_routes_fail(client):
     assert data["route_load_error"] == "simulated import failure"
 
 
+def test_api_health_200_when_redis_unavailable(client, monkeypatch):
+    from unittest.mock import AsyncMock, MagicMock
+
+    test_client, server = client
+    server.route_load_error = None
+    server.app.state.ready = True
+    mock_db = MagicMock()
+    mock_db.command = AsyncMock(return_value={"ok": 1})
+    monkeypatch.setattr("database.db", mock_db)
+    monkeypatch.setattr("services.cutover_config.redis_required", lambda: True)
+    monkeypatch.setattr(
+        "services.redis_store.redis_status",
+        lambda: {"enabled": False},
+    )
+
+    response = test_client.get("/api/health")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "degraded"
+    assert data["redis"] == "unavailable"
+    assert data["database"] == "connected"
+    assert data["routes_loaded"] is True
+
+
 def test_api_health_includes_routes_loaded(client):
     test_client, server = client
     server.route_load_error = None

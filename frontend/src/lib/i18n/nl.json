@@ -205,6 +205,15 @@
     "production": "Productie",
     "openTasksAria": "Open taken: {count}"
   },
+  "rolePreview": {
+    "menu": "Bekijk als rol",
+    "title": "Rolvervaring bekijken",
+    "description": "Bekijk navigatie, instellingen en paginatoegang als een andere rol. U blijft ingelogd als eigenaar — API-acties gebruiken nog steeds uw echte machtigingen.",
+    "banner": "Voorbeeldweergave als {role}",
+    "exit": "Voorbeeldweergave stoppen",
+    "active": "Actief",
+    "systemRole": "Systeem"
+  },
   "reports": {
     "title": "Formulierinzendingen",
     "submissions": "Inzendingen",

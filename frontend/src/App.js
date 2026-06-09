@@ -184,8 +184,13 @@ const useVersionCheck = () => {
           cache: "no-store",
           headers: { "Cache-Control": "no-cache" },
         });
-        if (!response.ok) return;
-        const data = await response.json();
+        let data = null;
+        try {
+          data = await response.json();
+        } catch {
+          return;
+        }
+        if (!data) return;
         const backendVersion = data?.version;
 
         if (backendVersion && isRemoteNewer(backendVersion, APP_VERSION)) {

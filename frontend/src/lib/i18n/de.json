@@ -205,6 +205,15 @@
     "production": "Production",
     "openTasksAria": "Open tasks: {count}"
   },
+  "rolePreview": {
+    "menu": "Als Rol anzeigen",
+    "title": "Rollenerfahrung anzeigen",
+    "description": "Navigation, Einstellungen und Seitenzugriff aus Sicht einer anderen Rolle anzeigen. Sie bleiben als Eigentümer angemeldet — API-Aktionen nutzen weiterhin Ihre tatsächlichen Berechtigungen.",
+    "banner": "Vorschau als {role}",
+    "exit": "Vorschau beenden",
+    "active": "Aktiv",
+    "systemRole": "System"
+  },
   "reports": {
     "title": "Form Submissions",
     "submissions": "Submissions",

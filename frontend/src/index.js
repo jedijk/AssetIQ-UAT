@@ -97,6 +97,63 @@ function isIOSWebAppStandalone() {
   }
 }
 
+async function clearAppCaches() {
+  try {
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    }
+    if ("caches" in window) {
+      const names = await caches.keys();
+      await Promise.all(names.map((n) => caches.delete(n)));
+    }
+  } catch (_e) {
+    // ignore
+  }
+}
+
+async function attemptChunkRecovery(source) {
+  const key = "assetiq_chunk_reload_attempted";
+  try {
+    if (sessionStorage.getItem(key) === "true") return false;
+    sessionStorage.setItem(key, "true");
+  } catch (_e) {
+    return false;
+  }
+  debugLog("chunk_error_autoreload", { source });
+  await clearAppCaches();
+  window.location.reload();
+  return true;
+}
+
+async function ensureFreshBuild() {
+  const key = "assetiq_stale_build_reload";
+  try {
+    if (sessionStorage.getItem(key) === "1") return;
+    const res = await fetch(`${window.location.origin}/index.html?_=${Date.now()}`, {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" },
+    });
+    if (!res.ok) return;
+    const html = await res.text();
+    const serverMatch = html.match(/\/static\/js\/main\.([a-f0-9]+)\.js/);
+    if (!serverMatch) return;
+    const script = document.querySelector('script[src*="/static/js/main."]');
+    const loadedMatch = script?.src?.match(/main\.([a-f0-9]+)\.js/);
+    if (loadedMatch && loadedMatch[1] !== serverMatch[1]) {
+      sessionStorage.setItem(key, "1");
+      debugLog("stale_main_bundle_reload", {
+        loaded: loadedMatch[1],
+        expected: serverMatch[1],
+      });
+      await clearAppCaches();
+      window.location.reload();
+    }
+  } catch (_e) {
+    // ignore
+  }
+}
+
 function showBootError(message) {
   try {
     const el = document.getElementById("root");
@@ -153,16 +210,7 @@ function showBootError(message) {
 
     if (btn) {
       btn.onclick = async () => {
-        try {
-          if ("serviceWorker" in navigator) {
-            const regs = await navigator.serviceWorker.getRegistrations();
-            await Promise.all(regs.map((r) => r.unregister()));
-          }
-          if ("caches" in window) {
-            const names = await caches.keys();
-            await Promise.all(names.map((n) => caches.delete(n)));
-          }
-        } catch (_e) {}
+        await clearAppCaches();
         window.location.reload();
       };
     }
@@ -248,7 +296,12 @@ window.addEventListener("error", (e) => {
   const msg = String(e?.message || "");
   if (msg.includes("Loading chunk") || msg.includes("ChunkLoadError")) {
     debugLog("chunk_load_error", { message: msg });
-    showBootError("A new version was deployed while your browser cached an older one. Tap Reload.");
+    attemptChunkRecovery("window_error").then((reloading) => {
+      if (!reloading) {
+        showBootError("A new version was deployed while your browser cached an older one. Tap Reload.");
+      }
+    });
+    return;
   }
 
   // iOS Safari sometimes reports minified runtime TypeErrors that otherwise surface as a blank screen.
@@ -284,86 +337,93 @@ window.addEventListener("unhandledrejection", (e) => {
   const msg = String(reason?.message || reason || "");
   if (msg.includes("Loading chunk") || msg.includes("ChunkLoadError")) {
     debugLog("chunk_load_rejection", { message: msg });
-    showBootError("A new version was deployed while your browser cached an older one. Tap Reload.");
+    attemptChunkRecovery("unhandled_rejection").then((reloading) => {
+      if (!reloading) {
+        showBootError("A new version was deployed while your browser cached an older one. Tap Reload.");
+      }
+    });
   }
 });
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
+function bootstrapApp() {
+  // Check if safe mode is requested via URL parameter (?safe=1)
+  const SAFE_MODE = isSafeModeRequested();
+  if (SAFE_MODE) {
+    debugLog("safe_mode_activated", { url: window.location.href });
+  }
 
-// Check if safe mode is requested via URL parameter (?safe=1)
-const SAFE_MODE = isSafeModeRequested();
-if (SAFE_MODE) {
-  debugLog("safe_mode_activated", { url: window.location.href });
-}
-
-// iOS standalone webapps are more sensitive to timing/memory edge cases; avoid
-// StrictMode double-invocation to reduce white screen reports.
-let appTree;
-if (SAFE_MODE) {
-  // Safe mode: minimal UI for debugging
-  appTree = <SafeMode />;
-} else if (IOS_WEBAPP_STANDALONE) {
-  // iOS standalone: skip StrictMode, wrap with GlobalErrorBoundary
-  appTree = (
-    <GlobalErrorBoundary>
-      <App />
-    </GlobalErrorBoundary>
-  );
-} else {
-  // Normal mode: StrictMode + GlobalErrorBoundary
-  appTree = (
-    <React.StrictMode>
+  // iOS standalone webapps are more sensitive to timing/memory edge cases; avoid
+  // StrictMode double-invocation to reduce white screen reports.
+  let appTree;
+  if (SAFE_MODE) {
+    // Safe mode: minimal UI for debugging
+    appTree = <SafeMode />;
+  } else if (IOS_WEBAPP_STANDALONE) {
+    // iOS standalone: skip StrictMode, wrap with GlobalErrorBoundary
+    appTree = (
       <GlobalErrorBoundary>
         <App />
       </GlobalErrorBoundary>
-    </React.StrictMode>
-  );
-}
-root.render(appTree);
-
-// Boot watchdog: if the app fails to mount, show the recovery UI instead of a blank screen.
-// Enhanced with multiple checks and shorter timeout for older devices.
-try {
-  if (typeof window !== "undefined" && !SAFE_MODE) {
-    const bootStartTime = Date.now();
-    
-    // First check at 3 seconds (catch early failures)
-    setTimeout(() => {
-      const el = document.getElementById("root");
-      const hasContent = !!(el && el.childNodes && el.childNodes.length > 0);
-      if (!hasContent) {
-        debugLog("boot_blank_screen_early", { 
-          ios_webapp: IOS_WEBAPP_STANDALONE,
-          elapsed: Date.now() - bootStartTime,
-        });
-      }
-    }, 3000);
-    
-    // Second check - show error if still blank
-    setTimeout(() => {
-      const el = document.getElementById("root");
-      const hasContent = !!(el && el.childNodes && el.childNodes.length > 0);
-      if (!hasContent) {
-        debugLog("boot_blank_screen", { 
-          ios_webapp: IOS_WEBAPP_STANDALONE,
-          elapsed: Date.now() - bootStartTime,
-        });
-        showBootError("The app started but did not render. Tap Reload to recover, or add ?safe=1 to URL for Safe Mode.");
-      }
-    }, IOS_WEBAPP_STANDALONE ? 4500 : 6500);
-    
-    // Final watchdog at 12 seconds
-    setTimeout(() => {
-      const el = document.getElementById("root");
-      const hasContent = !!(el && el.childNodes && el.childNodes.length > 0);
-      const innerText = el?.innerText || "";
-      if (!hasContent || innerText.length < 50) {
-        debugLog("boot_watchdog_final", { 
-          hasContent,
-          innerTextLength: innerText.length,
-          elapsed: Date.now() - bootStartTime,
-        });
-      }
-    }, 12000);
+    );
+  } else {
+    // Normal mode: StrictMode + GlobalErrorBoundary
+    appTree = (
+      <React.StrictMode>
+        <GlobalErrorBoundary>
+          <App />
+        </GlobalErrorBoundary>
+      </React.StrictMode>
+    );
   }
-} catch (_e) {}
+  const root = ReactDOM.createRoot(document.getElementById("root"));
+  root.render(appTree);
+
+  // Boot watchdog: if the app fails to mount, show the recovery UI instead of a blank screen.
+  // Enhanced with multiple checks and shorter timeout for older devices.
+  try {
+    if (typeof window !== "undefined" && !SAFE_MODE) {
+      const bootStartTime = Date.now();
+      
+      // First check at 3 seconds (catch early failures)
+      setTimeout(() => {
+        const el = document.getElementById("root");
+        const hasContent = !!(el && el.childNodes && el.childNodes.length > 0);
+        if (!hasContent) {
+          debugLog("boot_blank_screen_early", { 
+            ios_webapp: IOS_WEBAPP_STANDALONE,
+            elapsed: Date.now() - bootStartTime,
+          });
+        }
+      }, 3000);
+      
+      // Second check - show error if still blank
+      setTimeout(() => {
+        const el = document.getElementById("root");
+        const hasContent = !!(el && el.childNodes && el.childNodes.length > 0);
+        if (!hasContent) {
+          debugLog("boot_blank_screen", { 
+            ios_webapp: IOS_WEBAPP_STANDALONE,
+            elapsed: Date.now() - bootStartTime,
+          });
+          showBootError("The app started but did not render. Tap Reload to recover, or add ?safe=1 to URL for Safe Mode.");
+        }
+      }, IOS_WEBAPP_STANDALONE ? 4500 : 6500);
+      
+      // Final watchdog at 12 seconds
+      setTimeout(() => {
+        const el = document.getElementById("root");
+        const hasContent = !!(el && el.childNodes && el.childNodes.length > 0);
+        const innerText = el?.innerText || "";
+        if (!hasContent || innerText.length < 50) {
+          debugLog("boot_watchdog_final", { 
+            hasContent,
+            innerTextLength: innerText.length,
+            elapsed: Date.now() - bootStartTime,
+          });
+        }
+      }, 12000);
+    }
+  } catch (_e) {}
+}
+
+ensureFreshBuild().finally(bootstrapApp);
