@@ -1196,6 +1196,7 @@ async def add_recommendation_to_plan(
         "action_type": action_type_map.get(recommendation.get("action_type", "PM"), "corrective"),
         "status": "open",
         "priority": "medium",
+        "discipline": recommendation.get("discipline"),
         "source": recommendation.get("source", "recommendation"),
         "source_id": observation_id,
         "observation_id": observation_id,
