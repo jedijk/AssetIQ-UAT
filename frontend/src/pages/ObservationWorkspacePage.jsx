@@ -1394,20 +1394,20 @@ const ProcessJourney = ({ stages }) => {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 bg-slate-100 rounded-lg">
-          <TrendingUp className="w-5 h-5 text-slate-600" />
+    <div className="bg-white rounded-xl border border-slate-200 p-3">
+      {/* Header — compact */}
+      <div className="flex items-center gap-2 mb-2">
+        <div className="p-1 bg-slate-100 rounded">
+          <TrendingUp className="w-3.5 h-3.5 text-slate-600" />
         </div>
         <div>
-          <h3 className="font-semibold text-slate-900">Process Journey</h3>
-          <p className="text-xs text-slate-500">Track workflow progress</p>
+          <h3 className="font-medium text-xs text-slate-900 leading-tight">Process Journey</h3>
+          <p className="text-[10px] text-slate-500 leading-tight">Track workflow progress</p>
         </div>
       </div>
 
-      {/* Journey Steps */}
-      <div className="flex items-center justify-between overflow-x-auto pb-2">
+      {/* Journey Steps — 50% smaller */}
+      <div className="flex items-center justify-between overflow-x-auto pb-1">
         {stages?.map((stage, index) => {
           const config = stageConfig[stage.status] || stageConfig.not_started;
           const Icon = config.icon;
@@ -1415,15 +1415,15 @@ const ProcessJourney = ({ stages }) => {
           return (
             <React.Fragment key={stage.stage}>
               {/* Stage */}
-              <div className="flex flex-col items-center min-w-[80px]">
-                <div className={`w-10 h-10 rounded-full ${config.color} flex items-center justify-center text-white mb-2`}>
-                  <Icon className="w-5 h-5" />
+              <div className="flex flex-col items-center min-w-[44px]">
+                <div className={`w-5 h-5 rounded-full ${config.color} flex items-center justify-center text-white mb-1`}>
+                  <Icon className="w-2.5 h-2.5" />
                 </div>
-                <div className={`text-xs font-medium ${config.textColor} text-center`}>
+                <div className={`text-[10px] font-medium ${config.textColor} text-center leading-tight`}>
                   {stage.stage}
                 </div>
                 {stage.date && (
-                  <div className="text-[10px] text-slate-400 mt-0.5">
+                  <div className="text-[9px] text-slate-400 mt-0.5 leading-tight">
                     {format(parseISO(stage.date), "MMM d")}
                   </div>
                 )}
@@ -1431,7 +1431,7 @@ const ProcessJourney = ({ stages }) => {
               
               {/* Connector */}
               {index < stages.length - 1 && (
-                <div className={`flex-1 h-0.5 mx-2 ${
+                <div className={`flex-1 h-px mx-1 ${
                   stage.status === "completed" ? "bg-green-300" : "bg-slate-200"
                 }`} />
               )}
