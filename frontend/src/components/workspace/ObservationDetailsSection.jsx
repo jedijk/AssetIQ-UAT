@@ -474,10 +474,10 @@ const ObservationDetailsSection = ({ threatId }) => {
             {formatDateTime(threat.created_at)}
           </span>
         )}
-        {/* Risk Score badge */}
+        {/* Risk Score badge — desktop-only (Row 1 KPI card already shows it on mobile) */}
         {(threat.risk_score !== undefined && threat.risk_score !== null) && (
           <span
-            className={`text-xs font-semibold px-2 py-1 rounded ${
+            className={`hidden lg:inline-flex text-xs font-semibold px-2 py-1 rounded ${
               threat.risk_level === "Critical" ? "bg-red-100 text-red-700"
               : threat.risk_level === "High" ? "bg-orange-100 text-orange-700"
               : threat.risk_level === "Medium" ? "bg-yellow-100 text-yellow-700"
@@ -491,7 +491,7 @@ const ObservationDetailsSection = ({ threatId }) => {
         )}
         {rpnValue && (
           <span
-            className={`text-xs font-semibold px-2 py-1 rounded ${
+            className={`hidden lg:inline-flex text-xs font-semibold px-2 py-1 rounded ${
               rpnValue >= 300 ? "bg-red-100 text-red-700"
               : rpnValue >= 200 ? "bg-orange-100 text-orange-700"
               : rpnValue >= 100 ? "bg-yellow-100 text-yellow-700"
@@ -522,8 +522,19 @@ const ObservationDetailsSection = ({ threatId }) => {
               onValueChange={(v) => updateMutation.mutate({ status: v })}
               disabled={updateMutation.isPending}
             >
-              <SelectTrigger className="h-8 min-w-[8.5rem] text-xs" data-testid="workspace-status-select">
-                <SelectValue>{translateEnum(threat.status)}</SelectValue>
+              <SelectTrigger
+                className="h-8 w-9 sm:min-w-[8.5rem] sm:w-auto text-xs px-1 sm:px-3 [&>span]:hidden sm:[&>span]:inline"
+                data-testid="workspace-status-select"
+                title={translateEnum(threat.status)}
+              >
+                <SelectValue>
+                  {/* Desktop: full text */}
+                  <span className="hidden sm:inline">{translateEnum(threat.status)}</span>
+                  {/* Mobile: first-letter only — full text shown when dropdown is opened */}
+                  <span className="sm:hidden font-semibold">
+                    {(translateEnum(threat.status) || "?").charAt(0).toUpperCase()}
+                  </span>
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {STATUS_OPTIONS.map((s) => (
@@ -531,11 +542,29 @@ const ObservationDetailsSection = ({ threatId }) => {
                 ))}
               </SelectContent>
             </Select>
-            <Button size="sm" variant="ghost" onClick={shareLink} title="Share" data-testid="workspace-share-btn">
+            <Button size="sm" variant="ghost" onClick={shareLink} title="Share" data-testid="workspace-share-btn" className="h-8 w-8 p-0">
               <Share2 className="w-4 h-4" />
             </Button>
-            <Button size="sm" variant="outline" onClick={startEditing} data-testid="workspace-edit-btn">
-              <Edit className="w-3 h-3 mr-1" /> Edit
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={startEditing}
+              data-testid="workspace-edit-btn"
+              title="Edit observation"
+              className="h-8 w-8 sm:w-auto p-0 sm:px-3"
+            >
+              <Edit className="w-3.5 h-3.5 sm:mr-1" />
+              <span className="hidden sm:inline">Edit</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowDeleteDialog(true)}
+              title="Delete observation"
+              data-testid="workspace-delete-btn"
+              className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+            >
+              <Trash2 className="w-4 h-4" />
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -549,16 +578,6 @@ const ObservationDetailsSection = ({ threatId }) => {
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setShowLinkFailureModeDialog(true)} data-testid="menu-link-failure-mode">
                   <AlertTriangle className="w-4 h-4 mr-2" /> Link Failure Mode
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate(`/threats/${threatId}`)}>
-                  Open Classic View
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={(e) => { e.preventDefault(); setShowDeleteDialog(true); }}
-                  className="text-red-600 focus:text-red-700 focus:bg-red-50"
-                  data-testid="menu-delete-observation"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" /> Delete Observation
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
