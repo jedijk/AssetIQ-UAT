@@ -612,16 +612,21 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
         </div>
       </div>
 
-      {/* View Full Analysis Button — opens combined AI Risk + Causal dialog */}
+      {/* View Full Analysis Button — opens combined AI Risk + Causal dialog
+          Desktop-only: the dialog content is too dense for mobile screens. */}
       <Button
         size="sm"
-        className="w-full h-7 text-xs bg-purple-600 hover:bg-purple-700"
+        className="w-full h-7 text-xs bg-purple-600 hover:bg-purple-700 hidden lg:inline-flex"
         onClick={onViewFullAnalysis}
         data-testid="open-full-analysis-btn"
       >
         <Eye className="w-3.5 h-3.5 mr-1.5" />
         View Full Analysis
       </Button>
+      {/* Mobile note */}
+      <p className="lg:hidden text-[10px] text-slate-400 text-center mt-1">
+        Full analysis available on desktop
+      </p>
       </div>
     </div>
   );
