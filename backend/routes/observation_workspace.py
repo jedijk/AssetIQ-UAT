@@ -357,8 +357,8 @@ async def get_equipment_timeline_events(
         for action in actions:
             action_type = action.get("action_type", "corrective").lower()
             
-            # Skip PM (preventive maintenance) and scheduled tasks
-            if action_type in ["pm", "preventive", "preventive maintenance", "scheduled"]:
+            # Skip PM (preventive), PDM (predictive) and scheduled tasks — show only reactive/corrective history
+            if action_type in ["pm", "preventive", "preventive maintenance", "scheduled", "pdm", "predictive", "predictive maintenance"]:
                 continue
             
             event_type = "repair" if action_type in ["corrective", "repair", "cm"] else "work_order"
@@ -560,12 +560,15 @@ async def get_recommended_actions(observation: dict, failure_mode_data: dict = N
         for i, action in enumerate(fm_actions[:5]):  # Limit to 5
             if isinstance(action, dict):
                 action_title = action.get("action") or action.get("title") or action.get("description", "")
-                action_type = action.get("type", "PM").upper()
+                # Support both `action_type` and legacy `type`
+                action_type = (action.get("action_type") or action.get("type") or "PM").upper()
                 expected_impact = action.get("expected_impact") or action.get("impact", "")
+                discipline = action.get("discipline")
             else:
                 action_title = str(action)
                 action_type = "PM"
                 expected_impact = ""
+                discipline = None
             
             recommendations.append({
                 "id": f"fm-{failure_mode_data.get('id', 'unknown')}-{i}",
@@ -576,6 +579,7 @@ async def get_recommended_actions(observation: dict, failure_mode_data: dict = N
                 "expected_impact": expected_impact,
                 "confidence": None,  # Library actions don't have confidence
                 "failure_mode_id": failure_mode_data.get("id"),
+                "discipline": discipline,
                 "why_recommended": f"Recommended because this action is part of the standard mitigation strategy for '{failure_mode_data.get('failure_mode', 'this failure mode')}'."
             })
 

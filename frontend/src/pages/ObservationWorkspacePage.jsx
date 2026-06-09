@@ -648,16 +648,11 @@ const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding,
       <div className="flex items-start gap-2">
         {/* Left: Info */}
         <div className="flex-1 min-w-0">
-          {/* Header row: Type badge, discipline, time, source */}
+          {/* Header row: Type badge, time, source, discipline */}
           <div className="flex items-center gap-1 mb-1 flex-wrap">
             {action.action_type && (
               <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${typeColors[action.action_type] || 'bg-slate-100 text-slate-600'}`}>
                 {action.action_type}
-              </span>
-            )}
-            {action.discipline && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 capitalize">
-                {action.discipline}
               </span>
             )}
             {action.estimated_minutes && (
@@ -668,6 +663,11 @@ const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding,
             <span className={`text-[10px] px-1 py-0.5 rounded border ${sourceColor}`}>
               {sourceLabel}
             </span>
+            {action.discipline && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 capitalize" data-testid="recommended-action-discipline">
+                {action.discipline}
+              </span>
+            )}
             {isInPlan && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-medium ml-auto">
                 In Plan
