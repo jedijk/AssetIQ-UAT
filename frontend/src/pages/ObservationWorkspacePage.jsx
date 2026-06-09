@@ -794,12 +794,239 @@ const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddTo
 };
 
 /**
+ * Edit Action Dialog — popup that allows editing of all action fields.
+ * Fetches the full action by ID when opened so every field is populated
+ * from the source of truth (the action document itself).
+ */
+const EditActionDialog = ({ action, open, onClose, onSave, isSaving }) => {
+  // Map backend action_type values (e.g. "preventive") to short UI codes (PM/CM/PDM/OP)
+  const normalizeActionType = (val) => {
+    if (!val) return "CM";
+    const v = String(val).toUpperCase();
+    if (["PM", "CM", "PDM", "OP"].includes(v)) return v;
+    const lc = String(val).toLowerCase();
+    if (lc.startsWith("prev")) return "PM";
+    if (lc.startsWith("corr")) return "CM";
+    if (lc.startsWith("pred")) return "PDM";
+    if (lc.startsWith("oper")) return "OP";
+    return "CM";
+  };
+
+  // Fetch full action data from the action itself (single source of truth)
+  const { data: fullAction, isLoading } = useQuery({
+    queryKey: ["action-detail", action?.id],
+    queryFn: () => actionsAPI.getById(action.id),
+    enabled: !!(open && action?.id),
+    staleTime: 0,
+  });
+
+  const src = fullAction || action || {};
+
+  const [form, setForm] = useState(() => ({
+    title: "",
+    description: "",
+    action_type: "CM",
+    discipline: "",
+    status: "open",
+    due_date: "",
+    comments: "",
+  }));
+
+  // Re-initialise form once the full action data arrives
+  useEffect(() => {
+    if (fullAction) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setForm({
+        title: fullAction.title || "",
+        description: fullAction.description || "",
+        action_type: normalizeActionType(fullAction.action_type),
+        discipline: fullAction.discipline || "",
+        status: fullAction.status || "open",
+        due_date: fullAction.due_date ? String(fullAction.due_date).split("T")[0] : "",
+        comments: fullAction.comments || "",
+      });
+    }
+  }, [fullAction?.id, fullAction?.updated_at]);
+
+  const handleChange = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+
+  const handleSubmit = () => {
+    onSave({
+      title: form.title,
+      description: form.description,
+      action_type: form.action_type,
+      discipline: form.discipline || null,
+      status: form.status,
+      due_date: form.due_date || null,
+      comments: form.comments || null,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg" data-testid="edit-action-dialog">
+        <DialogHeader>
+          <DialogTitle>Edit Action</DialogTitle>
+          <DialogDescription>
+            Update fields for {src?.action_number || "this action"}.
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading && !fullAction ? (
+          <div className="py-10 flex items-center justify-center text-slate-500">
+            <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading action…
+          </div>
+        ) : (
+        <div className="grid gap-3 py-2">
+          <div className="grid gap-1.5">
+            <Label htmlFor="edit-title">Title</Label>
+            <Input
+              id="edit-title"
+              value={form.title}
+              onChange={(e) => handleChange("title", e.target.value)}
+              data-testid="edit-action-title"
+            />
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="edit-desc">Description</Label>
+            <Textarea
+              id="edit-desc"
+              rows={3}
+              value={form.description}
+              onChange={(e) => handleChange("description", e.target.value)}
+              data-testid="edit-action-description"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>Type</Label>
+              <Select value={form.action_type} onValueChange={(v) => handleChange("action_type", v)}>
+                <SelectTrigger data-testid="edit-action-type"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CM">CM — Corrective</SelectItem>
+                  <SelectItem value="PM">PM — Preventive</SelectItem>
+                  <SelectItem value="PDM">PDM — Predictive</SelectItem>
+                  <SelectItem value="OP">OP — Operational</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label>Discipline</Label>
+              <Select value={form.discipline || "none"} onValueChange={(v) => handleChange("discipline", v === "none" ? "" : v)}>
+                <SelectTrigger data-testid="edit-action-discipline"><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— None —</SelectItem>
+                  <SelectItem value="Mechanical">Mechanical</SelectItem>
+                  <SelectItem value="Electrical">Electrical</SelectItem>
+                  <SelectItem value="Instrumentation">Instrumentation</SelectItem>
+                  <SelectItem value="Piping">Piping</SelectItem>
+                  <SelectItem value="Process">Process</SelectItem>
+                  <SelectItem value="Structural">Structural</SelectItem>
+                  <SelectItem value="Safety">Safety</SelectItem>
+                  <SelectItem value="Operations">Operations</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>Status</Label>
+              <Select value={form.status} onValueChange={(v) => handleChange("status", v)}>
+                <SelectTrigger data-testid="edit-action-status"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="open">Open</SelectItem>
+                  <SelectItem value="planned">Planned</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="validated">Validated</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label htmlFor="edit-due">Due date</Label>
+              <Input
+                id="edit-due"
+                type="date"
+                value={form.due_date}
+                onChange={(e) => handleChange("due_date", e.target.value)}
+                data-testid="edit-action-due-date"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="edit-comments">Comments</Label>
+            <Textarea
+              id="edit-comments"
+              rows={2}
+              value={form.comments}
+              onChange={(e) => handleChange("comments", e.target.value)}
+              data-testid="edit-action-comments"
+            />
+          </div>
+        </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={isSaving} data-testid="edit-action-cancel">Cancel</Button>
+          <Button onClick={handleSubmit} disabled={isSaving || isLoading || !form.title.trim()} data-testid="edit-action-save">
+            {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            Save changes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+/**
+ * Delete Action Confirmation Dialog
+ */
+const DeleteActionDialog = ({ action, open, onClose, onConfirm, isDeleting }) => (
+  <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <DialogContent className="max-w-md" data-testid="delete-action-dialog">
+      <DialogHeader>
+        <DialogTitle>Remove from action plan?</DialogTitle>
+        <DialogDescription>
+          {action ? (
+            <>
+              Action <span className="font-semibold">&quot;{action.title}&quot;</span>
+              {action.action_number ? ` (${action.action_number})` : ""} will be deleted permanently
+              and will reappear in Recommended Actions if it originated from a recommendation.
+            </>
+          ) : "This action will be removed."}
+        </DialogDescription>
+      </DialogHeader>
+      <DialogFooter>
+        <Button variant="ghost" onClick={onClose} disabled={isDeleting} data-testid="delete-action-cancel">Cancel</Button>
+        <Button
+          variant="destructive"
+          onClick={onConfirm}
+          disabled={isDeleting}
+          data-testid="delete-action-confirm"
+        >
+          {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+          Delete
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+);
+
+/**
  * Action Plan Panel - Shows actions in the same style as recommended actions
  */
 const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, actionPlanIds = [] }) => {
   const navigate = useNavigate();
-  const [editingId, setEditingId] = useState(null);
-  const [deletingId, setDeletingId] = useState(null);
+  const [editingAction, setEditingAction] = useState(null);
+  const [deletingAction, setDeletingAction] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const typeColors = {
     PM: "bg-blue-100 text-blue-700",
@@ -816,24 +1043,35 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, act
     validated: { color: "bg-emerald-50 text-emerald-600 border-emerald-200", label: "Validated" },
   };
 
-  const handleEdit = async (action, e) => {
+  const handleEdit = (action, e) => {
     e.stopPropagation();
-    setEditingId(action.id);
+    setEditingAction(action);
+  };
+
+  const handleDelete = (action, e) => {
+    e.stopPropagation();
+    setDeletingAction(action);
+  };
+
+  const handleSaveEdit = async (updates) => {
+    if (!editingAction) return;
+    setIsSaving(true);
     try {
-      await onEditAction?.(action);
+      await onEditAction?.(editingAction, updates);
+      setEditingAction(null);
     } finally {
-      setEditingId(null);
+      setIsSaving(false);
     }
   };
 
-  const handleDelete = async (action, e) => {
-    e.stopPropagation();
-    if (!window.confirm(`Remove "${action.title}" from the action plan?`)) return;
-    setDeletingId(action.id);
+  const handleConfirmDelete = async () => {
+    if (!deletingAction) return;
+    setIsDeleting(true);
     try {
-      await onDeleteAction?.(action);
+      await onDeleteAction?.(deletingAction);
+      setDeletingAction(null);
     } finally {
-      setDeletingId(null);
+      setIsDeleting(false);
     }
   };
 
@@ -912,29 +1150,21 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, act
                       size="sm"
                       variant="ghost"
                       onClick={(e) => handleEdit(action, e)}
-                      disabled={editingId === action.id}
                       className="h-7 w-7 p-0"
                       title="Edit action"
+                      data-testid={`action-plan-edit-${action.id}`}
                     >
-                      {editingId === action.id ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Pencil className="w-3.5 h-3.5" />
-                      )}
+                      <Pencil className="w-3.5 h-3.5" />
                     </Button>
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={(e) => handleDelete(action, e)}
-                      disabled={deletingId === action.id}
                       className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
                       title="Remove from plan"
+                      data-testid={`action-plan-delete-${action.id}`}
                     >
-                      {deletingId === action.id ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-3.5 h-3.5" />
-                      )}
+                      <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
                 </div>
@@ -949,6 +1179,23 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, act
           <p className="text-[10px] text-slate-400 mt-1">Add from recommendations</p>
         </div>
       )}
+
+      {/* Edit / Delete dialogs */}
+      <EditActionDialog
+        key={editingAction?.id || "edit"}
+        action={editingAction}
+        open={!!editingAction}
+        onClose={() => setEditingAction(null)}
+        onSave={handleSaveEdit}
+        isSaving={isSaving}
+      />
+      <DeleteActionDialog
+        action={deletingAction}
+        open={!!deletingAction}
+        onClose={() => setDeletingAction(null)}
+        onConfirm={handleConfirmDelete}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 };
@@ -1051,9 +1298,43 @@ const ObservationWorkspacePage = () => {
     },
   });
 
+  // Update action mutation
+  const updateActionMutation = useMutation({
+    mutationFn: ({ actionId, updates }) => actionsAPI.update(actionId, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["observation-workspace", id] });
+      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      toast.success("Action updated");
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.detail || "Failed to update action");
+    },
+  });
+
+  // Delete action mutation
+  const deleteActionMutation = useMutation({
+    mutationFn: (actionId) => actionsAPI.delete(actionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["observation-workspace", id] });
+      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      toast.success("Action removed from plan");
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.detail || "Failed to remove action");
+    },
+  });
+
   // Handlers
   const handleAddToPlan = async (recommendation) => {
     await addRecommendationMutation.mutateAsync(recommendation);
+  };
+
+  const handleEditAction = async (action, updates) => {
+    await updateActionMutation.mutateAsync({ actionId: action.id, updates });
+  };
+
+  const handleDeleteAction = async (action) => {
+    await deleteActionMutation.mutateAsync(action.id);
   };
 
   const handleAddToStrategy = (action) => {
@@ -1227,6 +1508,8 @@ const ObservationWorkspacePage = () => {
           <ActionPlanPanel 
             actions={action_plan}
             onViewAll={handleViewAllActions}
+            onEditAction={handleEditAction}
+            onDeleteAction={handleDeleteAction}
           />
         </div>
 

@@ -645,10 +645,16 @@ async def get_action_plan(observation_id: str) -> List[dict]:
             "id": action.get("id"),
             "action_number": action.get("action_number", ""),
             "title": action.get("title", ""),
+            "description": action.get("description", ""),
             "status": action.get("status", "open"),
             "priority": action.get("priority", "medium"),
+            "action_type": (action.get("action_type") or "").upper() if action.get("action_type") else "",
+            "discipline": action.get("discipline"),
+            "assignee": action.get("assignee") or action.get("assigned_to") or "",
             "owner": action.get("owner_name") or action.get("assigned_to_name", ""),
-            "due_date": action.get("due_date", "")
+            "due_date": action.get("due_date", ""),
+            "comments": action.get("comments", ""),
+            "recommendation_id": action.get("recommendation_id"),
         })
     
     return action_plan
@@ -878,11 +884,38 @@ async def get_observation_workspace(
     # 3. Reliability intelligence
     reliability_intelligence = await get_reliability_intelligence(observation, failure_mode_data)
     
-    # 4. Recommended actions
+    # 4. Recommended actions — filter out items already added to the action plan
     recommended_actions = await get_recommended_actions(observation, failure_mode_data)
+    added_recommendation_ids = {a.get("recommendation_id") for a in action_plan if a.get("recommendation_id")}
+    if added_recommendation_ids:
+        recommended_actions = [r for r in recommended_actions if r.get("id") not in added_recommendation_ids]
     
     # 5. Process journey
     process_journey = await get_process_journey(observation, action_plan, investigation)
+    
+    # Sync observation.status with the current stage of the process journey.
+    # The "current" stage is the furthest stage that is in_progress, or the latest
+    # completed stage if none are in progress. Status values map 1:1 to stage names.
+    current_stage = None
+    for stg in process_journey:
+        if stg.get("status") == "in_progress":
+            current_stage = stg.get("stage")
+            break
+    if not current_stage:
+        for stg in process_journey:
+            if stg.get("status") == "completed":
+                current_stage = stg.get("stage")
+        # falls through to last completed
+    if current_stage and observation.get("status") != current_stage:
+        try:
+            await db.threats.update_one(
+                {"id": observation_id},
+                {"$set": {"status": current_stage, "updated_at": datetime.now(timezone.utc).isoformat()}}
+            )
+            observation["status"] = current_stage
+        except Exception:
+            # Non-fatal — UI still shows the derived stage from process_journey
+            pass
     
     return {
         "observation_id": observation_id,

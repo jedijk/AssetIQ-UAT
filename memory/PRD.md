@@ -638,3 +638,29 @@ See `/app/memory/test_credentials.md`
 - Test reports: `/app/test_reports/iteration_33.json` (backend),
   `/app/test_reports/iteration_34.json` (frontend)
 
+
+---
+
+## 2026-02-09 — Observation Workspace UX polish (Action Plan, Recommendations, Process Sync)
+
+### Completed
+- **Discipline next to Library badge** — backend `get_recommended_actions` now passes `discipline` from failure-mode action dicts; frontend `RecommendedActionCard` shows `[PM] [Library] [Mechanical]`.
+- **PDM hidden from history timeline** — `get_equipment_timeline_events` now skips `pm`, `pdm`, and `scheduled` task types, leaving only reactive/corrective entries.
+- **Action Plan discipline** — `get_action_plan` now returns `discipline`, `description`, `action_type`, `assignee`, `due_date`, `comments`, `recommendation_id`.
+- **Edit action popup** — new `EditActionDialog` allows editing all fields (title, description, type, discipline, priority, status, assignee, due_date, comments) via `PATCH /api/actions/{id}`.
+- **Delete confirmation popup** — new `DeleteActionDialog` replaces `window.confirm`; uses shadcn Dialog with destructive button.
+- **Recommendations auto-restore** — backend filters out recommendations whose `id` matches `recommendation_id` of any existing action plan item; deleting the action makes the recommendation reappear automatically.
+- **Observation status ↔ Process Journey sync** — on each workspace fetch, the backend computes the current journey stage (furthest in_progress, else latest completed) and updates `threats.status` to match (`Observation` / `Assessment` / `Planning` / `Investigation` / `Action` / `Mitigated` / `Learning`). Matches the `STATUS_OPTIONS` already used by the workspace status dropdown.
+
+### Files Touched
+- `/app/backend/routes/observation_workspace.py` (discipline pass-through, action_plan fields, recommendation filter, status auto-sync, PDM/PM/Scheduled timeline filter)
+- `/app/frontend/src/pages/ObservationWorkspacePage.jsx` (EditActionDialog, DeleteActionDialog, edit/delete mutations, badge reordering)
+
+### Tests
+- Backend curl validation against existing observation (`cf220c0e-...`) — observation status correctly synced to `Planning`; recommendations expose `discipline`; action plan returns `discipline`/`action_type`/`recommendation_id`; PM/PDM filtered.
+- Lint clean on touched files.
+
+### Next Action Items
+- Manual UI verification of edit popup save + delete flow (user testing pending)
+- Optional: extend `EditActionDialog` to support attachment uploads (reuses `actionsAPI.uploadAttachment`)
+
