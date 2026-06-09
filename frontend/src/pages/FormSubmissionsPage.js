@@ -83,7 +83,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../com
 import BackButton from "../components/BackButton";
 import { DISCIPLINES, getDisciplineColor } from "../constants/disciplines";
 import { DocumentViewer } from "../components/DocumentViewer";
-import { formatDate as formatDateUtil, formatDateTime as formatDateTimeUtil } from "../lib/dateUtils";
+import { formatDateTime as formatDateTimeUtil } from "../lib/dateUtils";
 import { formAPI } from "../components/forms/formAPI";
 import { openPrintWindow, isMobileDevice } from "../lib/printLabel";
 
@@ -861,8 +861,7 @@ export default function FormSubmissionsPage() {
                           {/* Date & Time */}
                           <div className="flex items-center gap-1">
                             <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                            <span className="hidden sm:inline">{formatDate(submission.submitted_at)}</span>
-                            <span className="sm:hidden">{submission.submitted_at ? formatDateUtil(submission.submitted_at, { format: 'short' }) : t("common.notAvailable")}</span>
+                            <span>{formatDate(submission.submitted_at)}</span>
                           </div>
                           
                           {/* Submitted By - Hide name on mobile */}
