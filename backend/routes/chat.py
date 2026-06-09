@@ -206,7 +206,7 @@ async def _store_assistant_msg(user_id: str, content: str, **extra) -> dict:
 # Observation creation
 # ---------------------------------------------------------------------------
 async def _create_observation(user_id: str, obs_data: dict, session_id: str,
-                              image_thumbnail: str = None) -> dict:
+                              image_thumbnail: str = None, user_description: str = None) -> dict:
     threat_id = str(uuid.uuid4())
     equipment_name = obs_data.get("equipment_name", "Unknown")
     failure_mode_name = obs_data.get("failure_mode_name", "Unknown")
@@ -249,6 +249,7 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
     threat_doc = {
         "id": threat_id,
         "title": f"{equipment_name} - {failure_mode_name}",
+        "description": user_description or "",
         "asset": equipment_name,
         "equipment_type": equipment_type,
         "failure_mode": failure_mode_name,
@@ -446,8 +447,20 @@ async def _finalize_chat_machine_result(
     resp_text = result["response_text"]
 
     if result.get("create_observation") and result.get("observation_data"):
+        # Get the description from issue_summary (same as shown in draft)
+        # Parse the summary to extract the Description line
+        issue_summary = conv.get("issue_summary") or ""
+        parsed_description = ""
+        for line in issue_summary.split('\n'):
+            if '**Description:**' in line or '**Beschrijving:**' in line:
+                parsed_description = line.replace('**Description:**', '').replace('**Beschrijving:**', '').strip()
+                break
+        
+        # Use parsed description from summary, fall back to original_message
+        user_description = parsed_description or result.get("original_message", "")
+        
         obs = await _create_observation(user_id, result["observation_data"],
-                                        session_id, image_thumbnail)
+                                        session_id, image_thumbnail, user_description)
         threat = obs["threat"]
         auto_actions = obs["auto_created_actions"]
         new_threat_id = obs["threat_id"]
@@ -513,6 +526,7 @@ async def _finalize_chat_machine_result(
             threat_equipment_type=threat.get("equipment_type"),
             threat_equipment_tag=eq_data.get("tag"),
             threat_failure_mode=threat["failure_mode"],
+            threat_description=threat.get("description", ""),
             threat_risk_level=threat["risk_level"],
             threat_risk_score=threat["risk_score"],
             threat_rank=threat.get("rank"),

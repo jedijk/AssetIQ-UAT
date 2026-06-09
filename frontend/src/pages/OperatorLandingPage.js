@@ -1,16 +1,10 @@
-import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Building2, ClipboardCheck, Activity } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
-import { myTasksAPI } from "../lib/api";
+import { api, preferencesAPI } from "../lib/api";
 import { publicAssetUrl } from "../lib/assetUrl";
-import {
-  filterActiveWorkItems,
-  getApiDisciplineParam,
-  getDefaultDisciplinesForUser,
-} from "../lib/myTasksFilterUtils";
 
 const haptic = () => {
   try {
@@ -22,30 +16,56 @@ const haptic = () => {
   } catch {}
 };
 
-const fetchOpenTaskBadgeCount = async (user, disciplines) => {
-  const data = await myTasksAPI.getTasks({
-    filter: "open",
-    discipline: getApiDisciplineParam(disciplines),
-  });
-  return filterActiveWorkItems(data.tasks, disciplines).length;
+function tasksFromMyTasksPayload(payload) {
+  if (Array.isArray(payload)) return payload;
+  return payload?.tasks ?? payload?.items ?? [];
+}
+
+const fetchTaskCounts = async (discipline) => {
+  const params = { filter: "open" };
+  if (discipline) {
+    params.discipline = discipline;
+  }
+  
+  const [openRes, overdueRes] = await Promise.all([
+    api.get("/work-items", { params }),
+    api.get("/work-items", { params: { ...params, filter: "overdue" } }),
+  ]);
+  const openTasks = tasksFromMyTasksPayload(openRes.data);
+  const overdueTasks = tasksFromMyTasksPayload(overdueRes.data);
+  const seenIds = new Set();
+  for (const task of [...openTasks, ...overdueTasks]) {
+    if (task?.id != null && task.id !== "") seenIds.add(String(task.id));
+  }
+  return {
+    open: openTasks.length,
+    overdue: overdueTasks.length,
+    total: seenIds.size,
+  };
 };
 
 export default function OperatorLandingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t } = useLanguage();
-  const defaultDisciplines = useMemo(
-    () => getDefaultDisciplinesForUser(user),
-    [user?.id, user?.discipline, user?.department, user?.position]
-  );
-
-  const { data: badge = 0 } = useQuery({
-    queryKey: ["operatorTaskCounts", user?.id, defaultDisciplines],
-    queryFn: () => fetchOpenTaskBadgeCount(user, defaultDisciplines),
-    enabled: !!user,
+  
+  // Fetch user preferences to get discipline filter
+  const { data: preferences } = useQuery({
+    queryKey: ["userPreferences"],
+    queryFn: preferencesAPI.getPreferences,
+    staleTime: 60000,
+  });
+  
+  const disciplineFilter = preferences?.discipline || null;
+  
+  const { data: taskCounts } = useQuery({
+    queryKey: ["operatorTaskCounts", disciplineFilter],
+    queryFn: () => fetchTaskCounts(disciplineFilter),
     refetchInterval: 30000,
     staleTime: 10000,
   });
+
+  const badge = taskCounts?.total || 0;
 
   const getGreeting = () => {
     const hour = new Date().getHours();

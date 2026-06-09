@@ -993,7 +993,7 @@ async def create_investigation_from_threat(
     await _assert_threat_installation_scope(current_user, threat)
     
     # Check if investigation already exists for this threat
-    existing = await db.investigations.find_one({"threat_id": threat_id})
+    existing = await db.investigations.find_one({"threat_id": threat_id}, {"_id": 0})
     if existing:
         return {"investigation": existing, "message": "Investigation already exists for this threat"}
     

@@ -7,6 +7,13 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Observation Workspace — Exposure Cards now use severity colors (VERIFIED via screenshot)**:
+  - `ExposureCard` in `/app/frontend/src/pages/ObservationWorkspacePage.jsx` derives background/border/text colors from the dimension `score` (1-5) via `severityColorByScore` (1→green, 2→sky, 3→yellow, 4→orange, 5→red). The static `color` prop now only acts as a fallback when no score is present.
+  - "Not assessed" cards continue to render in neutral slate.
+  - Verified visually on `cf220c0e-0704-4e33-b11f-8eff98ed0d23` (Belt - band defect): Production card (score 3) renders yellow; Safety/Env/Reputation (score 1) render green.
+  - File: `/app/frontend/src/pages/ObservationWorkspacePage.jsx` (lines 92-146).
+
+## Recent Changes
 - [Feb 2026] **Chat Sidebar — Voice dictation visibility fix (VERIFIED via lint + compile)**:
   - Real-time speech recognition (`startListening`) now auto-focuses the textarea, moves the caret to end, and triggers `resizeAndScrollTextarea()` on every result so the latest transcribed words are always visible to the user.
   - Added a dedicated `useEffect([message, interimTranscript, isListening])` that resizes the textarea to fit content and scrolls to bottom whenever dictation appends words.
@@ -638,3 +645,53 @@ See `/app/memory/test_credentials.md`
 - Test reports: `/app/test_reports/iteration_33.json` (backend),
   `/app/test_reports/iteration_34.json` (frontend)
 
+
+---
+
+## 2026-02-09 — Observation Workspace UX polish (Action Plan, Recommendations, Process Sync)
+
+### Completed
+- **Discipline next to Library badge** — backend `get_recommended_actions` now passes `discipline` from failure-mode action dicts; frontend `RecommendedActionCard` shows `[PM] [Library] [Mechanical]`.
+- **PDM hidden from history timeline** — `get_equipment_timeline_events` now skips `pm`, `pdm`, and `scheduled` task types, leaving only reactive/corrective entries.
+- **Action Plan discipline** — `get_action_plan` now returns `discipline`, `description`, `action_type`, `assignee`, `due_date`, `comments`, `recommendation_id`.
+- **Edit action popup** — new `EditActionDialog` allows editing all fields (title, description, type, discipline, priority, status, assignee, due_date, comments) via `PATCH /api/actions/{id}`.
+- **Delete confirmation popup** — new `DeleteActionDialog` replaces `window.confirm`; uses shadcn Dialog with destructive button.
+- **Recommendations auto-restore** — backend filters out recommendations whose `id` matches `recommendation_id` of any existing action plan item; deleting the action makes the recommendation reappear automatically.
+- **Observation status ↔ Process Journey sync** — on each workspace fetch, the backend computes the current journey stage (furthest in_progress, else latest completed) and updates `threats.status` to match (`Observation` / `Assessment` / `Planning` / `Investigation` / `Action` / `Mitigated` / `Learning`). Matches the `STATUS_OPTIONS` already used by the workspace status dropdown.
+
+### Files Touched
+- `/app/backend/routes/observation_workspace.py` (discipline pass-through, action_plan fields, recommendation filter, status auto-sync, PDM/PM/Scheduled timeline filter)
+- `/app/frontend/src/pages/ObservationWorkspacePage.jsx` (EditActionDialog, DeleteActionDialog, edit/delete mutations, badge reordering)
+
+### Tests
+- Backend curl validation against existing observation (`cf220c0e-...`) — observation status correctly synced to `Planning`; recommendations expose `discipline`; action plan returns `discipline`/`action_type`/`recommendation_id`; PM/PDM filtered.
+- Lint clean on touched files.
+
+### Next Action Items
+- Manual UI verification of edit popup save + delete flow (user testing pending)
+- Optional: extend `EditActionDialog` to support attachment uploads (reuses `actionsAPI.uploadAttachment`)
+
+
+
+---
+
+## 2026-02-09 (later) — Status filter & migration aligned with Process Journey
+
+### Completed
+- **Observation status migration** — new one-shot script `/app/backend/scripts/migrate_observation_statuses.py` runs on backend startup. It rewrites every legacy `Open` / `In Progress` / `Parked` / `Closed` value to the new model (`Observation`, `Assessment`, `Planning`, `Investigation`, `Action`, `Mitigated`, `Learning`) using the same logic as `get_process_journey`. Idempotent — skips observations already on the new model.
+- **Production run result:** 13 scanned → 10 migrated, 3 skipped. Distribution after migration: Assessment 6, Planning 3, Learning 4. No legacy values remain.
+- **Threats list (`ThreatsPage.js`) `STATUS_OPTIONS`** rebuilt to the 7 journey stages with distinct color tokens (blue → cyan → purple → indigo → amber → green → slate).
+- **Default status filter** changed from `["Open", "In Progress"]` to all six active stages (everything except the terminal `Learning`).
+- **Terminal-state styling** (left border + mobile badge) now keyed on `Mitigated` / `Learning` instead of `Mitigated` / `Closed`.
+- **Production exposure ranges** realigned with default Production Criticality definitions: L1 = 0h, L2 = <8h, L3 = 8–24h, L4 = 24–72h, **L5 = >72h (open-ended, "More than €X" instead of "Up to")**.
+- **Edit Action popup** now fetches the full action via `actionsAPI.getById(id)`; Type dropdown maps legacy backend values (`preventive`/`corrective`/`predictive`/`operational`) to short codes; **Assignee + Priority fields removed** per user request.
+
+### Files Touched
+- `/app/backend/scripts/migrate_observation_statuses.py` (new)
+- `/app/backend/server.py` (calls migration after disciplines seed)
+- `/app/backend/routes/observation_workspace.py` (production exposure ranges + open-ended L5)
+- `/app/frontend/src/pages/ThreatsPage.js` (STATUS_OPTIONS, default filter, terminal-state checks)
+- `/app/frontend/src/pages/ObservationWorkspacePage.jsx` (EditActionDialog fetches full action, removed Assignee/Priority)
+
+### Notes
+- The workspace endpoint already auto-syncs each observation's status to the current journey stage on view, so future drift between status and journey is impossible.

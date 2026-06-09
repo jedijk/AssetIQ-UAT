@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Toaster } from "sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Suspense, lazy } from "react";
@@ -38,7 +38,9 @@ import MyTasksPage from "./pages/MyTasksPage";
 import FormSubmissionsPage from "./pages/FormSubmissionsPage";
 import QRScanPage from "./pages/QRScanPage";
 
-const ThreatDetailPage = lazy(() => import("./pages/ThreatDetailPage"));
+// ThreatDetailPage (classic observation view) is obsolete — the workspace
+// view is now the single source of truth. The /threats/:id route redirects
+// to /threats/:id/workspace via the RedirectToWorkspace component.
 const ObservationWorkspacePage = lazy(() => import("./pages/ObservationWorkspacePage"));
 const ActionDetailPage = lazy(() => import("./pages/ActionDetailPage"));
 const EquipmentManagerPage = lazy(() => import("./pages/EquipmentManagerPage"));
@@ -309,6 +311,12 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
+const RedirectToWorkspace = () => {
+  const { id } = useParams();
+  const location = useLocation();
+  return <Navigate to={`/threats/${id}/workspace${location.search || ""}`} replace />;
+};
+
 const PublicRoute = ({ children }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -435,7 +443,8 @@ function App() {
                 <Route path="production" element={<Suspense fallback={<RouteFallback />}><DashboardPage initialTab="production" /></Suspense>} />
                 <Route path="definitions" element={<Suspense fallback={<RouteFallback />}><DefinitionsPage /></Suspense>} />
                 <Route path="threats" element={<Suspense fallback={<RouteFallback />}><ThreatsPage /></Suspense>} />
-                <Route path="threats/:id" element={<Suspense fallback={<RouteFallback />}><ThreatDetailPage /></Suspense>} />
+                {/* /threats/:id legacy "classic" view is obsolete — redirect to workspace */}
+                <Route path="threats/:id" element={<RedirectToWorkspace />} />
                 <Route path="threats/:id/workspace" element={<Suspense fallback={<RouteFallback />}><ObservationWorkspacePage /></Suspense>} />
                 <Route path="actions" element={<Suspense fallback={<RouteFallback />}><ActionsPage /></Suspense>} />
                 <Route path="actions/:actionId" element={<Suspense fallback={<RouteFallback />}><ActionDetailPage /></Suspense>} />

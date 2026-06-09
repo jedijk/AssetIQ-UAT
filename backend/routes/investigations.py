@@ -467,7 +467,7 @@ async def delete_investigation(
     
     deleted_actions_count = 0
     
-    # Optionally delete linked Central Actions
+    # Optionally delete additional linked Central Actions
     if delete_central_actions:
         result = await db.central_actions.delete_many({
             "source_type": "investigation",

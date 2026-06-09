@@ -46,6 +46,8 @@ import {
   History,
   Zap,
   CircleDot,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -80,31 +82,6 @@ import ObservationDetailsSection from "../components/workspace/ObservationDetail
 import AIInsightsPanel from "../components/AIInsightsPanel";
 import CausalIntelligencePanel from "../components/CausalIntelligencePanel";
 
-const interpolate = (template, vars = {}) => {
-  if (!template || typeof template !== "string") return template;
-  return Object.entries(vars).reduce(
-    (s, [k, v]) => s.replace(new RegExp(`\\{${k}\\}`, "g"), String(v ?? "")),
-    template
-  );
-};
-
-const useTranslateEnum = () => {
-  const { t } = useLanguage();
-  return (value) => {
-    if (!value) return value;
-    const key = `enums.${value}`;
-    const out = t(key);
-    return out && out !== key ? out : value;
-  };
-};
-
-const DIMENSION_LABEL_KEYS = {
-  production: "observations.production",
-  safety: "observations.safety",
-  environmental: "observations.environment",
-  reputation: "observations.reputation",
-};
-
 // ============================================================================
 // SUB-COMPONENTS
 // ============================================================================
@@ -113,8 +90,6 @@ const DIMENSION_LABEL_KEYS = {
  * Exposure Card - Shows production, safety, environmental exposure
  */
 const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, criticalityDefs }) => {
-  const { t } = useLanguage();
-  const translateEnum = useTranslateEnum();
   const [popup, setPopup] = useState({ show: false, x: 0, y: 0 });
   const popupRef = useRef(null);
 
@@ -129,13 +104,29 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
     return () => document.removeEventListener("mousedown", handler);
   }, [popup.show]);
 
+  // Color is derived from the severity score (1-5) when present, so all
+  // exposure cards use the same red→amber→yellow→sky→green scale and stay
+  // visually consistent with the criticality assessment colors. The `color`
+  // prop becomes the fallback when no score is provided.
   const colorClasses = {
     amber: "bg-amber-50 border-amber-200 text-amber-700",
     red: "bg-red-50 border-red-200 text-red-700",
     green: "bg-green-50 border-green-200 text-green-700",
     blue: "bg-blue-50 border-blue-200 text-blue-700",
     purple: "bg-purple-50 border-purple-200 text-purple-700",
+    sky: "bg-sky-50 border-sky-200 text-sky-700",
+    yellow: "bg-yellow-50 border-yellow-200 text-yellow-700",
+    orange: "bg-orange-50 border-orange-200 text-orange-700",
   };
+  
+  const severityColorByScore = {
+    5: "red",
+    4: "orange",
+    3: "yellow",
+    2: "sky",
+    1: "green",
+  };
+  const effectiveColor = severityColorByScore[score] || color;
 
   // The field name on each criticality definition row that holds this dimension's description.
   const fieldByDim = { safety: "safety", production: "production", environmental: "environment", reputation: "reputation" };
@@ -152,27 +143,27 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
   return (
     <>
       <div
-        className={`rounded-xl border px-3 py-2 ${dimension ? "cursor-context-menu" : ""} ${isNotAssessed ? "bg-slate-50 border-slate-200 text-slate-500" : colorClasses[color]}`}
+        className={`rounded-xl border px-3 py-2 ${dimension ? "cursor-context-menu" : ""} ${isNotAssessed ? "bg-slate-50 border-slate-200 text-slate-500" : colorClasses[effectiveColor]}`}
         onContextMenu={dimension ? (e) => {
           e.preventDefault();
           setPopup({ show: true, x: e.clientX, y: e.clientY });
         } : undefined}
-        title={dimension ? t("observationWorkspace.criticalityRightClick") : undefined}
+        title={dimension ? "Right-click for criticality definition" : undefined}
         data-testid={dimension ? `exposure-card-${dimension}` : undefined}
       >
         <div className="flex items-center gap-1.5 mb-0.5">
-          <Icon className="w-3.5 h-3.5" />
-          <span className="text-[10px] font-medium uppercase tracking-wide">{type}</span>
+          <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+          <span className="text-[10px] font-medium uppercase tracking-wide truncate">{type}</span>
         </div>
         {isNotAssessed ? (
-          <div className="text-sm font-semibold leading-tight italic">{t("observationWorkspace.notAssessed")}</div>
+          <div className="text-sm font-semibold leading-tight italic">Not Assessed</div>
         ) : (
           <>
             {data.primary && (
-              <div className="text-lg font-bold leading-tight">{data.primary}</div>
+              <div className="text-base sm:text-lg font-bold leading-tight break-words">{data.primary}</div>
             )}
             {data.secondary && (
-              <div className="text-[11px] opacity-80 leading-tight">{data.secondary}</div>
+              <div className="text-[11px] opacity-80 leading-tight line-clamp-2">{data.secondary}</div>
             )}
             {data.tertiary && (
               <div className="text-[11px] opacity-70 leading-tight">{data.tertiary}</div>
@@ -194,11 +185,7 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
             }}
           >
             <div className="flex items-center justify-between px-3 py-2 border-b">
-              <h3 className="font-semibold text-sm text-slate-800 capitalize">
-                {interpolate(t("observationWorkspace.criticalityTitle"), {
-                  dimension: t(DIMENSION_LABEL_KEYS[dimension] || dimension),
-                })}
-              </h3>
+              <h3 className="font-semibold text-sm text-slate-800 capitalize">{dimension} criticality</h3>
               <button onClick={() => setPopup({ show: false, x: 0, y: 0 })} className="p-1 hover:bg-slate-100 rounded">
                 <X className="w-4 h-4 text-slate-400" />
               </button>
@@ -210,9 +197,7 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
                     {currentRow.rank}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-slate-800">
-                      {currentRow.label || interpolate(t("observationWorkspace.levelN"), { rank: currentRow.rank })}
-                    </div>
+                    <div className="text-sm font-semibold text-slate-800">{currentRow.label || `Level ${currentRow.rank}`}</div>
                     <div className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap mt-1">{currentRow[field]}</div>
                   </div>
                 </div>
@@ -221,7 +206,7 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
                   <div className="flex-shrink-0 w-9 h-9 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
                     <AlertTriangle className="w-4 h-4" />
                   </div>
-                  <div className="text-sm text-slate-500 italic">{t("observationWorkspace.notAssessed")}</div>
+                  <div className="text-sm text-slate-500 italic">Not Assessed</div>
                 </div>
               )}
             </div>
@@ -236,10 +221,8 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
  * ALARP Progress Card
  */
 const ALARPCard = ({ alarp }) => {
-  const { t } = useLanguage();
-  const translateEnum = useTranslateEnum();
   const percentage = alarp?.percentage || 0;
-  const status = translateEnum(alarp?.status || "Not Started");
+  const status = alarp?.status || "Not Started";
   
   const getStatusColor = () => {
     if (percentage >= 90) return "text-green-600";
@@ -253,7 +236,7 @@ const ALARPCard = ({ alarp }) => {
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-1.5">
           <Target className="w-3.5 h-3.5 text-indigo-600" />
-          <span className="text-[10px] font-medium text-indigo-700 uppercase tracking-wide">{t("observationWorkspace.mitigated")}</span>
+          <span className="text-[10px] font-medium text-indigo-700 uppercase tracking-wide">Mitigated</span>
         </div>
         <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${getStatusColor()}`}>
           {status}
@@ -274,17 +257,14 @@ const ALARPCard = ({ alarp }) => {
  * Risk Summary Card
  */
 const RiskSummaryCard = ({ riskSummary }) => {
-  const { t } = useLanguage();
-  const translateEnum = useTranslateEnum();
   const riskScore = riskSummary?.risk_score || 0;
-  const rawRiskLevel = riskSummary?.risk_level || "Low";
-  const riskLevel = translateEnum(rawRiskLevel);
+  const riskLevel = riskSummary?.risk_level || "Low";
   const rpn = riskSummary?.rpn;
 
   const getRiskColor = () => {
-    if (rawRiskLevel === "Critical") return "border-red-300 bg-red-50";
-    if (rawRiskLevel === "High") return "border-orange-300 bg-orange-50";
-    if (rawRiskLevel === "Medium") return "border-yellow-300 bg-yellow-50";
+    if (riskLevel === "Critical") return "border-red-300 bg-red-50";
+    if (riskLevel === "High") return "border-orange-300 bg-orange-50";
+    if (riskLevel === "Medium") return "border-yellow-300 bg-yellow-50";
     return "border-green-300 bg-green-50";
   };
 
@@ -297,12 +277,12 @@ const RiskSummaryCard = ({ riskSummary }) => {
           detail: { x: e.clientX, y: e.clientY },
         }));
       }}
-      title={t("observationWorkspace.riskRightClick")}
+      title="Right-click for score calculation details"
       data-testid="kpi-risk-card"
     >
       <div className="flex items-center gap-1.5 mb-0.5">
         <AlertTriangle className="w-3.5 h-3.5" />
-        <span className="text-[10px] font-medium uppercase tracking-wide">{t("observationWorkspace.risk")}</span>
+        <span className="text-[10px] font-medium uppercase tracking-wide">Risk</span>
       </div>
       <div className="flex items-baseline gap-2 leading-tight">
         <span className="text-lg font-bold">{riskScore}</span>
@@ -320,25 +300,27 @@ const RiskSummaryCard = ({ riskSummary }) => {
  */
 const TimelineEventCard = ({ event, isCurrent }) => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
-  const translateEnum = useTranslateEnum();
   
   const getEventConfig = (type) => {
     const configs = {
-      observation: { icon: AlertTriangle, color: "amber", labelKey: "enums.Observation" },
-      failure: { icon: XCircle, color: "red", labelKey: "enums.Failure" },
-      work_order: { icon: Wrench, color: "blue", labelKey: "enums.Work Order" },
-      inspection: { icon: Eye, color: "green", labelKey: "enums.Inspection" },
-      repair: { icon: Wrench, color: "purple", labelKey: "enums.Repair" },
-      investigation: { icon: FileSearch, color: "indigo", labelKey: "enums.Investigation" },
-      strategy_change: { icon: Cog, color: "slate", labelKey: "enums.Strategy Change" },
+      observation: { icon: AlertTriangle, color: "amber", label: "Observation" },
+      failure: { icon: XCircle, color: "red", label: "Failure" },
+      work_order: { icon: Wrench, color: "blue", label: "Action" },
+      action: { icon: Wrench, color: "blue", label: "Action" },
+      inspection: { icon: Eye, color: "green", label: "Inspection" },
+      repair: { icon: Wrench, color: "purple", label: "Repair" },
+      investigation: { icon: FileSearch, color: "indigo", label: "Investigation" },
+      strategy_change: { icon: Cog, color: "slate", label: "Strategy Change" },
     };
-    const cfg = configs[type] || configs.observation;
-    return { ...cfg, label: t(cfg.labelKey) };
+    return configs[type] || configs.observation;
   };
 
   const config = getEventConfig(event.event_type);
   const Icon = config.icon;
+  
+  // For actions/work orders, show the action_type (PM, CM, PDM, etc.)
+  const isAction = event.event_type === "action" || event.event_type === "work_order";
+  const actionType = event.action_type || event.task_type || event.type;
   
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
@@ -364,41 +346,49 @@ const TimelineEventCard = ({ event, isCurrent }) => {
     try { tooltipParts.push(format(parseISO(event.date), "PPP")); } catch (_) { tooltipParts.push(event.date); }
   }
   if (config.label) tooltipParts.push(config.label);
+  if (actionType) tooltipParts.push(`Type: ${actionType}`);
   if (event.reference_id) tooltipParts.push(event.reference_id);
-  if (event.status) tooltipParts.push(interpolate(t("observationWorkspace.statusLabel"), { status: translateEnum(event.status) }));
+  if (event.status) tooltipParts.push(`Status: ${event.status}`);
   if (event.description) tooltipParts.push(event.description);
   const tooltip = tooltipParts.join("\n");
 
   return (
     <div 
-      className="flex flex-col items-center cursor-pointer group flex-shrink-0 w-32"
+      className="flex flex-col items-center cursor-pointer group flex-shrink-0 w-20"
       onClick={handleClick}
       title={tooltip}
     >
       {/* Date */}
-      <div className="text-[11px] text-slate-500 mb-2 font-medium h-4 leading-4">
+      <div className="text-[10px] text-slate-500 mb-1.5 font-medium h-3.5 leading-3.5">
         {formatDate(event.date)}
       </div>
       
       {/* Event Circle — sits above the connector line; bg-white outer ring punches through the rail */}
-      <div className={`relative z-10 w-10 h-10 rounded-full flex items-center justify-center transition-transform group-hover:scale-105 ring-2 ring-white ${
+      <div className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center transition-transform group-hover:scale-105 ring-2 ring-white ${
         isCurrent 
-          ? "bg-blue-600 text-white shadow-md shadow-blue-200"
+          ? "bg-blue-600 text-white shadow-sm shadow-blue-200"
           : `bg-${config.color}-100 text-${config.color}-600`
       }`}>
-        <Icon className="w-4 h-4" />
+        <Icon className="w-3 h-3" />
       </div>
       
+      {/* Action Type Badge (for actions/work orders) */}
+      {isAction && actionType && (
+        <div className="text-[9px] font-semibold mt-1 px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+          {actionType}
+        </div>
+      )}
+      
       {/* Event Title */}
-      <div className={`text-[11px] font-medium mt-2 text-center max-w-[120px] truncate leading-tight ${
+      <div className={`text-[10px] font-medium ${isAction && actionType ? 'mt-1' : 'mt-1.5'} text-center max-w-[72px] truncate leading-tight ${
         isCurrent ? "text-blue-700 font-semibold" : "text-slate-700"
       }`}>
-        {event.title?.substring(0, 25) || config.label}
+        {event.title?.substring(0, 22) || config.label}
       </div>
       
       {/* Reference ID */}
       {event.reference_id && (
-        <div className="text-[10px] text-slate-400 mt-0.5 leading-none">
+        <div className="text-[9px] text-slate-400 mt-0.5 leading-none">
           {event.reference_id}
         </div>
       )}
@@ -410,60 +400,56 @@ const TimelineEventCard = ({ event, isCurrent }) => {
  * Equipment Reliability Timeline
  */
 const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
-  const [viewMode, setViewMode] = useState("timeline");
+  const [viewMode, setViewMode] = useState("timeline"); // timeline or list
   const navigate = useNavigate();
-  const { t } = useLanguage();
-  const translateEnum = useTranslateEnum();
 
   // Find current event
   const currentEvent = events?.find(e => e.is_current);
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-slate-100 rounded-lg">
-            <History className="w-5 h-5 text-slate-600" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-slate-900">{t("observationWorkspace.equipmentHistory")}</h3>
-            <p className="text-xs text-slate-500">{t("observationWorkspace.equipmentHistorySubtitle")}</p>
-          </div>
+    <div className="bg-white rounded-lg border border-slate-200 px-3 py-2">
+      {/* Header — compact */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <History className="w-3.5 h-3.5 text-slate-500" />
+          <h3 className="font-medium text-xs text-slate-700">Equipment History</h3>
+          {events && events.length > 0 && (
+            <span className="text-[10px] text-slate-400">({events.length})</span>
+          )}
         </div>
         
         {/* View Toggle */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <Button
-            variant={viewMode === "timeline" ? "default" : "outline"}
+            variant={viewMode === "timeline" ? "default" : "ghost"}
             size="sm"
             onClick={() => setViewMode("timeline")}
-            className="h-8"
+            className="h-6 px-2 text-xs"
           >
-            <Calendar className="w-4 h-4 mr-1" />
-            {t("observationWorkspace.timeline")}
+            <Calendar className="w-3 h-3 mr-1" />
+            Timeline
           </Button>
           <Button
-            variant={viewMode === "list" ? "default" : "outline"}
+            variant={viewMode === "list" ? "default" : "ghost"}
             size="sm"
             onClick={() => setViewMode("list")}
-            className="h-8"
+            className="h-6 px-2 text-xs"
           >
-            <List className="w-4 h-4 mr-1" />
-            {t("observationWorkspace.list")}
+            <List className="w-3 h-3 mr-1" />
+            List
           </Button>
         </div>
       </div>
 
       {/* Timeline View */}
       {viewMode === "timeline" && events && events.length > 0 ? (
-        <div className="relative px-2">
+        <div className="relative px-1.5">
           {/* Horizontal connector — aligned with the centre of the event circles.
-              Position math: date row (16px text + mb-2 = 8px) + half of circle (40/2 = 20px) = 44px. */}
-          <div className="pointer-events-none absolute left-0 right-0 h-px bg-slate-200" style={{ top: "44px" }} />
+              Position math: date row (14px text + mb-1.5 = 6px) + half of circle (24/2 = 12px) = 32px. */}
+          <div className="pointer-events-none absolute left-0 right-0 h-px bg-slate-200" style={{ top: "32px" }} />
           
           {/* Events */}
-          <div className="flex items-start overflow-x-auto pb-2 gap-4 scrollbar-thin scrollbar-thumb-slate-300">
+          <div className="flex items-start overflow-x-auto pb-1.5 gap-3 scrollbar-thin scrollbar-thumb-slate-300">
             {events.slice(0, 10).map((event, index) => (
               <TimelineEventCard 
                 key={event.id || index}
@@ -474,17 +460,22 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
           </div>
         </div>
       ) : viewMode === "list" ? (
-        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+        <div className="space-y-1.5 max-h-[240px] overflow-y-auto">
           {events?.map((event, index) => {
             const config = {
-              observation: { icon: AlertTriangle, color: "amber" },
-              failure: { icon: XCircle, color: "red" },
-              work_order: { icon: Wrench, color: "blue" },
-              inspection: { icon: Eye, color: "green" },
-              repair: { icon: Wrench, color: "purple" },
-              investigation: { icon: FileSearch, color: "indigo" },
-            }[event.event_type] || { icon: CircleDot, color: "slate" };
+              observation: { icon: AlertTriangle, color: "amber", label: "Observation" },
+              failure: { icon: XCircle, color: "red", label: "Failure" },
+              work_order: { icon: Wrench, color: "blue", label: "Action" },
+              action: { icon: Wrench, color: "blue", label: "Action" },
+              inspection: { icon: Eye, color: "green", label: "Inspection" },
+              repair: { icon: Wrench, color: "purple", label: "Repair" },
+              investigation: { icon: FileSearch, color: "indigo", label: "Investigation" },
+            }[event.event_type] || { icon: CircleDot, color: "slate", label: "Event" };
             const Icon = config.icon;
+            
+            // For actions/work orders, show the action_type (PM, CM, PDM, etc.)
+            const isAction = event.event_type === "action" || event.event_type === "work_order";
+            const actionType = event.action_type || event.task_type || event.type;
             
             return (
               <div 
@@ -504,6 +495,16 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
                   <Icon className={`w-4 h-4 text-${config.color}-600`} />
                 </div>
                 <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    {isAction && actionType && (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                        {actionType}
+                      </span>
+                    )}
+                    {!isAction && (
+                      <span className="text-[10px] text-slate-500">{config.label}</span>
+                    )}
+                  </div>
                   <div className="font-medium text-sm text-slate-900 truncate">{event.title}</div>
                   <div className="text-xs text-slate-500">
                     {event.date && format(parseISO(event.date), "MMM d, yyyy")}
@@ -511,10 +512,10 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
                   </div>
                 </div>
                 {event.is_current && (
-                  <Badge className="bg-blue-600 text-xs">{t("observationWorkspace.current")}</Badge>
+                  <Badge className="bg-blue-600 text-xs">Current</Badge>
                 )}
                 {event.status && !event.is_current && (
-                  <Badge variant="outline" className="text-xs capitalize">{translateEnum(event.status)}</Badge>
+                  <Badge variant="outline" className="text-xs capitalize">{event.status}</Badge>
                 )}
               </div>
             );
@@ -523,7 +524,7 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
       ) : (
         <div className="text-center py-8 text-slate-500">
           <History className="w-12 h-12 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">{t("observationWorkspace.noHistoricalEvents")}</p>
+          <p className="text-sm">No historical events found</p>
         </div>
       )}
     </div>
@@ -534,38 +535,39 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
  * Reliability Intelligence Panel
  */
 const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threatId, threatData }) => {
-  const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 bg-purple-100 rounded-lg">
-          <Brain className="w-5 h-5 text-purple-600" />
-        </div>
-        <div>
-          <h3 className="font-semibold text-slate-900">{t("observationWorkspace.reliabilityIntelligence")}</h3>
-          <p className="text-xs text-slate-500">{t("observationWorkspace.reliabilityIntelligenceSubtitle")}</p>
+    <div className="bg-white rounded-xl border border-slate-200 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto scrollbar-thin">
+      {/* Header — sticky on scroll */}
+      <div className="lg:sticky lg:top-0 z-10 bg-white px-4 sm:px-6 pt-4 sm:pt-6 pb-3 border-b border-slate-100">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-purple-100 rounded-lg">
+            <Brain className="w-5 h-5 text-purple-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-slate-900">Reliability Intelligence</h3>
+            <p className="text-xs text-slate-500">AI-powered root cause analysis</p>
+          </div>
         </div>
       </div>
 
-      {/* Most Likely Cause */}
-      <div className="mb-6">
-        <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-          {t("observationWorkspace.mostLikelyCause")}
+      <div className="px-4 sm:px-6 pt-4 pb-4 sm:pb-6">
+
+      {/* Most Likely Cause — compact */}
+      <div className="mb-3">
+        <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1">
+          Most Likely Cause
         </div>
-        <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-          <div className="font-semibold text-purple-900 text-lg">
-            {intelligence?.most_likely_cause?.name || t("common.unknown")}
+        <div className="p-2 bg-purple-50 border border-purple-200 rounded-md">
+          <div className="font-semibold text-purple-900 text-sm leading-tight">
+            {intelligence?.most_likely_cause?.name || "Unknown"}
           </div>
-          <div className="flex items-center gap-2 mt-2">
-            <div className="text-sm text-purple-700">
-              {interpolate(t("observationWorkspace.confidencePercent"), {
-                percent: intelligence?.most_likely_cause?.confidence || 0,
-              })}
+          <div className="flex items-center gap-1.5 mt-1">
+            <div className="text-[10px] text-purple-700 whitespace-nowrap">
+              {intelligence?.most_likely_cause?.confidence || 0}% Confidence
             </div>
-            <div className="flex-1 h-1.5 bg-purple-200 rounded-full overflow-hidden">
+            <div className="flex-1 h-1 bg-purple-200 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-purple-600 rounded-full"
                 style={{ width: `${intelligence?.most_likely_cause?.confidence || 0}%` }}
@@ -578,27 +580,27 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
       {/* Supporting Evidence */}
       <div className="mb-6">
         <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-          {t("observationWorkspace.supportingEvidence")}
+          Supporting Evidence
         </div>
         <div className="space-y-2">
           {intelligence?.supporting_evidence && (
             <>
               <div className="flex items-center gap-2 text-sm">
                 <Check className="w-4 h-4 text-green-500" />
-                <span>{interpolate(t("observationWorkspace.similarEvents"), { count: intelligence.supporting_evidence.historical_events || 0 })}</span>
+                <span>{intelligence.supporting_evidence.historical_events || 0} Similar Events</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Check className="w-4 h-4 text-green-500" />
-                <span>{interpolate(t("observationWorkspace.previousFailures"), { count: intelligence.supporting_evidence.previous_failures || 0 })}</span>
+                <span>{intelligence.supporting_evidence.previous_failures || 0} Previous Failures</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Check className="w-4 h-4 text-green-500" />
-                <span>{interpolate(t("observationWorkspace.workOrdersCount"), { count: intelligence.supporting_evidence.work_orders || 0 })}</span>
+                <span>{intelligence.supporting_evidence.work_orders || 0} Actions</span>
               </div>
               {intelligence.supporting_evidence.inspection_evidence && (
                 <div className="flex items-center gap-2 text-sm">
                   <Check className="w-4 h-4 text-green-500" />
-                  <span>{t("observationWorkspace.inspectionEvidence")}</span>
+                  <span>Inspection Evidence</span>
                 </div>
               )}
             </>
@@ -609,7 +611,7 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
       {/* Contributing Factors */}
       <div className="mb-6">
         <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-          {t("observationWorkspace.contributingFactors")}
+          Contributing Factors
         </div>
         <div className="space-y-2">
           {intelligence?.contributing_factors?.slice(0, 4).map((factor, index) => (
@@ -626,16 +628,22 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
         </div>
       </div>
 
-      {/* View Full Analysis Button — opens combined AI Risk + Causal dialog */}
-      <Button 
-        variant="default"
-        className="w-full bg-purple-600 hover:bg-purple-700"
+      {/* View Full Analysis Button — opens combined AI Risk + Causal dialog
+          Desktop-only: the dialog content is too dense for mobile screens. */}
+      <Button
+        size="sm"
+        className="w-full h-7 text-xs bg-purple-600 hover:bg-purple-700 hidden lg:inline-flex"
         onClick={onViewFullAnalysis}
         data-testid="open-full-analysis-btn"
       >
-        <Eye className="w-4 h-4 mr-2" />
-        {t("observationWorkspace.viewFullAnalysis")}
+        <Eye className="w-3.5 h-3.5 mr-1.5" />
+        View Full Analysis
       </Button>
+      {/* Mobile note */}
+      <p className="lg:hidden text-[10px] text-slate-400 text-center mt-1">
+        Full analysis available on desktop
+      </p>
+      </div>
     </div>
   );
 };
@@ -643,100 +651,77 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
 /**
  * Recommended Action Card
  */
-const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding }) => {
-  const { t } = useLanguage();
-  const [expanded, setExpanded] = useState(false);
-  
-  const actionTypeColors = {
-    PM: "bg-blue-100 text-blue-700 border-blue-200",
-    CM: "bg-orange-100 text-orange-700 border-orange-200",
-    PDM: "bg-purple-100 text-purple-700 border-purple-200",
-    OP: "bg-green-100 text-green-700 border-green-200",
+const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding, isInPlan }) => {
+  const typeColors = {
+    PM: "bg-blue-100 text-blue-700",
+    CM: "bg-amber-100 text-amber-700",
+    PDM: "bg-purple-100 text-purple-700",
+    OP: "bg-green-100 text-green-700",
   };
 
-  const sourceColors = {
-    failure_mode_library: "bg-amber-100 text-amber-700",
-    ai_generated: "bg-purple-100 text-purple-700",
-  };
+  const sourceLabel = action.source === "failure_mode_library" ? "Library" : "AI";
+  const sourceColor = action.source === "failure_mode_library" 
+    ? "bg-amber-50 text-amber-600 border-amber-200" 
+    : "bg-purple-50 text-purple-600 border-purple-200";
 
   return (
-    <div className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 transition-colors">
-      {/* Header */}
-      <div className="flex items-start gap-3 mb-3">
-        <Badge className={`text-xs ${actionTypeColors[action.action_type] || actionTypeColors.PM}`}>
-          {action.action_type}
-        </Badge>
+    <div className={`p-2 rounded-lg border transition-colors group ${
+      isInPlan 
+        ? "bg-green-50 border-green-200" 
+        : "bg-slate-50 border-slate-100 hover:border-slate-200"
+    }`}>
+      {/* Main row: Info + Add button */}
+      <div className="flex items-start gap-2">
+        {/* Left: Info */}
         <div className="flex-1 min-w-0">
-          <div className="font-medium text-slate-900 text-sm">{action.title}</div>
-        </div>
-      </div>
-
-      {/* Source & Impact */}
-      <div className="flex items-center gap-2 mb-3 flex-wrap">
-        <Badge variant="outline" className={`text-[10px] ${sourceColors[action.source] || ""}`}>
-          {action.source_display || action.source}
-        </Badge>
-        {action.expected_impact && (
-          <span className="text-xs text-slate-500">
-            {interpolate(t("observationWorkspace.impactLabel"), { impact: action.expected_impact })}
-          </span>
-        )}
-        {action.confidence && (
-          <span className="text-xs text-purple-600">
-            {interpolate(t("observationWorkspace.confidenceLabel"), { percent: action.confidence })}
-          </span>
-        )}
-      </div>
-
-      {/* Expandable Why Recommended */}
-      {action.why_recommended && (
-        <div className="mb-3">
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
-          >
-            <ChevronDown className={`w-3 h-3 transition-transform ${expanded ? "rotate-180" : ""}`} />
-            {t("observationWorkspace.whyRecommended")}
-          </button>
-          <AnimatePresence>
-            {expanded && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="text-xs text-slate-600 mt-2 p-2 bg-slate-50 rounded-lg">
-                  {action.why_recommended}
-                </div>
-              </motion.div>
+          {/* Header row: Type badge, time, source, discipline */}
+          <div className="flex items-center gap-1 mb-1 flex-wrap">
+            {action.action_type && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${typeColors[action.action_type] || 'bg-slate-100 text-slate-600'}`}>
+                {action.action_type}
+              </span>
             )}
-          </AnimatePresence>
-        </div>
-      )}
+            {action.estimated_minutes && (
+              <span className="text-[10px] text-slate-500">
+                {action.estimated_minutes}m
+              </span>
+            )}
+            <span className={`text-[10px] px-1 py-0.5 rounded border ${sourceColor}`}>
+              {sourceLabel}
+            </span>
+            {action.discipline && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 capitalize" data-testid="recommended-action-discipline">
+                {action.discipline}
+              </span>
+            )}
+            {isInPlan && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-medium ml-auto">
+                In Plan
+              </span>
+            )}
+          </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-2">
+          {/* Description */}
+          <p className="text-xs text-slate-700 leading-snug">
+            {action.title || action.description || action.action}
+          </p>
+        </div>
+
+        {/* Right: Add button (disabled if already in plan) */}
         <Button
           size="sm"
           onClick={() => onAddToPlan(action)}
-          disabled={isAdding}
-          className="flex-1 h-8 text-xs"
+          disabled={isAdding || isInPlan}
+          className={`h-7 w-7 p-0 flex-shrink-0 ${isInPlan ? 'bg-green-600' : ''}`}
+          title={isInPlan ? "Already in action plan" : "Add to action plan"}
         >
           {isAdding ? (
-            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : isInPlan ? (
+            <Check className="w-3.5 h-3.5" />
           ) : (
-            <Plus className="w-3 h-3 mr-1" />
+            <Plus className="w-3.5 h-3.5" />
           )}
-          {t("observationWorkspace.addToPlan")}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => onAddToStrategy(action)}
-          className="h-8 text-xs"
-        >
-          {t("observationWorkspace.addToStrategy")}
         </Button>
       </div>
     </div>
@@ -747,7 +732,6 @@ const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding 
  * Recommended Actions Panel
  */
 const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddToPlan, onAddToStrategy, onGenerateAI, isGeneratingAI }) => {
-  const { t } = useLanguage();
   const [addingId, setAddingId] = useState(null);
 
   // Separate by source
@@ -764,17 +748,21 @@ const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddTo
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 bg-blue-100 rounded-lg">
-          <Lightbulb className="w-5 h-5 text-blue-600" />
-        </div>
-        <div>
-          <h3 className="font-semibold text-slate-900">{t("observationWorkspace.recommendedActions")}</h3>
-          <p className="text-xs text-slate-500">{t("observationWorkspace.recommendedActionsSubtitle")}</p>
+    <div className="bg-white rounded-xl border border-slate-200 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto scrollbar-thin">
+      {/* Header — sticky on scroll */}
+      <div className="lg:sticky lg:top-0 z-10 bg-white px-4 sm:px-6 pt-4 sm:pt-6 pb-3 border-b border-slate-100">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-blue-100 rounded-lg">
+            <Lightbulb className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-slate-900">Recommended Actions</h3>
+            <p className="text-xs text-slate-500">Strategy actions &amp; AI recommendations</p>
+          </div>
         </div>
       </div>
+
+      <div className="px-4 sm:px-6 pt-4 pb-4 sm:pb-6">
 
       {/* Library Actions */}
       {libraryActions.length > 0 && (
@@ -782,7 +770,7 @@ const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddTo
           <div className="flex items-center gap-2 mb-3">
             <div className="w-2 h-2 rounded-full bg-amber-400" />
             <span className="text-xs font-medium text-slate-700 uppercase tracking-wide">
-              {t("observationWorkspace.failureModeLibrary")}
+              Failure Mode Library
             </span>
             <Badge variant="outline" className="text-[10px]">{libraryActions.length}</Badge>
           </div>
@@ -806,7 +794,7 @@ const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddTo
           <div className="flex items-center gap-2 mb-3">
             <div className="w-2 h-2 rounded-full bg-purple-400" />
             <span className="text-xs font-medium text-slate-700 uppercase tracking-wide">
-              {t("observationWorkspace.aiGenerated")}
+              AI Generated
             </span>
             <Badge variant="outline" className="text-[10px]">{aiActions.length}</Badge>
           </div>
@@ -827,103 +815,623 @@ const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddTo
       {!recommendations || recommendations.length === 0 && (
         <div className="text-center py-8 text-slate-500">
           <Lightbulb className="w-12 h-12 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">{t("observationWorkspace.noRecommendations")}</p>
-          <p className="text-xs text-slate-400 mt-1">{t("observationWorkspace.noRecommendationsHint")}</p>
+          <p className="text-sm">No recommendations available</p>
+          <p className="text-xs text-slate-400 mt-1">Link a failure mode to get recommendations</p>
         </div>
       )}
+      </div>
     </div>
   );
 };
 
+// Map backend action_type values (e.g. "preventive") to short UI codes (PM/CM/PDM/OP/LEARN/IV)
+const normalizeActionType = (val) => {
+  if (!val) return "CM";
+  const v = String(val).toUpperCase();
+  if (["PM", "CM", "PDM", "OP", "LEARN", "IV"].includes(v)) return v;
+  const lc = String(val).toLowerCase();
+  if (lc.startsWith("prev")) return "PM";
+  if (lc.startsWith("corr")) return "CM";
+  if (lc.startsWith("pred")) return "PDM";
+  if (lc.startsWith("oper")) return "OP";
+  if (lc.startsWith("learn")) return "LEARN";
+  if (lc.startsWith("invest")) return "IV";
+  return "CM";
+};
+
 /**
- * Action Plan Panel
+ * Edit Action form body — lazy-initialised from the full action.
+ * Kept as a separate component (rendered with key={fullAction.id}) so the
+ * lazy useState initialiser fires each time a new action is loaded,
+ * eliminating the need for a setState-inside-useEffect.
  */
-const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onValidateAction }) => {
-  const navigate = useNavigate();
-  const { t } = useLanguage();
-  const translateEnum = useTranslateEnum();
+const EditActionForm = ({ fullAction, onSubmit, onCancel, isSaving }) => {
+  const [form, setForm] = useState(() => ({
+    title: fullAction?.title || "",
+    description: fullAction?.description || "",
+    action_type: normalizeActionType(fullAction?.action_type),
+    discipline: fullAction?.discipline || "",
+    status: fullAction?.status || "open",
+    due_date: fullAction?.due_date ? String(fullAction.due_date).split("T")[0] : "",
+    comments: fullAction?.comments || "",
+  }));
 
-  const statusConfig = {
-    open: { color: "bg-blue-100 text-blue-700", labelKey: "enums.Open" },
-    planned: { color: "bg-purple-100 text-purple-700", labelKey: "enums.Planned" },
-    in_progress: { color: "bg-amber-100 text-amber-700", labelKey: "enums.In Progress" },
-    completed: { color: "bg-green-100 text-green-700", labelKey: "enums.Completed" },
-    validated: { color: "bg-emerald-100 text-emerald-700", labelKey: "enums.Validated" },
-  };
+  const handleChange = (field, value) => setForm((f) => ({ ...f, [field]: value }));
 
-  const priorityConfig = {
-    critical: "text-red-600",
-    high: "text-orange-600",
-    medium: "text-amber-600",
-    low: "text-green-600",
+  const handleSubmit = () => {
+    onSubmit({
+      title: form.title,
+      description: form.description,
+      action_type: form.action_type,
+      discipline: form.discipline || null,
+      status: form.status,
+      due_date: form.due_date || null,
+      comments: form.comments || null,
+    });
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-green-100 rounded-lg">
-            <ClipboardList className="w-5 h-5 text-green-600" />
+    <>
+      <div className="grid gap-3 py-2">
+        <div className="grid gap-1.5">
+          <Label htmlFor="edit-title">Title</Label>
+          <Input
+            id="edit-title"
+            value={form.title}
+            onChange={(e) => handleChange("title", e.target.value)}
+            data-testid="edit-action-title"
+          />
+        </div>
+
+        <div className="grid gap-1.5">
+          <Label htmlFor="edit-desc">Description</Label>
+          <Textarea
+            id="edit-desc"
+            rows={3}
+            value={form.description}
+            onChange={(e) => handleChange("description", e.target.value)}
+            data-testid="edit-action-description"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-1.5">
+            <Label>Type</Label>
+            <Select value={form.action_type} onValueChange={(v) => handleChange("action_type", v)}>
+              <SelectTrigger data-testid="edit-action-type"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="CM">CM — Corrective</SelectItem>
+                <SelectItem value="PM">PM — Preventive</SelectItem>
+                <SelectItem value="PDM">PDM — Predictive</SelectItem>
+                <SelectItem value="OP">OP — Operational</SelectItem>
+                <SelectItem value="LEARN">LEARN — Learning / Strategy update</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <div>
-            <h3 className="font-semibold text-slate-900">{t("observationWorkspace.actionPlan")}</h3>
-            <p className="text-xs text-slate-500">
-              {(actions?.length || 0) === 1
-                ? interpolate(t("observationWorkspace.actionsTracked"), { count: actions?.length || 0 })
-                : interpolate(t("observationWorkspace.actionsTrackedPlural"), { count: actions?.length || 0 })}
-            </p>
+
+          <div className="grid gap-1.5">
+            <Label>Discipline</Label>
+            <Select value={form.discipline || "none"} onValueChange={(v) => handleChange("discipline", v === "none" ? "" : v)}>
+              <SelectTrigger data-testid="edit-action-discipline"><SelectValue placeholder="—" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— None —</SelectItem>
+                <SelectItem value="Mechanical">Mechanical</SelectItem>
+                <SelectItem value="Electrical">Electrical</SelectItem>
+                <SelectItem value="Instrumentation">Instrumentation</SelectItem>
+                <SelectItem value="Piping">Piping</SelectItem>
+                <SelectItem value="Process">Process</SelectItem>
+                <SelectItem value="Structural">Structural</SelectItem>
+                <SelectItem value="Safety">Safety</SelectItem>
+                <SelectItem value="Operations">Operations</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
-        <Button size="sm" variant="outline" onClick={onViewAll}>
-          {t("observationWorkspace.viewAll")}
-        </Button>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-1.5">
+            <Label>Status</Label>
+            <Select value={form.status} onValueChange={(v) => handleChange("status", v)}>
+              <SelectTrigger data-testid="edit-action-status"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="planned">Planned</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="validated">Validated</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="edit-due">Due date</Label>
+            <Input
+              id="edit-due"
+              type="date"
+              value={form.due_date}
+              onChange={(e) => handleChange("due_date", e.target.value)}
+              data-testid="edit-action-due-date"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-1.5">
+          <Label htmlFor="edit-comments">Comments</Label>
+          <Textarea
+            id="edit-comments"
+            rows={2}
+            value={form.comments}
+            onChange={(e) => handleChange("comments", e.target.value)}
+            data-testid="edit-action-comments"
+          />
+        </div>
       </div>
 
-      {/* Actions List */}
+      <DialogFooter>
+        <Button variant="ghost" onClick={onCancel} disabled={isSaving} data-testid="edit-action-cancel">Cancel</Button>
+        <Button onClick={handleSubmit} disabled={isSaving || !form.title.trim()} data-testid="edit-action-save">
+          {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+          Save changes
+        </Button>
+      </DialogFooter>
+    </>
+  );
+};
+
+/**
+ * Edit Action Dialog — popup that allows editing of all action fields.
+ * Fetches the full action by ID when opened so every field is populated
+ * from the source of truth (the action document itself).
+ */
+const EditActionDialog = ({ action, open, onClose, onSave, isSaving }) => {
+  // Fetch full action data from the action itself (single source of truth)
+  const { data: fullAction, isLoading } = useQuery({
+    queryKey: ["action-detail", action?.id],
+    queryFn: () => actionsAPI.getById(action.id),
+    enabled: !!(open && action?.id),
+    staleTime: 0,
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg" data-testid="edit-action-dialog">
+        <DialogHeader>
+          <DialogTitle>Edit Action</DialogTitle>
+          <DialogDescription>
+            Update fields for {fullAction?.action_number || action?.action_number || "this action"}.
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading && !fullAction ? (
+          <div className="py-10 flex items-center justify-center text-slate-500">
+            <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading action…
+          </div>
+        ) : (
+          <EditActionForm
+            key={fullAction?.id || action?.id || "edit"}
+            fullAction={fullAction || action || {}}
+            onSubmit={onSave}
+            onCancel={onClose}
+            isSaving={isSaving}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+/**
+ * Delete Action Confirmation Dialog
+ */
+const DeleteActionDialog = ({ action, open, onClose, onConfirm, isDeleting }) => (
+  <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <DialogContent className="max-w-md" data-testid="delete-action-dialog">
+      <DialogHeader>
+        <DialogTitle>Remove from action plan?</DialogTitle>
+        <DialogDescription>
+          {action ? (
+            <>
+              Action <span className="font-semibold">&quot;{action.title}&quot;</span>
+              {action.action_number ? ` (${action.action_number})` : ""} will be deleted permanently
+              and will reappear in Recommended Actions if it originated from a recommendation.
+            </>
+          ) : "This action will be removed."}
+        </DialogDescription>
+      </DialogHeader>
+      <DialogFooter>
+        <Button variant="ghost" onClick={onClose} disabled={isDeleting} data-testid="delete-action-cancel">Cancel</Button>
+        <Button
+          variant="destructive"
+          onClick={onConfirm}
+          disabled={isDeleting}
+          data-testid="delete-action-confirm"
+        >
+          {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+          Delete
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+);
+
+/**
+ * Add Action Dialog — manual creation of a new action on the observation's plan.
+ * Supports the same action_type list (CM/PM/PDM/OP/LEARN), letting users add
+ * "Learning" actions such as updating the PM plan.
+ */
+const AddActionDialog = ({ open, onClose, onCreate, isCreating }) => {
+  const [form, setForm] = useState({
+    title: "",
+    description: "",
+    action_type: "CM",
+    discipline: "",
+    status: "open",
+    due_date: "",
+    comments: "",
+  });
+
+  const handleChange = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+
+  const reset = () => setForm({
+    title: "", description: "", action_type: "CM", discipline: "",
+    status: "open", due_date: "", comments: "",
+  });
+
+  const handleSubmit = async () => {
+    await onCreate({
+      title: form.title,
+      description: form.description,
+      action_type: form.action_type,
+      discipline: form.discipline || null,
+      status: form.status,
+      due_date: form.due_date || null,
+      comments: form.comments || null,
+    });
+    reset();
+  };
+
+  const handleClose = () => { reset(); onClose(); };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
+      <DialogContent className="max-w-lg" data-testid="add-action-dialog">
+        <DialogHeader>
+          <DialogTitle>Add Action</DialogTitle>
+          <DialogDescription>
+            Manually add an action to this observation&apos;s plan. Use Learning to
+            capture follow-ups such as PM plan updates.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-3 py-2">
+          <div className="grid gap-1.5">
+            <Label htmlFor="add-title">Title</Label>
+            <Input
+              id="add-title"
+              value={form.title}
+              onChange={(e) => handleChange("title", e.target.value)}
+              placeholder="e.g. Update PM plan to include weekly inspection"
+              data-testid="add-action-title"
+            />
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="add-desc">Description</Label>
+            <Textarea
+              id="add-desc"
+              rows={3}
+              value={form.description}
+              onChange={(e) => handleChange("description", e.target.value)}
+              data-testid="add-action-description"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>Type</Label>
+              <Select value={form.action_type} onValueChange={(v) => handleChange("action_type", v)}>
+                <SelectTrigger data-testid="add-action-type"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CM">CM — Corrective</SelectItem>
+                  <SelectItem value="PM">PM — Preventive</SelectItem>
+                  <SelectItem value="PDM">PDM — Predictive</SelectItem>
+                  <SelectItem value="OP">OP — Operational</SelectItem>
+                  <SelectItem value="LEARN">LEARN — Learning / Strategy update</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label>Discipline</Label>
+              <Select value={form.discipline || "none"} onValueChange={(v) => handleChange("discipline", v === "none" ? "" : v)}>
+                <SelectTrigger data-testid="add-action-discipline"><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— None —</SelectItem>
+                  <SelectItem value="Mechanical">Mechanical</SelectItem>
+                  <SelectItem value="Electrical">Electrical</SelectItem>
+                  <SelectItem value="Instrumentation">Instrumentation</SelectItem>
+                  <SelectItem value="Piping">Piping</SelectItem>
+                  <SelectItem value="Process">Process</SelectItem>
+                  <SelectItem value="Structural">Structural</SelectItem>
+                  <SelectItem value="Safety">Safety</SelectItem>
+                  <SelectItem value="Operations">Operations</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>Status</Label>
+              <Select value={form.status} onValueChange={(v) => handleChange("status", v)}>
+                <SelectTrigger data-testid="add-action-status"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="open">Open</SelectItem>
+                  <SelectItem value="planned">Planned</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label htmlFor="add-due">Due date</Label>
+              <Input
+                id="add-due"
+                type="date"
+                value={form.due_date}
+                onChange={(e) => handleChange("due_date", e.target.value)}
+                data-testid="add-action-due-date"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="add-comments">Comments</Label>
+            <Textarea
+              id="add-comments"
+              rows={2}
+              value={form.comments}
+              onChange={(e) => handleChange("comments", e.target.value)}
+              data-testid="add-action-comments"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={handleClose} disabled={isCreating} data-testid="add-action-cancel">Cancel</Button>
+          <Button onClick={handleSubmit} disabled={isCreating || !form.title.trim()} data-testid="add-action-submit">
+            {isCreating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+            Add to plan
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+/**
+ * Action Plan Panel - Shows actions in the same style as recommended actions
+ */
+const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onAddAction, isCreating, actionPlanIds = [] }) => {
+  const navigate = useNavigate();
+  const [editingAction, setEditingAction] = useState(null);
+  const [deletingAction, setDeletingAction] = useState(null);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const typeColors = {
+    PM: "bg-blue-100 text-blue-700",
+    CM: "bg-amber-100 text-amber-700",
+    PDM: "bg-purple-100 text-purple-700",
+    OP: "bg-green-100 text-green-700",
+    LEARN: "bg-pink-100 text-pink-700",
+    IV: "bg-indigo-100 text-indigo-700",
+  };
+
+  const statusConfig = {
+    open: { color: "bg-blue-50 text-blue-600 border-blue-200", label: "Open" },
+    planned: { color: "bg-purple-50 text-purple-600 border-purple-200", label: "Planned" },
+    in_progress: { color: "bg-amber-50 text-amber-600 border-amber-200", label: "In Progress" },
+    completed: { color: "bg-green-50 text-green-600 border-green-200", label: "Completed" },
+    validated: { color: "bg-emerald-50 text-emerald-600 border-emerald-200", label: "Validated" },
+  };
+
+  const handleEdit = (action, e) => {
+    e.stopPropagation();
+    setEditingAction(action);
+  };
+
+  const handleDelete = (action, e) => {
+    e.stopPropagation();
+    setDeletingAction(action);
+  };
+
+  const handleSaveEdit = async (updates) => {
+    if (!editingAction) return;
+    setIsSaving(true);
+    try {
+      await onEditAction?.(editingAction, updates);
+      setEditingAction(null);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingAction) return;
+    setIsDeleting(true);
+    try {
+      await onDeleteAction?.(deletingAction);
+      setDeletingAction(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto scrollbar-thin">
+      {/* Header - sticky on scroll, sized to match Recommended Actions */}
+      <div className="lg:sticky lg:top-0 z-10 bg-white px-4 sm:px-6 pt-4 sm:pt-6 pb-3 border-b border-slate-100">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
+              <ClipboardList className="w-5 h-5 text-green-600" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-semibold text-slate-900 truncate">
+                Action Plan
+                {actions && actions.length > 0 && (
+                  <span className="ml-2 text-xs text-slate-400 font-normal">({actions.length})</span>
+                )}
+              </h3>
+              <p className="text-xs text-slate-500 truncate">Track planned &amp; in-progress actions</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowAddDialog(true)}
+              className="h-7 text-xs px-2"
+              title="Add a new action manually"
+              data-testid="action-plan-add-btn"
+            >
+              <Plus className="w-3.5 h-3.5 mr-1" /> Add
+            </Button>
+            {actions && actions.length > 0 && (
+              <Button size="sm" variant="ghost" onClick={onViewAll} className="h-7 text-xs px-2 hidden sm:inline-flex">
+                View All
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="px-4 sm:px-6 pt-4 pb-4 sm:pb-6">
+
+      {/* Actions List - Same style as recommended actions */}
       {actions && actions.length > 0 ? (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {actions.slice(0, 5).map((action) => {
             const status = statusConfig[action.status?.toLowerCase()] || statusConfig.open;
-            const priority = priorityConfig[action.priority?.toLowerCase()] || priorityConfig.medium;
+            const actionType = normalizeActionType(action.action_type);
+            const isInvestigationAction = !!action.linked_investigation_id;
 
             return (
               <div 
                 key={action.id}
-                className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-                onClick={() => navigate(`/actions/${action.id}`)}
+                className={`p-2 rounded-lg bg-slate-50 border border-slate-100 hover:border-slate-200 transition-colors group ${isInvestigationAction ? "cursor-pointer hover:bg-purple-50" : ""}`}
+                onClick={isInvestigationAction ? () => navigate(`/causal-engine?id=${action.linked_investigation_id}`) : undefined}
+                title={isInvestigationAction ? "Open linked investigation" : undefined}
+                data-testid={`action-plan-item-${action.id}`}
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs text-slate-500 font-mono">{action.action_number}</span>
-                    <Badge className={`text-[10px] ${status.color}`}>{t(status.labelKey)}</Badge>
-                  </div>
-                  <div className="font-medium text-sm text-slate-900 truncate">{action.title}</div>
-                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
-                    {action.owner && <span>{action.owner}</span>}
-                    {action.due_date && (
-                      <>
-                        <span className={priority}>
-                          {interpolate(t("observationWorkspace.dueDate"), {
-                            date: format(parseISO(action.due_date), "MMM d"),
-                          })}
+                <div className="flex items-start gap-2">
+                  {/* Left: Info */}
+                  <div className="flex-1 min-w-0">
+                    {/* Header row: Type badge, status */}
+                    <div className="flex items-center gap-1 mb-1 flex-wrap">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${typeColors[actionType] || 'bg-slate-100 text-slate-600'}`}>
+                        {actionType}
+                      </span>
+                      {action.discipline && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 capitalize">
+                          {action.discipline}
                         </span>
+                      )}
+                      <span className={`text-[10px] px-1 py-0.5 rounded border ${status.color}`}>
+                        {status.label}
+                      </span>
+                      {action.action_number && (
+                        <span className="text-[10px] text-slate-400 font-mono ml-auto">
+                          {action.action_number}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Title */}
+                    <p className="text-xs text-slate-700 leading-snug">
+                      {action.title}
+                    </p>
+
+                    {/* Due date / Owner */}
+                    {(action.due_date || action.owner) && (
+                      <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
+                        {action.owner && <span>{action.owner}</span>}
+                        {action.due_date && (
+                          <span>Due: {format(parseISO(action.due_date), "MMM d")}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right: Edit & Delete buttons — hidden for synthetic investigation entries */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {!action.is_synthetic && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => handleEdit(action, e)}
+                          className="h-7 w-7 p-0"
+                          title="Edit action"
+                          data-testid={`action-plan-edit-${action.id}`}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => handleDelete(action, e)}
+                          className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                          title="Remove from plan"
+                          data-testid={`action-plan-delete-${action.id}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
                       </>
                     )}
                   </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-400" />
               </div>
             );
           })}
         </div>
       ) : (
-        <div className="text-center py-8 text-slate-500">
-          <ClipboardList className="w-12 h-12 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">{t("observationWorkspace.noActionsInPlan")}</p>
-          <p className="text-xs text-slate-400 mt-1">{t("observationWorkspace.noActionsInPlanHint")}</p>
+        <div className="text-center py-6 text-slate-500">
+          <ClipboardList className="w-10 h-10 mx-auto mb-2 opacity-30" />
+          <p className="text-xs">No actions in plan</p>
+          <p className="text-[10px] text-slate-400 mt-1">Add from recommendations</p>
         </div>
       )}
+
+      {/* Edit / Delete dialogs */}
+      <EditActionDialog
+        key={editingAction?.id || "edit"}
+        action={editingAction}
+        open={!!editingAction}
+        onClose={() => setEditingAction(null)}
+        onSave={handleSaveEdit}
+        isSaving={isSaving}
+      />
+      <DeleteActionDialog
+        action={deletingAction}
+        open={!!deletingAction}
+        onClose={() => setDeletingAction(null)}
+        onConfirm={handleConfirmDelete}
+        isDeleting={isDeleting}
+      />
+      <AddActionDialog
+        open={showAddDialog}
+        onClose={() => setShowAddDialog(false)}
+        onCreate={async (data) => {
+          await onAddAction?.(data);
+          setShowAddDialog(false);
+        }}
+        isCreating={isCreating}
+      />
+      </div>
     </div>
   );
 };
@@ -932,8 +1440,6 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onValidateAction })
  * Process Journey Tracker
  */
 const ProcessJourney = ({ stages }) => {
-  const { t } = useLanguage();
-  const translateEnum = useTranslateEnum();
   const stageConfig = {
     completed: { color: "bg-green-500", textColor: "text-green-700", icon: Check },
     in_progress: { color: "bg-blue-500", textColor: "text-blue-700", icon: Activity },
@@ -941,50 +1447,39 @@ const ProcessJourney = ({ stages }) => {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 bg-slate-100 rounded-lg">
-          <TrendingUp className="w-5 h-5 text-slate-600" />
+    <div className="bg-white rounded-lg border border-slate-200 px-3 py-2 overflow-hidden">
+      {/* Single-row compact layout: title + steps inline (stacks on very small screens) */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <TrendingUp className="w-3 h-3 text-slate-500" />
+          <span className="text-[11px] font-medium text-slate-700">Process Journey</span>
         </div>
-        <div>
-          <h3 className="font-semibold text-slate-900">{t("observationWorkspace.processJourney")}</h3>
-          <p className="text-xs text-slate-500">{t("observationWorkspace.processJourneySubtitle")}</p>
-        </div>
-      </div>
 
-      {/* Journey Steps */}
-      <div className="flex items-center justify-between overflow-x-auto pb-2">
-        {stages?.map((stage, index) => {
-          const config = stageConfig[stage.status] || stageConfig.not_started;
-          const Icon = config.icon;
-          
-          return (
-            <React.Fragment key={stage.stage}>
-              {/* Stage */}
-              <div className="flex flex-col items-center min-w-[80px]">
-                <div className={`w-10 h-10 rounded-full ${config.color} flex items-center justify-center text-white mb-2`}>
-                  <Icon className="w-5 h-5" />
-                </div>
-                <div className={`text-xs font-medium ${config.textColor} text-center`}>
-                  {translateEnum(stage.stage)}
-                </div>
-                {stage.date && (
-                  <div className="text-[10px] text-slate-400 mt-0.5">
-                    {format(parseISO(stage.date), "MMM d")}
+        <div className="flex items-center justify-between flex-1 overflow-x-auto min-w-0">
+          {stages?.map((stage, index) => {
+            const config = stageConfig[stage.status] || stageConfig.not_started;
+            const Icon = config.icon;
+            
+            return (
+              <React.Fragment key={stage.stage}>
+                <div className="flex items-center gap-1 min-w-fit" title={stage.date ? `${stage.stage} — ${format(parseISO(stage.date), "MMM d")}` : stage.stage}>
+                  <div className={`w-3.5 h-3.5 rounded-full ${config.color} flex items-center justify-center text-white flex-shrink-0`}>
+                    <Icon className="w-2 h-2" />
                   </div>
+                  <span className={`text-[10px] font-medium ${config.textColor} whitespace-nowrap`}>
+                    {stage.stage}
+                  </span>
+                </div>
+                
+                {index < stages.length - 1 && (
+                  <div className={`flex-1 min-w-[6px] h-px mx-1 ${
+                    stage.status === "completed" ? "bg-green-300" : "bg-slate-200"
+                  }`} />
                 )}
-              </div>
-              
-              {/* Connector */}
-              {index < stages.length - 1 && (
-                <div className={`flex-1 h-0.5 mx-2 ${
-                  stage.status === "completed" ? "bg-green-300" : "bg-slate-200"
-                }`} />
-              )}
-            </React.Fragment>
-          );
-        })}
+              </React.Fragment>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -999,7 +1494,6 @@ const ObservationWorkspacePage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t } = useLanguage();
-  const translateEnum = useTranslateEnum();
 
   // Fetch workspace data
   const { data: workspace, isLoading, error } = useQuery({
@@ -1008,13 +1502,17 @@ const ObservationWorkspacePage = () => {
     staleTime: 30 * 1000, // 30 seconds
   });
 
-  // Fetch default criticality definitions (used for the right-click popovers on exposure cards).
+  // Criticality definitions for the right-click popovers on exposure cards.
+  // The workspace response already returns the installation-specific custom
+  // definitions (falling back to defaults), so we prefer that source. If the
+  // backend hasn't returned them yet we fall back to the defaults endpoint.
   const { data: definitionsData } = useQuery({
     queryKey: ["criticality-definitions-defaults"],
     queryFn: () => import("../lib/apis/definitions").then((m) => m.definitionsAPI.getDefaults()),
     staleTime: 10 * 60 * 1000,
+    enabled: !workspace?.criticality_definitions,
   });
-  const criticalityDefs = definitionsData?.criticality || [];
+  const criticalityDefs = workspace?.criticality_definitions || definitionsData?.criticality || [];
 
   // Add recommendation to plan mutation
   const addRecommendationMutation = useMutation({
@@ -1022,10 +1520,61 @@ const ObservationWorkspacePage = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["observation-workspace", id] });
       queryClient.invalidateQueries({ queryKey: ["actions"] });
-      toast.success(data.message || t("observationWorkspace.actionAddedToPlan"));
+      toast.success(data.message || "Action added to plan");
     },
     onError: () => {
-      toast.error(t("observationWorkspace.actionAddFailed"));
+      toast.error("Failed to add action");
+    },
+  });
+
+  // Update action mutation
+  const updateActionMutation = useMutation({
+    mutationFn: ({ actionId, updates }) => actionsAPI.update(actionId, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["observation-workspace", id] });
+      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      toast.success("Action updated");
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.detail || "Failed to update action");
+    },
+  });
+
+  // Delete action mutation
+  const deleteActionMutation = useMutation({
+    mutationFn: (actionId) => actionsAPI.delete(actionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["observation-workspace", id] });
+      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      toast.success("Action removed from plan");
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.detail || "Failed to remove action");
+    },
+  });
+
+  // Create action mutation (manual add — including Learning type)
+  const createActionMutation = useMutation({
+    mutationFn: (data) => actionsAPI.create({
+      title: data.title,
+      description: data.description || "",
+      source_type: "threat",
+      source_id: id,
+      source_name: workspace?.observation?.title || "Observation",
+      threat_id: id,
+      priority: "medium",
+      action_type: data.action_type,
+      discipline: data.discipline,
+      due_date: data.due_date,
+      comments: data.comments || "",
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["observation-workspace", id] });
+      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      toast.success("Action added to plan");
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.detail || "Failed to add action");
     },
   });
 
@@ -1034,8 +1583,20 @@ const ObservationWorkspacePage = () => {
     await addRecommendationMutation.mutateAsync(recommendation);
   };
 
+  const handleEditAction = async (action, updates) => {
+    await updateActionMutation.mutateAsync({ actionId: action.id, updates });
+  };
+
+  const handleDeleteAction = async (action) => {
+    await deleteActionMutation.mutateAsync(action.id);
+  };
+
+  const handleCreateAction = async (data) => {
+    await createActionMutation.mutateAsync(data);
+  };
+
   const handleAddToStrategy = (action) => {
-    toast.info(t("observationWorkspace.navigateToStrategyEditor"));
+    toast.info("Navigate to Strategy Editor to add action");
     // Could open a dialog or navigate to strategy page
   };
 
@@ -1055,7 +1616,7 @@ const ObservationWorkspacePage = () => {
       <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-slate-500">{t("observationWorkspace.loading")}</p>
+          <p className="text-slate-500">Loading workspace...</p>
         </div>
       </div>
     );
@@ -1068,10 +1629,10 @@ const ObservationWorkspacePage = () => {
         <div className="text-center py-16">
           <XCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-slate-700 mb-2">
-            {error?.response?.data?.detail || t("observationWorkspace.notFound")}
+            {error?.response?.data?.detail || "Observation not found"}
           </h2>
           <Button onClick={() => navigate("/threats")} variant="outline">
-            {t("observations.backToObservations")}
+            Back to Observations
           </Button>
         </div>
       </div>
@@ -1082,55 +1643,56 @@ const ObservationWorkspacePage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-12">
-      {/* Hero header — compact single-row like classic; stays fixed below the 48px app header */}
+      {/* Hero header — pinned at top below the 48px app header; does not move when scrolling */}
       <div className="sticky top-12 z-20 bg-white border-b border-slate-200 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 max-w-7xl">
-          <div className="flex items-center gap-2 sm:gap-3 py-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/threats")}
-              className="p-1 -ml-1 flex-shrink-0"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
+          {/* Mobile: title row (with ⋯ menu pinned right) + action bar row stack vertically.
+              Desktop: everything inline on a single row. */}
+          <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-3 py-2">
+            <div className="flex items-start sm:items-center gap-2 sm:gap-3 min-w-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/threats")}
+                className="p-1 -ml-1 flex-shrink-0"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <RiskBadge level={observation?.risk_level} size="sm" />
-                <span className="text-[11px] text-slate-400 font-mono">
-                  {observation?.threat_number}
-                </span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <RiskBadge level={observation?.risk_level} size="sm" />
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    {observation?.threat_number}
+                  </span>
+                </div>
+                <h1 className="font-semibold text-sm sm:text-base text-slate-900 truncate leading-tight">
+                  {observation?.title}
+                </h1>
               </div>
-              <h1 className="font-semibold text-sm sm:text-base text-slate-900 truncate leading-tight">
-                {observation?.title}
-              </h1>
+
+              {/* Mobile-only ⋯ slot — anchored top-right of the hero title row */}
+              <div id="workspace-hero-slot-mobile" className="lg:hidden flex-shrink-0 self-start" />
             </div>
 
-            {/* Action bar slot — ObservationDetailsSection portals status/share/edit/••• into here */}
-            <div id="workspace-hero-slot" className="flex-shrink-0" />
+            {/* Action bar slot (desktop) — ObservationDetailsSection portals share/edit/delete/⋯ into here */}
+            <div id="workspace-hero-slot" className="hidden lg:block lg:flex-shrink-0 lg:flex-none min-w-0 lg:overflow-visible" />
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-4 max-w-7xl py-3 space-y-3">
+      <div className="container mx-auto px-3 sm:px-4 max-w-7xl py-3 space-y-3">
         
         {/* Row 1: Risk & Exposure Header */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
           <ExposureCard
-            type={t("observationWorkspace.productionExposure")}
+            type="Production Exposure"
             data={{
               primary: exposure?.production?.formatted_value || "$0",
-              secondary: interpolate(t("observationWorkspace.hoursDowntime"), {
-                hours: exposure?.production?.estimated_downtime_hours || 0,
-              }),
-              tertiary: exposure?.production?.deferred_production 
-                ? interpolate(t("observationWorkspace.deferredProduction"), {
-                    amount: exposure.production.deferred_production,
-                    unit: exposure.production.deferred_production_unit || "bbl",
-                  })
-                : null
+              secondary: exposure?.production?.downtime_range 
+                ? `${exposure.production.downtime_range} Hours Downtime`
+                : "Not Assessed",
             }}
             icon={DollarSign}
             color="amber"
@@ -1140,14 +1702,18 @@ const ObservationWorkspacePage = () => {
           />
           
           <ExposureCard
-            type={t("observationWorkspace.safetyExposure")}
+            type="Safety Exposure"
             data={{
-              primary: interpolate(t("observationWorkspace.personnelCount"), {
-                count: exposure?.safety?.personnel_exposed || 0,
-              }),
-              secondary: interpolate(t("observationWorkspace.severityLevel"), {
-                level: translateEnum(exposure?.safety?.severity || "Low"),
-              }),
+              primary: exposure?.safety?.severity || "Not Assessed",
+              secondary: (() => {
+                const def = exposure?.safety?.definition;
+                if (def) {
+                  // Show first sentence so the card stays compact
+                  const first = def.split(/[.!?](\s|$)/)[0];
+                  return first || def;
+                }
+                return `${exposure?.safety?.severity || "Low"} severity`;
+              })(),
             }}
             icon={Users}
             color="red"
@@ -1157,9 +1723,17 @@ const ObservationWorkspacePage = () => {
           />
           
           <ExposureCard
-            type={t("observationWorkspace.environmentalImpact")}
+            type="Environmental Impact"
             data={{
-              primary: translateEnum(exposure?.environmental?.impact_rating || "Low"),
+              primary: exposure?.environmental?.impact_rating || "Low",
+              secondary: (() => {
+                const def = exposure?.environmental?.definition;
+                if (def) {
+                  const first = def.split(/[.!?](\s|$)/)[0];
+                  return first || def;
+                }
+                return undefined;
+              })(),
             }}
             icon={Leaf}
             color="green"
@@ -1169,9 +1743,17 @@ const ObservationWorkspacePage = () => {
           />
 
           <ExposureCard
-            type={t("observationWorkspace.reputationImpact")}
+            type="Reputation Impact"
             data={{
-              primary: translateEnum(exposure?.reputation?.impact_rating || "Low"),
+              primary: exposure?.reputation?.impact_rating || "Low",
+              secondary: (() => {
+                const def = exposure?.reputation?.definition;
+                if (def) {
+                  const first = def.split(/[.!?](\s|$)/)[0];
+                  return first || def;
+                }
+                return undefined;
+              })(),
             }}
             icon={Star}
             color="purple"
@@ -1194,8 +1776,8 @@ const ObservationWorkspacePage = () => {
           aiEvidence={timeline?.ai_evidence}
         />
 
-        {/* Row 3: Main Work Area - 3 Columns */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Row 3: Main Work Area - 3 Columns on desktop, stacked on mobile */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-6">
           {/* Column 1: Reliability Intelligence */}
           <ReliabilityIntelligencePanel 
             intelligence={reliability_intelligence}
@@ -1215,6 +1797,10 @@ const ObservationWorkspacePage = () => {
           <ActionPlanPanel 
             actions={action_plan}
             onViewAll={handleViewAllActions}
+            onEditAction={handleEditAction}
+            onDeleteAction={handleDeleteAction}
+            onAddAction={handleCreateAction}
+            isCreating={createActionMutation.isPending}
           />
         </div>
 
@@ -1229,12 +1815,12 @@ const ObservationWorkspacePage = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Brain className="w-5 h-5 text-purple-600" />
-              {t("observationWorkspace.fullReliabilityAnalysis")}
+              Full Reliability Analysis
             </DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
-            <CausalIntelligencePanel threatId={id} threatData={observation} />
-            <AIInsightsPanel threatId={id} threatData={observation} hideRecommendations />
+          <div className="flex flex-col gap-4 pt-2">
+            <AIInsightsPanel threatId={id} threatData={observation} hideRecommendations autoGenerate />
+            <CausalIntelligencePanel threatId={id} threatData={observation} autoGenerate />
           </div>
         </DialogContent>
       </Dialog>

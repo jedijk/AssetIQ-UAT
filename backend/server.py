@@ -274,7 +274,7 @@ BASE_ORIGINS = [
     "https://asset-iq-uat.vercel.app",
     "https://assetiq-uat.vercel.app",
     # Preview/Development
-    "https://observation-hub-2.preview.emergentagent.com",
+    "https://obs-equip-compact.preview.emergentagent.com",
     "http://localhost:3000",
     "http://localhost:5000",
 ]
@@ -905,6 +905,41 @@ async def background_startup():
                     logger.info("Disciplines configurator already populated")
             except Exception as e:
                 logger.warning(f"Disciplines seeding skipped: {e}")
+
+            # One-shot: migrate any legacy observation statuses to the new
+            # process-journey based status model (Observation, Assessment,
+            # Planning, Investigation, Action, Mitigated, Learning).
+            try:
+                from scripts.migrate_observation_statuses import migrate_observation_statuses
+                mig_stats = await migrate_observation_statuses(db)
+                if mig_stats["migrated"] > 0:
+                    logger.info(f"Observation status migration: {mig_stats}")
+            except Exception as e:
+                logger.warning(f"Observation status migration skipped: {e}")
+
+            # One-shot: backfill `discipline` on legacy central_actions whose
+            # discipline was never persisted (e.g. created before the add-rec
+            # endpoint copied discipline from the recommendation).
+            try:
+                from scripts.backfill_action_disciplines import backfill_action_disciplines
+                d_stats = await backfill_action_disciplines(db)
+                if d_stats["updated"] > 0:
+                    logger.info(f"Action discipline backfill: {d_stats}")
+            except Exception as e:
+                logger.warning(f"Action discipline backfill skipped: {e}")
+
+            # One-shot: drop legacy "Complete causal investigation" central_actions
+            # that the previous sync model created. Investigations are now surfaced
+            # as a synthetic IV entry in the action plan instead.
+            try:
+                result = await db.central_actions.delete_many({
+                    "source_type": "investigation",
+                    "source_id": {"$exists": True}
+                })
+                if result.deleted_count > 0:
+                    logger.info(f"Removed {result.deleted_count} legacy investigation-linked actions")
+            except Exception as e:
+                logger.warning(f"Legacy investigation-action cleanup skipped: {e}")
 
             # Start the task-generation cron (Sunday 02:00 plant-local by default).
             # Reads cron + timezone from app_settings.task_generation.

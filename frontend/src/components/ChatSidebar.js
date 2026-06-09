@@ -761,7 +761,13 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 {msg.threat_failure_mode && (
                   <div className="flex items-center gap-1.5">
                     <AlertTriangle className="w-3 h-3 text-slate-400" />
-                    <span><strong>Issue:</strong> {msg.threat_failure_mode}</span>
+                    <span><strong>Failure Mode:</strong> {msg.threat_failure_mode}</span>
+                  </div>
+                )}
+                {msg.threat_description && (
+                  <div className="flex items-start gap-1.5 mt-1">
+                    <MessageSquare className="w-3 h-3 text-slate-400 mt-0.5" />
+                    <span><strong>What's happening:</strong> {msg.threat_description}</span>
                   </div>
                 )}
                 {msg.threat_risk_score && (
@@ -834,44 +840,43 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
             {/* Header - Draft indicator */}
             <div className="flex items-center gap-2 text-orange-700 px-3 py-2 bg-orange-100/50 border-b border-orange-200">
               <AlertTriangle className="w-4 h-4" />
-              <span className="font-semibold text-sm">{msg.issue_confirm_language === "nl" ? "Concept Observatie" : "Draft Observation"}</span>
+              <span className="font-semibold text-sm">Draft Observation</span>
               <span className="ml-auto text-xs bg-orange-200 text-orange-800 px-2 py-0.5 rounded-full font-medium">
-                {msg.issue_confirm_language === "nl" ? "Te bevestigen" : "Pending"}
+                Pending
               </span>
             </div>
             
             {/* Observation Details */}
             <div className="p-3">
               {(() => {
-                const isNl = msg.issue_confirm_language === "nl";
                 const content = msg.content || "";
                 const summary = msg.issue_summary || "";
                 
-                // Parse the summary to extract Equipment, Issue Type, Description
+                // Parse the summary to extract Equipment, Failure Mode, What's happening
                 const lines = summary.split('\n');
                 let equipment = "";
-                let issueType = "";
-                let description = "";
+                let failureMode = "";
+                let whatsHappening = "";
                 
                 lines.forEach(line => {
                   if (line.includes('**Equipment:**') || line.includes('**Apparatuur:**')) {
                     equipment = line.replace(/\*\*Equipment:\*\*|\*\*Apparatuur:\*\*/g, '').trim();
-                  } else if (line.includes('**Issue Type:**') || line.includes('**Type storing:**') || line.includes('**Storingstype:**')) {
-                    issueType = line.replace(/\*\*Issue Type:\*\*|\*\*Type storing:\*\*|\*\*Storingstype:\*\*/g, '').trim();
+                  } else if (line.includes('**Issue Type:**') || line.includes('**Type storing:**') || line.includes('**Storingstype:**') || line.includes('**Failure Mode:**') || line.includes('**Faalwijze:**')) {
+                    failureMode = line.replace(/\*\*Issue Type:\*\*|\*\*Type storing:\*\*|\*\*Storingstype:\*\*|\*\*Failure Mode:\*\*|\*\*Faalwijze:\*\*/g, '').trim();
                   } else if (line.includes('**Description:**') || line.includes('**Beschrijving:**')) {
-                    description = line.replace(/\*\*Description:\*\*|\*\*Beschrijving:\*\*/g, '').trim();
+                    whatsHappening = line.replace(/\*\*Description:\*\*|\*\*Beschrijving:\*\*/g, '').trim();
                   }
                 });
                 
                 return (
                   <>
-                    {/* Title/Issue Type */}
+                    {/* Title/Failure Mode */}
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <h4 className="font-semibold text-slate-900 text-sm leading-tight">
-                        {issueType || (isNl ? "Nieuwe Observatie" : "New Observation")}
+                        {failureMode || "New Observation"}
                       </h4>
                       <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
-                        {isNl ? "Concept" : "Draft"}
+                        Draft
                       </span>
                     </div>
                     
@@ -880,21 +885,21 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                       {equipment && (
                         <div className="flex items-center gap-1.5">
                           <Wrench className="w-3.5 h-3.5 text-orange-400" />
-                          <span><strong>{isNl ? "Apparatuur:" : "Equipment:"}</strong> {equipment}</span>
+                          <span><strong>Equipment:</strong> {equipment}</span>
                         </div>
                       )}
-                      {issueType && (
+                      {failureMode && (
                         <div className="flex items-center gap-1.5">
                           <AlertTriangle className="w-3.5 h-3.5 text-orange-400" />
-                          <span><strong>{isNl ? "Storingstype:" : "Issue Type:"}</strong> {issueType}</span>
+                          <span><strong>Failure Mode:</strong> {failureMode}</span>
                         </div>
                       )}
-                      {description && (
+                      {whatsHappening && (
                         <div className="flex items-start gap-1.5 mt-2">
                           <MessageSquare className="w-3.5 h-3.5 text-orange-400 mt-0.5" />
                           <div>
-                            <strong>{isNl ? "Beschrijving:" : "Description:"}</strong>
-                            <p className="text-slate-700 mt-0.5">{description}</p>
+                            <strong>What's happening:</strong>
+                            <p className="text-slate-700 mt-0.5">{whatsHappening}</p>
                           </div>
                         </div>
                       )}
@@ -911,19 +916,19 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                           data-testid="issue-confirm-accept-btn"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                          {isNl ? "Accepteren" : "Accept"}
+                          Accept
                         </button>
                         <button
                           type="button"
                           onClick={() => {
                             textareaRef.current?.focus();
-                            setMessage(isNl ? "Wijzig: " : "Change: ");
+                            setMessage("Change: ");
                           }}
                           disabled={isSending}
                           className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-white border border-orange-300 text-orange-700 text-xs font-medium hover:bg-orange-50 disabled:opacity-50 transition-colors"
                           data-testid="issue-confirm-revise-btn"
                         >
-                          {isNl ? "Aanpassen" : "Revise"}
+                          Revise
                         </button>
                         <button
                           type="button"
@@ -943,7 +948,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                           className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-white border border-red-300 text-red-600 text-xs font-medium hover:bg-red-50 disabled:opacity-50 transition-colors"
                           data-testid="issue-confirm-cancel-btn"
                         >
-                          {isNl ? "Annuleren" : "Cancel"}
+                          Cancel
                         </button>
                       </div>
                     )}
@@ -1289,44 +1294,44 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
         data-testid="chat-sidebar"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-white">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-              <MessageSquare className="w-4 h-4 text-white" />
+        <div className="flex items-center justify-between px-3 py-2.5 sm:p-4 border-b border-slate-200 bg-white">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
+              <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
             </div>
-            <div>
-              <h2 className="font-semibold text-slate-900">Report Observation</h2>
-              <p className="text-xs text-slate-500">Describe the failure</p>
+            <div className="min-w-0">
+              <h2 className="font-semibold text-slate-900 text-sm sm:text-base truncate">Report a Problem</h2>
+              <p className="text-[10px] sm:text-xs text-slate-500">What did you notice?</p>
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
             {messages.length > 0 && (
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => clearChatMutation.mutate()}
                 disabled={clearChatMutation.isPending}
-                className="text-slate-400 hover:text-red-500 hover:bg-red-50"
+                className="w-8 h-8 sm:w-9 sm:h-9 text-slate-400 hover:text-red-500 hover:bg-red-50"
                 title="Clear chat history"
                 data-testid="clear-chat-btn"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </Button>
             )}
             <Button
               variant="ghost"
               size="icon"
               onClick={handleCloseWithAutoSkip}
-              className="text-slate-400 hover:text-slate-600"
+              className="w-8 h-8 sm:w-9 sm:h-9 text-slate-400 hover:text-slate-600"
               data-testid="close-chat-sidebar"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </Button>
           </div>
         </div>
 
         {/* Messages */}
-        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-2 py-3 sm:p-4 space-y-3 sm:space-y-4 custom-scrollbar">
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
               <div className="loading-dots">
@@ -1341,16 +1346,16 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 <AlertTriangle className="w-8 h-8 text-blue-600" />
               </div>
               <h3 className="text-lg font-semibold text-slate-800 mb-2">
-                Report a Threat
+                Report a Problem
               </h3>
               <p className="text-slate-500 text-sm mb-4">
-                Describe any equipment failure or issue.
+                Tell us what you noticed with the equipment
               </p>
               <div className="text-left bg-white rounded-xl p-3 text-xs text-slate-600 border border-slate-200 w-full">
-                <p className="font-medium text-slate-700 mb-2">Try saying:</p>
-                <p className="mb-1">"Pump P-104 is leaking from the seal"</p>
-                <p className="mb-1">"Bearing noise on compressor C-201"</p>
-                <p>"Heat exchanger showing reduced efficiency"</p>
+                <p className="font-medium text-slate-700 mb-2">Examples:</p>
+                <p className="mb-1">• Pump P-104 is leaking</p>
+                <p className="mb-1">• Loud noise from compressor</p>
+                <p>• Motor running hot</p>
               </div>
             </div>
           ) : (
@@ -1399,20 +1404,20 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
         </div>
 
         {/* Input Area - WhatsApp Style */}
-        <div className="border-t border-slate-200 bg-slate-100 p-3">
+        <div className="border-t border-slate-200 bg-slate-100 px-2 py-2 sm:p-3">
           {/* Image Preview */}
           {imagePreview && (
-            <div className="mb-3 px-1">
+            <div className="mb-2 sm:mb-3 px-1">
               <div className="relative inline-block">
-                <img src={imagePreview} alt="Upload preview" className="rounded-lg max-h-20 border border-slate-300" />
+                <img src={imagePreview} alt="Upload preview" className="rounded-lg max-h-16 sm:max-h-20 border border-slate-300" />
                 <button
                   onClick={() => {
                     setImageBase64(null);
                     setImagePreview(null);
                   }}
-                  className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-slate-700 text-white flex items-center justify-center hover:bg-slate-900 transition-colors"
+                  className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-slate-700 text-white flex items-center justify-center hover:bg-slate-900 transition-colors"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                 </button>
               </div>
             </div>
@@ -1517,30 +1522,30 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
           ) : (
             <>
             {/* Language Selector — always visible so user can pick EN/NL before dictating */}
-            <div className="flex items-center mb-2">
+            <div className="flex items-center mb-1.5 sm:mb-2">
               <Popover open={showLangPicker} onOpenChange={setShowLangPicker}>
                 <PopoverTrigger asChild>
                   <button
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 transition-colors"
+                    className="inline-flex items-center gap-1 sm:gap-1.5 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-[10px] sm:text-xs font-medium text-slate-600 transition-colors"
                     data-testid="chat-language-selector"
                     title="Language for typing & voice dictation"
                   >
-                    <Globe className="w-3 h-3" />
+                    <Globe className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                     {(() => {
                       const active = manualLanguage || detectedLanguage || appLanguage || "en";
                       return LANGUAGE_OPTIONS.find(l => l.code === active)?.flag || active.toUpperCase();
                     })()}
-                    {!manualLanguage && detectedLanguage && <span className="text-slate-400">detected</span>}
-                    <ChevronDown className="w-3 h-3 text-slate-400" />
+                    {!manualLanguage && detectedLanguage && <span className="text-slate-400 hidden sm:inline">detected</span>}
+                    <ChevronDown className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-400" />
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="w-44 p-1" sideOffset={4}>
+                <PopoverContent align="start" className="w-40 sm:w-44 p-1" sideOffset={4}>
                   {LANGUAGE_OPTIONS.map(lang => {
                     const active = manualLanguage || detectedLanguage || appLanguage;
                     return (
                       <button
                         key={lang.code}
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded text-sm hover:bg-slate-100 transition-colors ${
+                        className={`w-full flex items-center gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded text-sm hover:bg-slate-100 transition-colors ${
                           active === lang.code ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-700"
                         }`}
                         onClick={() => {
@@ -1561,7 +1566,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                     <>
                       <div className="border-t border-slate-100 my-1" />
                       <button
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-slate-500 hover:bg-slate-100"
+                        className="w-full flex items-center gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded text-sm text-slate-500 hover:bg-slate-100"
                         onClick={() => {
                           setManualLanguage(null);
                           setShowLangPicker(false);
@@ -1577,12 +1582,12 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
             
             {/* Recording indicator */}
             {isRecording && (
-              <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
-                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                <span className="text-sm text-red-700 font-medium">Recording... {formatTime(recordingTime)}</span>
+              <div className="mb-1.5 sm:mb-2 p-1.5 sm:p-2 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 sm:gap-3">
+                <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-500 rounded-full animate-pulse flex-shrink-0" />
+                <span className="text-xs sm:text-sm text-red-700 font-medium flex-1 min-w-0 truncate">Recording... {formatTime(recordingTime)}</span>
                 <button
                   onClick={cancelRecording}
-                  className="ml-auto px-3 py-1 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition-colors"
+                  className="ml-auto px-2 py-0.5 sm:px-3 sm:py-1 bg-red-600 text-white text-[10px] sm:text-xs font-medium rounded-lg hover:bg-red-700 transition-colors flex-shrink-0"
                 >
                   Stop
                 </button>
@@ -1591,21 +1596,21 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
             
             {/* Transcribing indicator */}
             {isTranscribing && (
-              <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3">
-                <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-                <span className="text-sm text-blue-700">Transcribing voice…</span>
+              <div className="mb-1.5 sm:mb-2 p-1.5 sm:p-2 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2 sm:gap-3">
+                <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 animate-spin flex-shrink-0" />
+                <span className="text-xs sm:text-sm text-blue-700">Transcribing voice…</span>
               </div>
             )}
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               {/* Attachment Button with Menu */}
               <div className="relative">
                 <button
                   onClick={() => setShowAttachMenu(!showAttachMenu)}
-                  className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-200 transition-colors"
+                  className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-200 transition-colors"
                   title="Attach file"
                 >
-                  <Paperclip className="w-5 h-5" />
+                  <Paperclip className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
                 {showAttachMenu && (
                   <>
@@ -1614,14 +1619,14 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                       className="fixed inset-0 z-40" 
                       onClick={() => setShowAttachMenu(false)}
                     />
-                    {/* Menu */}
-                    <div className="absolute bottom-12 left-0 z-50 w-48 bg-white rounded-lg border border-slate-200 shadow-lg p-1">
+                    {/* Menu - positioned to fit on mobile */}
+                    <div className="absolute bottom-12 left-0 z-50 w-44 sm:w-48 bg-white rounded-lg border border-slate-200 shadow-lg p-1">
                       <button
                         onClick={() => {
                           setShowAttachMenu(false);
                           cameraInputRef.current?.click();
                         }}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="w-full flex items-center gap-2.5 sm:gap-3 px-2.5 sm:px-3 py-2 sm:py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
                       >
                         <Camera className="w-4 h-4 text-blue-600" />
                         <span>Take Photo</span>
@@ -1631,17 +1636,17 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                           setShowAttachMenu(false);
                           fileInputRef.current?.click();
                         }}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="w-full flex items-center gap-2.5 sm:gap-3 px-2.5 sm:px-3 py-2 sm:py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
                       >
                         <ImagePlus className="w-4 h-4 text-green-600" />
-                        <span>Attach from Library</span>
+                        <span>From Library</span>
                       </button>
                       <button
                         onClick={() => {
                           setShowAttachMenu(false);
                           documentInputRef.current?.click();
                         }}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="w-full flex items-center gap-2.5 sm:gap-3 px-2.5 sm:px-3 py-2 sm:py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
                       >
                         <FileUp className="w-4 h-4 text-purple-600" />
                         <span>Add File</span>
@@ -1652,7 +1657,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               </div>
 
               {/* Input Container */}
-              <div className={`relative flex-1 bg-white rounded-3xl border flex items-center overflow-visible shadow-sm min-h-[44px] transition-all ${
+              <div className={`relative flex-1 min-w-0 bg-white rounded-3xl border flex items-center overflow-visible shadow-sm min-h-[40px] sm:min-h-[44px] transition-all ${
                 isListening 
                   ? 'border-red-400 ring-2 ring-red-200' 
                   : 'border-slate-200 focus-within:border-slate-300'
@@ -1676,12 +1681,12 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                     e.target.style.height = newHeight + 'px';
                   }}
                   onKeyDown={handleKeyPress}
-                  placeholder={isListening ? "Recording… tap mic to stop" : (isTranscribing ? "Transcribing your voice…" : "Type or tap mic to dictate...")}
+                  placeholder={isListening ? "Recording…" : (isTranscribing ? "Transcribing…" : "What's the problem?")}
                   disabled={isTranscribing}
-                  className="flex-1 px-4 py-3 text-sm bg-transparent border-none outline-none resize-none placeholder:text-slate-400 leading-5 scrollbar-thin focus:ring-0 focus:outline-none disabled:opacity-60"
+                  className="flex-1 min-w-0 px-3 sm:px-4 py-2.5 sm:py-3 text-sm bg-transparent border-none outline-none resize-none placeholder:text-slate-400 leading-5 scrollbar-thin focus:ring-0 focus:outline-none disabled:opacity-60"
                   rows={1}
                   style={{ 
-                    minHeight: '40px',
+                    minHeight: '36px',
                     maxHeight: '150px',
                     overflowY: (message.length + interimTranscript.length) > 100 ? 'auto' : 'hidden'
                   }}
@@ -1689,14 +1694,14 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 />
                 {/* Listening / Transcribing pill above input */}
                 {isListening && (
-                  <div className="absolute -top-7 left-3 flex items-center gap-1.5 bg-red-500 text-white text-[11px] font-medium px-2 py-0.5 rounded-full shadow-sm">
+                  <div className="absolute -top-6 sm:-top-7 left-2 sm:left-3 flex items-center gap-1 sm:gap-1.5 bg-red-500 text-white text-[10px] sm:text-[11px] font-medium px-1.5 sm:px-2 py-0.5 rounded-full shadow-sm whitespace-nowrap">
                     <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                    Recording — tap mic to stop
+                    Recording…
                   </div>
                 )}
                 {!isListening && isTranscribing && (
-                  <div className="absolute -top-7 left-3 flex items-center gap-1.5 bg-blue-600 text-white text-[11px] font-medium px-2 py-0.5 rounded-full shadow-sm">
-                    <Loader2 className="w-3 h-3 animate-spin" />
+                  <div className="absolute -top-6 sm:-top-7 left-2 sm:left-3 flex items-center gap-1 sm:gap-1.5 bg-blue-600 text-white text-[10px] sm:text-[11px] font-medium px-1.5 sm:px-2 py-0.5 rounded-full shadow-sm">
+                    <Loader2 className="w-2.5 h-2.5 sm:w-3 sm:h-3 animate-spin" />
                     Transcribing…
                   </div>
                 )}
@@ -1704,7 +1709,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 <button
                   onClick={toggleListening}
                   disabled={isSending || isTranscribing}
-                  className={`flex-shrink-0 w-8 h-8 mr-2 rounded-full flex items-center justify-center transition-all ${
+                  className={`flex-shrink-0 w-7 h-7 sm:w-8 sm:h-8 mr-1.5 sm:mr-2 rounded-full flex items-center justify-center transition-all ${
                     isListening 
                       ? 'bg-red-500 text-white animate-pulse shadow-md shadow-red-300' 
                       : isTranscribing
@@ -1715,11 +1720,11 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                   data-testid="sidebar-voice-record-button"
                 >
                   {isListening ? (
-                    <Square className="w-3.5 h-3.5 fill-current" />
+                    <Square className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-current" />
                   ) : isTranscribing ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
                   ) : (
-                    <Mic className="w-4 h-4" />
+                    <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   )}
                 </button>
               </div>
@@ -1728,7 +1733,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               <button
                 onClick={handleSend}
                 disabled={isSending || (!message.trim() && !imageBase64)}
-                className={`flex-shrink-0 w-11 h-11 rounded-full text-white flex items-center justify-center shadow-lg transition-all active:scale-95 disabled:opacity-50 ${
+                className={`flex-shrink-0 w-9 h-9 sm:w-11 sm:h-11 rounded-full text-white flex items-center justify-center shadow-lg transition-all active:scale-95 disabled:opacity-50 ${
                   isSending 
                     ? 'bg-blue-400' 
                     : 'bg-blue-600 hover:bg-blue-700'
@@ -1737,9 +1742,9 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 title="Send message"
               >
                 {isSending ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
                 ) : (
-                  <Send className="w-5 h-5" />
+                  <Send className="w-4 h-4 sm:w-5 sm:h-5" />
                 )}
               </button>
             </div>

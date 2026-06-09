@@ -28,6 +28,19 @@ export const definitionsAPI = {
     const response = await api.delete(`/definitions/${equipmentId}`);
     return response.data;
   },
+  // Production Loss Configuration
+  getProductionLossConfig: async () => {
+    const response = await api.get("/definitions/production-loss-config");
+    return response.data;
+  },
+  saveProductionLossConfig: async (config) => {
+    const response = await api.put("/definitions/production-loss-config", config);
+    return response.data;
+  },
+  resetProductionLossConfig: async () => {
+    const response = await api.delete("/definitions/production-loss-config");
+    return response.data;
+  },
 };
 
 // ==================== PREFERENCES API ====================

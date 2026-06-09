@@ -90,43 +90,84 @@ class ProcessStage(BaseModel):
 # HELPER FUNCTIONS
 # ============================================================================
 
-def calculate_production_exposure(observation: dict, criticality: dict) -> dict:
-    """Calculate production exposure based on criticality and observation data"""
+async def calculate_production_exposure(observation: dict, criticality: dict, user_id: str) -> dict:
+    """Calculate production exposure based on criticality, observation data, and user's production loss config"""
     production_impact = (criticality or {}).get("production_impact") or 0
     if not production_impact:  # None or 0 → not rated on the 1-5 scale
         return {"not_assessed": True, "production_impact_score": None, "formatted_value": "Not Assessed"}
     
-    # Base exposure calculation
-    # Production impact 1-5 scale maps to monetary exposure
-    exposure_multiplier = {
-        1: 5000,
-        2: 15000,
-        3: 50000,
-        4: 100000,
-        5: 250000
+    # Fetch user's production loss configuration
+    prod_loss_config = await db.production_loss_config.find_one(
+        {"created_by": user_id},
+        {"_id": 0}
+    )
+    
+    # Use config values or defaults
+    hourly_cost = (prod_loss_config or {}).get("hourly_cost", 500.0)
+    currency = (prod_loss_config or {}).get("currency", "EUR")
+    
+    # Currency symbols
+    currency_symbols = {
+        "EUR": "€",
+        "USD": "$",
+        "GBP": "£",
+        "CHF": "CHF ",
+        "NOK": "kr ",
+        "SEK": "kr ",
+        "DKK": "kr "
     }
+    currency_symbol = currency_symbols.get(currency, currency + " ")
     
-    base_exposure = exposure_multiplier.get(production_impact, 0)
+    # Downtime ranges based on production criticality level (1-5 scale).
+    # Aligned with the default Production Criticality definitions:
+    #   1 — Minimal:  No production impact / redundancy available
+    #   2 — Low:      Downtime < 8 hours
+    #   3 — Medium:   Downtime 8 – 24 hours
+    #   4 — High:     Downtime > 24 hours (capped at 72 for the range upper bound)
+    #   5 — Critical: Complete plant shutdown (> 72 hours, open-ended)
+    # Returns (min_hours, max_hours). max_hours = None means "open-ended" (>min_hours).
+    downtime_ranges = {
+        1: (0, 0),
+        2: (0, 8),
+        3: (8, 24),
+        4: (24, 72),
+        5: (72, None),  # open-ended
+    }
+    min_hours, max_hours = downtime_ranges.get(production_impact, (8, 24))
     
-    # Estimate downtime based on risk level
-    risk_level = observation.get("risk_level", "low")
-    downtime_hours = {
-        "critical": 48,
-        "high": 24,
-        "medium": 8,
-        "low": 2
-    }.get(risk_level.lower(), 4)
+    # Maximum exposure value:
+    #   - Closed range (max_hours set): max_hours × hourly_cost  → "Up to €X"
+    #   - Open-ended (max_hours = None): min_hours × hourly_cost → "More than €X"
+    open_ended = max_hours is None
+    hours_for_value = max_hours if not open_ended else min_hours
+    max_exposure_value = hours_for_value * hourly_cost
     
-    # Calculate deferred production (simplified)
-    hourly_rate = 1000  # bbl/hour baseline
-    deferred_production = downtime_hours * hourly_rate * (production_impact / 5)
+    # Build the human-readable downtime label
+    if open_ended:
+        downtime_label = f"> {min_hours}"
+    elif min_hours == 0 and max_hours == 0:
+        downtime_label = "0"
+    elif min_hours == 0:
+        downtime_label = f"< {max_hours}"
+    else:
+        downtime_label = f"{min_hours} - {max_hours}"
+    
+    formatted_value = (
+        f"More than {currency_symbol}{max_exposure_value:,.0f}"
+        if open_ended
+        else f"Up to {currency_symbol}{max_exposure_value:,.0f}"
+    )
     
     return {
-        "value": base_exposure,
-        "formatted_value": f"${base_exposure:,.0f}",
-        "estimated_downtime_hours": downtime_hours,
-        "deferred_production": round(deferred_production),
-        "deferred_production_unit": "bbl"
+        "value": max_exposure_value,
+        "formatted_value": formatted_value,
+        "min_downtime_hours": min_hours,
+        "max_downtime_hours": max_hours,
+        "downtime_range": downtime_label,
+        "open_ended": open_ended,
+        "hourly_cost": hourly_cost,
+        "currency": currency,
+        "production_impact_score": production_impact
     }
 
 
@@ -198,72 +239,131 @@ def calculate_reputation_exposure(observation: dict, criticality: dict) -> dict:
     }
 
 
+async def get_criticality_definitions_for_equipment(equipment_node: dict, user_id: str) -> List[dict]:
+    """
+    Resolve the criticality definitions that apply to an equipment node.
+
+    Walks the equipment hierarchy up to the installation (level == 'installation')
+    and returns the user's custom criticality definitions saved for that installation
+    if any exist. Falls back to the built-in DEFAULT_CRITICALITY otherwise.
+    """
+    # Lazy import to avoid circular imports at module load time
+    from routes.definitions import DEFAULT_CRITICALITY
+
+    if not equipment_node:
+        return DEFAULT_CRITICALITY
+
+    # Walk up to the installation
+    current = equipment_node
+    safety = 0  # avoid infinite loop on corrupt data
+    while current and current.get("level") != "installation" and safety < 20:
+        parent_id = current.get("parent_id")
+        if not parent_id:
+            break
+        current = await db.equipment_nodes.find_one({"id": parent_id}, {"_id": 0})
+        safety += 1
+
+    if not current or current.get("level") != "installation":
+        return DEFAULT_CRITICALITY
+
+    # Look up custom definitions for this installation (any user — fall back to the
+    # requesting user's own first, then any user's so shared workspaces still work).
+    custom = await db.definitions.find_one(
+        {"equipment_id": current.get("id"), "created_by": user_id},
+        {"_id": 0}
+    )
+    if not custom:
+        custom = await db.definitions.find_one(
+            {"equipment_id": current.get("id")},
+            {"_id": 0}
+        )
+
+    if custom and custom.get("criticality"):
+        return custom["criticality"]
+    return DEFAULT_CRITICALITY
+
+
 async def calculate_alarp_progress(observation_id: str, actions: list, investigation: dict = None) -> dict:
     """
-    Calculate ALARP progress based on:
-    - Action completion
-    - Investigation completion
-    - Validation evidence
+    Stage-based mitigation progress aligned with the Process Journey:
+        Observation reached               → 10%
+        Assessment (FM + Eq + risk)       → +10%
+        Planning (≥1 action on plan)      → +10%
+        Investigation                     → 0% (optional, no contribution)
+        Action — per completed action     → +40% × (completed / total)
+        Mitigated (all actions complete)  → 90%
+        Learning implemented              → 100%
     """
-    total_score = 0
-    # max_score = 100 - removed as unused
-    
-    # Action completion contributes 50%
-    if actions:
-        completed_actions = len([a for a in actions if a.get("status") in ["completed", "validated"]])
-        total_actions = len(actions)
-        action_progress = (completed_actions / total_actions * 50) if total_actions > 0 else 0
-        total_score += action_progress
+    progress = 10  # Observation stage reached (the observation exists)
+
+    observation = await db.threats.find_one({"id": observation_id}, {"_id": 0}) or {}
+
+    # Assessment (+10) — requires failure mode + equipment + risk score
+    has_fm = bool(observation.get("failure_mode") or observation.get("failure_mode_id"))
+    has_eq = bool(observation.get("linked_equipment_id"))
+    has_risk = (observation.get("risk_score") or 0) > 0
+    assessment_done = has_fm and has_eq and has_risk
+    if assessment_done:
+        progress += 10
+
+    # Planning (+10) — at least one action exists on the plan
+    total_actions = len(actions) if actions else 0
+    planning_done = total_actions > 0
+    if planning_done:
+        progress += 10
+
+    # Investigation contributes 0% intentionally (optional stage).
+
+    # Action contribution: up to 40% pro-rated by completion ratio.
+    completed_count = sum(
+        1 for a in (actions or []) if a.get("status") in ("completed", "validated")
+    )
+    action_pct = 0
+    if total_actions > 0:
+        if completed_count == total_actions:
+            # Mitigated stage reached — promote to 90% regardless of running total.
+            progress = 90
+        else:
+            action_pct = round(40 * completed_count / total_actions)
+            progress += action_pct
+
+    # Learning implemented → 100%
+    learning_done = any(
+        (a.get("action_type") or "").lower() in ("learning", "learn")
+        and a.get("status") in ("completed", "validated")
+        for a in (actions or [])
+    )
+    if learning_done:
+        progress = 100
+
+    progress = min(progress, 100)
+
+    # Status label reflects the furthest journey stage reached rather than an
+    # arbitrary percentage bucket — easier for the user to read at a glance.
+    if learning_done:
+        status = "Learning Complete"
+    elif total_actions > 0 and completed_count == total_actions:
+        status = "Mitigated"
+    elif total_actions > 0 and completed_count > 0:
+        status = "In Action"
+    elif planning_done:
+        status = "In Planning"
+    elif assessment_done:
+        status = "In Assessment"
     else:
-        # If no actions defined, this portion is not applicable - give partial credit
-        total_score += 25
-    
-    # Investigation completion contributes 30%
-    if investigation:
-        inv_status = investigation.get("status", "draft")
-        if inv_status == "completed":
-            total_score += 30
-        elif inv_status == "in_progress":
-            total_score += 15
-        elif inv_status == "review":
-            total_score += 25
-    
-    # Risk assessment completion contributes 20%
-    # (checking if observation has been fully assessed)
-    observation = await db.threats.find_one({"id": observation_id}, {"_id": 0})
-    if observation:
-        has_failure_mode = bool(observation.get("failure_mode"))
-        has_equipment = bool(observation.get("linked_equipment_id"))
-        has_risk_score = observation.get("risk_score", 0) > 0
-        
-        assessment_score = 0
-        if has_failure_mode:
-            assessment_score += 7
-        if has_equipment:
-            assessment_score += 7
-        if has_risk_score:
-            assessment_score += 6
-        total_score += assessment_score
-    
-    # Determine status
-    progress = min(round(total_score), 100)
-    if progress >= 90:
-        status = "ALARP Achieved"
-    elif progress >= 70:
-        status = "Approaching ALARP"
-    elif progress >= 40:
-        status = "In Progress"
-    else:
-        status = "Not Started"
-    
+        status = "Observation"
+
     return {
         "percentage": progress,
         "status": status,
         "components": {
-            "actions": round(action_progress) if actions else 25,
-            "investigation": 30 if investigation and investigation.get("status") == "completed" else 0,
-            "assessment": assessment_score if observation else 0
-        }
+            "observation": 10,
+            "assessment": 10 if assessment_done else 0,
+            "planning": 10 if planning_done else 0,
+            "investigation": 0,
+            "actions": action_pct,
+            "learning": 100 if learning_done else 0,
+        },
     }
 
 
@@ -342,7 +442,12 @@ async def get_equipment_timeline_events(
         
         for action in actions:
             action_type = action.get("action_type", "corrective").lower()
-            event_type = "repair" if action_type in ["corrective", "repair"] else "work_order"
+            
+            # Skip PM (preventive), PDM (predictive) and scheduled tasks — show only reactive/corrective history
+            if action_type in ["pm", "preventive", "preventive maintenance", "scheduled", "pdm", "predictive", "predictive maintenance"]:
+                continue
+            
+            event_type = "repair" if action_type in ["corrective", "repair", "cm"] else "work_order"
             
             events.append({
                 "id": action.get("id"),
@@ -350,37 +455,11 @@ async def get_equipment_timeline_events(
                 "event_type": event_type,
                 "title": action.get("title", "Action"),
                 "reference_id": action.get("action_number", ""),
-                "status": action.get("status", "")
+                "status": action.get("status", ""),
+                "action_type": action.get("action_type", "").upper()
             })
     
-    # 3. Get scheduled tasks (inspections)
-    task_conditions = []
-    if equipment_id:
-        task_conditions.append({"equipment_id": equipment_id})
-    
-    if task_conditions:
-        tasks = await db.scheduled_tasks.find(
-            {
-                "$or": task_conditions,
-                "status": {"$in": ["completed", "scheduled"]}
-            },
-            {"_id": 0, "id": 1, "task_title": 1, "scheduled_date": 1, 
-             "status": 1, "task_type": 1, "completed_date": 1}
-        ).sort("scheduled_date", -1).limit(limit).to_list(limit)
-        
-        for task in tasks:
-            task_type = task.get("task_type", "preventive").lower()
-            event_type = "inspection" if "inspect" in task_type or task_type == "preventive" else "work_order"
-            
-            events.append({
-                "id": task.get("id"),
-                "date": task.get("completed_date") or task.get("scheduled_date", ""),
-                "event_type": event_type,
-                "title": task.get("task_title", "Task"),
-                "status": task.get("status", "")
-            })
-    
-    # 4. Get investigations
+    # 3. Get investigations (skip scheduled tasks section)
     inv_conditions = []
     if asset_name:
         inv_conditions.append({"asset_name": asset_name})
@@ -567,12 +646,15 @@ async def get_recommended_actions(observation: dict, failure_mode_data: dict = N
         for i, action in enumerate(fm_actions[:5]):  # Limit to 5
             if isinstance(action, dict):
                 action_title = action.get("action") or action.get("title") or action.get("description", "")
-                action_type = action.get("type", "PM").upper()
+                # Support both `action_type` and legacy `type`
+                action_type = (action.get("action_type") or action.get("type") or "PM").upper()
                 expected_impact = action.get("expected_impact") or action.get("impact", "")
+                discipline = action.get("discipline")
             else:
                 action_title = str(action)
                 action_type = "PM"
                 expected_impact = ""
+                discipline = None
             
             recommendations.append({
                 "id": f"fm-{failure_mode_data.get('id', 'unknown')}-{i}",
@@ -583,6 +665,7 @@ async def get_recommended_actions(observation: dict, failure_mode_data: dict = N
                 "expected_impact": expected_impact,
                 "confidence": None,  # Library actions don't have confidence
                 "failure_mode_id": failure_mode_data.get("id"),
+                "discipline": discipline,
                 "why_recommended": f"Recommended because this action is part of the standard mitigation strategy for '{failure_mode_data.get('failure_mode', 'this failure mode')}'."
             })
 
@@ -629,7 +712,11 @@ async def get_recommended_actions(observation: dict, failure_mode_data: dict = N
 
 async def get_action_plan(observation_id: str) -> List[dict]:
     """
-    Get actions linked to this observation (existing actions system)
+    Get actions linked to this observation (existing actions system).
+    
+    Also surfaces any linked causal investigation as a synthetic IV-type entry
+    so the investigation appears in the plan without duplicating data in
+    central_actions.
     """
     actions = await db.central_actions.find(
         {
@@ -643,15 +730,53 @@ async def get_action_plan(observation_id: str) -> List[dict]:
     ).sort("created_at", -1).to_list(50)
     
     action_plan = []
+    
+    # Surface the linked investigation (if any) as a synthetic IV entry
+    investigation = await db.investigations.find_one({"threat_id": observation_id}, {"_id": 0})
+    if investigation:
+        inv_status = (investigation.get("status") or "draft").lower()
+        # Map investigation status → action plan status
+        status_map = {
+            "draft": "open",
+            "in_progress": "in_progress",
+            "review": "in_progress",
+            "completed": "completed",
+            "closed": "completed",
+        }
+        action_plan.append({
+            "id": f"inv-{investigation.get('id')}",
+            "action_number": investigation.get("case_number", ""),
+            "title": "Complete causal investigation",
+            "description": "Linked causal investigation. Click to open in Causal Engine.",
+            "status": status_map.get(inv_status, "open"),
+            "priority": "medium",
+            "action_type": "IV",
+            "discipline": "Reliability",
+            "assignee": investigation.get("investigation_leader", ""),
+            "owner": investigation.get("investigation_leader", ""),
+            "due_date": "",
+            "comments": "",
+            "recommendation_id": None,
+            "linked_investigation_id": investigation.get("id"),
+            "is_synthetic": True,
+        })
+
     for action in actions:
         action_plan.append({
             "id": action.get("id"),
             "action_number": action.get("action_number", ""),
             "title": action.get("title", ""),
+            "description": action.get("description", ""),
             "status": action.get("status", "open"),
             "priority": action.get("priority", "medium"),
+            "action_type": (action.get("action_type") or "").upper() if action.get("action_type") else "",
+            "discipline": action.get("discipline"),
+            "assignee": action.get("assignee") or action.get("assigned_to") or "",
             "owner": action.get("owner_name") or action.get("assigned_to_name", ""),
-            "due_date": action.get("due_date", "")
+            "due_date": action.get("due_date", ""),
+            "comments": action.get("comments", ""),
+            "recommendation_id": action.get("recommendation_id"),
+            "linked_investigation_id": action.get("linked_investigation_id"),
         })
     
     return action_plan
@@ -801,6 +926,7 @@ async def get_observation_workspace(
     # Get equipment criticality data — try linked_equipment_id first, then fall back
     # to matching by equipment_tag, then by asset name, so observations created via
     # chat (where the equipment isn't formally linked) still pull in their criticality.
+    # Finally, check if the observation already has stored criticality data.
     criticality = None
     equipment_node = None
     lookup_filters = []
@@ -811,12 +937,17 @@ async def get_observation_workspace(
         lookup_filters.append({"equipment_tag": observation["equipment_tag"]})
     if observation.get("asset"):
         lookup_filters.append({"name": observation["asset"]})
+    
     for f in lookup_filters:
         equipment_node = await db.equipment_nodes.find_one(f, {"_id": 0})
         if equipment_node:
             criticality = equipment_node.get("criticality")
             if criticality:
                 break
+    
+    # Fall back to observation's stored criticality data if no equipment node found
+    if not criticality and observation.get("equipment_criticality_data"):
+        criticality = observation.get("equipment_criticality_data")
     
     # Get failure mode data
     failure_mode_data = None
@@ -825,7 +956,7 @@ async def get_observation_workspace(
             {"id": observation.get("failure_mode_id")},
             {"_id": 0}
         )
-    elif observation.get("failure_mode"):
+    if not failure_mode_data and observation.get("failure_mode"):
         # Try to find by name
         failure_mode_data = await db.failure_modes.find_one(
             {"failure_mode": {"$regex": f"^{observation.get('failure_mode')}$", "$options": "i"}},
@@ -841,13 +972,48 @@ async def get_observation_workspace(
     # Get action plan
     action_plan = await get_action_plan(observation_id)
     
+    # Resolve criticality definitions for this observation's installation up-front
+    # so exposure cards can render the actual definition text (keeps the card
+    # primary/secondary labels in sync with the right-click popovers).
+    criticality_definitions = await get_criticality_definitions_for_equipment(
+        equipment_node, current_user["id"]
+    )
+    
+    def _def_for(score: int) -> dict:
+        """Return the criticality definition entry for a 1-5 score, or {}."""
+        if not score:
+            return {}
+        for entry in criticality_definitions or []:
+            if entry.get("rank") == score:
+                return entry
+        return {}
+    
     # Build all workspace components
     
     # 1. Exposure data
-    production_exposure = calculate_production_exposure(observation, criticality)
+    production_exposure = await calculate_production_exposure(observation, criticality, current_user["id"])
     safety_exposure = calculate_safety_exposure(observation, criticality)
     environmental_exposure = calculate_environmental_exposure(observation, criticality)
     reputation_exposure = calculate_reputation_exposure(observation, criticality)
+    
+    # Enrich exposures with the resolved definition labels so the card text
+    # matches the right-click popover content for that installation.
+    if safety_exposure.get("safety_impact_score"):
+        d = _def_for(safety_exposure["safety_impact_score"])
+        if d:
+            safety_exposure["severity"] = d.get("label") or d.get("name") or safety_exposure.get("severity", "Low")
+            safety_exposure["definition"] = d.get("safety") or (d.get("definitions") or {}).get("safety", "")
+    if environmental_exposure.get("environmental_impact_score"):
+        d = _def_for(environmental_exposure["environmental_impact_score"])
+        if d:
+            environmental_exposure["impact_rating"] = d.get("label") or d.get("name") or environmental_exposure.get("impact_rating", "Low")
+            environmental_exposure["definition"] = d.get("environment") or (d.get("definitions") or {}).get("environment", "")
+    if reputation_exposure.get("reputation_impact_score"):
+        d = _def_for(reputation_exposure["reputation_impact_score"])
+        if d:
+            reputation_exposure["impact_rating"] = d.get("label") or d.get("name") or reputation_exposure.get("impact_rating", "Low")
+            reputation_exposure["definition"] = d.get("reputation") or (d.get("definitions") or {}).get("reputation", "")
+    
     alarp_progress = await calculate_alarp_progress(observation_id, action_plan, investigation)
     
     exposure_data = {
@@ -875,11 +1041,38 @@ async def get_observation_workspace(
     # 3. Reliability intelligence
     reliability_intelligence = await get_reliability_intelligence(observation, failure_mode_data)
     
-    # 4. Recommended actions
+    # 4. Recommended actions — filter out items already added to the action plan
     recommended_actions = await get_recommended_actions(observation, failure_mode_data)
+    added_recommendation_ids = {a.get("recommendation_id") for a in action_plan if a.get("recommendation_id")}
+    if added_recommendation_ids:
+        recommended_actions = [r for r in recommended_actions if r.get("id") not in added_recommendation_ids]
     
     # 5. Process journey
     process_journey = await get_process_journey(observation, action_plan, investigation)
+    
+    # Sync observation.status with the current stage of the process journey.
+    # The "current" stage is the furthest stage that is in_progress, or the latest
+    # completed stage if none are in progress. Status values map 1:1 to stage names.
+    current_stage = None
+    for stg in process_journey:
+        if stg.get("status") == "in_progress":
+            current_stage = stg.get("stage")
+            break
+    if not current_stage:
+        for stg in process_journey:
+            if stg.get("status") == "completed":
+                current_stage = stg.get("stage")
+        # falls through to last completed
+    if current_stage and observation.get("status") != current_stage:
+        try:
+            await db.threats.update_one(
+                {"id": observation_id},
+                {"$set": {"status": current_stage, "updated_at": datetime.now(timezone.utc).isoformat()}}
+            )
+            observation["status"] = current_stage
+        except Exception:
+            # Non-fatal — UI still shows the derived stage from process_journey
+            pass
     
     return {
         "observation_id": observation_id,
@@ -933,6 +1126,10 @@ async def get_observation_workspace(
         "ai_insights_available": any(r.get("source") == "ai_generated" for r in recommended_actions),
         "action_plan": action_plan,
         "process_journey": process_journey,
+        # Custom criticality definitions for this observation's installation (falls
+        # back to defaults if no custom configuration exists). Used by the right-click
+        # popovers on exposure cards.
+        "criticality_definitions": criticality_definitions,
         "investigation": {
             "id": investigation.get("id") if investigation else None,
             "title": investigation.get("title") if investigation else None,
@@ -1035,6 +1232,7 @@ async def add_recommendation_to_plan(
         "action_type": action_type_map.get(recommendation.get("action_type", "PM"), "corrective"),
         "status": "open",
         "priority": "medium",
+        "discipline": recommendation.get("discipline"),
         "source": recommendation.get("source", "recommendation"),
         "source_id": observation_id,
         "observation_id": observation_id,
