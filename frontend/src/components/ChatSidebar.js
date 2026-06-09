@@ -840,16 +840,15 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
             {/* Header - Draft indicator */}
             <div className="flex items-center gap-2 text-orange-700 px-3 py-2 bg-orange-100/50 border-b border-orange-200">
               <AlertTriangle className="w-4 h-4" />
-              <span className="font-semibold text-sm">{msg.issue_confirm_language === "nl" ? "Concept Observatie" : "Draft Observation"}</span>
+              <span className="font-semibold text-sm">Draft Observation</span>
               <span className="ml-auto text-xs bg-orange-200 text-orange-800 px-2 py-0.5 rounded-full font-medium">
-                {msg.issue_confirm_language === "nl" ? "Te bevestigen" : "Pending"}
+                Pending
               </span>
             </div>
             
             {/* Observation Details */}
             <div className="p-3">
               {(() => {
-                const isNl = msg.issue_confirm_language === "nl";
                 const content = msg.content || "";
                 const summary = msg.issue_summary || "";
                 
@@ -874,10 +873,10 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                     {/* Title/Failure Mode */}
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <h4 className="font-semibold text-slate-900 text-sm leading-tight">
-                        {failureMode || (isNl ? "Nieuwe Observatie" : "New Observation")}
+                        {failureMode || "New Observation"}
                       </h4>
                       <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
-                        {isNl ? "Concept" : "Draft"}
+                        Draft
                       </span>
                     </div>
                     
@@ -886,20 +885,20 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                       {equipment && (
                         <div className="flex items-center gap-1.5">
                           <Wrench className="w-3.5 h-3.5 text-orange-400" />
-                          <span><strong>{isNl ? "Apparatuur:" : "Equipment:"}</strong> {equipment}</span>
+                          <span><strong>Equipment:</strong> {equipment}</span>
                         </div>
                       )}
                       {failureMode && (
                         <div className="flex items-center gap-1.5">
                           <AlertTriangle className="w-3.5 h-3.5 text-orange-400" />
-                          <span><strong>{isNl ? "Faalwijze:" : "Failure Mode:"}</strong> {failureMode}</span>
+                          <span><strong>Failure Mode:</strong> {failureMode}</span>
                         </div>
                       )}
                       {whatsHappening && (
                         <div className="flex items-start gap-1.5 mt-2">
                           <MessageSquare className="w-3.5 h-3.5 text-orange-400 mt-0.5" />
                           <div>
-                            <strong>{isNl ? "Wat gebeurt er:" : "What's happening:"}</strong>
+                            <strong>What's happening:</strong>
                             <p className="text-slate-700 mt-0.5">{whatsHappening}</p>
                           </div>
                         </div>
@@ -917,19 +916,19 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                           data-testid="issue-confirm-accept-btn"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                          {isNl ? "Accepteren" : "Accept"}
+                          Accept
                         </button>
                         <button
                           type="button"
                           onClick={() => {
                             textareaRef.current?.focus();
-                            setMessage(isNl ? "Wijzig: " : "Change: ");
+                            setMessage("Change: ");
                           }}
                           disabled={isSending}
                           className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-white border border-orange-300 text-orange-700 text-xs font-medium hover:bg-orange-50 disabled:opacity-50 transition-colors"
                           data-testid="issue-confirm-revise-btn"
                         >
-                          {isNl ? "Aanpassen" : "Revise"}
+                          Revise
                         </button>
                         <button
                           type="button"
@@ -949,7 +948,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                           className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-white border border-red-300 text-red-600 text-xs font-medium hover:bg-red-50 disabled:opacity-50 transition-colors"
                           data-testid="issue-confirm-cancel-btn"
                         >
-                          {isNl ? "Annuleren" : "Cancel"}
+                          Cancel
                         </button>
                       </div>
                     )}
