@@ -82,6 +82,7 @@ const Layout = () => {
   const [chatPrefillEquipment, setChatPrefillEquipment] = useState(null);
   const [chatPrefillMessage, setChatPrefillMessage] = useState(null);
   const [hierarchyOpen, setHierarchyOpen] = useState(typeof window !== 'undefined' && window.innerWidth >= 1024);
+  const [hierarchySearchQuery, setHierarchySearchQuery] = useState("");
   const [hierarchyWidth, setHierarchyWidth] = useState(288); // 288px = w-72 default
   const [isResizing, setIsResizing] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -483,11 +484,20 @@ const Layout = () => {
   useEffect(() => {
     const handleOpenChat = () => { setChatPrefillEquipment(null); setChatOpen(true); };
     const handleOpenHierarchy = () => setHierarchyOpen(true);
+    const handleOpenHierarchyWithSearch = (event) => {
+      const { query } = event.detail || {};
+      setHierarchyOpen(true);
+      if (query) {
+        setHierarchySearchQuery(query);
+      }
+    };
     window.addEventListener("open-chat", handleOpenChat);
     window.addEventListener("open-hierarchy", handleOpenHierarchy);
+    window.addEventListener("open-hierarchy-with-search", handleOpenHierarchyWithSearch);
     return () => {
       window.removeEventListener("open-chat", handleOpenChat);
       window.removeEventListener("open-hierarchy", handleOpenHierarchy);
+      window.removeEventListener("open-hierarchy-with-search", handleOpenHierarchyWithSearch);
     };
   }, []);
 
@@ -582,6 +592,8 @@ const Layout = () => {
                   onClose={() => setHierarchyOpen(false)}
                   isMobile={false}
                   onAddThreat={handleAddObservationFromHierarchy}
+                  initialSearchQuery={hierarchySearchQuery}
+                  onSearchQueryUsed={() => setHierarchySearchQuery("")}
                 />
               </div>
             </div>
@@ -603,6 +615,8 @@ const Layout = () => {
             onClose={() => setHierarchyOpen(false)}
             isMobile={true}
             onAddThreat={handleAddObservationFromHierarchy}
+            initialSearchQuery={hierarchySearchQuery}
+            onSearchQueryUsed={() => setHierarchySearchQuery("")}
           />
         </div>
 

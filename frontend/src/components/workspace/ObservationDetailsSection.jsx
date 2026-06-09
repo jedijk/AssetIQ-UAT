@@ -451,10 +451,8 @@ const ObservationDetailsSection = ({ threatId }) => {
   
   // Handler to search for tag in hierarchy
   const handleTagClick = (tag) => {
-    // Dispatch custom event to trigger hierarchy search
-    window.dispatchEvent(new CustomEvent('hierarchy-search', { detail: { query: tag } }));
-    // Also dispatch event to open hierarchy sidebar if it's closed (on larger screens)
-    window.dispatchEvent(new CustomEvent('open-hierarchy'));
+    // Dispatch single event with search query - Layout will open hierarchy and pass query
+    window.dispatchEvent(new CustomEvent('open-hierarchy-with-search', { detail: { query: tag } }));
   };
   
   const actionBar = (
@@ -720,7 +718,17 @@ const ObservationDetailsSection = ({ threatId }) => {
               )
             ) : (
               <div className="flex items-center gap-1 justify-end sm:justify-start">
-                <span className="font-semibold text-slate-900 text-sm truncate">{item.value}</span>
+                {item.field === "failure_mode" && item.value ? (
+                  <button
+                    onClick={() => navigate(`/library?search=${encodeURIComponent(threat.failure_mode)}`)}
+                    className="font-semibold text-slate-900 text-sm truncate hover:text-blue-600 hover:underline transition-colors cursor-pointer"
+                    title="Click to view in Failure Modes Library"
+                  >
+                    {item.value}
+                  </button>
+                ) : (
+                  <span className="font-semibold text-slate-900 text-sm truncate">{item.value}</span>
+                )}
                 {item.field === "failure_mode" && threat.is_new_failure_mode && (
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">NEW</span>
                 )}

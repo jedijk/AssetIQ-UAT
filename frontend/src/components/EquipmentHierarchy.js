@@ -840,7 +840,7 @@ const LevelSummaryItem = ({ level, count, isActive, onClick, isHidden, onToggleH
   );
 };
 
-const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, initialSearchQuery = "" }) => {
+const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, initialSearchQuery = "", onSearchQueryUsed }) => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const scrollContainerRef = useRef(null);
@@ -871,29 +871,20 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, in
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [preSearchExpandedNodes, setPreSearchExpandedNodes] = useState(null);
 
-  // Listen for external search requests (e.g., from clicking tag in observation workspace)
-  useEffect(() => {
-    const handleSearchRequest = (event) => {
-      const { query } = event.detail || {};
-      if (query) {
-        setSearchQuery(query);
-        // Focus the search input after a short delay
-        setTimeout(() => {
-          searchInputRef.current?.focus();
-        }, 100);
-      }
-    };
-    
-    window.addEventListener('hierarchy-search', handleSearchRequest);
-    return () => window.removeEventListener('hierarchy-search', handleSearchRequest);
-  }, []);
-
-  // Update search when initialSearchQuery prop changes
+  // Handle initial search query from props (e.g., from clicking tag in observation workspace)
   useEffect(() => {
     if (initialSearchQuery) {
       setSearchQuery(initialSearchQuery);
+      // Focus the search input after a short delay
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 100);
+      // Clear the prop so it doesn't re-apply on re-renders
+      if (onSearchQueryUsed) {
+        onSearchQueryUsed();
+      }
     }
-  }, [initialSearchQuery]);
+  }, [initialSearchQuery, onSearchQueryUsed]);
 
   // Hidden levels - persisted to localStorage, default: hide first 2 levels
   const [hiddenLevels, setHiddenLevels] = useState(() => {
