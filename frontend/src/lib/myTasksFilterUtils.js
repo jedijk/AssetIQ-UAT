@@ -1,10 +1,35 @@
 import { normalizeDiscipline } from "../constants/disciplines";
 
+/** Default My Tasks discipline filters by role (when no saved preference). */
+export const MAINTENANCE_DEFAULT_DISCIPLINES = [
+  "rotating",
+  "instrumentation",
+  "static",
+  "piping",
+  "electrical",
+  "civil",
+];
+
+/** Role-based default discipline filter for My Tasks. */
+export function defaultDisciplinesForRole(role) {
+  if (role === "operations") return ["operations"];
+  if (role === "maintenance") return [...MAINTENANCE_DEFAULT_DISCIPLINES];
+  return [];
+}
+
 /** Map stored preference to My Tasks multi-select state. */
 export function disciplinesFromPreference(discipline) {
   if (!discipline) return [];
   const normalized = normalizeDiscipline(discipline);
   return normalized ? [normalized] : [discipline];
+}
+
+/** Resolve discipline filter: saved preference wins; otherwise role defaults. */
+export function resolveMyTasksDisciplines(role, preferenceDiscipline) {
+  if (preferenceDiscipline) {
+    return disciplinesFromPreference(preferenceDiscipline);
+  }
+  return defaultDisciplinesForRole(role);
 }
 
 /** Map My Tasks selection to preference API value; undefined = skip persist (multi-select). */

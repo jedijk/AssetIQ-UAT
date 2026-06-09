@@ -474,6 +474,7 @@ async def _finalize_chat_machine_result(
     """Persist state + assistant message after `process_chat_message` (observation or in-flow)."""
     new_state = result["state"]
     resp_text = result["response_text"]
+    conv = await _read_conv(user_id)
 
     if result.get("create_observation") and result.get("observation_data"):
         # Get the description from issue_summary (same as shown in draft)

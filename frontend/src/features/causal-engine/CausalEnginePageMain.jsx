@@ -13,13 +13,10 @@ import { useCausalEngineData } from "../../hooks/investigations/useCausalEngineD
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { getBackendUrl } from "../../lib/apiConfig";
-import AttachmentsPanel from "../../components/attachments/AttachmentsPanel";
 import AIProblemCheckModal from "../../components/causal-engine/AIProblemCheckModal";
-import RecurringIssueQuadrant from "../../components/causal-engine/RecurringIssueQuadrant";
 import {
   Search, Plus, FileText, Clock, AlertTriangle, GitBranch, CheckSquare,
-  ChevronRight, Trash2, Calendar, User, MapPin,
-  Target, Loader2, ClipboardList, Edit, MessageSquare, Upload, File, Image, X, Download, Save, Lock, ShieldCheck, UserCheck, CheckCircle, ExternalLink, FileDown, Presentation, Sparkles, Brain,
+  Target, Loader2, ClipboardList, Edit, MessageSquare, Upload, File, Image, X, Download, Lock, ShieldCheck, UserCheck, CheckCircle, ExternalLink, Sparkles, Brain,
 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -30,21 +27,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { SearchableSelect } from "../../components/ui/searchable-select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../../components/ui/alert-dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../components/ui/dropdown-menu";
 import { CAUSE_CATEGORIES } from "../../components/CauseNodeItem";
 import BackButton from "../../components/BackButton";
 import DesktopOnlyMessage from "../../components/DesktopOnlyMessage";
 import { NewInvestigationDialog, EventDialog, FailureDialog, CauseDialog, ActionDialog } from "../../components/causal-engine/InvestigationDialogs";
-import EquipmentTimeline from "../../components/EquipmentTimeline";
 import {
   ACTION_PRIORITIES,
   ACTION_STATUSES,
   EVENT_CATEGORIES,
-  INVESTIGATION_STATUSES,
 } from "../../components/causal-engine/constants";
 import { InvestigationTimelineTab } from "./InvestigationTimelineTab";
 import { InvestigationFailuresTab } from "./InvestigationFailuresTab";
 import { InvestigationCausesTab } from "./InvestigationCausesTab";
+import { InvestigationActionsTab } from "./InvestigationActionsTab";
+import { InvestigationOverviewTab } from "./InvestigationOverviewTab";
 import { queryKeys } from "../../lib/queryKeys";
 
 export default function CausalEnginePageMain() {
@@ -208,7 +204,7 @@ export default function CausalEnginePageMain() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.investigations.all() });
       queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) });
-      queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.timelineAll() });
       // Close inline edit mode if it was open
       if (isEditingInvestigation) {
         setIsEditingInvestigation(false);
@@ -397,6 +393,52 @@ export default function CausalEnginePageMain() {
       toast.success(t("causal.fileDeleted") || "File deleted");
     },
   });
+
+  const handleUploadEvidence = useCallback(
+    async (files) => {
+      if (!selectedInvId) return;
+      setIsUploading(true);
+      try {
+        for (const file of files) {
+          let processedFile = file;
+          if (file.type.startsWith("image/")) {
+            try {
+              const result = await compressImage(file, {
+                maxWidth: 1920,
+                maxHeight: 1920,
+                quality: 0.8,
+                maxSizeMB: 1,
+              });
+              processedFile = result.file;
+              if (result.wasCompressed) {
+                const savedPercent = getCompressionPercent(result.originalSize, result.compressedSize);
+                toast.success(`${file.name} compressed (${savedPercent}% smaller)`);
+              }
+            } catch (err) {
+              console.error("Image compression failed:", err);
+            }
+          }
+          await investigationAPI.uploadFile(selectedInvId, processedFile);
+        }
+        queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) });
+        toast.success(t("causal.filesUploaded") || `${files.length} file(s) uploaded successfully`);
+      } catch (error) {
+        console.error("Upload failed:", error);
+        toast.error(t("causal.uploadFailed") || "Failed to upload file(s)");
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [selectedInvId, queryClient, t]
+  );
+
+  const handleRemoveEvidence = useCallback(
+    (raw) => {
+      if (!selectedInvId || !raw?.id) return;
+      deleteEvidenceMutation.mutate({ invId: selectedInvId, evidenceId: raw.id });
+    },
+    [selectedInvId, deleteEvidenceMutation]
+  );
   
   const deleteInvMutation = useMutation({
     mutationFn: async ({ id, options }) => {
@@ -425,7 +467,7 @@ export default function CausalEnginePageMain() {
         });
       }
       queryClient.invalidateQueries({ queryKey: queryKeys.investigations.all() });
-      queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.timelineAll() });
       queryClient.invalidateQueries({ queryKey: queryKeys.actions.all() }); // Refresh actions list
       setSelectedInvId(null);
       setDeleteInvOptions({ deleteCentralActions: false }); // Reset options
@@ -519,7 +561,7 @@ export default function CausalEnginePageMain() {
     mutationFn: (data) => investigationAPI.createAction(selectedInvId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) });
-      queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.timelineAll() });
       setShowActionDialog(false);
       setEditingItem(null);
       setActionForm({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, action_type: "", discipline: "", comment: "" });
@@ -531,7 +573,7 @@ export default function CausalEnginePageMain() {
     mutationFn: ({ actionId, data }) => investigationAPI.updateAction(selectedInvId, actionId, data),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) });
-      queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.timelineAll() });
       setShowActionDialog(false);
       setEditingItem(null);
       setActionForm({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, action_type: "", discipline: "", comment: "" });
@@ -548,7 +590,7 @@ export default function CausalEnginePageMain() {
     mutationFn: (actionId) => investigationAPI.deleteAction(selectedInvId, actionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) });
-      queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.timelineAll() });
     },
   });
 
@@ -571,7 +613,7 @@ export default function CausalEnginePageMain() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.actions.all() });
       queryClient.invalidateQueries({ queryKey: queryKeys.investigations.centralActions(selectedInvId) });
-      queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.timelineAll() });
       toast.success(t("causal.actionPromoted") || "Action added to Action Plan!");
     },
     onError: (error) => {
@@ -917,390 +959,42 @@ export default function CausalEnginePageMain() {
           {/* Tab content */}
           <div className="flex-1 overflow-y-auto p-4">
             {activeTab === "overview" && (
-              <div className="space-y-4">
-                {/* Inline Edit Mode */}
-                {isEditingInvestigation ? (
-                  <div className="bg-white rounded-xl border p-6 space-y-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <h2 className="text-lg font-semibold text-slate-900">Edit Investigation</h2>
-                      <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={handleCancelEdit}>
-                          <X className="w-4 h-4 mr-1" /> Cancel
-                        </Button>
-                        <Button size="sm" onClick={handleSaveInvestigation} disabled={updateInvMutation.isPending}>
-                          <Save className="w-4 h-4 mr-1" /> {updateInvMutation.isPending ? "Saving..." : "Save"}
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="md:col-span-2">
-                        <Label htmlFor="edit-title">Title</Label>
-                        <Input
-                          id="edit-title"
-                          value={editInvForm.title}
-                          onChange={(e) => setEditInvForm({ ...editInvForm, title: e.target.value })}
-                          placeholder="Investigation title"
-                          className="mt-1"
-                        />
-                      </div>
-                      
-                      <div className="md:col-span-2">
-                        <Label htmlFor="edit-description">Description</Label>
-                        <Textarea
-                          id="edit-description"
-                          value={editInvForm.description}
-                          onChange={(e) => setEditInvForm({ ...editInvForm, description: e.target.value })}
-                          placeholder="Investigation description"
-                          className="mt-1 min-h-[80px]"
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="edit-equipment">Equipment</Label>
-                        {equipmentNodes.length > 0 ? (
-                          <Select
-                            value={editInvForm.asset_name}
-                            onValueChange={(v) => setEditInvForm({ ...editInvForm, asset_name: v })}
-                          >
-                            <SelectTrigger className="mt-1" id="edit-equipment">
-                              <SelectValue placeholder="Select equipment" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {equipmentNodes.map((node) => (
-                                <SelectItem key={node.id} value={node.name}>
-                                  {node.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Input
-                            id="edit-equipment"
-                            value={editInvForm.asset_name}
-                            onChange={(e) => setEditInvForm({ ...editInvForm, asset_name: e.target.value })}
-                            placeholder="Enter equipment name"
-                            className="mt-1"
-                          />
-                        )}
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="edit-location">Location</Label>
-                        <Input
-                          id="edit-location"
-                          value={editInvForm.location}
-                          onChange={(e) => setEditInvForm({ ...editInvForm, location: e.target.value })}
-                          placeholder="Location"
-                          className="mt-1"
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="edit-date">Incident Date</Label>
-                        <Input
-                          id="edit-date"
-                          type="date"
-                          value={editInvForm.incident_date}
-                          onChange={(e) => setEditInvForm({ ...editInvForm, incident_date: e.target.value })}
-                          className="mt-1"
-                        />
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="edit-lead">Investigation Lead</Label>
-                        <Select
-                          value={editInvForm.investigation_leader}
-                          onValueChange={(v) => setEditInvForm({ ...editInvForm, investigation_leader: v })}
-                        >
-                          <SelectTrigger className="mt-1" id="edit-lead">
-                            <SelectValue placeholder="Select lead" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {users.map((user) => (
-                              <SelectItem key={user.id} value={user.name || user.email}>
-                                {user.name || user.email}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      <div>
-                        <Label htmlFor="edit-status">Status</Label>
-                        <Select
-                          value={editInvForm.status}
-                          onValueChange={(v) => setEditInvForm({ ...editInvForm, status: v })}
-                        >
-                          <SelectTrigger className="mt-1" id="edit-status">
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {INVESTIGATION_STATUSES.map((s) => (
-                              <SelectItem key={s.value} value={s.value}>
-                                {s.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  /* View Mode */
-                  <>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-sm font-mono text-slate-500">{investigation.case_number}</span>
-                          {isInvestigationLocked ? (
-                            <div className="flex items-center gap-1 h-7 px-2 rounded-md bg-green-100 text-green-700 text-xs font-medium">
-                              <Lock className="w-3 h-3" />
-                              {investigation.status === "completed" ? "Completed" : "Closed"}
-                            </div>
-                          ) : (
-                            <Select value={investigation.status} onValueChange={handleStatusChange}>
-                              <SelectTrigger className="h-7 w-32 text-xs"><SelectValue /></SelectTrigger>
-                              <SelectContent>{INVESTIGATION_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
-                            </Select>
-                          )}
-                        </div>
-                        <h1 className="text-xl font-bold text-slate-900 mb-1">{investigation.title}</h1>
-                        <p className="text-sm text-slate-600">{investigation.description}</p>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {/* AI Summary Button */}
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="text-purple-600 border-purple-200 hover:bg-purple-50 h-8"
-                          onClick={handleGenerateAISummary}
-                          disabled={isGeneratingAISummary}
-                          data-testid="ai-summary-btn"
-                        >
-                          {isGeneratingAISummary ? (
-                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                          ) : (
-                            <Brain className="w-4 h-4 mr-1" />
-                          )}
-                          AI Summary
-                        </Button>
-                        
-                        {/* Export Dropdown */}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="text-slate-600 h-8"
-                              disabled={isGeneratingReport}
-                              data-testid="export-report-btn"
-                            >
-                              {isGeneratingReport ? (
-                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                              ) : (
-                                <FileDown className="w-4 h-4 mr-1" />
-                              )}
-                              Export
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={handleDownloadPPTX} disabled={isGeneratingReport}>
-                              <Presentation className="w-4 h-4 mr-2 text-orange-500" />
-                              PowerPoint (.pptx)
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={handleDownloadPDF} disabled={isGeneratingReport}>
-                              <FileText className="w-4 h-4 mr-2 text-red-500" />
-                              PDF Report (.pdf)
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                        
-                        {!isInvestigationLocked && (
-                          <Button variant="ghost" size="icon" onClick={handleEditInvestigation} className="text-slate-500 hover:text-blue-600" data-testid="edit-investigation-btn">
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                        )}
-                        {!isInvestigationLocked && (
-                          <AlertDialog onOpenChange={(open) => { if (!open) setDeleteInvOptions({ deleteCentralActions: false }); }}>
-                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="text-red-500" data-testid="delete-investigation-btn"><Trash2 className="w-4 h-4" /></Button></AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Investigation</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will permanently delete this investigation and all its internal data (timeline events, failure identifications, causes, evidence).
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <div className="py-4 space-y-3">
-                                <label className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
-                                  <input 
-                                    type="checkbox" 
-                                    checked={deleteInvOptions.deleteCentralActions}
-                                    onChange={(e) => setDeleteInvOptions(prev => ({ ...prev, deleteCentralActions: e.target.checked }))}
-                                    className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500"
-                                  />
-                                  <div>
-                                    <div className="font-medium text-slate-900">Also delete linked Actions</div>
-                                    <div className="text-sm text-slate-500">Remove all Central Actions created from this investigation</div>
-                                  </div>
-                                </label>
-                              </div>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction 
-                                  onClick={() => deleteInvMutation.mutate({ id: selectedInvId, options: deleteInvOptions })} 
-                                  className="bg-red-600 hover:bg-red-700"
-                                >
-                                  Delete Investigation
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Compact Stats Row - Same as Threats */}
-                    <div className="flex flex-wrap gap-2">
-                      <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
-                        <div className="p-1.5 rounded-md bg-blue-50"><Clock className="w-4 h-4 text-blue-600" /></div>
-                        <div><span className="text-lg font-bold text-slate-900">{stats.totalEvents}</span><span className="text-xs text-slate-500 ml-1">Events</span></div>
-                      </div>
-                      <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
-                        <div className="p-1.5 rounded-md bg-orange-50"><AlertTriangle className="w-4 h-4 text-orange-600" /></div>
-                        <div><span className="text-lg font-bold text-slate-900">{stats.totalFailures}</span><span className="text-xs text-slate-500 ml-1">Failures</span></div>
-                      </div>
-                      <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
-                        <div className="p-1.5 rounded-md bg-purple-50"><GitBranch className="w-4 h-4 text-purple-600" /></div>
-                        <div><span className="text-lg font-bold text-slate-900">{stats.totalCauses}</span><span className="text-xs text-slate-500 ml-1">Causes</span></div>
-                      </div>
-                      <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
-                        <div className="p-1.5 rounded-md bg-red-50"><Target className="w-4 h-4 text-red-600" /></div>
-                        <div><span className="text-lg font-bold text-red-600">{stats.rootCauses}</span><span className="text-xs text-slate-500 ml-1">Root Causes</span></div>
-                      </div>
-                      <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-slate-200">
-                        <div className="p-1.5 rounded-md bg-green-50"><CheckSquare className="w-4 h-4 text-green-600" /></div>
-                        <div><span className="text-lg font-bold text-slate-900">{stats.totalActions}</span><span className="text-xs text-slate-500 ml-1">Actions</span></div>
-                      </div>
-                    </div>
-
-                    {/* Info cards */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                      {investigation.asset_name && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><Target className="w-3 h-3" />Equipment</div><p className="font-medium text-sm">{translateAssetName(investigation.asset_name)}{investigation.equipment_tag && <span className="text-slate-400 ml-1">({investigation.equipment_tag})</span>}</p></div>}
-                      {investigation.location && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><MapPin className="w-3 h-3" />Location</div><p className="font-medium text-sm">{investigation.location}</p></div>}
-                      {investigation.incident_date && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><Calendar className="w-3 h-3" />Date</div><p className="font-medium text-sm">{formatDate(investigation.incident_date)}</p></div>}
-                      {investigation.investigation_leader && <div className="bg-white rounded-lg border p-3"><div className="flex items-center gap-2 text-slate-500 text-xs mb-1"><User className="w-3 h-3" />Lead</div><p className="font-medium text-sm">{investigation.investigation_leader}</p></div>}
-                    </div>
-                  </>
-                )}
-                
-                {/* Quick Actions */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <button onClick={() => setActiveTab("timeline")} className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"><Clock className="w-5 h-5 text-blue-600" /><div className="text-left"><div className="font-medium text-sm">Timeline</div><div className="text-xs text-slate-500">Build sequence</div></div></button>
-                  <button onClick={() => setActiveTab("failures")} className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors"><AlertTriangle className="w-5 h-5 text-orange-600" /><div className="text-left"><div className="font-medium text-sm">Failures</div><div className="text-xs text-slate-500">Identify what failed</div></div></button>
-                  <button onClick={() => setActiveTab("causes")} className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors"><GitBranch className="w-5 h-5 text-purple-600" /><div className="text-left"><div className="font-medium text-sm">Causes</div><div className="text-xs text-slate-500">Build causal tree</div></div></button>
-                  <button onClick={() => setActiveTab("actions")} className="flex items-center gap-3 p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors"><CheckSquare className="w-5 h-5 text-green-600" /><div className="text-left"><div className="font-medium text-sm">Actions</div><div className="text-xs text-slate-500">Track corrections</div></div></button>
-                </div>
-
-                {/* Recurring Issue Quadrant - only shown for recurring issues or when similar incidents exist */}
-                <RecurringIssueQuadrant
-                  investigation={investigation}
-                  investigationAPI={investigationAPI}
-                  disabled={isInvestigationLocked}
-                />
-
-                {/* Problem Statement */}
-                <div className="bg-white rounded-lg border p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2 text-slate-700">
-                      <FileText className="w-4 h-4" />
-                      <span className="font-medium text-sm">Problem Statement</span>
-                    </div>
-                    {!isInvestigationLocked && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowAIProblemCheck(true)}
-                        className="text-purple-600 hover:bg-purple-50 h-7 px-2"
-                        title="Defensive Reasoning Check - Analyze for defensive reasoning, premature solutions, and clarity"
-                        data-testid="ai-problem-check-btn"
-                      >
-                        <Sparkles className="w-3.5 h-3.5 mr-1" />
-                        <span className="text-xs">Defensive Reasoning Check</span>
-                      </Button>
-                    )}
-                  </div>
-                  <Textarea
-                    value={localNotes}
-                    onChange={handleNotesChange}
-                    placeholder="Describe the problem statement - what is the observable issue that needs to be investigated..."
-                    className="min-h-[120px] resize-y text-sm"
-                    data-testid="investigation-notes"
-                  />
-                </div>
-
-                {/* Equipment History Timeline - shows related observations and actions from the linked threat */}
-                {investigation.threat_id && (
-                  <EquipmentTimeline 
-                    threatId={investigation.threat_id}
-                    equipmentId={null}
-                    equipmentName={investigation.asset_name}
-                  />
-                )}
-
-                {/* Attachments (aligned with Observations/Actions) */}
-                <div className="bg-white rounded-lg border p-4">
-                  <AttachmentsPanel
-                    title={t("causal.attachedFiles") || "Attachments"}
-                    items={evidenceItems}
-                    editable={!isInvestigationLocked}
-                    isUploading={isUploading}
-                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
-                    getKey={(e) => e?.id}
-                    getName={(e) => e?.original_filename || e?.name || "Attachment"}
-                    getUrl={(e) => (e?.storage_path ? `${API_BASE_URL}/api/storage/${e.storage_path}` : null)}
-                    getContentType={(e) => e?.content_type}
-                    onAddFiles={async (files) => {
-                      if (!selectedInvId) return;
-                      setIsUploading(true);
-                      try {
-                        for (const file of files) {
-                          let processedFile = file;
-                          if (file.type.startsWith("image/")) {
-                            try {
-                              const result = await compressImage(file, {
-                                maxWidth: 1920,
-                                maxHeight: 1920,
-                                quality: 0.8,
-                                maxSizeMB: 1,
-                              });
-                              processedFile = result.file;
-                              if (result.wasCompressed) {
-                                const savedPercent = getCompressionPercent(result.originalSize, result.compressedSize);
-                                toast.success(`${file.name} compressed (${savedPercent}% smaller)`);
-                              }
-                            } catch (err) {
-                              console.error("Image compression failed:", err);
-                            }
-                          }
-                          await investigationAPI.uploadFile(selectedInvId, processedFile);
-                        }
-                        queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) });
-                        toast.success(t("causal.filesUploaded") || `${files.length} file(s) uploaded successfully`);
-                      } catch (error) {
-                        console.error("Upload failed:", error);
-                        toast.error(t("causal.uploadFailed") || "Failed to upload file(s)");
-                      } finally {
-                        setIsUploading(false);
-                      }
-                    }}
-                    onRemove={(raw) => {
-                      if (!selectedInvId || !raw?.id) return;
-                      deleteEvidenceMutation.mutate({ invId: selectedInvId, evidenceId: raw.id });
-                    }}
-                  />
-                </div>
-              </div>
+              <InvestigationOverviewTab
+                isEditingInvestigation={isEditingInvestigation}
+                onCancelEdit={handleCancelEdit}
+                onSaveInvestigation={handleSaveInvestigation}
+                savePending={updateInvMutation.isPending}
+                editInvForm={editInvForm}
+                setEditInvForm={setEditInvForm}
+                equipmentNodes={equipmentNodes}
+                users={users}
+                investigation={investigation}
+                isInvestigationLocked={isInvestigationLocked}
+                onStatusChange={handleStatusChange}
+                translateAssetName={translateAssetName}
+                formatDate={formatDate}
+                stats={stats}
+                onGenerateAISummary={handleGenerateAISummary}
+                isGeneratingAISummary={isGeneratingAISummary}
+                onDownloadPPTX={handleDownloadPPTX}
+                onDownloadPDF={handleDownloadPDF}
+                isGeneratingReport={isGeneratingReport}
+                onEditInvestigation={handleEditInvestigation}
+                deleteInvOptions={deleteInvOptions}
+                setDeleteInvOptions={setDeleteInvOptions}
+                onDeleteInvestigation={() => deleteInvMutation.mutate({ id: selectedInvId, options: deleteInvOptions })}
+                onNavigateTab={setActiveTab}
+                onShowAIProblemCheck={() => setShowAIProblemCheck(true)}
+                localNotes={localNotes}
+                onNotesChange={handleNotesChange}
+                evidenceItems={evidenceItems}
+                isUploading={isUploading}
+                onUploadFiles={handleUploadEvidence}
+                onRemoveEvidence={handleRemoveEvidence}
+                apiBaseUrl={API_BASE_URL}
+                investigationAPI={investigationAPI}
+                t={t}
+              />
             )}
             
             {activeTab === "timeline" && (
@@ -1397,374 +1091,54 @@ export default function CausalEnginePageMain() {
             )}
             
             {activeTab === "actions" && (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div><h2 className="text-lg font-semibold">Corrective Actions</h2><p className="text-sm text-slate-500">Track actions to prevent recurrence</p></div>
-                  <Button onClick={() => { setEditingItem(null); setActionForm({ description: "", owner: "", priority: "medium", due_date: "", linked_cause_id: null, action_type: "", discipline: "", comment: "" }); setShowActionDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-action-btn" disabled={isInvestigationLocked}><Plus className="w-4 h-4 mr-2" />Add Action</Button>
-                </div>
-                
-                {actionItems.length === 0 ? (
-                  <div className="empty-state py-16">
-                    <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-                      <CheckSquare className="w-8 h-8 text-slate-400" />
-                    </div>
-                    <h3 className="text-lg font-medium mb-1">No actions defined</h3>
-                    <p className="text-sm text-slate-500">Add corrective actions</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {actionItems.map((action, idx) => {
-                      const priority = ACTION_PRIORITIES.find(p => p.value === action.priority);
-                      const statusInfo = ACTION_STATUSES.find(s => s.value === action.status);
-                      const isOverdue = action.due_date && new Date(action.due_date) < new Date() && action.status !== "completed";
-                      const alreadyInPlan = isActionInPlan(action);
-                      
-                      return (
-                        <motion.div 
-                          key={action.id} 
-                          initial={{ opacity: 0, y: 10 }} 
-                          animate={{ opacity: 1, y: 0 }} 
-                          transition={{ delay: idx * 0.03 }} 
-                          className={`rounded-xl border p-4 group hover:shadow-md transition-all ${
-                            alreadyInPlan ? 'bg-green-50 border-green-200' :
-                            isOverdue ? 'border-red-200 bg-red-50/30' : 
-                            'bg-white border-slate-200'
-                          }`}
-                          data-testid={`action-item-${action.id}`}
-                        >
-                          <div className="flex items-start gap-4">
-                            {/* Action Number & Priority Icon */}
-                            <div className="flex flex-col items-center gap-1">
-                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${priority?.bgClass?.split(' ')[0] || 'bg-slate-100'}`}>
-                                <CheckSquare className={`w-6 h-6 ${priority?.bgClass?.split(' ')[1] || 'text-slate-600'}`} />
-                              </div>
-                              <span className="text-xs font-medium text-slate-500">{action.action_number}</span>
-                            </div>
-                            
-                            {/* Main Content */}
-                            <div className="flex-1 min-w-0">
-                              {/* Description */}
-                              <p className="text-sm font-medium text-slate-900 mb-2 leading-relaxed">{action.description}</p>
-                              
-                              {/* Meta Row */}
-                              <div className="flex flex-wrap items-center gap-2 mb-2">
-                                <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${priority?.bgClass || "bg-slate-100 text-slate-700"}`}>
-                                  {priority?.label || action.priority}
-                                </span>
-                                {action.action_type && (
-                                  <span className={`text-xs px-2.5 py-1 rounded-full font-bold text-white ${
-                                    action.action_type === 'CM' ? 'bg-amber-500' :
-                                    action.action_type === 'PM' ? 'bg-blue-500' :
-                                    action.action_type === 'PDM' ? 'bg-purple-500' :
-                                    'bg-slate-500'
-                                  }`}>
-                                    {action.action_type}
-                                  </span>
-                                )}
-                                {action.discipline && (
-                                  <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-slate-100 text-slate-700">
-                                    {action.discipline}
-                                  </span>
-                                )}
-                                <Select value={action.status} onValueChange={(v) => updateActionMutation.mutate({ actionId: action.id, data: { status: v } })}>
-                                  <SelectTrigger className={`h-7 w-28 text-xs border-0 ${
-                                    action.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                    action.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                                    'bg-slate-100 text-slate-700'
-                                  }`}>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>{ACTION_STATUSES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
-                                </Select>
-                                {isOverdue && (
-                                  <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 font-medium">Overdue</span>
-                                )}
-                                {/* In Action Plan indicator */}
-                                {alreadyInPlan && (
-                                  <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 font-medium">
-                                    <CheckCircle className="w-3 h-3" />
-                                    In Action Plan
-                                  </span>
-                                )}
-                              </div>
-                              
-                              {/* Details Row */}
-                              <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
-                                {action.owner && (
-                                  <span className="flex items-center gap-1.5">
-                                    <User className="w-3.5 h-3.5" />
-                                    <span className="font-medium text-slate-700">{action.owner}</span>
-                                  </span>
-                                )}
-                                {action.due_date && (
-                                  <span className={`flex items-center gap-1.5 ${isOverdue ? 'text-red-600' : ''}`}>
-                                    <Calendar className="w-3.5 h-3.5" />
-                                    <span className={isOverdue ? 'font-medium' : ''}>{formatDate(action.due_date)}</span>
-                                  </span>
-                                )}
-                                {action.comment && (
-                                  <span className="flex items-center gap-1.5 text-slate-400">
-                                    <MessageSquare className="w-3.5 h-3.5" />
-                                    Comment
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            
-                            {/* Action Buttons */}
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              {alreadyInPlan ? (
-                                <Badge className="bg-green-100 text-green-700 border-green-300 text-xs px-2 py-1">
-                                  <CheckCircle className="w-3 h-3 mr-1" />
-                                  Added
-                                </Badge>
-                              ) : (
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" 
-                                  onClick={() => promoteToCentralActionMutation.mutate(action)} 
-                                  disabled={promoteToCentralActionMutation.isPending} 
-                                  title="Add to action plan" 
-                                  data-testid={`promote-action-${action.id}`}
-                                >
-                                  <ClipboardList className="w-4 h-4 mr-1" />Act
-                                </Button>
-                              )}
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-8 w-8 text-slate-500 hover:text-slate-700" 
-                                onClick={() => { 
-                                  setEditingItem({ type: "action", data: action }); 
-                                  setActionForm({ 
-                                    description: action.description || "", 
-                                    owner: action.owner || "", 
-                                    priority: action.priority || "medium", 
-                                    due_date: action.due_date || "", 
-                                    linked_cause_id: action.linked_cause_id || null, 
-                                    action_type: action.action_type || "", 
-                                    discipline: action.discipline || "", 
-                                    comment: action.comment || "" 
-                                  }); 
-                                  setShowActionDialog(true); 
-                                }}
-                              >
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50" 
-                                onClick={() => deleteActionMutation.mutate(action.id)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                )}
-                
-                {/* Action Plan Section - Central actions linked to this investigation */}
-                {centralActions.length > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                    className="mt-6 bg-white rounded-xl border border-slate-200 p-4"
-                    data-testid="investigation-action-plan-section"
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <ClipboardList className="w-5 h-5 text-blue-600" />
-                        <h3 className="font-semibold text-slate-900">Action Plan</h3>
-                        <Badge variant="secondary" className="text-xs">{centralActions.length}</Badge>
-                        {centralActions.filter(a => a.is_validated).length > 0 && (
-                          <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px]">
-                            <ShieldCheck className="w-3 h-3 mr-1" />
-                            {centralActions.filter(a => a.is_validated).length} validated
-                          </Badge>
-                        )}
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => window.location.href = "/actions"}
-                        className="text-blue-600 hover:text-blue-700 h-7 text-xs px-2"
-                      >
-                        View All
-                        <ExternalLink className="w-3 h-3 ml-1" />
-                      </Button>
-                    </div>
-                    <div className="space-y-2">
-                      {centralActions.map((action, index) => {
-                        const statusCfg = {
-                          open: { bg: "bg-slate-50", color: "text-slate-600", label: "Open" },
-                          in_progress: { bg: "bg-blue-50", color: "text-blue-600", label: "In Progress" },
-                          completed: { bg: "bg-green-50", color: "text-green-600", label: "Completed" },
-                          closed: { bg: "bg-slate-100", color: "text-slate-500", label: "Closed" },
-                        }[action.status] || { bg: "bg-slate-50", color: "text-slate-600", label: action.status };
-                        const actionNumber = index + 1;
-                        
-                        return (
-                          <div
-                            key={action.id}
-                            className={`flex flex-col gap-2 p-3 rounded-lg border transition-all sm:flex-row sm:items-start sm:gap-3 ${
-                              action.is_validated 
-                                ? "bg-green-50 border-green-200" 
-                                : `${statusCfg.bg} border-slate-200 hover:shadow-sm`
-                            }`}
-                            data-testid={`inv-action-plan-item-${action.id}`}
-                          >
-                            <div className="flex min-w-0 flex-1 items-start gap-3">
-                            {/* Action Number & Type Badge */}
-                            <div className="flex-shrink-0">
-                              {action.action_type ? (
-                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-xs relative ${
-                                  action.action_type === 'CM' ? 'bg-amber-500' :
-                                  action.action_type === 'PM' ? 'bg-blue-500' :
-                                  action.action_type === 'PDM' ? 'bg-purple-500' :
-                                  'bg-slate-500'
-                                }`}>
-                                  {action.action_type}
-                                  <span className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-slate-700 text-white text-[10px] font-bold flex items-center justify-center shadow">
-                                    {actionNumber}
-                                  </span>
-                                </div>
-                              ) : (
-                                <div className="w-10 h-10 rounded-lg bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-sm">
-                                  {actionNumber}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Content */}
-                            <div className="flex-1 min-w-0 cursor-pointer" onClick={() => window.location.href = `/actions/${action.id}`}>
-                              <div className="mb-1 flex flex-wrap items-center gap-x-1.5 gap-y-1">
-                                {/* Action ID */}
-                                {action.action_number && (
-                                  <span className="text-[10px] font-mono font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-                                    {action.action_number}
-                                  </span>
-                                )}
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusCfg.bg} ${statusCfg.color}`}>
-                                  {statusCfg.label}
-                                </span>
-                                {action.discipline && (
-                                  <span className="text-[10px] text-slate-400">{action.discipline}</span>
-                                )}
-                                {action.is_validated && (
-                                  <Badge className="shrink-0 bg-green-100 text-green-700 border-green-200 text-[10px] px-1.5">
-                                    <ShieldCheck className="w-3 h-3 mr-0.5" />
-                                    Validated
-                                  </Badge>
-                                )}
-                                {action.priority && (
-                                  <Badge
-                                    variant="outline"
-                                    className={`shrink-0 text-[10px] ${
-                                      action.priority === "high" || action.priority === "critical"
-                                        ? "border-red-300 text-red-600"
-                                        : action.priority === "medium"
-                                          ? "border-amber-300 text-amber-600"
-                                          : "border-slate-300 text-slate-600"
-                                    }`}
-                                  >
-                                    {action.priority}
-                                  </Badge>
-                                )}
-                              </div>
-                              <p className="text-sm text-slate-700 leading-snug line-clamp-2">{action.title}</p>
-                              {action.is_validated && action.validated_by_name && (
-                                <p className="text-[10px] text-green-600 mt-1 flex items-center gap-1">
-                                  <UserCheck className="w-3 h-3" />
-                                  {action.validated_by_name} ({action.validated_by_position})
-                                </p>
-                              )}
-                              {action.assignee && !action.is_validated && (
-                                <p className="text-[10px] text-slate-400 mt-1">Owner: {action.assignee}</p>
-                              )}
-                            </div>
-                            </div>
-
-                            {/* Actions Column */}
-                            <div className="flex w-full flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-2 pl-11 sm:w-auto sm:flex-shrink-0 sm:flex-col sm:items-end sm:gap-1 sm:border-t-0 sm:pt-0 sm:pl-0">
-                              {action.due_date && (
-                                <p className="shrink-0 text-[10px] text-slate-500">
-                                  Due: {formatDate(action.due_date)}
-                                </p>
-                              )}
-
-                              {/* Edit & Delete Buttons */}
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEditActionPlanItem(action);
-                                  }}
-                                  className="h-6 w-6 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50"
-                                  title="Edit action"
-                                  data-testid={`inv-edit-action-${action.id}`}
-                                >
-                                  <Edit className="w-3 h-3" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteActionPlanItem(action.id);
-                                  }}
-                                  disabled={deleteCentralActionMutation.isPending}
-                                  className="h-6 w-6 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50"
-                                  title="Delete action"
-                                  data-testid={`inv-delete-action-${action.id}`}
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              </div>
-                              
-                              {!action.is_validated ? (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleOpenValidateDialog(action);
-                                  }}
-                                  className="h-6 text-[10px] px-2 text-green-600 border-green-200 hover:bg-green-50 mt-1"
-                                  data-testid={`inv-validate-action-${action.id}`}
-                                >
-                                  <ShieldCheck className="w-3 h-3 mr-1" />
-                                  Validate
-                                </Button>
-                              ) : (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    unvalidateActionMutation.mutate(action.id);
-                                  }}
-                                  className="h-6 text-[10px] px-2 text-slate-400 hover:text-red-500 mt-1"
-                                  title="Remove validation"
-                                >
-                                  Remove
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                )}
-              </div>
+              <InvestigationActionsTab
+                actionItems={actionItems}
+                centralActions={centralActions}
+                isLocked={isInvestigationLocked}
+                actionPriorities={ACTION_PRIORITIES}
+                actionStatuses={ACTION_STATUSES}
+                formatDate={formatDate}
+                isActionInPlan={isActionInPlan}
+                onAddAction={() => {
+                  setEditingItem(null);
+                  setActionForm({
+                    description: "",
+                    owner: "",
+                    priority: "medium",
+                    due_date: "",
+                    linked_cause_id: null,
+                    action_type: "",
+                    discipline: "",
+                    comment: "",
+                  });
+                  setShowActionDialog(true);
+                }}
+                onEditAction={(action) => {
+                  setEditingItem({ type: "action", data: action });
+                  setActionForm({
+                    description: action.description || "",
+                    owner: action.owner || "",
+                    priority: action.priority || "medium",
+                    due_date: action.due_date || "",
+                    linked_cause_id: action.linked_cause_id || null,
+                    action_type: action.action_type || "",
+                    discipline: action.discipline || "",
+                    comment: action.comment || "",
+                  });
+                  setShowActionDialog(true);
+                }}
+                onDeleteAction={(id) => deleteActionMutation.mutate(id)}
+                onUpdateActionStatus={(actionId, status) =>
+                  updateActionMutation.mutate({ actionId, data: { status } })
+                }
+                onPromoteToPlan={(action) => promoteToCentralActionMutation.mutate(action)}
+                promotePending={promoteToCentralActionMutation.isPending}
+                onEditPlanAction={handleEditActionPlanItem}
+                onDeletePlanAction={handleDeleteActionPlanItem}
+                onValidatePlanAction={handleOpenValidateDialog}
+                onUnvalidatePlanAction={(id) => unvalidateActionMutation.mutate(id)}
+                deletePlanPending={deleteCentralActionMutation.isPending}
+              />
             )}
           </div>
         </div>

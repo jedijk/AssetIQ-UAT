@@ -31,6 +31,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useDisciplines } from "../../hooks/useDisciplines";
+import { queryKeys } from "../../lib/queryKeys";
 
 const ACTION_TYPE_KEYS = {
   CM: "observationWorkspace.actionTypeCM",
@@ -115,7 +116,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
 
   // Fetch actions linked to this threat/observation
   const { data: linkedActionsData } = useQuery({
-    queryKey: ["actions", "linked", threatId],
+    queryKey: queryKeys.actions.linked(threatId),
     queryFn: async () => {
       const response = await actionsAPI.getAll();
       const allActions = response?.actions || response || [];
@@ -156,8 +157,8 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
         discipline: discipline || null,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["actions"] });
-      queryClient.invalidateQueries({ queryKey: ["threatTimeline", threatId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.actions.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.timeline(threatId) });
       toast.success(t("threatDetail.actionAddedToPlan"));
     },
     onError: (error) => {
@@ -171,7 +172,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
     mutationFn: ({ actionId, validatorName, validatorPosition }) =>
       actionsAPI.validate(actionId, validatorName, validatorPosition, user?.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.actions.all() });
       toast.success(t("threatDetail.actionValidated"));
       setShowValidateDialog(false);
       setActionToValidate(null);
@@ -188,7 +189,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
   const unvalidateActionMutation = useMutation({
     mutationFn: (actionId) => actionsAPI.unvalidate(actionId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.actions.all() });
       toast.success(t("threatDetail.validationRemoved"));
     },
     onError: (error) => {
@@ -224,8 +225,8 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
       return threatsAPI.update(threatId, { recommended_actions: updatedActions });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
-      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.legacyDetail(threatId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
       toast.success(t("threatDetail.recommendedActionAdded"));
       setShowAddRecommendedDialog(false);
       setNewRecommendedAction({ action: "", action_type: "", discipline: "" });
@@ -243,8 +244,8 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
       return threatsAPI.update(threatId, { recommended_actions: currentActions });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
-      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.legacyDetail(threatId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
       toast.success(t("threatDetail.recommendedActionUpdated"));
       setShowEditRecommendedDialog(false);
       setEditingActionIndex(null);
@@ -263,8 +264,8 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
       return threatsAPI.update(threatId, { recommended_actions: currentActions });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
-      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.legacyDetail(threatId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
       toast.success(t("threatDetail.recommendedActionDeleted"));
     },
     onError: () => {
@@ -278,10 +279,10 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
       return actionsAPI.update(actionId, updates);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
-      queryClient.invalidateQueries({ queryKey: ["threats"] });
-      queryClient.invalidateQueries({ queryKey: ["linked-actions", threatId] });
-      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.legacyDetail(threatId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.actions.linkedToThreat(threatId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.actions.all() });
       toast.success(t("threatDetail.actionUpdated"));
       setShowEditActionDialog(false);
       setEditingAction(null);
@@ -299,9 +300,9 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
   const deleteActionMutation = useMutation({
     mutationFn: (actionId) => actionsAPI.delete(actionId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
-      queryClient.invalidateQueries({ queryKey: ["threats"] });
-      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.legacyDetail(threatId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.actions.all() });
       toast.success(t("threatDetail.actionDeleted"));
     },
     onError: () => {
@@ -339,9 +340,9 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
       return newFm;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
-      queryClient.invalidateQueries({ queryKey: ["threats"] });
-      queryClient.invalidateQueries({ queryKey: ["failure-modes"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.legacyDetail(threatId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.failureModes.all() });
       toast.success(t("threatDetail.failureModeCreated"));
       setShowCreateFMDialog(false);
       setFmData({ severity: 5, occurrence: 5, detection: 5, recommended_actions: [] });

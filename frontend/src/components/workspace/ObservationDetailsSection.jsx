@@ -51,6 +51,7 @@ import {
   failureModesAPI,
   usersAPI,
 } from "../../lib/api";
+import { queryKeys } from "../../lib/queryKeys";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useUndo } from "../../contexts/UndoContext";
 import {
@@ -131,35 +132,35 @@ const ObservationDetailsSection = ({ threatId }) => {
 
   // --- Data fetches ---------------------------------------------------------
   const { data: threat } = useQuery({
-    queryKey: ["threat", threatId],
+    queryKey: queryKeys.threats.legacyDetail(threatId),
     queryFn: () => threatsAPI.getById(threatId),
     enabled: !!threatId,
     staleTime: 30 * 1000,
   });
 
   const { data: equipmentNodesData } = useQuery({
-    queryKey: ["equipment-nodes"],
+    queryKey: queryKeys.equipment.nodes(),
     queryFn: equipmentHierarchyAPI.getNodes,
     staleTime: 5 * 60 * 1000,
   });
   const equipmentNodes = useMemo(() => equipmentNodesData?.nodes ?? [], [equipmentNodesData]);
 
   const { data: equipmentTypesData } = useQuery({
-    queryKey: ["equipment-types"],
+    queryKey: queryKeys.equipment.types(),
     queryFn: equipmentHierarchyAPI.getEquipmentTypes,
     staleTime: 5 * 60 * 1000,
   });
   const equipmentTypes = useMemo(() => equipmentTypesData?.equipment_types ?? [], [equipmentTypesData]);
 
   const { data: failureModesData } = useQuery({
-    queryKey: ["failure-modes-all"],
+    queryKey: queryKeys.failureModes.allForLookup(),
     queryFn: () => failureModesAPI.getAll({}),
     staleTime: 5 * 60 * 1000,
   });
   const failureModes = useMemo(() => failureModesData?.failure_modes ?? [], [failureModesData]);
 
   const { data: usersData } = useQuery({
-    queryKey: ["rbac-users"],
+    queryKey: queryKeys.users.rbac(),
     queryFn: usersAPI.getAll,
     staleTime: 5 * 60 * 1000,
   });
@@ -194,16 +195,16 @@ const ObservationDetailsSection = ({ threatId }) => {
         data: { oldData, newData: variables },
         undo: async () => {
           await threatsAPI.update(threatId, oldData);
-          queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
-          queryClient.invalidateQueries({ queryKey: ["observation-workspace", threatId] });
-          queryClient.invalidateQueries({ queryKey: ["threats"] });
+          queryClient.invalidateQueries({ queryKey: queryKeys.threats.legacyDetail(threatId) });
+          queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+          queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(threatId) });
           queryClient.invalidateQueries({ queryKey: ["stats"] });
         },
       });
-      queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
-      queryClient.invalidateQueries({ queryKey: ["observation-workspace", threatId] });
-      queryClient.invalidateQueries({ queryKey: ["threats"] });
-      queryClient.invalidateQueries({ queryKey: ["threatTimeline", threatId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.legacyDetail(threatId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.timeline(threatId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(threatId) });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
       toast.success(t("observations.observationUpdated"));
       setIsEditing(false);
@@ -214,7 +215,7 @@ const ObservationDetailsSection = ({ threatId }) => {
   const deleteMutation = useMutation({
     mutationFn: () => threatsAPI.delete(threatId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
       toast.success(t("observations.observationDeleted"));
       navigate("/threats");
@@ -225,9 +226,9 @@ const ObservationDetailsSection = ({ threatId }) => {
   const linkEquipmentMutation = useMutation({
     mutationFn: ({ equipmentNodeId }) => threatsAPI.linkToEquipment(threatId, equipmentNodeId),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
-      queryClient.invalidateQueries({ queryKey: ["observation-workspace", threatId] });
-      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.legacyDetail(threatId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(threatId) });
       toast.success(
         t("observations.linkedEquipmentToast", {
           asset: data.threat.asset,
@@ -243,9 +244,9 @@ const ObservationDetailsSection = ({ threatId }) => {
   const linkFailureModeMutation = useMutation({
     mutationFn: ({ failureModeId }) => threatsAPI.linkToFailureMode(threatId, failureModeId),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
-      queryClient.invalidateQueries({ queryKey: ["observation-workspace", threatId] });
-      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.legacyDetail(threatId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(threatId) });
       toast.success(
         t("observations.linkedFailureModeToast", {
           failureMode: data.threat.failure_mode,

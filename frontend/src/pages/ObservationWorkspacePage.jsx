@@ -76,6 +76,7 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { observationWorkspaceAPI, actionsAPI } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { aiRiskAPI } from "../lib/apis/aiRisk";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useDisciplines } from "../hooks/useDisciplines";
@@ -1575,7 +1576,7 @@ const ObservationWorkspacePage = () => {
 
   // Fetch workspace data
   const { data: workspace, isLoading, error } = useQuery({
-    queryKey: ["observation-workspace", id],
+    queryKey: queryKeys.observationWorkspace.detail(id),
     queryFn: () => observationWorkspaceAPI.getWorkspace(id),
     staleTime: 30 * 1000, // 30 seconds
   });
@@ -1596,7 +1597,7 @@ const ObservationWorkspacePage = () => {
   const addRecommendationMutation = useMutation({
     mutationFn: (recommendation) => observationWorkspaceAPI.addRecommendation(id, recommendation),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["observation-workspace", id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(id) });
       queryClient.invalidateQueries({ queryKey: ["actions"] });
       toast.success(data.message || t("observationWorkspace.actionAddedToPlan"));
     },
@@ -1609,7 +1610,7 @@ const ObservationWorkspacePage = () => {
   const updateActionMutation = useMutation({
     mutationFn: ({ actionId, updates }) => actionsAPI.update(actionId, updates),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["observation-workspace", id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(id) });
       queryClient.invalidateQueries({ queryKey: ["actions"] });
       toast.success(t("observationWorkspace.actionUpdated"));
     },
@@ -1622,7 +1623,7 @@ const ObservationWorkspacePage = () => {
   const deleteActionMutation = useMutation({
     mutationFn: (actionId) => actionsAPI.delete(actionId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["observation-workspace", id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(id) });
       queryClient.invalidateQueries({ queryKey: ["actions"] });
       toast.success(t("observationWorkspace.actionRemovedFromPlan"));
     },
@@ -1647,7 +1648,7 @@ const ObservationWorkspacePage = () => {
       comments: data.comments || "",
     }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["observation-workspace", id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(id) });
       queryClient.invalidateQueries({ queryKey: ["actions"] });
       toast.success(t("observationWorkspace.actionAddedToPlan"));
     },
@@ -1659,7 +1660,7 @@ const ObservationWorkspacePage = () => {
   const generateAIMutation = useMutation({
     mutationFn: () => aiRiskAPI.analyzeRisk(id, { includeForecast: true, includeSimilarIncidents: true }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["observation-workspace", id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(id) });
       queryClient.invalidateQueries({ queryKey: ["ai-insights", id] });
       toast.success(t("ai.analysisComplete") || "AI analysis complete");
     },

@@ -1082,9 +1082,24 @@ a, button, input, select, textarea {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
-  /* Room for My Tasks count badge (positioned above the button corner) */
-  padding-top: 1rem;
+  padding-top: 0.5rem;
   padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px));
+}
+
+/* Reserve corner space so the task-count badge is never clipped by overflow scrollports */
+.operator-landing-my-tasks-slot {
+  position: relative;
+  overflow: visible;
+  padding-top: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+.operator-landing-tasks-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+  pointer-events: none;
 }
 .theme-assetiq .operator-landing-surface,
 [data-theme="assetiq"] .operator-landing-surface {

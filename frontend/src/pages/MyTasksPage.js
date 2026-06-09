@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
+import { useEffectiveRole } from "../contexts/RolePreviewContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useEquipmentNodeNameMap, useEquipmentTypeNameMap } from "../hooks/useTranslatedEntities";
 import { toast } from "sonner";
@@ -103,11 +104,11 @@ import { imageAnalysisAPI, preferencesAPI } from "../lib/api";
 import { offlineStorage, useOfflineStatus } from "../services/offlineStorage";
 import { DISCIPLINES, getDisciplineLabel } from "../constants/disciplines";
 import {
-  disciplinesFromPreference,
   filterActiveWorkItems,
   getApiDisciplineParam,
   itemMatchesDisciplines,
   preferenceFromDisciplines,
+  resolveMyTasksDisciplines,
 } from "../lib/myTasksFilterUtils";
 import TaskExecutionFrame from "../components/task-execution/TaskExecutionFrame";
 import TaskCard, { SortableTaskCard } from "../components/task-execution/TaskCard";
@@ -295,6 +296,7 @@ const SortableAdhocPlanCard = ({ plan, tasksData, setSelectedTask, setViewMode, 
 const MyTasksPage = () => {
   const { t } = useLanguage();
   const { user } = useAuth();
+  const { effectiveRole } = useEffectiveRole();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const invalidateTaskListQueries = useCallback(() => {
@@ -504,13 +506,13 @@ const MyTasksPage = () => {
 
   const matchesDisciplineFilter = (item) => itemMatchesDisciplines(item, selectedDisciplines);
 
-  // Seed discipline filter from user preferences (shared with operator landing badge).
+  // Seed discipline filter from saved preference or role-based defaults (shared with operator landing).
   useEffect(() => {
     if (!preferences || userChangedDisciplineRef.current || selectedDisciplines.length > 0) {
       return;
     }
-    setSelectedDisciplines(disciplinesFromPreference(preferences.discipline));
-  }, [preferences, selectedDisciplines.length]);
+    setSelectedDisciplines(resolveMyTasksDisciplines(effectiveRole, preferences.discipline));
+  }, [preferences, selectedDisciplines.length, effectiveRole]);
   
   // Fetch tasks with offline caching
   const { data: tasksData, isLoading: tasksLoading, error: tasksError, refetch: refetchTasks } = useQuery({
