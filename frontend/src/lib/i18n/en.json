@@ -495,8 +495,8 @@
     "liteModeError": "Could not update performance preference."
   },
   "announcements": {
-    "liteModeTitle": "AssetIQ 3.7.3 — What's new",
-    "liteModeBody": "Equipment Manager: fixed caching/update issues so changes persist reliably. Maintenance Scheduling: new beta section for planning and timeline scheduling."
+    "liteModeTitle": "AssetIQ 3.7.4 — What's new",
+    "liteModeBody": "Reliability Intelligence: AI-generated summaries, causes, and recommendations now display in Dutch and German. Fixed confidence and event-count labels. Settings → Translations: bulk legacy translation build for existing records."
   },
   "enums": {
     "Equipment Damage": "Equipment Damage",

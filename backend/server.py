@@ -35,7 +35,7 @@ except Exception as _logging_init_err:
 # Single source of truth for the application version.
 # Bump this with each release; the frontend polls /api/health and will force a
 # hard refresh whenever it sees a newer version than the one baked into its bundle.
-APP_VERSION = "3.7.3"
+APP_VERSION = "3.7.4"
 
 ENVIRONMENT = os.environ.get("ENVIRONMENT", "development").lower()
 _IS_DEV_ENV = ENVIRONMENT in ("development", "dev", "local", "test", "testing")

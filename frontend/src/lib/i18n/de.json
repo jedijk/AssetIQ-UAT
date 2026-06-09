@@ -495,8 +495,8 @@
     "liteModeError": "Leistungseinstellung konnte nicht aktualisiert werden."
   },
   "announcements": {
-    "liteModeTitle": "AssetIQ 3.7.3 — Was gibt's Neues",
-    "liteModeBody": "Equipment Manager: Cache-/Update-Probleme behoben, sodass Änderungen zuverlässig gespeichert werden. Wartungsplanung: neuer Beta-Bereich für Planung und Timeline-Scheduling."
+    "liteModeTitle": "AssetIQ 3.7.4 — Was gibt's Neues",
+    "liteModeBody": "Reliability Intelligence: KI-Zusammenfassungen, Ursachen und Empfehlungen werden jetzt auf Niederländisch und Deutsch angezeigt. Konfidenz- und Ereigniszähler-Labels behoben. Einstellungen → Übersetzungen: Massenübersetzung für Legacy-Daten."
   },
   "enums": {
     "Equipment Damage": "Anlagenschaden",
