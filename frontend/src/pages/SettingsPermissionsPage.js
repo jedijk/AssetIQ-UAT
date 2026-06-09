@@ -31,6 +31,9 @@ import {
   Loader2,
   Plus,
   UserPlus,
+  Calendar,
+  Sparkles,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -84,6 +87,10 @@ import {
   TooltipTrigger,
 } from "../components/ui/tooltip";
 import BackButton from "../components/BackButton";
+import {
+  getVisiblePermissionSections,
+  normalizeFeatureEntries,
+} from "../lib/permissionSections";
 
 // Role icons and colors
 const ROLE_CONFIG = {
@@ -101,10 +108,15 @@ const FEATURE_ICONS = {
   investigations: FileText,
   actions: ClipboardList,
   tasks: ClipboardList,
+  scheduler: Calendar,
   forms: FileText,
   equipment: Building2,
   library: Library,
+  library_ai_tools: Brain,
+  insights: Sparkles,
+  chat: MessageSquare,
   feedback: MessageSquare,
+  statistics: BarChart3,
   users: Users,
   settings: Settings,
 };
@@ -118,6 +130,7 @@ export default function SettingsPermissionsPage({ embedded = false }) {
   const [showCreateRoleDialog, setShowCreateRoleDialog] = useState(false);
   const [newRole, setNewRole] = useState({ name: "", display_name: "", description: "", base_role: "viewer" });
   const [deleteRoleConfirm, setDeleteRoleConfirm] = useState(null);
+  const [showEmptySections, setShowEmptySections] = useState(false);
 
   // Fetch permissions
   const { data: permissionsData, isLoading, error, refetch } = useQuery({
@@ -236,6 +249,140 @@ export default function SettingsPermissionsPage({ embedded = false }) {
   const { permissions, features, roles } = permissionsData || {};
   const roleConfig = ROLE_CONFIG[selectedRole] || ROLE_CONFIG.viewer;
   const RoleIcon = roleConfig.icon;
+
+  const featureInfoByKey = Object.fromEntries(
+    normalizeFeatureEntries(features, Object.keys(FEATURE_ICONS))
+  );
+
+  const renderEmbeddedPermissionRows = (role) => {
+    const visibleSections = getVisiblePermissionSections(role, permissions, showEmptySections);
+    let rowIndex = 0;
+
+    return visibleSections.flatMap((section) => {
+      const sectionRows = section.features
+        .filter((featureKey) => featureInfoByKey[featureKey])
+        .map((featureKey) => {
+          const featureInfo = featureInfoByKey[featureKey];
+          const Icon = FEATURE_ICONS[featureKey] || FileText;
+          const perm = permissions?.[role]?.[featureKey] || {};
+          const displayName =
+            featureInfo?.name ||
+            featureKey.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+          const idx = rowIndex++;
+          return (
+            <tr key={featureKey} className={idx % 2 === 0 ? "" : "bg-slate-50/50"}>
+              <td className="py-2 px-3">
+                <div className="flex items-center gap-2">
+                  <Icon className="w-4 h-4 text-slate-400" />
+                  <span>{displayName}</span>
+                </div>
+              </td>
+              <td className="text-center py-2 px-3">
+                <Switch
+                  checked={perm.read !== false}
+                  onCheckedChange={() => handleTogglePermission(role, featureKey, "read", perm.read !== false)}
+                  disabled={updateMutation.isPending || role === "owner"}
+                />
+              </td>
+              <td className="text-center py-2 px-3">
+                <Switch
+                  checked={perm.write || false}
+                  onCheckedChange={() => handleTogglePermission(role, featureKey, "write", perm.write)}
+                  disabled={updateMutation.isPending || role === "owner"}
+                />
+              </td>
+              <td className="text-center py-2 px-3">
+                <Switch
+                  checked={perm.delete || false}
+                  onCheckedChange={() => handleTogglePermission(role, featureKey, "delete", perm.delete)}
+                  disabled={updateMutation.isPending || role === "owner"}
+                />
+              </td>
+            </tr>
+          );
+        });
+
+      if (sectionRows.length === 0) return [];
+
+      return [
+        <tr key={`${section.id}-header`} className="bg-slate-100/80">
+          <td colSpan={4} className="py-2 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {section.label}
+          </td>
+        </tr>,
+        ...sectionRows,
+      ];
+    });
+  };
+
+  const renderFullPermissionRows = (role) => {
+    const visibleSections = getVisiblePermissionSections(role, permissions, showEmptySections);
+
+    return visibleSections.flatMap((section) => {
+      const sectionRows = section.features
+        .filter((featureKey) => featureInfoByKey[featureKey])
+        .map((featureKey) => {
+          const featureInfo = featureInfoByKey[featureKey];
+          const rolePerms = permissions?.[role]?.[featureKey] || { read: false, write: false, delete: false };
+          const FeatureIcon = FEATURE_ICONS[featureKey] || FileText;
+
+          return (
+            <tr key={featureKey} className="border-b border-slate-100 hover:bg-slate-50">
+              <td className="py-4 px-4">
+                <div className="flex items-center gap-3">
+                  <FeatureIcon className="w-5 h-5 text-slate-400" />
+                  <div>
+                    <p className="font-medium text-slate-900">{featureInfo.name}</p>
+                    <p className="text-xs text-slate-500">{featureInfo.description}</p>
+                  </div>
+                </div>
+              </td>
+              <td className="py-4 px-4 text-center">
+                <div className="flex justify-center">
+                  <Switch
+                    checked={rolePerms.read}
+                    onCheckedChange={() => handleTogglePermission(role, featureKey, "read", rolePerms.read)}
+                    disabled={updateMutation.isPending}
+                    data-testid={`perm-${role}-${featureKey}-read`}
+                  />
+                </div>
+              </td>
+              <td className="py-4 px-4 text-center">
+                <div className="flex justify-center">
+                  <Switch
+                    checked={rolePerms.write}
+                    onCheckedChange={() => handleTogglePermission(role, featureKey, "write", rolePerms.write)}
+                    disabled={updateMutation.isPending || !rolePerms.read}
+                    data-testid={`perm-${role}-${featureKey}-write`}
+                  />
+                </div>
+              </td>
+              <td className="py-4 px-4 text-center">
+                <div className="flex justify-center">
+                  <Switch
+                    checked={rolePerms.delete}
+                    onCheckedChange={() => handleTogglePermission(role, featureKey, "delete", rolePerms.delete)}
+                    disabled={updateMutation.isPending || !rolePerms.write}
+                    data-testid={`perm-${role}-${featureKey}-delete`}
+                  />
+                </div>
+              </td>
+            </tr>
+          );
+        });
+
+      if (sectionRows.length === 0) return [];
+
+      return [
+        <tr key={`${section.id}-header`} className="bg-slate-100/80">
+          <td colSpan={4} className="py-3 px-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {section.label}
+          </td>
+        </tr>,
+        ...sectionRows,
+      ];
+    });
+  };
 
   // Embedded layout (inside User Management tab)
   if (embedded) {
@@ -361,6 +508,16 @@ export default function SettingsPermissionsPage({ embedded = false }) {
             {roles?.[selectedRole]?.description && (
               <CardDescription>{roles[selectedRole].description}</CardDescription>
             )}
+            <div className="flex justify-end pt-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowEmptySections((prev) => !prev)}
+                className="text-slate-600"
+              >
+                {showEmptySections ? "Hide empty sections" : "Show all sections"}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="border rounded-lg overflow-hidden">
@@ -389,57 +546,7 @@ export default function SettingsPermissionsPage({ embedded = false }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {(() => {
-                    // Handle both array and object formats for features
-                    let featureEntries = [];
-                    if (features && typeof features === 'object' && !Array.isArray(features)) {
-                      // features is an object like { observations: { name: 'Observations', description: '...' } }
-                      featureEntries = Object.entries(features);
-                    } else if (Array.isArray(features) && features.length > 0) {
-                      // features is an array of feature keys
-                      featureEntries = features.map(f => [f, { name: f.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) }]);
-                    } else {
-                      // fallback to FEATURE_ICONS keys
-                      featureEntries = Object.keys(FEATURE_ICONS).map(f => [f, { name: f.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) }]);
-                    }
-                    
-                    return featureEntries.map(([featureKey, featureInfo], idx) => {
-                      const Icon = FEATURE_ICONS[featureKey] || FileText;
-                      const perm = permissions?.[selectedRole]?.[featureKey] || {};
-                      const displayName = featureInfo?.name || featureKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                      return (
-                        <tr key={featureKey} className={idx % 2 === 0 ? "" : "bg-slate-50/50"}>
-                          <td className="py-2 px-3">
-                            <div className="flex items-center gap-2">
-                              <Icon className="w-4 h-4 text-slate-400" />
-                              <span>{displayName}</span>
-                            </div>
-                          </td>
-                        <td className="text-center py-2 px-3">
-                          <Switch
-                            checked={perm.read !== false}
-                            onCheckedChange={() => handleTogglePermission(selectedRole, featureKey, "read", perm.read !== false)}
-                            disabled={updateMutation.isPending || selectedRole === "owner"}
-                          />
-                        </td>
-                        <td className="text-center py-2 px-3">
-                          <Switch
-                            checked={perm.write || false}
-                            onCheckedChange={() => handleTogglePermission(selectedRole, featureKey, "write", perm.write)}
-                            disabled={updateMutation.isPending || selectedRole === "owner"}
-                          />
-                        </td>
-                        <td className="text-center py-2 px-3">
-                          <Switch
-                            checked={perm.delete || false}
-                            onCheckedChange={() => handleTogglePermission(selectedRole, featureKey, "delete", perm.delete)}
-                            disabled={updateMutation.isPending || selectedRole === "owner"}
-                          />
-                        </td>
-                      </tr>
-                      );
-                    });
-                  })()}
+                  {renderEmbeddedPermissionRows(selectedRole)}
                 </tbody>
               </table>
             </div>
@@ -582,6 +689,14 @@ export default function SettingsPermissionsPage({ embedded = false }) {
               })}
             </TabsList>
             <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowEmptySections((prev) => !prev)}
+              className="flex-shrink-0"
+            >
+              {showEmptySections ? "Hide empty sections" : "Show all sections"}
+            </Button>
+            <Button
               onClick={() => setShowCreateRoleDialog(true)}
               size="sm"
               className="bg-blue-600 hover:bg-blue-700 flex-shrink-0"
@@ -689,54 +804,7 @@ export default function SettingsPermissionsPage({ embedded = false }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {Object.entries(features || {}).map(([featureKey, featureInfo]) => {
-                          const rolePerms = permissions?.[role]?.[featureKey] || { read: false, write: false, delete: false };
-                          const FeatureIcon = FEATURE_ICONS[featureKey] || FileText;
-                          
-                          return (
-                            <tr key={featureKey} className="border-b border-slate-100 hover:bg-slate-50">
-                              <td className="py-4 px-4">
-                                <div className="flex items-center gap-3">
-                                  <FeatureIcon className="w-5 h-5 text-slate-400" />
-                                  <div>
-                                    <p className="font-medium text-slate-900">{featureInfo.name}</p>
-                                    <p className="text-xs text-slate-500">{featureInfo.description}</p>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="py-4 px-4 text-center">
-                                <div className="flex justify-center">
-                                  <Switch
-                                    checked={rolePerms.read}
-                                    onCheckedChange={() => handleTogglePermission(role, featureKey, 'read', rolePerms.read)}
-                                    disabled={updateMutation.isPending}
-                                    data-testid={`perm-${role}-${featureKey}-read`}
-                                  />
-                                </div>
-                              </td>
-                              <td className="py-4 px-4 text-center">
-                                <div className="flex justify-center">
-                                  <Switch
-                                    checked={rolePerms.write}
-                                    onCheckedChange={() => handleTogglePermission(role, featureKey, 'write', rolePerms.write)}
-                                    disabled={updateMutation.isPending || !rolePerms.read}
-                                    data-testid={`perm-${role}-${featureKey}-write`}
-                                  />
-                                </div>
-                              </td>
-                              <td className="py-4 px-4 text-center">
-                                <div className="flex justify-center">
-                                  <Switch
-                                    checked={rolePerms.delete}
-                                    onCheckedChange={() => handleTogglePermission(role, featureKey, 'delete', rolePerms.delete)}
-                                    disabled={updateMutation.isPending || !rolePerms.write}
-                                    data-testid={`perm-${role}-${featureKey}-delete`}
-                                  />
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
+                        {renderFullPermissionRows(role)}
                       </tbody>
                     </table>
                   </div>

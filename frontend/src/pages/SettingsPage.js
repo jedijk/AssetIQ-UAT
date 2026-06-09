@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { usePermissions } from "../contexts/PermissionsContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import {
   Settings,
@@ -73,14 +74,16 @@ const SETTINGS_SECTIONS = [
     sectionKey: "general",
     icon: Settings,
     path: "/settings/preferences",
-    roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"]
+    roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"],
+    personal: true,
   },
   {
     id: "privacy",
     sectionKey: "privacy",
     icon: Shield,
     path: "/settings/privacy",
-    roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"]
+    roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"],
+    personal: true,
   },
   {
     id: "users",
@@ -95,35 +98,40 @@ const SETTINGS_SECTIONS = [
     sectionKey: "qr",
     icon: QrCode,
     path: "/settings/qr",
-    roles: ["owner", "admin", "reliability_engineer"]
+    roles: ["owner", "admin", "reliability_engineer"],
+    requiresSettings: true,
   },
   {
     id: "risk",
     sectionKey: "risk",
     icon: Sliders,
     path: "/settings/risk-calculation",
-    roles: ["owner", "admin"]
+    roles: ["owner", "admin"],
+    requiresSettings: true,
   },
   {
     id: "definitions",
     sectionKey: "definitions",
     icon: Sliders,
     path: "/definitions",
-    roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"]
+    roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"],
+    feature: "equipment",
   },
   {
     id: "notifications",
     sectionKey: "notifications",
     icon: Bell,
     path: "/settings/notifications",
-    roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations"]
+    roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations"],
+    personal: true,
   },
   {
     id: "ai",
     sectionKey: "ai",
     icon: Brain,
     path: "/settings/ai-usage",
-    roles: ["owner", "admin"]
+    roles: ["owner", "admin"],
+    requiresSettings: true,
   },
   {
     id: "maintenance-readiness",
@@ -131,7 +139,8 @@ const SETTINGS_SECTIONS = [
     icon: ClipboardCheck,
     path: "/settings/maintenance-readiness",
     roles: ["owner", "admin"],
-    desktopOnly: true
+    desktopOnly: true,
+    requiresSettings: true,
   },
   {
     id: "performance",
@@ -159,7 +168,8 @@ const SETTINGS_SECTIONS = [
     sectionKey: "statistics",
     icon: BarChart3,
     path: "/settings/statistics",
-    roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations"]
+    roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations"],
+    feature: "statistics",
   },
   {
     id: "deletion-requests",
@@ -188,21 +198,24 @@ const SETTINGS_SECTIONS = [
     sectionKey: "disciplines",
     icon: Wrench,
     path: "/settings/disciplines",
-    roles: ["owner", "admin"]
+    roles: ["owner", "admin"],
+    requiresSettings: true,
   },
   {
     id: "task-generation",
     sectionKey: "taskGeneration",
     icon: CalendarClock,
     path: "/settings/task-generation",
-    roles: ["owner", "admin"]
+    roles: ["owner", "admin"],
+    requiresSettings: true,
   },
   {
     id: "translations",
     sectionKey: "translations",
     icon: Languages,
     path: "/settings/translations",
-    roles: ["owner", "admin"]
+    roles: ["owner", "admin"],
+    requiresSettings: true,
   },
   {
     id: "audit-log",
@@ -217,6 +230,7 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const { t } = useLanguage();
   const [activeSection, setActiveSection] = useState("general");
   const [showMobileNav, setShowMobileNav] = useState(true);
@@ -230,12 +244,25 @@ export default function SettingsPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Filter sections based on user role + device
-  const visibleSections = SETTINGS_SECTIONS.filter(section => {
-    if (!user?.role) return false;
-    if (section.desktopOnly && isMobileView) return false;
-    return section.roles.includes(user.role);
-  });
+  const visibleSections = useMemo(() => {
+    return SETTINGS_SECTIONS.filter((section) => {
+      if (!user?.role) return false;
+      if (section.desktopOnly && isMobileView) return false;
+      if (user.role === "owner") return true;
+      if (section.personal) return true;
+      if (section.roles?.length === 1 && section.roles[0] === "owner") return false;
+
+      if (!permissionsLoading) {
+        if (section.feature && !hasPermission(section.feature, "read")) return false;
+        if (section.requiresSettings && !hasPermission("settings", "read")) return false;
+      }
+
+      if (section.roles?.includes(user.role)) return true;
+      if (!permissionsLoading && section.feature && hasPermission(section.feature, "read")) return true;
+      if (!permissionsLoading && section.requiresSettings && hasPermission("settings", "read")) return true;
+      return false;
+    });
+  }, [user?.role, isMobileView, hasPermission, permissionsLoading]);
 
   const filteredSections = useMemo(
     () => visibleSections.filter((section) => sectionMatchesQuery(section, searchQuery, t)),
@@ -247,6 +274,11 @@ export default function SettingsPage() {
     const currentPath = location.pathname;
     const matchedSection = SETTINGS_SECTIONS.find(s => currentPath.startsWith(s.path));
     if (matchedSection) {
+      const isVisible = visibleSections.some((s) => s.id === matchedSection.id);
+      if (!isVisible && visibleSections.length > 0) {
+        navigate(visibleSections[0].path, { replace: true });
+        return;
+      }
       setActiveSection(matchedSection.id);
       // On mobile, hide nav when a section is selected
       setShowMobileNav(false);

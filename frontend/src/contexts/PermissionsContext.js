@@ -52,6 +52,13 @@ const FEATURE_PATHS = {
 // Authenticated routes that do not map to a feature permission check.
 const AUTHENTICATED_PUBLIC_PATHS = ["/", "/dashboard"];
 
+// Personal settings pages are always accessible to authenticated users.
+const PERSONAL_SETTINGS_PATHS = [
+  "/settings/preferences",
+  "/settings/privacy",
+  "/settings/notifications",
+];
+
 export const PermissionsProvider = ({ children }) => {
   const { user, token } = useAuth();
   const [permissions, setPermissions] = useState(null);
@@ -109,6 +116,10 @@ export const PermissionsProvider = ({ children }) => {
     if (user?.role === "owner" || user?.role === "admin") return true;
 
     if (AUTHENTICATED_PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`))) {
+      return true;
+    }
+
+    if (PERSONAL_SETTINGS_PATHS.some((p) => path === p || path.startsWith(`${p}/`))) {
       return true;
     }
     
