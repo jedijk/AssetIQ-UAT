@@ -104,13 +104,29 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
     return () => document.removeEventListener("mousedown", handler);
   }, [popup.show]);
 
+  // Color is derived from the severity score (1-5) when present, so all
+  // exposure cards use the same red→amber→yellow→sky→green scale and stay
+  // visually consistent with the criticality assessment colors. The `color`
+  // prop becomes the fallback when no score is provided.
   const colorClasses = {
     amber: "bg-amber-50 border-amber-200 text-amber-700",
     red: "bg-red-50 border-red-200 text-red-700",
     green: "bg-green-50 border-green-200 text-green-700",
     blue: "bg-blue-50 border-blue-200 text-blue-700",
     purple: "bg-purple-50 border-purple-200 text-purple-700",
+    sky: "bg-sky-50 border-sky-200 text-sky-700",
+    yellow: "bg-yellow-50 border-yellow-200 text-yellow-700",
+    orange: "bg-orange-50 border-orange-200 text-orange-700",
   };
+  
+  const severityColorByScore = {
+    5: "red",
+    4: "orange",
+    3: "yellow",
+    2: "sky",
+    1: "green",
+  };
+  const effectiveColor = severityColorByScore[score] || color;
 
   // The field name on each criticality definition row that holds this dimension's description.
   const fieldByDim = { safety: "safety", production: "production", environmental: "environment", reputation: "reputation" };
@@ -127,7 +143,7 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
   return (
     <>
       <div
-        className={`rounded-xl border px-3 py-2 ${dimension ? "cursor-context-menu" : ""} ${isNotAssessed ? "bg-slate-50 border-slate-200 text-slate-500" : colorClasses[color]}`}
+        className={`rounded-xl border px-3 py-2 ${dimension ? "cursor-context-menu" : ""} ${isNotAssessed ? "bg-slate-50 border-slate-200 text-slate-500" : colorClasses[effectiveColor]}`}
         onContextMenu={dimension ? (e) => {
           e.preventDefault();
           setPopup({ show: true, x: e.clientX, y: e.clientY });
