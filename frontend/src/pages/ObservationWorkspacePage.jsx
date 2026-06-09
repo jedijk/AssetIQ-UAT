@@ -76,6 +76,7 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { observationWorkspaceAPI, actionsAPI } from "../lib/api";
+import { aiRiskAPI } from "../lib/apis/aiRisk";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useDisciplines } from "../hooks/useDisciplines";
 import RiskBadge from "../components/RiskBadge";
@@ -733,7 +734,8 @@ const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding,
 /**
  * Recommended Actions Panel
  */
-const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddToPlan, onAddToStrategy, onGenerateAI, isGeneratingAI }) => {
+const RecommendedActionsPanel = ({ recommendations, onAddToPlan, onAddToStrategy, onGenerateAI, isGeneratingAI }) => {
+  const { t } = useLanguage();
   const [addingId, setAddingId] = useState(null);
 
   // Separate by source
@@ -753,14 +755,33 @@ const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddTo
     <div className="bg-white rounded-xl border border-slate-200 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto scrollbar-thin">
       {/* Header — sticky on scroll */}
       <div className="lg:sticky lg:top-0 z-10 bg-white px-4 sm:px-6 pt-4 sm:pt-6 pb-3 border-b border-slate-100">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-100 rounded-lg">
-            <Lightbulb className="w-5 h-5 text-blue-600" />
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
+              <Lightbulb className="w-5 h-5 text-blue-600" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="font-semibold text-slate-900">Recommended Actions</h3>
+              <p className="text-xs text-slate-500">Strategy actions &amp; AI recommendations</p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-semibold text-slate-900">Recommended Actions</h3>
-            <p className="text-xs text-slate-500">Strategy actions &amp; AI recommendations</p>
-          </div>
+          {aiActions.length === 0 && onGenerateAI && (
+            <Button
+              size="sm"
+              onClick={onGenerateAI}
+              disabled={isGeneratingAI}
+              className="flex-shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white h-8 w-8 p-0"
+              title={t("ai.runAi")}
+              aria-label={t("ai.runAi")}
+              data-testid="run-ai-recommendations-btn"
+            >
+              {isGeneratingAI ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4" />
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1575,6 +1596,29 @@ const ObservationWorkspacePage = () => {
     },
   });
 
+  const generateAIMutation = useMutation({
+    mutationFn: () => aiRiskAPI.analyzeRisk(id, { includeForecast: true, includeSimilarIncidents: true }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["observation-workspace", id] });
+      queryClient.invalidateQueries({ queryKey: ["ai-insights", id] });
+      toast.success(t("ai.analysisComplete") || "AI analysis complete");
+    },
+    onError: (error) => {
+      if (error?.isTimeout || error?.code === "ECONNABORTED") {
+        toast.error(t("ai.analysisTakingLonger") || "AI analysis taking longer than expected. Please wait and try again.");
+        return;
+      }
+      const errorMessage = error?.response?.data?.detail || error?.message;
+      if (errorMessage?.includes("rate limit")) {
+        toast.error(t("ai.rateLimitExceeded") || "AI rate limit exceeded. Please wait a moment and try again.");
+      } else if (errorMessage?.includes("token") || errorMessage?.includes("key")) {
+        toast.error(t("ai.configurationError") || "AI service configuration error. Please contact support.");
+      } else {
+        toast.error(t("ai.analysisFailed") || errorMessage || "AI analysis failed");
+      }
+    },
+  });
+
   // Handlers
   const handleAddToPlan = async (recommendation) => {
     await addRecommendationMutation.mutateAsync(recommendation);
@@ -1595,6 +1639,10 @@ const ObservationWorkspacePage = () => {
   const handleAddToStrategy = (action) => {
     toast.info("Navigate to Strategy Editor to add action");
     // Could open a dialog or navigate to strategy page
+  };
+
+  const handleGenerateAI = () => {
+    generateAIMutation.mutate();
   };
 
   const handleViewAllActions = () => {
@@ -1788,6 +1836,8 @@ const ObservationWorkspacePage = () => {
             recommendations={recommended_actions}
             onAddToPlan={handleAddToPlan}
             onAddToStrategy={handleAddToStrategy}
+            onGenerateAI={handleGenerateAI}
+            isGeneratingAI={generateAIMutation.isPending}
           />
 
           {/* Column 3: Action Plan */}

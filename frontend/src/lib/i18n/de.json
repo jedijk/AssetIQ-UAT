@@ -217,7 +217,9 @@
   },
   "permissions": {
     "sections": {
+      "observations": "Beobachtungen",
       "operations": "Betrieb",
+      "reliabilityIntelligence": "Zuverlässigkeitsintelligenz",
       "reliability": "Zuverlässigkeit & Anlagen",
       "collaboration": "Zusammenarbeit",
       "administration": "Administration"
@@ -1463,6 +1465,7 @@
     "rateLimitExceeded": "KI-Ratenlimit überschritten. Bitte warten.",
     "configurationError": "KI-Service-Konfigurationsfehler. Bitte Support kontaktieren.",
     "analyzeWithAi": "Mit KI analysieren",
+    "runAi": "KI ausführen",
     "analyzing": "Analysieren...",
     "whyIsThisHappening": "Warum passiert das?",
     "analyzingCauses": "Ursachen analysieren...",

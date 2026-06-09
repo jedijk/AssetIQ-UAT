@@ -217,7 +217,9 @@
   },
   "permissions": {
     "sections": {
+      "observations": "Observations",
       "operations": "Operations",
+      "reliabilityIntelligence": "Reliability Intelligence",
       "reliability": "Reliability & Equipment",
       "collaboration": "Collaboration",
       "administration": "Administration"
@@ -1463,6 +1465,7 @@
     "rateLimitExceeded": "AI rate limit exceeded. Please wait a moment and try again.",
     "configurationError": "AI service configuration error. Please contact support.",
     "analyzeWithAi": "Analyze with AI",
+    "runAi": "Run AI",
     "analyzing": "Analyzing...",
     "whyIsThisHappening": "Why is this happening?",
     "analyzingCauses": "Analyzing causes...",

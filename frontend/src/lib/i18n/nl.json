@@ -217,7 +217,9 @@
   },
   "permissions": {
     "sections": {
+      "observations": "Observaties",
       "operations": "Operaties",
+      "reliabilityIntelligence": "Betrouwbaarheidsintelligentie",
       "reliability": "Betrouwbaarheid & Apparatuur",
       "collaboration": "Samenwerking",
       "administration": "Beheer"
@@ -1463,6 +1465,7 @@
     "rateLimitExceeded": "AI limiet overschreden. Wacht even en probeer opnieuw.",
     "configurationError": "AI configuratiefout. Neem contact op met support.",
     "analyzeWithAi": "Analyseer met AI",
+    "runAi": "AI uitvoeren",
     "analyzing": "Analyseren...",
     "whyIsThisHappening": "Waarom gebeurt dit?",
     "analyzingCauses": "Oorzaken analyseren...",

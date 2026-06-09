@@ -39,7 +39,9 @@ export const PERMISSION_FEATURE_DESC_KEYS = {
 };
 
 export const PERMISSION_SECTION_LABEL_KEYS = {
+  observations: "permissions.sections.observations",
   operations: "permissions.sections.operations",
+  reliability_intelligence: "permissions.sections.reliabilityIntelligence",
   reliability: "permissions.sections.reliability",
   collaboration: "permissions.sections.collaboration",
   administration: "permissions.sections.administration",
