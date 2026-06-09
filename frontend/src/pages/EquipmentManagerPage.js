@@ -38,6 +38,13 @@ import ProcessImportWizard from "../components/equipment/ProcessImportWizard";
 import { AIEquipmentTypeMappingSuggestions } from "../components/equipment/AIEquipmentTypeMappingSuggestions";
 import MaintenanceProgramPanel from "../components/equipment/MaintenanceProgramPanel";
 import { getEquipmentLevelLabel, getEquipmentLevelDescription } from "../lib/equipmentLevelLabels";
+import {
+  LEGACY_LEVEL_MAP,
+  LEVEL_ORDER,
+  normalizeLevel,
+  getValidChildLevels,
+  canBeChildOf,
+} from "../lib/equipmentHierarchyUtils";
 import { computeCriticalityScore } from "../lib/criticalityScore";
 
 const EQUIPMENT_ICONS = { droplets: Droplets, wind: Wind, cog: Cog, thermometer: Thermometer, box: Box, "circle-dot": CircleDot, zap: Zap, gauge: Gauge, cpu: Cpu, pipette: Pipette, flame: Flame };
@@ -63,46 +70,8 @@ const LEVEL_CONFIG = {
   zone: { icon: Settings },
   auxiliary: { icon: Cog },
 };
-// ISO 14224 Level hierarchy - must match backend iso14224_models.py
-const LEVEL_ORDER = ["installation", "plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"];
-
-// Legacy level mapping to ISO 14224 standard - must match backend LEGACY_LEVEL_MAP
-const LEGACY_LEVEL_MAP = { 
-  "plant": "plant_unit",
-  "unit": "plant_unit",        // Backend maps "unit" to "plant_unit" (ISO 14224)
-  "system": "section_system", 
-  "section": "section_system",
-  "equipment": "equipment_unit",
-  "site": "installation",       // Map site to installation (ISO 14224 doesn't have separate site level)
-  "location": "installation",
-  "line": "section_system",
-  "production_line": "section_system",
-  "area": "section_system",
-  "zone": "section_system",
-  "auxiliary": "equipment_unit"
-};
 const CRIT_COLORS = { safety_critical: { bg: "bg-red-50", border: "border-red-200", text: "text-red-700", dot: "bg-red-500" }, production_critical: { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700", dot: "bg-orange-500" }, medium: { bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700", dot: "bg-yellow-500" }, low: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700", dot: "bg-green-500" } };
 const DISCIPLINES = ["mechanical", "electrical", "instrumentation", "process", "laboratory"];
-
-// Normalize legacy levels to ISO 14224 standard
-function normalizeLevel(level) {
-  return LEGACY_LEVEL_MAP[level] || level;
-}
-
-function getValidChildLevels(parentLevel) {
-  const normalizedLevel = normalizeLevel(parentLevel);
-  const idx = LEVEL_ORDER.indexOf(normalizedLevel);
-  if (idx === -1 || idx >= LEVEL_ORDER.length - 1) return [];
-  return [LEVEL_ORDER[idx + 1]];
-}
-
-function canBeChildOf(childLevel, parentLevel) {
-  const normalizedParent = normalizeLevel(parentLevel);
-  const normalizedChild = normalizeLevel(childLevel);
-  const parentIdx = LEVEL_ORDER.indexOf(normalizedParent);
-  const childIdx = LEVEL_ORDER.indexOf(normalizedChild);
-  return parentIdx >= 0 && childIdx === parentIdx + 1;
-}
 
 function buildTreeData(nodes, parentId = null, depth = 0) {
   if (depth > 10) return [];

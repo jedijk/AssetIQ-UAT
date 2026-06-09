@@ -44,6 +44,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { DocumentViewer } from "./DocumentViewer";
 import { getBackendUrl } from "../lib/apiConfig";
 import { getEquipmentLevelLabel } from "../lib/equipmentLevelLabels";
+import { LEVEL_ORDER as ISO_LEVEL_ORDER } from "../lib/equipmentHierarchyUtils";
 import { computeCriticalityScore, getCriticalityDimensions } from "../lib/criticalityScore";
 import MaintenanceProgramPanel from "./equipment/MaintenanceProgramPanel";
 
@@ -92,8 +93,6 @@ const LEGACY_LEVEL_MAP = {
 function normalizeLevel(level) {
   return LEGACY_LEVEL_MAP[level] || level;
 }
-
-const ISO_LEVEL_ORDER = ["installation", "plant_unit", "section_system", "equipment_unit", "subunit", "maintainable_item"];
 
 // Criticality colors
 const CRIT_COLORS = {

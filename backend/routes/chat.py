@@ -34,6 +34,7 @@ from services.threat_score_service import (
 )
 from services.cache_service import cache
 from utils.auto_translate import translate_observation, translate_action
+from services.chat_central_action_service import create_chat_central_action
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Chat"])
@@ -327,22 +328,27 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
 
     for ra in rec_actions:
         if isinstance(ra, dict) and ra.get("auto_create"):
-            aid = str(uuid.uuid4())
             desc = ra.get("action") or ra.get("description", "")
-            action_doc = {
-                "id": aid, "title": desc[:200], "description": desc,
-                "status": "Open", "priority": "Medium",
-                "type": ra.get("action_type", "CM"),
-                "discipline": ra.get("discipline", "Mechanical"),
-                "threat_id": threat_id, "threat_title": threat_doc["title"],
-                "auto_created_from_failure_mode": True,
-                "failure_mode_id": obs_data.get("failure_mode_id"),
-                "failure_mode_name": failure_mode_name,
-                "created_by": user_id,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "installation_id": installation_id,
-            }
-            await db.actions.insert_one(action_doc)
+            action_doc = await create_chat_central_action(
+                user_id=user_id,
+                threat_id=threat_id,
+                threat_title=threat_doc["title"],
+                title=desc[:200],
+                description=desc,
+                action_type=ra.get("action_type", "CM"),
+                discipline=ra.get("discipline", "Mechanical"),
+                priority="medium",
+                linked_equipment_id=obs_data.get("equipment_id"),
+                equipment_name=equipment_name,
+                failure_mode_id=obs_data.get("failure_mode_id"),
+                failure_mode_name=failure_mode_name,
+                auto_source="failure_mode",
+                installation_id=installation_id,
+                rpn=threat_doc.get("fmea_rpn"),
+                risk_score=threat_doc.get("risk_score"),
+                risk_level=threat_doc.get("risk_level"),
+            )
+            aid = action_doc["id"]
             asyncio.create_task(
                 translate_action(
                     aid,
@@ -855,25 +861,41 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                     # Create actions from AI recommendations
                     ai_actions = analysis.get("recommended_actions", [])
                     created_action_ids = []
+                    threat_full = await db.threats.find_one(
+                        {"id": threat_id},
+                        {
+                            "_id": 0,
+                            "title": 1,
+                            "asset": 1,
+                            "linked_equipment_id": 1,
+                            "installation_id": 1,
+                            "fmea_rpn": 1,
+                            "risk_score": 1,
+                            "risk_level": 1,
+                        },
+                    )
                     for ra in ai_actions:
                         action_desc = ra.get("action", "")
                         if not action_desc:
                             continue
-                        aid = str(uuid.uuid4())
-                        action_doc = {
-                            "id": aid,
-                            "title": action_desc[:200],
-                            "description": action_desc,
-                            "status": "Open",
-                            "priority": ra.get("priority", "Medium").capitalize(),
-                            "type": ra.get("type", "CM"),
-                            "threat_id": threat_id,
-                            "threat_title": threat_doc.get("title", "") if threat_doc else "",
-                            "auto_created_from_image_analysis": True,
-                            "created_by": user_id,
-                            "created_at": datetime.now(timezone.utc).isoformat(),
-                        }
-                        await db.actions.insert_one(action_doc)
+                        action_doc = await create_chat_central_action(
+                            user_id=user_id,
+                            threat_id=threat_id,
+                            threat_title=(threat_full or threat_doc or {}).get("title", ""),
+                            title=action_desc[:200],
+                            description=action_desc,
+                            action_type=ra.get("type", "CM"),
+                            discipline=ra.get("discipline", "Mechanical"),
+                            priority=ra.get("priority", "medium"),
+                            linked_equipment_id=(threat_full or {}).get("linked_equipment_id"),
+                            equipment_name=(threat_full or threat_doc or {}).get("asset"),
+                            auto_source="image_analysis",
+                            installation_id=(threat_full or {}).get("installation_id"),
+                            rpn=(threat_full or {}).get("fmea_rpn"),
+                            risk_score=(threat_full or {}).get("risk_score"),
+                            risk_level=(threat_full or {}).get("risk_level"),
+                        )
+                        aid = action_doc["id"]
                         asyncio.create_task(
                             translate_action(
                                 aid,
