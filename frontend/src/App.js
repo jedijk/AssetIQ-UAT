@@ -473,7 +473,7 @@ function App() {
                 
                 {/* Settings Layout with nested routes */}
                 <Route path="settings" element={<Suspense fallback={<RouteFallback />}><SettingsPage /></Suspense>}>
-                  <Route index element={<Navigate to="/settings/preferences" replace />} />
+                  <Route index element={null} />
                   <Route path="preferences" element={<Suspense fallback={<RouteFallback />}><SettingsPreferencesPage /></Suspense>} />
                   <Route path="general" element={<Suspense fallback={<RouteFallback />}><SettingsGeneralPage /></Suspense>} />
                   <Route path="user-management" element={<Suspense fallback={<RouteFallback />}><SettingsUserManagementPage /></Suspense>} />

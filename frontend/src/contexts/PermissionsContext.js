@@ -129,6 +129,11 @@ export const PermissionsProvider = ({ children }) => {
     if (PERSONAL_SETTINGS_PATHS.some((p) => path === p || path.startsWith(`${p}/`))) {
       return true;
     }
+
+    // Settings hub: allow equipment readers to open settings for definitions (read-only)
+    if (path === "/settings") {
+      return hasPermission("settings", "read") || hasPermission("equipment", "read");
+    }
     
     // Check each feature's paths
     for (const [feature, paths] of Object.entries(FEATURE_PATHS)) {

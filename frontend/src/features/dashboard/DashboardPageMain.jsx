@@ -8,7 +8,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useEffectiveRole } from "../../contexts/RolePreviewContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { getBackendUrl, getAuthHeaders } from "../../lib/apiConfig";
-import { formatDate, formatDateTime } from "../../lib/dateUtils";
+import { formatDate, formatDateTime, formatDateTimeCompact } from "../../lib/dateUtils";
 import { AuthenticatedImage, useAuthenticatedMedia } from "../../components/AuthenticatedMedia";
 import { motion } from "framer-motion";
 import OperatorLandingPage from "../../pages/OperatorLandingPage";
@@ -463,8 +463,8 @@ export default function DashboardPageMain({ initialTab }) {
               data-testid="operational-tab"
             >
               <Activity className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden xs:inline">{t("dashboard.operational") || "Operational"}</span>
-              <span className="xs:hidden">Ops</span>
+              <span className="hidden xs:inline">{t("dashboard.operational")}</span>
+              <span className="xs:hidden">{t("dashboard.operationalShort")}</span>
             </button>
             <button 
               onClick={() => setActiveTab("production")}
@@ -472,8 +472,8 @@ export default function DashboardPageMain({ initialTab }) {
               data-testid="production-tab"
             >
               <Gauge className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden xs:inline">Production</span>
-              <span className="xs:hidden">Prod</span>
+              <span className="hidden xs:inline">{t("dashboard.production")}</span>
+              <span className="xs:hidden">{t("dashboard.productionShort")}</span>
             </button>
             {canShowBuilder && (
               <button
@@ -484,8 +484,8 @@ export default function DashboardPageMain({ initialTab }) {
                 data-testid="builder-tab"
               >
                 <Sparkles className="w-4 h-4 flex-shrink-0" />
-                <span className="hidden xs:inline">Builder</span>
-                <span className="xs:hidden">Build</span>
+                <span className="hidden xs:inline">{t("dashboard.builder")}</span>
+                <span className="xs:hidden">{t("dashboard.builderShort")}</span>
               </button>
             )}
           </div>
@@ -499,7 +499,7 @@ export default function DashboardPageMain({ initialTab }) {
                 size="icon"
                 className="h-9 w-9"
                 onClick={refreshDashboard}
-                title="Refresh"
+                title={t("dashboard.refresh")}
                 data-testid="dashboard-refresh-btn"
               >
                 <RefreshCw className={`w-4 h-4 ${isFetchingAny ? "animate-spin" : ""}`} />
@@ -786,6 +786,11 @@ export default function DashboardPageMain({ initialTab }) {
                       {obs.equipment_tag && (
                         <span className="text-[9px] font-mono text-slate-400">{obs.equipment_tag}</span>
                       )}
+                      {obs.created_at && (
+                        <span className="text-[10px] text-slate-400 tabular-nums md:hidden">
+                          {formatDateTimeCompact(obs.created_at)}
+                        </span>
+                      )}
                     </div>
                   </div>
                   
@@ -807,6 +812,18 @@ export default function DashboardPageMain({ initialTab }) {
                     )}
                   </div>
                   
+                  {/* Registration date/time */}
+                  {obs.created_at && (
+                    <div className="w-[5.75rem] flex-shrink-0 text-right hidden md:block">
+                      <span
+                        className="text-[10px] text-slate-400 tabular-nums whitespace-nowrap"
+                        title={t("observations.submissionDate")}
+                      >
+                        {formatDateTimeCompact(obs.created_at)}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Status Badge - Fixed width for alignment */}
                   <div className="w-16 flex-shrink-0 text-right">
                     <span className={`text-[10px] px-1.5 py-0.5 rounded inline-block ${
@@ -886,7 +903,13 @@ export default function DashboardPageMain({ initialTab }) {
               }`} />
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-slate-700 truncate">{item.title}</p>
-                <p className="text-[10px] text-slate-400">{item.asset}</p>
+                <p className="text-[10px] text-slate-400 truncate">
+                  {item.asset}
+                  {item.asset && item.created_at && <span className="text-slate-300 mx-1">·</span>}
+                  {item.created_at && (
+                    <span className="tabular-nums">{formatDateTimeCompact(item.created_at)}</span>
+                  )}
+                </p>
               </div>
               {/* Compact Risk Score & RPN */}
               <div className="flex items-center gap-1 flex-shrink-0">

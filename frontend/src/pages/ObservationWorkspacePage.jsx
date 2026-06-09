@@ -83,6 +83,34 @@ import RiskBadge from "../components/RiskBadge";
 import ObservationDetailsSection from "../components/workspace/ObservationDetailsSection";
 import AIInsightsPanel from "../components/AIInsightsPanel";
 import CausalIntelligencePanel from "../components/CausalIntelligencePanel";
+import { translateEnum } from "../lib/translateEnum";
+
+const EVENT_TYPE_ENUM = {
+  observation: "Observation",
+  failure: "Failure",
+  work_order: "Action",
+  action: "Action",
+  inspection: "Inspection",
+  repair: "Repair",
+  investigation: "Investigation",
+  strategy_change: "Strategy Change",
+};
+
+const getEventTypeLabel = (t, type) => translateEnum(t, EVENT_TYPE_ENUM[type] || "Event");
+
+const ACTION_STATUS_ENUM = {
+  open: "Open",
+  planned: "Planned",
+  in_progress: "In Progress",
+  completed: "Completed",
+  validated: "Validated",
+};
+
+const getActionStatusLabel = (t, status) => {
+  if (!status) return status;
+  const key = ACTION_STATUS_ENUM[String(status).toLowerCase()];
+  return key ? translateEnum(t, key) : translateEnum(t, status);
+};
 
 // ============================================================================
 // SUB-COMPONENTS
@@ -92,6 +120,7 @@ import CausalIntelligencePanel from "../components/CausalIntelligencePanel";
  * Exposure Card - Shows production, safety, environmental exposure
  */
 const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, criticalityDefs }) => {
+  const { t } = useLanguage();
   const [popup, setPopup] = useState({ show: false, x: 0, y: 0 });
   const popupRef = useRef(null);
 
@@ -150,7 +179,7 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
           e.preventDefault();
           setPopup({ show: true, x: e.clientX, y: e.clientY });
         } : undefined}
-        title={dimension ? "Right-click for criticality definition" : undefined}
+        title={dimension ? t("observationWorkspace.criticalityRightClick") : undefined}
         data-testid={dimension ? `exposure-card-${dimension}` : undefined}
       >
         <div className="flex items-center gap-1.5 mb-0.5">
@@ -158,7 +187,7 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
           <span className="text-[10px] font-medium uppercase tracking-wide truncate">{type}</span>
         </div>
         {isNotAssessed ? (
-          <div className="text-sm font-semibold leading-tight italic">Not Assessed</div>
+          <div className="text-sm font-semibold leading-tight italic">{t("observationWorkspace.notAssessed")}</div>
         ) : (
           <>
             {data.primary && (
@@ -187,7 +216,7 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
             }}
           >
             <div className="flex items-center justify-between px-3 py-2 border-b">
-              <h3 className="font-semibold text-sm text-slate-800 capitalize">{dimension} criticality</h3>
+              <h3 className="font-semibold text-sm text-slate-800 capitalize">{t("observationWorkspace.criticalityTitle", { dimension })}</h3>
               <button onClick={() => setPopup({ show: false, x: 0, y: 0 })} className="p-1 hover:bg-slate-100 rounded">
                 <X className="w-4 h-4 text-slate-400" />
               </button>
@@ -199,7 +228,7 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
                     {currentRow.rank}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-slate-800">{currentRow.label || `Level ${currentRow.rank}`}</div>
+                    <div className="text-sm font-semibold text-slate-800">{currentRow.label || t("observationWorkspace.levelN", { rank: currentRow.rank })}</div>
                     <div className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap mt-1">{currentRow[field]}</div>
                   </div>
                 </div>
@@ -208,7 +237,7 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
                   <div className="flex-shrink-0 w-9 h-9 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
                     <AlertTriangle className="w-4 h-4" />
                   </div>
-                  <div className="text-sm text-slate-500 italic">Not Assessed</div>
+                  <div className="text-sm text-slate-500 italic">{t("observationWorkspace.notAssessed")}</div>
                 </div>
               )}
             </div>
@@ -223,6 +252,7 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
  * ALARP Progress Card
  */
 const ALARPCard = ({ alarp }) => {
+  const { t } = useLanguage();
   const percentage = alarp?.percentage || 0;
   const status = alarp?.status || "Not Started";
   
@@ -238,10 +268,10 @@ const ALARPCard = ({ alarp }) => {
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-1.5">
           <Target className="w-3.5 h-3.5 text-indigo-600" />
-          <span className="text-[10px] font-medium text-indigo-700 uppercase tracking-wide">Mitigated</span>
+          <span className="text-[10px] font-medium text-indigo-700 uppercase tracking-wide">{t("observationWorkspace.mitigated")}</span>
         </div>
         <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${getStatusColor()}`}>
-          {status}
+          {translateEnum(t, status)}
         </Badge>
       </div>
       <div className="text-lg font-bold text-indigo-700 leading-tight mb-1">{percentage}%</div>
@@ -259,6 +289,7 @@ const ALARPCard = ({ alarp }) => {
  * Risk Summary Card
  */
 const RiskSummaryCard = ({ riskSummary }) => {
+  const { t } = useLanguage();
   const riskScore = riskSummary?.risk_score || 0;
   const riskLevel = riskSummary?.risk_level || "Low";
   const rpn = riskSummary?.rpn;
@@ -279,12 +310,12 @@ const RiskSummaryCard = ({ riskSummary }) => {
           detail: { x: e.clientX, y: e.clientY },
         }));
       }}
-      title="Right-click for score calculation details"
+      title={t("observationWorkspace.riskRightClick")}
       data-testid="kpi-risk-card"
     >
       <div className="flex items-center gap-1.5 mb-0.5">
         <AlertTriangle className="w-3.5 h-3.5" />
-        <span className="text-[10px] font-medium uppercase tracking-wide">Risk</span>
+        <span className="text-[10px] font-medium uppercase tracking-wide">{t("observationWorkspace.risk")}</span>
       </div>
       <div className="flex items-baseline gap-2 leading-tight">
         <span className="text-lg font-bold">{riskScore}</span>
@@ -302,19 +333,21 @@ const RiskSummaryCard = ({ riskSummary }) => {
  */
 const TimelineEventCard = ({ event, isCurrent }) => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   
   const getEventConfig = (type) => {
     const configs = {
-      observation: { icon: AlertTriangle, color: "amber", label: "Observation" },
-      failure: { icon: XCircle, color: "red", label: "Failure" },
-      work_order: { icon: Wrench, color: "blue", label: "Action" },
-      action: { icon: Wrench, color: "blue", label: "Action" },
-      inspection: { icon: Eye, color: "green", label: "Inspection" },
-      repair: { icon: Wrench, color: "purple", label: "Repair" },
-      investigation: { icon: FileSearch, color: "indigo", label: "Investigation" },
-      strategy_change: { icon: Cog, color: "slate", label: "Strategy Change" },
+      observation: { icon: AlertTriangle, color: "amber" },
+      failure: { icon: XCircle, color: "red" },
+      work_order: { icon: Wrench, color: "blue" },
+      action: { icon: Wrench, color: "blue" },
+      inspection: { icon: Eye, color: "green" },
+      repair: { icon: Wrench, color: "purple" },
+      investigation: { icon: FileSearch, color: "indigo" },
+      strategy_change: { icon: Cog, color: "slate" },
     };
-    return configs[type] || configs.observation;
+    const base = configs[type] || configs.observation;
+    return { ...base, label: getEventTypeLabel(t, type) };
   };
 
   const config = getEventConfig(event.event_type);
@@ -348,9 +381,9 @@ const TimelineEventCard = ({ event, isCurrent }) => {
     try { tooltipParts.push(format(parseISO(event.date), "PPP")); } catch (_) { tooltipParts.push(event.date); }
   }
   if (config.label) tooltipParts.push(config.label);
-  if (actionType) tooltipParts.push(`Type: ${actionType}`);
+  if (actionType) tooltipParts.push(t("observationWorkspace.eventTypeLabel", { type: actionType }));
   if (event.reference_id) tooltipParts.push(event.reference_id);
-  if (event.status) tooltipParts.push(`Status: ${event.status}`);
+  if (event.status) tooltipParts.push(t("observationWorkspace.statusLabel", { status: translateEnum(t, event.status) }));
   if (event.description) tooltipParts.push(event.description);
   const tooltip = tooltipParts.join("\n");
 
@@ -402,6 +435,7 @@ const TimelineEventCard = ({ event, isCurrent }) => {
  * Equipment Reliability Timeline
  */
 const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
+  const { t } = useLanguage();
   const [viewMode, setViewMode] = useState("timeline"); // timeline or list
   const navigate = useNavigate();
 
@@ -414,7 +448,7 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <History className="w-3.5 h-3.5 text-slate-500" />
-          <h3 className="font-medium text-xs text-slate-700">Equipment History</h3>
+          <h3 className="font-medium text-xs text-slate-700">{t("observationWorkspace.equipmentHistory")}</h3>
           {events && events.length > 0 && (
             <span className="text-[10px] text-slate-400">({events.length})</span>
           )}
@@ -429,7 +463,7 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
             className="h-6 px-2 text-xs"
           >
             <Calendar className="w-3 h-3 mr-1" />
-            Timeline
+            {t("observationWorkspace.timeline")}
           </Button>
           <Button
             variant={viewMode === "list" ? "default" : "ghost"}
@@ -438,7 +472,7 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
             className="h-6 px-2 text-xs"
           >
             <List className="w-3 h-3 mr-1" />
-            List
+            {t("observationWorkspace.list")}
           </Button>
         </div>
       </div>
@@ -464,15 +498,16 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
       ) : viewMode === "list" ? (
         <div className="space-y-1.5 max-h-[240px] overflow-y-auto">
           {events?.map((event, index) => {
-            const config = {
-              observation: { icon: AlertTriangle, color: "amber", label: "Observation" },
-              failure: { icon: XCircle, color: "red", label: "Failure" },
-              work_order: { icon: Wrench, color: "blue", label: "Action" },
-              action: { icon: Wrench, color: "blue", label: "Action" },
-              inspection: { icon: Eye, color: "green", label: "Inspection" },
-              repair: { icon: Wrench, color: "purple", label: "Repair" },
-              investigation: { icon: FileSearch, color: "indigo", label: "Investigation" },
-            }[event.event_type] || { icon: CircleDot, color: "slate", label: "Event" };
+            const configBase = {
+              observation: { icon: AlertTriangle, color: "amber" },
+              failure: { icon: XCircle, color: "red" },
+              work_order: { icon: Wrench, color: "blue" },
+              action: { icon: Wrench, color: "blue" },
+              inspection: { icon: Eye, color: "green" },
+              repair: { icon: Wrench, color: "purple" },
+              investigation: { icon: FileSearch, color: "indigo" },
+            }[event.event_type] || { icon: CircleDot, color: "slate" };
+            const config = { ...configBase, label: getEventTypeLabel(t, event.event_type) };
             const Icon = config.icon;
             
             // For actions/work orders, show the action_type (PM, CM, PDM, etc.)
@@ -514,10 +549,10 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
                   </div>
                 </div>
                 {event.is_current && (
-                  <Badge className="bg-blue-600 text-xs">Current</Badge>
+                  <Badge className="bg-blue-600 text-xs">{t("observationWorkspace.current")}</Badge>
                 )}
                 {event.status && !event.is_current && (
-                  <Badge variant="outline" className="text-xs capitalize">{event.status}</Badge>
+                  <Badge variant="outline" className="text-xs capitalize">{translateEnum(t, event.status)}</Badge>
                 )}
               </div>
             );
@@ -526,7 +561,7 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
       ) : (
         <div className="text-center py-8 text-slate-500">
           <History className="w-12 h-12 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">No historical events found</p>
+          <p className="text-sm">{t("observationWorkspace.noHistoricalEvents")}</p>
         </div>
       )}
     </div>
@@ -537,6 +572,7 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
  * Reliability Intelligence Panel
  */
 const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threatId, threatData }) => {
+  const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -548,8 +584,8 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
             <Brain className="w-5 h-5 text-purple-600" />
           </div>
           <div>
-            <h3 className="font-semibold text-slate-900">Reliability Intelligence</h3>
-            <p className="text-xs text-slate-500">AI-powered root cause analysis</p>
+            <h3 className="font-semibold text-slate-900">{t("observationWorkspace.reliabilityIntelligence")}</h3>
+            <p className="text-xs text-slate-500">{t("observationWorkspace.reliabilityIntelligenceSubtitle")}</p>
           </div>
         </div>
       </div>
@@ -559,15 +595,15 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
       {/* Most Likely Cause — compact */}
       <div className="mb-3">
         <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1">
-          Most Likely Cause
+          {t("observationWorkspace.mostLikelyCause")}
         </div>
         <div className="p-2 bg-purple-50 border border-purple-200 rounded-md">
           <div className="font-semibold text-purple-900 text-sm leading-tight">
-            {intelligence?.most_likely_cause?.name || "Unknown"}
+            {intelligence?.most_likely_cause?.name || t("observationWorkspace.unknown")}
           </div>
           <div className="flex items-center gap-1.5 mt-1">
             <div className="text-[10px] text-purple-700 whitespace-nowrap">
-              {intelligence?.most_likely_cause?.confidence || 0}% Confidence
+              {t("observationWorkspace.confidencePercent", { percent: intelligence?.most_likely_cause?.confidence || 0 })}
             </div>
             <div className="flex-1 h-1 bg-purple-200 rounded-full overflow-hidden">
               <div 
@@ -582,27 +618,27 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
       {/* Supporting Evidence */}
       <div className="mb-6">
         <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-          Supporting Evidence
+          {t("observationWorkspace.supportingEvidence")}
         </div>
         <div className="space-y-2">
           {intelligence?.supporting_evidence && (
             <>
               <div className="flex items-center gap-2 text-sm">
                 <Check className="w-4 h-4 text-green-500" />
-                <span>{intelligence.supporting_evidence.historical_events || 0} Similar Events</span>
+                <span>{t("observationWorkspace.similarEvents", { count: intelligence.supporting_evidence.historical_events || 0 })}</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Check className="w-4 h-4 text-green-500" />
-                <span>{intelligence.supporting_evidence.previous_failures || 0} Previous Failures</span>
+                <span>{t("observationWorkspace.previousFailures", { count: intelligence.supporting_evidence.previous_failures || 0 })}</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Check className="w-4 h-4 text-green-500" />
-                <span>{intelligence.supporting_evidence.work_orders || 0} Actions</span>
+                <span>{t("observationWorkspace.actionsCount", { count: intelligence.supporting_evidence.work_orders || 0 })}</span>
               </div>
               {intelligence.supporting_evidence.inspection_evidence && (
                 <div className="flex items-center gap-2 text-sm">
                   <Check className="w-4 h-4 text-green-500" />
-                  <span>Inspection Evidence</span>
+                  <span>{t("observationWorkspace.inspectionEvidence")}</span>
                 </div>
               )}
             </>
@@ -613,7 +649,7 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
       {/* Contributing Factors */}
       <div className="mb-6">
         <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-          Contributing Factors
+          {t("observationWorkspace.contributingFactorsTitle")}
         </div>
         <div className="space-y-2">
           {intelligence?.contributing_factors?.slice(0, 4).map((factor, index) => (
@@ -639,11 +675,11 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
         data-testid="open-full-analysis-btn"
       >
         <Eye className="w-3.5 h-3.5 mr-1.5" />
-        View Full Analysis
+        {t("observationWorkspace.viewFullAnalysisButton")}
       </Button>
       {/* Mobile note */}
       <p className="lg:hidden text-[10px] text-slate-400 text-center mt-1">
-        Full analysis available on desktop
+        {t("observationWorkspace.fullAnalysisDesktop")}
       </p>
       </div>
     </div>
@@ -654,6 +690,7 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
  * Recommended Action Card
  */
 const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding, isInPlan }) => {
+  const { t } = useLanguage();
   const { getLabel } = useDisciplines();
   const typeColors = {
     PM: "bg-blue-100 text-blue-700",
@@ -662,7 +699,7 @@ const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding,
     OP: "bg-green-100 text-green-700",
   };
 
-  const sourceLabel = action.source === "failure_mode_library" ? "Library" : "AI";
+  const sourceLabel = action.source === "failure_mode_library" ? t("observationWorkspace.librarySource") : t("observationWorkspace.aiSource");
   const sourceColor = action.source === "failure_mode_library" 
     ? "bg-amber-50 text-amber-600 border-amber-200" 
     : "bg-purple-50 text-purple-600 border-purple-200";
@@ -699,7 +736,7 @@ const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding,
             )}
             {isInPlan && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-medium ml-auto">
-                In Plan
+                {t("observationWorkspace.inPlan")}
               </span>
             )}
           </div>
@@ -716,7 +753,7 @@ const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding,
           onClick={() => onAddToPlan(action)}
           disabled={isAdding || isInPlan}
           className={`h-7 w-7 p-0 flex-shrink-0 ${isInPlan ? 'bg-green-600' : ''}`}
-          title={isInPlan ? "Already in action plan" : "Add to action plan"}
+          title={isInPlan ? t("observationWorkspace.alreadyInPlan") : t("observationWorkspace.addToPlanTitle")}
         >
           {isAdding ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -761,8 +798,8 @@ const RecommendedActionsPanel = ({ recommendations, onAddToPlan, onAddToStrategy
               <Lightbulb className="w-5 h-5 text-blue-600" />
             </div>
             <div className="min-w-0">
-              <h3 className="font-semibold text-slate-900">Recommended Actions</h3>
-              <p className="text-xs text-slate-500">Strategy actions &amp; AI recommendations</p>
+              <h3 className="font-semibold text-slate-900">{t("observationWorkspace.recommendedActions")}</h3>
+              <p className="text-xs text-slate-500">{t("observationWorkspace.recommendedActionsSubtitle")}</p>
             </div>
           </div>
           {aiActions.length === 0 && onGenerateAI && (
@@ -793,7 +830,7 @@ const RecommendedActionsPanel = ({ recommendations, onAddToPlan, onAddToStrategy
           <div className="flex items-center gap-2 mb-3">
             <div className="w-2 h-2 rounded-full bg-amber-400" />
             <span className="text-xs font-medium text-slate-700 uppercase tracking-wide">
-              Failure Mode Library
+              {t("observationWorkspace.failureModeLibrary")}
             </span>
             <Badge variant="outline" className="text-[10px]">{libraryActions.length}</Badge>
           </div>
@@ -817,7 +854,7 @@ const RecommendedActionsPanel = ({ recommendations, onAddToPlan, onAddToStrategy
           <div className="flex items-center gap-2 mb-3">
             <div className="w-2 h-2 rounded-full bg-purple-400" />
             <span className="text-xs font-medium text-slate-700 uppercase tracking-wide">
-              AI Generated
+              {t("observationWorkspace.aiGenerated")}
             </span>
             <Badge variant="outline" className="text-[10px]">{aiActions.length}</Badge>
           </div>
@@ -838,8 +875,8 @@ const RecommendedActionsPanel = ({ recommendations, onAddToPlan, onAddToStrategy
       {!recommendations || recommendations.length === 0 && (
         <div className="text-center py-8 text-slate-500">
           <Lightbulb className="w-12 h-12 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">No recommendations available</p>
-          <p className="text-xs text-slate-400 mt-1">Link a failure mode to get recommendations</p>
+          <p className="text-sm">{t("observationWorkspace.noRecommendations")}</p>
+          <p className="text-xs text-slate-400 mt-1">{t("observationWorkspace.noRecommendationsHint")}</p>
         </div>
       )}
       </div>
@@ -869,6 +906,7 @@ const normalizeActionType = (val) => {
  * eliminating the need for a setState-inside-useEffect.
  */
 const EditActionForm = ({ fullAction, onSubmit, onCancel, isSaving }) => {
+  const { t } = useLanguage();
   const { disciplines, normalize } = useDisciplines();
   const [form, setForm] = useState(() => ({
     title: fullAction?.title || "",
@@ -900,7 +938,7 @@ const EditActionForm = ({ fullAction, onSubmit, onCancel, isSaving }) => {
     <>
       <div className="grid gap-3 py-2">
         <div className="grid gap-1.5">
-          <Label htmlFor="edit-title">Title</Label>
+          <Label htmlFor="edit-title">{t("observationWorkspace.titleLabel")}</Label>
           <Input
             id="edit-title"
             value={form.title}
@@ -910,7 +948,7 @@ const EditActionForm = ({ fullAction, onSubmit, onCancel, isSaving }) => {
         </div>
 
         <div className="grid gap-1.5">
-          <Label htmlFor="edit-desc">Description</Label>
+          <Label htmlFor="edit-desc">{t("observationWorkspace.descriptionLabel")}</Label>
           <Textarea
             id="edit-desc"
             rows={3}
@@ -922,25 +960,25 @@ const EditActionForm = ({ fullAction, onSubmit, onCancel, isSaving }) => {
 
         <div className="grid grid-cols-2 gap-3">
           <div className="grid gap-1.5">
-            <Label>Type</Label>
+            <Label>{t("observationWorkspace.typeLabel")}</Label>
             <Select value={form.action_type} onValueChange={(v) => handleChange("action_type", v)}>
               <SelectTrigger data-testid="edit-action-type"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="CM">CM — Corrective</SelectItem>
-                <SelectItem value="PM">PM — Preventive</SelectItem>
-                <SelectItem value="PDM">PDM — Predictive</SelectItem>
-                <SelectItem value="OP">OP — Operational</SelectItem>
-                <SelectItem value="LEARN">LEARN — Learning / Strategy update</SelectItem>
+                <SelectItem value="CM">{t("observationWorkspace.actionTypeCM")}</SelectItem>
+                <SelectItem value="PM">{t("observationWorkspace.actionTypePM")}</SelectItem>
+                <SelectItem value="PDM">{t("observationWorkspace.actionTypePDM")}</SelectItem>
+                <SelectItem value="OP">{t("observationWorkspace.actionTypeOP")}</SelectItem>
+                <SelectItem value="LEARN">{t("observationWorkspace.actionTypeLEARN")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="grid gap-1.5">
-            <Label>Discipline</Label>
+            <Label>{t("observationWorkspace.disciplineLabel")}</Label>
             <Select value={disciplineValue || "none"} onValueChange={(v) => handleChange("discipline", v === "none" ? "" : v)}>
               <SelectTrigger data-testid="edit-action-discipline"><SelectValue placeholder="—" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">— None —</SelectItem>
+                <SelectItem value="none">{t("observationWorkspace.noneDiscipline")}</SelectItem>
                 {disciplines.map((d) => (
                   <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
                 ))}
@@ -951,21 +989,21 @@ const EditActionForm = ({ fullAction, onSubmit, onCancel, isSaving }) => {
 
         <div className="grid grid-cols-2 gap-3">
           <div className="grid gap-1.5">
-            <Label>Status</Label>
+            <Label>{t("observationWorkspace.status")}</Label>
             <Select value={form.status} onValueChange={(v) => handleChange("status", v)}>
               <SelectTrigger data-testid="edit-action-status"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="open">Open</SelectItem>
-                <SelectItem value="planned">Planned</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="validated">Validated</SelectItem>
+                <SelectItem value="open">{getActionStatusLabel(t, "open")}</SelectItem>
+                <SelectItem value="planned">{getActionStatusLabel(t, "planned")}</SelectItem>
+                <SelectItem value="in_progress">{getActionStatusLabel(t, "in_progress")}</SelectItem>
+                <SelectItem value="completed">{getActionStatusLabel(t, "completed")}</SelectItem>
+                <SelectItem value="validated">{getActionStatusLabel(t, "validated")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="edit-due">Due date</Label>
+            <Label htmlFor="edit-due">{t("observationWorkspace.dueDateLabel")}</Label>
             <Input
               id="edit-due"
               type="date"
@@ -977,7 +1015,7 @@ const EditActionForm = ({ fullAction, onSubmit, onCancel, isSaving }) => {
         </div>
 
         <div className="grid gap-1.5">
-          <Label htmlFor="edit-comments">Comments</Label>
+          <Label htmlFor="edit-comments">{t("observationWorkspace.comments")}</Label>
           <Textarea
             id="edit-comments"
             rows={2}
@@ -989,10 +1027,10 @@ const EditActionForm = ({ fullAction, onSubmit, onCancel, isSaving }) => {
       </div>
 
       <DialogFooter>
-        <Button variant="ghost" onClick={onCancel} disabled={isSaving} data-testid="edit-action-cancel">Cancel</Button>
+        <Button variant="ghost" onClick={onCancel} disabled={isSaving} data-testid="edit-action-cancel">{t("common.cancel")}</Button>
         <Button onClick={handleSubmit} disabled={isSaving || !form.title.trim()} data-testid="edit-action-save">
           {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-          Save changes
+          {t("common.saveChanges")}
         </Button>
       </DialogFooter>
     </>
@@ -1005,6 +1043,7 @@ const EditActionForm = ({ fullAction, onSubmit, onCancel, isSaving }) => {
  * from the source of truth (the action document itself).
  */
 const EditActionDialog = ({ action, open, onClose, onSave, isSaving }) => {
+  const { t } = useLanguage();
   // Fetch full action data from the action itself (single source of truth)
   const { data: fullAction, isLoading } = useQuery({
     queryKey: ["action-detail", action?.id],
@@ -1017,15 +1056,17 @@ const EditActionDialog = ({ action, open, onClose, onSave, isSaving }) => {
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg" data-testid="edit-action-dialog">
         <DialogHeader>
-          <DialogTitle>Edit Action</DialogTitle>
+          <DialogTitle>{t("observationWorkspace.editActionTitle")}</DialogTitle>
           <DialogDescription>
-            Update fields for {fullAction?.action_number || action?.action_number || "this action"}.
+            {t("observationWorkspace.editActionDescription", {
+              actionNumber: fullAction?.action_number || action?.action_number || t("observationWorkspace.thisAction"),
+            })}
           </DialogDescription>
         </DialogHeader>
 
         {isLoading && !fullAction ? (
           <div className="py-10 flex items-center justify-center text-slate-500">
-            <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading action…
+            <Loader2 className="w-5 h-5 animate-spin mr-2" /> {t("observationWorkspace.loadingAction")}
           </div>
         ) : (
           <EditActionForm
@@ -1044,36 +1085,38 @@ const EditActionDialog = ({ action, open, onClose, onSave, isSaving }) => {
 /**
  * Delete Action Confirmation Dialog
  */
-const DeleteActionDialog = ({ action, open, onClose, onConfirm, isDeleting }) => (
-  <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-    <DialogContent className="max-w-md" data-testid="delete-action-dialog">
-      <DialogHeader>
-        <DialogTitle>Remove from action plan?</DialogTitle>
-        <DialogDescription>
-          {action ? (
-            <>
-              Action <span className="font-semibold">&quot;{action.title}&quot;</span>
-              {action.action_number ? ` (${action.action_number})` : ""} will be deleted permanently
-              and will reappear in Recommended Actions if it originated from a recommendation.
-            </>
-          ) : "This action will be removed."}
-        </DialogDescription>
-      </DialogHeader>
-      <DialogFooter>
-        <Button variant="ghost" onClick={onClose} disabled={isDeleting} data-testid="delete-action-cancel">Cancel</Button>
-        <Button
-          variant="destructive"
-          onClick={onConfirm}
-          disabled={isDeleting}
-          data-testid="delete-action-confirm"
-        >
-          {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
-          Delete
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
-);
+const DeleteActionDialog = ({ action, open, onClose, onConfirm, isDeleting }) => {
+  const { t } = useLanguage();
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md" data-testid="delete-action-dialog">
+        <DialogHeader>
+          <DialogTitle>{t("observationWorkspace.deleteActionTitle")}</DialogTitle>
+          <DialogDescription>
+            {action ? (
+              t("observationWorkspace.deleteActionDescription", {
+                title: action.title,
+                actionNumber: action.action_number ? ` (${action.action_number})` : "",
+              })
+            ) : t("observationWorkspace.deleteActionRemovedOnly")}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={isDeleting} data-testid="delete-action-cancel">{t("common.cancel")}</Button>
+          <Button
+            variant="destructive"
+            onClick={onConfirm}
+            disabled={isDeleting}
+            data-testid="delete-action-confirm"
+          >
+            {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+            {t("common.delete")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 /**
  * Add Action Dialog — manual creation of a new action on the observation's plan.
@@ -1081,6 +1124,7 @@ const DeleteActionDialog = ({ action, open, onClose, onConfirm, isDeleting }) =>
  * "Learning" actions such as updating the PM plan.
  */
 const AddActionDialog = ({ open, onClose, onCreate, isCreating }) => {
+  const { t } = useLanguage();
   const { disciplines, normalize } = useDisciplines();
   const [form, setForm] = useState({
     title: "",
@@ -1118,27 +1162,26 @@ const AddActionDialog = ({ open, onClose, onCreate, isCreating }) => {
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent className="max-w-lg" data-testid="add-action-dialog">
         <DialogHeader>
-          <DialogTitle>Add Action</DialogTitle>
+          <DialogTitle>{t("observationWorkspace.addActionTitle")}</DialogTitle>
           <DialogDescription>
-            Manually add an action to this observation&apos;s plan. Use Learning to
-            capture follow-ups such as PM plan updates.
+            {t("observationWorkspace.addActionDescription")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-3 py-2">
           <div className="grid gap-1.5">
-            <Label htmlFor="add-title">Title</Label>
+            <Label htmlFor="add-title">{t("observationWorkspace.titleLabel")}</Label>
             <Input
               id="add-title"
               value={form.title}
               onChange={(e) => handleChange("title", e.target.value)}
-              placeholder="e.g. Update PM plan to include weekly inspection"
+              placeholder={t("observationWorkspace.addActionPlaceholder")}
               data-testid="add-action-title"
             />
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="add-desc">Description</Label>
+            <Label htmlFor="add-desc">{t("observationWorkspace.descriptionLabel")}</Label>
             <Textarea
               id="add-desc"
               rows={3}
@@ -1150,25 +1193,25 @@ const AddActionDialog = ({ open, onClose, onCreate, isCreating }) => {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
-              <Label>Type</Label>
+              <Label>{t("observationWorkspace.typeLabel")}</Label>
               <Select value={form.action_type} onValueChange={(v) => handleChange("action_type", v)}>
                 <SelectTrigger data-testid="add-action-type"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="CM">CM — Corrective</SelectItem>
-                  <SelectItem value="PM">PM — Preventive</SelectItem>
-                  <SelectItem value="PDM">PDM — Predictive</SelectItem>
-                  <SelectItem value="OP">OP — Operational</SelectItem>
-                  <SelectItem value="LEARN">LEARN — Learning / Strategy update</SelectItem>
+                  <SelectItem value="CM">{t("observationWorkspace.actionTypeCM")}</SelectItem>
+                  <SelectItem value="PM">{t("observationWorkspace.actionTypePM")}</SelectItem>
+                  <SelectItem value="PDM">{t("observationWorkspace.actionTypePDM")}</SelectItem>
+                  <SelectItem value="OP">{t("observationWorkspace.actionTypeOP")}</SelectItem>
+                  <SelectItem value="LEARN">{t("observationWorkspace.actionTypeLEARN")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="grid gap-1.5">
-              <Label>Discipline</Label>
+              <Label>{t("observationWorkspace.disciplineLabel")}</Label>
               <Select value={form.discipline || "none"} onValueChange={(v) => handleChange("discipline", v === "none" ? "" : v)}>
                 <SelectTrigger data-testid="add-action-discipline"><SelectValue placeholder="—" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">— None —</SelectItem>
+                  <SelectItem value="none">{t("observationWorkspace.noneDiscipline")}</SelectItem>
                   {disciplines.map((d) => (
                     <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
                   ))}
@@ -1179,20 +1222,20 @@ const AddActionDialog = ({ open, onClose, onCreate, isCreating }) => {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
-              <Label>Status</Label>
+              <Label>{t("observationWorkspace.status")}</Label>
               <Select value={form.status} onValueChange={(v) => handleChange("status", v)}>
                 <SelectTrigger data-testid="add-action-status"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="planned">Planned</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="open">{getActionStatusLabel(t, "open")}</SelectItem>
+                  <SelectItem value="planned">{getActionStatusLabel(t, "planned")}</SelectItem>
+                  <SelectItem value="in_progress">{getActionStatusLabel(t, "in_progress")}</SelectItem>
+                  <SelectItem value="completed">{getActionStatusLabel(t, "completed")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="grid gap-1.5">
-              <Label htmlFor="add-due">Due date</Label>
+              <Label htmlFor="add-due">{t("observationWorkspace.dueDateLabel")}</Label>
               <Input
                 id="add-due"
                 type="date"
@@ -1204,7 +1247,7 @@ const AddActionDialog = ({ open, onClose, onCreate, isCreating }) => {
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="add-comments">Comments</Label>
+            <Label htmlFor="add-comments">{t("observationWorkspace.comments")}</Label>
             <Textarea
               id="add-comments"
               rows={2}
@@ -1216,10 +1259,10 @@ const AddActionDialog = ({ open, onClose, onCreate, isCreating }) => {
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={handleClose} disabled={isCreating} data-testid="add-action-cancel">Cancel</Button>
+          <Button variant="ghost" onClick={handleClose} disabled={isCreating} data-testid="add-action-cancel">{t("common.cancel")}</Button>
           <Button onClick={handleSubmit} disabled={isCreating || !form.title.trim()} data-testid="add-action-submit">
             {isCreating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-            Add to plan
+            {t("observationWorkspace.addToPlanButton")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1231,6 +1274,7 @@ const AddActionDialog = ({ open, onClose, onCreate, isCreating }) => {
  * Action Plan Panel - Shows actions in the same style as recommended actions
  */
 const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onAddAction, isCreating, actionPlanIds = [] }) => {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { getLabel } = useDisciplines();
   const [editingAction, setEditingAction] = useState(null);
@@ -1249,11 +1293,11 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
   };
 
   const statusConfig = {
-    open: { color: "bg-blue-50 text-blue-600 border-blue-200", label: "Open" },
-    planned: { color: "bg-purple-50 text-purple-600 border-purple-200", label: "Planned" },
-    in_progress: { color: "bg-amber-50 text-amber-600 border-amber-200", label: "In Progress" },
-    completed: { color: "bg-green-50 text-green-600 border-green-200", label: "Completed" },
-    validated: { color: "bg-emerald-50 text-emerald-600 border-emerald-200", label: "Validated" },
+    open: { color: "bg-blue-50 text-blue-600 border-blue-200", label: getActionStatusLabel(t, "open") },
+    planned: { color: "bg-purple-50 text-purple-600 border-purple-200", label: getActionStatusLabel(t, "planned") },
+    in_progress: { color: "bg-amber-50 text-amber-600 border-amber-200", label: getActionStatusLabel(t, "in_progress") },
+    completed: { color: "bg-green-50 text-green-600 border-green-200", label: getActionStatusLabel(t, "completed") },
+    validated: { color: "bg-emerald-50 text-emerald-600 border-emerald-200", label: getActionStatusLabel(t, "validated") },
   };
 
   const handleEdit = (action, e) => {
@@ -1299,12 +1343,12 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
             </div>
             <div className="min-w-0">
               <h3 className="font-semibold text-slate-900 truncate">
-                Action Plan
+                {t("observationWorkspace.actionPlan")}
                 {actions && actions.length > 0 && (
                   <span className="ml-2 text-xs text-slate-400 font-normal">({actions.length})</span>
                 )}
               </h3>
-              <p className="text-xs text-slate-500 truncate">Track planned &amp; in-progress actions</p>
+              <p className="text-xs text-slate-500 truncate">{t("observationWorkspace.actionPlanSubtitle")}</p>
             </div>
           </div>
           <div className="flex items-center gap-1 flex-shrink-0">
@@ -1313,14 +1357,14 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
               variant="ghost"
               onClick={() => setShowAddDialog(true)}
               className="h-7 text-xs px-2"
-              title="Add a new action manually"
+              title={t("observationWorkspace.addActionManually")}
               data-testid="action-plan-add-btn"
             >
-              <Plus className="w-3.5 h-3.5 mr-1" /> Add
+              <Plus className="w-3.5 h-3.5 mr-1" /> {t("observationWorkspace.add")}
             </Button>
             {actions && actions.length > 0 && (
               <Button size="sm" variant="ghost" onClick={onViewAll} className="h-7 text-xs px-2 hidden sm:inline-flex">
-                View All
+                {t("observationWorkspace.viewAll")}
               </Button>
             )}
           </div>
@@ -1342,7 +1386,7 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
                 key={action.id}
                 className={`p-2 rounded-lg bg-slate-50 border border-slate-100 hover:border-slate-200 transition-colors group ${isInvestigationAction ? "cursor-pointer hover:bg-purple-50" : ""}`}
                 onClick={isInvestigationAction ? () => navigate(`/causal-engine?id=${action.linked_investigation_id}`) : undefined}
-                title={isInvestigationAction ? "Open linked investigation" : undefined}
+                title={isInvestigationAction ? t("observationWorkspace.openLinkedInvestigation") : undefined}
                 data-testid={`action-plan-item-${action.id}`}
               >
                 <div className="flex items-start gap-2">
@@ -1378,7 +1422,7 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
                       <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
                         {action.owner && <span>{action.owner}</span>}
                         {action.due_date && (
-                          <span>Due: {format(parseISO(action.due_date), "MMM d")}</span>
+                          <span>{t("observationWorkspace.dueDate", { date: format(parseISO(action.due_date), "MMM d") })}</span>
                         )}
                       </div>
                     )}
@@ -1393,7 +1437,7 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
                           variant="ghost"
                           onClick={(e) => handleEdit(action, e)}
                           className="h-7 w-7 p-0"
-                          title="Edit action"
+                          title={t("observationWorkspace.editAction")}
                           data-testid={`action-plan-edit-${action.id}`}
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -1403,7 +1447,7 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
                           variant="ghost"
                           onClick={(e) => handleDelete(action, e)}
                           className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
-                          title="Remove from plan"
+                          title={t("observationWorkspace.removeFromPlan")}
                           data-testid={`action-plan-delete-${action.id}`}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -1419,8 +1463,8 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
       ) : (
         <div className="text-center py-6 text-slate-500">
           <ClipboardList className="w-10 h-10 mx-auto mb-2 opacity-30" />
-          <p className="text-xs">No actions in plan</p>
-          <p className="text-[10px] text-slate-400 mt-1">Add from recommendations</p>
+          <p className="text-xs">{t("observationWorkspace.noActionsInPlan")}</p>
+          <p className="text-[10px] text-slate-400 mt-1">{t("observationWorkspace.addFromRecommendations")}</p>
         </div>
       )}
 
@@ -1458,6 +1502,7 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
  * Process Journey Tracker
  */
 const ProcessJourney = ({ stages }) => {
+  const { t } = useLanguage();
   const stageConfig = {
     completed: { color: "bg-green-500", textColor: "text-green-700", icon: Check },
     in_progress: { color: "bg-blue-500", textColor: "text-blue-700", icon: Activity },
@@ -1470,7 +1515,7 @@ const ProcessJourney = ({ stages }) => {
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <TrendingUp className="w-3 h-3 text-slate-500" />
-          <span className="text-[11px] font-medium text-slate-700">Process Journey</span>
+          <span className="text-[11px] font-medium text-slate-700">{t("observationWorkspace.processJourney")}</span>
         </div>
 
         <div className="flex items-center justify-between flex-1 overflow-x-auto min-w-0">
@@ -1480,12 +1525,12 @@ const ProcessJourney = ({ stages }) => {
             
             return (
               <React.Fragment key={stage.stage}>
-                <div className="flex items-center gap-1 min-w-fit" title={stage.date ? `${stage.stage} — ${format(parseISO(stage.date), "MMM d")}` : stage.stage}>
+                <div className="flex items-center gap-1 min-w-fit" title={stage.date ? `${translateEnum(t, stage.stage)} — ${format(parseISO(stage.date), "MMM d")}` : translateEnum(t, stage.stage)}>
                   <div className={`w-3.5 h-3.5 rounded-full ${config.color} flex items-center justify-center text-white flex-shrink-0`}>
                     <Icon className="w-2 h-2" />
                   </div>
                   <span className={`text-[10px] font-medium ${config.textColor} whitespace-nowrap`}>
-                    {stage.stage}
+                    {translateEnum(t, stage.stage)}
                   </span>
                 </div>
                 
@@ -1538,10 +1583,10 @@ const ObservationWorkspacePage = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["observation-workspace", id] });
       queryClient.invalidateQueries({ queryKey: ["actions"] });
-      toast.success(data.message || "Action added to plan");
+      toast.success(data.message || t("observationWorkspace.actionAddedToPlan"));
     },
     onError: () => {
-      toast.error("Failed to add action");
+      toast.error(t("observationWorkspace.actionAddFailed"));
     },
   });
 
@@ -1551,10 +1596,10 @@ const ObservationWorkspacePage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["observation-workspace", id] });
       queryClient.invalidateQueries({ queryKey: ["actions"] });
-      toast.success("Action updated");
+      toast.success(t("observationWorkspace.actionUpdated"));
     },
     onError: (err) => {
-      toast.error(err?.response?.data?.detail || "Failed to update action");
+      toast.error(err?.response?.data?.detail || t("observationWorkspace.actionUpdateFailed"));
     },
   });
 
@@ -1564,10 +1609,10 @@ const ObservationWorkspacePage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["observation-workspace", id] });
       queryClient.invalidateQueries({ queryKey: ["actions"] });
-      toast.success("Action removed from plan");
+      toast.success(t("observationWorkspace.actionRemovedFromPlan"));
     },
     onError: (err) => {
-      toast.error(err?.response?.data?.detail || "Failed to remove action");
+      toast.error(err?.response?.data?.detail || t("observationWorkspace.actionRemoveFailed"));
     },
   });
 
@@ -1578,7 +1623,7 @@ const ObservationWorkspacePage = () => {
       description: data.description || "",
       source_type: "threat",
       source_id: id,
-      source_name: workspace?.observation?.title || "Observation",
+      source_name: workspace?.observation?.title || t("observations.statusObservation"),
       threat_id: id,
       priority: "medium",
       action_type: data.action_type,
@@ -1589,10 +1634,10 @@ const ObservationWorkspacePage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["observation-workspace", id] });
       queryClient.invalidateQueries({ queryKey: ["actions"] });
-      toast.success("Action added to plan");
+      toast.success(t("observationWorkspace.actionAddedToPlan"));
     },
     onError: (err) => {
-      toast.error(err?.response?.data?.detail || "Failed to add action");
+      toast.error(err?.response?.data?.detail || t("observationWorkspace.actionAddFailed"));
     },
   });
 
@@ -1637,7 +1682,7 @@ const ObservationWorkspacePage = () => {
   };
 
   const handleAddToStrategy = (action) => {
-    toast.info("Navigate to Strategy Editor to add action");
+    toast.info(t("observationWorkspace.navigateToStrategyEditor"));
     // Could open a dialog or navigate to strategy page
   };
 
@@ -1661,7 +1706,7 @@ const ObservationWorkspacePage = () => {
       <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-slate-500">Loading workspace...</p>
+          <p className="text-slate-500">{t("observationWorkspace.loading")}</p>
         </div>
       </div>
     );
@@ -1674,10 +1719,10 @@ const ObservationWorkspacePage = () => {
         <div className="text-center py-16">
           <XCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-slate-700 mb-2">
-            {error?.response?.data?.detail || "Observation not found"}
+            {error?.response?.data?.detail || t("observationWorkspace.notFound")}
           </h2>
           <Button onClick={() => navigate("/threats")} variant="outline">
-            Back to Observations
+            {t("observations.backToObservations")}
           </Button>
         </div>
       </div>
@@ -1732,12 +1777,12 @@ const ObservationWorkspacePage = () => {
         {/* Row 1: Risk & Exposure Header */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
           <ExposureCard
-            type="Production Exposure"
+            type={t("observationWorkspace.productionExposure")}
             data={{
               primary: exposure?.production?.formatted_value || "$0",
               secondary: exposure?.production?.downtime_range 
-                ? `${exposure.production.downtime_range} Hours Downtime`
-                : "Not Assessed",
+                ? t("observationWorkspace.hoursDowntime", { hours: exposure.production.downtime_range })
+                : t("observationWorkspace.notAssessed"),
             }}
             icon={DollarSign}
             color="amber"
@@ -1747,9 +1792,9 @@ const ObservationWorkspacePage = () => {
           />
           
           <ExposureCard
-            type="Safety Exposure"
+            type={t("observationWorkspace.safetyExposure")}
             data={{
-              primary: exposure?.safety?.severity || "Not Assessed",
+              primary: exposure?.safety?.severity ? translateEnum(t, exposure.safety.severity) : t("observationWorkspace.notAssessed"),
               secondary: (() => {
                 const def = exposure?.safety?.definition;
                 if (def) {
@@ -1757,7 +1802,9 @@ const ObservationWorkspacePage = () => {
                   const first = def.split(/[.!?](\s|$)/)[0];
                   return first || def;
                 }
-                return `${exposure?.safety?.severity || "Low"} severity`;
+                return t("observationWorkspace.severityLevel", {
+                  level: translateEnum(t, exposure?.safety?.severity || t("observationWorkspace.severityLow")),
+                });
               })(),
             }}
             icon={Users}
@@ -1768,9 +1815,9 @@ const ObservationWorkspacePage = () => {
           />
           
           <ExposureCard
-            type="Environmental Impact"
+            type={t("observationWorkspace.environmentalImpact")}
             data={{
-              primary: exposure?.environmental?.impact_rating || "Low",
+              primary: translateEnum(t, exposure?.environmental?.impact_rating || t("observationWorkspace.severityLow")),
               secondary: (() => {
                 const def = exposure?.environmental?.definition;
                 if (def) {
@@ -1788,9 +1835,9 @@ const ObservationWorkspacePage = () => {
           />
 
           <ExposureCard
-            type="Reputation Impact"
+            type={t("observationWorkspace.reputationImpact")}
             data={{
-              primary: exposure?.reputation?.impact_rating || "Low",
+              primary: translateEnum(t, exposure?.reputation?.impact_rating || t("observationWorkspace.severityLow")),
               secondary: (() => {
                 const def = exposure?.reputation?.definition;
                 if (def) {
@@ -1862,7 +1909,7 @@ const ObservationWorkspacePage = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Brain className="w-5 h-5 text-purple-600" />
-              Full Reliability Analysis
+              {t("observationWorkspace.fullReliabilityAnalysis")}
             </DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-4 pt-2">

@@ -32,8 +32,8 @@ export function DashboardTabHeader(props) {
               data-testid="operational-tab"
             >
               <Activity className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden xs:inline">{t("dashboard.operational") || "Operational"}</span>
-              <span className="xs:hidden">Ops</span>
+              <span className="hidden xs:inline">{t("dashboard.operational")}</span>
+              <span className="xs:hidden">{t("dashboard.operationalShort")}</span>
             </button>
             <button 
               onClick={() => setActiveTab("production")}
@@ -41,8 +41,8 @@ export function DashboardTabHeader(props) {
               data-testid="production-tab"
             >
               <Gauge className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden xs:inline">Production</span>
-              <span className="xs:hidden">Prod</span>
+              <span className="hidden xs:inline">{t("dashboard.production")}</span>
+              <span className="xs:hidden">{t("dashboard.productionShort")}</span>
             </button>
             {canShowBuilder && (
               <button
@@ -53,8 +53,8 @@ export function DashboardTabHeader(props) {
                 data-testid="builder-tab"
               >
                 <Sparkles className="w-4 h-4 flex-shrink-0" />
-                <span className="hidden xs:inline">Builder</span>
-                <span className="xs:hidden">Build</span>
+                <span className="hidden xs:inline">{t("dashboard.builder")}</span>
+                <span className="xs:hidden">{t("dashboard.builderShort")}</span>
               </button>
             )}
           </div>
@@ -68,7 +68,7 @@ export function DashboardTabHeader(props) {
                 size="icon"
                 className="h-9 w-9"
                 onClick={refreshDashboard}
-                title="Refresh"
+                title={t("dashboard.refresh")}
                 data-testid="dashboard-refresh-btn"
               >
                 <RefreshCw className={`w-4 h-4 ${isFetchingAny ? "animate-spin" : ""}`} />

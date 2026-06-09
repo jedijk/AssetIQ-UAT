@@ -55,6 +55,7 @@ class EntityType(str, Enum):
     # Observations & Investigations
     OBSERVATION = "observation"
     INVESTIGATION = "investigation"
+    ACTION = "action"
     
     # System UI
     UI_TEXT = "ui_text"

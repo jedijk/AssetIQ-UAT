@@ -112,6 +112,21 @@ async def translate_observation(obs_id: str, obs_data: dict, created_by: str = N
     )
 
 
+async def translate_action(action_id: str, action_data: dict, created_by: str = None):
+    """Translate centralized action"""
+    data_for_translation = {
+        "name": action_data.get("title", action_data.get("name", "")),
+        "title": action_data.get("title", action_data.get("name", "")),
+        "description": action_data.get("description", "") or "",
+    }
+    await auto_translate_entity(
+        EntityType.ACTION,
+        action_id,
+        data_for_translation,
+        created_by=created_by,
+    )
+
+
 async def translate_investigation(inv_id: str, inv_data: dict, created_by: str = None):
     """Translate investigation"""
     data_for_translation = {

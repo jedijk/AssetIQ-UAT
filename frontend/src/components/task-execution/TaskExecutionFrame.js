@@ -37,6 +37,7 @@ import {
   Trash2,
   PenLine,
 } from "lucide-react";
+import { useLanguage } from "../../contexts/LanguageContext";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
@@ -122,6 +123,7 @@ const clearDraft = (taskId) => {
 };
 
 const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
+  const { t } = useLanguage();
   const isMobile = useIsMobile();
   const [formData, setFormData] = useState({});
   const [completionNotes, setCompletionNotes] = useState("");
@@ -206,9 +208,9 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
         setAttachments(restoredAttachments);
         setHasDraft(true);
         if (needsReupload.length > 0) {
-          toast.info(`Restored draft. ${needsReupload.length} attachment(s) need to be re-added.`, { duration: 4000 });
+          toast.info(t("forms.execution.restoredDraftReupload").replace("{count}", String(needsReupload.length)), { duration: 4000 });
         } else {
-          toast.info("Restored your previous draft", { duration: 3000 });
+          toast.info(t("forms.execution.restoredDraft"), { duration: 3000 });
         }
       } else {
         setFormData({});
@@ -361,7 +363,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
     setAiFilledFields(prev => ({ ...prev, ...filled }));
     setAiCorrections({});
     if (imageBase64) setExtractionImageData(imageBase64);
-    toast.success(`Auto-filled ${Object.keys(fills).length} fields from photo`);
+    toast.success(t("forms.execution.autoFilledFields").replace("{count}", String(Object.keys(fills).length)));
   };
 
   // Search equipment by name
@@ -390,7 +392,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
     formFields.forEach(field => {
       const fieldType = field.type || field.field_type;
       if (field.required && !formData[field.id] && formData[field.id] !== false && formData[field.id] !== 0) {
-        errors[field.id] = "This field is required";
+        errors[field.id] = t("forms.execution.requiredField");
       }
       if ((fieldType === "date" || fieldType === "datetime") && formData[field.id]) {
         const issue = getDatePlausibilityIssue(formData[field.id], fieldType);
@@ -439,7 +441,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
   // Handle form submission
   const handleSubmit = async () => {
     if (!validateForm()) {
-      toast.error("Please fill in all required fields");
+      toast.error(t("forms.execution.fillRequiredFields"));
       return;
     }
     
@@ -528,7 +530,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
       onBack();
     } catch (error) {
       console.error("Task completion error:", error);
-      const errorMsg = error?.response?.data?.detail || error.message || "Failed to complete task. Please try again.";
+      const errorMsg = error?.response?.data?.detail || error.message || t("forms.execution.completeFailed");
       toast.error(errorMsg);
     } finally {
       setIsSubmitting(false);
@@ -566,7 +568,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
             className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ml-1.5 bg-red-100 text-red-800 ring-1 ring-red-300"
             data-testid={`date-warning-badge-${field.id}`}
           >
-            Wrong year — check date ({datePlausibilityIssue.parsedYear})
+            {t("forms.execution.wrongYearCheck").replace("{year}", String(datePlausibilityIssue.parsedYear))}
           </span>
         );
       }
@@ -579,12 +581,10 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
           "bg-green-100 text-green-700"
         }`} data-testid={`ai-badge-${field.id}`}>
           {wasCorrected
-            ? "Corrected"
+            ? t("forms.execution.corrected")
             : dateAdjusted
-              ? `AI date corrected — verify (${Math.round(conf * 100)}%)`
-              : isLow
-                ? `AI ${Math.round(conf * 100)}%`
-                : `AI ${Math.round(conf * 100)}%`}
+              ? t("forms.execution.aiDateCorrected").replace("{percent}", String(Math.round(conf * 100)))
+              : t("forms.execution.aiConfidence").replace("{percent}", String(Math.round(conf * 100)))}
         </span>
       );
     };
@@ -685,7 +685,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
               inputMode="decimal"
               value={value ?? ""}
               onChange={(e) => handleNumericChange(field.id, e.target.value, { ...field, min_threshold: minThreshold, max_threshold: maxThreshold })}
-              placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
+              placeholder={field.placeholder || t("forms.execution.enterField").replace("{label}", field.label)}
               className={cn(
                 isExceeded && "border-red-500 bg-red-50",
                 aiInfo && !corrected && "ring-1 ring-green-300 bg-green-50/30",
@@ -736,7 +736,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
             <Textarea
               value={value ?? ""}
               onChange={(e) => handleFieldChange(field.id, e.target.value)}
-              placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}... (or use microphone)`}
+              placeholder={field.placeholder || t("forms.execution.enterFieldMic").replace("{label}", field.label)}
               rows={3}
               className="text-sm"
             />
@@ -888,7 +888,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
               onChange={(e) => {
                 const selectedDate = e.target.value;
                 if (selectedDate > todayDate) {
-                  toast.error("Future dates are not allowed");
+                  toast.error(t("forms.execution.futureDateNotAllowed"));
                   return;
                 }
                 handleFieldChange(field.id, selectedDate);
@@ -927,7 +927,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
               onChange={(e) => {
                 const selectedDateTime = e.target.value;
                 if (selectedDateTime > nowDateTime) {
-                  toast.error("Future dates are not allowed");
+                  toast.error(t("forms.execution.futureDateNotAllowed"));
                   return;
                 }
                 handleFieldChange(field.id, selectedDateTime);
@@ -996,7 +996,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
                     <FileText className="w-10 h-10 text-slate-400" />
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{value.name || "Uploaded file"}</p>
+                    <p className="text-sm font-medium truncate">{value.name || t("forms.execution.uploadedFile")}</p>
                     <p className="text-xs text-slate-500">{value.size ? `${(value.size / 1024).toFixed(1)} KB` : ""}</p>
                   </div>
                   <Button
@@ -1012,7 +1012,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
                 <label className="flex flex-col items-center cursor-pointer">
                   <Upload className="w-8 h-8 text-slate-400 mb-2" />
                   <span className="text-sm text-slate-600">
-                    {fieldType === "image" ? "Upload image" : "Upload file"}
+                    {fieldType === "image" ? t("forms.execution.uploadImage") : t("forms.execution.uploadFile")}
                   </span>
                   <span className="text-xs text-slate-400 mt-1">
                     {field.allowed_types || (fieldType === "image" ? "jpg, png, gif" : "Any file")}
@@ -1102,7 +1102,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
                   handleFieldChange(field.id, null);
                   searchEquipment(field.id, e.target.value);
                 }}
-                placeholder="Search equipment..."
+                placeholder={t("forms.execution.searchEquipment")}
                 className={cn(mobileInputClass)}
               />
               {isSearching && (
@@ -1156,7 +1156,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
             <Input
               value={value ?? ""}
               onChange={(e) => handleFieldChange(field.id, e.target.value)}
-              placeholder={field.placeholder || `Enter ${field.label.toLowerCase()}`}
+              placeholder={field.placeholder || t("forms.execution.enterField").replace("{label}", field.label)}
               className={cn(mobileInputClass)}
             />
             {hasError && <p className="text-xs text-red-600">{hasError}</p>}
@@ -1173,7 +1173,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
     )}>
       <div className="flex items-start justify-between">
         <div className="flex-1 pr-12">
-          <h3 className="font-semibold text-lg">{task?.title || task?.task_template_name || "Task"}</h3>
+          <h3 className="font-semibold text-lg">{task?.title || task?.task_template_name || t("forms.execution.taskFallback")}</h3>
           {task?.equipment_name && (
             <p className="text-sm text-white/80 mt-1 flex items-center gap-1">
               <Building2 className="w-3.5 h-3.5" />
@@ -1207,7 +1207,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
               {showDocumentList && (
                 <div className="absolute right-0 top-12 bg-white rounded-lg shadow-xl border z-50 min-w-[280px] max-w-[350px]">
                   <div className="p-3 border-b bg-slate-50 rounded-t-lg">
-                    <h4 className="font-medium text-slate-800 text-sm">Reference Documents</h4>
+                    <h4 className="font-medium text-slate-800 text-sm">{t("forms.referenceDocuments")}</h4>
                   </div>
                   <div className="max-h-[300px] overflow-y-auto">
                     {formDocuments.map((doc, idx) => (
@@ -1225,7 +1225,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
                           </div>
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-slate-800 truncate">
-                              {doc.name || doc.filename || `Document ${idx + 1}`}
+                              {doc.name || doc.filename || t("forms.execution.documentFallback").replace("{index}", String(idx + 1))}
                             </p>
                             <p className="text-xs text-slate-500">
                               {doc.type || doc.name?.split('.').pop()?.toUpperCase() || 'Document'}
@@ -1278,14 +1278,14 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
       ) : (
         <div className="text-center py-6 text-slate-400">
           <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
-          <p className="text-sm">No form fields for this task</p>
+          <p className="text-sm">{t("forms.execution.noFormFields")}</p>
         </div>
       )}
       
       {/* Completion Notes */}
       <div className="space-y-2 pt-4 border-t">
         <div className="flex items-center justify-between">
-          <Label className={isMobile ? "text-sm" : ""}>Completion Notes</Label>
+          <Label className={isMobile ? "text-sm" : ""}>{t("forms.execution.completionNotes")}</Label>
           <VoiceInput 
             size="sm"
             onTranscribe={(text, append) => {
@@ -1300,7 +1300,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
         <Textarea
           value={completionNotes}
           onChange={(e) => setCompletionNotes(e.target.value)}
-          placeholder="Add any notes about task completion... (or use microphone to dictate)"
+          placeholder={t("forms.execution.completionNotesPlaceholder")}
           rows={3}
           className="text-sm"
         />
@@ -1310,7 +1310,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <Label className={isMobile ? "text-sm" : ""}>
-            Attachments
+            {t("forms.execution.attachments")}
             {attachments.length > 0 && (
               <Badge variant="secondary" className="ml-2 text-xs">
                 {attachments.length}
@@ -1320,7 +1320,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
           {hasDraft && (
             <span className="text-xs text-amber-600 flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
-              Draft saved
+              {t("forms.execution.draftSaved")}
             </span>
           )}
         </div>
@@ -1353,7 +1353,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
                       />
                       <div className="hidden aspect-square flex-col items-center justify-center p-2 bg-slate-50">
                         <ImageIcon className="w-8 h-8 text-slate-400 mb-1" />
-                        <span className="text-[10px] text-amber-600 font-medium">Preview unavailable</span>
+                        <span className="text-[10px] text-amber-600 font-medium">{t("forms.execution.previewUnavailable")}</span>
                       </div>
                     </div>
                   ) : (
@@ -1367,7 +1367,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
                         {att.name?.split('.').pop() || 'File'}
                       </span>
                       {att.needsReupload && (
-                        <span className="text-[9px] text-amber-600 mt-1">Needs re-upload</span>
+                        <span className="text-[9px] text-amber-600 mt-1">{t("forms.execution.needsReupload")}</span>
                       )}
                     </div>
                   )}
@@ -1428,7 +1428,13 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
                       processedFile = result.file;
                       if (result.wasCompressed) {
                         const savedPercent = getCompressionPercent(result.originalSize, result.compressedSize);
-                        toast.success(`${file.name} compressed: ${formatFileSize(result.originalSize)} → ${formatFileSize(result.compressedSize)} (${savedPercent}% smaller)`);
+                        toast.success(
+                          t("forms.execution.fileCompressed")
+                            .replace("{name}", file.name)
+                            .replace("{before}", formatFileSize(result.originalSize))
+                            .replace("{after}", formatFileSize(result.compressedSize))
+                            .replace("{percent}", String(savedPercent))
+                        );
                       }
                     } catch (err) {
                       console.error('Image compression failed:', err);
@@ -1450,7 +1456,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
                     size: processedFile.size
                   }]);
                 }
-                toast.success(`${files.length} file(s) attached`);
+                toast.success(t("forms.execution.filesAttached").replace("{count}", String(files.length)));
               } finally {
                 setUploadingAttachment(false);
               }
@@ -1463,7 +1469,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
           ) : (
             <Upload className="w-4 h-4 mr-2" />
           )}
-          {attachments.length > 0 ? "Add More Files" : "Add Attachment"}
+          {attachments.length > 0 ? t("forms.execution.addMoreFiles") : t("forms.execution.addAttachment")}
         </Button>
       </div>
       
@@ -1478,12 +1484,12 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
           {isSubmitting ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin mr-2" />
-              Completing...
+              {t("forms.execution.completing")}
             </>
           ) : (
             <>
               <Check className="w-5 h-5 mr-2" />
-              Complete Task
+              {t("forms.execution.completeTask")}
             </>
           )}
         </Button>
@@ -1524,9 +1530,9 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h2 className="font-semibold text-slate-800 truncate">Execute Task</h2>
+          <h2 className="font-semibold text-slate-800 truncate">{t("forms.execution.title")}</h2>
           {task?.form_template_name && (
-            <p className="text-xs text-slate-500 truncate">Form: {task.form_template_name}</p>
+            <p className="text-xs text-slate-500 truncate">{t("forms.execution.formLabel").replace("{name}", task.form_template_name)}</p>
           )}
         </div>
         {hasDraft && (
@@ -1540,13 +1546,13 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
                 setCompletionNotes("");
                 setAttachments([]);
                 setHasDraft(false);
-                toast.info("Draft cleared");
+                toast.info(t("forms.execution.draftCleared"));
               }
             }}
             className="text-slate-500 hover:text-red-600 text-xs"
           >
             <Trash2 className="w-3.5 h-3.5 mr-1" />
-            Clear
+            {t("forms.execution.clearDraft")}
           </Button>
         )}
         {formDocuments.length > 0 && (
@@ -1557,7 +1563,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
             className="gap-1"
           >
             <FileText className="w-4 h-4" />
-            <span className="hidden sm:inline">View Doc</span>
+            <span className="hidden sm:inline">{t("forms.execution.viewDoc")}</span>
           </Button>
         )}
         {onDelete && (
@@ -1577,13 +1583,13 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Task</AlertDialogTitle>
+            <AlertDialogTitle>{t("forms.execution.deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this task? This action cannot be undone.
+              {t("forms.execution.deleteConfirm")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setShowDeleteConfirm(false);
@@ -1593,7 +1599,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
               }}
               className="bg-red-600 hover:bg-red-700"
             >
-              Delete
+              {t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

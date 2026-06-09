@@ -181,7 +181,7 @@ export function useTranslatedActions(actions = []) {
   
   const { data: translationsMap = {} } = useQuery({
     queryKey: ["action-translations", language, actionIds.length, actionIds.slice(0, 5).join(",")],
-    queryFn: () => fetchBatchTranslations("observation", actionIds, language),
+    queryFn: () => fetchBatchTranslations("action", actionIds, language),
     enabled: language !== "en" && actionIds.length > 0,
     staleTime: 1000 * 60 * 5,
     retry: false,

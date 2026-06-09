@@ -1,10 +1,12 @@
 import { useNavigate } from "react-router-dom";
 import { useMemo } from "react";
 import { format } from "date-fns";
-import { Building2, ClipboardCheck, Activity } from "lucide-react";
+import { Building2, ClipboardCheck, Activity, AlertTriangle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
+import { useEffectiveRole } from "../contexts/RolePreviewContext";
 import { useLanguage } from "../contexts/LanguageContext";
+import { isMaintenanceSimpleMode } from "../lib/simpleModeProfile";
 import { myTasksAPI, preferencesAPI } from "../lib/api";
 import { publicAssetUrl } from "../lib/assetUrl";
 import {
@@ -35,7 +37,9 @@ const fetchOpenTaskCount = async (selectedDisciplines) => {
 export default function OperatorLandingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { effectiveRole } = useEffectiveRole();
   const { t } = useLanguage();
+  const maintenanceProfile = isMaintenanceSimpleMode(effectiveRole || user?.role);
   
   // Fetch user preferences to get discipline filter
   const { data: preferences } = useQuery({
@@ -123,14 +127,25 @@ export default function OperatorLandingPage() {
             <span className="text-sm font-semibold tracking-wide">{t("simpleMode.equipment")}</span>
           </button>
 
-          <button
-            onClick={handleClick(() => navigate("/production"))}
-            className="flex flex-col items-center justify-center gap-3 rounded-2xl p-6 bg-violet-600 text-white shadow-lg shadow-violet-600/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
-            data-testid="operator-btn-production"
-          >
-            <Activity className="w-8 h-8" strokeWidth={2} />
-            <span className="text-sm font-semibold tracking-wide">{t("simpleMode.production")}</span>
-          </button>
+          {maintenanceProfile ? (
+            <button
+              onClick={handleClick(() => navigate("/threats"))}
+              className="flex flex-col items-center justify-center gap-3 rounded-2xl p-6 bg-amber-500 text-white shadow-lg shadow-amber-500/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
+              data-testid="operator-btn-observations"
+            >
+              <AlertTriangle className="w-8 h-8" strokeWidth={2} />
+              <span className="text-sm font-semibold tracking-wide">{t("nav.observations")}</span>
+            </button>
+          ) : (
+            <button
+              onClick={handleClick(() => navigate("/production"))}
+              className="flex flex-col items-center justify-center gap-3 rounded-2xl p-6 bg-violet-600 text-white shadow-lg shadow-violet-600/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
+              data-testid="operator-btn-production"
+            >
+              <Activity className="w-8 h-8" strokeWidth={2} />
+              <span className="text-sm font-semibold tracking-wide">{t("simpleMode.production")}</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

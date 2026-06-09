@@ -87,7 +87,7 @@ export default function LayoutHeader({
               onClick={() => setHierarchyOpen(!hierarchyOpen)}
               className="hidden lg:flex h-7 w-7 text-slate-600 dark:text-slate-300 hover:text-blue-600 border-slate-300 dark:border-slate-600"
               data-testid="hierarchy-toggle"
-              title={hierarchyOpen ? "Hide Equipment Panel" : "Show Equipment Panel"}
+              title={hierarchyOpen ? t("equipment.hideEquipmentPanel") : t("equipment.showEquipmentPanel")}
             >
               {hierarchyOpen ? (
                 <PanelLeftClose className="w-4 h-4" />
@@ -162,9 +162,8 @@ export default function LayoutHeader({
               setDismissedNotifications={setDismissedNotifications}
             />
 
-            {/* Language Switcher - Compact, hidden in simple mode */}
-            {!isOperatorActive && (
-              <DropdownMenu>
+            {/* Language Switcher - Compact */}
+            <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
@@ -205,7 +204,6 @@ export default function LayoutHeader({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            )}
 
             {/* Help Button */}
             <DropdownMenu
@@ -426,7 +424,7 @@ export default function LayoutHeader({
               transition={springPresets.snappy}
             >
               <PanelLeftOpen className="w-5 h-5" />
-              Equipment Hierarchy
+              {t("equipment.equipmentHierarchyTitle")}
             </motion.button>
             
             {/* Main Navigation Items */}

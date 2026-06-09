@@ -31,6 +31,7 @@ TRANSLATABLE_FIELDS = {
     EntityType.FORM_TEMPLATE: ["name", "description"],
     EntityType.OBSERVATION: ["name", "description", "title"],
     EntityType.INVESTIGATION: ["name", "description", "title"],
+    EntityType.ACTION: ["name", "description", "title"],
 }
 
 

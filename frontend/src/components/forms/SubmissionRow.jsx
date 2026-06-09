@@ -11,8 +11,10 @@ import { ThresholdBadge } from "./FieldPreview";
 import { formatDateTime } from "../../lib/dateUtils";
 import { formAPI } from "./formAPI";
 import { openPrintWindow, isMobileDevice } from "../../lib/printLabel";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 export const SubmissionRow = ({ submission, labelConfig: labelConfigProp }) => {
+  const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [labelConfig, setLabelConfig] = useState(
@@ -52,7 +54,7 @@ export const SubmissionRow = ({ submission, labelConfig: labelConfigProp }) => {
       const cfg = await ensureConfig();
       const templateId = submission?.label_template_id || cfg?.label_template_id;
       if (!cfg?.enabled || !templateId) {
-        toast.error("This form has no label template configured. Enable it in the form designer.");
+        toast.error(t("reports.noLabelTemplate"));
         if (preOpened && !preOpened.closed) preOpened.close();
         return;
       }
@@ -65,13 +67,13 @@ export const SubmissionRow = ({ submission, labelConfig: labelConfigProp }) => {
         win: preOpened,
         filename: `${submission.template_name || "label"}.pdf`,
       });
-      if (res.method === "window") toast.success("Label print dialog opened");
-      else if (res.mobile) toast.info("Label downloaded — use Share → Print");
-      else if (res.method === "download") toast.info("Print blocked — label downloaded.");
-      else toast.success("Print dialog opened");
+      if (res.method === "window") toast.success(t("reports.printDialogOpened"));
+      else if (res.mobile) toast.info(t("reports.labelDownloaded"));
+      else if (res.method === "download") toast.info(t("reports.printBlocked"));
+      else toast.success(t("reports.printOpened"));
     } catch (err) {
       if (preOpened && !preOpened.closed) preOpened.close();
-      toast.error(err.response?.data?.detail || "Print failed");
+      toast.error(err.response?.data?.detail || t("reports.printFailed"));
     } finally {
       setPrinting(false);
     }

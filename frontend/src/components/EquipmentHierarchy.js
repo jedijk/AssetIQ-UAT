@@ -1107,7 +1107,9 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, in
       <div className={`flex items-center justify-between p-3 border-b border-slate-200 flex-shrink-0 ${isMobile ? 'bg-white sticky top-0 z-10' : ''}`}>
         <div className="flex items-center gap-2">
           <Layers className="w-5 h-5 text-blue-600" />
-          <h2 className="font-semibold text-slate-900">{isMobile ? 'Equipment Hierarchy' : 'Hierarchy'}</h2>
+          <h2 className="font-semibold text-slate-900">
+            {isMobile ? t("equipment.equipmentHierarchyTitle") : t("equipment.hierarchy")}
+          </h2>
         </div>
         <div className="flex items-center gap-1">
           {/* View mode toggle */}
@@ -1117,7 +1119,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, in
             className="h-7 px-2 text-xs"
             onClick={() => { setViewMode("tree"); setFilterLevel(null); setSearchQuery(""); }}
           >
-            Tree
+            {t("equipment.tree")}
           </Button>
           <Button
             variant={viewMode === "levels" ? "secondary" : "ghost"}
@@ -1125,7 +1127,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, in
             className="h-7 px-2 text-xs"
             onClick={() => { setViewMode("levels"); setSearchQuery(""); }}
           >
-            Levels
+            {t("equipment.levels")}
           </Button>
           {isMobile && (
             <Button
@@ -1147,7 +1149,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, in
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input
               ref={searchInputRef}
-              placeholder="Search equipment..."
+              placeholder={t("equipment.searchEquipment")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8 pr-8 h-8 text-sm bg-white"
@@ -1165,7 +1167,8 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, in
           </div>
           {searchQuery && (
             <div className="mt-1.5 text-xs text-slate-500">
-              {matchingIds.size} {matchingIds.size === 1 ? 'match' : 'matches'}
+              {matchingIds.size}{" "}
+              {matchingIds.size === 1 ? t("equipment.matchSingular") : t("equipment.matches")}
             </div>
           )}
         </div>
@@ -1185,7 +1188,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, in
             // ISO Levels View
             <div className="space-y-1">
               <div className="px-2 py-1 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Hierarchy Levels
+                {t("equipment.hierarchyLevels")}
               </div>
               {ISO_LEVEL_ORDER.map(level => (
                 <LevelSummaryItem
@@ -1229,15 +1232,15 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, in
               ) : (
                 <div className="text-center py-8 text-slate-500">
                   <Building2 className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                  <p className="text-sm font-medium">No equipment hierarchy</p>
-                  <p className="text-xs mt-1">Go to Equipment Manager to create hierarchy</p>
+                  <p className="text-sm font-medium">{t("equipment.noEquipmentHierarchy")}</p>
+                  <p className="text-xs mt-1">{t("equipment.goToEquipmentManagerHint")}</p>
                   <Button
                     variant="outline"
                     size="sm"
                     className="mt-3"
                     onClick={() => navigate("/equipment-manager")}
                   >
-                    Open Equipment Manager
+                    {t("equipment.openEquipmentManager")}
                   </Button>
                 </div>
               )}
@@ -1250,18 +1253,19 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, in
       <div className="p-3 border-t border-slate-200 bg-slate-50 flex-shrink-0">
         {isMobile && (
           <p className="text-xs text-slate-400 mb-2 text-center">
-            Tap item for options • Tap arrow to expand
+            {t("equipment.tapItemHint")}
           </p>
         )}
         <div className="flex items-center justify-between text-xs text-slate-500">
           <span>
-            <span className="font-medium">{nodes.length}</span> items
+            <span className="font-medium">{nodes.length}</span>{" "}
+            {nodes.length === 1 ? t("equipment.itemSingular") : t("equipment.itemsPlural")}
           </span>
           <button
             onClick={() => { navigate("/equipment-manager"); if (isMobile) onClose?.(); }}
             className="text-blue-600 hover:text-blue-700 font-medium"
           >
-            Manage
+            {t("equipment.manage")}
           </button>
         </div>
       </div>

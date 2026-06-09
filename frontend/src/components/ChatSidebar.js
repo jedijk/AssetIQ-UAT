@@ -33,14 +33,16 @@ import {
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { useLanguage } from "../contexts/LanguageContext";
+import { translateEnum } from "../lib/translateEnum";
 
 const LANGUAGE_OPTIONS = [
   { code: "en", label: "English", flag: "EN" },
   { code: "nl", label: "Nederlands", flag: "NL" },
+  { code: "de", label: "Deutsch", flag: "DE" },
 ];
 
 const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage = null }) => {
-  const { language: appLanguage, setLanguage: setAppLanguage } = useLanguage();
+  const { t, language: appLanguage, setLanguage: setAppLanguage } = useLanguage();
   const [message, setMessage] = useState("");
   const [imageBase64, setImageBase64] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -82,7 +84,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
   useEffect(() => {
     if (prefillEquipment && isOpen) {
       // More explicit format to help AI extract the asset name correctly
-      const prefillText = `Reporting issue for equipment "${prefillEquipment}": `;
+      const prefillText = t("chat.reportingForEquipment", { equipment: prefillEquipment });
       setMessage(prefillText);
       // Focus the textarea and resize after a short delay
       setTimeout(() => {
@@ -231,7 +233,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
           queryClient.invalidateQueries({ queryKey: ["stats"] });
         })
         .catch((err) => {
-          const msg = err?.response?.data?.detail || "Auto-skip failed";
+          const msg = err?.response?.data?.detail || t("chat.autoSkipFailed");
           toast.error(msg);
         })
         .finally(() => {
@@ -316,7 +318,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
       
       if (looksLikeEquipmentSelection && gotEquipmentOptionsBack) {
         // This likely means the chat state was lost (database environment changed)
-        toast.warning("Chat state was reset. Your previous session may have been in a different database environment.", {
+        toast.warning(t("chat.chatStateReset"), {
           duration: 5000,
         });
         // Force refetch chat history to sync with current database
@@ -338,7 +340,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
       }
     },
     onError: (error) => {
-      const errorMsg = error.response?.data?.detail || "Failed to send message";
+      const errorMsg = error.response?.data?.detail || t("chat.sendFailed");
       toast.error(errorMsg);
     },
     onSettled: () => {
@@ -351,10 +353,10 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
     mutationFn: () => chatAPI.clearHistory(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
-      toast.success("Chat history cleared");
+      toast.success(t("chat.chatCleared"));
     },
     onError: () => {
-      toast.error("Failed to clear chat");
+      toast.error(t("chat.clearChatFailed"));
     },
   });
 
@@ -406,12 +408,12 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
     if (!file) return;
 
     if (!file.type.match(/^image\/(jpeg|png|webp)$/)) {
-      toast.error("Please upload a JPEG, PNG, or WebP image");
+      toast.error(t("chat.imageTypeError"));
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be less than 5MB");
+      toast.error(t("chat.imageSizeError"));
       return;
     }
 
@@ -461,7 +463,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
         setRecordingTime(prev => prev + 1);
       }, 1000);
     } catch (error) {
-      toast.error("Could not access microphone");
+      toast.error(t("chat.micAccessError"));
     }
   };
 
@@ -537,10 +539,10 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
           }
         }, 50);
       } else {
-        toast.error("Could not transcribe voice - no text detected");
+        toast.error(t("chat.noTextFromVoice"));
       }
     } catch (error) {
-      toast.error("Failed to transcribe voice");
+      toast.error(t("chat.voiceTranscribeFailed"));
     } finally {
       setIsTranscribing(false);
     }
@@ -616,10 +618,10 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               }
             }, 50);
           } else {
-            toast.error("No speech detected");
+            toast.error(t("chat.noSpeechDetected"));
           }
         } catch (e) {
-          toast.error("Voice transcription failed");
+          toast.error(t("chat.voiceTranscribeFailed"));
         } finally {
           setIsTranscribing(false);
         }
@@ -637,7 +639,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
         }
       }, 50);
     } catch (error) {
-      toast.error("Could not access microphone");
+      toast.error(t("chat.micAccessError"));
       setIsListening(false);
     }
   };
@@ -709,7 +711,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
           {msg.has_image && !msg.image_data && (
             <div className="mb-2 p-3 bg-blue-500/50 rounded-lg flex items-center gap-2 text-blue-100">
               <ImageIcon className="w-4 h-4" />
-              <span className="text-xs">Image attached</span>
+              <span className="text-xs">{t("chat.imageAttached")}</span>
             </div>
           )}
           <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -727,14 +729,14 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
             {/* Header */}
             <div className="flex items-center gap-2 text-green-700 px-3 py-2 bg-green-100/50 border-b border-green-200">
               <CheckCircle2 className="w-4 h-4" />
-              <span className="font-semibold text-sm">Observation Recorded</span>
+              <span className="font-semibold text-sm">{t("chat.observationRecorded")}</span>
             </div>
             
             {/* Threat Details */}
             <div className="p-3">
               <div className="flex items-start justify-between gap-2 mb-2">
                 <h4 className="font-semibold text-slate-900 text-sm leading-tight">
-                  {msg.threat_title || "Threat Logged"}
+                  {msg.threat_title || t("chat.threatLogged")}
                 </h4>
                 <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold ${
                   msg.threat_risk_level === "Critical" ? "bg-red-100 text-red-700" :
@@ -742,7 +744,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                   msg.threat_risk_level === "Medium" ? "bg-yellow-100 text-yellow-700" :
                   "bg-green-100 text-green-700"
                 }`}>
-                  {msg.threat_risk_level || "Medium"}
+                  {translateEnum(t, msg.threat_risk_level) || translateEnum(t, "Medium")}
                 </span>
               </div>
               
@@ -750,7 +752,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 {msg.threat_asset && (
                   <div className="flex items-center gap-1.5">
                     <Wrench className="w-3 h-3 text-slate-400" />
-                    <span><strong>Equipment:</strong> {msg.threat_asset}</span>
+                    <span><strong>{t("chat.equipmentLabel")}</strong> {msg.threat_asset}</span>
                   </div>
                 )}
                 {msg.threat_equipment_tag && (
@@ -761,19 +763,19 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 {msg.threat_failure_mode && (
                   <div className="flex items-center gap-1.5">
                     <AlertTriangle className="w-3 h-3 text-slate-400" />
-                    <span><strong>Failure Mode:</strong> {msg.threat_failure_mode}</span>
+                    <span><strong>{t("chat.failureModeLabel")}</strong> {msg.threat_failure_mode}</span>
                   </div>
                 )}
                 {msg.threat_description && (
                   <div className="flex items-start gap-1.5 mt-1">
                     <MessageSquare className="w-3 h-3 text-slate-400 mt-0.5" />
-                    <span><strong>What's happening:</strong> {msg.threat_description}</span>
+                    <span><strong>{t("chat.whatsHappening")}</strong> {msg.threat_description}</span>
                   </div>
                 )}
                 {msg.threat_risk_score && (
                   <div className="flex items-center gap-1.5">
                     <Activity className="w-3 h-3 text-slate-400" />
-                    <span><strong>Risk Score:</strong> {msg.threat_risk_score} • <strong>Rank:</strong> #{msg.threat_rank}</span>
+                    <span><strong>{t("chat.riskScoreLabel")}</strong> {msg.threat_risk_score} • <strong>{t("chat.rankLabel")}</strong> #{msg.threat_rank}</span>
                   </div>
                 )}
               </div>
@@ -783,7 +785,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 onClick={onClose}
                 className="inline-flex items-center gap-1 text-blue-600 text-xs font-medium hover:underline"
               >
-                View full details
+                {t("chat.viewFullDetails")}
                 <ArrowRight className="w-3 h-3" />
               </a>
             </div>
@@ -792,10 +794,9 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
             {(msg.chat_state === "awaiting_context" || msg.awaiting_context_for_threat) && (
               <div className="px-3 pb-3 pt-2 border-t border-slate-200 bg-slate-50/50">
                 <p className="text-xs text-slate-600 mb-2">
-                  Would you like to add more details? (temperature, conditions, photos) — add your comments in the chat below ↓
-                  {" "}
+                  {t("chat.contextPrompt")}{" "}
                   <span className="text-slate-500">
-                    Closing and reopening the chat does not reset the auto-skip timer.
+                    {t("chat.contextTimerHint")}
                   </span>
                 </p>
                 <div className="flex flex-wrap gap-2 items-center">
@@ -806,7 +807,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                     data-testid="add-photo-btn"
                   >
                     <ImageIcon className="w-3.5 h-3.5" />
-                    Add Photo
+                    {t("chat.addPhoto")}
                   </button>
                   <button
                     onClick={() => {
@@ -821,11 +822,11 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-500 rounded-lg hover:bg-slate-100 transition-colors text-xs font-medium disabled:opacity-50"
                     data-testid="skip-context-btn"
                   >
-                    Skip {autoSkipCountdown && `(${autoSkipCountdown}s)`}
+                    {t("chat.skip")} {autoSkipCountdown && `(${autoSkipCountdown}s)`}
                   </button>
                   {autoSkipCountdown && (
                     <span className="text-xs text-slate-400 ml-1">
-                      Auto-skip in {autoSkipCountdown}s
+                      {t("chat.autoSkipIn", { seconds: autoSkipCountdown })}
                     </span>
                   )}
                 </div>
@@ -840,9 +841,9 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
             {/* Header - Draft indicator */}
             <div className="flex items-center gap-2 text-orange-700 px-3 py-2 bg-orange-100/50 border-b border-orange-200">
               <AlertTriangle className="w-4 h-4" />
-              <span className="font-semibold text-sm">Draft Observation</span>
+              <span className="font-semibold text-sm">{t("chat.draftObservation")}</span>
               <span className="ml-auto text-xs bg-orange-200 text-orange-800 px-2 py-0.5 rounded-full font-medium">
-                Pending
+                {t("chat.pending")}
               </span>
             </div>
             
@@ -873,10 +874,10 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                     {/* Title/Failure Mode */}
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <h4 className="font-semibold text-slate-900 text-sm leading-tight">
-                        {failureMode || "New Observation"}
+                        {failureMode || t("chat.newObservation")}
                       </h4>
                       <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
-                        Draft
+                        {t("chat.draftObservation")}
                       </span>
                     </div>
                     
@@ -885,20 +886,20 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                       {equipment && (
                         <div className="flex items-center gap-1.5">
                           <Wrench className="w-3.5 h-3.5 text-orange-400" />
-                          <span><strong>Equipment:</strong> {equipment}</span>
+                          <span><strong>{t("chat.equipmentLabel")}</strong> {equipment}</span>
                         </div>
                       )}
                       {failureMode && (
                         <div className="flex items-center gap-1.5">
                           <AlertTriangle className="w-3.5 h-3.5 text-orange-400" />
-                          <span><strong>Failure Mode:</strong> {failureMode}</span>
+                          <span><strong>{t("chat.failureModeLabel")}</strong> {failureMode}</span>
                         </div>
                       )}
                       {whatsHappening && (
                         <div className="flex items-start gap-1.5 mt-2">
                           <MessageSquare className="w-3.5 h-3.5 text-orange-400 mt-0.5" />
                           <div>
-                            <strong>What's happening:</strong>
+                            <strong>{t("chat.whatsHappening")}</strong>
                             <p className="text-slate-700 mt-0.5">{whatsHappening}</p>
                           </div>
                         </div>
@@ -916,19 +917,19 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                           data-testid="issue-confirm-accept-btn"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                          Accept
+                          {t("chat.accept")}
                         </button>
                         <button
                           type="button"
                           onClick={() => {
                             textareaRef.current?.focus();
-                            setMessage("Change: ");
+                            setMessage(t("chat.changePrefix"));
                           }}
                           disabled={isSending}
                           className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-white border border-orange-300 text-orange-700 text-xs font-medium hover:bg-orange-50 disabled:opacity-50 transition-colors"
                           data-testid="issue-confirm-revise-btn"
                         >
-                          Revise
+                          {t("chat.revise")}
                         </button>
                         <button
                           type="button"
@@ -939,7 +940,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                               queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
                               queryClient.invalidateQueries({ queryKey: ["threats"] });
                             } catch (e) {
-                              toast.error("Cancel failed");
+                              toast.error(t("chat.cancelFailed"));
                             } finally {
                               setIsSending(false);
                             }
@@ -948,7 +949,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                           className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-white border border-red-300 text-red-600 text-xs font-medium hover:bg-red-50 disabled:opacity-50 transition-colors"
                           data-testid="issue-confirm-cancel-btn"
                         >
-                          Cancel
+                          {t("chat.cancel")}
                         </button>
                       </div>
                     )}
@@ -967,7 +968,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
         {!msg.threat_id && isInteractive && (msg.chat_state === "awaiting_context" || msg.awaiting_context_for_threat) && (
           <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
             <p className="text-xs text-slate-500 mb-2">
-              Closing and reopening the chat does not reset the auto-continue timer.
+              {t("chat.contextTimerHint")}
             </p>
             <div className="flex flex-wrap gap-2 items-center">
               <button
@@ -977,7 +978,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 data-testid="add-more-photo-btn"
               >
                 <ImageIcon className="w-3.5 h-3.5" />
-                Add Photo
+                {t("chat.addPhoto")}
               </button>
               <button
                 onClick={() => {
@@ -992,11 +993,11 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-500 rounded-lg hover:bg-slate-100 transition-colors text-xs font-medium disabled:opacity-50"
                 data-testid="skip-more-context-btn"
               >
-                Done {autoSkipCountdown && `(${autoSkipCountdown}s)`}
+                {t("chat.done")} {autoSkipCountdown && `(${autoSkipCountdown}s)`}
               </button>
               {autoSkipCountdown && (
                 <span className="text-xs text-slate-400 ml-1">
-                  Auto-continue in {autoSkipCountdown}s
+                  {t("chat.autoContinueIn", { seconds: autoSkipCountdown })}
                 </span>
               )}
             </div>
@@ -1028,7 +1029,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                     {/* Show parent subunit for maintainable items */}
                     {eq.parent_name && (
                       <div className="text-xs text-slate-500 mt-0.5 truncate">
-                        <span className="text-slate-400">in</span> {eq.parent_name}
+                        {t("chat.equipmentInParent", { parent: eq.parent_name })}
                       </div>
                     )}
                   </div>
@@ -1055,7 +1056,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <HelpCircle className="w-4 h-4 text-slate-500" />
-                  <span className="font-medium text-slate-700 text-sm">I don&apos;t know</span>
+                  <span className="font-medium text-slate-700 text-sm">{t("chat.dontKnow")}</span>
                 </div>
                 {isSending ? (
                   <Loader2 className="w-4 h-4 text-slate-400 animate-spin flex-shrink-0" />
@@ -1063,7 +1064,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                   <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors flex-shrink-0" />
                 )}
               </div>
-              <span className="text-xs text-slate-500 ml-6">Continue without selecting equipment</span>
+              <span className="text-xs text-slate-500 ml-6">{t("chat.continueWithoutEquipment")}</span>
             </button>
             
             {/* Cancel option */}
@@ -1075,7 +1076,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm"
             >
               <X className="w-3.5 h-3.5 inline mr-1" />
-              None of these / Cancel
+              {t("chat.noneOfTheseCancel")}
             </button>
           </div>
         )}
@@ -1129,7 +1130,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <HelpCircle className="w-4 h-4 text-slate-500" />
-                  <span className="font-medium text-slate-700 text-sm">I don&apos;t know</span>
+                  <span className="font-medium text-slate-700 text-sm">{t("chat.dontKnow")}</span>
                 </div>
                 {isSending ? (
                   <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
@@ -1137,7 +1138,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                   <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
                 )}
               </div>
-              <span className="text-xs text-slate-500 ml-6">Record without a specific failure mode</span>
+              <span className="text-xs text-slate-500 ml-6">{t("chat.recordWithoutFailureMode")}</span>
             </button>
             
             {/* New Failure Mode option */}
@@ -1156,11 +1157,11 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Plus className="w-4 h-4 text-green-600" />
-                  <span className="font-medium text-green-900 text-sm">New Failure Mode</span>
+                  <span className="font-medium text-green-900 text-sm">{t("chat.newFailureMode")}</span>
                 </div>
                 <ArrowRight className="w-4 h-4 text-green-400 group-hover:text-green-600 transition-colors" />
               </div>
-              <span className="text-xs text-green-600 ml-6">Specify a custom failure mode</span>
+              <span className="text-xs text-green-600 ml-6">{t("chat.specifyCustomFailureMode")}</span>
             </button>
             
             {/* Cancel option for failure modes */}
@@ -1174,7 +1175,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm"
             >
               <X className="w-3.5 h-3.5 inline mr-1" />
-              None of these / Describe differently
+              {t("chat.noneOfTheseDescribeDifferently")}
             </button>
           </div>
         )}
@@ -1184,7 +1185,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
           <div className="mt-3 space-y-2">
             <div className="p-3 bg-green-50 rounded-lg border border-green-200">
               <label className="block text-sm font-medium text-green-800 mb-2">
-                Enter failure mode name:
+                {t("chat.specifyFailureMode")}
               </label>
               <div className="flex gap-2">
                 <input
@@ -1192,7 +1193,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                   type="text"
                   value={newFailureModeName}
                   onChange={(e) => setNewFailureModeName(e.target.value)}
-                  placeholder="e.g., Bearing wear, Seal leak..."
+                  placeholder={t("chat.failureModePlaceholder")}
                   className="flex-1 px-3 py-2 text-sm border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && newFailureModeName.trim().length >= 3) {
@@ -1211,7 +1212,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                       setShowNewFailureModeInput(false);
                       setNewFailureModeName("");
                     } else {
-                      toast.error("Failure mode name must be at least 3 characters");
+                      toast.error(t("chat.failureModeMinCharsError"));
                     }
                   }}
                   disabled={isSending || newFailureModeName.trim().length < 3}
@@ -1221,7 +1222,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                   {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </button>
               </div>
-              <p className="text-xs text-green-600 mt-1">Min. 3 characters required</p>
+              <p className="text-xs text-green-600 mt-1">{t("chat.minCharsRequired")}</p>
             </div>
             <button
               onClick={() => {
@@ -1231,7 +1232,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm"
             >
               <X className="w-3.5 h-3.5 inline mr-1" />
-              Cancel
+              {t("chat.cancel")}
             </button>
           </div>
         )}
@@ -1240,7 +1241,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
         {/* New failure mode option - only on latest message */}
         {isInteractive && msg.failure_mode_suggestions && msg.failure_mode_suggestions.length === 0 && !showNewFailureModeInput && (
           <div className="mt-3 space-y-2">
-            <p className="text-sm text-amber-700">No matching failure modes found in the library.</p>
+            <p className="text-sm text-amber-700">{t("chat.noMatchingFailureModesLibrary")}</p>
             <button
               onClick={() => {
                 setShowNewFailureModeInput(true);
@@ -1256,11 +1257,11 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Plus className="w-4 h-4 text-green-600" />
-                  <span className="font-medium text-green-900 text-sm">New Failure Mode</span>
+                  <span className="font-medium text-green-900 text-sm">{t("chat.newFailureMode")}</span>
                 </div>
                 <ArrowRight className="w-4 h-4 text-green-400 group-hover:text-green-600 transition-colors" />
               </div>
-              <span className="text-xs text-green-600 ml-6">Specify the failure mode name</span>
+              <span className="text-xs text-green-600 ml-6">{t("chat.specifyFailureMode")}</span>
             </button>
           </div>
         )}
@@ -1269,7 +1270,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
         {isInteractive && isFollowUp && !msg.threat_id && !msg.equipment_suggestions && !msg.failure_mode_suggestions && !showNewFailureModeInput && (
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-1 text-blue-600 text-xs">
             <HelpCircle className="w-3 h-3" />
-            <span>Please provide more details</span>
+            <span>{t("chat.provideMoreDetails")}</span>
           </div>
         )}
       </div>
@@ -1300,8 +1301,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
             </div>
             <div className="min-w-0">
-              <h2 className="font-semibold text-slate-900 text-sm sm:text-base truncate">Report a Problem</h2>
-              <p className="text-[10px] sm:text-xs text-slate-500">What did you notice?</p>
+              <h2 className="font-semibold text-slate-900 text-sm sm:text-base truncate">{t("chat.title")}</h2>
+              <p className="text-[10px] sm:text-xs text-slate-500">{t("chat.headerSubtitle")}</p>
             </div>
           </div>
           <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
@@ -1312,7 +1313,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 onClick={() => clearChatMutation.mutate()}
                 disabled={clearChatMutation.isPending}
                 className="w-8 h-8 sm:w-9 sm:h-9 text-slate-400 hover:text-red-500 hover:bg-red-50"
-                title="Clear chat history"
+                title={t("chat.clearChatHistory")}
                 data-testid="clear-chat-btn"
               >
                 <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -1346,16 +1347,16 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 <AlertTriangle className="w-8 h-8 text-blue-600" />
               </div>
               <h3 className="text-lg font-semibold text-slate-800 mb-2">
-                Report a Problem
+                {t("chat.title")}
               </h3>
               <p className="text-slate-500 text-sm mb-4">
-                Tell us what you noticed with the equipment
+                {t("chat.emptyStateDesc")}
               </p>
               <div className="text-left bg-white rounded-xl p-3 text-xs text-slate-600 border border-slate-200 w-full">
-                <p className="font-medium text-slate-700 mb-2">Examples:</p>
-                <p className="mb-1">• Pump P-104 is leaking</p>
-                <p className="mb-1">• Loud noise from compressor</p>
-                <p>• Motor running hot</p>
+                <p className="font-medium text-slate-700 mb-2">{t("chat.examples")}</p>
+                <p className="mb-1">• {t("chat.example1")}</p>
+                <p className="mb-1">• {t("chat.example2")}</p>
+                <p>• {t("chat.example3")}</p>
               </div>
             </div>
           ) : (
@@ -1390,9 +1391,9 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                       </div>
                       <div>
                         <p className="text-sm font-medium text-blue-800">
-                          {isTranscribing ? "Transcribing & translating..." : "AI is processing..."}
+                          {isTranscribing ? t("chat.transcribingTranslating") : t("chat.aiProcessing")}
                         </p>
-                        <p className="text-xs text-blue-500">This may take a few seconds</p>
+                        <p className="text-xs text-blue-500">{t("chat.mayTakeSeconds")}</p>
                       </div>
                     </div>
                   </div>
@@ -1454,7 +1455,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               <button
                 onClick={cancelRecording}
                 className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:text-red-500 hover:bg-red-50 transition-colors"
-                title="Cancel recording"
+                title={t("chat.cancelRecordingTitle")}
               >
                 <Trash2 className="w-5 h-5" />
               </button>
@@ -1491,7 +1492,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 <button
                   onClick={pauseRecording}
                   className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-white hover:bg-slate-700 transition-colors"
-                  title={isPaused ? "Resume" : "Pause"}
+                  title={isPaused ? t("chat.resumeRecordingTitle") : t("chat.pauseRecordingTitle")}
                 >
                   {isPaused ? (
                     <Play className="w-4 h-4" />
@@ -1510,7 +1511,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                     ? 'bg-blue-400' 
                     : 'bg-blue-600 hover:bg-blue-700'
                 }`}
-                title={isTranscribing ? "Processing voice..." : "Send voice message"}
+                title={isTranscribing ? t("chat.processingVoiceTitle") : t("chat.sendVoiceTitle")}
               >
                 {isTranscribing || isSending ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -1528,14 +1529,14 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                   <button
                     className="inline-flex items-center gap-1 sm:gap-1.5 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-[10px] sm:text-xs font-medium text-slate-600 transition-colors"
                     data-testid="chat-language-selector"
-                    title="Language for typing & voice dictation"
+                    title={t("chat.languageDictationTitle")}
                   >
                     <Globe className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                     {(() => {
                       const active = manualLanguage || detectedLanguage || appLanguage || "en";
                       return LANGUAGE_OPTIONS.find(l => l.code === active)?.flag || active.toUpperCase();
                     })()}
-                    {!manualLanguage && detectedLanguage && <span className="text-slate-400 hidden sm:inline">detected</span>}
+                    {!manualLanguage && detectedLanguage && <span className="text-slate-400 hidden sm:inline">{t("chat.detected")}</span>}
                     <ChevronDown className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-400" />
                   </button>
                 </PopoverTrigger>
@@ -1551,7 +1552,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                         onClick={() => {
                           setManualLanguage(lang.code);
                           setShowLangPicker(false);
-                          if (lang.code === "en" || lang.code === "nl") {
+                          if (lang.code === "en" || lang.code === "nl" || lang.code === "de") {
                             setAppLanguage(lang.code);
                           }
                         }}
@@ -1572,7 +1573,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                           setShowLangPicker(false);
                         }}
                       >
-                        Auto-detect
+                        {t("chat.autoDetect")}
                       </button>
                     </>
                   )}
@@ -1584,12 +1585,12 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
             {isRecording && (
               <div className="mb-1.5 sm:mb-2 p-1.5 sm:p-2 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 sm:gap-3">
                 <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-500 rounded-full animate-pulse flex-shrink-0" />
-                <span className="text-xs sm:text-sm text-red-700 font-medium flex-1 min-w-0 truncate">Recording... {formatTime(recordingTime)}</span>
+                <span className="text-xs sm:text-sm text-red-700 font-medium flex-1 min-w-0 truncate">{t("chat.recording")} {formatTime(recordingTime)}</span>
                 <button
                   onClick={cancelRecording}
                   className="ml-auto px-2 py-0.5 sm:px-3 sm:py-1 bg-red-600 text-white text-[10px] sm:text-xs font-medium rounded-lg hover:bg-red-700 transition-colors flex-shrink-0"
                 >
-                  Stop
+                  {t("chat.stop")}
                 </button>
               </div>
             )}
@@ -1598,7 +1599,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
             {isTranscribing && (
               <div className="mb-1.5 sm:mb-2 p-1.5 sm:p-2 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2 sm:gap-3">
                 <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 animate-spin flex-shrink-0" />
-                <span className="text-xs sm:text-sm text-blue-700">Transcribing voice…</span>
+                <span className="text-xs sm:text-sm text-blue-700">{t("chat.transcribing")}</span>
               </div>
             )}
             
@@ -1608,7 +1609,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 <button
                   onClick={() => setShowAttachMenu(!showAttachMenu)}
                   className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-200 transition-colors"
-                  title="Attach file"
+                  title={t("chat.attachFileTitle")}
                 >
                   <Paperclip className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
@@ -1629,7 +1630,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                         className="w-full flex items-center gap-2.5 sm:gap-3 px-2.5 sm:px-3 py-2 sm:py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
                       >
                         <Camera className="w-4 h-4 text-blue-600" />
-                        <span>Take Photo</span>
+                        <span>{t("chat.takePhoto")}</span>
                       </button>
                       <button
                         onClick={() => {
@@ -1639,7 +1640,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                         className="w-full flex items-center gap-2.5 sm:gap-3 px-2.5 sm:px-3 py-2 sm:py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
                       >
                         <ImagePlus className="w-4 h-4 text-green-600" />
-                        <span>From Library</span>
+                        <span>{t("chat.fromLibrary")}</span>
                       </button>
                       <button
                         onClick={() => {
@@ -1649,7 +1650,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                         className="w-full flex items-center gap-2.5 sm:gap-3 px-2.5 sm:px-3 py-2 sm:py-2.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
                       >
                         <FileUp className="w-4 h-4 text-purple-600" />
-                        <span>Add File</span>
+                        <span>{t("chat.addFile")}</span>
                       </button>
                     </div>
                   </>
@@ -1681,7 +1682,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                     e.target.style.height = newHeight + 'px';
                   }}
                   onKeyDown={handleKeyPress}
-                  placeholder={isListening ? "Recording…" : (isTranscribing ? "Transcribing…" : "What's the problem?")}
+                  placeholder={isListening ? t("chat.recording") : (isTranscribing ? t("chat.transcribing") : t("chat.inputPlaceholder"))}
                   disabled={isTranscribing}
                   className="flex-1 min-w-0 px-3 sm:px-4 py-2.5 sm:py-3 text-sm bg-transparent border-none outline-none resize-none placeholder:text-slate-400 leading-5 scrollbar-thin focus:ring-0 focus:outline-none disabled:opacity-60"
                   rows={1}
@@ -1696,13 +1697,13 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 {isListening && (
                   <div className="absolute -top-6 sm:-top-7 left-2 sm:left-3 flex items-center gap-1 sm:gap-1.5 bg-red-500 text-white text-[10px] sm:text-[11px] font-medium px-1.5 sm:px-2 py-0.5 rounded-full shadow-sm whitespace-nowrap">
                     <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                    Recording…
+                    {t("chat.recording")}
                   </div>
                 )}
                 {!isListening && isTranscribing && (
                   <div className="absolute -top-6 sm:-top-7 left-2 sm:left-3 flex items-center gap-1 sm:gap-1.5 bg-blue-600 text-white text-[10px] sm:text-[11px] font-medium px-1.5 sm:px-2 py-0.5 rounded-full shadow-sm">
                     <Loader2 className="w-2.5 h-2.5 sm:w-3 sm:h-3 animate-spin" />
-                    Transcribing…
+                    {t("chat.transcribing")}
                   </div>
                 )}
                 {/* Mic button inside input - records audio, sent to backend Whisper on stop */}
@@ -1716,7 +1717,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                         ? 'bg-blue-100 text-blue-600'
                         : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'
                   }`}
-                  title={isListening ? "Stop & transcribe" : (isTranscribing ? "Transcribing…" : "Tap to record")}
+                  title={isListening ? t("chat.stopTranscribeTitle") : (isTranscribing ? t("chat.transcribing") : t("chat.tapToRecordTitle"))}
                   data-testid="sidebar-voice-record-button"
                 >
                   {isListening ? (
@@ -1739,7 +1740,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                     : 'bg-blue-600 hover:bg-blue-700'
                 }`}
                 data-testid="sidebar-send-message-button"
-                title="Send message"
+                title={t("chat.sendMessageTitle")}
               >
                 {isSending ? (
                   <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />

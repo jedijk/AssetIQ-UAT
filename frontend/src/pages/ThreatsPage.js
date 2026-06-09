@@ -68,6 +68,17 @@ import { VirtualList } from "../components/ui/VirtualList";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useCapabilities } from "../core/performance";
 import { formatDateCompact } from "../lib/dateUtils";
+import { translateEnum } from "../lib/translateEnum";
+
+const STATUS_LABEL_KEYS = {
+  Observation: "observations.statusObservation",
+  Assessment: "observations.statusAssessment",
+  Planning: "observations.statusPlanning",
+  Investigation: "observations.statusInvestigation",
+  Action: "observations.statusAction",
+  Mitigated: "observations.statusMitigated",
+  Learning: "observations.statusLearning",
+};
 
 const formatSubmissionDate = (createdAt) => {
   if (!createdAt) return "—";
@@ -95,13 +106,13 @@ const ThreatListSubmissionDate = ({ createdAt, t, variant = "mobile" }) => {
 // Status options aligned with the Observation Workspace process-journey model.
 // Stages: Observation → Assessment → Planning → Investigation → Action → Mitigated → Learning
 const STATUS_OPTIONS = [
-  { value: "Observation",   label: "Observation",   color: "bg-blue-500",    textColor: "text-blue-700",    bgColor: "bg-blue-100" },
-  { value: "Assessment",    label: "Assessment",    color: "bg-cyan-500",    textColor: "text-cyan-700",    bgColor: "bg-cyan-100" },
-  { value: "Planning",      label: "Planning",      color: "bg-purple-500",  textColor: "text-purple-700",  bgColor: "bg-purple-100" },
-  { value: "Investigation", label: "Investigation", color: "bg-indigo-500",  textColor: "text-indigo-700",  bgColor: "bg-indigo-100" },
-  { value: "Action",        label: "Action",        color: "bg-amber-500",   textColor: "text-amber-700",   bgColor: "bg-amber-100" },
-  { value: "Mitigated",     label: "Mitigated",     color: "bg-green-500",   textColor: "text-green-700",   bgColor: "bg-green-100" },
-  { value: "Learning",      label: "Learning",      color: "bg-slate-400",   textColor: "text-slate-600",   bgColor: "bg-slate-100" },
+  { value: "Observation",   color: "bg-blue-500",    textColor: "text-blue-700",    bgColor: "bg-blue-100" },
+  { value: "Assessment",    color: "bg-cyan-500",    textColor: "text-cyan-700",    bgColor: "bg-cyan-100" },
+  { value: "Planning",      color: "bg-purple-500",  textColor: "text-purple-700",  bgColor: "bg-purple-100" },
+  { value: "Investigation", color: "bg-indigo-500",  textColor: "text-indigo-700",  bgColor: "bg-indigo-100" },
+  { value: "Action",        color: "bg-amber-500",   textColor: "text-amber-700",   bgColor: "bg-amber-100" },
+  { value: "Mitigated",     color: "bg-green-500",   textColor: "text-green-700",   bgColor: "bg-green-100" },
+  { value: "Learning",      color: "bg-slate-400",   textColor: "text-slate-600",   bgColor: "bg-slate-100" },
 ];
 
 // Format registration date for display
@@ -173,6 +184,12 @@ const ThreatsPage = () => {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { t } = useLanguage();
+  const getStatusLabel = (status) => {
+    if (!status) return status;
+    const key = STATUS_LABEL_KEYS[status];
+    if (key) return t(key);
+    return translateEnum(t, status);
+  };
   const { hasPermission } = usePermissions();
   const { user } = useAuth();
   const isMobile = useIsMobile();
@@ -222,9 +239,9 @@ const ThreatsPage = () => {
 
   // Get status display text
   const getStatusDisplayText = () => {
-    if (statusFilter.length === 0) return "All Status";
-    if (statusFilter.length === 1) return statusFilter[0];
-    return `${statusFilter.length} selected`;
+    if (statusFilter.length === 0) return t("observations.allStatus");
+    if (statusFilter.length === 1) return getStatusLabel(statusFilter[0]);
+    return t("observations.selectedCount", { count: statusFilter.length });
   };
 
   // Initialize filters from URL params
@@ -339,13 +356,13 @@ const ThreatsPage = () => {
       console.error("Failed to fetch observations:", threatsError);
       // Check if it's an auth error
       if (threatsError.response?.status === 401) {
-        toast.error("Session expired. Please log in again.");
+        toast.error(t("observations.sessionExpired"));
         // Redirect to login
         window.location.href = "/login";
       } else if (threatsError.response?.status === 503) {
-        toast.error("Server temporarily unavailable. Retrying...");
+        toast.error(t("observations.serverUnavailableRetry"));
       } else {
-        toast.error("Failed to load observations. Please refresh the page.");
+        toast.error(t("observations.loadFailedRefresh"));
       }
       setErrorShown(true);
     }
@@ -367,12 +384,12 @@ const ThreatsPage = () => {
       queryClient.invalidateQueries({ queryKey: ["equipmentHistory"] });
       const actionsDeleted = result?.deleted_actions || 0;
       const investigationsDeleted = result?.deleted_investigations || 0;
-      let msg = "Observation deleted successfully";
+      let msg = t("observations.deletedSuccess");
       if (actionsDeleted > 0 || investigationsDeleted > 0) {
         const parts = [];
         if (investigationsDeleted > 0) parts.push(`${investigationsDeleted} investigation(s)`);
         if (actionsDeleted > 0) parts.push(`${actionsDeleted} action(s)`);
-        msg += ` (${parts.join(', ')} also removed)`;
+        msg = t("observations.deletedWithRelated", { details: parts.join(", ") });
       }
       toast.success(msg);
       setDeleteDialogOpen(false);
@@ -380,7 +397,7 @@ const ThreatsPage = () => {
       setDeleteOptions({ deleteActions: false, deleteInvestigations: false });
     },
     onError: () => {
-      toast.error("Failed to delete observation");
+      toast.error(t("observations.deleteFailed"));
     },
   });
 
@@ -522,7 +539,7 @@ const ThreatsPage = () => {
               {threatsTruncated ? "+" : ""}
             </span>
             {(stats?.critical_count || 0) > 0 && (
-              <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">{stats?.critical_count} critical</span>
+              <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">{t("observations.criticalCount", { count: stats?.critical_count })}</span>
             )}
           </div>
         </div>
@@ -549,7 +566,7 @@ const ThreatsPage = () => {
           <div className="flex items-center gap-2 mb-3 sm:mb-4 px-2 sm:px-4 py-1.5 sm:py-2 bg-blue-50 border border-blue-200 rounded-lg">
             <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 flex-shrink-0" />
             <span className="text-xs sm:text-sm text-blue-700 truncate">
-              <strong className="hidden sm:inline">Showing threats for: </strong>
+              <strong className="hidden sm:inline">{t("observations.showingFor")} </strong>
               <strong>{assetFilter}</strong>
               {assetsToFilter.length > 1 && (
                 <span className="ml-1 text-blue-500">
@@ -561,7 +578,7 @@ const ThreatsPage = () => {
               onClick={clearAssetFilter}
               className="ml-auto text-xs text-blue-600 hover:text-blue-800 font-medium flex-shrink-0"
             >
-              Clear
+              {t("common.clear")}
             </button>
           </div>
         )}
@@ -598,7 +615,7 @@ const ThreatsPage = () => {
             <div className="flex items-center gap-1.5">
               <Filter className="w-3.5 h-3.5 text-slate-400" />
               <span className={`truncate ${statusFilter.length > 0 ? "text-slate-900" : "text-slate-500"}`}>
-                {statusFilter.length === 0 ? "Status" : statusFilter.length === 1 ? statusFilter[0] : `${statusFilter.length} sel`}
+                {statusFilter.length === 0 ? t("observations.status") : statusFilter.length === 1 ? getStatusLabel(statusFilter[0]) : `${statusFilter.length} ${t("observations.selected")}`}
               </span>
             </div>
             <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform flex-shrink-0 ${statusDropdownOpen ? 'rotate-180' : ''}`} />
@@ -626,7 +643,7 @@ const ThreatsPage = () => {
                 >
                   <div className="flex items-center gap-2">
                     <span className={`w-2.5 h-2.5 rounded-full ${status.color}`}></span>
-                    <span className="text-sm text-slate-700">{(t(`observations.status${status.value.replace(/\s+/g,'')}`) !== `observations.status${status.value.replace(/\s+/g,'')}` ? t(`observations.status${status.value.replace(/\s+/g,'')}`) : status.label)}</span>
+                    <span className="text-sm text-slate-700">{getStatusLabel(status.value)}</span>
                   </div>
                   {statusFilter.includes(status.value) && (
                     <Check className="w-4 h-4 text-blue-600" />
@@ -717,9 +734,9 @@ const ThreatsPage = () => {
               role="alert"
               data-testid="threats-load-error"
             >
-              <p className="font-medium">Could not load observations</p>
+              <p className="font-medium">{t("observations.loadErrorTitle")}</p>
               <p className="mt-1 text-amber-800/90">
-                Check your connection and try again. If this device is older, wait a few seconds after opening the app.
+                {t("observations.loadErrorHint")}
               </p>
               <Button
                 type="button"
@@ -731,7 +748,7 @@ const ThreatsPage = () => {
                   refetchThreats();
                 }}
               >
-                Retry
+                {t("observations.retry")}
               </Button>
             </div>
           )}
@@ -767,15 +784,15 @@ const ThreatsPage = () => {
               : t("observations.noObservationsDesc")}
           </p>
           {isFetching && (
-            <p className="text-sm text-blue-500 mt-2">Loading observations...</p>
+            <p className="text-sm text-blue-500 mt-2">{t("observations.loadingObservations")}</p>
           )}
         </div>
       ) : (
         <div className="priority-list" data-testid="threats-list">
           {threatsTruncated && (
             <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              Showing the first {caps.maxListItems} observations after sorting for responsiveness.
-              Use filters or search to narrow results.
+              {t("observations.listTruncated", { count: caps.maxListItems })}
+              {" "}{t("observations.listTruncatedHint")}
             </div>
           )}
           {useVirtualThreatList ? (
@@ -816,7 +833,7 @@ const ThreatsPage = () => {
                             ? "bg-green-100 text-green-700" 
                             : "bg-slate-200 text-slate-600"
                         }`}>
-                          {threat.status === "Mitigated" ? "✓" : "—"} {threat.status}
+                          {threat.status === "Mitigated" ? "✓" : "—"} {getStatusLabel(threat.status)}
                         </span>
                       </div>
                     )}
@@ -924,7 +941,7 @@ const ThreatsPage = () => {
                       ? "bg-green-100 text-green-700" 
                       : "bg-slate-200 text-slate-600"
                   }`}>
-                    {threat.status === "Mitigated" ? "✓" : "—"} {threat.status}
+                    {threat.status === "Mitigated" ? "✓" : "—"} {getStatusLabel(threat.status)}
                   </span>
                 </div>
               )}
@@ -1022,8 +1039,7 @@ const ThreatsPage = () => {
                   {(() => {
                     const statusConfig = STATUS_OPTIONS.find(s => s.value === threat.status) || 
                       { bgColor: "bg-slate-100", textColor: "text-slate-600" };
-                    const sKey = `observations.status${threat.status?.replace(/\s+/g,'') || ''}`;
-                    const statusLabel = t(sKey) !== sKey ? t(sKey) : threat.status;
+                    const statusLabel = getStatusLabel(threat.status);
                     return (
                       <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig.bgColor} ${statusConfig.textColor}`}>
                         {statusLabel}

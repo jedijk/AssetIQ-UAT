@@ -3,8 +3,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { chatAPI, voiceAPI } from "../lib/api";
 import { X, Send, Mic, MicOff, Loader2, Trash2, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
+import { useLanguage } from "../contexts/LanguageContext";
+import { translateEnum } from "../lib/translateEnum";
 
 const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
+  const { t } = useLanguage();
   const [message, setMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
@@ -31,7 +34,7 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
       setMessage("");
     },
     onError: (error) => {
-      toast.error(error.response?.data?.detail || "Failed to send");
+      toast.error(error.response?.data?.detail || t("chat.sendFailed"));
     },
   });
 
@@ -39,10 +42,10 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
     mutationFn: () => chatAPI.clearHistory(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
-      toast.success("Chat cleared");
+      toast.success(t("chat.chatCleared"));
     },
     onError: () => {
-      toast.error("Failed to clear chat");
+      toast.error(t("chat.clearChatFailed"));
     },
   });
 
@@ -80,9 +83,9 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
           try {
             const result = await voiceAPI.transcribe(base64);
             setMessage((prev) => prev + (prev ? " " : "") + result.text);
-            toast.success("Voice transcribed!");
+            toast.success(t("chat.voiceTranscribed"));
           } catch {
-            toast.error("Failed to transcribe");
+            toast.error(t("chat.voiceTranscribeFailed"));
           }
         };
         reader.readAsDataURL(blob);
@@ -93,7 +96,7 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
       setMediaRecorder(recorder);
       setIsRecording(true);
     } catch {
-      toast.error("Could not access microphone");
+      toast.error(t("chat.micAccessError"));
     }
   };
 
@@ -118,7 +121,6 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
                 const chunks = (msg.content || "").split(/\n\n+/);
                 const intro = chunks[0] || "";
                 const promptText = chunks.slice(1).join("\n\n").trim();
-                const isNl = msg.issue_confirm_language === "nl";
                 return (
                   <>
                     <p className="issue-confirm-intro">{intro}</p>
@@ -133,7 +135,7 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
                           disabled={sendMutation.isPending}
                           data-testid="issue-confirm-yes-btn"
                         >
-                          {isNl ? "Ja" : "Yes"}
+                          {t("chat.accept")}
                         </button>
                         <button
                           type="button"
@@ -142,15 +144,13 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
                           disabled={sendMutation.isPending}
                           data-testid="issue-confirm-revise-btn"
                         >
-                          {isNl ? "Aanpassen" : "Revise"}
+                          {t("chat.revise")}
                         </button>
                       </div>
                     )}
                     {isLastAssistant && (
                       <p className="issue-confirm-hint">
-                        {isNl
-                          ? "Of typ hieronder wat er aangepast moet worden — we werken je beschrijving en samenvatting bij."
-                          : "Or type below what to change — we'll update your description and summary."}
+                        {t("chat.issueConfirmHint")}
                       </p>
                     )}
                   </>
@@ -172,7 +172,7 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
                 >
                   <span>{eq.name}</span>
                   {eq.parent_name && (
-                    <span className="text-xs text-slate-400 block">in {eq.parent_name}</span>
+                    <span className="text-xs text-slate-400 block">{t("chat.equipmentInParent", { parent: eq.parent_name })}</span>
                   )}
                 </button>
               ))}
@@ -184,7 +184,7 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
                 data-testid="equipment-unknown-btn"
               >
                 <HelpCircle className="w-3.5 h-3.5 inline mr-1 opacity-70" />
-                I don&apos;t know
+                {t("chat.dontKnow")}
               </button>
             </div>
           )}
@@ -209,7 +209,7 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
                 data-testid="failure-mode-unknown-btn"
               >
                 <HelpCircle className="w-3.5 h-3.5 inline mr-1 opacity-70" />
-                I don&apos;t know
+                {t("chat.dontKnow")}
               </button>
             </div>
           )}
@@ -219,13 +219,13 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
             <div className="threat-card">
               <div className="threat-header">
                 <span className="threat-icon">✓</span>
-                <span>Observation Recorded</span>
+                <span>{t("chat.observationRecorded")}</span>
               </div>
               <p className="threat-title">{msg.threat_title}</p>
               <div className="threat-meta">
-                <span>Risk: {msg.threat_risk_level}</span>
-                <span>Score: {msg.threat_risk_score}</span>
-                <span>Rank: #{msg.threat_rank}</span>
+                <span>{translateEnum(t, msg.threat_risk_level) || msg.threat_risk_level}</span>
+                <span>{t("chat.riskScoreLabel")} {msg.threat_risk_score}</span>
+                <span>{t("chat.rankLabel")} #{msg.threat_rank}</span>
               </div>
             </div>
           )}
@@ -242,8 +242,8 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
           <X size={24} />
         </button>
         <div className="header-text">
-          <h1>Report Observation</h1>
-          <p>Describe the issue you observed</p>
+          <h1>{t("chat.title")}</h1>
+          <p>{t("chat.subtitle")}</p>
         </div>
         {messages.length > 0 ? (
           <button 
@@ -264,8 +264,8 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
         {messages.length === 0 ? (
           <div className="chat-empty">
             <div className="empty-icon">💬</div>
-            <p>Start a conversation</p>
-            <p className="hint">e.g., "pump is leaking" or "motor overheating"</p>
+            <p>{t("chat.startConversation")}</p>
+            <p className="hint">{t("chat.example1")} · {t("chat.example3")}</p>
           </div>
         ) : (
           messages.map((msg, idx) => {
@@ -286,7 +286,7 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyPress={(e) => e.key === "Enter" && handleSend()}
-            placeholder="Describe the failure..."
+            placeholder={t("chat.inputPlaceholder")}
             data-testid="chat-input"
           />
           

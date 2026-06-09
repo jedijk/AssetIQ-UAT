@@ -103,6 +103,7 @@ function getCookie(name) {
 
 // Authenticated Lightbox component for viewing images with proper mobile auth
 const AuthenticatedLightbox = ({ url, name, onClose }) => {
+  const { t } = useLanguage();
   const [blobUrl, setBlobUrl] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -206,7 +207,7 @@ const AuthenticatedLightbox = ({ url, name, onClose }) => {
         disabled={!blobUrl}
       >
         <Download className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
-        <span className="hidden sm:inline">Download</span>
+        <span className="hidden sm:inline">{t("reports.lightboxDownload")}</span>
       </Button>
       
       <div className="relative max-w-full max-h-full flex items-center justify-center">
@@ -218,8 +219,8 @@ const AuthenticatedLightbox = ({ url, name, onClose }) => {
         
         {error && (
           <div className="text-white/70 text-center">
-            <p className="text-lg mb-2">Failed to load image</p>
-            <p className="text-sm">Click anywhere to close</p>
+            <p className="text-lg mb-2">{t("reports.lightboxLoadFailed")}</p>
+            <p className="text-sm">{t("reports.lightboxTapToClose")}</p>
           </div>
         )}
         
@@ -1595,6 +1596,7 @@ export default function FormSubmissionsPage() {
 // Inline lightbox rendered inside a portal. Uses authenticated blob URL so that
 // images served from /api/storage/... (which require Bearer auth) load correctly.
 const LightboxPortal = ({ viewingImage, onClose }) => {
+  const { t } = useLanguage();
   const isDataOrBlob = typeof viewingImage.url === "string" &&
     (viewingImage.url.startsWith("data:") || viewingImage.url.startsWith("blob:") || viewingImage.url.startsWith("http"));
 
@@ -1637,7 +1639,7 @@ const LightboxPortal = ({ viewingImage, onClose }) => {
         disabled={!displayUrl}
       >
         <Download className="w-5 h-5 sm:w-4 sm:h-4 sm:mr-2" />
-        <span className="hidden sm:inline">Download</span>
+        <span className="hidden sm:inline">{t("reports.lightboxDownload")}</span>
       </Button>
 
       <div className="relative max-w-full max-h-full flex items-center justify-center">
@@ -1648,8 +1650,8 @@ const LightboxPortal = ({ viewingImage, onClose }) => {
         )}
         {failed && (
           <div className="text-white/70 text-center">
-            <p className="text-lg mb-2">Failed to load image</p>
-            <p className="text-sm">Click anywhere to close</p>
+            <p className="text-lg mb-2">{t("reports.lightboxLoadFailed")}</p>
+            <p className="text-sm">{t("reports.lightboxTapToClose")}</p>
           </div>
         )}
         {displayUrl && !loading && !failed && (

@@ -44,11 +44,12 @@ import {
 } from "../ui/select";
 import { Checkbox } from "../ui/checkbox";
 import { QR_PRINT_TEMPLATES } from "../../lib/qrTemplates";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 // Action type configurations
 const ACTION_TYPES = [
   { id: "view_asset", label: "View Asset Dashboard", icon: Eye, description: "Opens the equipment detail page" },
-  { id: "report_observation", label: "Report Observation", icon: MessageSquare, description: "Opens chat to report an issue" },
+  { id: "report_observation", labelKey: "observations.reportThreat", descriptionKey: "chat.qrReportDescription", icon: MessageSquare },
 ];
 
 // Size options
@@ -58,7 +59,13 @@ const SIZE_OPTIONS = [
   { id: "large", label: "Large (12cm)", pixels: 360 },
 ];
 
+const actionTypeLabel = (actionType, t) =>
+  actionType.labelKey ? t(actionType.labelKey) : actionType.label;
+const actionTypeDescription = (actionType, t) =>
+  actionType.descriptionKey ? t(actionType.descriptionKey) : actionType.description;
+
 export function QRCodeDialog({ open, onOpenChange, equipment, existingQR = null }) {
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [qrData, setQrData] = useState(existingQR);
   const [label, setLabel] = useState(existingQR?.label || equipment?.tag || equipment?.name || "");
@@ -272,9 +279,9 @@ export function QRCodeDialog({ open, onOpenChange, equipment, existingQR = null 
                         <Icon className={`w-4 h-4 ${action?.enabled ? "text-blue-600" : "text-slate-400"}`} />
                         <div className="flex-1">
                           <p className={`text-sm font-medium ${action?.enabled ? "text-slate-900" : "text-slate-500"}`}>
-                            {actionType.label}
+                            {actionTypeLabel(actionType, t)}
                           </p>
-                          <p className="text-xs text-slate-500">{actionType.description}</p>
+                          <p className="text-xs text-slate-500">{actionTypeDescription(actionType, t)}</p>
                         </div>
                         {action?.enabled && (
                           <input
@@ -474,7 +481,7 @@ export function BulkQRDialog({ open, onOpenChange, selectedItems = [] }) {
                 </SelectTrigger>
                 <SelectContent>
                   {ACTION_TYPES.map(a => (
-                    <SelectItem key={a.id} value={a.id}>{a.label}</SelectItem>
+                    <SelectItem key={a.id} value={a.id}>{actionTypeLabel(a, t)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

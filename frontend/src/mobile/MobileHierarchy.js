@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { equipmentHierarchyAPI } from "../lib/api";
+import { useLanguage } from "../contexts/LanguageContext";
 import { 
   ChevronRight, 
   ChevronDown, 
@@ -19,6 +20,7 @@ import {
 } from "lucide-react";
 
 const MobileHierarchy = () => {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [expandedNodes, setExpandedNodes] = useState(new Set());
   const [selectedNode, setSelectedNode] = useState(null);
@@ -202,12 +204,12 @@ const MobileHierarchy = () => {
       {/* Header */}
       <header className="mobile-header">
         <div className="header-content">
-          <h1>Equipment</h1>
-          <p className="subtitle">Asset Hierarchy</p>
+          <h1>{t("equipment.mobileTitle")}</h1>
+          <p className="subtitle">{t("equipment.mobileSubtitle")}</p>
         </div>
         <div className="header-badge">
           <span className="badge-count">{nodes.length}</span>
-          <span className="badge-label">Assets</span>
+          <span className="badge-label">{t("equipment.assets")}</span>
         </div>
       </header>
 
@@ -217,7 +219,7 @@ const MobileHierarchy = () => {
           <Search size={18} className="search-icon" />
           <input
             type="text"
-            placeholder="Search equipment..."
+            placeholder={t("equipment.searchEquipment")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="search-input"
@@ -233,7 +235,7 @@ const MobileHierarchy = () => {
         {isLoading ? (
           <div className="loading-state">
             <div className="loading-spinner" />
-            <span>Loading hierarchy...</span>
+            <span>{t("equipment.loadingHierarchy")}</span>
           </div>
         ) : searchQuery && flatResults.length > 0 ? (
           <div className="search-results">
@@ -272,8 +274,8 @@ const MobileHierarchy = () => {
         ) : rootNodes.length === 0 ? (
           <div className="empty-state">
             <Building2 size={48} className="empty-icon" />
-            <p>No equipment found</p>
-            <span>Add equipment from the web app</span>
+            <p>{t("equipment.noEquipmentFound")}</p>
+            <span>{t("equipment.addEquipmentFromWeb")}</span>
           </div>
         ) : (
           <div className="hierarchy-tree">

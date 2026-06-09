@@ -205,10 +205,10 @@ const ObservationDetailsSection = ({ threatId }) => {
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline", threatId] });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
-      toast.success("Observation updated");
+      toast.success(t("observations.observationUpdated"));
       setIsEditing(false);
     },
-    onError: () => toast.error("Failed to update observation"),
+    onError: () => toast.error(t("observations.observationUpdateFailed")),
   });
 
   const deleteMutation = useMutation({
@@ -216,10 +216,10 @@ const ObservationDetailsSection = ({ threatId }) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
-      toast.success("Observation deleted");
+      toast.success(t("observations.observationDeleted"));
       navigate("/threats");
     },
-    onError: () => toast.error("Failed to delete observation"),
+    onError: () => toast.error(t("observations.observationDeleteFailed")),
   });
 
   const linkEquipmentMutation = useMutation({
@@ -229,11 +229,15 @@ const ObservationDetailsSection = ({ threatId }) => {
       queryClient.invalidateQueries({ queryKey: ["observation-workspace", threatId] });
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       toast.success(
-        `Linked to ${data.threat.asset}. Score: ${data.score_calculation.final_score} (${data.score_calculation.risk_level})`
+        t("observations.linkedEquipmentToast", {
+          asset: data.threat.asset,
+          score: data.score_calculation.final_score,
+          level: data.score_calculation.risk_level,
+        })
       );
       setShowLinkEquipmentDialog(false);
     },
-    onError: () => toast.error("Failed to link equipment"),
+    onError: () => toast.error(t("observations.linkEquipmentFailed")),
   });
 
   const linkFailureModeMutation = useMutation({
@@ -243,13 +247,17 @@ const ObservationDetailsSection = ({ threatId }) => {
       queryClient.invalidateQueries({ queryKey: ["observation-workspace", threatId] });
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       toast.success(
-        `Linked to ${data.threat.failure_mode}. Score: ${data.score_calculation.final_score} (${data.score_calculation.risk_level})`
+        t("observations.linkedFailureModeToast", {
+          failureMode: data.threat.failure_mode,
+          score: data.score_calculation.final_score,
+          level: data.score_calculation.risk_level,
+        })
       );
       setShowLinkFailureModeDialog(false);
       setSelectedFailureModeId(null);
       setFailureModeSearch("");
     },
-    onError: () => toast.error("Failed to link failure mode"),
+    onError: () => toast.error(t("observations.linkFailureModeFailed")),
   });
 
   // --- Derived data ---------------------------------------------------------
@@ -414,9 +422,9 @@ const ObservationDetailsSection = ({ threatId }) => {
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(shareableLink);
-      toast.success("Link copied to clipboard");
+      toast.success(t("observations.linkCopied"));
     } catch {
-      toast.success("Link ready to copy");
+      toast.success(t("observations.linkReadyToCopy"));
     }
   };
   const shareLink = async () => {
@@ -446,7 +454,7 @@ const ObservationDetailsSection = ({ threatId }) => {
     { label: t("observations.equipmentType"), value: translateEquipmentTypeName(threat.equipment_type), icon: Target, field: "equipment_type", type: "searchable", options: equipmentTypeOptions },
     { label: t("observations.failureMode"), value: translateFailureModeName(threat.failure_mode), icon: AlertTriangle, field: "failure_mode", type: "searchable", options: failureModeOptions },
     { label: t("observations.frequency"), value: translateEnum(threat.frequency), icon: Clock, field: "frequency", type: "select", options: FREQUENCY_OPTIONS },
-    { label: "Discipline", value: disciplineDisplay, icon: Cog, field: "discipline", type: "discipline-select" },
+    { label: t("observations.discipline"), value: disciplineDisplay, icon: Cog, field: "discipline", type: "discipline-select" },
   ];
 
   const attachmentCount = ((isEditing ? editForm.attachments : threat.attachments) || []).length;

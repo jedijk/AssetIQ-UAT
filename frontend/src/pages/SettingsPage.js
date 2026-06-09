@@ -286,13 +286,17 @@ export default function SettingsPage() {
       // On mobile, hide nav when a section is selected
       setShowMobileNav(false);
     } else if (currentPath === "/settings" || currentPath === "/settings/") {
-      // Redirect to first available section
+      // Redirect to first available section; users without settings access land on definitions
       if (visibleSections.length > 0) {
-        navigate(visibleSections[0].path, { replace: true });
+        const preferDefinitions = !permissionsLoading && !hasPermission("settings", "read");
+        const target = preferDefinitions
+          ? (visibleSections.find((s) => s.id === "definitions") || visibleSections[0])
+          : visibleSections[0];
+        navigate(target.path, { replace: true });
       }
       setShowMobileNav(true);
     }
-  }, [location.pathname, navigate, visibleSections]);
+  }, [location.pathname, navigate, visibleSections, hasPermission, permissionsLoading]);
 
   const handleSectionClick = (section) => {
     setActiveSection(section.id);

@@ -32,17 +32,23 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useDisciplines } from "../../hooks/useDisciplines";
 
-const ACTION_TYPES = [
-  { value: "CM", label: "CM - Corrective", color: "bg-amber-500" },
-  { value: "PM", label: "PM - Preventive", color: "bg-blue-500" },
-  { value: "PDM", label: "PDM - Predictive", color: "bg-purple-500" },
+const ACTION_TYPE_KEYS = {
+  CM: "observationWorkspace.actionTypeCM",
+  PM: "observationWorkspace.actionTypePM",
+  PDM: "observationWorkspace.actionTypePDM",
+};
+
+const getActionTypes = (t) => [
+  { value: "CM", label: t(ACTION_TYPE_KEYS.CM), color: "bg-amber-500" },
+  { value: "PM", label: t(ACTION_TYPE_KEYS.PM), color: "bg-blue-500" },
+  { value: "PDM", label: t(ACTION_TYPE_KEYS.PDM), color: "bg-purple-500" },
 ];
 
-const TYPE_STYLES = {
-  CM: { bg: "bg-amber-500", text: "text-white", label: "CM", fullLabel: "Corrective" },
-  PM: { bg: "bg-blue-500", text: "text-white", label: "PM", fullLabel: "Preventive" },
-  PDM: { bg: "bg-purple-500", text: "text-white", label: "PDM", fullLabel: "Predictive" },
-};
+const getTypeStyles = (t) => ({
+  CM: { bg: "bg-amber-500", text: "text-white", label: "CM", fullLabel: t(ACTION_TYPE_KEYS.CM) },
+  PM: { bg: "bg-blue-500", text: "text-white", label: "PM", fullLabel: t(ACTION_TYPE_KEYS.PM) },
+  PDM: { bg: "bg-purple-500", text: "text-white", label: "PDM", fullLabel: t(ACTION_TYPE_KEYS.PDM) },
+});
 
 const ACTION_STATUS_CONFIG = {
   open: { icon: Clock, color: "text-blue-500", bg: "bg-blue-50", label: "Open" },
@@ -58,6 +64,8 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
   const { t } = useLanguage();
   const { user } = useAuth();
   const { selectOptions, getLabel, normalize } = useDisciplines();
+  const actionTypes = getActionTypes(t);
+  const typeStyles = getTypeStyles(t);
   const [showAddRecommendedDialog, setShowAddRecommendedDialog] = useState(false);
   const [showCreateFMDialog, setShowCreateFMDialog] = useState(false);
   const [showValidateDialog, setShowValidateDialog] = useState(false);
@@ -515,7 +523,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
             const actionText = isObj ? action.action || action.description || "" : action;
             const actionType = isObj ? action.action_type : null;
             const discipline = isObj ? action.discipline : null;
-            const typeStyle = actionType ? TYPE_STYLES[actionType] || { bg: "bg-slate-500", text: "text-white", label: actionType } : null;
+            const typeStyle = actionType ? typeStyles[actionType] || { bg: "bg-slate-500", text: "text-white", label: actionType } : null;
 
             // Check if this action has already been acted upon (exists in linked actions)
             const isAlreadyActed = linkedActions.some(linkedAction => {
@@ -670,7 +678,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
             {linkedActions.map((action, index) => {
               const statusCfg = ACTION_STATUS_CONFIG[action.status] || ACTION_STATUS_CONFIG.open;
               const StatusIcon = statusCfg.icon;
-              const typeStyle = action.action_type ? TYPE_STYLES[action.action_type] : null;
+              const typeStyle = action.action_type ? typeStyles[action.action_type] : null;
               const actionNumber = index + 1;
               
               return (
@@ -864,7 +872,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                     <SelectValue placeholder={t("threatDetail.selectType")} />
                   </SelectTrigger>
                   <SelectContent>
-                    {ACTION_TYPES.map((type) => (
+                    {actionTypes.map((type) => (
                       <SelectItem key={type.value} value={type.value}>
                         <div className="flex items-center gap-2">
                           <span className={`w-2 h-2 rounded-full ${type.color}`} />
@@ -981,7 +989,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                     <SelectValue placeholder={t("threatDetail.selectType")} />
                   </SelectTrigger>
                   <SelectContent>
-                    {ACTION_TYPES.map((type) => (
+                    {actionTypes.map((type) => (
                       <SelectItem key={type.value} value={type.value}>
                         <div className="flex items-center gap-2">
                           <span className={`w-2 h-2 rounded-full ${type.color}`} />
@@ -1372,7 +1380,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                     <SelectValue placeholder={t("threatDetail.selectType")} />
                   </SelectTrigger>
                   <SelectContent>
-                    {ACTION_TYPES.map((type) => (
+                    {actionTypes.map((type) => (
                       <SelectItem key={type.value} value={type.value}>
                         <div className="flex items-center gap-2">
                           <span className={`w-2 h-2 rounded-full ${type.color}`} />

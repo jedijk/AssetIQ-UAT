@@ -482,6 +482,15 @@ async def generate_translations(
                     "description": obs.get("description", "") or "",
                 }
             return None
+        elif entity_type == EntityType.ACTION:
+            act = await db.central_actions.find_one({"id": entity_id})
+            if act:
+                return {
+                    "title": act.get("title", ""),
+                    "name": act.get("title", ""),
+                    "description": act.get("description", "") or "",
+                }
+            return None
         elif entity_type == EntityType.INVESTIGATION:
             inv = await db.investigations.find_one({"id": entity_id})
             if inv:
@@ -562,6 +571,10 @@ async def generate_all_translations(
         async for o in db.threats.find({}, {"id": 1, "_id": 0}):
             if o.get("id"):
                 entity_ids.append(o["id"])
+    elif entity_type == EntityType.ACTION:
+        async for a in db.central_actions.find({}, {"id": 1, "_id": 0}):
+            if a.get("id"):
+                entity_ids.append(a["id"])
     elif entity_type == EntityType.INVESTIGATION:
         async for i in db.investigations.find({}, {"id": 1, "_id": 0}):
             if i.get("id"):

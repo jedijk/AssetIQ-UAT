@@ -9,9 +9,11 @@ from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel
 import uuid
 import logging
+import asyncio
 
 from database import db
 from auth import get_current_user
+from utils.auto_translate import translate_action
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/observation-workspace", tags=["Observation Workspace"])
@@ -1186,6 +1188,17 @@ async def add_action_to_plan(
     }
     
     await db.central_actions.insert_one(new_action)
+
+    asyncio.create_task(
+        translate_action(
+            action_id,
+            {
+                "title": new_action.get("title", ""),
+                "description": new_action.get("description", "") or "",
+            },
+            current_user.get("id"),
+        )
+    )
     
     return {
         "success": True,
@@ -1250,6 +1263,17 @@ async def add_recommendation_to_plan(
     }
     
     await db.central_actions.insert_one(new_action)
+
+    asyncio.create_task(
+        translate_action(
+            action_id,
+            {
+                "title": new_action.get("title", ""),
+                "description": new_action.get("description", "") or "",
+            },
+            current_user.get("id"),
+        )
+    )
     
     return {
         "success": True,

@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { threatsAPI } from "../lib/api";
+import { useLanguage } from "../contexts/LanguageContext";
+import { translateEnum } from "../lib/translateEnum";
 import { 
   AlertTriangle, 
   Clock, 
@@ -13,6 +15,7 @@ import {
 } from "lucide-react";
 
 const MobileObservations = () => {
+  const { t } = useLanguage();
   const [filter, setFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -54,9 +57,9 @@ const MobileObservations = () => {
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const days = Math.floor(hours / 24);
     
-    if (hours < 1) return "Just now";
-    if (hours < 24) return `${hours}h ago`;
-    if (days < 7) return `${days}d ago`;
+    if (hours < 1) return t("observations.justNow");
+    if (hours < 24) return t("observations.hoursAgo", { hours });
+    if (days < 7) return t("observations.daysAgo", { days });
     return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
@@ -67,9 +70,9 @@ const MobileObservations = () => {
   };
 
   const filterTabs = [
-    { id: "all", label: "All", count: stats.total },
-    { id: "open", label: "Open", count: stats.open },
-    { id: "high", label: "High Risk", count: stats.critical },
+    { id: "all", label: t("common.all"), count: stats.total },
+    { id: "open", label: t("observations.statusOpen"), count: stats.open },
+    { id: "high", label: t("observations.highRisk"), count: stats.critical },
   ];
 
   return (
@@ -77,12 +80,12 @@ const MobileObservations = () => {
       {/* Header */}
       <header className="mobile-header">
         <div className="header-content">
-          <h1>Observations</h1>
-          <p className="subtitle">Risk monitoring & tracking</p>
+          <h1>{t("observations.title")}</h1>
+          <p className="subtitle">{t("observations.mobileSubtitle")}</p>
         </div>
         <div className="header-badge">
           <span className="badge-count">{stats.open}</span>
-          <span className="badge-label">Open</span>
+          <span className="badge-label">{t("observations.statusOpen")}</span>
         </div>
       </header>
 
@@ -92,7 +95,7 @@ const MobileObservations = () => {
           <Search size={18} className="search-icon" />
           <input
             type="text"
-            placeholder="Search observations..."
+            placeholder={t("observations.searchPlaceholder")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="search-input"
@@ -121,27 +124,27 @@ const MobileObservations = () => {
         {isLoading ? (
           <div className="loading-state">
             <div className="loading-spinner" />
-            <span>Loading observations...</span>
+            <span>{t("observations.loadingObservations")}</span>
           </div>
         ) : isError ? (
           <div className="empty-state">
             <Eye size={48} className="empty-icon" />
-            <p>Could not load observations</p>
-            <span>Check your connection and try again.</span>
+            <p>{t("observations.loadErrorTitle")}</p>
+            <span>{t("observations.loadErrorHint")}</span>
             <button
               type="button"
               className="retry-btn"
               onClick={() => refetch()}
               style={{ marginTop: "12px", padding: "8px 16px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "#fff" }}
             >
-              Retry
+              {t("observations.retry")}
             </button>
           </div>
         ) : filteredObs.length === 0 ? (
           <div className="empty-state">
             <Eye size={48} className="empty-icon" />
-            <p>No observations found</p>
-            <span>Report new observations via the + button</span>
+            <p>{t("observations.noObservations")}</p>
+            <span>{t("observations.reportViaPlus")}</span>
           </div>
         ) : (
           <div className="observations-list">
@@ -168,7 +171,7 @@ const MobileObservations = () => {
                         className="risk-badge"
                         style={{ backgroundColor: riskConfig.bg, color: riskConfig.color }}
                       >
-                        {obs.risk_level}
+                        {translateEnum(t, obs.risk_level)}
                       </span>
                       <span className="obs-rank">#{obs.rank}</span>
                     </div>
@@ -178,7 +181,7 @@ const MobileObservations = () => {
                     <div className="obs-meta">
                       <span className="meta-item">
                         <MapPin size={12} />
-                        {obs.asset || "Unassigned"}
+                        {obs.asset || t("observations.unassignedAsset")}
                       </span>
                       <span className="meta-item">
                         <Clock size={12} />
@@ -191,7 +194,7 @@ const MobileObservations = () => {
                         <AlertTriangle size={12} />
                         {obs.failure_mode}
                         {obs.is_new_failure_mode && (
-                          <span className="new-badge">NEW</span>
+                          <span className="new-badge">{t("observations.newBadge")}</span>
                         )}
                       </div>
                     )}
@@ -200,7 +203,7 @@ const MobileObservations = () => {
                   {/* Status & Arrow */}
                   <div className="obs-right">
                     <span className={`status-badge ${obs.status?.toLowerCase()}`}>
-                      {obs.status}
+                      {translateEnum(t, obs.status)}
                     </span>
                     <ChevronRight size={18} className="chevron" />
                   </div>

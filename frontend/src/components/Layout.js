@@ -707,7 +707,7 @@ const Layout = () => {
         whileTap={{ scale: 0.92 }}
         transition={springPresets.snappy}
         data-testid="fab-report-observation"
-        title="Report Observation"
+        title={t("observations.reportThreat")}
       >
         <Plus className="w-7 h-7" />
       </motion.button>

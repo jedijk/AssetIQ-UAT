@@ -9,6 +9,7 @@ import uuid
 import base64
 import io
 import logging
+import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -32,6 +33,7 @@ from services.threat_score_service import (
     calculate_rank, update_all_ranks, get_risk_settings_for_installation, calculate_risk_score,
 )
 from services.cache_service import cache
+from utils.auto_translate import translate_observation, translate_action
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Chat"])
@@ -215,7 +217,7 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
     equ_id = obs_data.get("equipment_id")
     fm_id = obs_data.get("failure_mode_id")
     is_custom_fm = obs_data.get("is_custom_failure_mode", False)
-    if chat_lang == "nl":
+    if chat_lang in ("nl", "de"):
         if is_custom_fm or not fm_id:
             failure_mode_name = await translate_to_english_for_record(
                 failure_mode_name, "failure mode label"
@@ -295,6 +297,17 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
 
     await db.threats.insert_one(threat_doc)
 
+    asyncio.create_task(
+        translate_observation(
+            threat_id,
+            {
+                "title": threat_doc.get("title") or threat_doc.get("description", "")[:120],
+                "description": threat_doc.get("description", "") or "",
+            },
+            user_id,
+        )
+    )
+
     from services.reliability_graph import _run_graph_sync, sync_threat_edges
 
     await _run_graph_sync(
@@ -330,6 +343,16 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
                 "installation_id": installation_id,
             }
             await db.actions.insert_one(action_doc)
+            asyncio.create_task(
+                translate_action(
+                    aid,
+                    {
+                        "title": action_doc.get("title", ""),
+                        "description": action_doc.get("description", "") or "",
+                    },
+                    user_id,
+                )
+            )
             auto_created.append({"id": aid, "title": desc[:100], "type": ra.get("action_type", "CM")})
 
     if auto_created:
@@ -851,6 +874,16 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                             "created_at": datetime.now(timezone.utc).isoformat(),
                         }
                         await db.actions.insert_one(action_doc)
+                        asyncio.create_task(
+                            translate_action(
+                                aid,
+                                {
+                                    "title": action_doc.get("title", ""),
+                                    "description": action_doc.get("description", "") or "",
+                                },
+                                user_id,
+                            )
+                        )
                         created_action_ids.append(aid)
 
                     if created_action_ids:

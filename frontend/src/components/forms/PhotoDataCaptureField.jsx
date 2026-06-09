@@ -4,6 +4,7 @@ import { isImplausibleFormDate } from "../../lib/datePlausibility";
 import { Button } from "../ui/button";
 import { getApiUrl } from "../../lib/apiConfig";
 import { compressImage } from "../../lib/imageCompression";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 const CONFIDENCE_COLORS = {
   high: "ring-green-400 bg-green-50",
@@ -25,6 +26,7 @@ function getCookie(name) {
 }
 
 export default function PhotoDataCaptureField({ config, formData, onAutoFill, formTemplateId }) {
+  const { t } = useLanguage();
   const [status, setStatus] = useState("idle"); // idle, processing, success, error
   const [preview, setPreview] = useState(null);
   const [results, setResults] = useState([]);
@@ -116,7 +118,7 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
 
       if (!data.success) {
         setStatus("error");
-        setError(data.message || "Extraction failed");
+        setError(data.message || t("forms.execution.extractionFailed"));
         return;
       }
 
@@ -183,8 +185,8 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
           data-testid="photo-capture-btn"
         >
           <Camera className="w-8 h-8" />
-          <span className="text-sm font-medium">{config.label || "Capture Photo"}</span>
-          <span className="text-xs text-slate-400">Tap to open camera</span>
+          <span className="text-sm font-medium">{config.label || t("forms.execution.capturePhoto")}</span>
+          <span className="text-xs text-slate-400">{t("forms.execution.tapToOpenCamera")}</span>
         </button>
       )}
 
@@ -196,7 +198,7 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
           )}
           <div className="flex items-center gap-2 text-blue-600">
             <Loader2 className="w-5 h-5 animate-spin" />
-            <span className="text-sm font-medium">Analyzing image...</span>
+            <span className="text-sm font-medium">{t("forms.execution.analyzingImage")}</span>
           </div>
         </div>
       )}
@@ -213,7 +215,7 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
             </div>
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={handleCapture} data-testid="photo-retake-btn">
-                <RotateCcw className="w-3 h-3" /> Retake
+                <RotateCcw className="w-3 h-3" /> {t("forms.execution.retake")}
               </Button>
               <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setStatus("idle"); setPreview(null); setResults([]); }}>
                 <X className="w-3 h-3" />
@@ -269,7 +271,7 @@ export default function PhotoDataCaptureField({ config, formData, onAutoFill, fo
             <img src={preview} alt="Captured" className="w-24 h-24 object-cover rounded-lg border opacity-60" />
           )}
           <div className="text-center">
-            <p className="text-sm text-red-600 font-medium">{error || "Extraction failed"}</p>
+            <p className="text-sm text-red-600 font-medium">{error || t("forms.execution.extractionFailed")}</p>
             <p className="text-xs text-slate-400 mt-1">You can retry or fill fields manually</p>
           </div>
           <Button variant="outline" size="sm" className="gap-1" onClick={handleCapture} data-testid="photo-retry-btn">

@@ -3,7 +3,7 @@ Actions routes.
 """
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from datetime import datetime, timezone
 import uuid
 import logging
@@ -11,6 +11,8 @@ from database import db, installation_filter
 from auth import require_permission
 from services.cache_service import cache
 from services.tenant_schema import merge_tenant_filter, with_tenant_id
+from services.background_jobs import schedule_tracked_job
+from utils.auto_translate import translate_action
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Actions"])
@@ -367,6 +369,7 @@ async def get_overdue_actions(
 @router.post("/actions")
 async def create_central_action(
     data: CentralActionCreate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(_actions_write)
 ):
     """Create a new centralized action (promote from threat or investigation)."""
@@ -478,6 +481,18 @@ async def create_central_action(
         ),
         "action_create",
     )
+    schedule_tracked_job(
+        background_tasks,
+        "translate_action",
+        translate_action,
+        action_id,
+        {
+            "title": action_doc.get("title", ""),
+            "description": action_doc.get("description", "") or "",
+        },
+        current_user["id"],
+        user_id=current_user["id"],
+    )
     return action_doc
 
 
@@ -518,6 +533,7 @@ async def get_central_action(
 async def update_central_action(
     action_id: str,
     data: CentralActionUpdate,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(_actions_write)
 ):
     """Update a centralized action. Owner and Admin can update any action."""
@@ -612,6 +628,20 @@ async def update_central_action(
                 ),
                 "action_close_outcome",
             )
+
+    if any(k in update_data for k in ("title", "description")):
+        schedule_tracked_job(
+            background_tasks,
+            "translate_action",
+            translate_action,
+            action_id,
+            {
+                "title": updated.get("title", ""),
+                "description": updated.get("description", "") or "",
+            },
+            current_user["id"],
+            user_id=current_user["id"],
+        )
 
     response = dict(updated)
     if completion_notification:
