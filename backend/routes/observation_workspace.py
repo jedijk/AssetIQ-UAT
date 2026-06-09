@@ -14,6 +14,7 @@ import asyncio
 from database import db
 from auth import get_current_user
 from utils.auto_translate import translate_action
+from utils.workspace_localization import localize_workspace_payload
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/observation-workspace", tags=["Observation Workspace"])
@@ -910,6 +911,7 @@ async def get_process_journey(observation: dict, actions: list, investigation: d
 @router.get("/{observation_id}")
 async def get_observation_workspace(
     observation_id: str,
+    language: Optional[str] = Query(None, description="UI language code (nl, de) for localized content"),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -1076,7 +1078,7 @@ async def get_observation_workspace(
             # Non-fatal — UI still shows the derived stage from process_journey
             pass
     
-    return {
+    payload = {
         "observation_id": observation_id,
         "observation": {
             "id": observation.get("id"),
@@ -1139,6 +1141,12 @@ async def get_observation_workspace(
             "case_number": investigation.get("case_number") if investigation else None
         } if investigation else None
     }
+
+    return await localize_workspace_payload(
+        payload,
+        language,
+        user_id=current_user.get("id"),
+    )
 
 
 @router.post("/{observation_id}/add-action")

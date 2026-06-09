@@ -1572,12 +1572,12 @@ const ObservationWorkspacePage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   // Fetch workspace data
   const { data: workspace, isLoading, error } = useQuery({
-    queryKey: queryKeys.observationWorkspace.detail(id),
-    queryFn: () => observationWorkspaceAPI.getWorkspace(id),
+    queryKey: queryKeys.observationWorkspace.detail(id, language),
+    queryFn: () => observationWorkspaceAPI.getWorkspace(id, { language }),
     staleTime: 30 * 1000, // 30 seconds
   });
 

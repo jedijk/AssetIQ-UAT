@@ -21,6 +21,7 @@ from ai_risk_models import (
 )
 from services.ai_security_service import detect_prompt_injection
 from services.ai_gateway import chat, user_context
+from utils.workspace_localization import localize_ai_insights, localize_causal_analysis
 
 logger = logging.getLogger(__name__)
 
@@ -436,6 +437,7 @@ async def analyze_threat_risk(
 async def get_risk_insights(
     request: Request,
     threat_id: str,
+    language: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
     """Get cached AI risk insights for a threat"""
@@ -465,7 +467,12 @@ async def get_risk_insights(
         )
     except Exception as e:
         logger.warning(f"Failed backfilling ai_risk_insights onto threat {threat_id}: {e}")
-    return insight
+
+    return await localize_ai_insights(
+        insight,
+        language,
+        user_id=current_user.get("id"),
+    )
 
 
 @router.get("/ai/top-risks")
@@ -520,6 +527,7 @@ async def get_ai_top_risks(
 async def generate_threat_causes(
     request: Request,
     threat_id: str,
+    language: Optional[str] = None,
     body: GenerateCausesRequest = None,
     current_user: dict = Depends(get_current_user)
 ):
@@ -530,7 +538,11 @@ async def generate_threat_causes(
         existing = await db.ai_causal_analysis.find_one({"threat_id": threat_id}, {"_id": 0})
         if existing and isinstance(existing, dict) and existing.get("probable_causes"):
             existing["cached"] = True
-            return existing
+            return await localize_causal_analysis(
+                existing,
+                language,
+                user_id=current_user.get("id"),
+            )
     except Exception:
         # Cache read failure should not block generation.
         pass
@@ -647,6 +659,7 @@ async def generate_threat_causes(
 async def get_causal_analysis(
     request: Request,
     threat_id: str,
+    language: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
     """Get cached causal analysis for a threat"""
@@ -658,7 +671,12 @@ async def get_causal_analysis(
         # Return null (200) rather than 404 so the UI can quietly render the
         # "no analysis yet" empty state without console noise.
         return None
-    return analysis
+
+    return await localize_causal_analysis(
+        analysis,
+        language,
+        user_id=current_user.get("id"),
+    )
 
 
 @router.post("/ai/explain/{threat_id}")

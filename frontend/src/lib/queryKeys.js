@@ -20,7 +20,7 @@ export const queryKeys = {
     linkedToThreat: (threatId) => ["linked-actions", threatId],
   },
   observationWorkspace: {
-    detail: (id) => ["observation-workspace", id],
+    detail: (id, language = "en") => ["observation-workspace", id, language],
   },
   investigations: {
     all: () => ["investigations"],

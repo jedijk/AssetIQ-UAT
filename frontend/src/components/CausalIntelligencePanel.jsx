@@ -169,13 +169,13 @@ const CauseCard = ({ cause, index, t }) => {
 export default function CausalIntelligencePanel({ threatId, threatData, autoGenerate = false }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [expanded, setExpanded] = useState(true);
   
   // Fetch existing causal analysis
   const { data: causalData, isLoading: loadingCausal, error: causalError } = useQuery({
-    queryKey: ["ai-causal", threatId],
-    queryFn: () => aiRiskAPI.getCausalAnalysis(threatId),
+    queryKey: ["ai-causal", threatId, language],
+    queryFn: () => aiRiskAPI.getCausalAnalysis(threatId, { language }),
     retry: false,
     staleTime: 5 * 60 * 1000,
     // Don't treat 404 as an error - it just means no analysis exists yet
@@ -183,10 +183,10 @@ export default function CausalIntelligencePanel({ threatId, threatData, autoGene
   
   // Mutation to generate causes - works independently of AI Risk Insight
   const generateMutation = useMutation({
-    mutationFn: () => aiRiskAPI.generateCauses(threatId, { maxCauses: 5 }),
+    mutationFn: () => aiRiskAPI.generateCauses(threatId, { maxCauses: 5, language }),
     onSuccess: (data) => {
       // Update the cache with the new data directly
-      queryClient.setQueryData(["ai-causal", threatId], data);
+      queryClient.setQueryData(["ai-causal", threatId, language], data);
       toast.success(t("ai.analysisComplete") || "Causal analysis complete");
     },
     onError: (error) => {

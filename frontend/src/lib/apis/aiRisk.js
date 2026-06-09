@@ -12,8 +12,12 @@ export const aiRiskAPI = {
     return response.data;
   },
 
-  getRiskInsights: async (threatId) => {
-    const response = await api.get(`/ai/risk-insights/${threatId}`);
+  getRiskInsights: async (threatId, options = {}) => {
+    const params = {};
+    if (options.language) {
+      params.language = options.language;
+    }
+    const response = await api.get(`/ai/risk-insights/${threatId}`, { params });
     return response.data;
   },
 
@@ -29,8 +33,13 @@ export const aiRiskAPI = {
       include_evidence: options.includeEvidence ?? true,
       include_mitigations: options.includeMitigations ?? true,
     };
+    const params = {};
+    if (options.language) {
+      params.language = options.language;
+    }
 
     const response = await aiApi.post(`/ai/generate-causes/${threatId}`, payload, {
+      params,
       validateStatus: (s) => (s >= 200 && s < 300) || s === 202,
     });
 
@@ -47,7 +56,7 @@ export const aiRiskAPI = {
           throw err;
         }
         try {
-          const cached = await aiRiskAPI.getCausalAnalysis(threatId);
+          const cached = await aiRiskAPI.getCausalAnalysis(threatId, options);
           if (cached) return cached;
         } catch (e) {
           const status = e?.response?.status;
@@ -63,8 +72,12 @@ export const aiRiskAPI = {
     return response.data;
   },
 
-  getCausalAnalysis: async (threatId) => {
-    const response = await api.get(`/ai/causal-analysis/${threatId}`);
+  getCausalAnalysis: async (threatId, options = {}) => {
+    const params = {};
+    if (options.language) {
+      params.language = options.language;
+    }
+    const response = await api.get(`/ai/causal-analysis/${threatId}`, { params });
     return response.data;
   },
 

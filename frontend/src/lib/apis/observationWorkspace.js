@@ -9,8 +9,12 @@ export const observationWorkspaceAPI = {
    * Get complete workspace data for an observation
    * @param {string} observationId - The observation ID
    */
-  getWorkspace: async (observationId) => {
-    const response = await api.get(`/observation-workspace/${observationId}`);
+  getWorkspace: async (observationId, options = {}) => {
+    const params = {};
+    if (options.language) {
+      params.language = options.language;
+    }
+    const response = await api.get(`/observation-workspace/${observationId}`, { params });
     return response.data;
   },
 

@@ -168,14 +168,14 @@ const ForecastChart = ({ forecasts, t, currentScore = 60 }) => {
 export default function AIInsightsPanel({ threatId, threatData, compact = false, hideRecommendations = false, autoGenerate = false }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [expanded, setExpanded] = useState(!compact);
   const [addedRecommendations, setAddedRecommendations] = useState(new Set());
   
   // Fetch existing insights
   const { data: insights, isLoading: loadingInsights, error: insightsError } = useQuery({
-    queryKey: ["ai-insights", threatId],
-    queryFn: () => aiRiskAPI.getRiskInsights(threatId),
+    queryKey: ["ai-insights", threatId, language],
+    queryFn: () => aiRiskAPI.getRiskInsights(threatId, { language }),
     retry: false,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
