@@ -10,6 +10,7 @@ import logging
 from database import db, installation_filter
 from auth import require_permission
 from services.cache_service import cache
+from services.tenant_schema import merge_tenant_filter, with_tenant_id
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Actions"])
@@ -17,6 +18,22 @@ router = APIRouter(tags=["Actions"])
 _actions_read = require_permission("actions:read")
 _actions_write = require_permission("actions:write")
 _actions_delete = require_permission("actions:delete")
+
+
+async def _find_central_action(action_id: str, user: dict, *, include_mongo_id: bool = False):
+    """Load an action scoped to the user's tenant."""
+    from bson import ObjectId
+
+    projection = None if include_mongo_id else {"_id": 0}
+    query = merge_tenant_filter({"id": action_id}, user)
+    action = await db.central_actions.find_one(query, projection)
+    if not action:
+        try:
+            query = merge_tenant_filter({"_id": ObjectId(action_id)}, user)
+            action = await db.central_actions.find_one(query, projection)
+        except Exception:
+            pass
+    return action
 
 
 async def _assert_action_installation_scope(user: dict, action: dict) -> None:
@@ -212,6 +229,8 @@ async def get_all_actions(
             query["assignee"] = assignee_match
     if source_type and source_type != "all":
         query["source_type"] = source_type
+
+    query = merge_tenant_filter(query, current_user)
     
     actions = await db.central_actions.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
     
@@ -272,6 +291,7 @@ async def get_all_actions(
     if base_stats_query.get("_impossible"):
         stats = {"total": 0, "open": 0, "in_progress": 0, "completed": 0, "overdue": 0}
     else:
+        base_stats_query = merge_tenant_filter(base_stats_query, current_user)
         now_iso = datetime.now(timezone.utc).isoformat()
         pipeline = [
             {"$match": base_stats_query},
@@ -329,11 +349,14 @@ async def get_overdue_actions(
     """Get all overdue actions for notifications."""
     now = datetime.now(timezone.utc).isoformat()
     
-    overdue_actions = await db.central_actions.find({
-        "created_by": current_user["id"],
-        "status": {"$in": ["open", "in_progress"]},
-        "due_date": {"$lt": now, "$nin": [None, ""]}
-    }, {"_id": 0}).sort("due_date", 1).to_list(50)
+    overdue_actions = await db.central_actions.find(
+        merge_tenant_filter({
+            "created_by": current_user["id"],
+            "status": {"$in": ["open", "in_progress"]},
+            "due_date": {"$lt": now, "$nin": [None, ""]},
+        }, current_user),
+        {"_id": 0},
+    ).sort("due_date", 1).to_list(50)
     
     return {
         "overdue_actions": overdue_actions,
@@ -431,6 +454,7 @@ async def create_central_action(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
+    action_doc = with_tenant_id(action_doc, current_user)
     
     await db.central_actions.insert_one(action_doc)
     action_doc.pop("_id", None)
@@ -463,23 +487,7 @@ async def get_central_action(
     current_user: dict = Depends(_actions_read)
 ):
     """Get a specific centralized action."""
-    from bson import ObjectId
-    
-    # Try to find by id field first
-    action = await db.central_actions.find_one(
-        {"id": action_id},
-        {"_id": 0}
-    )
-    
-    # If not found, try by ObjectId
-    if not action:
-        try:
-            action = await db.central_actions.find_one(
-                {"_id": ObjectId(action_id)},
-                {"_id": 0}
-            )
-        except:
-            pass
+    action = await _find_central_action(action_id, current_user)
     
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
@@ -513,17 +521,7 @@ async def update_central_action(
     current_user: dict = Depends(_actions_write)
 ):
     """Update a centralized action. Owner and Admin can update any action."""
-    from bson import ObjectId
-    
-    # Try to find by id field first
-    action = await db.central_actions.find_one({"id": action_id})
-    
-    # If not found, try by ObjectId
-    if not action:
-        try:
-            action = await db.central_actions.find_one({"_id": ObjectId(action_id)})
-        except:
-            pass
+    action = await _find_central_action(action_id, current_user, include_mongo_id=True)
     
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
@@ -628,14 +626,7 @@ async def delete_central_action(
     current_user: dict = Depends(_actions_delete)
 ):
     """Delete a centralized action. Owner and Admin can delete any action."""
-    from bson import ObjectId
-
-    action = await db.central_actions.find_one({"id": action_id})
-    if not action:
-        try:
-            action = await db.central_actions.find_one({"_id": ObjectId(action_id)})
-        except Exception:
-            pass
+    action = await _find_central_action(action_id, current_user, include_mongo_id=True)
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
     await _assert_action_installation_scope(current_user, action)
@@ -670,17 +661,7 @@ async def validate_action(
     current_user: dict = Depends(_actions_write)
 ):
     """Validate an action (mark as reviewed/approved by a person)."""
-    from bson import ObjectId
-    
-    # Try to find by id field first
-    action = await db.central_actions.find_one({"id": action_id})
-    
-    # If not found, try by ObjectId
-    if not action:
-        try:
-            action = await db.central_actions.find_one({"_id": ObjectId(action_id)})
-        except:
-            pass
+    action = await _find_central_action(action_id, current_user, include_mongo_id=True)
     
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
@@ -696,11 +677,11 @@ async def validate_action(
     }
     
     await db.central_actions.update_one(
-        {"id": action_id},
+        {"_id": action["_id"]},
         {"$set": update_data}
     )
     
-    updated = await db.central_actions.find_one({"id": action_id}, {"_id": 0})
+    updated = await _find_central_action(action_id, current_user)
     return updated
 
 
@@ -710,14 +691,7 @@ async def unvalidate_action(
     current_user: dict = Depends(_actions_write)
 ):
     """Remove validation from an action."""
-    from bson import ObjectId
-
-    action = await db.central_actions.find_one({"id": action_id})
-    if not action:
-        try:
-            action = await db.central_actions.find_one({"_id": ObjectId(action_id)})
-        except Exception:
-            pass
+    action = await _find_central_action(action_id, current_user, include_mongo_id=True)
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
     await _assert_action_installation_scope(current_user, action)
@@ -732,11 +706,11 @@ async def unvalidate_action(
     }
     
     await db.central_actions.update_one(
-        {"id": action_id},
+        {"_id": action["_id"]},
         {"$set": update_data}
     )
     
-    updated = await db.central_actions.find_one({"id": action_id}, {"_id": 0})
+    updated = await _find_central_action(action_id, current_user)
     return updated
 
 
@@ -757,8 +731,11 @@ async def get_source_action_completion_status(
     
     # Get all actions for this source
     all_actions = await db.central_actions.find(
-        {"source_type": source_type, "source_id": source_id, "created_by": current_user["id"]},
-        {"_id": 0, "id": 1, "status": 1, "title": 1, "is_validated": 1}
+        merge_tenant_filter(
+            {"source_type": source_type, "source_id": source_id, "created_by": current_user["id"]},
+            current_user,
+        ),
+        {"_id": 0, "id": 1, "status": 1, "title": 1, "is_validated": 1},
     ).to_list(100)
     
     if not all_actions:

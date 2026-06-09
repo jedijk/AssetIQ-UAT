@@ -25,6 +25,10 @@ from utils.auto_translate import translate_investigation
 from utils.mongo_regex import exact_case_insensitive
 from services.ai_gateway import chat as ai_gateway_chat, user_context
 from services.tenant_schema import merge_tenant_filter, with_tenant_id
+from services.investigation_action_bridge import (
+    delete_central_for_action_item,
+    upsert_central_from_action_item,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -771,6 +775,11 @@ async def create_action_item(
     
     await db.action_items.insert_one(action_doc)
     action_doc.pop("_id", None)
+    await upsert_central_from_action_item(
+        action_doc,
+        inv,
+        created_by=current_user.get("id"),
+    )
     return action_doc
 
 
@@ -803,6 +812,14 @@ async def update_action_item(
         await db.action_items.update_one({"id": action_id}, {"$set": update_data})
     
     updated = await db.action_items.find_one({"id": action_id}, {"_id": 0})
+    if updated:
+        inv = await db.investigations.find_one({"id": inv_id}, {"_id": 0})
+        if inv:
+            await upsert_central_from_action_item(
+                updated,
+                inv,
+                created_by=current_user.get("id"),
+            )
     
     # Check if all actions for this investigation are now completed
     completion_notification = None
@@ -853,6 +870,7 @@ async def delete_action_item(
     result = await db.action_items.delete_one({"id": action_id, "investigation_id": inv_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Action item not found")
+    await delete_central_for_action_item(action_id)
     return {"message": "Action item deleted"}
 
 

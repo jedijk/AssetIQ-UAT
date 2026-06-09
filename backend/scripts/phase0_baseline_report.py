@@ -32,28 +32,15 @@ async def tenant_backfill_sample() -> tuple[bool, str]:
         return True, "SKIP tenant sample (MONGO_URL unset)"
 
     from motor.motor_asyncio import AsyncIOMotorClient
+    from services.tenant_readiness import wave_coverage, format_coverage_lines
+    from services.tenant_schema import WAVE2_COLLECTIONS
 
     db_name = os.environ.get("DB_NAME", "assetiq-UAT").strip('"')
     client = AsyncIOMotorClient(mongo_url)
     db = client[db_name]
 
-    collections = [
-        "task_instances",
-        "scheduled_tasks",
-        "central_actions",
-        "maintenance_programs_v2",
-        "equipment_type_strategies",
-    ]
-    lines = []
-    failed = False
-    for name in collections:
-        total = await db[name].count_documents({})
-        missing = await db[name].count_documents({"tenant_id": {"$exists": False}})
-        pct = 100.0 if total == 0 else round(100 * (total - missing) / total, 1)
-        lines.append(f"  {name}: {total} docs, {pct}% with tenant_id")
-        if total > 0 and pct < 100:
-            failed = True
-    return not failed, "\n".join(lines)
+    ok, rows = await wave_coverage(db, WAVE2_COLLECTIONS)
+    return ok, format_coverage_lines(rows)
 
 
 def run_gate(script: str) -> tuple[bool, str]:
@@ -83,15 +70,18 @@ async def main() -> int:
 
     print("\n--- UAT gates ---")
     gate_failed = False
-    for script in (
-        "verify_schedule_drift.py",
-        "verify_v2_program_coverage.py",
-        "verify_reliability_graph_sync.py",
-    ):
-        ok, msg = run_gate(script)
-        print(f"  {msg}")
-        if not ok:
-            gate_failed = True
+    if not os.environ.get("MONGO_URL"):
+        print("  SKIP UAT gates (MONGO_URL unset — set MONGO_URL to run against UAT DB)")
+    else:
+        for script in (
+            "verify_schedule_drift.py",
+            "verify_v2_program_coverage.py",
+            "verify_reliability_graph_sync.py",
+        ):
+            ok, msg = run_gate(script)
+            print(f"  {msg}")
+            if not ok:
+                gate_failed = True
 
     print("\n--- Tenant backfill sample ---")
     tenant_ok, tenant_msg = await tenant_backfill_sample()

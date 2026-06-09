@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import client, DEFAULT_DB_NAME  # noqa: E402
 from services.tenant_schema import (  # noqa: E402
     DEFAULT_TENANT_FIELD,
+    WAVE2_COLLECTIONS,
     WAVE_COLLECTIONS,
     ensure_tenant_indexes,
     tenant_id_from_user,
@@ -97,6 +98,11 @@ async def backfill_collection(
 async def main() -> int:
     parser = argparse.ArgumentParser(description="Backfill tenant_id on wave collections")
     parser.add_argument(
+        "--wave2",
+        action="store_true",
+        help="Only Wave 2 collections (required before TENANT_STRICT_MODE)",
+    )
+    parser.add_argument(
         "--collections",
         default="",
         help="Comma-separated subset (default: all WAVE_COLLECTIONS)",
@@ -114,7 +120,9 @@ async def main() -> int:
     db_name = os.environ.get("DB_NAME", DEFAULT_DB_NAME)
     db = client[db_name]
 
-    if args.collections.strip():
+    if args.wave2:
+        names = set(WAVE2_COLLECTIONS)
+    elif args.collections.strip():
         names: Set[str] = {c.strip() for c in args.collections.split(",") if c.strip()}
         unknown = names - set(WAVE_COLLECTIONS)
         if unknown:

@@ -56,6 +56,34 @@ Unset `SENTRY_DSN` to disable (default).
 
 ## UAT gates & background jobs
 
+**Phase 0 baseline** — cutover snapshot, tenant sample, UAT gates:
+
+```bash
+cd backend && MONGO_URL=mongodb://... ENVIRONMENT=uat python scripts/phase0_baseline_report.py
+```
+
+**Phase 1 data integrity** — work items, programs v2, actions unification, FMEA seed:
+
+```bash
+cd backend && MONGO_URL=mongodb://... ENVIRONMENT=uat python scripts/phase1_data_integrity_report.py
+```
+
+**Backfill investigation actions** (Phase 1C):
+
+```bash
+cd backend && MONGO_URL=mongodb://... python scripts/migrate_investigation_action_items.py --dry-run
+cd backend && MONGO_URL=mongodb://... python scripts/migrate_investigation_action_items.py
+```
+
+**Phase 2 tenancy** — tenant backfill, strict mode readiness:
+
+```bash
+cd backend && MONGO_URL=mongodb://... ENVIRONMENT=uat python scripts/phase2_tenancy_report.py
+cd backend && MONGO_URL=mongodb://... python scripts/backfill_tenant_id.py --wave2 --create-indexes
+```
+
+See [TENANT_ISOLATION.md](./TENANT_ISOLATION.md).
+
 **UAT cutover checklist** — run drift + v2 program coverage gates:
 
 ```bash
