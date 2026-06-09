@@ -1062,9 +1062,6 @@ const ObservationWorkspacePage = () => {
             data={{
               primary: exposure?.production?.formatted_value || "$0",
               secondary: `${exposure?.production?.estimated_downtime_hours || 0} Hours Downtime`,
-              tertiary: exposure?.production?.deferred_production 
-                ? `${exposure.production.deferred_production} ${exposure.production.deferred_production_unit || "bbl"} Deferred`
-                : null
             }}
             icon={DollarSign}
             color="amber"

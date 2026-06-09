@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Sliders, AlertTriangle, BarChart2, Eye, Info, Building2, Check, Pencil, RotateCcw, Save, X, Gauge, ArrowLeft } from "lucide-react";
+import { Sliders, AlertTriangle, BarChart2, Eye, Info, Building2, Check, Pencil, RotateCcw, Save, X, Gauge, ArrowLeft, DollarSign } from "lucide-react";
 import { useLanguage } from "../contexts/LanguageContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
@@ -437,6 +437,245 @@ const EditableTable = ({ type, data, isEditing, onUpdateRow, t }) => {
   );
 };
 
+// Production Loss Configuration Component
+const ProductionLossConfig = ({ t }) => {
+  const queryClient = useQueryClient();
+  const [isEditing, setIsEditing] = useState(false);
+  const [localConfig, setLocalConfig] = useState({
+    hourly_cost: 500,
+    currency: "EUR",
+    unit_of_measure: "hour",
+    notes: ""
+  });
+
+  // Query production loss config
+  const { data: configData, isLoading } = useQuery({
+    queryKey: ["production-loss-config"],
+    queryFn: definitionsAPI.getProductionLossConfig
+  });
+
+  // Update local state when data loads
+  useEffect(() => {
+    if (configData) {
+      setLocalConfig({
+        hourly_cost: configData.hourly_cost || 500,
+        currency: configData.currency || "EUR",
+        unit_of_measure: configData.unit_of_measure || "hour",
+        notes: configData.notes || ""
+      });
+    }
+  }, [configData]);
+
+  // Save mutation
+  const saveMutation = useMutation({
+    mutationFn: definitionsAPI.saveProductionLossConfig,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["production-loss-config"] });
+      toast.success("Production loss configuration saved");
+      setIsEditing(false);
+    },
+    onError: () => toast.error("Failed to save configuration")
+  });
+
+  // Reset mutation
+  const resetMutation = useMutation({
+    mutationFn: definitionsAPI.resetProductionLossConfig,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["production-loss-config"] });
+      toast.success("Configuration reset to defaults");
+      setIsEditing(false);
+    },
+    onError: () => toast.error("Failed to reset configuration")
+  });
+
+  const handleSave = () => {
+    saveMutation.mutate(localConfig);
+  };
+
+  const handleCancel = () => {
+    if (configData) {
+      setLocalConfig({
+        hourly_cost: configData.hourly_cost || 500,
+        currency: configData.currency || "EUR",
+        unit_of_measure: configData.unit_of_measure || "hour",
+        notes: configData.notes || ""
+      });
+    }
+    setIsEditing(false);
+  };
+
+  const currencyOptions = [
+    { value: "EUR", label: "€ Euro (EUR)" },
+    { value: "USD", label: "$ US Dollar (USD)" },
+    { value: "GBP", label: "£ British Pound (GBP)" },
+    { value: "CHF", label: "CHF Swiss Franc (CHF)" },
+    { value: "NOK", label: "kr Norwegian Krone (NOK)" },
+    { value: "SEK", label: "kr Swedish Krona (SEK)" },
+    { value: "DKK", label: "kr Danish Krone (DKK)" },
+  ];
+
+  const getCurrencySymbol = (currency) => {
+    const symbols = { EUR: "€", USD: "$", GBP: "£", CHF: "CHF", NOK: "kr", SEK: "kr", DKK: "kr" };
+    return symbols[currency] || currency;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
+              <span>Production Loss Configuration</span>
+              {isEditing && <Badge className="ml-2 bg-amber-100 text-amber-800 text-xs">Editing</Badge>}
+              {configData?.is_default && <Badge variant="outline" className="ml-2 text-xs">Default</Badge>}
+            </CardTitle>
+            <CardDescription className="text-xs sm:text-sm mt-1">
+              Configure the cost of production downtime for exposure calculations
+            </CardDescription>
+          </div>
+          {!isEditing ? (
+            <Button size="sm" onClick={() => setIsEditing(true)}>
+              <Pencil className="w-4 h-4 mr-1" />
+              Edit
+            </Button>
+          ) : (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleCancel}>
+                <X className="w-4 h-4 mr-1" />
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleSave} disabled={saveMutation.isPending} className="bg-green-600 hover:bg-green-700">
+                <Save className="w-4 h-4 mr-1" />
+                {saveMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Info Card */}
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start gap-3">
+            <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-blue-800">
+              <p className="font-medium mb-1">How this is used</p>
+              <p>This configuration determines how production exposure is calculated in the Observation Workspace. The hourly cost is multiplied by estimated downtime to show the financial impact of equipment failures.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Configuration Form */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Hourly Cost */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700">Hourly Production Loss Cost</label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-medium">
+                  {getCurrencySymbol(localConfig.currency)}
+                </span>
+                <Input
+                  type="number"
+                  min={0}
+                  step={10}
+                  value={localConfig.hourly_cost}
+                  onChange={(e) => setLocalConfig({ ...localConfig, hourly_cost: parseFloat(e.target.value) || 0 })}
+                  disabled={!isEditing}
+                  className="pl-8"
+                  placeholder="500"
+                />
+              </div>
+              <span className="flex items-center text-sm text-slate-500">/ hour</span>
+            </div>
+            <p className="text-xs text-slate-500">The cost incurred for every hour of production downtime</p>
+          </div>
+
+          {/* Currency */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-slate-700">Currency</label>
+            <Select
+              value={localConfig.currency}
+              onValueChange={(val) => setLocalConfig({ ...localConfig, currency: val })}
+              disabled={!isEditing}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {currencyOptions.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-slate-500">Currency for displaying production exposure values</p>
+          </div>
+        </div>
+
+        {/* Notes */}
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-slate-700">Notes (Optional)</label>
+          <Textarea
+            value={localConfig.notes || ""}
+            onChange={(e) => setLocalConfig({ ...localConfig, notes: e.target.value })}
+            disabled={!isEditing}
+            rows={3}
+            placeholder="e.g., Based on average production output of 1000 units/hour at €0.50/unit"
+          />
+        </div>
+
+        {/* Example Calculation */}
+        <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+          <h4 className="font-medium text-slate-800 mb-3 flex items-center gap-2">
+            <BarChart2 className="w-4 h-4 text-slate-600" />
+            Example Calculation
+          </h4>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between items-center py-2 border-b border-slate-200">
+              <span className="text-slate-600">Hourly cost:</span>
+              <span className="font-medium text-slate-800">{getCurrencySymbol(localConfig.currency)}{localConfig.hourly_cost.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b border-slate-200">
+              <span className="text-slate-600">Estimated downtime (8 hours):</span>
+              <span className="font-medium text-slate-800">× 8</span>
+            </div>
+            <div className="flex justify-between items-center py-2 bg-green-50 -mx-4 px-4 rounded">
+              <span className="font-medium text-green-700">Production Exposure:</span>
+              <span className="font-bold text-green-700 text-lg">{getCurrencySymbol(localConfig.currency)}{(localConfig.hourly_cost * 8).toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Reset to Defaults */}
+        {!configData?.is_default && isEditing && (
+          <div className="pt-4 border-t border-slate-200">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => resetMutation.mutate()}
+              disabled={resetMutation.isPending}
+              className="text-slate-600"
+            >
+              <RotateCcw className="w-4 h-4 mr-1" />
+              Reset to Default (€500/hour)
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 export default function DefinitionsPage() {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
@@ -763,10 +1002,14 @@ export default function DefinitionsPage() {
         {!loadingDefinitions && (selectedInstallation || (isMobile && localCriticality.length > 0)) && (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-              <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-4 mb-2 sm:mb-4">
+              <TabsList className="inline-flex w-auto min-w-full sm:grid sm:grid-cols-5 mb-2 sm:mb-4">
                 <TabsTrigger value="criticality" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="criticality-tab">
                   <Gauge className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span className="text-xs sm:text-sm">{t("definitions.criticality") || "Criticality"}</span>
+                </TabsTrigger>
+                <TabsTrigger value="production-loss" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="production-loss-tab">
+                  <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="text-xs sm:text-sm">Production Loss</span>
                 </TabsTrigger>
                 <TabsTrigger value="severity" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="severity-tab">
                   <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -816,6 +1059,11 @@ export default function DefinitionsPage() {
                   />
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* Production Loss Tab */}
+            <TabsContent value="production-loss">
+              <ProductionLossConfig t={t} />
             </TabsContent>
 
             {/* Severity Tab */}

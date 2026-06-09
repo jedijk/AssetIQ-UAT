@@ -468,3 +468,67 @@ async def delete_definitions(
         raise HTTPException(status_code=404, detail="Definitions not found")
     
     return {"message": "Definitions reset to defaults", "equipment_id": equipment_id}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Production Loss Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ProductionLossConfig(BaseModel):
+    hourly_cost: float = 500.0  # Cost per hour of downtime in EUR
+    currency: str = "EUR"
+    unit_of_measure: str = "hour"
+    notes: Optional[str] = None
+
+
+@router.get("/production-loss-config")
+async def get_production_loss_config(current_user: dict = Depends(get_current_user)):
+    """Get production loss configuration for the user's organization."""
+    config = await db.production_loss_config.find_one(
+        {"created_by": current_user["id"]},
+        {"_id": 0}
+    )
+    
+    if not config:
+        # Return default config
+        return {
+            "hourly_cost": 500.0,
+            "currency": "EUR",
+            "unit_of_measure": "hour",
+            "notes": None,
+            "is_default": True
+        }
+    
+    config["is_default"] = False
+    return config
+
+
+@router.put("/production-loss-config")
+async def save_production_loss_config(
+    config: ProductionLossConfig,
+    current_user: dict = Depends(_settings_write)
+):
+    """Save production loss configuration."""
+    doc = {
+        "created_by": current_user["id"],
+        "hourly_cost": config.hourly_cost,
+        "currency": config.currency,
+        "unit_of_measure": config.unit_of_measure,
+        "notes": config.notes,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.production_loss_config.update_one(
+        {"created_by": current_user["id"]},
+        {"$set": doc},
+        upsert=True
+    )
+    
+    return {"message": "Production loss configuration saved", **doc}
+
+
+@router.delete("/production-loss-config")
+async def reset_production_loss_config(current_user: dict = Depends(_settings_write)):
+    """Reset production loss configuration to defaults."""
+    await db.production_loss_config.delete_one({"created_by": current_user["id"]})
+    return {"message": "Production loss configuration reset to defaults"}
