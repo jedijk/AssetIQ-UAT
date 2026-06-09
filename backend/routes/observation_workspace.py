@@ -118,26 +118,53 @@ async def calculate_production_exposure(observation: dict, criticality: dict, us
     }
     currency_symbol = currency_symbols.get(currency, currency + " ")
     
-    # Downtime ranges based on production criticality level (1-5 scale)
-    # Returns (min_hours, max_hours) for each level
+    # Downtime ranges based on production criticality level (1-5 scale).
+    # Aligned with the default Production Criticality definitions:
+    #   1 — Minimal:  No production impact / redundancy available
+    #   2 — Low:      Downtime < 8 hours
+    #   3 — Medium:   Downtime 8 – 24 hours
+    #   4 — High:     Downtime > 24 hours (capped at 72 for the range upper bound)
+    #   5 — Critical: Complete plant shutdown (> 72 hours, open-ended)
+    # Returns (min_hours, max_hours). max_hours = None means "open-ended" (>min_hours).
     downtime_ranges = {
-        1: (1, 2),      # Level 1: Minimal (1-2 hours)
-        2: (2, 4),      # Level 2: Low (2-4 hours)
-        3: (8, 24),     # Level 3: Moderate (8-24 hours)
-        4: (24, 48),    # Level 4: High (24-48 hours)
-        5: (48, 72)     # Level 5: Critical (48+ hours)
+        1: (0, 0),
+        2: (0, 8),
+        3: (8, 24),
+        4: (24, 72),
+        5: (72, None),  # open-ended
     }
     min_hours, max_hours = downtime_ranges.get(production_impact, (8, 24))
     
-    # Calculate maximum exposure: max downtime hours × hourly cost
-    max_exposure_value = max_hours * hourly_cost
+    # Maximum exposure value:
+    #   - Closed range (max_hours set): max_hours × hourly_cost  → "Up to €X"
+    #   - Open-ended (max_hours = None): min_hours × hourly_cost → "More than €X"
+    open_ended = max_hours is None
+    hours_for_value = max_hours if not open_ended else min_hours
+    max_exposure_value = hours_for_value * hourly_cost
+    
+    # Build the human-readable downtime label
+    if open_ended:
+        downtime_label = f"> {min_hours}"
+    elif min_hours == 0 and max_hours == 0:
+        downtime_label = "0"
+    elif min_hours == 0:
+        downtime_label = f"< {max_hours}"
+    else:
+        downtime_label = f"{min_hours} - {max_hours}"
+    
+    formatted_value = (
+        f"More than {currency_symbol}{max_exposure_value:,.0f}"
+        if open_ended
+        else f"Up to {currency_symbol}{max_exposure_value:,.0f}"
+    )
     
     return {
         "value": max_exposure_value,
-        "formatted_value": f"Up to {currency_symbol}{max_exposure_value:,.0f}",
+        "formatted_value": formatted_value,
         "min_downtime_hours": min_hours,
         "max_downtime_hours": max_hours,
-        "downtime_range": f"{min_hours} - {max_hours}",
+        "downtime_range": downtime_label,
+        "open_ended": open_ended,
         "hourly_cost": hourly_cost,
         "currency": currency,
         "production_impact_score": production_impact
