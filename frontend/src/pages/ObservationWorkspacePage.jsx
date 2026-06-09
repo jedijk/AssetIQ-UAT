@@ -1249,29 +1249,36 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin">
-      {/* Header - sticky on scroll */}
-      <div className="sticky top-0 z-10 bg-white px-4 pt-4 pb-2 border-b border-slate-100">
+      {/* Header - sticky on scroll, sized to match Recommended Actions */}
+      <div className="sticky top-0 z-10 bg-white px-6 pt-6 pb-3 border-b border-slate-100">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ClipboardList className="w-4 h-4 text-green-600" />
-            <h3 className="font-medium text-sm text-slate-700">Action Plan</h3>
-            {actions && actions.length > 0 && (
-              <span className="text-xs text-slate-400">({actions.length})</span>
-            )}
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <ClipboardList className="w-5 h-5 text-green-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-slate-900">
+                Action Plan
+                {actions && actions.length > 0 && (
+                  <span className="ml-2 text-xs text-slate-400 font-normal">({actions.length})</span>
+                )}
+              </h3>
+              <p className="text-xs text-slate-500">Track planned &amp; in-progress actions</p>
+            </div>
           </div>
           <div className="flex items-center gap-1">
             <Button
               size="sm"
               variant="ghost"
               onClick={() => setShowAddDialog(true)}
-              className="h-6 text-xs px-2"
+              className="h-7 text-xs px-2"
               title="Add a new action manually"
               data-testid="action-plan-add-btn"
             >
               <Plus className="w-3.5 h-3.5 mr-1" /> Add
             </Button>
             {actions && actions.length > 0 && (
-              <Button size="sm" variant="ghost" onClick={onViewAll} className="h-6 text-xs px-2">
+              <Button size="sm" variant="ghost" onClick={onViewAll} className="h-7 text-xs px-2">
                 View All
               </Button>
             )}
@@ -1279,7 +1286,7 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
         </div>
       </div>
 
-      <div className="px-4 pt-3 pb-4">
+      <div className="px-6 pt-4 pb-6">
 
       {/* Actions List - Same style as recommended actions */}
       {actions && actions.length > 0 ? (
