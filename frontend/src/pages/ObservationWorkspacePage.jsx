@@ -1393,6 +1393,7 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
         }}
         isCreating={isCreating}
       />
+      </div>
     </div>
   );
 };
