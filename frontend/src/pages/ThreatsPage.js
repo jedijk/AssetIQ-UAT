@@ -68,7 +68,6 @@ import { Skeleton } from "../components/ui/skeleton";
 import { VirtualList } from "../components/ui/VirtualList";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useCapabilities } from "../core/performance";
-import { formatDateCompact } from "../lib/dateUtils";
 import { translateEnum } from "../lib/translateEnum";
 
 const STATUS_LABEL_KEYS = {
@@ -79,29 +78,6 @@ const STATUS_LABEL_KEYS = {
   Action: "observations.statusAction",
   Mitigated: "observations.statusMitigated",
   Learning: "observations.statusLearning",
-};
-
-const formatSubmissionDate = (createdAt) => {
-  if (!createdAt) return "—";
-  return formatDateCompact(createdAt);
-};
-
-const ThreatListSubmissionDate = ({ createdAt, t, variant = "mobile" }) => {
-  const formatted = formatSubmissionDate(createdAt);
-  if (variant === "desktop") {
-    return (
-      <div className="hidden sm:flex flex-col items-center w-[4.75rem] shrink-0">
-        <div className="text-[10px] text-slate-400 mb-0.5">{t("observations.submissionDate")}</div>
-        <div className="text-xs font-medium text-slate-600 tabular-nums whitespace-nowrap">{formatted}</div>
-      </div>
-    );
-  }
-  return (
-    <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-0.5 sm:hidden">
-      <Clock className="w-3 h-3 shrink-0" />
-      <span className="tabular-nums">{formatted}</span>
-    </div>
-  );
 };
 
 // Status options aligned with the Observation Workspace process-journey model.
@@ -882,11 +858,9 @@ const ThreatsPage = () => {
                           </span>
                         )}
                       </div>
-                      <ThreatListSubmissionDate createdAt={threat.created_at} t={t} variant="mobile" />
                     </div>
 
                     <div className="flex flex-col items-end gap-1 text-right sm:flex-row sm:items-center sm:gap-4">
-                      <ThreatListSubmissionDate createdAt={threat.created_at} t={t} variant="desktop" />
                       {typeof threat.business_risk_score === "number" && (
                         <div className="hidden sm:flex items-center gap-1 text-xs text-slate-500">
                           <TrendingUp className="w-3.5 h-3.5" />
@@ -996,12 +970,10 @@ const ThreatsPage = () => {
                     </span>
                   )}
                 </div>
-                <ThreatListSubmissionDate createdAt={threat.created_at} t={t} variant="mobile" />
               </div>
 
               {/* Score Display - Stacked on mobile, side-by-side on desktop */}
               <div className="flex sm:flex-row flex-col items-end sm:items-center gap-1 sm:gap-6 flex-shrink-0">
-                <ThreatListSubmissionDate createdAt={threat.created_at} t={t} variant="desktop" />
                 {/* Business Risk Score */}
                 <div className="flex sm:flex-col items-center sm:items-center gap-1.5 sm:gap-0 w-auto sm:w-16">
                   <div className="text-[10px] text-slate-400 sm:mb-0.5">{t("observations.score")}</div>
