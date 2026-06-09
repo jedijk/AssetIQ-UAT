@@ -676,7 +676,7 @@ const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding 
           onClick={() => onAddToPlan(action)}
           disabled={isAdding}
           className="h-7 w-7 p-0 flex-shrink-0"
-          title="Add to Plan"
+          title="Add to action plan"
         >
           {isAdding ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
