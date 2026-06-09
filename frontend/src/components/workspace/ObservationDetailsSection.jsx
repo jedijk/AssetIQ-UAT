@@ -661,8 +661,8 @@ const ObservationDetailsSection = ({ threatId }) => {
         {infoItems.map((item) => (
           <div key={item.label} className="bg-white rounded-lg border border-slate-200 px-3 py-1.5 flex items-center gap-2 min-h-[36px]">
             <item.icon className="w-3 h-3 text-slate-400 flex-shrink-0" />
-            <span className="text-[10px] uppercase tracking-wide text-slate-500 truncate flex-shrink-0 hidden sm:inline">{item.label}</span>
-            <div className="flex-1 min-w-0 text-right sm:text-left">
+            <span className="text-[10px] uppercase tracking-wide text-slate-500 truncate flex-shrink-0">{item.label}</span>
+            <div className="flex-1 min-w-0 text-right">
             {isEditing ? (
               item.type === "searchable" ? (
                 <SearchableCombobox

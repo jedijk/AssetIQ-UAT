@@ -303,6 +303,14 @@ async def create_investigation(
         user_id=current_user["id"],
     )
     
+    # Auto-create the "Complete causal investigation" action in the action plan
+    # so investigators see the work they need to finish from the workspace.
+    try:
+        from services.investigation_action_sync import create_investigation_action
+        await create_investigation_action(inv_id, data.threat_id, current_user)
+    except Exception as e:
+        logger.warning(f"Failed to create linked investigation action for {inv_id}: {e}")
+    
     # Include similar incidents info in response
     inv_doc["similar_incidents"] = similar_check.get("similar_incidents", [])
     
