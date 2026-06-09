@@ -37,7 +37,6 @@ export function buildNavItems(t) {
 export function buildSettingsMenuItems(t) {
   return [
     { path: "/equipment-manager", label: t("nav.equipmentManager"), icon: Building2, desktopOnly: true, feature: "equipment" },
-    { path: "/decision-engine", label: t("decisionEngine.title"), icon: Brain, desktopOnly: true },
     { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users, feature: "users" },
     { path: "/settings/preferences", label: "Preferences", icon: Clock, desktopOnly: true },
     { path: "/settings/risk-calculation", label: "Risk Calculation", icon: Sliders, adminOnly: true, desktopOnly: true },

@@ -111,6 +111,13 @@ export default function DashboardPageMain({ initialTab }) {
 
   const isOperatorMode = user?.role === "operator" || operatorToggle;
 
+  // Q1 plan: Intelligence Map is the default home for reliability engineers (desktop).
+  useEffect(() => {
+    if (user?.role === "reliability_engineer" && !isOperatorMode && !isMobileViewport) {
+      navigate("/library?tab=intelligence-map", { replace: true });
+    }
+  }, [user?.role, isOperatorMode, isMobileViewport, navigate]);
+
   const refreshDashboard = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["stats"] });
     queryClient.invalidateQueries({ queryKey: ["threats"] });

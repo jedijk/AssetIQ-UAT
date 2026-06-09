@@ -7,7 +7,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
 
-from database import db
+from services.cutover_config import default_work_items_source
 
 WorkItemsSourceMode = Literal["v2_instances", "hybrid"]
 
@@ -25,7 +25,7 @@ def is_bridge_enabled() -> bool:
 
 def work_items_source_mode() -> WorkItemsSourceMode:
     """Return work-items read mode (hybrid merges unbridged scheduled_tasks)."""
-    mode = (os.getenv("WORK_ITEMS_SOURCE") or "hybrid").strip().lower()
+    mode = (os.getenv("WORK_ITEMS_SOURCE") or default_work_items_source()).strip().lower()
     if mode == "v2_instances":
         return "v2_instances"
     return "hybrid"
@@ -33,6 +33,8 @@ def work_items_source_mode() -> WorkItemsSourceMode:
 
 async def bridge_synced_recent_window(hours: Optional[int] = None) -> bool:
     """True when the bridge completed a non-dry-run within the recent window."""
+    from database import db
+
     window = hours if hours is not None else _RECENT_BRIDGE_HOURS
     cutoff = datetime.now(timezone.utc) - timedelta(hours=window)
     run = await db.task_generation_runs.find_one(

@@ -93,10 +93,22 @@ async def api_health_check():
     except Exception as e:
         db_status = f"error: {str(e)[:100]}"
     
+    redis_status = None
+    try:
+        from services.cutover_config import redis_required
+        from services.redis_store import redis_status as get_redis_status
+        if redis_required():
+            status = get_redis_status()
+            redis_status = "connected" if status.get("enabled") else "unavailable"
+    except Exception as e:
+        redis_status = f"error: {str(e)[:100]}"
+    
     uptime = round(time.time() - app.state.start_time, 2)
     
     routes_ok = route_load_error is None
     overall_ok = db_status == "connected" and routes_ok
+    if redis_status == "unavailable":
+        overall_ok = False
 
     payload = {
         "status": "ok" if overall_ok else "degraded",
@@ -107,6 +119,8 @@ async def api_health_check():
         "routes_loaded": routes_ok,
         "version": APP_VERSION,
     }
+    if redis_status is not None:
+        payload["redis"] = redis_status
     if route_load_error is not None:
         payload["route_load_error"] = route_load_error.get("error")
         payload["route_load_error_type"] = route_load_error.get("type")
@@ -862,6 +876,16 @@ async def background_startup():
         
         if connected:
             logger.info("MongoDB connected successfully")
+
+            try:
+                from services.cutover_config import cutover_gaps, cutover_snapshot
+                snap = cutover_snapshot()
+                logger.info("Cutover config snapshot: %s", snap)
+                gaps = cutover_gaps()
+                if gaps:
+                    logger.warning("90-day cutover gaps: %s", "; ".join(gaps))
+            except Exception as exc:
+                logger.warning("Cutover config check skipped: %s", exc)
 
             # Ensure primary owner role in UAT DB (auth reads request DB first; UAT must have role=owner there)
             try:
