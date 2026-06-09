@@ -1886,13 +1886,15 @@ const ObservationWorkspacePage = () => {
 
         {/* Row 3: Main Work Area - 3 Columns on desktop, stacked on mobile */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-6">
-          {/* Column 1: Reliability Intelligence */}
-          <ReliabilityIntelligencePanel 
-            intelligence={reliability_intelligence}
-            onViewFullAnalysis={handleViewFullAnalysis}
-            threatId={id}
-            threatData={observation}
-          />
+          {/* Column 1: Reliability Intelligence (desktop only) */}
+          <div className="hidden lg:block">
+            <ReliabilityIntelligencePanel 
+              intelligence={reliability_intelligence}
+              onViewFullAnalysis={handleViewFullAnalysis}
+              threatId={id}
+              threatData={observation}
+            />
+          </div>
 
           {/* Column 2: Recommended Actions */}
           <RecommendedActionsPanel 
