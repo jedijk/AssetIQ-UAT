@@ -356,7 +356,12 @@ async def get_equipment_timeline_events(
         
         for action in actions:
             action_type = action.get("action_type", "corrective").lower()
-            event_type = "repair" if action_type in ["corrective", "repair"] else "work_order"
+            
+            # Skip PM (preventive maintenance) and scheduled tasks
+            if action_type in ["pm", "preventive", "preventive maintenance", "scheduled"]:
+                continue
+            
+            event_type = "repair" if action_type in ["corrective", "repair", "cm"] else "work_order"
             
             events.append({
                 "id": action.get("id"),
@@ -364,37 +369,11 @@ async def get_equipment_timeline_events(
                 "event_type": event_type,
                 "title": action.get("title", "Action"),
                 "reference_id": action.get("action_number", ""),
-                "status": action.get("status", "")
+                "status": action.get("status", ""),
+                "action_type": action.get("action_type", "").upper()
             })
     
-    # 3. Get scheduled tasks (inspections)
-    task_conditions = []
-    if equipment_id:
-        task_conditions.append({"equipment_id": equipment_id})
-    
-    if task_conditions:
-        tasks = await db.scheduled_tasks.find(
-            {
-                "$or": task_conditions,
-                "status": {"$in": ["completed", "scheduled"]}
-            },
-            {"_id": 0, "id": 1, "task_title": 1, "scheduled_date": 1, 
-             "status": 1, "task_type": 1, "completed_date": 1}
-        ).sort("scheduled_date", -1).limit(limit).to_list(limit)
-        
-        for task in tasks:
-            task_type = task.get("task_type", "preventive").lower()
-            event_type = "inspection" if "inspect" in task_type or task_type == "preventive" else "work_order"
-            
-            events.append({
-                "id": task.get("id"),
-                "date": task.get("completed_date") or task.get("scheduled_date", ""),
-                "event_type": event_type,
-                "title": task.get("task_title", "Task"),
-                "status": task.get("status", "")
-            })
-    
-    # 4. Get investigations
+    # 3. Get investigations (skip scheduled tasks section)
     inv_conditions = []
     if asset_name:
         inv_conditions.append({"asset_name": asset_name})
