@@ -776,7 +776,7 @@ const ThreatsPage = () => {
                     initial={caps.animations ? { opacity: 0, y: 10 } : false}
                     animate={{ opacity: 1, y: 0 }}
                     transition={caps.animations ? { delay: idx * 0.01 } : { duration: 0 }}
-                    onClick={() => navigate(`/threats/${threat.id}`)}
+                    onClick={() => navigate(`/threats/${threat.id}/workspace`)}
                     onMouseEnter={handleMouseEnter}
                     className={`priority-item group relative ${
                       threat.status === "Mitigated" || threat.status === "Learning" 
@@ -881,7 +881,7 @@ const ThreatsPage = () => {
               initial={caps.animations ? { opacity: 0, y: 10 } : false}
               animate={{ opacity: 1, y: 0 }}
               transition={caps.animations ? { delay: idx * 0.05 } : { duration: 0 }}
-              onClick={() => navigate(`/threats/${threat.id}`)}
+              onClick={() => navigate(`/threats/${threat.id}/workspace`)}
               onMouseEnter={handleMouseEnter}
               className={`priority-item group relative ${
                 threat.status === "Mitigated" || threat.status === "Learning" 
