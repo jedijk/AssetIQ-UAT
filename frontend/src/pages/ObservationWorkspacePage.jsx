@@ -522,17 +522,21 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 bg-purple-100 rounded-lg">
-          <Brain className="w-5 h-5 text-purple-600" />
-        </div>
-        <div>
-          <h3 className="font-semibold text-slate-900">Reliability Intelligence</h3>
-          <p className="text-xs text-slate-500">AI-powered root cause analysis</p>
+    <div className="bg-white rounded-xl border border-slate-200 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin">
+      {/* Header — sticky on scroll */}
+      <div className="sticky top-0 z-10 bg-white px-6 pt-6 pb-3 border-b border-slate-100">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-purple-100 rounded-lg">
+            <Brain className="w-5 h-5 text-purple-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-slate-900">Reliability Intelligence</h3>
+            <p className="text-xs text-slate-500">AI-powered root cause analysis</p>
+          </div>
         </div>
       </div>
+
+      <div className="px-6 pt-4 pb-6">
 
       {/* Most Likely Cause — compact */}
       <div className="mb-3">
@@ -618,6 +622,7 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
         <Eye className="w-4 h-4 mr-2" />
         View Full Analysis
       </Button>
+      </div>
     </div>
   );
 };
@@ -722,17 +727,21 @@ const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddTo
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 bg-blue-100 rounded-lg">
-          <Lightbulb className="w-5 h-5 text-blue-600" />
-        </div>
-        <div>
-          <h3 className="font-semibold text-slate-900">Recommended Actions</h3>
-          <p className="text-xs text-slate-500">Strategy actions & AI recommendations</p>
+    <div className="bg-white rounded-xl border border-slate-200 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin">
+      {/* Header — sticky on scroll */}
+      <div className="sticky top-0 z-10 bg-white px-6 pt-6 pb-3 border-b border-slate-100">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-blue-100 rounded-lg">
+            <Lightbulb className="w-5 h-5 text-blue-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-slate-900">Recommended Actions</h3>
+            <p className="text-xs text-slate-500">Strategy actions & AI recommendations</p>
+          </div>
         </div>
       </div>
+
+      <div className="px-6 pt-4 pb-6">
 
       {/* Library Actions */}
       {libraryActions.length > 0 && (
@@ -789,6 +798,7 @@ const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddTo
           <p className="text-xs text-slate-400 mt-1">Link a failure mode to get recommendations</p>
         </div>
       )}
+      </div>
     </div>
   );
 };
@@ -1238,34 +1248,38 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4">
-      {/* Header - Compact */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <ClipboardList className="w-4 h-4 text-green-600" />
-          <h3 className="font-medium text-sm text-slate-700">Action Plan</h3>
-          {actions && actions.length > 0 && (
-            <span className="text-xs text-slate-400">({actions.length})</span>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setShowAddDialog(true)}
-            className="h-6 text-xs px-2"
-            title="Add a new action manually"
-            data-testid="action-plan-add-btn"
-          >
-            <Plus className="w-3.5 h-3.5 mr-1" /> Add
-          </Button>
-          {actions && actions.length > 0 && (
-            <Button size="sm" variant="ghost" onClick={onViewAll} className="h-6 text-xs px-2">
-              View All
+    <div className="bg-white rounded-xl border border-slate-200 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin">
+      {/* Header - sticky on scroll */}
+      <div className="sticky top-0 z-10 bg-white px-4 pt-4 pb-2 border-b border-slate-100">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ClipboardList className="w-4 h-4 text-green-600" />
+            <h3 className="font-medium text-sm text-slate-700">Action Plan</h3>
+            {actions && actions.length > 0 && (
+              <span className="text-xs text-slate-400">({actions.length})</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowAddDialog(true)}
+              className="h-6 text-xs px-2"
+              title="Add a new action manually"
+              data-testid="action-plan-add-btn"
+            >
+              <Plus className="w-3.5 h-3.5 mr-1" /> Add
             </Button>
-          )}
+            {actions && actions.length > 0 && (
+              <Button size="sm" variant="ghost" onClick={onViewAll} className="h-6 text-xs px-2">
+                View All
+              </Button>
+            )}
+          </div>
         </div>
       </div>
+
+      <div className="px-4 pt-3 pb-4">
 
       {/* Actions List - Same style as recommended actions */}
       {actions && actions.length > 0 ? (
@@ -1644,8 +1658,16 @@ const ObservationWorkspacePage = () => {
           <ExposureCard
             type="Safety Exposure"
             data={{
-              primary: `${exposure?.safety?.personnel_exposed || 0} Personnel`,
-              secondary: `${exposure?.safety?.severity || "Low"} Severity`,
+              primary: exposure?.safety?.severity || "Not Assessed",
+              secondary: (() => {
+                const def = exposure?.safety?.definition;
+                if (def) {
+                  // Show first sentence so the card stays compact
+                  const first = def.split(/[.!?](\s|$)/)[0];
+                  return first || def;
+                }
+                return `${exposure?.safety?.severity || "Low"} severity`;
+              })(),
             }}
             icon={Users}
             color="red"
@@ -1658,6 +1680,14 @@ const ObservationWorkspacePage = () => {
             type="Environmental Impact"
             data={{
               primary: exposure?.environmental?.impact_rating || "Low",
+              secondary: (() => {
+                const def = exposure?.environmental?.definition;
+                if (def) {
+                  const first = def.split(/[.!?](\s|$)/)[0];
+                  return first || def;
+                }
+                return undefined;
+              })(),
             }}
             icon={Leaf}
             color="green"
@@ -1670,6 +1700,14 @@ const ObservationWorkspacePage = () => {
             type="Reputation Impact"
             data={{
               primary: exposure?.reputation?.impact_rating || "Low",
+              secondary: (() => {
+                const def = exposure?.reputation?.definition;
+                if (def) {
+                  const first = def.split(/[.!?](\s|$)/)[0];
+                  return first || def;
+                }
+                return undefined;
+              })(),
             }}
             icon={Star}
             color="purple"

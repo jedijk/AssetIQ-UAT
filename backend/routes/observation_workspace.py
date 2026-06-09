@@ -936,6 +936,22 @@ async def get_observation_workspace(
     # Get action plan
     action_plan = await get_action_plan(observation_id)
     
+    # Resolve criticality definitions for this observation's installation up-front
+    # so exposure cards can render the actual definition text (keeps the card
+    # primary/secondary labels in sync with the right-click popovers).
+    criticality_definitions = await get_criticality_definitions_for_equipment(
+        equipment_node, current_user["id"]
+    )
+    
+    def _def_for(score: int) -> dict:
+        """Return the criticality definition entry for a 1-5 score, or {}."""
+        if not score:
+            return {}
+        for entry in criticality_definitions or []:
+            if entry.get("rank") == score:
+                return entry
+        return {}
+    
     # Build all workspace components
     
     # 1. Exposure data
@@ -943,6 +959,25 @@ async def get_observation_workspace(
     safety_exposure = calculate_safety_exposure(observation, criticality)
     environmental_exposure = calculate_environmental_exposure(observation, criticality)
     reputation_exposure = calculate_reputation_exposure(observation, criticality)
+    
+    # Enrich exposures with the resolved definition labels so the card text
+    # matches the right-click popover content for that installation.
+    if safety_exposure.get("safety_impact_score"):
+        d = _def_for(safety_exposure["safety_impact_score"])
+        if d:
+            safety_exposure["severity"] = d.get("label") or d.get("name") or safety_exposure.get("severity", "Low")
+            safety_exposure["definition"] = d.get("safety") or (d.get("definitions") or {}).get("safety", "")
+    if environmental_exposure.get("environmental_impact_score"):
+        d = _def_for(environmental_exposure["environmental_impact_score"])
+        if d:
+            environmental_exposure["impact_rating"] = d.get("label") or d.get("name") or environmental_exposure.get("impact_rating", "Low")
+            environmental_exposure["definition"] = d.get("environment") or (d.get("definitions") or {}).get("environment", "")
+    if reputation_exposure.get("reputation_impact_score"):
+        d = _def_for(reputation_exposure["reputation_impact_score"])
+        if d:
+            reputation_exposure["impact_rating"] = d.get("label") or d.get("name") or reputation_exposure.get("impact_rating", "Low")
+            reputation_exposure["definition"] = d.get("reputation") or (d.get("definitions") or {}).get("reputation", "")
+    
     alarp_progress = await calculate_alarp_progress(observation_id, action_plan, investigation)
     
     exposure_data = {
@@ -978,11 +1013,6 @@ async def get_observation_workspace(
     
     # 5. Process journey
     process_journey = await get_process_journey(observation, action_plan, investigation)
-    
-    # 6. Resolve criticality definitions for this observation's installation
-    criticality_definitions = await get_criticality_definitions_for_equipment(
-        equipment_node, current_user["id"]
-    )
     
     # Sync observation.status with the current stage of the process journey.
     # The "current" stage is the furthest stage that is in_progress, or the latest
