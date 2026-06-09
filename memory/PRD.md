@@ -7,6 +7,13 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.3** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Observation Workspace — Exposure Cards now use severity colors (VERIFIED via screenshot)**:
+  - `ExposureCard` in `/app/frontend/src/pages/ObservationWorkspacePage.jsx` derives background/border/text colors from the dimension `score` (1-5) via `severityColorByScore` (1→green, 2→sky, 3→yellow, 4→orange, 5→red). The static `color` prop now only acts as a fallback when no score is present.
+  - "Not assessed" cards continue to render in neutral slate.
+  - Verified visually on `cf220c0e-0704-4e33-b11f-8eff98ed0d23` (Belt - band defect): Production card (score 3) renders yellow; Safety/Env/Reputation (score 1) render green.
+  - File: `/app/frontend/src/pages/ObservationWorkspacePage.jsx` (lines 92-146).
+
+## Recent Changes
 - [Feb 2026] **Chat Sidebar — Voice dictation visibility fix (VERIFIED via lint + compile)**:
   - Real-time speech recognition (`startListening`) now auto-focuses the textarea, moves the caret to end, and triggers `resizeAndScrollTextarea()` on every result so the latest transcribed words are always visible to the user.
   - Added a dedicated `useEffect([message, interimTranscript, isListening])` that resizes the textarea to fit content and scrolls to bottom whenever dictation appends words.
