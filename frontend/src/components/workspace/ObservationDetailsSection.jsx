@@ -448,13 +448,27 @@ const ObservationDetailsSection = ({ threatId }) => {
   const attachmentCount = ((isEditing ? editForm.attachments : threat.attachments) || []).length;
 
   // --- Render ---------------------------------------------------------------
+  
+  // Handler to search for tag in hierarchy
+  const handleTagClick = (tag) => {
+    // Dispatch custom event to trigger hierarchy search
+    window.dispatchEvent(new CustomEvent('hierarchy-search', { detail: { query: tag } }));
+    // Also dispatch event to open hierarchy sidebar if it's closed (on larger screens)
+    window.dispatchEvent(new CustomEvent('open-hierarchy'));
+  };
+  
   const actionBar = (
     <div className="flex items-center justify-between flex-wrap gap-3 w-full" data-testid="workspace-actions-bar">
       <div className="flex items-center gap-2 flex-wrap">
         {threat.equipment_tag && (
-          <span className="text-xs text-slate-500 font-mono bg-slate-50 px-2 py-1 rounded">
+          <button
+            onClick={() => handleTagClick(threat.equipment_tag)}
+            className="text-xs text-slate-600 font-mono bg-slate-100 px-2 py-1 rounded hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-pointer flex items-center gap-1"
+            title="Click to find in hierarchy"
+          >
+            <Search className="w-3 h-3" />
             {threat.equipment_tag}
-          </span>
+          </button>
         )}
         {threat.created_at && (
           <span className="flex items-center gap-1 text-xs text-slate-500">

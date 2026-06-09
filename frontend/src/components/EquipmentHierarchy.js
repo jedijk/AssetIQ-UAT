@@ -840,7 +840,7 @@ const LevelSummaryItem = ({ level, count, isActive, onClick, isHidden, onToggleH
   );
 };
 
-const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) => {
+const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, initialSearchQuery = "" }) => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const scrollContainerRef = useRef(null);
@@ -868,8 +868,32 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat }) 
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [viewMode, setViewMode] = useState("tree"); // "tree" or "levels"
   const [filterLevel, setFilterLevel] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [preSearchExpandedNodes, setPreSearchExpandedNodes] = useState(null);
+
+  // Listen for external search requests (e.g., from clicking tag in observation workspace)
+  useEffect(() => {
+    const handleSearchRequest = (event) => {
+      const { query } = event.detail || {};
+      if (query) {
+        setSearchQuery(query);
+        // Focus the search input after a short delay
+        setTimeout(() => {
+          searchInputRef.current?.focus();
+        }, 100);
+      }
+    };
+    
+    window.addEventListener('hierarchy-search', handleSearchRequest);
+    return () => window.removeEventListener('hierarchy-search', handleSearchRequest);
+  }, []);
+
+  // Update search when initialSearchQuery prop changes
+  useEffect(() => {
+    if (initialSearchQuery) {
+      setSearchQuery(initialSearchQuery);
+    }
+  }, [initialSearchQuery]);
 
   // Hidden levels - persisted to localStorage, default: hide first 2 levels
   const [hiddenLevels, setHiddenLevels] = useState(() => {
