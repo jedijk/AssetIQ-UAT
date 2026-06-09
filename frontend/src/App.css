@@ -172,11 +172,24 @@ html, body {
     background-color: var(--bg-primary);
 }
 
+/* Full sticky header height: safe-area padding + h-12 content + bottom border */
+:root {
+    --app-header-offset: calc(max(0.5rem, env(safe-area-inset-top, 0px)) + 3rem + 1px);
+    scroll-padding-top: var(--app-header-offset);
+}
+
 /* Header */
 .app-header {
     @apply sticky top-0 z-40;
     background-color: var(--bg-secondary);
     border-bottom: 1px solid var(--border-primary);
+}
+
+/* Page sub-headers that stick below the main app header */
+.sticky-below-app-header {
+    position: sticky;
+    top: var(--app-header-offset);
+    z-index: 30;
 }
 
 /* Header text colors for dark mode */
@@ -1053,8 +1066,8 @@ a, button, input, select, textarea {
 
 /* Mobile simple mode: hero stays below sticky header; buttons scroll independently */
 .operator-landing-layout {
-  height: calc(100dvh - 3rem);
-  max-height: calc(100dvh - 3rem);
+  height: calc(100dvh - var(--app-header-offset));
+  max-height: calc(100dvh - var(--app-header-offset));
   overflow: hidden;
 }
 
@@ -1069,6 +1082,8 @@ a, button, input, select, textarea {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
+  /* Room for My Tasks count badge (positioned above the button corner) */
+  padding-top: 1rem;
   padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px));
 }
 .theme-assetiq .operator-landing-surface,

@@ -408,7 +408,7 @@ Recent Threats (last 10):
     else:
         context_parts.append("THREATS DATA: No threats registered yet.")
 
-    actions = await db.actions.find({"created_by": user_id}, {"_id": 0}).to_list(200)
+    actions = await db.central_actions.find({"created_by": user_id}, {"_id": 0}).to_list(200)
     if actions:
         action_status_counts = {}
         action_priority_counts = {}

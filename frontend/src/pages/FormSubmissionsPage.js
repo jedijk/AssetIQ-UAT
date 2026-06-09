@@ -675,7 +675,7 @@ export default function FormSubmissionsPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <div className="sticky top-12 z-30 bg-white border-b border-slate-200 shadow-sm">
+      <div className="sticky-below-app-header bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-2 sm:gap-4">
             <div className="flex items-center gap-2 sm:gap-3">

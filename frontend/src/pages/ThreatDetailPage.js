@@ -652,7 +652,7 @@ const ThreatDetailPage = () => {
   return (
     <div className="min-h-screen bg-slate-50 pb-20" data-testid="threat-detail-page">
       {/* Fixed Header - Below main app header */}
-      <div className="sticky top-12 z-30 bg-white border-b border-slate-200 shadow-sm">
+      <div className="sticky-below-app-header bg-white border-b border-slate-200 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 max-w-4xl">
           {/* Mobile Header - Two rows for better readability */}
           <div className="sm:hidden py-2">

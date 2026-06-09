@@ -346,7 +346,7 @@ export default function ActionDetailPage() {
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
       {/* Fixed Header - starts below main nav (top-12 = 48px) */}
-      <div className="sticky top-12 z-30 bg-white border-b border-slate-200 shadow-sm">
+      <div className="sticky-below-app-header bg-white border-b border-slate-200 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 max-w-2xl">
           <div className="py-2.5 sm:py-3 space-y-2">
             <div className="flex items-center gap-2">

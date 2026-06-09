@@ -9,6 +9,7 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { usePermissions } from "../contexts/PermissionsContext";
 import { formatDate as formatDateUtil, formatDateTime } from "../lib/dateUtils";
 import { useTranslatedActions } from "../hooks/useTranslatedEntities";
+import { queryKeys } from "../lib/queryKeys";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
@@ -205,7 +206,7 @@ export default function ActionsPage() {
 
   // Fetch actions (fetch all, filter client-side for multi-select)
   const { data, isLoading } = useQuery({
-    queryKey: ["actions"],
+    queryKey: queryKeys.actions.all(),
     queryFn: () => actionsAPI.getAll(),
   });
 

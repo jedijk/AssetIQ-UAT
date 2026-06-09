@@ -1749,7 +1749,7 @@ const ObservationWorkspacePage = () => {
   return (
     <div className="min-h-screen bg-slate-50 pb-12">
       {/* Hero header — pinned at top below the 48px app header; does not move when scrolling */}
-      <div className="sticky top-12 z-20 bg-white border-b border-slate-200 shadow-sm">
+      <div className="sticky-below-app-header bg-white border-b border-slate-200 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 max-w-7xl">
           {/* Mobile: title row (with ⋯ menu pinned right) + action bar row stack vertically.
               Desktop: everything inline on a single row. */}

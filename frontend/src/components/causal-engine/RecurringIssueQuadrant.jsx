@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "../../lib/queryKeys";
 import { 
   RefreshCcw, Plus, X, ChevronDown, ChevronUp, 
   Link2, Unlink, AlertCircle, History, Loader2,
@@ -66,14 +67,14 @@ export default function RecurringIssueQuadrant({
 
   // Fetch linked incident details
   const { data: linkedData } = useQuery({
-    queryKey: ["linked-incident", investigation?.id],
+    queryKey: queryKeys.investigations.linkedIncident(investigation?.id),
     queryFn: () => investigationAPI.getLinkedIncident(investigation?.id),
     enabled: !!investigation?.id && !!linkedIncidentId,
   });
 
   // Fetch similar incidents for linking
   const { data: similarData, isLoading: loadingSimilar } = useQuery({
-    queryKey: ["similar-incidents", investigation?.id],
+    queryKey: queryKeys.investigations.similarIncidents(investigation?.id),
     queryFn: () => investigationAPI.getSimilarIncidents(investigation?.id),
     enabled: !!investigation?.id && isExpanded && !linkedIncidentId,
   });
@@ -92,7 +93,7 @@ export default function RecurringIssueQuadrant({
   const saveQuadrantMutation = useMutation({
     mutationFn: (data) => investigationAPI.updateRecurringQuadrant(investigation?.id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["investigation", investigation?.id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(investigation?.id) });
       toast.success("Quadrant data saved");
     },
     onError: () => {
@@ -104,8 +105,8 @@ export default function RecurringIssueQuadrant({
   const linkMutation = useMutation({
     mutationFn: (linkedId) => investigationAPI.linkIncident(investigation?.id, linkedId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["investigation", investigation?.id] });
-      queryClient.invalidateQueries({ queryKey: ["linked-incident", investigation?.id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(investigation?.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.linkedIncident(investigation?.id) });
       toast.success("Incident linked successfully");
     },
     onError: () => {
@@ -117,8 +118,8 @@ export default function RecurringIssueQuadrant({
   const unlinkMutation = useMutation({
     mutationFn: () => investigationAPI.unlinkIncident(investigation?.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["investigation", investigation?.id] });
-      queryClient.invalidateQueries({ queryKey: ["linked-incident", investigation?.id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(investigation?.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.linkedIncident(investigation?.id) });
       setQuadrantData({
         current_is: [],
         current_is_not: [],

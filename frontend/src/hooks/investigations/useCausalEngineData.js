@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "../../lib/queryKeys";
 
 export function useCausalEngineData({
   selectedInvId,
@@ -9,7 +10,7 @@ export function useCausalEngineData({
   failureModesAPI,
 }) {
   const { data: investigationsData, isLoading: loadingInvestigations, error: investigationsError } = useQuery({
-    queryKey: ["investigations"],
+    queryKey: queryKeys.investigations.all(),
     queryFn: () => investigationAPI.getAll(),
     staleTime: 0,
     refetchOnMount: "always",
@@ -19,28 +20,28 @@ export function useCausalEngineData({
   const investigations = investigationsData?.investigations || [];
 
   const { data: usersData } = useQuery({
-    queryKey: ["rbac-users"],
+    queryKey: queryKeys.users.rbac(),
     queryFn: () => usersAPI.getAll(),
     staleTime: 60000,
   });
   const users = usersData?.users || [];
 
   const { data: equipmentNodesData } = useQuery({
-    queryKey: ["equipment-nodes"],
+    queryKey: queryKeys.equipment.nodes(),
     queryFn: () => equipmentHierarchyAPI.getNodes(),
     staleTime: 60000,
   });
   const equipmentNodes = equipmentNodesData?.nodes || [];
 
   const { data: failureModesData } = useQuery({
-    queryKey: ["failure-modes-list"],
+    queryKey: queryKeys.failureModes.list(),
     queryFn: () => failureModesAPI.getAll(),
     staleTime: 60000,
   });
   const failureModesList = failureModesData?.failure_modes || [];
 
   const { data: centralActionsData } = useQuery({
-    queryKey: ["central-actions", "investigation", selectedInvId],
+    queryKey: queryKeys.investigations.centralActions(selectedInvId),
     queryFn: async () => {
       const response = await actionsAPI.getAll();
       const allActions = response?.actions || response || [];
@@ -54,7 +55,7 @@ export function useCausalEngineData({
   const centralActions = centralActionsData || [];
 
   const { data: investigationData, isLoading: loadingInvestigation } = useQuery({
-    queryKey: ["investigation", selectedInvId],
+    queryKey: queryKeys.investigations.detail(selectedInvId),
     queryFn: () => investigationAPI.getById(selectedInvId),
     enabled: !!selectedInvId,
     staleTime: 0,

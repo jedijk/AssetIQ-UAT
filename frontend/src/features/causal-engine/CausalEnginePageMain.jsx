@@ -31,7 +31,7 @@ import { SearchableSelect } from "../../components/ui/searchable-select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../../components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../components/ui/dropdown-menu";
-import { CauseTree, CAUSE_CATEGORIES } from "../../components/CauseNodeItem";
+import { CAUSE_CATEGORIES } from "../../components/CauseNodeItem";
 import BackButton from "../../components/BackButton";
 import DesktopOnlyMessage from "../../components/DesktopOnlyMessage";
 import { NewInvestigationDialog, EventDialog, FailureDialog, CauseDialog, ActionDialog } from "../../components/causal-engine/InvestigationDialogs";
@@ -42,6 +42,10 @@ import {
   EVENT_CATEGORIES,
   INVESTIGATION_STATUSES,
 } from "../../components/causal-engine/constants";
+import { InvestigationTimelineTab } from "./InvestigationTimelineTab";
+import { InvestigationFailuresTab } from "./InvestigationFailuresTab";
+import { InvestigationCausesTab } from "./InvestigationCausesTab";
+import { queryKeys } from "../../lib/queryKeys";
 
 export default function CausalEnginePageMain() {
   const queryClient = useQueryClient();
@@ -190,7 +194,7 @@ export default function CausalEnginePageMain() {
   const createInvMutation = useMutation({
     mutationFn: investigationAPI.create,
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["investigations"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.all() });
       setSelectedInvId(data.id);
       setShowNewInvDialog(false);
       setNewInvForm({ title: "", description: "", asset_name: "", location: "", incident_date: "", investigation_leader: "" });
@@ -202,8 +206,8 @@ export default function CausalEnginePageMain() {
   const updateInvMutation = useMutation({
     mutationFn: ({ id, data }) => investigationAPI.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["investigations"] });
-      queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
       // Close inline edit mode if it was open
       if (isEditingInvestigation) {
@@ -353,7 +357,7 @@ export default function CausalEnginePageMain() {
         
         await investigationAPI.uploadFile(selectedInvId, processedFile);
       }
-      queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) });
       toast.success(t("causal.filesUploaded") || `${files.length} file(s) uploaded successfully`);
     } catch (error) {
       console.error("Upload failed:", error);
@@ -389,7 +393,7 @@ export default function CausalEnginePageMain() {
   const deleteEvidenceMutation = useMutation({
     mutationFn: ({ invId, evidenceId }) => investigationAPI.deleteEvidence(invId, evidenceId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) });
       toast.success(t("causal.fileDeleted") || "File deleted");
     },
   });
@@ -416,13 +420,13 @@ export default function CausalEnginePageMain() {
               incident_date: deletedInv.incident_date,
               investigation_leader: deletedInv.investigation_leader
             });
-            queryClient.invalidateQueries({ queryKey: ["investigations"] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.investigations.all() });
           },
         });
       }
-      queryClient.invalidateQueries({ queryKey: ["investigations"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.all() });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
-      queryClient.invalidateQueries({ queryKey: ["actions"] }); // Refresh actions list
+      queryClient.invalidateQueries({ queryKey: queryKeys.actions.all() }); // Refresh actions list
       setSelectedInvId(null);
       setDeleteInvOptions({ deleteCentralActions: false }); // Reset options
       const actionsDeleted = result?.deleted_central_actions || 0;
@@ -433,7 +437,7 @@ export default function CausalEnginePageMain() {
   const createEventMutation = useMutation({
     mutationFn: (data) => investigationAPI.createEvent(selectedInvId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) });
       setShowEventDialog(false);
       setEditingItem(null);
       setEventForm({ event_time: "", description: "", category: "operational_event", evidence_source: "", confidence: "medium", notes: "", comment: "" });
@@ -444,7 +448,7 @@ export default function CausalEnginePageMain() {
   const updateEventMutation = useMutation({
     mutationFn: ({ eventId, data }) => investigationAPI.updateEvent(selectedInvId, eventId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) });
       setShowEventDialog(false);
       setEditingItem(null);
       setEventForm({ event_time: "", description: "", category: "operational_event", evidence_source: "", confidence: "medium", notes: "", comment: "" });
@@ -454,13 +458,13 @@ export default function CausalEnginePageMain() {
   
   const deleteEventMutation = useMutation({
     mutationFn: (eventId) => investigationAPI.deleteEvent(selectedInvId, eventId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) }),
   });
   
   const createFailureMutation = useMutation({
     mutationFn: (data) => investigationAPI.createFailure(selectedInvId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) });
       setShowFailureDialog(false);
       setEditingItem(null);
       setFailureForm({ asset_name: "", subsystem: "", component: "", failure_mode: "", degradation_mechanism: "", evidence: "", comment: "" });
@@ -471,7 +475,7 @@ export default function CausalEnginePageMain() {
   const updateFailureMutation = useMutation({
     mutationFn: ({ failureId, data }) => investigationAPI.updateFailure(selectedInvId, failureId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) });
       setShowFailureDialog(false);
       setEditingItem(null);
       setFailureForm({ asset_name: "", subsystem: "", component: "", failure_mode: "", degradation_mechanism: "", evidence: "", comment: "" });
@@ -481,13 +485,13 @@ export default function CausalEnginePageMain() {
   
   const deleteFailureMutation = useMutation({
     mutationFn: (failureId) => investigationAPI.deleteFailure(selectedInvId, failureId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) }),
   });
   
   const createCauseMutation = useMutation({
     mutationFn: (data) => investigationAPI.createCause(selectedInvId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) });
       setShowCauseDialog(false);
       setEditingItem(null);
       setCauseForm({ description: "", category: "technical_cause", parent_id: null, is_root_cause: false, evidence: "", comment: "" });
@@ -498,7 +502,7 @@ export default function CausalEnginePageMain() {
   const updateCauseMutation = useMutation({
     mutationFn: ({ causeId, data }) => investigationAPI.updateCause(selectedInvId, causeId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) });
       setShowCauseDialog(false);
       setEditingItem(null);
       setCauseForm({ description: "", category: "technical_cause", parent_id: null, is_root_cause: false, evidence: "", comment: "" });
@@ -508,13 +512,13 @@ export default function CausalEnginePageMain() {
   
   const deleteCauseMutation = useMutation({
     mutationFn: (causeId) => investigationAPI.deleteCause(selectedInvId, causeId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) }),
   });
   
   const createActionMutation = useMutation({
     mutationFn: (data) => investigationAPI.createAction(selectedInvId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
       setShowActionDialog(false);
       setEditingItem(null);
@@ -526,7 +530,7 @@ export default function CausalEnginePageMain() {
   const updateActionMutation = useMutation({
     mutationFn: ({ actionId, data }) => investigationAPI.updateAction(selectedInvId, actionId, data),
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
       setShowActionDialog(false);
       setEditingItem(null);
@@ -543,7 +547,7 @@ export default function CausalEnginePageMain() {
   const deleteActionMutation = useMutation({
     mutationFn: (actionId) => investigationAPI.deleteAction(selectedInvId, actionId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
     },
   });
@@ -565,8 +569,8 @@ export default function CausalEnginePageMain() {
       threat_id: investigation?.threat_id || null,
     }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["actions"] });
-      queryClient.invalidateQueries({ queryKey: ["central-actions", "investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.actions.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.centralActions(selectedInvId) });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline"] });
       toast.success(t("causal.actionPromoted") || "Action added to Action Plan!");
     },
@@ -581,8 +585,8 @@ export default function CausalEnginePageMain() {
     mutationFn: ({ actionId, validatorName, validatorPosition }) =>
       actionsAPI.validate(actionId, validatorName, validatorPosition, user?.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["actions"] });
-      queryClient.invalidateQueries({ queryKey: ["central-actions", "investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.actions.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.centralActions(selectedInvId) });
       toast.success("Action validated successfully!");
       setShowValidateDialog(false);
       setActionToValidate(null);
@@ -599,8 +603,8 @@ export default function CausalEnginePageMain() {
   const unvalidateActionMutation = useMutation({
     mutationFn: (actionId) => actionsAPI.unvalidate(actionId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["actions"] });
-      queryClient.invalidateQueries({ queryKey: ["central-actions", "investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.actions.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.centralActions(selectedInvId) });
       toast.success("Validation removed");
     },
     onError: (error) => {
@@ -613,8 +617,8 @@ export default function CausalEnginePageMain() {
   const editActionMutation = useMutation({
     mutationFn: ({ actionId, updates }) => actionsAPI.update(actionId, updates),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["actions"] });
-      queryClient.invalidateQueries({ queryKey: ["central-actions", "investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.actions.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.centralActions(selectedInvId) });
       toast.success("Action updated!");
       setShowEditActionDialog(false);
       setEditingAction(null);
@@ -629,8 +633,8 @@ export default function CausalEnginePageMain() {
   const deleteCentralActionMutation = useMutation({
     mutationFn: (actionId) => actionsAPI.delete(actionId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["actions"] });
-      queryClient.invalidateQueries({ queryKey: ["central-actions", "investigation", selectedInvId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.actions.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.investigations.centralActions(selectedInvId) });
       toast.success("Action deleted!");
     },
     onError: (error) => {
@@ -1281,7 +1285,7 @@ export default function CausalEnginePageMain() {
                           }
                           await investigationAPI.uploadFile(selectedInvId, processedFile);
                         }
-                        queryClient.invalidateQueries({ queryKey: ["investigation", selectedInvId] });
+                        queryClient.invalidateQueries({ queryKey: queryKeys.investigations.detail(selectedInvId) });
                         toast.success(t("causal.filesUploaded") || `${files.length} file(s) uploaded successfully`);
                       } catch (error) {
                         console.error("Upload failed:", error);
@@ -1300,125 +1304,96 @@ export default function CausalEnginePageMain() {
             )}
             
             {activeTab === "timeline" && (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div><h2 className="text-lg font-semibold">Sequence of Events</h2><p className="text-sm text-slate-500">Reconstruct the timeline</p></div>
-                  <Button onClick={() => { setEditingItem(null); setEventForm({ event_time: "", description: "", category: "operational_event", evidence_source: "", confidence: "medium", notes: "", comment: "" }); setShowEventDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-event-btn" disabled={isInvestigationLocked}><Plus className="w-4 h-4 mr-2" />Add Event</Button>
-                </div>
-                
-                {sortedTimelineEvents.length === 0 ? (
-                  <div className="empty-state py-16">
-                    <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-                      <Clock className="w-8 h-8 text-slate-400" />
-                    </div>
-                    <h3 className="text-lg font-medium mb-1">No events recorded</h3>
-                    <p className="text-sm text-slate-500">Start by adding the first event</p>
-                  </div>
-                ) : (
-                  <div className="priority-list">
-                    {sortedTimelineEvents.map((event, idx) => {
-                      const category = EVENT_CATEGORIES.find(c => c.value === event.category);
-                      // Format the timestamp to be more readable using user preferences
-                      const formatEventTime = (timeStr) => {
-                        if (!timeStr) return `#${idx + 1}`;
-                        try {
-                          return formatDateTime(timeStr);
-                        } catch {
-                          return timeStr.substring(0, 16).replace('T', ' ');
-                        }
-                      };
-                      return (
-                        <motion.div key={event.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03 }} className="priority-item group" data-testid={`timeline-event-${event.id}`}>
-                          <div className={`flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${category?.bgClass?.split(' ')[0] || 'bg-slate-100'}`}>
-                            <Clock className={`w-5 h-5 sm:w-6 sm:h-6 ${category?.bgClass?.split(' ')[1] || 'text-slate-600'}`} />
-                          </div>
-                          <div className="flex-1 min-w-0 ml-3">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <span className="text-xs font-medium text-slate-500">{formatEventTime(event.event_time)}</span>
-                              <span className={`text-xs px-2 py-0.5 rounded-full ${category?.bgClass || "bg-slate-100 text-slate-700"}`}>{category?.label || event.category}</span>
-                              <span className={`text-xs px-2 py-0.5 rounded-full ${event.confidence === "high" ? "bg-green-100 text-green-700" : event.confidence === "low" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>{event.confidence}</span>
-                              {event.comment && <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 flex items-center gap-1"><MessageSquare className="w-3 h-3" />Has comment</span>}
-                            </div>
-                            <p className="text-sm text-slate-900 line-clamp-2">{event.description}</p>
-                            {event.evidence_source && <p className="text-xs text-slate-500 mt-1">Source: {event.evidence_source}</p>}
-                          </div>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => { setEditingItem({ type: "event", data: event }); setEventForm({ event_time: event.event_time || "", description: event.description, category: event.category, evidence_source: event.evidence_source || "", confidence: event.confidence, notes: event.notes || "", comment: event.comment || "" }); setShowEventDialog(true); }}><Edit className="w-4 h-4" /></Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteEventMutation.mutate(event.id)}><Trash2 className="w-4 h-4" /></Button>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <InvestigationTimelineTab
+                events={sortedTimelineEvents}
+                isLocked={isInvestigationLocked}
+                eventCategories={EVENT_CATEGORIES}
+                formatDateTime={formatDateTime}
+                onAddEvent={() => {
+                  setEditingItem(null);
+                  setEventForm({
+                    event_time: "",
+                    description: "",
+                    category: "operational_event",
+                    evidence_source: "",
+                    confidence: "medium",
+                    notes: "",
+                    comment: "",
+                  });
+                  setShowEventDialog(true);
+                }}
+                onEditEvent={(event) => {
+                  setEditingItem({ type: "event", data: event });
+                  setEventForm({
+                    event_time: event.event_time || "",
+                    description: event.description,
+                    category: event.category,
+                    evidence_source: event.evidence_source || "",
+                    confidence: event.confidence,
+                    notes: event.notes || "",
+                    comment: event.comment || "",
+                  });
+                  setShowEventDialog(true);
+                }}
+                onDeleteEvent={(id) => deleteEventMutation.mutate(id)}
+              />
             )}
-            
+
             {activeTab === "failures" && (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div><h2 className="text-lg font-semibold">Failure Identification</h2><p className="text-sm text-slate-500">Define what technically failed</p></div>
-                  <Button onClick={() => { setEditingItem(null); setFailureForm({ asset_name: "", subsystem: "", component: "", failure_mode: "", degradation_mechanism: "", evidence: "", comment: "" }); setShowFailureDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-failure-btn" disabled={isInvestigationLocked}><Plus className="w-4 h-4 mr-2" />Add Failure</Button>
-                </div>
-                
-                {failureIdentifications.length === 0 ? (
-                  <div className="empty-state py-16">
-                    <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-                      <AlertTriangle className="w-8 h-8 text-slate-400" />
-                    </div>
-                    <h3 className="text-lg font-medium mb-1">No failures identified</h3>
-                    <p className="text-sm text-slate-500">Document what failed</p>
-                  </div>
-                ) : (
-                  <div className="priority-list">
-                    {failureIdentifications.map((failure, idx) => (
-                      <motion.div key={failure.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.03 }} className="priority-item group" data-testid={`failure-item-${failure.id}`}>
-                        <div className="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center bg-red-50">
-                          <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
-                        </div>
-                        <div className="priority-rank text-sm">#{idx + 1}</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <span className="font-semibold text-sm">{failure.asset_name}</span>
-                            {failure.subsystem && <><ChevronRight className="w-3 h-3 text-slate-400" /><span className="text-sm text-slate-600">{failure.subsystem}</span></>}
-                            {failure.component && <><ChevronRight className="w-3 h-3 text-slate-400" /><span className="text-sm text-slate-600">{failure.component}</span></>}
-                            {failure.comment && <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 flex items-center gap-1"><MessageSquare className="w-3 h-3" />Has comment</span>}
-                          </div>
-                          <div className="text-xs sm:text-sm text-slate-500">
-                            <span className="text-red-600 font-medium">{failure.failure_mode}</span>
-                            {failure.degradation_mechanism && <span className="ml-2">• {failure.degradation_mechanism}</span>}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => { setEditingItem({ type: "failure", data: failure }); setFailureForm({ asset_name: failure.asset_name, subsystem: failure.subsystem || "", component: failure.component, failure_mode: failure.failure_mode, degradation_mechanism: failure.degradation_mechanism || "", evidence: failure.evidence || "", comment: failure.comment || "" }); setShowFailureDialog(true); }}><Edit className="w-4 h-4" /></Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteFailureMutation.mutate(failure.id)}><Trash2 className="w-4 h-4" /></Button>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <InvestigationFailuresTab
+                failures={failureIdentifications}
+                isLocked={isInvestigationLocked}
+                onAddFailure={() => {
+                  setEditingItem(null);
+                  setFailureForm({
+                    asset_name: "",
+                    subsystem: "",
+                    component: "",
+                    failure_mode: "",
+                    degradation_mechanism: "",
+                    evidence: "",
+                    comment: "",
+                  });
+                  setShowFailureDialog(true);
+                }}
+                onEditFailure={(failure) => {
+                  setEditingItem({ type: "failure", data: failure });
+                  setFailureForm({
+                    asset_name: failure.asset_name,
+                    subsystem: failure.subsystem || "",
+                    component: failure.component,
+                    failure_mode: failure.failure_mode,
+                    degradation_mechanism: failure.degradation_mechanism || "",
+                    evidence: failure.evidence || "",
+                    comment: failure.comment || "",
+                  });
+                  setShowFailureDialog(true);
+                }}
+                onDeleteFailure={(id) => deleteFailureMutation.mutate(id)}
+              />
             )}
-            
+
             {activeTab === "causes" && (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div><h2 className="text-lg font-semibold">Causal Tree</h2><p className="text-sm text-slate-500">Build cause-and-effect relationships</p></div>
-                  <Button onClick={() => { setEditingItem(null); setCauseForm({ description: "", category: "technical_cause", parent_id: null, is_root_cause: false, evidence: "", comment: "" }); setShowCauseDialog(true); }} className="h-11 bg-blue-600 hover:bg-blue-700" data-testid="add-cause-btn" disabled={isInvestigationLocked}><Plus className="w-4 h-4 mr-2" />Add Cause</Button>
-                </div>
-                
-                {causeNodes.length === 0 ? (
-                  <div className="empty-state py-16">
-                    <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-                      <GitBranch className="w-8 h-8 text-slate-400" />
-                    </div>
-                    <h3 className="text-lg font-medium mb-1">No causes identified</h3>
-                    <p className="text-sm text-slate-500">Start building the causal tree</p>
-                  </div>
-                ) : (
-                  <CauseTree causes={causeNodes} onEdit={handleEditCause} onDelete={handleDeleteCause} onAddChild={handleAddChildCause} onToggleRoot={handleToggleRootCause} isLocked={isInvestigationLocked} />
-                )}
-              </div>
+              <InvestigationCausesTab
+                causes={causeNodes}
+                isLocked={isInvestigationLocked}
+                onAddCause={() => {
+                  setEditingItem(null);
+                  setCauseForm({
+                    description: "",
+                    category: "technical_cause",
+                    parent_id: null,
+                    is_root_cause: false,
+                    evidence: "",
+                    comment: "",
+                  });
+                  setShowCauseDialog(true);
+                }}
+                onEditCause={handleEditCause}
+                onDeleteCause={handleDeleteCause}
+                onAddChildCause={handleAddChildCause}
+                onToggleRootCause={handleToggleRootCause}
+              />
             )}
             
             {activeTab === "actions" && (
