@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Eye, Loader2 } from "lucide-react";
 import { permissionsAPI } from "../../lib/api";
-import { formatRoleLabel, useRolePreview } from "../../contexts/RolePreviewContext";
+import { formatRoleLabel, resolveRoleDescription, resolveRoleDisplayName } from "../../lib/roleLabels";
+import { useRolePreview } from "../../contexts/RolePreviewContext";
 import {
   Dialog,
   DialogContent,
@@ -63,11 +64,11 @@ export default function RolePreviewDialog({ open, onOpenChange, t }) {
                 >
                   <div className="flex flex-col items-start gap-0.5 text-left flex-1">
                     <span className="font-medium">
-                      {role.display_name || formatRoleLabel(role.name)}
+                      {resolveRoleDisplayName(role.name, role)}
                     </span>
-                    {role.description && (
+                    {resolveRoleDescription(role.name, role) && (
                       <span className={`text-xs ${isActive ? "text-amber-100" : "text-slate-500"}`}>
-                        {role.description}
+                        {resolveRoleDescription(role.name, role)}
                       </span>
                     )}
                   </div>

@@ -93,6 +93,17 @@ import {
   getVisiblePermissionSections,
   normalizeFeatureEntries,
 } from "../lib/permissionSections";
+import {
+  getPermissionFeatureDescription,
+  getPermissionFeatureName,
+  getPermissionSectionLabel,
+} from "../lib/permissionFeatureLabels";
+import {
+  formatRoleLabel,
+  resolveRoleDescription,
+  resolveRoleDisplayName,
+  roleInfoByKey,
+} from "../lib/roleLabels";
 
 // Role icons and colors
 const ROLE_CONFIG = {
@@ -115,7 +126,7 @@ const FEATURE_ICONS = {
   equipment: Building2,
   library: Library,
   library_ai_tools: Brain,
-  insights: Sparkles,
+  reliability_intelligence: Sparkles,
   chat: MessageSquare,
   feedback: MessageSquare,
   statistics: BarChart3,
@@ -250,6 +261,7 @@ export default function SettingsPermissionsPage({ embedded = false }) {
   }
 
   const { permissions, features, roles } = permissionsData || {};
+  const rolesByKey = roleInfoByKey(roles);
   const roleConfig = ROLE_CONFIG[selectedRole] || ROLE_CONFIG.viewer;
   const RoleIcon = roleConfig.icon;
 
@@ -268,9 +280,12 @@ export default function SettingsPermissionsPage({ embedded = false }) {
           const featureInfo = featureInfoByKey[featureKey];
           const Icon = FEATURE_ICONS[featureKey] || FileText;
           const perm = permissions?.[role]?.[featureKey] || {};
-          const displayName =
+          const displayName = getPermissionFeatureName(
+            t,
+            featureKey,
             featureInfo?.name ||
-            featureKey.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+              featureKey.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())
+          );
           const idx = rowIndex++;
           return (
             <tr key={featureKey} className={idx % 2 === 0 ? "" : "bg-slate-50/50"}>
@@ -310,7 +325,7 @@ export default function SettingsPermissionsPage({ embedded = false }) {
       return [
         <tr key={`${section.id}-header`} className="bg-slate-100/80">
           <td colSpan={4} className="py-2 px-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {section.label}
+            {getPermissionSectionLabel(t, section.id, section.label)}
           </td>
         </tr>,
         ...sectionRows,
@@ -335,8 +350,12 @@ export default function SettingsPermissionsPage({ embedded = false }) {
                 <div className="flex items-center gap-3">
                   <FeatureIcon className="w-5 h-5 text-slate-400" />
                   <div>
-                    <p className="font-medium text-slate-900">{featureInfo.name}</p>
-                    <p className="text-xs text-slate-500">{featureInfo.description}</p>
+                    <p className="font-medium text-slate-900">
+                      {getPermissionFeatureName(t, featureKey, featureInfo.name)}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {getPermissionFeatureDescription(t, featureKey, featureInfo.description)}
+                    </p>
                   </div>
                 </div>
               </td>
@@ -379,7 +398,7 @@ export default function SettingsPermissionsPage({ embedded = false }) {
       return [
         <tr key={`${section.id}-header`} className="bg-slate-100/80">
           <td colSpan={4} className="py-3 px-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {section.label}
+            {getPermissionSectionLabel(t, section.id, section.label)}
           </td>
         </tr>,
         ...sectionRows,
@@ -454,7 +473,7 @@ export default function SettingsPermissionsPage({ embedded = false }) {
             return roleEntries.map(([roleKey, roleInfo]) => {
               const Icon = ROLE_CONFIG[roleKey]?.icon || Shield;
               const isCustom = roleInfo?.is_custom;
-              const displayName = ROLE_CONFIG[roleKey]?.label || roleInfo?.display_name || roleInfo?.name || roleKey;
+              const displayName = resolveRoleDisplayName(roleKey, roleInfo);
               return (
                 <Button
                   key={roleKey}
@@ -478,9 +497,9 @@ export default function SettingsPermissionsPage({ embedded = false }) {
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">
                 <RoleIcon className={`w-5 h-5 ${roleConfig.color}`} />
-                {roles?.[selectedRole]?.display_name || selectedRole} Permissions
+                {resolveRoleDisplayName(selectedRole, rolesByKey[selectedRole])} Permissions
               </CardTitle>
-              {roles?.[selectedRole]?.is_custom && (
+              {rolesByKey[selectedRole]?.is_custom && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
@@ -492,7 +511,7 @@ export default function SettingsPermissionsPage({ embedded = false }) {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete Custom Role?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will permanently delete the "{roles?.[selectedRole]?.display_name}" role.
+                        This will permanently delete the "{resolveRoleDisplayName(selectedRole, rolesByKey[selectedRole])}" role.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -508,8 +527,8 @@ export default function SettingsPermissionsPage({ embedded = false }) {
                 </AlertDialog>
               )}
             </div>
-            {roles?.[selectedRole]?.description && (
-              <CardDescription>{roles[selectedRole].description}</CardDescription>
+            {resolveRoleDescription(selectedRole, rolesByKey[selectedRole]) && (
+              <CardDescription>{resolveRoleDescription(selectedRole, rolesByKey[selectedRole])}</CardDescription>
             )}
             <div className="flex justify-end pt-2">
               <Button
@@ -686,7 +705,7 @@ export default function SettingsPermissionsPage({ embedded = false }) {
                     data-testid={`role-tab-${role}`}
                   >
                     <Icon className={`w-4 h-4 ${config?.color || 'text-slate-600'}`} />
-                    <span>{config?.label || role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
+                    <span>{resolveRoleDisplayName(role, rolesByKey[role])}</span>
                   </TabsTrigger>
                 );
               })}
@@ -737,7 +756,7 @@ export default function SettingsPermissionsPage({ embedded = false }) {
                       </div>
                       <div>
                         <CardTitle className="text-lg flex items-center gap-2">
-                          {ROLE_CONFIG[role]?.label || role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                          {resolveRoleDisplayName(role, rolesByKey[role])}
                           {isCustomRole && (
                             <Badge variant="secondary" className="text-xs">Custom</Badge>
                           )}
@@ -973,7 +992,7 @@ export default function SettingsPermissionsPage({ embedded = false }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Custom Role?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the role "{deleteRoleConfirm}". Make sure no users are assigned to this role before deleting.
+              This will permanently delete the role "{deleteRoleConfirm ? formatRoleLabel(deleteRoleConfirm) : ""}". Make sure no users are assigned to this role before deleting.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

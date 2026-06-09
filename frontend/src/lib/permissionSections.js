@@ -3,21 +3,25 @@ export const PERMISSION_SECTIONS = [
   {
     id: "operations",
     label: "Operations",
+    labelKey: "permissions.sections.operations",
     features: ["observations", "actions", "tasks", "scheduler", "forms"],
   },
   {
     id: "reliability",
     label: "Reliability & Equipment",
-    features: ["investigations", "library", "library_ai_tools", "insights", "equipment"],
+    labelKey: "permissions.sections.reliability",
+    features: ["investigations", "library", "library_ai_tools", "reliability_intelligence", "equipment"],
   },
   {
     id: "collaboration",
     label: "Collaboration",
+    labelKey: "permissions.sections.collaboration",
     features: ["chat", "feedback"],
   },
   {
     id: "administration",
     label: "Administration",
+    labelKey: "permissions.sections.administration",
     features: ["users", "statistics", "settings"],
   },
 ];

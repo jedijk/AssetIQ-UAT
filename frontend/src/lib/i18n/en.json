@@ -18,7 +18,8 @@
     "aiUsage": "AI Usage",
     "maintenanceReadiness": "Maintenance Readiness",
     "taskScheduler": "Execution",
-    "formSubmissions": "Reports"
+    "formSubmissions": "Reports",
+    "reliabilityIntelligence": "Reliability Intelligence"
   },
   "settings": {
     "userManagement": "User Management",
@@ -213,6 +214,63 @@
     "exit": "Exit preview",
     "active": "Active",
     "systemRole": "System"
+  },
+  "permissions": {
+    "sections": {
+      "operations": "Operations",
+      "reliability": "Reliability & Equipment",
+      "collaboration": "Collaboration",
+      "administration": "Administration"
+    },
+    "features": {
+      "observations": {
+        "description": "Observations page and threat management"
+      },
+      "investigations": {
+        "description": "Causal Engine investigations and root-cause analysis"
+      },
+      "actions": {
+        "description": "Actions page and corrective/preventive work"
+      },
+      "tasks": {
+        "description": "My Tasks execution queue"
+      },
+      "scheduler": {
+        "description": "Execution planner and task scheduling"
+      },
+      "forms": {
+        "description": "Reports and form submissions"
+      },
+      "equipment": {
+        "description": "Equipment Manager and definitions"
+      },
+      "library": {
+        "description": "Strategy library for failure modes and maintenance programs"
+      },
+      "library_ai_tools": {
+        "name": "Strategy — AI Tools",
+        "description": "AI tools inside Strategy: suggest failure modes, bulk improve, review disciplines, find similar, suggest equipment types, and the not-improved filter"
+      },
+      "reliability_intelligence": {
+        "description": "Reliability Intelligence main page and case management"
+      },
+      "chat": {
+        "name": "AI Chat",
+        "description": "AI assistant sidebar for reliability questions"
+      },
+      "statistics": {
+        "description": "User Statistics settings page"
+      },
+      "feedback": {
+        "description": "Feedback page and suggestions"
+      },
+      "users": {
+        "description": "User Management settings page"
+      },
+      "settings": {
+        "description": "Settings pages and system configuration"
+      }
+    }
   },
   "reports": {
     "title": "Form Submissions",

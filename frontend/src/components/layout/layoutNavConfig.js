@@ -22,7 +22,7 @@ import {
 export function buildNavItems(t) {
   return [
     { path: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
-    { path: "/reliability", label: "Reliability Intelligence", icon: Sparkles, desktopOnly: true },
+    { path: "/reliability", label: t("nav.reliabilityIntelligence"), icon: Sparkles, desktopOnly: true, feature: "reliability_intelligence" },
     { path: "/threats", label: t("nav.observations"), icon: AlertTriangle, feature: "observations" },
     { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch, desktopOnly: true, feature: "investigations" },
     { path: "/actions", label: t("nav.actions"), icon: ClipboardList, feature: "actions" },

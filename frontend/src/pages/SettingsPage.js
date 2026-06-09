@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { usePermissions } from "../contexts/PermissionsContext";
 import { useEffectiveRole } from "../contexts/RolePreviewContext";
+import { formatRoleLabel } from "../lib/roleLabels";
 import { useLanguage } from "../contexts/LanguageContext";
 import {
   Settings,
@@ -415,7 +416,7 @@ export default function SettingsPage() {
         <div className="p-3 border-t border-slate-200 bg-slate-50">
           <div className="text-xs text-slate-500 text-center space-y-1">
             <div>
-              {t("settings.accessLevel").replace("{role}", user?.role || "")}
+              {t("settings.accessLevel").replace("{role}", formatRoleLabel(effectiveRole || user?.role || ""))}
             </div>
             <div className="text-slate-400">
               {t("settings.version").replace("{version}", APP_VERSION)}

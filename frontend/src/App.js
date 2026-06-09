@@ -65,7 +65,6 @@ const SettingsAIUsagePage = lazy(() => import("./pages/SettingsAIUsagePage"));
 const SettingsServerPerformancePage = lazy(() => import("./pages/SettingsServerPerformancePage"));
 const SettingsMaintenanceReadinessPage = lazy(() => import("./pages/SettingsMaintenanceReadinessPage"));
 const SettingsDatabasePage = lazy(() => import("./pages/SettingsDatabasePage"));
-const InsightsPage = lazy(() => import("./pages/InsightsPage"));
 const SettingsLogIngestionPage = lazy(() => import("./pages/SettingsLogIngestionPage"));
 const SettingsPrivacyPage = lazy(() => import("./pages/SettingsPrivacyPage"));
 const SettingsDeletionRequestsPage = lazy(() => import("./pages/SettingsDeletionRequestsPage"));
@@ -488,7 +487,7 @@ function App() {
                   <Route path="maintenance-readiness" element={<Suspense fallback={<RouteFallback />}><SettingsMaintenanceReadinessPage /></Suspense>} />
                   <Route path="database" element={<Suspense fallback={<RouteFallback />}><SettingsDatabasePage /></Suspense>} />
                   <Route path="audit-log" element={<Suspense fallback={<RouteFallback />}><SettingsAuditLogPage /></Suspense>} />
-                  <Route path="insights" element={<Suspense fallback={<RouteFallback />}><InsightsPage /></Suspense>} />
+                  <Route path="insights" element={<Navigate to="/reliability" replace />} />
                   <Route path="statistics" element={<Suspense fallback={<RouteFallback />}><UserStatisticsPage /></Suspense>} />
                   <Route path="criticality-definitions" element={<Suspense fallback={<RouteFallback />}><DefinitionsPage /></Suspense>} />
                   <Route path="feedback" element={<Suspense fallback={<RouteFallback />}><FeedbackPage /></Suspense>} />

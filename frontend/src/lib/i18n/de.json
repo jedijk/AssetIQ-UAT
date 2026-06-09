@@ -18,7 +18,8 @@
     "aiUsage": "KI-Nutzung",
     "maintenanceReadiness": "Maintenance Readiness",
     "taskScheduler": "Planer",
-    "formSubmissions": "Berichte"
+    "formSubmissions": "Berichte",
+    "reliabilityIntelligence": "Zuverlässigkeitsintelligenz"
   },
   "settings": {
     "userManagement": "Benutzerverwaltung",
@@ -213,6 +214,63 @@
     "exit": "Vorschau beenden",
     "active": "Aktiv",
     "systemRole": "System"
+  },
+  "permissions": {
+    "sections": {
+      "operations": "Betrieb",
+      "reliability": "Zuverlässigkeit & Anlagen",
+      "collaboration": "Zusammenarbeit",
+      "administration": "Administration"
+    },
+    "features": {
+      "observations": {
+        "description": "Beobachtungsseite und Risikomanagement"
+      },
+      "investigations": {
+        "description": "Ursachenanalyse und Root-Cause-Untersuchungen"
+      },
+      "actions": {
+        "description": "Maßnahmenseite und korrektive/präventive Arbeit"
+      },
+      "tasks": {
+        "description": "Meine Aufgaben-Ausführungswarteschlange"
+      },
+      "scheduler": {
+        "description": "Ausführungsplaner und Aufgabenplanung"
+      },
+      "forms": {
+        "description": "Berichte und Formulareinreichungen"
+      },
+      "equipment": {
+        "description": "Anlagenmanager und Definitionen"
+      },
+      "library": {
+        "description": "Strategiebibliothek für Ausfallmodi und Wartungsprogramme"
+      },
+      "library_ai_tools": {
+        "name": "Strategie — KI-Tools",
+        "description": "KI-Tools in Strategie: Ausfallmodi vorschlagen, Massenverbesserung, Disziplinen prüfen, Ähnliches finden, Anlagentypen vorschlagen und Nicht-verbessert-Filter"
+      },
+      "reliability_intelligence": {
+        "description": "Zuverlässigkeitsintelligenz-Hauptseite und Fallverwaltung"
+      },
+      "chat": {
+        "name": "KI-Chat",
+        "description": "KI-Assistent in der Seitenleiste für Zuverlässigkeitsfragen"
+      },
+      "statistics": {
+        "description": "Benutzerstatistik-Einstellungsseite"
+      },
+      "feedback": {
+        "description": "Feedback-Seite und Vorschläge"
+      },
+      "users": {
+        "description": "Benutzerverwaltung-Einstellungsseite"
+      },
+      "settings": {
+        "description": "Einstellungsseiten und Systemkonfiguration"
+      }
+    }
   },
   "reports": {
     "title": "Form Submissions",

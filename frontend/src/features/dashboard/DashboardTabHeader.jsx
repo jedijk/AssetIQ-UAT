@@ -36,15 +36,6 @@ export function DashboardTabHeader(props) {
               <span className="xs:hidden">Ops</span>
             </button>
             <button 
-              onClick={() => setActiveTab("reliability")}
-              className={`hidden sm:flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "reliability" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
-              data-testid="reliability-tab"
-            >
-              <Activity className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden sm:inline">Reliability Insights</span>
-              <span className="sm:hidden">Insights</span>
-            </button>
-            <button 
               onClick={() => setActiveTab("production")}
               className={`flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "production" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
               data-testid="production-tab"

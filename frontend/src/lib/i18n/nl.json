@@ -18,7 +18,8 @@
     "aiUsage": "AI Gebruik",
     "maintenanceReadiness": "Onderhoudsgereedheid",
     "taskScheduler": "Uitvoering",
-    "formSubmissions": "Rapporten"
+    "formSubmissions": "Rapporten",
+    "reliabilityIntelligence": "Betrouwbaarheidsintelligentie"
   },
   "settings": {
     "userManagement": "Gebruikersbeheer",
@@ -213,6 +214,63 @@
     "exit": "Voorbeeldweergave stoppen",
     "active": "Actief",
     "systemRole": "Systeem"
+  },
+  "permissions": {
+    "sections": {
+      "operations": "Operaties",
+      "reliability": "Betrouwbaarheid & Apparatuur",
+      "collaboration": "Samenwerking",
+      "administration": "Beheer"
+    },
+    "features": {
+      "observations": {
+        "description": "Observatiespagina en dreigingsbeheer"
+      },
+      "investigations": {
+        "description": "Oorzaakanalyse en root-cause-onderzoek"
+      },
+      "actions": {
+        "description": "Actiespagina en corrigerend/preventief werk"
+      },
+      "tasks": {
+        "description": "Mijn Taken-uitvoeringswachtrij"
+      },
+      "scheduler": {
+        "description": "Uitvoeringsplanner en taakplanning"
+      },
+      "forms": {
+        "description": "Rapporten en formulierinzendingen"
+      },
+      "equipment": {
+        "description": "Apparatuurbeheer en definities"
+      },
+      "library": {
+        "description": "Strategiebibliotheek voor storingsmodi en onderhoudsprogramma's"
+      },
+      "library_ai_tools": {
+        "name": "Strategie — AI-tools",
+        "description": "AI-tools in Strategie: storingsmodi voorstellen, bulk verbeteren, disciplines beoordelen, vergelijkbaar zoeken, apparatuurtypes voorstellen en het niet-verbeterd-filter"
+      },
+      "reliability_intelligence": {
+        "description": "Betrouwbaarheidsintelligentie hoofdpagina en casusbeheer"
+      },
+      "chat": {
+        "name": "AI-chat",
+        "description": "AI-assistent in de zijbalk voor betrouwbaarheidsvragen"
+      },
+      "statistics": {
+        "description": "Gebruikersstatistieken-instellingenpagina"
+      },
+      "feedback": {
+        "description": "Feedbackpagina en suggesties"
+      },
+      "users": {
+        "description": "Gebruikersbeheer-instellingenpagina"
+      },
+      "settings": {
+        "description": "Instellingenpagina's en systeemconfiguratie"
+      }
+    }
   },
   "reports": {
     "title": "Formulierinzendingen",

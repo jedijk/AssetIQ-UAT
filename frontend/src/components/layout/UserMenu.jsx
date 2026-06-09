@@ -15,6 +15,7 @@ import {
 } from "../ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { getApiUrl } from "../../lib/apiConfig";
+import { formatRoleLabel } from "../../lib/roleLabels";
 
 export const UserMenu = ({ 
   user, 
@@ -77,7 +78,7 @@ export const UserMenu = ({
             {user?.role && (
               <Badge className={`mt-2 text-xs w-fit ${roleColors[user.role] || roleColors.viewer}`}>
                 <Shield className="w-3 h-3 mr-1" />
-                {user.role}
+                {formatRoleLabel(user.role)}
               </Badge>
             )}
           </div>

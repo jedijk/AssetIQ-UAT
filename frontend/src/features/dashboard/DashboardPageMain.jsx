@@ -57,7 +57,6 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
 import { Label } from "../../components/ui/label";
-import InsightsPage from "../../pages/InsightsPage";
 import { DISCIPLINES } from "../../constants/disciplines";
 import {
   AuthenticatedLightbox,
@@ -135,8 +134,7 @@ export default function DashboardPageMain({ initialTab }) {
   useEffect(() => {
     const handleResize = () => {
       // sm breakpoint is 640px
-      // Only redirect reliability tab on mobile, production is now mobile-friendly
-      if (window.innerWidth < 640 && (activeTab === "reliability" || activeTab === "builder")) {
+      if (window.innerWidth < 640 && activeTab === "builder") {
         setActiveTab("operational");
       }
     };
@@ -451,15 +449,6 @@ export default function DashboardPageMain({ initialTab }) {
               <Activity className="w-4 h-4 flex-shrink-0" />
               <span className="hidden xs:inline">{t("dashboard.operational") || "Operational"}</span>
               <span className="xs:hidden">Ops</span>
-            </button>
-            <button 
-              onClick={() => setActiveTab("reliability")}
-              className={`hidden sm:flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "reliability" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
-              data-testid="reliability-tab"
-            >
-              <Activity className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden sm:inline">Reliability Insights</span>
-              <span className="sm:hidden">Insights</span>
             </button>
             <button 
               onClick={() => setActiveTab("production")}
@@ -1061,13 +1050,6 @@ export default function DashboardPageMain({ initialTab }) {
             </div>
           )}
           
-          {/* Reliability Insights Tab */}
-          {activeTab === "reliability" && (
-            <div className="animate-fade-in -mx-4 sm:-mx-6">
-              <InsightsPage embedded={true} />
-            </div>
-          )}
-
           {/* Smart Dashboard Builder Tab (manual, intuitive) */}
           {activeTab === "builder" && canShowBuilder && (
             <div className="animate-fade-in">

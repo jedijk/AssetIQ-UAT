@@ -12,14 +12,14 @@ const FEATURE_PATHS = {
   observations: ["/threats", "/observations"],
   investigations: ["/investigations", "/causal-engine", "/decision-engine"],
   actions: ["/actions"],
-  // "tasks" is execution / personal work queue
-  tasks: ["/my-tasks"],
+  // "tasks" is execution / personal work queue + production dashboard
+  tasks: ["/my-tasks", "/production"],
   // "scheduler" is the planner / scheduling UI (route is `/tasks`)
   scheduler: ["/tasks"],
   forms: ["/forms", "/form-submissions", "/granulometry"],
   equipment: ["/equipment", "/definitions", "/equipment-manager"],
-  library: ["/library", "/reliability"],
-  insights: ["/settings/insights", "/production"],
+  library: ["/library"],
+  reliability_intelligence: ["/reliability"],
   // chat is currently a sidebar (no dedicated route), keep mapping empty for now
   chat: [],
   statistics: ["/settings/statistics", "/user-statistics"],

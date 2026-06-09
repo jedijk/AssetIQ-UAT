@@ -15,6 +15,21 @@ from services.permission_resolver import invalidate_permissions_cache
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+SYSTEM_ROLE_LABELS = {
+    "owner": "Owner",
+    "admin": "Admin",
+    "manager": "Manager",
+    "reliability_engineer": "Reliability Engineer",
+    "maintenance": "Maintenance",
+    "operations": "Operations",
+    "operator": "Operator",
+    "viewer": "Viewer",
+}
+
+
+def format_role_label(role: str) -> str:
+    return SYSTEM_ROLE_LABELS.get(role, role.replace("_", " ").title())
+
 
 # Default permissions for each role
 DEFAULT_PERMISSIONS = {
@@ -28,7 +43,7 @@ DEFAULT_PERMISSIONS = {
         "equipment": {"read": True, "write": True, "delete": True},
         "library": {"read": True, "write": True, "delete": True},
         "library_ai_tools": {"read": True, "write": True, "delete": True},
-        "insights": {"read": True, "write": True, "delete": True},
+        "reliability_intelligence": {"read": True, "write": True, "delete": True},
         "chat": {"read": True, "write": True, "delete": True},
         "statistics": {"read": True, "write": True, "delete": True},
         "feedback": {"read": True, "write": True, "delete": True},
@@ -45,7 +60,7 @@ DEFAULT_PERMISSIONS = {
         "equipment": {"read": True, "write": True, "delete": False},
         "library": {"read": True, "write": True, "delete": True},
         "library_ai_tools": {"read": True, "write": True, "delete": False},
-        "insights": {"read": True, "write": True, "delete": False},
+        "reliability_intelligence": {"read": True, "write": True, "delete": False},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": True, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": True},
@@ -62,7 +77,7 @@ DEFAULT_PERMISSIONS = {
         "equipment": {"read": True, "write": True, "delete": False},
         "library": {"read": True, "write": True, "delete": False},
         "library_ai_tools": {"read": False, "write": False, "delete": False},
-        "insights": {"read": True, "write": True, "delete": False},
+        "reliability_intelligence": {"read": True, "write": True, "delete": False},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": True, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": False},
@@ -79,7 +94,7 @@ DEFAULT_PERMISSIONS = {
         "equipment": {"read": True, "write": False, "delete": False},
         "library": {"read": True, "write": False, "delete": False},
         "library_ai_tools": {"read": False, "write": False, "delete": False},
-        "insights": {"read": True, "write": False, "delete": False},
+        "reliability_intelligence": {"read": True, "write": False, "delete": False},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": False, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": False},
@@ -96,7 +111,7 @@ DEFAULT_PERMISSIONS = {
         "equipment": {"read": True, "write": False, "delete": False},
         "library": {"read": True, "write": False, "delete": False},
         "library_ai_tools": {"read": False, "write": False, "delete": False},
-        "insights": {"read": True, "write": False, "delete": False},
+        "reliability_intelligence": {"read": True, "write": False, "delete": False},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": False, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": False},
@@ -113,7 +128,7 @@ DEFAULT_PERMISSIONS = {
         "equipment": {"read": True, "write": False, "delete": False},
         "library": {"read": True, "write": False, "delete": False},
         "library_ai_tools": {"read": False, "write": False, "delete": False},
-        "insights": {"read": True, "write": False, "delete": False},
+        "reliability_intelligence": {"read": True, "write": False, "delete": False},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": False, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": False},
@@ -126,67 +141,67 @@ DEFAULT_PERMISSIONS = {
 DEFAULT_PERMISSIONS["manager"] = DEFAULT_PERMISSIONS["admin"]
 DEFAULT_PERMISSIONS["operator"] = DEFAULT_PERMISSIONS["operations"]
 
-# Feature descriptions for UI
+# Feature labels for UI — keep names aligned with nav / page titles in the frontend.
 FEATURES = {
     "observations": {
         "name": "Observations",
-        "description": "Risk observations and threat management"
+        "description": "Observations page and threat management"
     },
     "investigations": {
-        "name": "Causal Investigations",
-        "description": "Root cause analysis and causal trees"
+        "name": "Causal Engine",
+        "description": "Causal Engine investigations and root-cause analysis"
     },
     "actions": {
         "name": "Actions",
-        "description": "Corrective and preventive actions"
+        "description": "Actions page and corrective/preventive work"
     },
     "tasks": {
         "name": "My Tasks",
-        "description": "Task execution and completion"
+        "description": "My Tasks execution queue"
     },
     "scheduler": {
-        "name": "Task Scheduler",
-        "description": "Task planning and scheduling"
+        "name": "Execution",
+        "description": "Execution planner and task scheduling"
     },
     "forms": {
-        "name": "Forms",
-        "description": "Form templates and submissions"
+        "name": "Reports",
+        "description": "Reports and form submissions"
     },
     "equipment": {
         "name": "Equipment Manager",
-        "description": "Equipment hierarchy and criticality"
+        "description": "Equipment Manager and definitions"
     },
     "library": {
-        "name": "Library",
-        "description": "Failure modes and maintenance strategies"
+        "name": "Strategy",
+        "description": "Strategy library for failure modes and maintenance programs"
     },
     "library_ai_tools": {
-        "name": "Library — AI Tools",
-        "description": "Heavy-cost AI buttons in the failure-modes library: Suggest Failure Modes, Bulk Improve, Review Disciplines, Find Similar, Suggest New Equipment Types, and the 'Not improved yet' filter"
+        "name": "Strategy — AI Tools",
+        "description": "AI tools inside Strategy: suggest failure modes, bulk improve, review disciplines, find similar, suggest equipment types, and the not-improved filter"
     },
-    "insights": {
-        "name": "Reliability Insights",
-        "description": "AI-powered reliability analytics and dashboards"
+    "reliability_intelligence": {
+        "name": "Reliability Intelligence",
+        "description": "Reliability Intelligence main page and case management"
     },
     "chat": {
         "name": "AI Chat",
-        "description": "AI assistant for reliability questions"
+        "description": "AI assistant sidebar for reliability questions"
     },
     "statistics": {
-        "name": "Statistics",
-        "description": "User activity and system usage analytics"
+        "name": "User Statistics",
+        "description": "User Statistics settings page"
     },
     "feedback": {
         "name": "Feedback",
-        "description": "User feedback and suggestions"
+        "description": "Feedback page and suggestions"
     },
     "users": {
         "name": "User Management",
-        "description": "User accounts and access control"
+        "description": "User Management settings page"
     },
     "settings": {
         "name": "Settings",
-        "description": "System configuration and permissions"
+        "description": "Settings pages and system configuration"
     },
 }
 
@@ -239,6 +254,9 @@ def _backfill_permissions(stored_perms: Dict) -> Dict:
     result: Dict = {}
     for role_name, role_perms in stored_perms.items():
         merged = dict(role_perms or {})
+        if "insights" in merged and "reliability_intelligence" not in merged:
+            merged["reliability_intelligence"] = dict(merged["insights"])
+        merged.pop("insights", None)
         defaults_for_role = DEFAULT_PERMISSIONS.get(role_name) or DEFAULT_PERMISSIONS["viewer"]
         for feature_key in FEATURES.keys():
             if feature_key not in merged:
@@ -260,10 +278,11 @@ async def list_roles(current_user: dict = Depends(get_current_user)):
     # Build role list with metadata
     roles = []
     for role in SYSTEM_ROLES:
+        display_name = format_role_label(role)
         roles.append({
             "name": role,
-            "display_name": role.replace("_", " ").title(),
-            "description": f"System role: {role}",
+            "display_name": display_name,
+            "description": f"System role: {display_name}",
             "is_system": True,
             "is_deletable": False
         })

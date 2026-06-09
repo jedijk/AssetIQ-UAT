@@ -1,23 +1,11 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "./AuthContext";
+import { formatRoleLabel } from "../lib/roleLabels";
+
+export { formatRoleLabel };
 
 const STORAGE_KEY = "rolePreviewRole";
 export const ROLE_PREVIEW_CHANGED_EVENT = "rolePreviewChanged";
-
-const ROLE_LABELS = {
-  owner: "Owner",
-  admin: "Admin",
-  reliability_engineer: "Reliability Engineer",
-  maintenance: "Maintenance",
-  operations: "Operations",
-  operator: "Operator",
-  viewer: "Viewer",
-};
-
-export function formatRoleLabel(role) {
-  if (!role) return "";
-  return ROLE_LABELS[role] || role.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
 const RolePreviewContext = createContext(null);
 
