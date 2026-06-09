@@ -3,7 +3,7 @@ import { Building2, ClipboardCheck, Activity } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
-import { api } from "../lib/api";
+import { api, preferencesAPI } from "../lib/api";
 import { publicAssetUrl } from "../lib/assetUrl";
 
 const haptic = () => {
@@ -21,10 +21,15 @@ function tasksFromMyTasksPayload(payload) {
   return payload?.tasks ?? payload?.items ?? [];
 }
 
-const fetchTaskCounts = async () => {
+const fetchTaskCounts = async (discipline) => {
+  const params = { filter: "open" };
+  if (discipline) {
+    params.discipline = discipline;
+  }
+  
   const [openRes, overdueRes] = await Promise.all([
-    api.get("/work-items", { params: { filter: "open" } }),
-    api.get("/work-items", { params: { filter: "overdue" } }),
+    api.get("/work-items", { params }),
+    api.get("/work-items", { params: { ...params, filter: "overdue" } }),
   ]);
   const openTasks = tasksFromMyTasksPayload(openRes.data);
   const overdueTasks = tasksFromMyTasksPayload(overdueRes.data);
@@ -43,9 +48,19 @@ export default function OperatorLandingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t } = useLanguage();
+  
+  // Fetch user preferences to get discipline filter
+  const { data: preferences } = useQuery({
+    queryKey: ["userPreferences"],
+    queryFn: preferencesAPI.getPreferences,
+    staleTime: 60000,
+  });
+  
+  const disciplineFilter = preferences?.discipline || null;
+  
   const { data: taskCounts } = useQuery({
-    queryKey: ["operatorTaskCounts"],
-    queryFn: fetchTaskCounts,
+    queryKey: ["operatorTaskCounts", disciplineFilter],
+    queryFn: () => fetchTaskCounts(disciplineFilter),
     refetchInterval: 30000,
     staleTime: 10000,
   });

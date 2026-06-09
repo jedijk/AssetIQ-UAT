@@ -997,6 +997,7 @@ class UserPreferencesUpdate(BaseModel):
     date_format: str = None
     time_format: str = None  # "12h" or "24h"
     language: str = None
+    discipline: str = None  # Filter discipline for simple mode
 
 
 @router.get("/users/me/preferences")
@@ -1015,7 +1016,8 @@ async def get_user_preferences(
         "timezone_auto_detect": True,
         "date_format": "YYYY-MM-DD",
         "time_format": "24h",
-        "language": "en"
+        "language": "en",
+        "discipline": None  # No filter by default
     }
     
     preferences = user.get("preferences", {}) if user else {}
@@ -1040,6 +1042,8 @@ async def update_user_preferences(
         update_data["preferences.time_format"] = preferences.time_format
     if preferences.language is not None:
         update_data["preferences.language"] = preferences.language
+    if preferences.discipline is not None:
+        update_data["preferences.discipline"] = preferences.discipline if preferences.discipline != "all" else None
     
     if update_data:
         await db.users.update_one(
