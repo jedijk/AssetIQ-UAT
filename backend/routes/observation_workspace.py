@@ -90,23 +90,33 @@ class ProcessStage(BaseModel):
 # HELPER FUNCTIONS
 # ============================================================================
 
-def calculate_production_exposure(observation: dict, criticality: dict) -> dict:
-    """Calculate production exposure based on criticality and observation data"""
+async def calculate_production_exposure(observation: dict, criticality: dict, user_id: str) -> dict:
+    """Calculate production exposure based on criticality, observation data, and user's production loss config"""
     production_impact = (criticality or {}).get("production_impact") or 0
     if not production_impact:  # None or 0 → not rated on the 1-5 scale
         return {"not_assessed": True, "production_impact_score": None, "formatted_value": "Not Assessed"}
     
-    # Base exposure calculation
-    # Production impact 1-5 scale maps to monetary exposure
-    exposure_multiplier = {
-        1: 5000,
-        2: 15000,
-        3: 50000,
-        4: 100000,
-        5: 250000
-    }
+    # Fetch user's production loss configuration
+    prod_loss_config = await db.production_loss_config.find_one(
+        {"created_by": user_id},
+        {"_id": 0}
+    )
     
-    base_exposure = exposure_multiplier.get(production_impact, 0)
+    # Use config values or defaults
+    hourly_cost = (prod_loss_config or {}).get("hourly_cost", 500.0)
+    currency = (prod_loss_config or {}).get("currency", "EUR")
+    
+    # Currency symbols
+    currency_symbols = {
+        "EUR": "€",
+        "USD": "$",
+        "GBP": "£",
+        "CHF": "CHF ",
+        "NOK": "kr ",
+        "SEK": "kr ",
+        "DKK": "kr "
+    }
+    currency_symbol = currency_symbols.get(currency, currency + " ")
     
     # Estimate downtime based on risk level
     risk_level = observation.get("risk_level", "low")
@@ -117,16 +127,15 @@ def calculate_production_exposure(observation: dict, criticality: dict) -> dict:
         "low": 2
     }.get(risk_level.lower(), 4)
     
-    # Calculate deferred production (simplified)
-    hourly_rate = 1000  # bbl/hour baseline
-    deferred_production = downtime_hours * hourly_rate * (production_impact / 5)
+    # Calculate exposure: downtime hours × hourly cost
+    exposure_value = downtime_hours * hourly_cost
     
     return {
-        "value": base_exposure,
-        "formatted_value": f"${base_exposure:,.0f}",
+        "value": exposure_value,
+        "formatted_value": f"{currency_symbol}{exposure_value:,.0f}",
         "estimated_downtime_hours": downtime_hours,
-        "deferred_production": round(deferred_production),
-        "deferred_production_unit": "bbl",
+        "hourly_cost": hourly_cost,
+        "currency": currency,
         "production_impact_score": production_impact
     }
 
@@ -851,7 +860,7 @@ async def get_observation_workspace(
     # Build all workspace components
     
     # 1. Exposure data
-    production_exposure = calculate_production_exposure(observation, criticality)
+    production_exposure = await calculate_production_exposure(observation, criticality, current_user["id"])
     safety_exposure = calculate_safety_exposure(observation, criticality)
     environmental_exposure = calculate_environmental_exposure(observation, criticality)
     reputation_exposure = calculate_reputation_exposure(observation, criticality)
