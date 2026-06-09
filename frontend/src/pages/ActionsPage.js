@@ -917,7 +917,7 @@ export default function ActionsPage() {
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={(e) => {
                         e.stopPropagation();
-                        navigate(`/actions/${action.id}`);
+                        openEditDialog(action);
                       }}>
                         <Edit2 className="w-4 h-4 mr-2" /> Edit
                       </DropdownMenuItem>
