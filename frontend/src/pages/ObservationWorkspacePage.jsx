@@ -1780,9 +1780,9 @@ const ObservationWorkspacePage = () => {
               Full Reliability Analysis
             </DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
-            <CausalIntelligencePanel threatId={id} threatData={observation} />
-            <AIInsightsPanel threatId={id} threatData={observation} hideRecommendations />
+          <div className="flex flex-col gap-4 pt-2">
+            <AIInsightsPanel threatId={id} threatData={observation} hideRecommendations autoGenerate />
+            <CausalIntelligencePanel threatId={id} threatData={observation} autoGenerate />
           </div>
         </DialogContent>
       </Dialog>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { aiRiskAPI, threatsAPI, equipmentHierarchyAPI, failureModesAPI } from "../lib/api";
@@ -162,7 +162,7 @@ const ForecastChart = ({ forecasts, t, currentScore = 60 }) => {
   );
 };
 
-export default function AIInsightsPanel({ threatId, threatData, compact = false, hideRecommendations = false }) {
+export default function AIInsightsPanel({ threatId, threatData, compact = false, hideRecommendations = false, autoGenerate = false }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { t } = useLanguage();
@@ -301,6 +301,21 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false,
   const handleAnalyze = () => {
     analyzeMutation.mutate();
   };
+
+  // Auto-trigger analysis when autoGenerate is on and no insights exist yet
+  useEffect(() => {
+    const hasData = insights && (insights.dynamic_risk || insights.summary || insights.risk_drivers);
+    if (
+      autoGenerate &&
+      !loadingInsights &&
+      !hasData &&
+      !analyzeMutation.isPending &&
+      !analyzeMutation.data
+    ) {
+      analyzeMutation.mutate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoGenerate, loadingInsights, insights]);
   
   // No insights yet (either 404 error or backend returned null/empty) - show analyze button
   const hasInsights = insights && (insights.dynamic_risk || insights.summary || insights.risk_drivers);
