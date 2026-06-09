@@ -847,28 +847,28 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 const content = msg.content || "";
                 const summary = msg.issue_summary || "";
                 
-                // Parse the summary to extract Equipment, Issue Type, Description
+                // Parse the summary to extract Equipment, Failure Mode, What's happening
                 const lines = summary.split('\n');
                 let equipment = "";
-                let issueType = "";
-                let description = "";
+                let failureMode = "";
+                let whatsHappening = "";
                 
                 lines.forEach(line => {
                   if (line.includes('**Equipment:**') || line.includes('**Apparatuur:**')) {
                     equipment = line.replace(/\*\*Equipment:\*\*|\*\*Apparatuur:\*\*/g, '').trim();
-                  } else if (line.includes('**Issue Type:**') || line.includes('**Type storing:**') || line.includes('**Storingstype:**')) {
-                    issueType = line.replace(/\*\*Issue Type:\*\*|\*\*Type storing:\*\*|\*\*Storingstype:\*\*/g, '').trim();
+                  } else if (line.includes('**Issue Type:**') || line.includes('**Type storing:**') || line.includes('**Storingstype:**') || line.includes('**Failure Mode:**') || line.includes('**Faalwijze:**')) {
+                    failureMode = line.replace(/\*\*Issue Type:\*\*|\*\*Type storing:\*\*|\*\*Storingstype:\*\*|\*\*Failure Mode:\*\*|\*\*Faalwijze:\*\*/g, '').trim();
                   } else if (line.includes('**Description:**') || line.includes('**Beschrijving:**')) {
-                    description = line.replace(/\*\*Description:\*\*|\*\*Beschrijving:\*\*/g, '').trim();
+                    whatsHappening = line.replace(/\*\*Description:\*\*|\*\*Beschrijving:\*\*/g, '').trim();
                   }
                 });
                 
                 return (
                   <>
-                    {/* Title/Issue Type */}
+                    {/* Title/Failure Mode */}
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <h4 className="font-semibold text-slate-900 text-sm leading-tight">
-                        {issueType || (isNl ? "Nieuwe Observatie" : "New Observation")}
+                        {failureMode || (isNl ? "Nieuwe Observatie" : "New Observation")}
                       </h4>
                       <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
                         {isNl ? "Concept" : "Draft"}
@@ -883,18 +883,18 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                           <span><strong>{isNl ? "Apparatuur:" : "Equipment:"}</strong> {equipment}</span>
                         </div>
                       )}
-                      {issueType && (
+                      {failureMode && (
                         <div className="flex items-center gap-1.5">
                           <AlertTriangle className="w-3.5 h-3.5 text-orange-400" />
-                          <span><strong>{isNl ? "Storingstype:" : "Issue Type:"}</strong> {issueType}</span>
+                          <span><strong>{isNl ? "Faalwijze:" : "Failure Mode:"}</strong> {failureMode}</span>
                         </div>
                       )}
-                      {description && (
+                      {whatsHappening && (
                         <div className="flex items-start gap-1.5 mt-2">
                           <MessageSquare className="w-3.5 h-3.5 text-orange-400 mt-0.5" />
                           <div>
-                            <strong>{isNl ? "Beschrijving:" : "Description:"}</strong>
-                            <p className="text-slate-700 mt-0.5">{description}</p>
+                            <strong>{isNl ? "Wat gebeurt er:" : "What's happening:"}</strong>
+                            <p className="text-slate-700 mt-0.5">{whatsHappening}</p>
                           </div>
                         </div>
                       )}
@@ -911,7 +911,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                           data-testid="issue-confirm-accept-btn"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                          {isNl ? "Accepteren" : "Accept"}
+                          {isNl ? "Bevestig" : "Looks Good"}
                         </button>
                         <button
                           type="button"
@@ -923,7 +923,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                           className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-white border border-orange-300 text-orange-700 text-xs font-medium hover:bg-orange-50 disabled:opacity-50 transition-colors"
                           data-testid="issue-confirm-revise-btn"
                         >
-                          {isNl ? "Aanpassen" : "Revise"}
+                          {isNl ? "Aanpassen" : "Edit"}
                         </button>
                         <button
                           type="button"
@@ -1295,8 +1295,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
             </div>
             <div className="min-w-0">
-              <h2 className="font-semibold text-slate-900 text-sm sm:text-base truncate">Report Observation</h2>
-              <p className="text-[10px] sm:text-xs text-slate-500">Describe the failure</p>
+              <h2 className="font-semibold text-slate-900 text-sm sm:text-base truncate">Report a Problem</h2>
+              <p className="text-[10px] sm:text-xs text-slate-500">What did you notice?</p>
             </div>
           </div>
           <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
@@ -1341,16 +1341,16 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 <AlertTriangle className="w-8 h-8 text-blue-600" />
               </div>
               <h3 className="text-lg font-semibold text-slate-800 mb-2">
-                Report a Threat
+                Report a Problem
               </h3>
               <p className="text-slate-500 text-sm mb-4">
-                Describe any equipment failure or issue.
+                Tell us what you noticed with the equipment
               </p>
               <div className="text-left bg-white rounded-xl p-3 text-xs text-slate-600 border border-slate-200 w-full">
-                <p className="font-medium text-slate-700 mb-2">Try saying:</p>
-                <p className="mb-1">"Pump P-104 is leaking from the seal"</p>
-                <p className="mb-1">"Bearing noise on compressor C-201"</p>
-                <p>"Heat exchanger showing reduced efficiency"</p>
+                <p className="font-medium text-slate-700 mb-2">Examples:</p>
+                <p className="mb-1">• Pump P-104 is leaking</p>
+                <p className="mb-1">• Loud noise from compressor</p>
+                <p>• Motor running hot</p>
               </div>
             </div>
           ) : (
@@ -1676,7 +1676,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                     e.target.style.height = newHeight + 'px';
                   }}
                   onKeyDown={handleKeyPress}
-                  placeholder={isListening ? "Recording…" : (isTranscribing ? "Transcribing…" : "Type or tap mic...")}
+                  placeholder={isListening ? "Recording…" : (isTranscribing ? "Transcribing…" : "What's the problem?")}
                   disabled={isTranscribing}
                   className="flex-1 min-w-0 px-3 sm:px-4 py-2.5 sm:py-3 text-sm bg-transparent border-none outline-none resize-none placeholder:text-slate-400 leading-5 scrollbar-thin focus:ring-0 focus:outline-none disabled:opacity-60"
                   rows={1}
