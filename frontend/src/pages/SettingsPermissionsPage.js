@@ -262,6 +262,11 @@ export default function SettingsPermissionsPage({ embedded = false }) {
 
   const { permissions, features, roles } = permissionsData || {};
   const rolesByKey = roleInfoByKey(roles);
+  const getRoleHeading = (roleKey) =>
+    resolveRoleDisplayName(roleKey, {
+      ...rolesByKey[roleKey],
+      label: ROLE_CONFIG[roleKey]?.label,
+    });
   const roleConfig = ROLE_CONFIG[selectedRole] || ROLE_CONFIG.viewer;
   const RoleIcon = roleConfig.icon;
 
@@ -473,7 +478,10 @@ export default function SettingsPermissionsPage({ embedded = false }) {
             return roleEntries.map(([roleKey, roleInfo]) => {
               const Icon = ROLE_CONFIG[roleKey]?.icon || Shield;
               const isCustom = roleInfo?.is_custom;
-              const displayName = resolveRoleDisplayName(roleKey, roleInfo);
+              const displayName = resolveRoleDisplayName(roleKey, {
+                ...roleInfo,
+                label: ROLE_CONFIG[roleKey]?.label,
+              });
               return (
                 <Button
                   key={roleKey}
@@ -497,7 +505,7 @@ export default function SettingsPermissionsPage({ embedded = false }) {
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">
                 <RoleIcon className={`w-5 h-5 ${roleConfig.color}`} />
-                {resolveRoleDisplayName(selectedRole, rolesByKey[selectedRole])} Permissions
+                {getRoleHeading(selectedRole)} Permissions
               </CardTitle>
               {rolesByKey[selectedRole]?.is_custom && (
                 <AlertDialog>
@@ -511,7 +519,7 @@ export default function SettingsPermissionsPage({ embedded = false }) {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete Custom Role?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will permanently delete the "{resolveRoleDisplayName(selectedRole, rolesByKey[selectedRole])}" role.
+                        This will permanently delete the "{getRoleHeading(selectedRole)}" role.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -705,7 +713,7 @@ export default function SettingsPermissionsPage({ embedded = false }) {
                     data-testid={`role-tab-${role}`}
                   >
                     <Icon className={`w-4 h-4 ${config?.color || 'text-slate-600'}`} />
-                    <span>{resolveRoleDisplayName(role, rolesByKey[role])}</span>
+                    <span>{getRoleHeading(role)}</span>
                   </TabsTrigger>
                 );
               })}
@@ -756,7 +764,7 @@ export default function SettingsPermissionsPage({ embedded = false }) {
                       </div>
                       <div>
                         <CardTitle className="text-lg flex items-center gap-2">
-                          {resolveRoleDisplayName(role, rolesByKey[role])}
+                          {getRoleHeading(role)}
                           {isCustomRole && (
                             <Badge variant="secondary" className="text-xs">Custom</Badge>
                           )}

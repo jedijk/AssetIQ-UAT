@@ -17,8 +17,11 @@ export function formatRoleLabel(role) {
 }
 
 export function resolveRoleDisplayName(roleKey, roleInfo) {
-  if (roleInfo?.display_name && roleInfo.display_name !== roleKey) {
-    return roleInfo.display_name;
+  if (!roleKey) return "";
+  if (ROLE_LABELS[roleKey]) return ROLE_LABELS[roleKey];
+  const label = roleInfo?.display_name || roleInfo?.label || roleInfo?.name;
+  if (label && label !== roleKey) {
+    return label;
   }
   return formatRoleLabel(roleKey);
 }
