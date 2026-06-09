@@ -487,7 +487,7 @@ function App() {
                   <Route path="maintenance-readiness" element={<Suspense fallback={<RouteFallback />}><SettingsMaintenanceReadinessPage /></Suspense>} />
                   <Route path="database" element={<Suspense fallback={<RouteFallback />}><SettingsDatabasePage /></Suspense>} />
                   <Route path="audit-log" element={<Suspense fallback={<RouteFallback />}><SettingsAuditLogPage /></Suspense>} />
-                  <Route path="insights" element={<Navigate to="/reliability" replace />} />
+                  <Route path="insights" element={<Navigate to="/dashboard" replace />} />
                   <Route path="statistics" element={<Suspense fallback={<RouteFallback />}><UserStatisticsPage /></Suspense>} />
                   <Route path="criticality-definitions" element={<Suspense fallback={<RouteFallback />}><DefinitionsPage /></Suspense>} />
                   <Route path="feedback" element={<Suspense fallback={<RouteFallback />}><FeedbackPage /></Suspense>} />

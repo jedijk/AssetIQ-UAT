@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useIsFetching, useQuery, useQueryClient } from "@tanstack/react-query";
 import { statsAPI, actionsAPI, investigationAPI, equipmentHierarchyAPI, threatsAPI, usersAPI, api } from "../../lib/api";
 import { formAPI } from "../../components/forms";
@@ -75,9 +75,17 @@ const SmartDashboardBuilderPanel = lazy(() =>
 );
 
 
+const DISABLED_DASHBOARD_TABS = new Set(["reliability", "lab"]);
+
+function resolveDashboardTab(tab) {
+  if (!tab || DISABLED_DASHBOARD_TABS.has(tab)) return null;
+  return tab;
+}
+
 export default function DashboardPageMain({ initialTab }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { effectiveRole } = useEffectiveRole();
   const queryClient = useQueryClient();
@@ -91,7 +99,9 @@ export default function DashboardPageMain({ initialTab }) {
   const isOwner = effectiveRole === "owner";
   const canShowBuilder = manualBuilderEnabled && !isMobileViewport && isOwner;
   const [activeTab, setActiveTab] = useState(
-    initialTab || (manualBuilderEnabled && !initialIsMobileViewport ? "builder" : "operational")
+    resolveDashboardTab(initialTab) ||
+      resolveDashboardTab(location.state?.activeTab) ||
+      (manualBuilderEnabled && !initialIsMobileViewport ? "builder" : "operational")
   );
   const [operatorToggle, setOperatorToggle] = useState(
     () => localStorage.getItem("operatorViewEnabled") === "true"
@@ -162,10 +172,16 @@ export default function DashboardPageMain({ initialTab }) {
   }, [activeTab, canShowBuilder]);
 
   useEffect(() => {
-    if (activeTab === "lab") {
+    if (DISABLED_DASHBOARD_TABS.has(activeTab)) {
       setActiveTab("operational");
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (location.state?.activeTab && DISABLED_DASHBOARD_TABS.has(location.state.activeTab)) {
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.pathname, location.state, navigate]);
   
   // Filter states
   const [disciplineFilter, setDisciplineFilter] = useState("all");

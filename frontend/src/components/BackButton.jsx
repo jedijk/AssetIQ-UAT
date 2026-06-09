@@ -16,8 +16,7 @@ const BackButton = ({ className = "", fallbackPath = "/dashboard" }) => {
   
   const handleBack = () => {
     if (fromReliability) {
-      // Navigate back to reliability performance dashboard
-      navigate("/dashboard", { state: { activeTab: "reliability" } });
+      navigate("/dashboard");
     } else if (window.history.length > 2) {
       // Use browser history if we have previous pages
       // window.history.length includes current page, so >2 means we have at least one previous page
