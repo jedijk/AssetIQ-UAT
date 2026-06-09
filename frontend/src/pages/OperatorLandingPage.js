@@ -74,11 +74,11 @@ export default function OperatorLandingPage() {
 
   return (
     <div
-      className="operator-landing-surface flex flex-col items-center justify-center min-h-[calc(100vh-52px)] w-full"
+      className="operator-landing-surface operator-landing-layout flex flex-col items-center w-full"
       data-testid="operator-landing"
     >
-      {/* Hero: app mark + greeting; buttons live below */}
-      <div className="flex flex-col items-center px-6 pt-2 pb-1 w-full">
+      {/* Hero stays pinned below the app header; only the action buttons scroll */}
+      <div className="operator-landing-hero flex flex-col items-center px-6 pt-2 pb-2 w-full">
         <div className="flex w-full max-w-sm flex-col items-center text-center">
           <img
             src={publicAssetUrl("/logo.png")}
@@ -96,7 +96,7 @@ export default function OperatorLandingPage() {
         </div>
       </div>
 
-      <div className="flex shrink-0 flex-col gap-4 px-6 pb-8 pt-1 w-full max-w-xs mx-auto">
+      <div className="operator-landing-actions flex flex-col gap-4 px-6 pb-8 pt-1 w-full max-w-xs mx-auto">
         <button
           onClick={handleClick(() => navigate("/my-tasks"))}
           className="relative flex items-center justify-center gap-3 rounded-2xl p-6 bg-orange-400 text-white w-full shadow-lg shadow-orange-400/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
@@ -130,7 +130,7 @@ export default function OperatorLandingPage() {
           {maintenanceProfile ? (
             <button
               onClick={handleClick(() => navigate("/threats"))}
-              className="flex flex-col items-center justify-center gap-3 rounded-2xl p-6 bg-amber-500 text-white shadow-lg shadow-amber-500/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
+              className="flex flex-col items-center justify-center gap-3 rounded-2xl p-6 bg-purple-600 text-white shadow-lg shadow-purple-600/20 active:scale-[0.97] active:shadow-sm transition-all duration-150"
               data-testid="operator-btn-observations"
             >
               <AlertTriangle className="w-8 h-8" strokeWidth={2} />

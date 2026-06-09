@@ -1655,6 +1655,7 @@
     "configurationError": "KI-Service-Konfigurationsfehler. Bitte Support kontaktieren.",
     "analyzeWithAi": "Mit KI analysieren",
     "runAi": "KI ausführen",
+    "generateAiq": "Mit AIQ generieren",
     "analyzing": "Analysieren...",
     "whyIsThisHappening": "Warum passiert das?",
     "analyzingCauses": "Ursachen analysieren...",

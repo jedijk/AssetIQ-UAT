@@ -803,21 +803,36 @@ const RecommendedActionsPanel = ({ recommendations, onAddToPlan, onAddToStrategy
             </div>
           </div>
           {aiActions.length === 0 && onGenerateAI && (
-            <Button
-              size="sm"
-              onClick={onGenerateAI}
-              disabled={isGeneratingAI}
-              className="flex-shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white h-8 w-8 p-0"
-              title={t("ai.runAi")}
-              aria-label={t("ai.runAi")}
-              data-testid="run-ai-recommendations-btn"
-            >
-              {isGeneratingAI ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Sparkles className="w-4 h-4" />
+            <span className="relative inline-flex flex-shrink-0">
+              {!isGeneratingAI && (
+                <span className="ai-recommendation-glow-ring" aria-hidden="true" />
               )}
-            </Button>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      onClick={onGenerateAI}
+                      disabled={isGeneratingAI}
+                      className={`relative z-10 flex-shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white h-8 w-8 p-0 ${
+                        isGeneratingAI ? "" : "ai-recommendation-glow-btn"
+                      }`}
+                      aria-label={t("ai.generateAiq")}
+                      data-testid="run-ai-recommendations-btn"
+                    >
+                      {isGeneratingAI ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-4 h-4 ai-recommendation-sparkle-icon" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    {t("ai.generateAiq")}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </span>
           )}
         </div>
       </div>

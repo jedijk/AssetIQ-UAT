@@ -1655,6 +1655,7 @@
     "configurationError": "AI service configuration error. Please contact support.",
     "analyzeWithAi": "Analyze with AI",
     "runAi": "Run AI",
+    "generateAiq": "Generate with AIQ",
     "analyzing": "Analyzing...",
     "whyIsThisHappening": "Why is this happening?",
     "analyzingCauses": "Analyzing causes...",
