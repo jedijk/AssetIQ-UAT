@@ -1061,7 +1061,9 @@ const ObservationWorkspacePage = () => {
             type="Production Exposure"
             data={{
               primary: exposure?.production?.formatted_value || "$0",
-              secondary: `Up to ${exposure?.production?.estimated_downtime_hours || 0} Hours Downtime`,
+              secondary: exposure?.production?.downtime_range 
+                ? `${exposure.production.downtime_range} Hours Downtime`
+                : "Not Assessed",
             }}
             icon={DollarSign}
             color="amber"
