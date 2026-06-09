@@ -77,6 +77,7 @@ import {
 } from "../components/ui/select";
 import { observationWorkspaceAPI, actionsAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
+import { useDisciplines } from "../hooks/useDisciplines";
 import RiskBadge from "../components/RiskBadge";
 import ObservationDetailsSection from "../components/workspace/ObservationDetailsSection";
 import AIInsightsPanel from "../components/AIInsightsPanel";
@@ -652,6 +653,7 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
  * Recommended Action Card
  */
 const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding, isInPlan }) => {
+  const { getLabel } = useDisciplines();
   const typeColors = {
     PM: "bg-blue-100 text-blue-700",
     CM: "bg-amber-100 text-amber-700",
@@ -690,8 +692,8 @@ const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding,
               {sourceLabel}
             </span>
             {action.discipline && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 capitalize" data-testid="recommended-action-discipline">
-                {action.discipline}
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600" data-testid="recommended-action-discipline">
+                {getLabel(action.discipline)}
               </span>
             )}
             {isInPlan && (
@@ -846,6 +848,7 @@ const normalizeActionType = (val) => {
  * eliminating the need for a setState-inside-useEffect.
  */
 const EditActionForm = ({ fullAction, onSubmit, onCancel, isSaving }) => {
+  const { disciplines, normalize } = useDisciplines();
   const [form, setForm] = useState(() => ({
     title: fullAction?.title || "",
     description: fullAction?.description || "",
@@ -856,6 +859,8 @@ const EditActionForm = ({ fullAction, onSubmit, onCancel, isSaving }) => {
     comments: fullAction?.comments || "",
   }));
 
+  const disciplineValue = normalize(form.discipline) || form.discipline || "";
+
   const handleChange = (field, value) => setForm((f) => ({ ...f, [field]: value }));
 
   const handleSubmit = () => {
@@ -863,7 +868,7 @@ const EditActionForm = ({ fullAction, onSubmit, onCancel, isSaving }) => {
       title: form.title,
       description: form.description,
       action_type: form.action_type,
-      discipline: form.discipline || null,
+      discipline: normalize(form.discipline) || form.discipline || null,
       status: form.status,
       due_date: form.due_date || null,
       comments: form.comments || null,
@@ -911,18 +916,13 @@ const EditActionForm = ({ fullAction, onSubmit, onCancel, isSaving }) => {
 
           <div className="grid gap-1.5">
             <Label>Discipline</Label>
-            <Select value={form.discipline || "none"} onValueChange={(v) => handleChange("discipline", v === "none" ? "" : v)}>
+            <Select value={disciplineValue || "none"} onValueChange={(v) => handleChange("discipline", v === "none" ? "" : v)}>
               <SelectTrigger data-testid="edit-action-discipline"><SelectValue placeholder="—" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">— None —</SelectItem>
-                <SelectItem value="Mechanical">Mechanical</SelectItem>
-                <SelectItem value="Electrical">Electrical</SelectItem>
-                <SelectItem value="Instrumentation">Instrumentation</SelectItem>
-                <SelectItem value="Piping">Piping</SelectItem>
-                <SelectItem value="Process">Process</SelectItem>
-                <SelectItem value="Structural">Structural</SelectItem>
-                <SelectItem value="Safety">Safety</SelectItem>
-                <SelectItem value="Operations">Operations</SelectItem>
+                {disciplines.map((d) => (
+                  <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -1060,6 +1060,7 @@ const DeleteActionDialog = ({ action, open, onClose, onConfirm, isDeleting }) =>
  * "Learning" actions such as updating the PM plan.
  */
 const AddActionDialog = ({ open, onClose, onCreate, isCreating }) => {
+  const { disciplines, normalize } = useDisciplines();
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -1082,7 +1083,7 @@ const AddActionDialog = ({ open, onClose, onCreate, isCreating }) => {
       title: form.title,
       description: form.description,
       action_type: form.action_type,
-      discipline: form.discipline || null,
+      discipline: normalize(form.discipline) || form.discipline || null,
       status: form.status,
       due_date: form.due_date || null,
       comments: form.comments || null,
@@ -1147,14 +1148,9 @@ const AddActionDialog = ({ open, onClose, onCreate, isCreating }) => {
                 <SelectTrigger data-testid="add-action-discipline"><SelectValue placeholder="—" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">— None —</SelectItem>
-                  <SelectItem value="Mechanical">Mechanical</SelectItem>
-                  <SelectItem value="Electrical">Electrical</SelectItem>
-                  <SelectItem value="Instrumentation">Instrumentation</SelectItem>
-                  <SelectItem value="Piping">Piping</SelectItem>
-                  <SelectItem value="Process">Process</SelectItem>
-                  <SelectItem value="Structural">Structural</SelectItem>
-                  <SelectItem value="Safety">Safety</SelectItem>
-                  <SelectItem value="Operations">Operations</SelectItem>
+                  {disciplines.map((d) => (
+                    <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -1215,6 +1211,7 @@ const AddActionDialog = ({ open, onClose, onCreate, isCreating }) => {
  */
 const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onAddAction, isCreating, actionPlanIds = [] }) => {
   const navigate = useNavigate();
+  const { getLabel } = useDisciplines();
   const [editingAction, setEditingAction] = useState(null);
   const [deletingAction, setDeletingAction] = useState(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -1336,8 +1333,8 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
                         {actionType}
                       </span>
                       {action.discipline && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 capitalize">
-                          {action.discipline}
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                          {getLabel(action.discipline)}
                         </span>
                       )}
                       <span className={`text-[10px] px-1 py-0.5 rounded border ${status.color}`}>

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { permissionsAPI } from "../lib/api";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
+import { useRolePreview } from "../contexts/RolePreviewContext";
 import { toast } from "sonner";
 import DesktopOnlyMessage from "../components/DesktopOnlyMessage";
 import {
@@ -124,6 +125,7 @@ const FEATURE_ICONS = {
 export default function SettingsPermissionsPage({ embedded = false }) {
   const { t } = useLanguage();
   const { user } = useAuth();
+  const { isOwner, isPreviewing } = useRolePreview();
   const queryClient = useQueryClient();
   const [selectedRole, setSelectedRole] = useState("admin");
   const isMobile = useIsMobile();
@@ -214,7 +216,7 @@ export default function SettingsPermissionsPage({ embedded = false }) {
   }
 
   // Check if user is owner (skip if embedded - parent handles role check)
-  if (user?.role !== "owner" && !embedded) {
+  if ((!isOwner || isPreviewing) && !embedded) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] text-center">
         <Lock className="w-16 h-16 text-slate-300 mb-4" />

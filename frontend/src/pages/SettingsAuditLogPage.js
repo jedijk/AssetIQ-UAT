@@ -7,7 +7,7 @@ import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
 import { formatDateTime } from "../lib/dateUtils";
 import { api } from "../lib/apiClient";
-import { useAuth } from "../contexts/AuthContext";
+import { useEffectiveRole } from "../contexts/RolePreviewContext";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { Calendar } from "../components/ui/calendar";
 
@@ -102,9 +102,9 @@ function statusVariant(status) {
 
 export default function SettingsAuditLogPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { effectiveRole } = useEffectiveRole();
 
-  const isAllowed = user?.role === "owner";
+  const isAllowed = effectiveRole === "owner";
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);

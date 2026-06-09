@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Suspense, lazy } from "react";
 import { MotionConfig } from "framer-motion";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { RolePreviewProvider } from "./contexts/RolePreviewContext";
 import { PermissionsProvider, usePermissions } from "./contexts/PermissionsContext";
 import { UndoProvider } from "./contexts/UndoContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
@@ -374,6 +375,7 @@ function App() {
         <ThemeProvider>
           <LanguageProvider>
             <AuthProvider>
+              <RolePreviewProvider>
               <PermissionsProvider>
                 <UndoProvider>
                   <BrowserRouter>
@@ -502,6 +504,7 @@ function App() {
             </BrowserRouter>
           </UndoProvider>
         </PermissionsProvider>
+              </RolePreviewProvider>
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>

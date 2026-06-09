@@ -37,10 +37,13 @@ export function useDisciplines({ includeInactive = false } = {}) {
   };
 
   const getLabel = (value) => {
+    if (!value) return "";
+    const normalized = normalize(value);
     const found = disciplines.find(
       (d) =>
-        d.value?.toLowerCase() === (value || "").toLowerCase() ||
-        d.label?.toLowerCase() === (value || "").toLowerCase(),
+        d.value?.toLowerCase() === normalized.toLowerCase() ||
+        d.value?.toLowerCase() === String(value).toLowerCase() ||
+        d.label?.toLowerCase() === String(value).toLowerCase(),
     );
     return found?.label || value;
   };
@@ -60,10 +63,16 @@ export function useDisciplines({ includeInactive = false } = {}) {
     return legacyNormalize(value);
   };
 
+  const selectOptions = disciplines.map((d) => ({
+    value: d.value,
+    label: d.label,
+  }));
+
   return {
     disciplines,
     values,
     labels,
+    selectOptions,
     getColor,
     getLabel,
     normalize,

@@ -6,6 +6,9 @@ import { useAuth } from "../contexts/AuthContext";
 import { usePermissions } from "../contexts/PermissionsContext";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
+import { useRolePreview } from "../contexts/RolePreviewContext";
+import RolePreviewBanner from "./layout/RolePreviewBanner";
+import RolePreviewDialog from "./layout/RolePreviewDialog";
 import { getBackendUrl } from "../lib/apiConfig";
 import { api } from "../lib/api";
 import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLeftOpen, PanelLeftClose, Settings, Building2, GitBranch, Undo2, ClipboardList, Info, LayoutDashboard, Users, BarChart3, Sliders, Bell, Clock, ChevronRight, Calendar, Activity, FileText, Brain, Wifi, WifiOff, RefreshCw, Cloud, ClipboardCheck, MessageCircleQuestion, Tag, Shield, Loader2, Server, HelpCircle, User, Camera, Briefcase, Save, Database, ScrollText, Gauge, Sparkles } from "lucide-react";
@@ -480,6 +483,9 @@ const Layout = () => {
     window.dispatchEvent(new CustomEvent("operatorViewChanged"));
   };
 
+  const { isOwner, isPreviewing, previewRoleLabel } = useRolePreview();
+  const [rolePreviewDialogOpen, setRolePreviewDialogOpen] = useState(false);
+
   // Listen for custom events from OperatorLandingPage
   useEffect(() => {
     const handleOpenChat = () => { setChatPrefillEquipment(null); setChatOpen(true); };
@@ -571,8 +577,19 @@ const Layout = () => {
         logout={logout}
         operatorViewEnabled={operatorViewEnabled}
         toggleOperatorView={toggleOperatorView}
+        isOwner={isOwner}
+        isPreviewing={isPreviewing}
+        previewRoleLabel={previewRoleLabel}
+        onOpenRolePreview={() => setRolePreviewDialogOpen(true)}
         dismissedNotifications={dismissedNotifications}
         setDismissedNotifications={setDismissedNotifications}
+      />
+
+      <RolePreviewBanner t={t} />
+      <RolePreviewDialog
+        open={rolePreviewDialogOpen}
+        onOpenChange={setRolePreviewDialogOpen}
+        t={t}
       />
 
 

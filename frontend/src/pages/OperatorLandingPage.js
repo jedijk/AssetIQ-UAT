@@ -1,10 +1,17 @@
 import { useNavigate } from "react-router-dom";
+import { useMemo } from "react";
+import { format } from "date-fns";
 import { Building2, ClipboardCheck, Activity } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
-import { api, preferencesAPI } from "../lib/api";
+import { myTasksAPI, preferencesAPI } from "../lib/api";
 import { publicAssetUrl } from "../lib/assetUrl";
+import {
+  disciplinesFromPreference,
+  filterActiveWorkItems,
+  getApiDisciplineParam,
+} from "../lib/myTasksFilterUtils";
 
 const haptic = () => {
   try {
@@ -16,32 +23,13 @@ const haptic = () => {
   } catch {}
 };
 
-function tasksFromMyTasksPayload(payload) {
-  if (Array.isArray(payload)) return payload;
-  return payload?.tasks ?? payload?.items ?? [];
-}
-
-const fetchTaskCounts = async (discipline) => {
-  const params = { filter: "open" };
-  if (discipline) {
-    params.discipline = discipline;
-  }
-  
-  const [openRes, overdueRes] = await Promise.all([
-    api.get("/work-items", { params }),
-    api.get("/work-items", { params: { ...params, filter: "overdue" } }),
-  ]);
-  const openTasks = tasksFromMyTasksPayload(openRes.data);
-  const overdueTasks = tasksFromMyTasksPayload(overdueRes.data);
-  const seenIds = new Set();
-  for (const task of [...openTasks, ...overdueTasks]) {
-    if (task?.id != null && task.id !== "") seenIds.add(String(task.id));
-  }
-  return {
-    open: openTasks.length,
-    overdue: overdueTasks.length,
-    total: seenIds.size,
-  };
+const fetchOpenTaskCount = async (selectedDisciplines) => {
+  const data = await myTasksAPI.getTasks({
+    filter: "open",
+    date: format(new Date(), "yyyy-MM-dd"),
+    discipline: getApiDisciplineParam(selectedDisciplines),
+  });
+  return filterActiveWorkItems(data.tasks, selectedDisciplines).length;
 };
 
 export default function OperatorLandingPage() {
@@ -56,16 +44,20 @@ export default function OperatorLandingPage() {
     staleTime: 60000,
   });
   
-  const disciplineFilter = preferences?.discipline || null;
-  
-  const { data: taskCounts } = useQuery({
-    queryKey: ["operatorTaskCounts", disciplineFilter],
-    queryFn: () => fetchTaskCounts(disciplineFilter),
+  const selectedDisciplines = useMemo(
+    () => disciplinesFromPreference(preferences?.discipline),
+    [preferences?.discipline],
+  );
+
+  const { data: openCount } = useQuery({
+    queryKey: ["operatorTaskCounts", selectedDisciplines, user?.id],
+    queryFn: () => fetchOpenTaskCount(selectedDisciplines),
+    enabled: !!user,
     refetchInterval: 30000,
     staleTime: 10000,
   });
 
-  const badge = taskCounts?.total || 0;
+  const badge = openCount ?? 0;
 
   const getGreeting = () => {
     const hour = new Date().getHours();

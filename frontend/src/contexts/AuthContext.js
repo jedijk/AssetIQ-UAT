@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useRef, useCallback } f
 import axios from "axios";
 import { getApiUrl } from "../lib/apiConfig";
 import { updateCachedPreferences, clearCachedPreferences } from "../lib/dateUtils";
+import { clearRolePreviewStorage } from "./RolePreviewContext";
 
 const AuthContext = createContext(null);
 const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
@@ -67,6 +68,7 @@ export const AuthProvider = ({ children }) => {
       } catch (_e) {}
     }
     localStorage.removeItem("token");
+    clearRolePreviewStorage();
     delete axios.defaults.headers.common["Authorization"];
     setToken(null);
     setUser(null);

@@ -5,6 +5,7 @@ import { useIsFetching, useQuery, useQueryClient } from "@tanstack/react-query";
 import { statsAPI, actionsAPI, investigationAPI, equipmentHierarchyAPI, threatsAPI, usersAPI, api } from "../../lib/api";
 import { formAPI } from "../../components/forms";
 import { useAuth } from "../../contexts/AuthContext";
+import { useEffectiveRole } from "../../contexts/RolePreviewContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { getBackendUrl, getAuthHeaders } from "../../lib/apiConfig";
 import { formatDate, formatDateTime } from "../../lib/dateUtils";
@@ -79,6 +80,7 @@ export default function DashboardPageMain({ initialTab }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { effectiveRole } = useEffectiveRole();
   const queryClient = useQueryClient();
   const isFetchingAny = useIsFetching() > 0;
   // ON by default; disable explicitly with REACT_APP_ENABLE_SMART_DASHBOARD_BUILDER=false
@@ -87,7 +89,7 @@ export default function DashboardPageMain({ initialTab }) {
   // Operator view: shown on mobile when role is operator or owner has toggled it
   const initialIsMobileViewport = window.innerWidth < 768;
   const [isMobileViewport, setIsMobileViewport] = useState(() => initialIsMobileViewport);
-  const isOwner = user?.role === "owner";
+  const isOwner = effectiveRole === "owner";
   const canShowBuilder = manualBuilderEnabled && !isMobileViewport && isOwner;
   const [activeTab, setActiveTab] = useState(
     initialTab || (manualBuilderEnabled && !initialIsMobileViewport ? "builder" : "operational")
@@ -113,10 +115,10 @@ export default function DashboardPageMain({ initialTab }) {
 
   // Q1 plan: Intelligence Map is the default home for reliability engineers (desktop).
   useEffect(() => {
-    if (user?.role === "reliability_engineer" && !isOperatorMode && !isMobileViewport) {
+    if (effectiveRole === "reliability_engineer" && !isOperatorMode && !isMobileViewport) {
       navigate("/library?tab=intelligence-map", { replace: true });
     }
-  }, [user?.role, isOperatorMode, isMobileViewport, navigate]);
+  }, [effectiveRole, isOperatorMode, isMobileViewport, navigate]);
 
   const refreshDashboard = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["stats"] });

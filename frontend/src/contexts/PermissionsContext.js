@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useAuth } from "./AuthContext";
+import { useEffectiveRole } from "./RolePreviewContext";
 import { permissionsAPI } from "../lib/api";
 
 const PermissionsContext = createContext(null);
@@ -61,25 +62,33 @@ const PERSONAL_SETTINGS_PATHS = [
 
 export const PermissionsProvider = ({ children }) => {
   const { user, token } = useAuth();
+  const { effectiveRole, isPreviewing } = useEffectiveRole();
   const [permissions, setPermissions] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const fetchPermissions = useCallback(async () => {
     try {
       setLoading(true);
+      if (isPreviewing) {
+        const data = await permissionsAPI.getByRole(effectiveRole);
+        setPermissions({
+          role: effectiveRole,
+          permissions: data.permissions,
+        });
+        return;
+      }
       const data = await permissionsAPI.getMy();
       setPermissions(data);
     } catch (error) {
       console.error("Failed to fetch permissions:", error);
-      // Set default viewer permissions on error
       setPermissions({
-        role: user?.role || "viewer",
+        role: effectiveRole,
         permissions: {},
       });
     } finally {
       setLoading(false);
     }
-  }, [user?.role]);
+  }, [effectiveRole, isPreviewing]);
 
   // Fetch permissions when user logs in
   useEffect(() => {
@@ -91,12 +100,11 @@ export const PermissionsProvider = ({ children }) => {
       setPermissions(null);
       setLoading(false);
     }
-  }, [user, token, fetchPermissions]);
+  }, [user, token, fetchPermissions, isPreviewing, effectiveRole]);
 
   // Check if user has a specific permission
   const hasPermission = useCallback((feature, action = "read") => {
-    // Owner always has all permissions
-    if (user?.role === "owner") return true;
+    if (user?.role === "owner" && !isPreviewing) return true;
     
     // If permissions not loaded yet, default to checking role
     if (!permissions?.permissions) {
@@ -108,12 +116,11 @@ export const PermissionsProvider = ({ children }) => {
     if (!featurePerms) return false;
     
     return featurePerms[action] === true;
-  }, [permissions, user?.role]);
+  }, [permissions, user?.role, isPreviewing]);
 
   // Check if user can access a specific route
   const canAccessRoute = useCallback((path) => {
-    // Owner and admin can access everything
-    if (user?.role === "owner" || user?.role === "admin") return true;
+    if ((user?.role === "owner" || user?.role === "admin") && !isPreviewing) return true;
 
     if (AUTHENTICATED_PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`))) {
       return true;
@@ -132,7 +139,7 @@ export const PermissionsProvider = ({ children }) => {
     
     // Deny unmapped routes (previously defaulted to allow)
     return false;
-  }, [hasPermission, user?.role]);
+  }, [hasPermission, user?.role, isPreviewing]);
 
   // Check if a nav item should be visible
   const canSeeNavItem = useCallback((path) => {
@@ -154,7 +161,8 @@ export const PermissionsProvider = ({ children }) => {
       canAccessRoute,
       canSeeNavItem,
       refreshPermissions,
-      userRole: user?.role || "viewer"
+      userRole: effectiveRole,
+      isPreviewing,
     }}>
       {children}
     </PermissionsContext.Provider>

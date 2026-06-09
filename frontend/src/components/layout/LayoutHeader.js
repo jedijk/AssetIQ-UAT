@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  Menu, X, PanelLeftOpen, PanelLeftClose, Settings, HelpCircle, LogOut, User, Shield,
+  Menu, X, PanelLeftOpen, PanelLeftClose, Settings, HelpCircle, LogOut, User, Shield, Eye,
   Info, MessageCircleQuestion, Tag,
 } from "lucide-react";
 import AnimatedDrawer from "../animations/AnimatedDrawer";
@@ -43,6 +43,10 @@ export default function LayoutHeader({
   logout,
   operatorViewEnabled,
   toggleOperatorView,
+  isOwner,
+  isPreviewing,
+  previewRoleLabel,
+  onOpenRolePreview,
   dismissedNotifications,
   setDismissedNotifications,
 }) {
@@ -357,6 +361,21 @@ export default function LayoutHeader({
                     <User className="w-4 h-4 mr-2" />
                     {t("profile.editProfile") || "Edit Profile"}
                   </DropdownMenuItem>
+                  {isOwner && (
+                    <DropdownMenuItem
+                      onClick={onOpenRolePreview}
+                      className="cursor-pointer"
+                      data-testid="role-preview-menu-item"
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      {t("rolePreview.menu")}
+                      {isPreviewing && (
+                        <span className="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 truncate max-w-[80px]">
+                          {previewRoleLabel}
+                        </span>
+                      )}
+                    </DropdownMenuItem>
+                  )}
                   {isMobileView && (
                   <>
                   <DropdownMenuSeparator />

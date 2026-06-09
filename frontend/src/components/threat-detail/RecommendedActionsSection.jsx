@@ -30,25 +30,12 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
+import { useDisciplines } from "../../hooks/useDisciplines";
 
 const ACTION_TYPES = [
   { value: "CM", label: "CM - Corrective", color: "bg-amber-500" },
   { value: "PM", label: "PM - Preventive", color: "bg-blue-500" },
   { value: "PDM", label: "PDM - Predictive", color: "bg-purple-500" },
-];
-
-const DISCIPLINES = [
-  "Mechanical",
-  "Electrical",
-  "Instrumentation",
-  "Process",
-  "Civil/Structural",
-  "Rotating Equipment",
-  "Static Equipment",
-  "Piping",
-  "Safety",
-  "Operations",
-  "Multi-discipline",
 ];
 
 const TYPE_STYLES = {
@@ -70,6 +57,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { user } = useAuth();
+  const { selectOptions, getLabel, normalize } = useDisciplines();
   const [showAddRecommendedDialog, setShowAddRecommendedDialog] = useState(false);
   const [showCreateFMDialog, setShowCreateFMDialog] = useState(false);
   const [showValidateDialog, setShowValidateDialog] = useState(false);
@@ -385,7 +373,10 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
       toast.error(t("threatDetail.enterActionDescription"));
       return;
     }
-    addRecommendedActionMutation.mutate(newRecommendedAction);
+    addRecommendedActionMutation.mutate({
+      ...newRecommendedAction,
+      discipline: normalize(newRecommendedAction.discipline) || newRecommendedAction.discipline,
+    });
   };
 
   // Open edit dialog with current action data
@@ -395,7 +386,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
     setEditRecommendedAction({
       action: isObj ? (action.action || action.description || "") : action,
       action_type: isObj ? (action.action_type || "") : "",
-      discipline: isObj ? (action.discipline || "") : "",
+      discipline: isObj ? normalize(action.discipline || "") || (action.discipline || "") : "",
     });
     setShowEditRecommendedDialog(true);
   };
@@ -408,7 +399,10 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
     }
     editRecommendedActionMutation.mutate({
       index: editingActionIndex,
-      updatedAction: editRecommendedAction,
+      updatedAction: {
+        ...editRecommendedAction,
+        discipline: normalize(editRecommendedAction.discipline) || editRecommendedAction.discipline,
+      },
     });
   };
 
@@ -426,7 +420,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
       title: action.title || "",
       description: action.description || "",
       action_type: action.action_type || "",
-      discipline: action.discipline || "",
+      discipline: normalize(action.discipline || "") || action.discipline || "",
       priority: action.priority || "medium",
       status: action.status || "open",
     });
@@ -441,7 +435,10 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
     }
     editActionMutation.mutate({
       actionId: editingAction.id,
-      updates: editActionForm,
+      updates: {
+        ...editActionForm,
+        discipline: normalize(editActionForm.discipline) || editActionForm.discipline || null,
+      },
     });
   };
 
@@ -555,7 +552,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                   {discipline && (
                     <div className="flex items-center gap-1.5 mb-1">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium">
-                        {discipline}
+                        {getLabel(discipline)}
                       </span>
                       {actionType && (
                         <span className="text-[10px] text-slate-400">
@@ -618,7 +615,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                       onClick={() => promoteToActionMutation.mutate({
                         text: actionText,
                         action_type: actionType,
-                        discipline: discipline,
+                        discipline: normalize(discipline) || discipline,
                       })}
                       disabled={promoteToActionMutation.isPending}
                       className="opacity-0 group-hover:opacity-100 transition-all text-blue-600 hover:text-white hover:bg-blue-600 rounded-md px-2 py-1 h-7 text-xs"
@@ -718,7 +715,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                         <span className={`text-[10px] font-medium ${statusCfg.color}`}>{getActionStatusLabel(action.status)}</span>
                       </div>
                       {action.discipline && (
-                        <span className="shrink-0 text-[10px] text-slate-400">{action.discipline}</span>
+                        <span className="shrink-0 text-[10px] text-slate-400">{getLabel(action.discipline)}</span>
                       )}
                       {/* Validation Badge */}
                       {action.is_validated && (
@@ -881,7 +878,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               <div className="space-y-2">
                 <Label htmlFor="rec-action-discipline">{t("threatDetail.disciplineRequired")}</Label>
                 <SearchableSelect
-                  options={DISCIPLINES.map((disc) => ({ value: disc, label: disc }))}
+                  options={selectOptions}
                   value={newRecommendedAction.discipline}
                   onValueChange={(v) => setNewRecommendedAction({ ...newRecommendedAction, discipline: v })}
                   placeholder={t("observations.selectDiscipline")}
@@ -907,7 +904,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                   <div className="flex-1">
                     {newRecommendedAction.discipline && (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium mb-1">
-                        {newRecommendedAction.discipline}
+                        {getLabel(newRecommendedAction.discipline)}
                       </span>
                     )}
                     <p className="text-sm text-slate-700">{newRecommendedAction.action}</p>
@@ -998,7 +995,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               <div className="space-y-2">
                 <Label htmlFor="edit-rec-action-discipline">{t("threatDetail.disciplineRequired")}</Label>
                 <SearchableSelect
-                  options={DISCIPLINES.map((disc) => ({ value: disc, label: disc }))}
+                  options={selectOptions}
                   value={editRecommendedAction.discipline}
                   onValueChange={(v) => setEditRecommendedAction({ ...editRecommendedAction, discipline: v })}
                   placeholder={t("observations.selectDiscipline")}
@@ -1024,7 +1021,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                   <div className="flex-1">
                     {editRecommendedAction.discipline && (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium mb-1">
-                        {editRecommendedAction.discipline}
+                        {getLabel(editRecommendedAction.discipline)}
                       </span>
                     )}
                     <p className="text-sm text-slate-700">{editRecommendedAction.action}</p>
@@ -1389,7 +1386,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               <div className="space-y-2">
                 <Label htmlFor="edit-action-discipline">Discipline</Label>
                 <SearchableSelect
-                  options={DISCIPLINES.map((disc) => ({ value: disc, label: disc }))}
+                  options={selectOptions}
                   value={editActionForm.discipline}
                   onValueChange={(v) => setEditActionForm({ ...editActionForm, discipline: v })}
                   placeholder="Select discipline..."

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { usePermissions } from "../contexts/PermissionsContext";
+import { useEffectiveRole } from "../contexts/RolePreviewContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import {
   Settings,
@@ -230,6 +231,7 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { effectiveRole } = useEffectiveRole();
   const { hasPermission, loading: permissionsLoading } = usePermissions();
   const { t } = useLanguage();
   const [activeSection, setActiveSection] = useState("general");
@@ -248,7 +250,7 @@ export default function SettingsPage() {
     return SETTINGS_SECTIONS.filter((section) => {
       if (!user?.role) return false;
       if (section.desktopOnly && isMobileView) return false;
-      if (user.role === "owner") return true;
+      if (effectiveRole === "owner") return true;
       if (section.personal) return true;
       if (section.roles?.length === 1 && section.roles[0] === "owner") return false;
 
@@ -257,12 +259,12 @@ export default function SettingsPage() {
         if (section.requiresSettings && !hasPermission("settings", "read")) return false;
       }
 
-      if (section.roles?.includes(user.role)) return true;
+      if (section.roles?.includes(effectiveRole)) return true;
       if (!permissionsLoading && section.feature && hasPermission(section.feature, "read")) return true;
       if (!permissionsLoading && section.requiresSettings && hasPermission("settings", "read")) return true;
       return false;
     });
-  }, [user?.role, isMobileView, hasPermission, permissionsLoading]);
+  }, [user?.role, effectiveRole, isMobileView, hasPermission, permissionsLoading]);
 
   const filteredSections = useMemo(
     () => visibleSections.filter((section) => sectionMatchesQuery(section, searchQuery, t)),

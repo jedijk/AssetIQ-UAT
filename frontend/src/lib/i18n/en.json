@@ -205,6 +205,15 @@
     "production": "Production",
     "openTasksAria": "Open tasks: {count}"
   },
+  "rolePreview": {
+    "menu": "Preview as role",
+    "title": "Preview role experience",
+    "description": "See navigation, settings, and page access as another role. Your account stays signed in as owner — API actions still use your real permissions.",
+    "banner": "Previewing as {role}",
+    "exit": "Exit preview",
+    "active": "Active",
+    "systemRole": "System"
+  },
   "reports": {
     "title": "Form Submissions",
     "submissions": "Submissions",
