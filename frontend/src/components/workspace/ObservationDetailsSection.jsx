@@ -785,7 +785,7 @@ const ObservationDetailsSection = ({ threatId }) => {
                 />
               )
             ) : (
-              <div className="flex items-center gap-1 justify-center">
+              <div className="flex items-center gap-1 justify-center min-w-0">
                 {item.field === "failure_mode" && item.value ? (
                   <button
                     onClick={() => {
@@ -798,13 +798,14 @@ const ObservationDetailsSection = ({ threatId }) => {
                         navigate(`/library?search=${encodeURIComponent(threat.failure_mode)}`);
                       }
                     }}
-                    className="font-semibold text-slate-900 text-xs sm:text-sm break-words sm:truncate text-center block hover:text-blue-600 hover:underline transition-colors cursor-pointer"
+                    style={{ minHeight: 0, minWidth: 0 }}
+                    className="appearance-none p-0 m-0 border-0 bg-transparent font-semibold text-slate-900 text-xs sm:text-sm leading-tight truncate text-center block max-w-full hover:text-blue-600 hover:underline transition-colors cursor-pointer"
                     title="Click to view in Failure Modes Library"
                   >
                     {item.value}
                   </button>
                 ) : (
-                  <span className="font-semibold text-slate-900 text-xs sm:text-sm break-words sm:truncate block text-center">{item.value}</span>
+                  <span className="font-semibold text-slate-900 text-xs sm:text-sm leading-tight truncate text-center block max-w-full">{item.value}</span>
                 )}
                 {item.field === "failure_mode" && threat.is_new_failure_mode && (
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">NEW</span>
