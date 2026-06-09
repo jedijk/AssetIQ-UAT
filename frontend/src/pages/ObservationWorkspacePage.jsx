@@ -136,18 +136,18 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
         data-testid={dimension ? `exposure-card-${dimension}` : undefined}
       >
         <div className="flex items-center gap-1.5 mb-0.5">
-          <Icon className="w-3.5 h-3.5" />
-          <span className="text-[10px] font-medium uppercase tracking-wide">{type}</span>
+          <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+          <span className="text-[10px] font-medium uppercase tracking-wide truncate">{type}</span>
         </div>
         {isNotAssessed ? (
           <div className="text-sm font-semibold leading-tight italic">Not Assessed</div>
         ) : (
           <>
             {data.primary && (
-              <div className="text-lg font-bold leading-tight">{data.primary}</div>
+              <div className="text-base sm:text-lg font-bold leading-tight break-words">{data.primary}</div>
             )}
             {data.secondary && (
-              <div className="text-[11px] opacity-80 leading-tight">{data.secondary}</div>
+              <div className="text-[11px] opacity-80 leading-tight line-clamp-2">{data.secondary}</div>
             )}
             {data.tertiary && (
               <div className="text-[11px] opacity-70 leading-tight">{data.tertiary}</div>
@@ -522,9 +522,9 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin">
+    <div className="bg-white rounded-xl border border-slate-200 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto scrollbar-thin">
       {/* Header — sticky on scroll */}
-      <div className="sticky top-0 z-10 bg-white px-6 pt-6 pb-3 border-b border-slate-100">
+      <div className="lg:sticky lg:top-0 z-10 bg-white px-4 sm:px-6 pt-4 sm:pt-6 pb-3 border-b border-slate-100">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-purple-100 rounded-lg">
             <Brain className="w-5 h-5 text-purple-600" />
@@ -536,7 +536,7 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
         </div>
       </div>
 
-      <div className="px-6 pt-4 pb-6">
+      <div className="px-4 sm:px-6 pt-4 pb-4 sm:pb-6">
 
       {/* Most Likely Cause — compact */}
       <div className="mb-3">
@@ -727,21 +727,21 @@ const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddTo
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin">
+    <div className="bg-white rounded-xl border border-slate-200 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto scrollbar-thin">
       {/* Header — sticky on scroll */}
-      <div className="sticky top-0 z-10 bg-white px-6 pt-6 pb-3 border-b border-slate-100">
+      <div className="lg:sticky lg:top-0 z-10 bg-white px-4 sm:px-6 pt-4 sm:pt-6 pb-3 border-b border-slate-100">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-blue-100 rounded-lg">
             <Lightbulb className="w-5 h-5 text-blue-600" />
           </div>
           <div>
             <h3 className="font-semibold text-slate-900">Recommended Actions</h3>
-            <p className="text-xs text-slate-500">Strategy actions & AI recommendations</p>
+            <p className="text-xs text-slate-500">Strategy actions &amp; AI recommendations</p>
           </div>
         </div>
       </div>
 
-      <div className="px-6 pt-4 pb-6">
+      <div className="px-4 sm:px-6 pt-4 pb-4 sm:pb-6">
 
       {/* Library Actions */}
       {libraryActions.length > 0 && (
@@ -1248,25 +1248,25 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin">
+    <div className="bg-white rounded-xl border border-slate-200 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto scrollbar-thin">
       {/* Header - sticky on scroll, sized to match Recommended Actions */}
-      <div className="sticky top-0 z-10 bg-white px-6 pt-6 pb-3 border-b border-slate-100">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
+      <div className="lg:sticky lg:top-0 z-10 bg-white px-4 sm:px-6 pt-4 sm:pt-6 pb-3 border-b border-slate-100">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
               <ClipboardList className="w-5 h-5 text-green-600" />
             </div>
-            <div>
-              <h3 className="font-semibold text-slate-900">
+            <div className="min-w-0">
+              <h3 className="font-semibold text-slate-900 truncate">
                 Action Plan
                 {actions && actions.length > 0 && (
                   <span className="ml-2 text-xs text-slate-400 font-normal">({actions.length})</span>
                 )}
               </h3>
-              <p className="text-xs text-slate-500">Track planned &amp; in-progress actions</p>
+              <p className="text-xs text-slate-500 truncate">Track planned &amp; in-progress actions</p>
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-shrink-0">
             <Button
               size="sm"
               variant="ghost"
@@ -1278,7 +1278,7 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
               <Plus className="w-3.5 h-3.5 mr-1" /> Add
             </Button>
             {actions && actions.length > 0 && (
-              <Button size="sm" variant="ghost" onClick={onViewAll} className="h-7 text-xs px-2">
+              <Button size="sm" variant="ghost" onClick={onViewAll} className="h-7 text-xs px-2 hidden sm:inline-flex">
                 View All
               </Button>
             )}
@@ -1286,7 +1286,7 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
         </div>
       </div>
 
-      <div className="px-6 pt-4 pb-6">
+      <div className="px-4 sm:px-6 pt-4 pb-4 sm:pb-6">
 
       {/* Actions List - Same style as recommended actions */}
       {actions && actions.length > 0 ? (
@@ -1416,15 +1416,15 @@ const ProcessJourney = ({ stages }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg border border-slate-200 px-3 py-2">
-      {/* Single-row compact layout: title + steps inline */}
-      <div className="flex items-center gap-3">
+    <div className="bg-white rounded-lg border border-slate-200 px-3 py-2 overflow-hidden">
+      {/* Single-row compact layout: title + steps inline (stacks on very small screens) */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <TrendingUp className="w-3 h-3 text-slate-500" />
           <span className="text-[11px] font-medium text-slate-700">Process Journey</span>
         </div>
 
-        <div className="flex items-center justify-between flex-1 overflow-x-auto">
+        <div className="flex items-center justify-between flex-1 overflow-x-auto min-w-0">
           {stages?.map((stage, index) => {
             const config = stageConfig[stage.status] || stageConfig.not_started;
             const Icon = config.icon;
@@ -1644,10 +1644,10 @@ const ObservationWorkspacePage = () => {
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-4 max-w-7xl py-3 space-y-3">
+      <div className="container mx-auto px-3 sm:px-4 max-w-7xl py-3 space-y-3">
         
         {/* Row 1: Risk & Exposure Header */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
           <ExposureCard
             type="Production Exposure"
             data={{
@@ -1738,8 +1738,8 @@ const ObservationWorkspacePage = () => {
           aiEvidence={timeline?.ai_evidence}
         />
 
-        {/* Row 3: Main Work Area - 3 Columns */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Row 3: Main Work Area - 3 Columns on desktop, stacked on mobile */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-6">
           {/* Column 1: Reliability Intelligence */}
           <ReliabilityIntelligencePanel 
             intelligence={reliability_intelligence}
