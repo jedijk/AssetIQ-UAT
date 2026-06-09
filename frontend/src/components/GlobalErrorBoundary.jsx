@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import { debugLog } from '../lib/debug';
+import { attemptChunkRecovery, clearAppCaches, hardReloadWithCacheBust, isChunkLoadFailure } from '../lib/chunkRecovery';
 
 class GlobalErrorBoundary extends React.Component {
   constructor(props) {
@@ -23,33 +24,12 @@ class GlobalErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     this.setState({ errorInfo });
 
-    // Auto-recover from chunk load errors (stale caches after deploy), especially on iOS.
-    // Do this once per tab session to avoid reload loops.
     try {
       const msg = String(error?.message || error || "");
-      const isChunk =
-        msg.includes("Loading chunk") ||
-        msg.includes("ChunkLoadError") ||
-        msg.includes("dynamically imported module");
-      if (isChunk) {
-        const key = "assetiq_chunk_reload_attempted";
-        const already = (() => {
-          try {
-            return sessionStorage.getItem(key) === "true";
-          } catch (_e) {
-            return false;
-          }
-        })();
-        if (!already) {
-          try {
-            sessionStorage.setItem(key, "true");
-          } catch (_e) {}
-          debugLog("chunk_error_autoreload", { message: msg });
-          // Give the error UI a brief moment to paint, then clear caches + reload.
-          setTimeout(() => {
-            this.handleReload();
-          }, 300);
-        }
+      if (isChunkLoadFailure(msg)) {
+        setTimeout(() => {
+          attemptChunkRecovery("global_error_boundary");
+        }, 300);
       }
     } catch (_e) {}
     
@@ -70,23 +50,14 @@ class GlobalErrorBoundary extends React.Component {
 
   handleReload = async () => {
     try {
-      // Clear caches before reload
-      if ('serviceWorker' in navigator) {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map(r => r.unregister()));
-      }
-      if ('caches' in window) {
-        const names = await caches.keys();
-        await Promise.all(names.map(n => caches.delete(n)));
-      }
-      // Clear localStorage lite mode preference to start fresh
+      await clearAppCaches();
       try {
         localStorage.removeItem('forceLiteMode');
       } catch (e) {}
     } catch (e) {
       console.warn('Cache clear failed:', e);
     }
-    window.location.reload();
+    await hardReloadWithCacheBust();
   };
 
   handleRetry = () => {

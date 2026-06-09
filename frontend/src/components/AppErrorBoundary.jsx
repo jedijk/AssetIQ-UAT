@@ -1,5 +1,6 @@
 import React from "react";
 import { debugLog } from "../lib/debug";
+import { attemptChunkRecovery, isChunkLoadFailure } from "../lib/chunkRecovery";
 
 export class AppErrorBoundary extends React.Component {
   constructor(props) {
@@ -12,32 +13,12 @@ export class AppErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
-    // Auto-recover from chunk load errors (stale caches after deploy).
-    // Do this once per tab session to avoid reload loops.
     try {
       const msg = String(error?.message || error || "");
-      const isChunk =
-        msg.includes("Loading chunk") ||
-        msg.includes("ChunkLoadError") ||
-        msg.includes("dynamically imported module");
-      if (isChunk) {
-        const key = "assetiq_chunk_reload_attempted";
-        const already = (() => {
-          try {
-            return sessionStorage.getItem(key) === "true";
-          } catch (_e) {
-            return false;
-          }
-        })();
-        if (!already) {
-          try {
-            sessionStorage.setItem(key, "true");
-          } catch (_e) {}
-          // Give the error UI a brief moment to paint, then clear caches + reload.
-          setTimeout(() => {
-            this.handleHardReload();
-          }, 300);
-        }
+      if (isChunkLoadFailure(msg)) {
+        setTimeout(() => {
+          attemptChunkRecovery("app_error_boundary");
+        }, 300);
       }
     } catch (_e) {}
 

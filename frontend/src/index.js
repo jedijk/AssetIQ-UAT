@@ -10,6 +10,12 @@ import GlobalErrorBoundary from "./components/GlobalErrorBoundary";
 import SafeMode, { isSafeModeRequested } from "./components/SafeMode";
 import { installGlobalDebugHooks, debugLog } from "./lib/debug";
 import { installPerfObservers, PERF_ENABLED } from "./lib/perf";
+import {
+  clearAppCaches,
+  ensureFreshBuild,
+  installChunkRecoveryHandlers,
+  scheduleChunkRecoveryFlagClear,
+} from "./lib/chunkRecovery";
 
 // Patch ResizeObserver to prevent "loop completed with undelivered notifications" errors
 // This is a known issue with cmdk, Radix UI, and other libraries that use ResizeObserver
@@ -94,63 +100,6 @@ function isIOSWebAppStandalone() {
     return !!(navStandalone || mqlStandalone);
   } catch (_e) {
     return false;
-  }
-}
-
-async function clearAppCaches() {
-  try {
-    if ("serviceWorker" in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map((r) => r.unregister()));
-    }
-    if ("caches" in window) {
-      const names = await caches.keys();
-      await Promise.all(names.map((n) => caches.delete(n)));
-    }
-  } catch (_e) {
-    // ignore
-  }
-}
-
-async function attemptChunkRecovery(source) {
-  const key = "assetiq_chunk_reload_attempted";
-  try {
-    if (sessionStorage.getItem(key) === "true") return false;
-    sessionStorage.setItem(key, "true");
-  } catch (_e) {
-    return false;
-  }
-  debugLog("chunk_error_autoreload", { source });
-  await clearAppCaches();
-  window.location.reload();
-  return true;
-}
-
-async function ensureFreshBuild() {
-  const key = "assetiq_stale_build_reload";
-  try {
-    if (sessionStorage.getItem(key) === "1") return;
-    const res = await fetch(`${window.location.origin}/index.html?_=${Date.now()}`, {
-      cache: "no-store",
-      headers: { "Cache-Control": "no-cache" },
-    });
-    if (!res.ok) return;
-    const html = await res.text();
-    const serverMatch = html.match(/\/static\/js\/main\.([a-f0-9]+)\.js/);
-    if (!serverMatch) return;
-    const script = document.querySelector('script[src*="/static/js/main."]');
-    const loadedMatch = script?.src?.match(/main\.([a-f0-9]+)\.js/);
-    if (loadedMatch && loadedMatch[1] !== serverMatch[1]) {
-      sessionStorage.setItem(key, "1");
-      debugLog("stale_main_bundle_reload", {
-        loaded: loadedMatch[1],
-        expected: serverMatch[1],
-      });
-      await clearAppCaches();
-      window.location.reload();
-    }
-  } catch (_e) {
-    // ignore
   }
 }
 
@@ -291,16 +240,16 @@ if ('serviceWorker' in navigator && ENABLE_SERVICE_WORKER) {
   });
 }
 
-// Catch chunk-load failures (common after deploy on iOS) and show a recovery UI.
+installChunkRecoveryHandlers({
+  onRecoveryFailed: () => {
+    showBootError("A new version was deployed while your browser cached an older one. Tap Reload.");
+  },
+});
+
+// Catch runtime errors that are not chunk-load failures.
 window.addEventListener("error", (e) => {
   const msg = String(e?.message || "");
   if (msg.includes("Loading chunk") || msg.includes("ChunkLoadError")) {
-    debugLog("chunk_load_error", { message: msg });
-    attemptChunkRecovery("window_error").then((reloading) => {
-      if (!reloading) {
-        showBootError("A new version was deployed while your browser cached an older one. Tap Reload.");
-      }
-    });
     return;
   }
 
@@ -328,20 +277,6 @@ window.addEventListener("error", (e) => {
       });
     } catch (_e2) {}
     showBootError("The app hit a runtime error. Tap Reload to recover.");
-  }
-});
-
-// Some chunk-load failures arrive as unhandled promise rejections.
-window.addEventListener("unhandledrejection", (e) => {
-  const reason = e?.reason;
-  const msg = String(reason?.message || reason || "");
-  if (msg.includes("Loading chunk") || msg.includes("ChunkLoadError")) {
-    debugLog("chunk_load_rejection", { message: msg });
-    attemptChunkRecovery("unhandled_rejection").then((reloading) => {
-      if (!reloading) {
-        showBootError("A new version was deployed while your browser cached an older one. Tap Reload.");
-      }
-    });
   }
 });
 
@@ -377,6 +312,7 @@ function bootstrapApp() {
   }
   const root = ReactDOM.createRoot(document.getElementById("root"));
   root.render(appTree);
+  scheduleChunkRecoveryFlagClear();
 
   // Boot watchdog: if the app fails to mount, show the recovery UI instead of a blank screen.
   // Enhanced with multiple checks and shorter timeout for older devices.
