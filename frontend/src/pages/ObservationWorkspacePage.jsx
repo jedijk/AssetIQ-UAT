@@ -376,37 +376,35 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
   const currentEvent = events?.find(e => e.is_current);
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-slate-100 rounded-lg">
-            <History className="w-5 h-5 text-slate-600" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-slate-900">Equipment History</h3>
-            <p className="text-xs text-slate-500">Historical context for the asset</p>
-          </div>
+    <div className="bg-white rounded-xl border border-slate-200 p-3">
+      {/* Header - Compact */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <History className="w-4 h-4 text-slate-500" />
+          <h3 className="font-medium text-sm text-slate-700">Equipment History</h3>
+          {events && events.length > 0 && (
+            <span className="text-xs text-slate-400">({events.length} events)</span>
+          )}
         </div>
         
-        {/* View Toggle */}
-        <div className="flex items-center gap-2">
+        {/* View Toggle - Compact */}
+        <div className="flex items-center gap-1">
           <Button
-            variant={viewMode === "timeline" ? "default" : "outline"}
+            variant={viewMode === "timeline" ? "default" : "ghost"}
             size="sm"
             onClick={() => setViewMode("timeline")}
-            className="h-8"
+            className="h-6 px-2 text-xs"
           >
-            <Calendar className="w-4 h-4 mr-1" />
+            <Calendar className="w-3 h-3 mr-1" />
             Timeline
           </Button>
           <Button
-            variant={viewMode === "list" ? "default" : "outline"}
+            variant={viewMode === "list" ? "default" : "ghost"}
             size="sm"
             onClick={() => setViewMode("list")}
-            className="h-8"
+            className="h-6 px-2 text-xs"
           >
-            <List className="w-4 h-4 mr-1" />
+            <List className="w-3 h-3 mr-1" />
             List
           </Button>
         </div>

@@ -11,7 +11,7 @@ import time
 from typing import Optional, Dict, Any
 
 # Configuration
-BASE_URL = "https://observation-hub-2.preview.emergentagent.com/api"
+BASE_URL = "https://obs-equip-compact.preview.emergentagent.com/api"
 TEST_EMAIL = "jedijk@gmail.com"
 TEST_PASSWORD = "Jaap8019@"
 
