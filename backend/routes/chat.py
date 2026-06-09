@@ -447,8 +447,17 @@ async def _finalize_chat_machine_result(
     resp_text = result["response_text"]
 
     if result.get("create_observation") and result.get("observation_data"):
-        # Get the original user description to store with the observation
-        user_description = result.get("original_message", "")
+        # Get the description from issue_summary (same as shown in draft)
+        # Parse the summary to extract the Description line
+        issue_summary = conv.get("issue_summary") or ""
+        parsed_description = ""
+        for line in issue_summary.split('\n'):
+            if '**Description:**' in line or '**Beschrijving:**' in line:
+                parsed_description = line.replace('**Description:**', '').replace('**Beschrijving:**', '').strip()
+                break
+        
+        # Use parsed description from summary, fall back to original_message
+        user_description = parsed_description or result.get("original_message", "")
         
         obs = await _create_observation(user_id, result["observation_data"],
                                         session_id, image_thumbnail, user_description)

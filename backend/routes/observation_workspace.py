@@ -845,7 +845,7 @@ async def get_observation_workspace(
             {"id": observation.get("failure_mode_id")},
             {"_id": 0}
         )
-    elif observation.get("failure_mode"):
+    if not failure_mode_data and observation.get("failure_mode"):
         # Try to find by name
         failure_mode_data = await db.failure_modes.find_one(
             {"failure_mode": {"$regex": f"^{observation.get('failure_mode')}$", "$options": "i"}},
