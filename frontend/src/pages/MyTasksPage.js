@@ -303,9 +303,9 @@ const MyTasksPage = () => {
   const invalidateTaskListQueries = useCallback(() => {
     queryClient.invalidateQueries({
       predicate: (query) =>
-        query.queryKey[0] === "my-tasks" ||
-        query.queryKey[0] === "my-tasks-count" ||
-        query.queryKey[0] === "operatorTaskCounts",
+        query.queryKey[0] === queryKeys.myTasks.prefix ||
+        query.queryKey[0] === queryKeys.myTasks.countPrefix ||
+        query.queryKey[0] === queryKeys.myTasks.operatorCountsPrefix,
     });
   }, [queryClient]);
   const [activeFilter, setActiveFilter] = useState("adhoc");
@@ -327,7 +327,9 @@ const MyTasksPage = () => {
     mutationFn: (discipline) => preferencesAPI.updatePreferences({ discipline }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.users.preferences() });
-      queryClient.invalidateQueries({ queryKey: ["operatorTaskCounts"] });
+      queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey[0] === queryKeys.myTasks.operatorCountsPrefix,
+      });
     },
   });
 
@@ -517,7 +519,7 @@ const MyTasksPage = () => {
   
   // Fetch tasks with offline caching
   const { data: tasksData, isLoading: tasksLoading, error: tasksError, refetch: refetchTasks } = useQuery({
-    queryKey: ["my-tasks", activeFilter, selectedDate, selectedDisciplines],
+    queryKey: queryKeys.myTasks.list(activeFilter, selectedDate, selectedDisciplines),
     queryFn: async () => {
       try {
         const data = await myTasksAPI.getTasks({
@@ -718,7 +720,7 @@ const MyTasksPage = () => {
   // Per-tab counts (respect discipline filter selection)
   const filterCountQueries = useQueries({
     queries: ["open", "overdue", "recurring"].map((filter) => ({
-      queryKey: ["my-tasks-count", filter, selectedDisciplines, selectedDate, user?.id],
+      queryKey: queryKeys.myTasks.filterCount(filter, selectedDisciplines, selectedDate, user?.id),
       queryFn: async () => {
         const data = await myTasksAPI.getTasks({
           filter,

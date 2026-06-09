@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useLocation } from "react-router-dom";
 import { getBackendUrl, getAuthHeaders } from '../lib/apiConfig';
 import { api } from '../lib/api';
+import { queryKeys } from "../lib/queryKeys";
 import { useLanguage } from "../contexts/LanguageContext";
 import { AuthenticatedImage, useAuthenticatedMedia } from "../components/AuthenticatedMedia";
 import { toast } from "sonner";
@@ -451,7 +452,10 @@ export default function FormSubmissionsPage() {
 
   // Fetch submissions
   const { data: submissionsData, isLoading, refetch } = useQuery({
-    queryKey: ["form-submissions", { hasWarnings: statusFilter === "warnings", hasCritical: statusFilter === "critical" }],
+    queryKey: queryKeys.formSubmissions.list({
+      hasWarnings: statusFilter === "warnings",
+      hasCritical: statusFilter === "critical",
+    }),
     queryFn: () => fetchSubmissions({
       hasWarnings: statusFilter === "warnings",
       hasCritical: statusFilter === "critical",
@@ -468,7 +472,7 @@ export default function FormSubmissionsPage() {
     },
     onSuccess: () => {
       toast.success(t("reports.deletedSuccess"));
-      queryClient.invalidateQueries({ queryKey: ["form-submissions"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.formSubmissions.all() });
       setDeleteConfirm(null);
       setSelectedSubmission(null);
     },
@@ -483,7 +487,7 @@ export default function FormSubmissionsPage() {
     },
     onSuccess: async (_res, vars) => {
       toast.success(t("reports.updatedSuccess"));
-      queryClient.invalidateQueries({ queryKey: ["form-submissions"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.formSubmissions.all() });
       try {
         const full = await fetchSubmission(vars.submissionId);
         setSelectedSubmission(full);

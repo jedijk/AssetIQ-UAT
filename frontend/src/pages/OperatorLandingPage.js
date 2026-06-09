@@ -55,7 +55,7 @@ export default function OperatorLandingPage() {
   );
 
   const { data: openCount } = useQuery({
-    queryKey: ["operatorTaskCounts", selectedDisciplines, user?.id],
+    queryKey: queryKeys.myTasks.operatorCounts(selectedDisciplines, user?.id),
     queryFn: () => fetchOpenTaskCount(selectedDisciplines),
     enabled: !!user,
     refetchInterval: 30000,

@@ -1,4 +1,5 @@
 import { api } from "../lib/apiClient";
+import { queryKeys } from "../lib/queryKeys";
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { 
@@ -272,17 +273,17 @@ const MobileAnalytics = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const { data: analyticsData, isLoading: analyticsLoading } = useQuery({
-    queryKey: ["mobile-analytics"],
+    queryKey: queryKeys.mobile.analytics(),
     queryFn: fetchAnalytics,
   });
 
   const { data: riskData, isLoading: riskLoading } = useQuery({
-    queryKey: ["mobile-risk-overview"],
+    queryKey: queryKeys.mobile.riskOverview(),
     queryFn: fetchRiskOverview,
   });
 
   const { data: statsData, isLoading: statsLoading } = useQuery({
-    queryKey: ["mobile-stats"],
+    queryKey: queryKeys.mobile.stats(),
     queryFn: fetchStats,
   });
 

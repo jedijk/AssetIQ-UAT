@@ -52,4 +52,35 @@ export const queryKeys = {
     /** Legacy key used by threat detail / observation workspace lookups */
     allForLookup: () => ["failure-modes-all"],
   },
+  chat: {
+    history: () => ["chatHistory"],
+  },
+  myTasks: {
+    /** Prefix for predicate invalidation across filter variants */
+    prefix: "my-tasks",
+    countPrefix: "my-tasks-count",
+    operatorCountsPrefix: "operatorTaskCounts",
+    list: (filter, date, disciplines) => ["my-tasks", filter, date, disciplines],
+    operatorCounts: (disciplines, userId) => ["operatorTaskCounts", disciplines, userId],
+    filterCount: (filter, disciplines, date, userId) =>
+      ["my-tasks-count", filter, disciplines, date, userId],
+  },
+  centralActions: {
+    prefix: "central-actions",
+  },
+  formSubmissions: {
+    all: () => ["form-submissions"],
+    list: (filters) => ["form-submissions", filters],
+    dashboard: () => ["form-submissions-dashboard"],
+  },
+  notifications: {
+    overdueActions: () => ["overdueActions"],
+  },
+  mobile: {
+    myTasks: (filter) => ["myTasks", filter],
+    executiveKpis: () => ["mobile-executive-kpis"],
+    analytics: () => ["mobile-analytics"],
+    riskOverview: () => ["mobile-risk-overview"],
+    stats: () => ["mobile-stats"],
+  },
 };

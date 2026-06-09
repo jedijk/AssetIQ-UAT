@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { equipmentHierarchyAPI } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { useLanguage } from "../contexts/LanguageContext";
 import { 
   ChevronRight, 
@@ -30,7 +31,7 @@ const MobileHierarchy = () => {
   const scrollContainerRef = useRef(null);
 
   const { data: nodesData = {}, isLoading } = useQuery({
-    queryKey: ["equipmentNodes"],
+    queryKey: queryKeys.equipment.nodes(),
     queryFn: equipmentHierarchyAPI.getNodes,
   });
 

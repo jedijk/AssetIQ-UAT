@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { chatAPI, voiceAPI } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { X, Send, Mic, MicOff, Loader2, Trash2, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -22,15 +23,15 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
   }, [prefillMessage, onPrefillConsumed]);
 
   const { data: messages = [] } = useQuery({
-    queryKey: ["chatHistory"],
+    queryKey: queryKeys.chat.history(),
     queryFn: () => chatAPI.getHistory(100),
   });
 
   const sendMutation = useMutation({
     mutationFn: ({ content }) => chatAPI.sendMessage(content),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
-      queryClient.invalidateQueries({ queryKey: ["threats"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.history() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
       setMessage("");
     },
     onError: (error) => {
@@ -41,7 +42,7 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
   const clearMutation = useMutation({
     mutationFn: () => chatAPI.clearHistory(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.history() });
       toast.success(t("chat.chatCleared"));
     },
     onError: () => {

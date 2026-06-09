@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { chatAPI, voiceAPI, threatsAPI } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -119,7 +120,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
 
   // Fetch chat history
   const { data: messages = [], isLoading, refetch: refetchHistory } = useQuery({
-    queryKey: ["chatHistory"],
+    queryKey: queryKeys.chat.history(),
     queryFn: () => chatAPI.getHistory(100),
     enabled: isOpen,
   });
@@ -170,9 +171,9 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
       chatAPI
         .sendMessage("skip", null, manualLanguageRef.current)
         .then(() => {
-          queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
-          queryClient.invalidateQueries({ queryKey: ["threats"] });
-          queryClient.invalidateQueries({ queryKey: ["stats"] });
+          queryClient.invalidateQueries({ queryKey: queryKeys.chat.history() });
+          queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+          queryClient.invalidateQueries({ queryKey: queryKeys.stats.all() });
         })
         .catch(() => { /* silently ignore — user is closing the window */ })
         .finally(() => {
@@ -228,9 +229,9 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
       chatAPI
         .sendMessage("skip", null, manualLanguageRef.current)
         .then(() => {
-          queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
-          queryClient.invalidateQueries({ queryKey: ["threats"] });
-          queryClient.invalidateQueries({ queryKey: ["stats"] });
+          queryClient.invalidateQueries({ queryKey: queryKeys.chat.history() });
+          queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+          queryClient.invalidateQueries({ queryKey: queryKeys.stats.all() });
         })
         .catch((err) => {
           const msg = err?.response?.data?.detail || t("chat.autoSkipFailed");
@@ -306,9 +307,9 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
       setAutoSkipCountdown(null);
     },
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
-      queryClient.invalidateQueries({ queryKey: ["threats"] });
-      queryClient.invalidateQueries({ queryKey: ["stats"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.history() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all() });
       
       // Detect database environment mismatch
       // If user sent what looks like an equipment selection but got equipment options back
@@ -322,7 +323,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
           duration: 5000,
         });
         // Force refetch chat history to sync with current database
-        queryClient.refetchQueries({ queryKey: ["chatHistory"] });
+        queryClient.refetchQueries({ queryKey: queryKeys.chat.history() });
       }
       
       setMessage("");
@@ -352,7 +353,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
   const clearChatMutation = useMutation({
     mutationFn: () => chatAPI.clearHistory(),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.history() });
       toast.success(t("chat.chatCleared"));
     },
     onError: () => {
@@ -937,8 +938,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                             try {
                               setIsSending(true);
                               await chatAPI.cancelFlow();
-                              queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
-                              queryClient.invalidateQueries({ queryKey: ["threats"] });
+                              queryClient.invalidateQueries({ queryKey: queryKeys.chat.history() });
+                              queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
                             } catch (e) {
                               toast.error(t("chat.cancelFailed"));
                             } finally {
@@ -1071,7 +1072,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
             <button
               onClick={async () => {
                 await chatAPI.cancelFlow();
-                queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
+                queryClient.invalidateQueries({ queryKey: queryKeys.chat.history() });
               }}
               className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm"
             >
@@ -1170,7 +1171,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 setShowNewFailureModeInput(false);
                 setNewFailureModeName("");
                 await chatAPI.cancelFlow();
-                queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
+                queryClient.invalidateQueries({ queryKey: queryKeys.chat.history() });
               }}
               className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm"
             >

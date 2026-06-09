@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { actionsAPI } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { useLanguage } from "../contexts/LanguageContext";
 import { 
   CheckCircle, 
@@ -20,7 +21,7 @@ const MobileActions = () => {
   const [filter, setFilter] = useState("open");
 
   const { data: actionsData = {}, isLoading } = useQuery({
-    queryKey: ["actions"],
+    queryKey: queryKeys.actions.all(),
     queryFn: () => actionsAPI.getAll(),
   });
 

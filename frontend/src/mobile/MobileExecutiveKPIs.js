@@ -8,6 +8,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { rilDashboardAPI } from "../lib/apis/rilAPI";
+import { queryKeys } from "../lib/queryKeys";
 
 const KPICard = ({ icon: Icon, label, value, sub, color = "blue" }) => {
   const colorClasses = {
@@ -31,7 +32,7 @@ const KPICard = ({ icon: Icon, label, value, sub, color = "blue" }) => {
 
 const MobileExecutiveKPIs = () => {
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["mobile-executive-kpis"],
+    queryKey: queryKeys.mobile.executiveKpis(),
     queryFn: () => rilDashboardAPI.getExecutive(),
     staleTime: 60_000,
   });

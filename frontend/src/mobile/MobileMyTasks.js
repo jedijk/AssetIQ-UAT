@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useAuth } from "../contexts/AuthContext";
 import { myTasksAPI } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { 
   Clock, 
   CheckCircle2, 
@@ -24,7 +25,7 @@ const MobileMyTasks = () => {
   const [selectedTask, setSelectedTask] = useState(null);
 
   const { data: tasksData = {}, isLoading } = useQuery({
-    queryKey: ["myTasks", filter],
+    queryKey: queryKeys.mobile.myTasks(filter),
     queryFn: () => myTasksAPI.getTasks({ filter }),
     enabled: !!user,
   });

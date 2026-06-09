@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { chatAPI, voiceAPI } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -49,7 +50,7 @@ const ChatPage = () => {
 
   // Fetch chat history
   const { data: messages = [], isLoading } = useQuery({
-    queryKey: ["chatHistory"],
+    queryKey: queryKeys.chat.history(),
     queryFn: () => chatAPI.getHistory(100),
   });
 
@@ -57,9 +58,9 @@ const ChatPage = () => {
   const sendMutation = useMutation({
     mutationFn: ({ content, image }) => chatAPI.sendMessage(content, image, manualLanguage),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["chatHistory"] });
-      queryClient.invalidateQueries({ queryKey: ["threats"] });
-      queryClient.invalidateQueries({ queryKey: ["stats"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.chat.history() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.stats.all() });
       setMessage("");
       setImageBase64(null);
       setImagePreview(null);

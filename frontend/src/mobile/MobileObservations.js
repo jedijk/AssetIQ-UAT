@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { threatsAPI } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { useLanguage } from "../contexts/LanguageContext";
 import { translateEnum } from "../lib/translateEnum";
 import { 
@@ -20,7 +21,7 @@ const MobileObservations = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: observations = [], isLoading, isError, refetch } = useQuery({
-    queryKey: ["threats"],
+    queryKey: queryKeys.threats.all(),
     queryFn: () => threatsAPI.getAll(),
     retry: 2,
     staleTime: 60 * 1000,

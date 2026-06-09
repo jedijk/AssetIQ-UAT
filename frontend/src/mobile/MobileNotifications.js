@@ -1,18 +1,19 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { actionsAPI, threatsAPI } from "../lib/api";
+import { queryKeys } from "../lib/queryKeys";
 import { Bell, AlertTriangle } from "lucide-react";
 
 const MobileNotifications = () => {
   const { data: overdueData = {} } = useQuery({
-    queryKey: ["overdueActions"],
+    queryKey: queryKeys.notifications.overdueActions(),
     queryFn: actionsAPI.getOverdue,
   });
 
   const overdueActions = overdueData.overdue_actions || [];
 
   const { data: threats = [] } = useQuery({
-    queryKey: ["threats"],
+    queryKey: queryKeys.threats.all(),
     queryFn: () => threatsAPI.getAll(),
   });
 

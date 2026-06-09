@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useIsFetching, useQuery, useQueryClient } from "@tanstack/react-query";
 import { statsAPI, actionsAPI, investigationAPI, equipmentHierarchyAPI, threatsAPI, usersAPI, api } from "../../lib/api";
+import { queryKeys } from "../../lib/queryKeys";
 import { formAPI } from "../../components/forms";
 import { useAuth } from "../../contexts/AuthContext";
 import { useEffectiveRole } from "../../contexts/RolePreviewContext";
@@ -130,14 +131,14 @@ export default function DashboardPageMain({ initialTab }) {
   }, [effectiveRole, isOperatorMode, isMobileViewport, navigate]);
 
   const refreshDashboard = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: ["stats"] });
-    queryClient.invalidateQueries({ queryKey: ["threats"] });
-    queryClient.invalidateQueries({ queryKey: ["actions"] });
-    queryClient.invalidateQueries({ queryKey: ["investigations"] });
-    queryClient.invalidateQueries({ queryKey: ["form-submissions-dashboard"] });
-    queryClient.invalidateQueries({ queryKey: ["top-observations"] });
-    queryClient.invalidateQueries({ queryKey: ["equipment-nodes"] });
-    queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.stats.all() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.actions.all() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.investigations.all() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.formSubmissions.dashboard() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.threats.top() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.equipment.nodes() });
+    queryClient.invalidateQueries({ queryKey: queryKeys.users.rbac() });
   }, [queryClient]);
 
   // Redirect to operational tab on mobile if viewing hidden tabs (except production which is now mobile-enabled)
@@ -243,7 +244,7 @@ export default function DashboardPageMain({ initialTab }) {
   
   // Fetch users for owner filter
   const { data: usersData } = useQuery({
-    queryKey: ["rbac-users"],
+    queryKey: queryKeys.users.rbac(),
     queryFn: usersAPI.getAll,
     staleTime: 5 * 60 * 1000,
   });
@@ -251,7 +252,7 @@ export default function DashboardPageMain({ initialTab }) {
 
   // Fetch equipment hierarchy for plant unit filter
   const { data: equipmentData } = useQuery({
-    queryKey: ["equipment-nodes"],
+    queryKey: queryKeys.equipment.nodes(),
     queryFn: equipmentHierarchyAPI.getNodes,
     staleTime: 5 * 60 * 1000,
   });
@@ -281,12 +282,12 @@ export default function DashboardPageMain({ initialTab }) {
 
   // Fetch all data
   const { data: stats } = useQuery({
-    queryKey: ["stats"],
+    queryKey: queryKeys.stats.all(),
     queryFn: statsAPI.get,
   });
 
   const { data: observationsData = [] } = useQuery({
-    queryKey: ["threats"],
+    queryKey: queryKeys.threats.all(),
     queryFn: () => threatsAPI.getAll(),
   });
   const allObservations = Array.isArray(observationsData) ? observationsData : [];
@@ -311,7 +312,7 @@ export default function DashboardPageMain({ initialTab }) {
   });
 
   const { data: actionsData = { actions: [], stats: {} } } = useQuery({
-    queryKey: ["actions"],
+    queryKey: queryKeys.actions.all(),
     queryFn: () => actionsAPI.getAll(),
   });
   const allActions = Array.isArray(actionsData?.actions) ? actionsData.actions : (Array.isArray(actionsData) ? actionsData : []);
@@ -332,7 +333,7 @@ export default function DashboardPageMain({ initialTab }) {
   });
 
   const { data: investigationsData = { investigations: [] }, isLoading: isLoadingInvestigations, error: investigationsError } = useQuery({
-    queryKey: ["investigations"],
+    queryKey: queryKeys.investigations.all(),
     queryFn: () => investigationAPI.getAll(),
     staleTime: 0,
     refetchOnMount: 'always',
@@ -356,7 +357,7 @@ export default function DashboardPageMain({ initialTab }) {
 
   // Fetch recent form submissions for dashboard widget
   const { data: formSubmissionsData = [] } = useQuery({
-    queryKey: ["form-submissions-dashboard"],
+    queryKey: queryKeys.formSubmissions.dashboard(),
     queryFn: () => formAPI.getSubmissions({ limit: 10 }),
     staleTime: 60 * 1000, // 1 minute
   });
@@ -367,7 +368,7 @@ export default function DashboardPageMain({ initialTab }) {
 
   // Top 10 highest scoring observations
   const { data: topObservationsData = [] } = useQuery({
-    queryKey: ["top-observations"],
+    queryKey: queryKeys.threats.top(),
     queryFn: () => threatsAPI.getTop(10),
   });
   const topObservations = Array.isArray(topObservationsData) ? topObservationsData : [];
