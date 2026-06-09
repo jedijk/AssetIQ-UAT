@@ -1394,50 +1394,39 @@ const ProcessJourney = ({ stages }) => {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-3">
-      {/* Header — compact */}
-      <div className="flex items-center gap-2 mb-2">
-        <div className="p-1 bg-slate-100 rounded">
-          <TrendingUp className="w-3.5 h-3.5 text-slate-600" />
+    <div className="bg-white rounded-lg border border-slate-200 px-3 py-2">
+      {/* Single-row compact layout: title + steps inline */}
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <TrendingUp className="w-3 h-3 text-slate-500" />
+          <span className="text-[11px] font-medium text-slate-700">Process Journey</span>
         </div>
-        <div>
-          <h3 className="font-medium text-xs text-slate-900 leading-tight">Process Journey</h3>
-          <p className="text-[10px] text-slate-500 leading-tight">Track workflow progress</p>
-        </div>
-      </div>
 
-      {/* Journey Steps — 50% smaller */}
-      <div className="flex items-center justify-between overflow-x-auto pb-1">
-        {stages?.map((stage, index) => {
-          const config = stageConfig[stage.status] || stageConfig.not_started;
-          const Icon = config.icon;
-          
-          return (
-            <React.Fragment key={stage.stage}>
-              {/* Stage */}
-              <div className="flex flex-col items-center min-w-[44px]">
-                <div className={`w-5 h-5 rounded-full ${config.color} flex items-center justify-center text-white mb-1`}>
-                  <Icon className="w-2.5 h-2.5" />
-                </div>
-                <div className={`text-[10px] font-medium ${config.textColor} text-center leading-tight`}>
-                  {stage.stage}
-                </div>
-                {stage.date && (
-                  <div className="text-[9px] text-slate-400 mt-0.5 leading-tight">
-                    {format(parseISO(stage.date), "MMM d")}
+        <div className="flex items-center justify-between flex-1 overflow-x-auto">
+          {stages?.map((stage, index) => {
+            const config = stageConfig[stage.status] || stageConfig.not_started;
+            const Icon = config.icon;
+            
+            return (
+              <React.Fragment key={stage.stage}>
+                <div className="flex items-center gap-1 min-w-fit" title={stage.date ? `${stage.stage} — ${format(parseISO(stage.date), "MMM d")}` : stage.stage}>
+                  <div className={`w-3.5 h-3.5 rounded-full ${config.color} flex items-center justify-center text-white flex-shrink-0`}>
+                    <Icon className="w-2 h-2" />
                   </div>
+                  <span className={`text-[10px] font-medium ${config.textColor} whitespace-nowrap`}>
+                    {stage.stage}
+                  </span>
+                </div>
+                
+                {index < stages.length - 1 && (
+                  <div className={`flex-1 min-w-[6px] h-px mx-1 ${
+                    stage.status === "completed" ? "bg-green-300" : "bg-slate-200"
+                  }`} />
                 )}
-              </div>
-              
-              {/* Connector */}
-              {index < stages.length - 1 && (
-                <div className={`flex-1 h-px mx-1 ${
-                  stage.status === "completed" ? "bg-green-300" : "bg-slate-200"
-                }`} />
-              )}
-            </React.Fragment>
-          );
-        })}
+              </React.Fragment>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
