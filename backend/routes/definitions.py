@@ -481,7 +481,7 @@ class ProductionLossConfig(BaseModel):
     notes: Optional[str] = None
 
 
-@router.get("/production-loss-config")
+@router.get("/definitions/production-loss-config")
 async def get_production_loss_config(current_user: dict = Depends(get_current_user)):
     """Get production loss configuration for the user's organization."""
     config = await db.production_loss_config.find_one(
@@ -503,7 +503,7 @@ async def get_production_loss_config(current_user: dict = Depends(get_current_us
     return config
 
 
-@router.put("/production-loss-config")
+@router.put("/definitions/production-loss-config")
 async def save_production_loss_config(
     config: ProductionLossConfig,
     current_user: dict = Depends(_settings_write)
@@ -527,7 +527,7 @@ async def save_production_loss_config(
     return {"message": "Production loss configuration saved", **doc}
 
 
-@router.delete("/production-loss-config")
+@router.delete("/definitions/production-loss-config")
 async def reset_production_loss_config(current_user: dict = Depends(_settings_write)):
     """Reset production loss configuration to defaults."""
     await db.production_loss_config.delete_one({"created_by": current_user["id"]})
