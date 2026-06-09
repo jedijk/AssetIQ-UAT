@@ -126,7 +126,8 @@ def calculate_production_exposure(observation: dict, criticality: dict) -> dict:
         "formatted_value": f"${base_exposure:,.0f}",
         "estimated_downtime_hours": downtime_hours,
         "deferred_production": round(deferred_production),
-        "deferred_production_unit": "bbl"
+        "deferred_production_unit": "bbl",
+        "production_impact_score": production_impact
     }
 
 
@@ -801,6 +802,7 @@ async def get_observation_workspace(
     # Get equipment criticality data — try linked_equipment_id first, then fall back
     # to matching by equipment_tag, then by asset name, so observations created via
     # chat (where the equipment isn't formally linked) still pull in their criticality.
+    # Finally, check if the observation already has stored criticality data.
     criticality = None
     equipment_node = None
     lookup_filters = []
@@ -817,6 +819,10 @@ async def get_observation_workspace(
             criticality = equipment_node.get("criticality")
             if criticality:
                 break
+    
+    # Fall back to observation's stored criticality data if no equipment node found
+    if not criticality and observation.get("equipment_criticality_data"):
+        criticality = observation.get("equipment_criticality_data")
     
     # Get failure mode data
     failure_mode_data = None
