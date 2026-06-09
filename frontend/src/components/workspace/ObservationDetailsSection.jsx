@@ -370,10 +370,14 @@ const ObservationDetailsSection = ({ threatId }) => {
   }, []);
 
   // The action bar (status + edit + share + ••• + RPN + tag + datetime) is rendered
-  // into the page hero via portal, so it appears inside the workspace header.
+  // into the page hero via portal so it appears inside the workspace header.
+  // On mobile, we also expose a compact ⋯-only portal target so the menu can
+  // anchor to the top-right of the hero title row.
   const [heroSlot, setHeroSlot] = useState(null);
+  const [heroSlotMobile, setHeroSlotMobile] = useState(null);
   useEffect(() => {
     setHeroSlot(document.getElementById("workspace-hero-slot"));
+    setHeroSlotMobile(document.getElementById("workspace-hero-slot-mobile"));
   }, [threat]);
 
   if (!threat) return null;
@@ -536,8 +540,10 @@ const ObservationDetailsSection = ({ threatId }) => {
                 ))}
               </SelectContent>
             </Select>
-            <Button size="sm" variant="ghost" onClick={shareLink} title="Share" data-testid="workspace-share-btn" className="h-6 w-6 sm:h-8 sm:w-8 p-0">
-              <Share2 className="w-3 h-3 sm:w-4 sm:h-4" />
+            {/* Share / Edit / Delete — desktop only (sm and up). On mobile,
+                these collapse into the ⋯ menu so the hero stays tidy. */}
+            <Button size="sm" variant="ghost" onClick={shareLink} title="Share" data-testid="workspace-share-btn" className="hidden sm:inline-flex h-8 w-8 p-0">
+              <Share2 className="w-4 h-4" />
             </Button>
             <Button
               size="sm"
@@ -545,9 +551,9 @@ const ObservationDetailsSection = ({ threatId }) => {
               onClick={startEditing}
               data-testid="workspace-edit-btn"
               title="Edit observation"
-              className="h-6 w-6 sm:h-8 sm:w-auto p-0 sm:px-3"
+              className="hidden sm:inline-flex h-8 sm:w-auto p-0 sm:px-3"
             >
-              <Edit className="w-3 h-3 sm:w-3.5 sm:h-3.5 sm:mr-1" />
+              <Edit className="w-3.5 h-3.5 sm:mr-1" />
               <span className="hidden sm:inline">Edit</span>
             </Button>
             <Button
@@ -556,22 +562,36 @@ const ObservationDetailsSection = ({ threatId }) => {
               onClick={() => setShowDeleteDialog(true)}
               title="Delete observation"
               data-testid="workspace-delete-btn"
-              className="h-6 w-6 sm:h-8 sm:w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+              className="hidden sm:inline-flex h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
             >
-              <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+              <Trash2 className="w-4 h-4" />
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="ghost" className="h-6 w-6 sm:h-8 sm:w-8 p-0" data-testid="workspace-more-menu">
-                  <MoreVertical className="w-3 h-3 sm:w-4 sm:h-4" />
+                <Button size="sm" variant="ghost" className="h-8 w-8 p-0" data-testid="workspace-more-menu">
+                  <MoreVertical className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {/* Mobile-only quick actions */}
+                <DropdownMenuItem className="sm:hidden" onClick={shareLink} data-testid="menu-share">
+                  <Share2 className="w-4 h-4 mr-2" /> Share
+                </DropdownMenuItem>
+                <DropdownMenuItem className="sm:hidden" onClick={startEditing} data-testid="menu-edit">
+                  <Edit className="w-4 h-4 mr-2" /> Edit
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setShowLinkEquipmentDialog(true)} data-testid="menu-link-equipment">
                   <LinkIcon className="w-4 h-4 mr-2" /> Link Equipment
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setShowLinkFailureModeDialog(true)} data-testid="menu-link-failure-mode">
                   <AlertTriangle className="w-4 h-4 mr-2" /> Link Failure Mode
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="sm:hidden text-red-600 focus:text-red-700 focus:bg-red-50"
+                  onClick={(e) => { e.preventDefault(); setShowDeleteDialog(true); }}
+                  data-testid="menu-delete-observation"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" /> Delete
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -581,12 +601,45 @@ const ObservationDetailsSection = ({ threatId }) => {
     </div>
   );
 
+  // Compact mobile menu — just the ⋯ dropdown with all actions.
+  const mobileMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 -mr-1" data-testid="workspace-mobile-more-menu">
+          <MoreVertical className="w-4 h-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={shareLink}>
+          <Share2 className="w-4 h-4 mr-2" /> Share
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={startEditing}>
+          <Edit className="w-4 h-4 mr-2" /> Edit
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setShowLinkEquipmentDialog(true)}>
+          <LinkIcon className="w-4 h-4 mr-2" /> Link Equipment
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setShowLinkFailureModeDialog(true)}>
+          <AlertTriangle className="w-4 h-4 mr-2" /> Link Failure Mode
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={(e) => { e.preventDefault(); setShowDeleteDialog(true); }}
+          className="text-red-600 focus:text-red-700 focus:bg-red-50"
+        >
+          <Trash2 className="w-4 h-4 mr-2" /> Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <div className="space-y-3">
-      {/* Action bar — rendered into the page hero via portal when the slot exists; falls back to inline if no slot found. */}
+      {/* Action bar — desktop hero portal. Falls back to inline if no slot found. */}
       {heroSlot ? createPortal(actionBar, heroSlot) : (
-        <div className="bg-white rounded-xl border border-slate-200 p-4">{actionBar}</div>
+        <div className="hidden lg:block bg-white rounded-xl border border-slate-200 p-4">{actionBar}</div>
       )}
+      {/* Mobile ⋯ menu — anchored top-right of the hero title row. */}
+      {heroSlotMobile && createPortal(mobileMenu, heroSlotMobile)}
 
       {/* Score calculation popup — triggered by right-clicking the Risk KPI card (Row 1) via window event. */}
       {scoreCalcPopup.show && (() => {

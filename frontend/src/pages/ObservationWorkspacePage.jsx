@@ -1627,13 +1627,13 @@ const ObservationWorkspacePage = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-12">
-      {/* Hero header — compact single-row like classic; stays fixed below the 48px app header */}
+      {/* Hero header — pinned at top below the 48px app header; does not move when scrolling */}
       <div className="sticky top-12 z-20 bg-white border-b border-slate-200 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 max-w-7xl">
-          {/* Mobile: title row + action bar row stack vertically.
+          {/* Mobile: title row (with ⋯ menu pinned right) + action bar row stack vertically.
               Desktop: everything inline on a single row. */}
           <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-3 py-2">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="flex items-start sm:items-center gap-2 sm:gap-3 min-w-0">
               <Button
                 variant="ghost"
                 size="sm"
@@ -1654,11 +1654,13 @@ const ObservationWorkspacePage = () => {
                   {observation?.title}
                 </h1>
               </div>
+
+              {/* Mobile-only ⋯ slot — anchored top-right of the hero title row */}
+              <div id="workspace-hero-slot-mobile" className="lg:hidden flex-shrink-0 self-start" />
             </div>
 
-            {/* Action bar slot — ObservationDetailsSection portals status/share/edit/••• into here.
-                Wraps naturally on mobile (full-width below the title row). */}
-            <div id="workspace-hero-slot" className="flex-1 lg:flex-shrink-0 lg:flex-none min-w-0 overflow-x-auto lg:overflow-visible" />
+            {/* Action bar slot (desktop) — ObservationDetailsSection portals share/edit/delete/⋯ into here */}
+            <div id="workspace-hero-slot" className="hidden lg:block lg:flex-shrink-0 lg:flex-none min-w-0 lg:overflow-visible" />
           </div>
         </div>
       </div>
