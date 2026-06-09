@@ -46,8 +46,9 @@ export const sectionHasPermissionsForRole = (section, role, permissions) =>
     roleHasAnyFeaturePermission(permissions?.[role]?.[featureKey])
   );
 
-export const getVisiblePermissionSections = (role, permissions, showEmptySections) => {
-  if (showEmptySections || role === "owner") {
+/** Admin UI: show every section by default so disabled features stay editable. */
+export const getVisiblePermissionSections = (role, permissions, hideEmptySections = false) => {
+  if (!hideEmptySections) {
     return PERMISSION_SECTIONS;
   }
   return PERMISSION_SECTIONS.filter((section) =>

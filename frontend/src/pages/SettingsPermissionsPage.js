@@ -144,7 +144,7 @@ export default function SettingsPermissionsPage({ embedded = false }) {
   const [showCreateRoleDialog, setShowCreateRoleDialog] = useState(false);
   const [newRole, setNewRole] = useState({ name: "", display_name: "", description: "", base_role: "viewer" });
   const [deleteRoleConfirm, setDeleteRoleConfirm] = useState(null);
-  const [showEmptySections, setShowEmptySections] = useState(false);
+  const [hideEmptySections, setHideEmptySections] = useState(false);
 
   // Fetch permissions
   const { data: permissionsData, isLoading, error, refetch } = useQuery({
@@ -275,7 +275,7 @@ export default function SettingsPermissionsPage({ embedded = false }) {
   );
 
   const renderEmbeddedPermissionRows = (role) => {
-    const visibleSections = getVisiblePermissionSections(role, permissions, showEmptySections);
+    const visibleSections = getVisiblePermissionSections(role, permissions, hideEmptySections);
     let rowIndex = 0;
 
     return visibleSections.flatMap((section) => {
@@ -339,7 +339,7 @@ export default function SettingsPermissionsPage({ embedded = false }) {
   };
 
   const renderFullPermissionRows = (role) => {
-    const visibleSections = getVisiblePermissionSections(role, permissions, showEmptySections);
+    const visibleSections = getVisiblePermissionSections(role, permissions, hideEmptySections);
 
     return visibleSections.flatMap((section) => {
       const sectionRows = section.features
@@ -542,10 +542,10 @@ export default function SettingsPermissionsPage({ embedded = false }) {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowEmptySections((prev) => !prev)}
+                onClick={() => setHideEmptySections((prev) => !prev)}
                 className="text-slate-600"
               >
-                {showEmptySections ? "Hide empty sections" : "Show all sections"}
+                {hideEmptySections ? "Show all sections" : "Hide empty sections"}
               </Button>
             </div>
           </CardHeader>
@@ -721,10 +721,10 @@ export default function SettingsPermissionsPage({ embedded = false }) {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowEmptySections((prev) => !prev)}
+              onClick={() => setHideEmptySections((prev) => !prev)}
               className="flex-shrink-0"
             >
-              {showEmptySections ? "Hide empty sections" : "Show all sections"}
+              {hideEmptySections ? "Show all sections" : "Hide empty sections"}
             </Button>
             <Button
               onClick={() => setShowCreateRoleDialog(true)}
