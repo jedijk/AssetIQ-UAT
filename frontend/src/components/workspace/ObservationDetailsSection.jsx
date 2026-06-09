@@ -517,24 +517,18 @@ const ObservationDetailsSection = ({ threatId }) => {
           </>
         ) : (
           <>
+            {/* Status selector — desktop only. Status auto-syncs with the
+                process journey, so a mobile editor isn't needed. */}
             <Select
               value={threat.status}
               onValueChange={(v) => updateMutation.mutate({ status: v })}
               disabled={updateMutation.isPending}
             >
               <SelectTrigger
-                className="h-8 w-9 sm:min-w-[8.5rem] sm:w-auto text-xs px-1 sm:px-3 [&>span]:hidden sm:[&>span]:inline"
+                className="hidden sm:inline-flex h-8 min-w-[8.5rem] text-xs"
                 data-testid="workspace-status-select"
-                title={translateEnum(threat.status)}
               >
-                <SelectValue>
-                  {/* Desktop: full text */}
-                  <span className="hidden sm:inline">{translateEnum(threat.status)}</span>
-                  {/* Mobile: first-letter only — full text shown when dropdown is opened */}
-                  <span className="sm:hidden font-semibold">
-                    {(translateEnum(threat.status) || "?").charAt(0).toUpperCase()}
-                  </span>
-                </SelectValue>
+                <SelectValue>{translateEnum(threat.status)}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {STATUS_OPTIONS.map((s) => (
