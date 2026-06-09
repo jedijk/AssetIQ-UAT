@@ -725,12 +725,12 @@ const ObservationDetailsSection = ({ threatId }) => {
         data-testid="workspace-info-grid"
       >
         {infoItems.map((item) => (
-          <div key={item.label} className="bg-white rounded-lg border border-slate-200 px-2 sm:px-3 py-1.5 sm:py-2 flex flex-col sm:flex-row sm:items-center gap-0.5 sm:gap-2 min-h-[36px] sm:min-h-[44px]">
-            <div className="flex items-center gap-1 sm:gap-2 min-w-0 justify-center sm:justify-start">
+          <div key={item.label} className="bg-white rounded-lg border border-slate-200 px-2 sm:px-3 py-1.5 sm:py-2 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 min-h-[36px] sm:min-h-[44px] text-center">
+            <div className="flex items-center gap-1 sm:gap-2 min-w-0 justify-center">
               <item.icon className="w-3 h-3 text-slate-400 flex-shrink-0" />
               <span className="text-[10px] uppercase tracking-wide text-slate-500 truncate flex-shrink-0">{item.label}</span>
             </div>
-            <div className="flex-1 min-w-0 text-center sm:text-right">
+            <div className="min-w-0 text-center flex items-center justify-center">
             {isEditing ? (
               item.type === "searchable" ? (
                 <SearchableCombobox
@@ -785,7 +785,7 @@ const ObservationDetailsSection = ({ threatId }) => {
                 />
               )
             ) : (
-              <div className="flex items-center gap-1 justify-end sm:justify-start">
+              <div className="flex items-center gap-1 justify-center">
                 {item.field === "failure_mode" && item.value ? (
                   <button
                     onClick={() => {
@@ -798,13 +798,13 @@ const ObservationDetailsSection = ({ threatId }) => {
                         navigate(`/library?search=${encodeURIComponent(threat.failure_mode)}`);
                       }
                     }}
-                    className="font-semibold text-slate-900 text-xs sm:text-sm break-words sm:truncate text-center sm:text-right block w-full hover:text-blue-600 hover:underline transition-colors cursor-pointer"
+                    className="font-semibold text-slate-900 text-xs sm:text-sm break-words sm:truncate text-center block hover:text-blue-600 hover:underline transition-colors cursor-pointer"
                     title="Click to view in Failure Modes Library"
                   >
                     {item.value}
                   </button>
                 ) : (
-                  <span className="font-semibold text-slate-900 text-xs sm:text-sm break-words sm:truncate block">{item.value}</span>
+                  <span className="font-semibold text-slate-900 text-xs sm:text-sm break-words sm:truncate block text-center">{item.value}</span>
                 )}
                 {item.field === "failure_mode" && threat.is_new_failure_mode && (
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">NEW</span>
