@@ -308,7 +308,7 @@ const MyTasksPage = () => {
         query.queryKey[0] === queryKeys.myTasks.operatorCountsPrefix,
     });
   }, [queryClient]);
-  const [activeFilter, setActiveFilter] = useState("adhoc");
+  const [activeFilter, setActiveFilter] = useState("open");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTask, setSelectedTask] = useState(null);
