@@ -287,7 +287,8 @@ const TimelineEventCard = ({ event, isCurrent }) => {
     const configs = {
       observation: { icon: AlertTriangle, color: "amber", label: "Observation" },
       failure: { icon: XCircle, color: "red", label: "Failure" },
-      work_order: { icon: Wrench, color: "blue", label: "Work Order" },
+      work_order: { icon: Wrench, color: "blue", label: "Action" },
+      action: { icon: Wrench, color: "blue", label: "Action" },
       inspection: { icon: Eye, color: "green", label: "Inspection" },
       repair: { icon: Wrench, color: "purple", label: "Repair" },
       investigation: { icon: FileSearch, color: "indigo", label: "Investigation" },
@@ -435,6 +436,7 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
               observation: { icon: AlertTriangle, color: "amber" },
               failure: { icon: XCircle, color: "red" },
               work_order: { icon: Wrench, color: "blue" },
+              action: { icon: Wrench, color: "blue" },
               inspection: { icon: Eye, color: "green" },
               repair: { icon: Wrench, color: "purple" },
               investigation: { icon: FileSearch, color: "indigo" },
@@ -545,7 +547,7 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Check className="w-4 h-4 text-green-500" />
-                <span>{intelligence.supporting_evidence.work_orders || 0} Work Orders</span>
+                <span>{intelligence.supporting_evidence.work_orders || 0} Actions</span>
               </div>
               {intelligence.supporting_evidence.inspection_evidence && (
                 <div className="flex items-center gap-2 text-sm">
