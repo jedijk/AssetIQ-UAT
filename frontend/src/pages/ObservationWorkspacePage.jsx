@@ -598,8 +598,6 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
  * Recommended Action Card
  */
 const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding }) => {
-  const [expanded, setExpanded] = useState(false);
-  
   const typeColors = {
     PM: "bg-blue-100 text-blue-700",
     CM: "bg-amber-100 text-amber-700",
@@ -613,92 +611,52 @@ const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding 
     : "bg-purple-50 text-purple-600 border-purple-200";
 
   return (
-    <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 hover:border-slate-200 transition-colors group">
-      {/* Header row: Type badge, discipline, time, source */}
-      <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-        {action.action_type && (
-          <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${typeColors[action.action_type] || 'bg-slate-100 text-slate-600'}`}>
-            {action.action_type}
-          </span>
-        )}
-        {action.discipline && (
-          <span className="text-[10px] text-slate-500 capitalize">{action.discipline}</span>
-        )}
-        {action.estimated_minutes && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
-            {action.estimated_minutes} min
-          </span>
-        )}
-        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${sourceColor}`}>
-          {sourceLabel}
-        </span>
-        {action.confidence && (
-          <span className="text-[10px] text-purple-600 ml-auto">
-            {action.confidence}%
-          </span>
-        )}
-      </div>
+    <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 hover:border-slate-200 transition-colors group">
+      {/* Main row: Info + Add button */}
+      <div className="flex items-start gap-2">
+        {/* Left: Info */}
+        <div className="flex-1 min-w-0">
+          {/* Header row: Type badge, discipline, time, source */}
+          <div className="flex items-center gap-1 mb-1 flex-wrap">
+            {action.action_type && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${typeColors[action.action_type] || 'bg-slate-100 text-slate-600'}`}>
+                {action.action_type}
+              </span>
+            )}
+            {action.discipline && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 capitalize">
+                {action.discipline}
+              </span>
+            )}
+            {action.estimated_minutes && (
+              <span className="text-[10px] text-slate-500">
+                {action.estimated_minutes}m
+              </span>
+            )}
+            <span className={`text-[10px] px-1 py-0.5 rounded border ${sourceColor}`}>
+              {sourceLabel}
+            </span>
+          </div>
 
-      {/* Description */}
-      <p className="text-xs text-slate-700 leading-relaxed mb-2">
-        {action.title || action.description || action.action}
-      </p>
+          {/* Description */}
+          <p className="text-xs text-slate-700 leading-snug">
+            {action.title || action.description || action.action}
+          </p>
+        </div>
 
-      {/* Expandable details */}
-      {(action.why_recommended || action.expected_impact) && (
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-700 mb-2"
-        >
-          <ChevronDown className={`w-3 h-3 transition-transform ${expanded ? "rotate-180" : ""}`} />
-          {expanded ? "Less" : "More info"}
-        </button>
-      )}
-      
-      <AnimatePresence>
-        {expanded && (action.why_recommended || action.expected_impact) && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="text-[10px] text-slate-500 mb-2 p-2 bg-white rounded border border-slate-100 space-y-1">
-              {action.expected_impact && (
-                <p><span className="font-medium">Impact:</span> {action.expected_impact}</p>
-              )}
-              {action.why_recommended && (
-                <p><span className="font-medium">Why:</span> {action.why_recommended}</p>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Compact action buttons */}
-      <div className="flex items-center gap-1.5">
+        {/* Right: Add button */}
         <Button
           size="sm"
           onClick={() => onAddToPlan(action)}
           disabled={isAdding}
-          className="h-6 text-[10px] px-2 flex-1"
+          className="h-7 w-7 p-0 flex-shrink-0"
+          title="Add to Plan"
         >
           {isAdding ? (
-            <Loader2 className="w-3 h-3 animate-spin" />
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : (
-            <>
-              <Plus className="w-3 h-3 mr-1" />
-              Add to Plan
-            </>
+            <Plus className="w-3.5 h-3.5" />
           )}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => onAddToStrategy(action)}
-          className="h-6 text-[10px] px-2"
-        >
-          Strategy
         </Button>
       </div>
     </div>
