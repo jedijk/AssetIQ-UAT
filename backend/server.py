@@ -928,6 +928,19 @@ async def background_startup():
             except Exception as e:
                 logger.warning(f"Action discipline backfill skipped: {e}")
 
+            # One-shot: drop legacy "Complete causal investigation" central_actions
+            # that the previous sync model created. Investigations are now surfaced
+            # as a synthetic IV entry in the action plan instead.
+            try:
+                result = await db.central_actions.delete_many({
+                    "source_type": "investigation",
+                    "source_id": {"$exists": True}
+                })
+                if result.deleted_count > 0:
+                    logger.info(f"Removed {result.deleted_count} legacy investigation-linked actions")
+            except Exception as e:
+                logger.warning(f"Legacy investigation-action cleanup skipped: {e}")
+
             # Start the task-generation cron (Sunday 02:00 plant-local by default).
             # Reads cron + timezone from app_settings.task_generation.
             try:

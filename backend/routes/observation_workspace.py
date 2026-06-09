@@ -712,7 +712,11 @@ async def get_recommended_actions(observation: dict, failure_mode_data: dict = N
 
 async def get_action_plan(observation_id: str) -> List[dict]:
     """
-    Get actions linked to this observation (existing actions system)
+    Get actions linked to this observation (existing actions system).
+    
+    Also surfaces any linked causal investigation as a synthetic IV-type entry
+    so the investigation appears in the plan without duplicating data in
+    central_actions.
     """
     actions = await db.central_actions.find(
         {
@@ -726,6 +730,37 @@ async def get_action_plan(observation_id: str) -> List[dict]:
     ).sort("created_at", -1).to_list(50)
     
     action_plan = []
+    
+    # Surface the linked investigation (if any) as a synthetic IV entry
+    investigation = await db.investigations.find_one({"threat_id": observation_id}, {"_id": 0})
+    if investigation:
+        inv_status = (investigation.get("status") or "draft").lower()
+        # Map investigation status → action plan status
+        status_map = {
+            "draft": "open",
+            "in_progress": "in_progress",
+            "review": "in_progress",
+            "completed": "completed",
+            "closed": "completed",
+        }
+        action_plan.append({
+            "id": f"inv-{investigation.get('id')}",
+            "action_number": investigation.get("case_number", ""),
+            "title": "Complete causal investigation",
+            "description": "Linked causal investigation. Click to open in Causal Engine.",
+            "status": status_map.get(inv_status, "open"),
+            "priority": "medium",
+            "action_type": "IV",
+            "discipline": "Reliability",
+            "assignee": investigation.get("investigation_leader", ""),
+            "owner": investigation.get("investigation_leader", ""),
+            "due_date": "",
+            "comments": "",
+            "recommendation_id": None,
+            "linked_investigation_id": investigation.get("id"),
+            "is_synthetic": True,
+        })
+
     for action in actions:
         action_plan.append({
             "id": action.get("id"),

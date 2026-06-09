@@ -808,17 +808,18 @@ const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddTo
   );
 };
 
-// Map backend action_type values (e.g. "preventive") to short UI codes (PM/CM/PDM/OP/LEARN)
+// Map backend action_type values (e.g. "preventive") to short UI codes (PM/CM/PDM/OP/LEARN/IV)
 const normalizeActionType = (val) => {
   if (!val) return "CM";
   const v = String(val).toUpperCase();
-  if (["PM", "CM", "PDM", "OP", "LEARN"].includes(v)) return v;
+  if (["PM", "CM", "PDM", "OP", "LEARN", "IV"].includes(v)) return v;
   const lc = String(val).toLowerCase();
   if (lc.startsWith("prev")) return "PM";
   if (lc.startsWith("corr")) return "CM";
   if (lc.startsWith("pred")) return "PDM";
   if (lc.startsWith("oper")) return "OP";
   if (lc.startsWith("learn")) return "LEARN";
+  if (lc.startsWith("invest")) return "IV";
   return "CM";
 };
 
@@ -1210,6 +1211,7 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
     PDM: "bg-purple-100 text-purple-700",
     OP: "bg-green-100 text-green-700",
     LEARN: "bg-pink-100 text-pink-700",
+    IV: "bg-indigo-100 text-indigo-700",
   };
 
   const statusConfig = {
@@ -1348,28 +1350,32 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
                     )}
                   </div>
 
-                  {/* Right: Edit & Delete buttons */}
+                  {/* Right: Edit & Delete buttons — hidden for synthetic investigation entries */}
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={(e) => handleEdit(action, e)}
-                      className="h-7 w-7 p-0"
-                      title="Edit action"
-                      data-testid={`action-plan-edit-${action.id}`}
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={(e) => handleDelete(action, e)}
-                      className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
-                      title="Remove from plan"
-                      data-testid={`action-plan-delete-${action.id}`}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
+                    {!action.is_synthetic && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => handleEdit(action, e)}
+                          className="h-7 w-7 p-0"
+                          title="Edit action"
+                          data-testid={`action-plan-edit-${action.id}`}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => handleDelete(action, e)}
+                          className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                          title="Remove from plan"
+                          data-testid={`action-plan-delete-${action.id}`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
