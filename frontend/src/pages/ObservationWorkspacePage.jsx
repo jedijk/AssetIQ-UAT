@@ -534,20 +534,20 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
         </div>
       </div>
 
-      {/* Most Likely Cause */}
-      <div className="mb-6">
-        <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
+      {/* Most Likely Cause — compact */}
+      <div className="mb-3">
+        <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1">
           Most Likely Cause
         </div>
-        <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-          <div className="font-semibold text-purple-900 text-lg">
+        <div className="p-2 bg-purple-50 border border-purple-200 rounded-md">
+          <div className="font-semibold text-purple-900 text-sm leading-tight">
             {intelligence?.most_likely_cause?.name || "Unknown"}
           </div>
-          <div className="flex items-center gap-2 mt-2">
-            <div className="text-sm text-purple-700">
+          <div className="flex items-center gap-1.5 mt-1">
+            <div className="text-[10px] text-purple-700 whitespace-nowrap">
               {intelligence?.most_likely_cause?.confidence || 0}% Confidence
             </div>
-            <div className="flex-1 h-1.5 bg-purple-200 rounded-full overflow-hidden">
+            <div className="flex-1 h-1 bg-purple-200 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-purple-600 rounded-full"
                 style={{ width: `${intelligence?.most_likely_cause?.confidence || 0}%` }}
