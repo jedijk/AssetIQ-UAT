@@ -46,6 +46,8 @@ import {
   History,
   Zap,
   CircleDot,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -623,7 +625,7 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
 /**
  * Recommended Action Card
  */
-const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding }) => {
+const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding, isInPlan }) => {
   const typeColors = {
     PM: "bg-blue-100 text-blue-700",
     CM: "bg-amber-100 text-amber-700",
@@ -637,7 +639,11 @@ const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding 
     : "bg-purple-50 text-purple-600 border-purple-200";
 
   return (
-    <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 hover:border-slate-200 transition-colors group">
+    <div className={`p-2 rounded-lg border transition-colors group ${
+      isInPlan 
+        ? "bg-green-50 border-green-200" 
+        : "bg-slate-50 border-slate-100 hover:border-slate-200"
+    }`}>
       {/* Main row: Info + Add button */}
       <div className="flex items-start gap-2">
         {/* Left: Info */}
@@ -662,6 +668,11 @@ const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding 
             <span className={`text-[10px] px-1 py-0.5 rounded border ${sourceColor}`}>
               {sourceLabel}
             </span>
+            {isInPlan && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-medium ml-auto">
+                In Plan
+              </span>
+            )}
           </div>
 
           {/* Description */}
@@ -670,16 +681,18 @@ const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding 
           </p>
         </div>
 
-        {/* Right: Add button */}
+        {/* Right: Add button (disabled if already in plan) */}
         <Button
           size="sm"
           onClick={() => onAddToPlan(action)}
-          disabled={isAdding}
-          className="h-7 w-7 p-0 flex-shrink-0"
-          title="Add to action plan"
+          disabled={isAdding || isInPlan}
+          className={`h-7 w-7 p-0 flex-shrink-0 ${isInPlan ? 'bg-green-600' : ''}`}
+          title={isInPlan ? "Already in action plan" : "Add to action plan"}
         >
           {isAdding ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : isInPlan ? (
+            <Check className="w-3.5 h-3.5" />
           ) : (
             <Plus className="w-3.5 h-3.5" />
           )}
@@ -781,84 +794,159 @@ const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddTo
 };
 
 /**
- * Action Plan Panel
+ * Action Plan Panel - Shows actions in the same style as recommended actions
  */
-const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onValidateAction }) => {
+const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, actionPlanIds = [] }) => {
   const navigate = useNavigate();
+  const [editingId, setEditingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
-  const statusConfig = {
-    open: { color: "bg-blue-100 text-blue-700", label: "Open" },
-    planned: { color: "bg-purple-100 text-purple-700", label: "Planned" },
-    in_progress: { color: "bg-amber-100 text-amber-700", label: "In Progress" },
-    completed: { color: "bg-green-100 text-green-700", label: "Completed" },
-    validated: { color: "bg-emerald-100 text-emerald-700", label: "Validated" },
+  const typeColors = {
+    PM: "bg-blue-100 text-blue-700",
+    CM: "bg-amber-100 text-amber-700",
+    PDM: "bg-purple-100 text-purple-700",
+    OP: "bg-green-100 text-green-700",
   };
 
-  const priorityConfig = {
-    critical: "text-red-600",
-    high: "text-orange-600",
-    medium: "text-amber-600",
-    low: "text-green-600",
+  const statusConfig = {
+    open: { color: "bg-blue-50 text-blue-600 border-blue-200", label: "Open" },
+    planned: { color: "bg-purple-50 text-purple-600 border-purple-200", label: "Planned" },
+    in_progress: { color: "bg-amber-50 text-amber-600 border-amber-200", label: "In Progress" },
+    completed: { color: "bg-green-50 text-green-600 border-green-200", label: "Completed" },
+    validated: { color: "bg-emerald-50 text-emerald-600 border-emerald-200", label: "Validated" },
+  };
+
+  const handleEdit = async (action, e) => {
+    e.stopPropagation();
+    setEditingId(action.id);
+    try {
+      await onEditAction?.(action);
+    } finally {
+      setEditingId(null);
+    }
+  };
+
+  const handleDelete = async (action, e) => {
+    e.stopPropagation();
+    if (!window.confirm(`Remove "${action.title}" from the action plan?`)) return;
+    setDeletingId(action.id);
+    try {
+      await onDeleteAction?.(action);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6 max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-thin">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-green-100 rounded-lg">
-            <ClipboardList className="w-5 h-5 text-green-600" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-slate-900">Action Plan</h3>
-            <p className="text-xs text-slate-500">
-              {actions?.length || 0} action{actions?.length !== 1 ? "s" : ""} tracked
-            </p>
-          </div>
+    <div className="bg-white rounded-xl border border-slate-200 p-4">
+      {/* Header - Compact */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <ClipboardList className="w-4 h-4 text-green-600" />
+          <h3 className="font-medium text-sm text-slate-700">Action Plan</h3>
+          {actions && actions.length > 0 && (
+            <span className="text-xs text-slate-400">({actions.length})</span>
+          )}
         </div>
-        <Button size="sm" variant="outline" onClick={onViewAll}>
-          View All
-        </Button>
+        {actions && actions.length > 0 && (
+          <Button size="sm" variant="ghost" onClick={onViewAll} className="h-6 text-xs px-2">
+            View All
+          </Button>
+        )}
       </div>
 
-      {/* Actions List */}
+      {/* Actions List - Same style as recommended actions */}
       {actions && actions.length > 0 ? (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {actions.slice(0, 5).map((action) => {
             const status = statusConfig[action.status?.toLowerCase()] || statusConfig.open;
-            const priority = priorityConfig[action.priority?.toLowerCase()] || priorityConfig.medium;
+            const actionType = action.action_type?.toUpperCase() || "CM";
 
             return (
               <div 
                 key={action.id}
-                className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
-                onClick={() => navigate(`/actions/${action.id}`)}
+                className="p-2 rounded-lg bg-slate-50 border border-slate-100 hover:border-slate-200 transition-colors group"
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs text-slate-500 font-mono">{action.action_number}</span>
-                    <Badge className={`text-[10px] ${status.color}`}>{status.label}</Badge>
-                  </div>
-                  <div className="font-medium text-sm text-slate-900 truncate">{action.title}</div>
-                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
-                    {action.owner && <span>{action.owner}</span>}
-                    {action.due_date && (
-                      <>
-                        <span className={priority}>Due: {format(parseISO(action.due_date), "MMM d")}</span>
-                      </>
+                <div className="flex items-start gap-2">
+                  {/* Left: Info */}
+                  <div className="flex-1 min-w-0">
+                    {/* Header row: Type badge, status */}
+                    <div className="flex items-center gap-1 mb-1 flex-wrap">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${typeColors[actionType] || 'bg-slate-100 text-slate-600'}`}>
+                        {actionType}
+                      </span>
+                      {action.discipline && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 capitalize">
+                          {action.discipline}
+                        </span>
+                      )}
+                      <span className={`text-[10px] px-1 py-0.5 rounded border ${status.color}`}>
+                        {status.label}
+                      </span>
+                      {action.action_number && (
+                        <span className="text-[10px] text-slate-400 font-mono ml-auto">
+                          {action.action_number}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Title */}
+                    <p className="text-xs text-slate-700 leading-snug">
+                      {action.title}
+                    </p>
+
+                    {/* Due date / Owner */}
+                    {(action.due_date || action.owner) && (
+                      <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500">
+                        {action.owner && <span>{action.owner}</span>}
+                        {action.due_date && (
+                          <span>Due: {format(parseISO(action.due_date), "MMM d")}</span>
+                        )}
+                      </div>
                     )}
                   </div>
+
+                  {/* Right: Edit & Delete buttons */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => handleEdit(action, e)}
+                      disabled={editingId === action.id}
+                      className="h-7 w-7 p-0"
+                      title="Edit action"
+                    >
+                      {editingId === action.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Pencil className="w-3.5 h-3.5" />
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => handleDelete(action, e)}
+                      disabled={deletingId === action.id}
+                      className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                      title="Remove from plan"
+                    >
+                      {deletingId === action.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3.5 h-3.5" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-slate-400" />
               </div>
             );
           })}
         </div>
       ) : (
-        <div className="text-center py-8 text-slate-500">
-          <ClipboardList className="w-12 h-12 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">No actions in plan</p>
-          <p className="text-xs text-slate-400 mt-1">Add recommendations to build your plan</p>
+        <div className="text-center py-6 text-slate-500">
+          <ClipboardList className="w-10 h-10 mx-auto mb-2 opacity-30" />
+          <p className="text-xs">No actions in plan</p>
+          <p className="text-[10px] text-slate-400 mt-1">Add from recommendations</p>
         </div>
       )}
     </div>
