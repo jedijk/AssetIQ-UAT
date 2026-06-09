@@ -239,56 +239,108 @@ def calculate_reputation_exposure(observation: dict, criticality: dict) -> dict:
     }
 
 
+async def get_criticality_definitions_for_equipment(equipment_node: dict, user_id: str) -> List[dict]:
+    """
+    Resolve the criticality definitions that apply to an equipment node.
+
+    Walks the equipment hierarchy up to the installation (level == 'installation')
+    and returns the user's custom criticality definitions saved for that installation
+    if any exist. Falls back to the built-in DEFAULT_CRITICALITY otherwise.
+    """
+    # Lazy import to avoid circular imports at module load time
+    from routes.definitions import DEFAULT_CRITICALITY
+
+    if not equipment_node:
+        return DEFAULT_CRITICALITY
+
+    # Walk up to the installation
+    current = equipment_node
+    safety = 0  # avoid infinite loop on corrupt data
+    while current and current.get("level") != "installation" and safety < 20:
+        parent_id = current.get("parent_id")
+        if not parent_id:
+            break
+        current = await db.equipment_nodes.find_one({"id": parent_id}, {"_id": 0})
+        safety += 1
+
+    if not current or current.get("level") != "installation":
+        return DEFAULT_CRITICALITY
+
+    # Look up custom definitions for this installation (any user — fall back to the
+    # requesting user's own first, then any user's so shared workspaces still work).
+    custom = await db.definitions.find_one(
+        {"equipment_id": current.get("id"), "created_by": user_id},
+        {"_id": 0}
+    )
+    if not custom:
+        custom = await db.definitions.find_one(
+            {"equipment_id": current.get("id")},
+            {"_id": 0}
+        )
+
+    if custom and custom.get("criticality"):
+        return custom["criticality"]
+    return DEFAULT_CRITICALITY
+
+
 async def calculate_alarp_progress(observation_id: str, actions: list, investigation: dict = None) -> dict:
     """
-    Calculate ALARP progress based on:
-    - Action completion
-    - Investigation completion
-    - Validation evidence
+    Stage-based mitigation progress aligned with the Process Journey:
+        Observation reached               → 10%
+        Assessment (FM + Eq + risk)       → +10%
+        Planning (≥1 action on plan)      → +10%
+        Investigation                     → 0% (optional, no contribution)
+        Action — per completed action     → +40% × (completed / total)
+        Mitigated (all actions complete)  → 90%
+        Learning implemented              → 100%
     """
-    total_score = 0
-    # max_score = 100 - removed as unused
-    
-    # Action completion contributes 50%
-    if actions:
-        completed_actions = len([a for a in actions if a.get("status") in ["completed", "validated"]])
-        total_actions = len(actions)
-        action_progress = (completed_actions / total_actions * 50) if total_actions > 0 else 0
-        total_score += action_progress
-    else:
-        # If no actions defined, this portion is not applicable - give partial credit
-        total_score += 25
-    
-    # Investigation completion contributes 30%
-    if investigation:
-        inv_status = investigation.get("status", "draft")
-        if inv_status == "completed":
-            total_score += 30
-        elif inv_status == "in_progress":
-            total_score += 15
-        elif inv_status == "review":
-            total_score += 25
-    
-    # Risk assessment completion contributes 20%
-    # (checking if observation has been fully assessed)
-    observation = await db.threats.find_one({"id": observation_id}, {"_id": 0})
-    if observation:
-        has_failure_mode = bool(observation.get("failure_mode"))
-        has_equipment = bool(observation.get("linked_equipment_id"))
-        has_risk_score = observation.get("risk_score", 0) > 0
-        
-        assessment_score = 0
-        if has_failure_mode:
-            assessment_score += 7
-        if has_equipment:
-            assessment_score += 7
-        if has_risk_score:
-            assessment_score += 6
-        total_score += assessment_score
-    
-    # Determine status
-    progress = min(round(total_score), 100)
-    if progress >= 90:
+    progress = 10  # Observation stage reached (the observation exists)
+
+    observation = await db.threats.find_one({"id": observation_id}, {"_id": 0}) or {}
+
+    # Assessment (+10) — requires failure mode + equipment + risk score
+    has_fm = bool(observation.get("failure_mode") or observation.get("failure_mode_id"))
+    has_eq = bool(observation.get("linked_equipment_id"))
+    has_risk = (observation.get("risk_score") or 0) > 0
+    assessment_done = has_fm and has_eq and has_risk
+    if assessment_done:
+        progress += 10
+
+    # Planning (+10) — at least one action exists on the plan
+    total_actions = len(actions) if actions else 0
+    planning_done = total_actions > 0
+    if planning_done:
+        progress += 10
+
+    # Investigation contributes 0% intentionally (optional stage).
+
+    # Action contribution: up to 40% pro-rated by completion ratio.
+    completed_count = sum(
+        1 for a in (actions or []) if a.get("status") in ("completed", "validated")
+    )
+    action_pct = 0
+    if total_actions > 0:
+        if completed_count == total_actions:
+            # Mitigated stage reached — promote to 90% regardless of running total.
+            progress = 90
+        else:
+            action_pct = round(40 * completed_count / total_actions)
+            progress += action_pct
+
+    # Learning implemented → 100%
+    learning_done = any(
+        (a.get("action_type") or "").lower() in ("learning", "learn")
+        and a.get("status") in ("completed", "validated")
+        for a in (actions or [])
+    )
+    if learning_done:
+        progress = 100
+
+    progress = min(progress, 100)
+
+    if progress >= 100:
+        status = "Learning Complete"
+    elif progress >= 90:
         status = "ALARP Achieved"
     elif progress >= 70:
         status = "Approaching ALARP"
@@ -296,15 +348,18 @@ async def calculate_alarp_progress(observation_id: str, actions: list, investiga
         status = "In Progress"
     else:
         status = "Not Started"
-    
+
     return {
         "percentage": progress,
         "status": status,
         "components": {
-            "actions": round(action_progress) if actions else 25,
-            "investigation": 30 if investigation and investigation.get("status") == "completed" else 0,
-            "assessment": assessment_score if observation else 0
-        }
+            "observation": 10,
+            "assessment": 10 if assessment_done else 0,
+            "planning": 10 if planning_done else 0,
+            "investigation": 0,
+            "actions": action_pct,
+            "learning": 100 if learning_done else 0,
+        },
     }
 
 
@@ -920,6 +975,11 @@ async def get_observation_workspace(
     # 5. Process journey
     process_journey = await get_process_journey(observation, action_plan, investigation)
     
+    # 6. Resolve criticality definitions for this observation's installation
+    criticality_definitions = await get_criticality_definitions_for_equipment(
+        equipment_node, current_user["id"]
+    )
+    
     # Sync observation.status with the current stage of the process journey.
     # The "current" stage is the furthest stage that is in_progress, or the latest
     # completed stage if none are in progress. Status values map 1:1 to stage names.
@@ -996,6 +1056,10 @@ async def get_observation_workspace(
         "ai_insights_available": any(r.get("source") == "ai_generated" for r in recommended_actions),
         "action_plan": action_plan,
         "process_journey": process_journey,
+        # Custom criticality definitions for this observation's installation (falls
+        # back to defaults if no custom configuration exists). Used by the right-click
+        # popovers on exposure cards.
+        "criticality_definitions": criticality_definitions,
         "investigation": {
             "id": investigation.get("id") if investigation else None,
             "title": investigation.get("title") if investigation else None,

@@ -164,9 +164,9 @@ const ThreatsPage = () => {
   })();
   const caps = useCapabilities();
   const [searchParams, setSearchParams] = useSearchParams();
-  // Default: show all stages except the terminal "Learning" state
+  // Default: show the 5 active in-progress stages (excludes terminal Mitigated & Learning)
   const [statusFilter, setStatusFilter] = useState([
-    "Observation", "Assessment", "Planning", "Investigation", "Action", "Mitigated",
+    "Observation", "Assessment", "Planning", "Investigation", "Action",
   ]);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [riskFilter, setRiskFilter] = useState("all"); // Filter by risk level

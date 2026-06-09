@@ -793,64 +793,41 @@ const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddTo
   );
 };
 
+// Map backend action_type values (e.g. "preventive") to short UI codes (PM/CM/PDM/OP/LEARN)
+const normalizeActionType = (val) => {
+  if (!val) return "CM";
+  const v = String(val).toUpperCase();
+  if (["PM", "CM", "PDM", "OP", "LEARN"].includes(v)) return v;
+  const lc = String(val).toLowerCase();
+  if (lc.startsWith("prev")) return "PM";
+  if (lc.startsWith("corr")) return "CM";
+  if (lc.startsWith("pred")) return "PDM";
+  if (lc.startsWith("oper")) return "OP";
+  if (lc.startsWith("learn")) return "LEARN";
+  return "CM";
+};
+
 /**
- * Edit Action Dialog — popup that allows editing of all action fields.
- * Fetches the full action by ID when opened so every field is populated
- * from the source of truth (the action document itself).
+ * Edit Action form body — lazy-initialised from the full action.
+ * Kept as a separate component (rendered with key={fullAction.id}) so the
+ * lazy useState initialiser fires each time a new action is loaded,
+ * eliminating the need for a setState-inside-useEffect.
  */
-const EditActionDialog = ({ action, open, onClose, onSave, isSaving }) => {
-  // Map backend action_type values (e.g. "preventive") to short UI codes (PM/CM/PDM/OP)
-  const normalizeActionType = (val) => {
-    if (!val) return "CM";
-    const v = String(val).toUpperCase();
-    if (["PM", "CM", "PDM", "OP"].includes(v)) return v;
-    const lc = String(val).toLowerCase();
-    if (lc.startsWith("prev")) return "PM";
-    if (lc.startsWith("corr")) return "CM";
-    if (lc.startsWith("pred")) return "PDM";
-    if (lc.startsWith("oper")) return "OP";
-    return "CM";
-  };
-
-  // Fetch full action data from the action itself (single source of truth)
-  const { data: fullAction, isLoading } = useQuery({
-    queryKey: ["action-detail", action?.id],
-    queryFn: () => actionsAPI.getById(action.id),
-    enabled: !!(open && action?.id),
-    staleTime: 0,
-  });
-
-  const src = fullAction || action || {};
-
+const EditActionForm = ({ fullAction, onSubmit, onCancel, isSaving }) => {
   const [form, setForm] = useState(() => ({
-    title: "",
-    description: "",
-    action_type: "CM",
-    discipline: "",
-    status: "open",
-    due_date: "",
-    comments: "",
+    title: fullAction?.title || "",
+    description: fullAction?.description || "",
+    action_type: normalizeActionType(fullAction?.action_type),
+    discipline: fullAction?.discipline || "",
+    status: fullAction?.status || "open",
+    due_date: fullAction?.due_date ? String(fullAction.due_date).split("T")[0] : "",
+    comments: fullAction?.comments || "",
   }));
-
-  // Re-initialise form once the full action data arrives
-  useEffect(() => {
-    if (fullAction) {
-      setForm({
-        title: fullAction.title || "",
-        description: fullAction.description || "",
-        action_type: normalizeActionType(fullAction.action_type),
-        discipline: fullAction.discipline || "",
-        status: fullAction.status || "open",
-        due_date: fullAction.due_date ? String(fullAction.due_date).split("T")[0] : "",
-        comments: fullAction.comments || "",
-      });
-    }
-  }, [fullAction?.id, fullAction?.updated_at]);
 
   const handleChange = (field, value) => setForm((f) => ({ ...f, [field]: value }));
 
   const handleSubmit = () => {
-    onSave({
+    onSubmit({
       title: form.title,
       description: form.description,
       action_type: form.action_type,
@@ -862,12 +839,134 @@ const EditActionDialog = ({ action, open, onClose, onSave, isSaving }) => {
   };
 
   return (
+    <>
+      <div className="grid gap-3 py-2">
+        <div className="grid gap-1.5">
+          <Label htmlFor="edit-title">Title</Label>
+          <Input
+            id="edit-title"
+            value={form.title}
+            onChange={(e) => handleChange("title", e.target.value)}
+            data-testid="edit-action-title"
+          />
+        </div>
+
+        <div className="grid gap-1.5">
+          <Label htmlFor="edit-desc">Description</Label>
+          <Textarea
+            id="edit-desc"
+            rows={3}
+            value={form.description}
+            onChange={(e) => handleChange("description", e.target.value)}
+            data-testid="edit-action-description"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-1.5">
+            <Label>Type</Label>
+            <Select value={form.action_type} onValueChange={(v) => handleChange("action_type", v)}>
+              <SelectTrigger data-testid="edit-action-type"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="CM">CM — Corrective</SelectItem>
+                <SelectItem value="PM">PM — Preventive</SelectItem>
+                <SelectItem value="PDM">PDM — Predictive</SelectItem>
+                <SelectItem value="OP">OP — Operational</SelectItem>
+                <SelectItem value="LEARN">LEARN — Learning / Strategy update</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label>Discipline</Label>
+            <Select value={form.discipline || "none"} onValueChange={(v) => handleChange("discipline", v === "none" ? "" : v)}>
+              <SelectTrigger data-testid="edit-action-discipline"><SelectValue placeholder="—" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— None —</SelectItem>
+                <SelectItem value="Mechanical">Mechanical</SelectItem>
+                <SelectItem value="Electrical">Electrical</SelectItem>
+                <SelectItem value="Instrumentation">Instrumentation</SelectItem>
+                <SelectItem value="Piping">Piping</SelectItem>
+                <SelectItem value="Process">Process</SelectItem>
+                <SelectItem value="Structural">Structural</SelectItem>
+                <SelectItem value="Safety">Safety</SelectItem>
+                <SelectItem value="Operations">Operations</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-1.5">
+            <Label>Status</Label>
+            <Select value={form.status} onValueChange={(v) => handleChange("status", v)}>
+              <SelectTrigger data-testid="edit-action-status"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="planned">Planned</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="validated">Validated</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="edit-due">Due date</Label>
+            <Input
+              id="edit-due"
+              type="date"
+              value={form.due_date}
+              onChange={(e) => handleChange("due_date", e.target.value)}
+              data-testid="edit-action-due-date"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-1.5">
+          <Label htmlFor="edit-comments">Comments</Label>
+          <Textarea
+            id="edit-comments"
+            rows={2}
+            value={form.comments}
+            onChange={(e) => handleChange("comments", e.target.value)}
+            data-testid="edit-action-comments"
+          />
+        </div>
+      </div>
+
+      <DialogFooter>
+        <Button variant="ghost" onClick={onCancel} disabled={isSaving} data-testid="edit-action-cancel">Cancel</Button>
+        <Button onClick={handleSubmit} disabled={isSaving || !form.title.trim()} data-testid="edit-action-save">
+          {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+          Save changes
+        </Button>
+      </DialogFooter>
+    </>
+  );
+};
+
+/**
+ * Edit Action Dialog — popup that allows editing of all action fields.
+ * Fetches the full action by ID when opened so every field is populated
+ * from the source of truth (the action document itself).
+ */
+const EditActionDialog = ({ action, open, onClose, onSave, isSaving }) => {
+  // Fetch full action data from the action itself (single source of truth)
+  const { data: fullAction, isLoading } = useQuery({
+    queryKey: ["action-detail", action?.id],
+    queryFn: () => actionsAPI.getById(action.id),
+    enabled: !!(open && action?.id),
+    staleTime: 0,
+  });
+
+  return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg" data-testid="edit-action-dialog">
         <DialogHeader>
           <DialogTitle>Edit Action</DialogTitle>
           <DialogDescription>
-            Update fields for {src?.action_number || "this action"}.
+            Update fields for {fullAction?.action_number || action?.action_number || "this action"}.
           </DialogDescription>
         </DialogHeader>
 
@@ -876,108 +975,14 @@ const EditActionDialog = ({ action, open, onClose, onSave, isSaving }) => {
             <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading action…
           </div>
         ) : (
-        <div className="grid gap-3 py-2">
-          <div className="grid gap-1.5">
-            <Label htmlFor="edit-title">Title</Label>
-            <Input
-              id="edit-title"
-              value={form.title}
-              onChange={(e) => handleChange("title", e.target.value)}
-              data-testid="edit-action-title"
-            />
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="edit-desc">Description</Label>
-            <Textarea
-              id="edit-desc"
-              rows={3}
-              value={form.description}
-              onChange={(e) => handleChange("description", e.target.value)}
-              data-testid="edit-action-description"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
-              <Label>Type</Label>
-              <Select value={form.action_type} onValueChange={(v) => handleChange("action_type", v)}>
-                <SelectTrigger data-testid="edit-action-type"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CM">CM — Corrective</SelectItem>
-                  <SelectItem value="PM">PM — Preventive</SelectItem>
-                  <SelectItem value="PDM">PDM — Predictive</SelectItem>
-                  <SelectItem value="OP">OP — Operational</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-1.5">
-              <Label>Discipline</Label>
-              <Select value={form.discipline || "none"} onValueChange={(v) => handleChange("discipline", v === "none" ? "" : v)}>
-                <SelectTrigger data-testid="edit-action-discipline"><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">— None —</SelectItem>
-                  <SelectItem value="Mechanical">Mechanical</SelectItem>
-                  <SelectItem value="Electrical">Electrical</SelectItem>
-                  <SelectItem value="Instrumentation">Instrumentation</SelectItem>
-                  <SelectItem value="Piping">Piping</SelectItem>
-                  <SelectItem value="Process">Process</SelectItem>
-                  <SelectItem value="Structural">Structural</SelectItem>
-                  <SelectItem value="Safety">Safety</SelectItem>
-                  <SelectItem value="Operations">Operations</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
-              <Label>Status</Label>
-              <Select value={form.status} onValueChange={(v) => handleChange("status", v)}>
-                <SelectTrigger data-testid="edit-action-status"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="planned">Planned</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="validated">Validated</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-1.5">
-              <Label htmlFor="edit-due">Due date</Label>
-              <Input
-                id="edit-due"
-                type="date"
-                value={form.due_date}
-                onChange={(e) => handleChange("due_date", e.target.value)}
-                data-testid="edit-action-due-date"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="edit-comments">Comments</Label>
-            <Textarea
-              id="edit-comments"
-              rows={2}
-              value={form.comments}
-              onChange={(e) => handleChange("comments", e.target.value)}
-              data-testid="edit-action-comments"
-            />
-          </div>
-        </div>
+          <EditActionForm
+            key={fullAction?.id || action?.id || "edit"}
+            fullAction={fullAction || action || {}}
+            onSubmit={onSave}
+            onCancel={onClose}
+            isSaving={isSaving}
+          />
         )}
-
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose} disabled={isSaving} data-testid="edit-action-cancel">Cancel</Button>
-          <Button onClick={handleSubmit} disabled={isSaving || isLoading || !form.title.trim()} data-testid="edit-action-save">
-            {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-            Save changes
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -1018,12 +1023,169 @@ const DeleteActionDialog = ({ action, open, onClose, onConfirm, isDeleting }) =>
 );
 
 /**
+ * Add Action Dialog — manual creation of a new action on the observation's plan.
+ * Supports the same action_type list (CM/PM/PDM/OP/LEARN), letting users add
+ * "Learning" actions such as updating the PM plan.
+ */
+const AddActionDialog = ({ open, onClose, onCreate, isCreating }) => {
+  const [form, setForm] = useState({
+    title: "",
+    description: "",
+    action_type: "CM",
+    discipline: "",
+    status: "open",
+    due_date: "",
+    comments: "",
+  });
+
+  const handleChange = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+
+  const reset = () => setForm({
+    title: "", description: "", action_type: "CM", discipline: "",
+    status: "open", due_date: "", comments: "",
+  });
+
+  const handleSubmit = async () => {
+    await onCreate({
+      title: form.title,
+      description: form.description,
+      action_type: form.action_type,
+      discipline: form.discipline || null,
+      status: form.status,
+      due_date: form.due_date || null,
+      comments: form.comments || null,
+    });
+    reset();
+  };
+
+  const handleClose = () => { reset(); onClose(); };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
+      <DialogContent className="max-w-lg" data-testid="add-action-dialog">
+        <DialogHeader>
+          <DialogTitle>Add Action</DialogTitle>
+          <DialogDescription>
+            Manually add an action to this observation&apos;s plan. Use Learning to
+            capture follow-ups such as PM plan updates.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-3 py-2">
+          <div className="grid gap-1.5">
+            <Label htmlFor="add-title">Title</Label>
+            <Input
+              id="add-title"
+              value={form.title}
+              onChange={(e) => handleChange("title", e.target.value)}
+              placeholder="e.g. Update PM plan to include weekly inspection"
+              data-testid="add-action-title"
+            />
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="add-desc">Description</Label>
+            <Textarea
+              id="add-desc"
+              rows={3}
+              value={form.description}
+              onChange={(e) => handleChange("description", e.target.value)}
+              data-testid="add-action-description"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>Type</Label>
+              <Select value={form.action_type} onValueChange={(v) => handleChange("action_type", v)}>
+                <SelectTrigger data-testid="add-action-type"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CM">CM — Corrective</SelectItem>
+                  <SelectItem value="PM">PM — Preventive</SelectItem>
+                  <SelectItem value="PDM">PDM — Predictive</SelectItem>
+                  <SelectItem value="OP">OP — Operational</SelectItem>
+                  <SelectItem value="LEARN">LEARN — Learning / Strategy update</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label>Discipline</Label>
+              <Select value={form.discipline || "none"} onValueChange={(v) => handleChange("discipline", v === "none" ? "" : v)}>
+                <SelectTrigger data-testid="add-action-discipline"><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— None —</SelectItem>
+                  <SelectItem value="Mechanical">Mechanical</SelectItem>
+                  <SelectItem value="Electrical">Electrical</SelectItem>
+                  <SelectItem value="Instrumentation">Instrumentation</SelectItem>
+                  <SelectItem value="Piping">Piping</SelectItem>
+                  <SelectItem value="Process">Process</SelectItem>
+                  <SelectItem value="Structural">Structural</SelectItem>
+                  <SelectItem value="Safety">Safety</SelectItem>
+                  <SelectItem value="Operations">Operations</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label>Status</Label>
+              <Select value={form.status} onValueChange={(v) => handleChange("status", v)}>
+                <SelectTrigger data-testid="add-action-status"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="open">Open</SelectItem>
+                  <SelectItem value="planned">Planned</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label htmlFor="add-due">Due date</Label>
+              <Input
+                id="add-due"
+                type="date"
+                value={form.due_date}
+                onChange={(e) => handleChange("due_date", e.target.value)}
+                data-testid="add-action-due-date"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="add-comments">Comments</Label>
+            <Textarea
+              id="add-comments"
+              rows={2}
+              value={form.comments}
+              onChange={(e) => handleChange("comments", e.target.value)}
+              data-testid="add-action-comments"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={handleClose} disabled={isCreating} data-testid="add-action-cancel">Cancel</Button>
+          <Button onClick={handleSubmit} disabled={isCreating || !form.title.trim()} data-testid="add-action-submit">
+            {isCreating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+            Add to plan
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+/**
  * Action Plan Panel - Shows actions in the same style as recommended actions
  */
-const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, actionPlanIds = [] }) => {
+const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onAddAction, isCreating, actionPlanIds = [] }) => {
   const navigate = useNavigate();
   const [editingAction, setEditingAction] = useState(null);
   const [deletingAction, setDeletingAction] = useState(null);
+  const [showAddDialog, setShowAddDialog] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -1032,6 +1194,7 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, act
     CM: "bg-amber-100 text-amber-700",
     PDM: "bg-purple-100 text-purple-700",
     OP: "bg-green-100 text-green-700",
+    LEARN: "bg-pink-100 text-pink-700",
   };
 
   const statusConfig = {
@@ -1085,11 +1248,23 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, act
             <span className="text-xs text-slate-400">({actions.length})</span>
           )}
         </div>
-        {actions && actions.length > 0 && (
-          <Button size="sm" variant="ghost" onClick={onViewAll} className="h-6 text-xs px-2">
-            View All
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setShowAddDialog(true)}
+            className="h-6 text-xs px-2"
+            title="Add a new action manually"
+            data-testid="action-plan-add-btn"
+          >
+            <Plus className="w-3.5 h-3.5 mr-1" /> Add
           </Button>
-        )}
+          {actions && actions.length > 0 && (
+            <Button size="sm" variant="ghost" onClick={onViewAll} className="h-6 text-xs px-2">
+              View All
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Actions List - Same style as recommended actions */}
@@ -1195,6 +1370,15 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, act
         onConfirm={handleConfirmDelete}
         isDeleting={isDeleting}
       />
+      <AddActionDialog
+        open={showAddDialog}
+        onClose={() => setShowAddDialog(false)}
+        onCreate={async (data) => {
+          await onAddAction?.(data);
+          setShowAddDialog(false);
+        }}
+        isCreating={isCreating}
+      />
     </div>
   );
 };
@@ -1276,13 +1460,17 @@ const ObservationWorkspacePage = () => {
     staleTime: 30 * 1000, // 30 seconds
   });
 
-  // Fetch default criticality definitions (used for the right-click popovers on exposure cards).
+  // Criticality definitions for the right-click popovers on exposure cards.
+  // The workspace response already returns the installation-specific custom
+  // definitions (falling back to defaults), so we prefer that source. If the
+  // backend hasn't returned them yet we fall back to the defaults endpoint.
   const { data: definitionsData } = useQuery({
     queryKey: ["criticality-definitions-defaults"],
     queryFn: () => import("../lib/apis/definitions").then((m) => m.definitionsAPI.getDefaults()),
     staleTime: 10 * 60 * 1000,
+    enabled: !workspace?.criticality_definitions,
   });
-  const criticalityDefs = definitionsData?.criticality || [];
+  const criticalityDefs = workspace?.criticality_definitions || definitionsData?.criticality || [];
 
   // Add recommendation to plan mutation
   const addRecommendationMutation = useMutation({
@@ -1323,6 +1511,31 @@ const ObservationWorkspacePage = () => {
     },
   });
 
+  // Create action mutation (manual add — including Learning type)
+  const createActionMutation = useMutation({
+    mutationFn: (data) => actionsAPI.create({
+      title: data.title,
+      description: data.description || "",
+      source_type: "threat",
+      source_id: id,
+      source_name: workspace?.observation?.title || "Observation",
+      threat_id: id,
+      priority: "medium",
+      action_type: data.action_type,
+      discipline: data.discipline,
+      due_date: data.due_date,
+      comments: data.comments || "",
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["observation-workspace", id] });
+      queryClient.invalidateQueries({ queryKey: ["actions"] });
+      toast.success("Action added to plan");
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.detail || "Failed to add action");
+    },
+  });
+
   // Handlers
   const handleAddToPlan = async (recommendation) => {
     await addRecommendationMutation.mutateAsync(recommendation);
@@ -1334,6 +1547,10 @@ const ObservationWorkspacePage = () => {
 
   const handleDeleteAction = async (action) => {
     await deleteActionMutation.mutateAsync(action.id);
+  };
+
+  const handleCreateAction = async (data) => {
+    await createActionMutation.mutateAsync(data);
   };
 
   const handleAddToStrategy = (action) => {
@@ -1509,6 +1726,8 @@ const ObservationWorkspacePage = () => {
             onViewAll={handleViewAllActions}
             onEditAction={handleEditAction}
             onDeleteAction={handleDeleteAction}
+            onAddAction={handleCreateAction}
+            isCreating={createActionMutation.isPending}
           />
         </div>
 
