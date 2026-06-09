@@ -118,27 +118,27 @@ async def calculate_production_exposure(observation: dict, criticality: dict, us
     }
     currency_symbol = currency_symbols.get(currency, currency + " ")
     
-    # Estimate downtime based on production criticality level (1-5 scale)
-    # Level 1: Minimal (1-2 hours) → 2 hours
-    # Level 2: Low (2-4 hours) → 4 hours  
-    # Level 3: Moderate (8-24 hours) → 8 hours
-    # Level 4: High (24-48 hours) → 24 hours
-    # Level 5: Critical (48+ hours) → 48 hours
-    downtime_hours = {
+    # Use maximum downtime hours based on production criticality level (1-5 scale)
+    # Level 1: Minimal (1-2 hours) → up to 2 hours
+    # Level 2: Low (2-4 hours) → up to 4 hours  
+    # Level 3: Moderate (8-24 hours) → up to 24 hours
+    # Level 4: High (24-48 hours) → up to 48 hours
+    # Level 5: Critical (48+ hours) → up to 72 hours
+    max_downtime_hours = {
         1: 2,
         2: 4,
-        3: 8,
-        4: 24,
-        5: 48
-    }.get(production_impact, 8)
+        3: 24,
+        4: 48,
+        5: 72
+    }.get(production_impact, 24)
     
-    # Calculate exposure: downtime hours × hourly cost
-    exposure_value = downtime_hours * hourly_cost
+    # Calculate maximum exposure: max downtime hours × hourly cost
+    max_exposure_value = max_downtime_hours * hourly_cost
     
     return {
-        "value": exposure_value,
-        "formatted_value": f"{currency_symbol}{exposure_value:,.0f}",
-        "estimated_downtime_hours": downtime_hours,
+        "value": max_exposure_value,
+        "formatted_value": f"Up to {currency_symbol}{max_exposure_value:,.0f}",
+        "estimated_downtime_hours": max_downtime_hours,
         "hourly_cost": hourly_cost,
         "currency": currency,
         "production_impact_score": production_impact
