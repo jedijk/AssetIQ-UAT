@@ -1272,7 +1272,7 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
         <div className="space-y-2">
           {actions.slice(0, 5).map((action) => {
             const status = statusConfig[action.status?.toLowerCase()] || statusConfig.open;
-            const actionType = action.action_type?.toUpperCase() || "CM";
+            const actionType = normalizeActionType(action.action_type);
 
             return (
               <div 
