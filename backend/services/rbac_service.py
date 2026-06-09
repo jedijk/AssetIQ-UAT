@@ -406,6 +406,7 @@ class RBACService:
             "position": user.get("position"),
             "phone": user.get("phone"),
             "assigned_installations": user.get("assigned_installations", []),
+            "default_simple_mode": bool(user.get("default_simple_mode", False)),
             "created_at": serialize_date(user.get("created_at")),
             "last_login": serialize_date(user.get("last_login")),
             "role_updated_at": serialize_date(user.get("role_updated_at")),

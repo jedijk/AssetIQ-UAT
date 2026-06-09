@@ -2425,7 +2425,12 @@
     "confirmPassword": "Passwort bestätigen",
     "passwordsDoNotMatch": "Passwörter stimmen nicht überein",
     "passwordRequired": "Passwort ist erforderlich",
-    "passwordRequirements": "Mindestens 8 Zeichen mit Großbuchstabe, Kleinbuchstabe, Zahl und Sonderzeichen."
+    "passwordRequirements": "Mindestens 8 Zeichen mit Großbuchstabe, Kleinbuchstabe, Zahl und Sonderzeichen.",
+    "defaultSimpleMode": "Standard-Einfachmodus",
+    "simpleModeUpdated": "Einfachmodus für {name} ist jetzt {state}",
+    "simpleModeUpdateFailed": "Einfachmodus konnte nicht aktualisiert werden",
+    "simpleModeAriaOn": "Einfachmodus aktiviert für {name}",
+    "simpleModeAriaOff": "Einfachmodus deaktiviert für {name}"
   },
   "userStatistics": {
     "title": "User Statistics",

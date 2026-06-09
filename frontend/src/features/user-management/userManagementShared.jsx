@@ -1,6 +1,9 @@
 import React from "react";
-import { Crown, Shield, ShieldCheck, ShieldAlert, Eye, Wrench, Settings } from "lucide-react";
+import { Crown, Shield, ShieldCheck, ShieldAlert, Eye, Wrench, Settings, Smartphone } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "../../components/ui/avatar";
+import { Badge } from "../../components/ui/badge";
+import { Switch } from "../../components/ui/switch";
+import { DropdownMenuItem } from "../../components/ui/dropdown-menu";
 
 // Role icons mapping
 const roleIcons = {
@@ -50,4 +53,44 @@ const UserAvatar = ({ user, avatarUrl, size = "md", className = "" }) => {
 };
 
 
-export { roleIcons, roleColors, UserAvatar };
+const SimpleModeUserBadge = ({ enabled, t }) => {
+  if (!enabled) return null;
+  return (
+    <Badge
+      variant="outline"
+      className="text-[10px] bg-green-50 text-green-700 border-green-200 gap-1 font-medium"
+      data-testid="simple-mode-user-badge"
+    >
+      <Smartphone className="w-3 h-3" />
+      {t("simpleMode.title")}
+    </Badge>
+  );
+};
+
+const SimpleModeDropdownItem = ({ user, t, onToggle, isPending }) => {
+  const enabled = !!user.default_simple_mode;
+  return (
+    <DropdownMenuItem
+      onSelect={(e) => e.preventDefault()}
+      className="flex items-center justify-between gap-3 cursor-default"
+      data-testid={`simple-mode-toggle-${user.id}`}
+    >
+      <span className="flex items-center gap-2 text-sm min-w-0">
+        <Smartphone className="w-4 h-4 shrink-0" />
+        <span className="truncate">{t("userManagement.defaultSimpleMode")}</span>
+      </span>
+      <Switch
+        checked={enabled}
+        disabled={isPending}
+        onCheckedChange={(checked) => onToggle(user, checked)}
+        aria-label={(enabled
+          ? t("userManagement.simpleModeAriaOn")
+          : t("userManagement.simpleModeAriaOff")
+        ).replace("{name}", user.name || "")}
+        data-testid={`simple-mode-switch-${user.id}`}
+      />
+    </DropdownMenuItem>
+  );
+};
+
+export { roleIcons, roleColors, UserAvatar, SimpleModeUserBadge, SimpleModeDropdownItem };

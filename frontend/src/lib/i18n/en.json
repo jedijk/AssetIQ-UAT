@@ -2425,7 +2425,12 @@
     "confirmPassword": "Confirm Password",
     "passwordsDoNotMatch": "Passwords don't match",
     "passwordRequired": "Password is required",
-    "passwordRequirements": "Minimum 8 characters with uppercase, lowercase, number, and special character."
+    "passwordRequirements": "Minimum 8 characters with uppercase, lowercase, number, and special character.",
+    "defaultSimpleMode": "Default Simple Mode",
+    "simpleModeUpdated": "Simple Mode for {name} is now {state}",
+    "simpleModeUpdateFailed": "Failed to update Simple Mode",
+    "simpleModeAriaOn": "Simple Mode enabled for {name}",
+    "simpleModeAriaOff": "Simple Mode disabled for {name}"
   },
   "userStatistics": {
     "title": "User Statistics",

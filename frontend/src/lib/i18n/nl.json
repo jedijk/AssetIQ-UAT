@@ -2425,7 +2425,12 @@
     "confirmPassword": "Bevestig wachtwoord",
     "passwordsDoNotMatch": "Wachtwoorden komen niet overeen",
     "passwordRequired": "Wachtwoord is verplicht",
-    "passwordRequirements": "Minimaal 8 tekens met hoofdletter, kleine letter, cijfer en speciaal teken."
+    "passwordRequirements": "Minimaal 8 tekens met hoofdletter, kleine letter, cijfer en speciaal teken.",
+    "defaultSimpleMode": "Standaard eenvoudige modus",
+    "simpleModeUpdated": "Eenvoudige modus voor {name} is nu {state}",
+    "simpleModeUpdateFailed": "Eenvoudige modus bijwerken mislukt",
+    "simpleModeAriaOn": "Eenvoudige modus ingeschakeld voor {name}",
+    "simpleModeAriaOff": "Eenvoudige modus uitgeschakeld voor {name}"
   },
   "userStatistics": {
     "title": "Gebruikersstatistieken",

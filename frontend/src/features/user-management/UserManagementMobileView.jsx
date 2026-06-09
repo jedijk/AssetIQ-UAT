@@ -54,7 +54,7 @@ import {
 } from "../../components/ui/dialog";
 import { Label } from "../../components/ui/label";
 import ImageEditor from "../../components/ImageEditor";
-import { roleIcons, roleColors, UserAvatar } from "./userManagementShared";
+import { roleIcons, roleColors, UserAvatar, SimpleModeUserBadge, SimpleModeDropdownItem } from "./userManagementShared";
 
 export function UserManagementMobileView({
   navigate,
@@ -104,6 +104,7 @@ export function UserManagementMobileView({
   handleAvatarUpload,
   handleEditProfile,
   handleChangeRole,
+  handleToggleSimpleMode,
   handleConfirmRoleChange,
   handleSaveProfile,
   handleEditorClose,
@@ -281,8 +282,9 @@ export function UserManagementMobileView({
 
                       {/* Name and email */}
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-slate-900 truncate">{user.name}</span>
+                          <SimpleModeUserBadge enabled={user.default_simple_mode} t={t} />
                           {user.is_active ? (
                             <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" title="Active" />
                           ) : (
@@ -358,19 +360,12 @@ export function UserManagementMobileView({
                             <ShieldCheck className="w-4 h-4 mr-2" /> Reset GDPR Consent
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem 
-                          onClick={() => {
-                            const newVal = !user.default_simple_mode;
-                            updateProfileMutation.mutate({ userId: user.id, data: { default_simple_mode: newVal } });
-                            toast.success(`Simple Mode default ${newVal ? "enabled" : "disabled"} for ${user.name}`);
-                          }}
-                        >
-                          <Smartphone className="w-4 h-4 mr-2" /> 
-                          Default Simple Mode
-                          <span className={`ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded ${user.default_simple_mode ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-500"}`}>
-                            {user.default_simple_mode ? "ON" : "OFF"}
-                          </span>
-                        </DropdownMenuItem>
+                        <SimpleModeDropdownItem
+                          user={user}
+                          t={t}
+                          onToggle={handleToggleSimpleMode}
+                          isPending={updateProfileMutation.isPending}
+                        />
                         <DropdownMenuSeparator />
                         {user.is_active ? (
                           <DropdownMenuItem 

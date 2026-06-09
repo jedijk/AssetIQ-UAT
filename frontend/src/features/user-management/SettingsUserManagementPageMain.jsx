@@ -181,13 +181,41 @@ export default function SettingsUserManagementPage() {
 
   const updateProfileMutation = useMutation({
     mutationFn: rbacAPI.updateUserProfile,
-    onSuccess: async () => {
+    onMutate: async ({ userId, data }) => {
+      if (data?.default_simple_mode === undefined) return;
+      const queryKey = ["rbac-users", search, roleFilter];
+      await queryClient.cancelQueries({ queryKey: ["rbac-users"] });
+      const previous = queryClient.getQueryData(queryKey);
+      queryClient.setQueryData(queryKey, (old) => {
+        if (!old?.users) return old;
+        return {
+          ...old,
+          users: old.users.map((u) =>
+            u.id === userId ? { ...u, default_simple_mode: data.default_simple_mode } : u
+          ),
+        };
+      });
+      return { previous, queryKey };
+    },
+    onSuccess: async (_data, variables) => {
       await queryClient.invalidateQueries({ queryKey: ["rbac-users"] });
       await refetch();
+      if (variables?.data?.default_simple_mode !== undefined) {
+        return;
+      }
       toast.success("Profile updated successfully");
       setEditingUser(null);
     },
-    onError: () => toast.error("Failed to update profile")
+    onError: (_err, variables, context) => {
+      if (context?.previous && context?.queryKey) {
+        queryClient.setQueryData(context.queryKey, context.previous);
+      }
+      if (variables?.data?.default_simple_mode !== undefined) {
+        toast.error(t("userManagement.simpleModeUpdateFailed"));
+        return;
+      }
+      toast.error("Failed to update profile");
+    },
   });
 
   const uploadAvatarMutation = useMutation({
@@ -426,6 +454,21 @@ export default function SettingsUserManagementPage() {
     setSelectedRole(user.role);
   };
 
+  const handleToggleSimpleMode = (user, enabled) => {
+    updateProfileMutation.mutate(
+      { userId: user.id, data: { default_simple_mode: enabled } },
+      {
+        onSuccess: () => {
+          toast.success(
+            t("userManagement.simpleModeUpdated")
+              .replace("{name}", user.name || "")
+              .replace("{state}", enabled ? t("simpleMode.on") : t("simpleMode.off"))
+          );
+        },
+      }
+    );
+  };
+
   const handleConfirmRoleChange = () => {
     if (changeRoleUser && selectedRole) {
       updateRoleMutation.mutate({
@@ -574,6 +617,7 @@ export default function SettingsUserManagementPage() {
     handleAvatarUpload,
     handleEditProfile,
     handleChangeRole,
+    handleToggleSimpleMode,
     handleConfirmRoleChange,
     handleSaveProfile,
     handleEditorClose,
