@@ -40,6 +40,7 @@ import {
 } from "../ui/alert-dialog";
 import RiskBadge from "../RiskBadge";
 import { toast } from "sonner";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 const STATUS_OPTIONS = ["Open", "In Progress", "Parked", "Mitigated", "Closed", "Canceled"];
 
@@ -56,6 +57,14 @@ export const ThreatHeader = ({
   headerRef,
 }) => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
+
+  const translateStatus = (status) => {
+    if (!status) return status;
+    const key = `enums.${status}`;
+    const out = t(key);
+    return out && out !== key ? out : status;
+  };
 
   const handleShare = async () => {
     const shareUrl = `${window.location.origin}/threats/${threat.id}`;
@@ -63,17 +72,17 @@ export const ThreatHeader = ({
       if (navigator.share) {
         await navigator.share({
           title: threat.title,
-          text: `Observation: ${threat.title}`,
+          text: `${t("observations.observation")}: ${threat.title}`,
           url: shareUrl,
         });
       } else {
         await navigator.clipboard.writeText(shareUrl);
-        toast.success("Link copied to clipboard");
+        toast.success(t("observations.linkCopied"));
       }
     } catch (err) {
       if (err.name !== "AbortError") {
         await navigator.clipboard.writeText(shareUrl);
-        toast.success("Link copied to clipboard");
+        toast.success(t("observations.linkCopied"));
       }
     }
   };
@@ -95,7 +104,7 @@ export const ThreatHeader = ({
           data-testid="back-to-threats-button"
         >
           <ArrowLeft className="w-3 h-3 mr-1" />
-          Back
+          {t("threatDetail.back")}
         </Button>
 
         {/* Title and actions row */}
@@ -120,7 +129,7 @@ export const ThreatHeader = ({
               <div className="flex items-center gap-2 mt-1.5">
                 <RiskBadge level={threat.risk_level} size="sm" />
                 <span className="text-[10px] font-medium text-slate-500">
-                  Score: {threat.risk_score || 0}
+                  {t("threatDetail.scoreLabel").replace("{score}", threat.risk_score || 0)}
                 </span>
                 {threat.rpn && (
                   <span className="text-[10px] font-medium text-slate-500">
@@ -174,13 +183,13 @@ export const ThreatHeader = ({
                       threat.status === "Closed" ? "text-slate-500" :
                       "text-slate-700"
                     }`}>
-                      {threat.status}
+                      {translateStatus(threat.status)}
                     </span>
                     <ChevronDown className="w-3 h-3 text-slate-400" />
                   </SelectTrigger>
                   <SelectContent>
                     {STATUS_OPTIONS.map((s) => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                      <SelectItem key={s} value={s}>{translateStatus(s)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -195,11 +204,11 @@ export const ThreatHeader = ({
                   <DropdownMenuContent align="end" className="w-40">
                     <DropdownMenuItem onClick={startEditing} data-testid="mobile-edit-button">
                       <Edit className="w-4 h-4 mr-2" />
-                      Edit
+                      {t("common.edit")}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleShare} data-testid="mobile-share-button">
                       <Share2 className="w-4 h-4 mr-2" />
-                      Share
+                      {t("observations.shareLink")}
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <AlertDialog>
@@ -210,18 +219,18 @@ export const ThreatHeader = ({
                           data-testid="mobile-delete-button"
                         >
                           <Trash2 className="w-4 h-4 mr-2" />
-                          Delete
+                          {t("common.delete")}
                         </DropdownMenuItem>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Delete Observation</AlertDialogTitle>
+                          <AlertDialogTitle>{t("observations.deleteObservation")}</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Are you sure you want to delete this observation? This action cannot be undone.
+                            {t("observations.deleteObservationConfirm")}
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
                           <AlertDialogAction
                             onClick={() => deleteMutation.mutate()}
                             className="bg-red-600 hover:bg-red-700"
@@ -230,7 +239,7 @@ export const ThreatHeader = ({
                             {deleteMutation.isPending ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
-                              "Delete"
+                              t("common.delete")
                             )}
                           </AlertDialogAction>
                         </AlertDialogFooter>
@@ -253,7 +262,7 @@ export const ThreatHeader = ({
           data-testid="back-to-threats-button-desktop"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Observations
+          {t("threatDetail.backToObservations")}
         </Button>
 
         <div className="flex items-start justify-between gap-4">
@@ -261,11 +270,11 @@ export const ThreatHeader = ({
             <div className="flex items-center gap-3 mb-2">
               <RiskBadge level={threat.risk_level} size="lg" />
               <span className="text-slate-500 font-mono text-sm" data-testid="threat-rank-display">
-                Rank #{threat.rank} of {threat.total_threats}
+                {t("threatDetail.rankOf").replace("{rank}", threat.rank).replace("{total}", threat.total_threats)}
               </span>
               {threat.risk_score && (
                 <span className="text-sm text-slate-500">
-                  Score: <span className="font-semibold">{threat.risk_score}</span>
+                  {t("observations.riskScore")}: <span className="font-semibold">{threat.risk_score}</span>
                 </span>
               )}
               {threat.rpn && (
@@ -297,7 +306,7 @@ export const ThreatHeader = ({
                   data-testid="cancel-edit-button-desktop"
                 >
                   <X className="w-4 h-4 mr-2" />
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   onClick={saveChanges}
@@ -310,7 +319,7 @@ export const ThreatHeader = ({
                   ) : (
                     <Save className="w-4 h-4 mr-2" />
                   )}
-                  Save
+                  {t("common.save")}
                 </Button>
               </>
             ) : (
@@ -331,7 +340,7 @@ export const ThreatHeader = ({
                   data-testid="edit-threat-button-desktop"
                 >
                   <Edit className="w-4 h-4 mr-2" />
-                  Edit
+                  {t("common.edit")}
                 </Button>
 
                 <Select
@@ -344,7 +353,7 @@ export const ThreatHeader = ({
                   </SelectTrigger>
                   <SelectContent>
                     {STATUS_OPTIONS.map((s) => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                      <SelectItem key={s} value={s}>{translateStatus(s)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -357,13 +366,13 @@ export const ThreatHeader = ({
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Observation</AlertDialogTitle>
+                      <AlertDialogTitle>{t("observations.deleteObservation")}</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to delete this observation? This action cannot be undone.
+                        {t("observations.deleteObservationConfirm")}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={() => deleteMutation.mutate()}
                         className="bg-red-600 hover:bg-red-700"
@@ -372,7 +381,7 @@ export const ThreatHeader = ({
                         {deleteMutation.isPending ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
-                          "Delete"
+                          t("common.delete")
                         )}
                       </AlertDialogAction>
                     </AlertDialogFooter>

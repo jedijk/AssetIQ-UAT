@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useEquipmentNodeNameMap, useEquipmentTypeNameMap } from "../hooks/useTranslatedEntities";
@@ -102,6 +102,11 @@ import { useIsMobile } from "../hooks/useIsMobile";
 import { imageAnalysisAPI } from "../lib/api";
 import { offlineStorage, useOfflineStatus } from "../services/offlineStorage";
 import { DISCIPLINES, getDisciplineLabel, normalizeDiscipline } from "../constants/disciplines";
+import {
+  filterActiveWorkItems,
+  getApiDisciplineParam,
+  itemMatchesDisciplines,
+} from "../lib/myTasksFilterUtils";
 import TaskExecutionFrame from "../components/task-execution/TaskExecutionFrame";
 import TaskCard, { SortableTaskCard } from "../components/task-execution/TaskCard";
 import { useSortable } from "@dnd-kit/sortable";
@@ -290,6 +295,14 @@ const MyTasksPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const invalidateTaskListQueries = useCallback(() => {
+    queryClient.invalidateQueries({
+      predicate: (query) =>
+        query.queryKey[0] === "my-tasks" ||
+        query.queryKey[0] === "my-tasks-count" ||
+        query.queryKey[0] === "operatorTaskCounts",
+    });
+  }, [queryClient]);
   const [activeFilter, setActiveFilter] = useState("adhoc");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [searchQuery, setSearchQuery] = useState("");
@@ -416,9 +429,7 @@ const MyTasksPage = () => {
       if (result.synced > 0) {
         toast.success(`Synced ${result.synced} completed task(s)`);
         // Invalidate all my-tasks queries regardless of filters
-        queryClient.invalidateQueries({ 
-          predicate: (query) => query.queryKey[0] === "my-tasks" 
-        });
+        invalidateTaskListQueries();
         queryClient.invalidateQueries({ 
           predicate: (query) => query.queryKey[0] === "task-instances" 
         });
@@ -468,19 +479,7 @@ const MyTasksPage = () => {
     return `${getDisciplineLabel(selectedDisciplines[0])} +${selectedDisciplines.length - 1}`;
   };
 
-  const matchesDisciplineFilter = (item) => {
-    if (selectedDisciplines.length === 0) return true;
-    const disc = (
-      normalizeDiscipline(item.discipline) ||
-      item.discipline ||
-      item.mitigation_strategy ||
-      ""
-    ).toLowerCase();
-    return selectedDisciplines.some((d) => {
-      const dl = d.toLowerCase();
-      return disc.includes(dl) || dl.includes(disc) || disc === dl;
-    });
-  };
+  const matchesDisciplineFilter = (item) => itemMatchesDisciplines(item, selectedDisciplines);
 
   // Seed selectedDisciplines once from user discipline unless they already picked.
   useEffect(() => {
@@ -503,7 +502,7 @@ const MyTasksPage = () => {
         const data = await myTasksAPI.getTasks({
           filter: activeFilter,
           date: activeFilter === "open" ? format(selectedDate, "yyyy-MM-dd") : undefined,
-          discipline: selectedDisciplines.length === 1 ? selectedDisciplines[0] : undefined,
+          discipline: getApiDisciplineParam(selectedDisciplines),
         });
         // Cache tasks for offline access
         if (data?.tasks) {
@@ -659,10 +658,7 @@ const MyTasksPage = () => {
           })();
         }
       }
-      // Invalidate all my-tasks queries regardless of filters
-      queryClient.invalidateQueries({ 
-        predicate: (query) => query.queryKey[0] === "my-tasks" 
-      });
+      invalidateTaskListQueries();
       queryClient.invalidateQueries({ 
         predicate: (query) => query.queryKey[0] === "task-instances" 
       });
@@ -686,10 +682,7 @@ const MyTasksPage = () => {
   const startMutation = useMutation({
     mutationFn: ({ taskId, isAction }) => myTasksAPI.startTask(taskId, isAction),
     onSuccess: (data) => {
-      // Invalidate all my-tasks queries regardless of filters
-      queryClient.invalidateQueries({ 
-        predicate: (query) => query.queryKey[0] === "my-tasks" 
-      });
+      invalidateTaskListQueries();
       // Also invalidate actions list since action status changed
       queryClient.invalidateQueries({ 
         predicate: (query) => query.queryKey[0] === "actions" 
@@ -701,11 +694,36 @@ const MyTasksPage = () => {
     },
   });
   
-  // Fetch ad-hoc plans (only when adhoc tab is active)
+  // Per-tab counts (respect discipline filter selection)
+  const filterCountQueries = useQueries({
+    queries: ["open", "overdue", "recurring"].map((filter) => ({
+      queryKey: ["my-tasks-count", filter, selectedDisciplines, selectedDate, user?.id],
+      queryFn: async () => {
+        const data = await myTasksAPI.getTasks({
+          filter,
+          date: filter === "open" ? format(selectedDate, "yyyy-MM-dd") : undefined,
+          discipline: getApiDisciplineParam(selectedDisciplines),
+        });
+        return filterActiveWorkItems(data.tasks, selectedDisciplines).length;
+      },
+      enabled: !!user,
+      staleTime: 10000,
+      refetchInterval: 30000,
+    })),
+  });
+
+  const filterCounts = {
+    open: filterCountQueries[0]?.data ?? 0,
+    overdue: filterCountQueries[1]?.data ?? 0,
+    recurring: filterCountQueries[2]?.data ?? 0,
+    adhoc: 0,
+  };
+
+  // Fetch ad-hoc plans (for adhoc tab + badge counts)
   const { data: adhocPlansData, isLoading: adhocPlansLoading } = useQuery({
     queryKey: ["adhoc-plans"],
     queryFn: () => myTasksAPI.getAdhocPlans(),
-    enabled: !!user && activeFilter === "adhoc",
+    enabled: !!user,
     refetchInterval: 30000,
     staleTime: 10000, // Consider data fresh for 10 seconds
     refetchOnWindowFocus: true,
@@ -717,10 +735,7 @@ const MyTasksPage = () => {
     onSuccess: (newTask) => {
       toast.success("Task started! Redirecting to execution...");
       queryClient.invalidateQueries({ queryKey: ["adhoc-plans"] });
-      // Invalidate all my-tasks queries regardless of filters
-      queryClient.invalidateQueries({ 
-        predicate: (query) => query.queryKey[0] === "my-tasks" 
-      });
+      invalidateTaskListQueries();
       // Also invalidate actions list
       queryClient.invalidateQueries({ 
         predicate: (query) => query.queryKey[0] === "actions" 
@@ -746,9 +761,7 @@ const MyTasksPage = () => {
       const itemType = variables.isAction ? "Action" : "Task";
       toast.success(`${itemType} deleted`);
       // Invalidate all task-related queries for instant sync (use predicate for partial match)
-      queryClient.invalidateQueries({ 
-        predicate: (query) => query.queryKey[0] === "my-tasks" 
-      });
+      invalidateTaskListQueries();
       queryClient.invalidateQueries({ 
         predicate: (query) => query.queryKey[0] === "task-instances" 
       });
@@ -818,8 +831,8 @@ const MyTasksPage = () => {
     if (task.status === "completed" || task.status === "completed_offline") {
       return false;
     }
-    // Apply discipline filter (multi-select; API only handles single discipline)
-    if (selectedDisciplines.length > 1 && !matchesDisciplineFilter(task)) {
+    // Apply discipline filter (API only handles single discipline param)
+    if (selectedDisciplines.length > 0 && !matchesDisciplineFilter(task)) {
       return false;
     }
     // Apply search filter
@@ -906,6 +919,7 @@ const MyTasksPage = () => {
   // Calculate stats - adjust for adhoc tab
   const adhocPlans = (adhocPlansData?.plans || []).filter(matchesDisciplineFilter);
   const isAdhocTab = activeFilter === "adhoc";
+  const tabCounts = { ...filterCounts, adhoc: adhocPlans.length };
   
   // Sort adhoc plans - manual or default (by last executed, then by title)
   const sortedAdhocPlans = isManualSort && manualSortOrder.length > 0
@@ -928,15 +942,19 @@ const MyTasksPage = () => {
       });
   
   const stats = {
-    total: isAdhocTab ? adhocPlans.length : tasks.length,
-    overdue: tasks.filter(t => t.status === "overdue").length,
-    today: tasks.filter(t => t.due_date && isToday(parseISO(t.due_date))).length,
-    inProgress: isAdhocTab 
-      ? adhocPlans.filter(p => p.has_in_progress_task).length 
-      : tasks.filter(t => t.status === "in_progress").length,
-    open: isAdhocTab 
-      ? adhocPlans.filter(p => !p.has_in_progress_task).length
-      : tasks.filter(t => t.source_type === "action" || (t.source_type === "task" && t.status === "in_progress")).length,
+    total: isAdhocTab ? adhocPlans.length : filteredTasks.length,
+    overdue: filteredTasks.filter((t) => t.status === "overdue").length,
+    today: filteredTasks.filter((t) => t.due_date && isToday(parseISO(t.due_date))).length,
+    inProgress: isAdhocTab
+      ? adhocPlans.filter((p) => p.has_in_progress_task).length
+      : filteredTasks.filter((t) => t.status === "in_progress").length,
+    open: isAdhocTab
+      ? adhocPlans.filter((p) => !p.has_in_progress_task).length
+      : filteredTasks.filter(
+          (t) =>
+            t.source_type === "action" ||
+            (t.source_type === "task" && t.status === "in_progress")
+        ).length,
   };
   
   // Handle back from execution frame
@@ -1197,24 +1215,30 @@ const MyTasksPage = () => {
                 <TabsTrigger value="open" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="filter-open">
                   <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span className="text-xs sm:text-sm">Open</span>
-                  {stats.today > 0 && (
-                    <Badge variant="secondary" className="ml-0.5 h-4 px-1 text-[10px] hidden sm:flex">{stats.today}</Badge>
+                  {tabCounts.open > 0 && (
+                    <Badge variant="secondary" className="ml-0.5 h-4 px-1 text-[10px]">{tabCounts.open}</Badge>
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="overdue" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="filter-overdue">
                   <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span className="text-xs sm:text-sm">Overdue</span>
-                  {stats.overdue > 0 && (
-                    <Badge variant="destructive" className="ml-0.5 h-4 px-1 text-[10px] hidden sm:flex">{stats.overdue}</Badge>
+                  {tabCounts.overdue > 0 && (
+                    <Badge variant="destructive" className="ml-0.5 h-4 px-1 text-[10px]">{tabCounts.overdue}</Badge>
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="recurring" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="filter-recurring">
                   <Repeat className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span className="text-xs sm:text-sm">Recurring</span>
+                  {tabCounts.recurring > 0 && (
+                    <Badge variant="secondary" className="ml-0.5 h-4 px-1 text-[10px]">{tabCounts.recurring}</Badge>
+                  )}
                 </TabsTrigger>
                 <TabsTrigger value="adhoc" className="flex items-center gap-1 sm:gap-2 whitespace-nowrap px-3 sm:px-4" data-testid="filter-adhoc">
                   <Zap className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span className="text-xs sm:text-sm">Adhoc</span>
+                  {tabCounts.adhoc > 0 && (
+                    <Badge variant="secondary" className="ml-0.5 h-4 px-1 text-[10px]">{tabCounts.adhoc}</Badge>
+                  )}
                 </TabsTrigger>
               </TabsList>
             </div>

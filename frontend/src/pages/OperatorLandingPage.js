@@ -1,10 +1,16 @@
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Building2, ClipboardCheck, Activity } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
-import { api } from "../lib/api";
+import { myTasksAPI } from "../lib/api";
 import { publicAssetUrl } from "../lib/assetUrl";
+import {
+  filterActiveWorkItems,
+  getApiDisciplineParam,
+  getDefaultDisciplinesForUser,
+} from "../lib/myTasksFilterUtils";
 
 const haptic = () => {
   try {
@@ -16,41 +22,30 @@ const haptic = () => {
   } catch {}
 };
 
-function tasksFromMyTasksPayload(payload) {
-  if (Array.isArray(payload)) return payload;
-  return payload?.tasks ?? payload?.items ?? [];
-}
-
-const fetchTaskCounts = async () => {
-  const [openRes, overdueRes] = await Promise.all([
-    api.get("/work-items", { params: { filter: "open" } }),
-    api.get("/work-items", { params: { filter: "overdue" } }),
-  ]);
-  const openTasks = tasksFromMyTasksPayload(openRes.data);
-  const overdueTasks = tasksFromMyTasksPayload(overdueRes.data);
-  const seenIds = new Set();
-  for (const task of [...openTasks, ...overdueTasks]) {
-    if (task?.id != null && task.id !== "") seenIds.add(String(task.id));
-  }
-  return {
-    open: openTasks.length,
-    overdue: overdueTasks.length,
-    total: seenIds.size,
-  };
+const fetchOpenTaskBadgeCount = async (user, disciplines) => {
+  const data = await myTasksAPI.getTasks({
+    filter: "open",
+    discipline: getApiDisciplineParam(disciplines),
+  });
+  return filterActiveWorkItems(data.tasks, disciplines).length;
 };
 
 export default function OperatorLandingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t } = useLanguage();
-  const { data: taskCounts } = useQuery({
-    queryKey: ["operatorTaskCounts"],
-    queryFn: fetchTaskCounts,
+  const defaultDisciplines = useMemo(
+    () => getDefaultDisciplinesForUser(user),
+    [user?.id, user?.discipline, user?.department, user?.position]
+  );
+
+  const { data: badge = 0 } = useQuery({
+    queryKey: ["operatorTaskCounts", user?.id, defaultDisciplines],
+    queryFn: () => fetchOpenTaskBadgeCount(user, defaultDisciplines),
+    enabled: !!user,
     refetchInterval: 30000,
     staleTime: 10000,
   });
-
-  const badge = taskCounts?.total || 0;
 
   const getGreeting = () => {
     const hour = new Date().getHours();

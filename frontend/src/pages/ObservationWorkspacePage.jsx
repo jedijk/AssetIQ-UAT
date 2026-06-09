@@ -80,6 +80,31 @@ import ObservationDetailsSection from "../components/workspace/ObservationDetail
 import AIInsightsPanel from "../components/AIInsightsPanel";
 import CausalIntelligencePanel from "../components/CausalIntelligencePanel";
 
+const interpolate = (template, vars = {}) => {
+  if (!template || typeof template !== "string") return template;
+  return Object.entries(vars).reduce(
+    (s, [k, v]) => s.replace(new RegExp(`\\{${k}\\}`, "g"), String(v ?? "")),
+    template
+  );
+};
+
+const useTranslateEnum = () => {
+  const { t } = useLanguage();
+  return (value) => {
+    if (!value) return value;
+    const key = `enums.${value}`;
+    const out = t(key);
+    return out && out !== key ? out : value;
+  };
+};
+
+const DIMENSION_LABEL_KEYS = {
+  production: "observations.production",
+  safety: "observations.safety",
+  environmental: "observations.environment",
+  reputation: "observations.reputation",
+};
+
 // ============================================================================
 // SUB-COMPONENTS
 // ============================================================================
@@ -88,6 +113,8 @@ import CausalIntelligencePanel from "../components/CausalIntelligencePanel";
  * Exposure Card - Shows production, safety, environmental exposure
  */
 const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, criticalityDefs }) => {
+  const { t } = useLanguage();
+  const translateEnum = useTranslateEnum();
   const [popup, setPopup] = useState({ show: false, x: 0, y: 0 });
   const popupRef = useRef(null);
 
@@ -130,7 +157,7 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
           e.preventDefault();
           setPopup({ show: true, x: e.clientX, y: e.clientY });
         } : undefined}
-        title={dimension ? "Right-click for criticality definition" : undefined}
+        title={dimension ? t("observationWorkspace.criticalityRightClick") : undefined}
         data-testid={dimension ? `exposure-card-${dimension}` : undefined}
       >
         <div className="flex items-center gap-1.5 mb-0.5">
@@ -138,7 +165,7 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
           <span className="text-[10px] font-medium uppercase tracking-wide">{type}</span>
         </div>
         {isNotAssessed ? (
-          <div className="text-sm font-semibold leading-tight italic">Not Assessed</div>
+          <div className="text-sm font-semibold leading-tight italic">{t("observationWorkspace.notAssessed")}</div>
         ) : (
           <>
             {data.primary && (
@@ -167,7 +194,11 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
             }}
           >
             <div className="flex items-center justify-between px-3 py-2 border-b">
-              <h3 className="font-semibold text-sm text-slate-800 capitalize">{dimension} criticality</h3>
+              <h3 className="font-semibold text-sm text-slate-800 capitalize">
+                {interpolate(t("observationWorkspace.criticalityTitle"), {
+                  dimension: t(DIMENSION_LABEL_KEYS[dimension] || dimension),
+                })}
+              </h3>
               <button onClick={() => setPopup({ show: false, x: 0, y: 0 })} className="p-1 hover:bg-slate-100 rounded">
                 <X className="w-4 h-4 text-slate-400" />
               </button>
@@ -179,7 +210,9 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
                     {currentRow.rank}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-slate-800">{currentRow.label || `Level ${currentRow.rank}`}</div>
+                    <div className="text-sm font-semibold text-slate-800">
+                      {currentRow.label || interpolate(t("observationWorkspace.levelN"), { rank: currentRow.rank })}
+                    </div>
                     <div className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap mt-1">{currentRow[field]}</div>
                   </div>
                 </div>
@@ -188,7 +221,7 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
                   <div className="flex-shrink-0 w-9 h-9 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
                     <AlertTriangle className="w-4 h-4" />
                   </div>
-                  <div className="text-sm text-slate-500 italic">Not Assessed</div>
+                  <div className="text-sm text-slate-500 italic">{t("observationWorkspace.notAssessed")}</div>
                 </div>
               )}
             </div>
@@ -203,8 +236,10 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
  * ALARP Progress Card
  */
 const ALARPCard = ({ alarp }) => {
+  const { t } = useLanguage();
+  const translateEnum = useTranslateEnum();
   const percentage = alarp?.percentage || 0;
-  const status = alarp?.status || "Not Started";
+  const status = translateEnum(alarp?.status || "Not Started");
   
   const getStatusColor = () => {
     if (percentage >= 90) return "text-green-600";
@@ -218,7 +253,7 @@ const ALARPCard = ({ alarp }) => {
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-1.5">
           <Target className="w-3.5 h-3.5 text-indigo-600" />
-          <span className="text-[10px] font-medium text-indigo-700 uppercase tracking-wide">Mitigated</span>
+          <span className="text-[10px] font-medium text-indigo-700 uppercase tracking-wide">{t("observationWorkspace.mitigated")}</span>
         </div>
         <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${getStatusColor()}`}>
           {status}
@@ -239,14 +274,17 @@ const ALARPCard = ({ alarp }) => {
  * Risk Summary Card
  */
 const RiskSummaryCard = ({ riskSummary }) => {
+  const { t } = useLanguage();
+  const translateEnum = useTranslateEnum();
   const riskScore = riskSummary?.risk_score || 0;
-  const riskLevel = riskSummary?.risk_level || "Low";
+  const rawRiskLevel = riskSummary?.risk_level || "Low";
+  const riskLevel = translateEnum(rawRiskLevel);
   const rpn = riskSummary?.rpn;
 
   const getRiskColor = () => {
-    if (riskLevel === "Critical") return "border-red-300 bg-red-50";
-    if (riskLevel === "High") return "border-orange-300 bg-orange-50";
-    if (riskLevel === "Medium") return "border-yellow-300 bg-yellow-50";
+    if (rawRiskLevel === "Critical") return "border-red-300 bg-red-50";
+    if (rawRiskLevel === "High") return "border-orange-300 bg-orange-50";
+    if (rawRiskLevel === "Medium") return "border-yellow-300 bg-yellow-50";
     return "border-green-300 bg-green-50";
   };
 
@@ -259,12 +297,12 @@ const RiskSummaryCard = ({ riskSummary }) => {
           detail: { x: e.clientX, y: e.clientY },
         }));
       }}
-      title="Right-click for score calculation details"
+      title={t("observationWorkspace.riskRightClick")}
       data-testid="kpi-risk-card"
     >
       <div className="flex items-center gap-1.5 mb-0.5">
         <AlertTriangle className="w-3.5 h-3.5" />
-        <span className="text-[10px] font-medium uppercase tracking-wide">Risk</span>
+        <span className="text-[10px] font-medium uppercase tracking-wide">{t("observationWorkspace.risk")}</span>
       </div>
       <div className="flex items-baseline gap-2 leading-tight">
         <span className="text-lg font-bold">{riskScore}</span>
@@ -282,18 +320,21 @@ const RiskSummaryCard = ({ riskSummary }) => {
  */
 const TimelineEventCard = ({ event, isCurrent }) => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
+  const translateEnum = useTranslateEnum();
   
   const getEventConfig = (type) => {
     const configs = {
-      observation: { icon: AlertTriangle, color: "amber", label: "Observation" },
-      failure: { icon: XCircle, color: "red", label: "Failure" },
-      work_order: { icon: Wrench, color: "blue", label: "Work Order" },
-      inspection: { icon: Eye, color: "green", label: "Inspection" },
-      repair: { icon: Wrench, color: "purple", label: "Repair" },
-      investigation: { icon: FileSearch, color: "indigo", label: "Investigation" },
-      strategy_change: { icon: Cog, color: "slate", label: "Strategy Change" },
+      observation: { icon: AlertTriangle, color: "amber", labelKey: "enums.Observation" },
+      failure: { icon: XCircle, color: "red", labelKey: "enums.Failure" },
+      work_order: { icon: Wrench, color: "blue", labelKey: "enums.Work Order" },
+      inspection: { icon: Eye, color: "green", labelKey: "enums.Inspection" },
+      repair: { icon: Wrench, color: "purple", labelKey: "enums.Repair" },
+      investigation: { icon: FileSearch, color: "indigo", labelKey: "enums.Investigation" },
+      strategy_change: { icon: Cog, color: "slate", labelKey: "enums.Strategy Change" },
     };
-    return configs[type] || configs.observation;
+    const cfg = configs[type] || configs.observation;
+    return { ...cfg, label: t(cfg.labelKey) };
   };
 
   const config = getEventConfig(event.event_type);
@@ -324,7 +365,7 @@ const TimelineEventCard = ({ event, isCurrent }) => {
   }
   if (config.label) tooltipParts.push(config.label);
   if (event.reference_id) tooltipParts.push(event.reference_id);
-  if (event.status) tooltipParts.push(`Status: ${event.status}`);
+  if (event.status) tooltipParts.push(interpolate(t("observationWorkspace.statusLabel"), { status: translateEnum(event.status) }));
   if (event.description) tooltipParts.push(event.description);
   const tooltip = tooltipParts.join("\n");
 
@@ -369,8 +410,10 @@ const TimelineEventCard = ({ event, isCurrent }) => {
  * Equipment Reliability Timeline
  */
 const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
-  const [viewMode, setViewMode] = useState("timeline"); // timeline or list
+  const [viewMode, setViewMode] = useState("timeline");
   const navigate = useNavigate();
+  const { t } = useLanguage();
+  const translateEnum = useTranslateEnum();
 
   // Find current event
   const currentEvent = events?.find(e => e.is_current);
@@ -384,8 +427,8 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
             <History className="w-5 h-5 text-slate-600" />
           </div>
           <div>
-            <h3 className="font-semibold text-slate-900">Equipment History</h3>
-            <p className="text-xs text-slate-500">Historical context for the asset</p>
+            <h3 className="font-semibold text-slate-900">{t("observationWorkspace.equipmentHistory")}</h3>
+            <p className="text-xs text-slate-500">{t("observationWorkspace.equipmentHistorySubtitle")}</p>
           </div>
         </div>
         
@@ -398,7 +441,7 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
             className="h-8"
           >
             <Calendar className="w-4 h-4 mr-1" />
-            Timeline
+            {t("observationWorkspace.timeline")}
           </Button>
           <Button
             variant={viewMode === "list" ? "default" : "outline"}
@@ -407,7 +450,7 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
             className="h-8"
           >
             <List className="w-4 h-4 mr-1" />
-            List
+            {t("observationWorkspace.list")}
           </Button>
         </div>
       </div>
@@ -468,10 +511,10 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
                   </div>
                 </div>
                 {event.is_current && (
-                  <Badge className="bg-blue-600 text-xs">Current</Badge>
+                  <Badge className="bg-blue-600 text-xs">{t("observationWorkspace.current")}</Badge>
                 )}
                 {event.status && !event.is_current && (
-                  <Badge variant="outline" className="text-xs capitalize">{event.status}</Badge>
+                  <Badge variant="outline" className="text-xs capitalize">{translateEnum(event.status)}</Badge>
                 )}
               </div>
             );
@@ -480,7 +523,7 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
       ) : (
         <div className="text-center py-8 text-slate-500">
           <History className="w-12 h-12 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">No historical events found</p>
+          <p className="text-sm">{t("observationWorkspace.noHistoricalEvents")}</p>
         </div>
       )}
     </div>
@@ -491,6 +534,7 @@ const EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
  * Reliability Intelligence Panel
  */
 const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threatId, threatData }) => {
+  const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -501,23 +545,25 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
           <Brain className="w-5 h-5 text-purple-600" />
         </div>
         <div>
-          <h3 className="font-semibold text-slate-900">Reliability Intelligence</h3>
-          <p className="text-xs text-slate-500">AI-powered root cause analysis</p>
+          <h3 className="font-semibold text-slate-900">{t("observationWorkspace.reliabilityIntelligence")}</h3>
+          <p className="text-xs text-slate-500">{t("observationWorkspace.reliabilityIntelligenceSubtitle")}</p>
         </div>
       </div>
 
       {/* Most Likely Cause */}
       <div className="mb-6">
         <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-          Most Likely Cause
+          {t("observationWorkspace.mostLikelyCause")}
         </div>
         <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
           <div className="font-semibold text-purple-900 text-lg">
-            {intelligence?.most_likely_cause?.name || "Unknown"}
+            {intelligence?.most_likely_cause?.name || t("common.unknown")}
           </div>
           <div className="flex items-center gap-2 mt-2">
             <div className="text-sm text-purple-700">
-              {intelligence?.most_likely_cause?.confidence || 0}% Confidence
+              {interpolate(t("observationWorkspace.confidencePercent"), {
+                percent: intelligence?.most_likely_cause?.confidence || 0,
+              })}
             </div>
             <div className="flex-1 h-1.5 bg-purple-200 rounded-full overflow-hidden">
               <div 
@@ -532,27 +578,27 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
       {/* Supporting Evidence */}
       <div className="mb-6">
         <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-          Supporting Evidence
+          {t("observationWorkspace.supportingEvidence")}
         </div>
         <div className="space-y-2">
           {intelligence?.supporting_evidence && (
             <>
               <div className="flex items-center gap-2 text-sm">
                 <Check className="w-4 h-4 text-green-500" />
-                <span>{intelligence.supporting_evidence.historical_events || 0} Similar Events</span>
+                <span>{interpolate(t("observationWorkspace.similarEvents"), { count: intelligence.supporting_evidence.historical_events || 0 })}</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Check className="w-4 h-4 text-green-500" />
-                <span>{intelligence.supporting_evidence.previous_failures || 0} Previous Failures</span>
+                <span>{interpolate(t("observationWorkspace.previousFailures"), { count: intelligence.supporting_evidence.previous_failures || 0 })}</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <Check className="w-4 h-4 text-green-500" />
-                <span>{intelligence.supporting_evidence.work_orders || 0} Work Orders</span>
+                <span>{interpolate(t("observationWorkspace.workOrdersCount"), { count: intelligence.supporting_evidence.work_orders || 0 })}</span>
               </div>
               {intelligence.supporting_evidence.inspection_evidence && (
                 <div className="flex items-center gap-2 text-sm">
                   <Check className="w-4 h-4 text-green-500" />
-                  <span>Inspection Evidence</span>
+                  <span>{t("observationWorkspace.inspectionEvidence")}</span>
                 </div>
               )}
             </>
@@ -563,7 +609,7 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
       {/* Contributing Factors */}
       <div className="mb-6">
         <div className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-          Contributing Factors
+          {t("observationWorkspace.contributingFactors")}
         </div>
         <div className="space-y-2">
           {intelligence?.contributing_factors?.slice(0, 4).map((factor, index) => (
@@ -588,7 +634,7 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
         data-testid="open-full-analysis-btn"
       >
         <Eye className="w-4 h-4 mr-2" />
-        View Full Analysis
+        {t("observationWorkspace.viewFullAnalysis")}
       </Button>
     </div>
   );
@@ -598,6 +644,7 @@ const ReliabilityIntelligencePanel = ({ intelligence, onViewFullAnalysis, threat
  * Recommended Action Card
  */
 const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding }) => {
+  const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   
   const actionTypeColors = {
@@ -631,12 +678,12 @@ const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding 
         </Badge>
         {action.expected_impact && (
           <span className="text-xs text-slate-500">
-            Impact: {action.expected_impact}
+            {interpolate(t("observationWorkspace.impactLabel"), { impact: action.expected_impact })}
           </span>
         )}
         {action.confidence && (
           <span className="text-xs text-purple-600">
-            {action.confidence}% confidence
+            {interpolate(t("observationWorkspace.confidenceLabel"), { percent: action.confidence })}
           </span>
         )}
       </div>
@@ -649,7 +696,7 @@ const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding 
             className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
           >
             <ChevronDown className={`w-3 h-3 transition-transform ${expanded ? "rotate-180" : ""}`} />
-            Why Recommended
+            {t("observationWorkspace.whyRecommended")}
           </button>
           <AnimatePresence>
             {expanded && (
@@ -681,7 +728,7 @@ const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding 
           ) : (
             <Plus className="w-3 h-3 mr-1" />
           )}
-          Add To Plan
+          {t("observationWorkspace.addToPlan")}
         </Button>
         <Button
           size="sm"
@@ -689,7 +736,7 @@ const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding 
           onClick={() => onAddToStrategy(action)}
           className="h-8 text-xs"
         >
-          Add To Strategy
+          {t("observationWorkspace.addToStrategy")}
         </Button>
       </div>
     </div>
@@ -700,6 +747,7 @@ const RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding 
  * Recommended Actions Panel
  */
 const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddToPlan, onAddToStrategy, onGenerateAI, isGeneratingAI }) => {
+  const { t } = useLanguage();
   const [addingId, setAddingId] = useState(null);
 
   // Separate by source
@@ -723,8 +771,8 @@ const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddTo
           <Lightbulb className="w-5 h-5 text-blue-600" />
         </div>
         <div>
-          <h3 className="font-semibold text-slate-900">Recommended Actions</h3>
-          <p className="text-xs text-slate-500">Strategy actions & AI recommendations</p>
+          <h3 className="font-semibold text-slate-900">{t("observationWorkspace.recommendedActions")}</h3>
+          <p className="text-xs text-slate-500">{t("observationWorkspace.recommendedActionsSubtitle")}</p>
         </div>
       </div>
 
@@ -734,7 +782,7 @@ const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddTo
           <div className="flex items-center gap-2 mb-3">
             <div className="w-2 h-2 rounded-full bg-amber-400" />
             <span className="text-xs font-medium text-slate-700 uppercase tracking-wide">
-              Failure Mode Library
+              {t("observationWorkspace.failureModeLibrary")}
             </span>
             <Badge variant="outline" className="text-[10px]">{libraryActions.length}</Badge>
           </div>
@@ -758,7 +806,7 @@ const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddTo
           <div className="flex items-center gap-2 mb-3">
             <div className="w-2 h-2 rounded-full bg-purple-400" />
             <span className="text-xs font-medium text-slate-700 uppercase tracking-wide">
-              AI Generated
+              {t("observationWorkspace.aiGenerated")}
             </span>
             <Badge variant="outline" className="text-[10px]">{aiActions.length}</Badge>
           </div>
@@ -779,8 +827,8 @@ const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddTo
       {!recommendations || recommendations.length === 0 && (
         <div className="text-center py-8 text-slate-500">
           <Lightbulb className="w-12 h-12 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">No recommendations available</p>
-          <p className="text-xs text-slate-400 mt-1">Link a failure mode to get recommendations</p>
+          <p className="text-sm">{t("observationWorkspace.noRecommendations")}</p>
+          <p className="text-xs text-slate-400 mt-1">{t("observationWorkspace.noRecommendationsHint")}</p>
         </div>
       )}
     </div>
@@ -792,13 +840,15 @@ const RecommendedActionsPanel = ({ recommendations, aiInsightsAvailable, onAddTo
  */
 const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onValidateAction }) => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
+  const translateEnum = useTranslateEnum();
 
   const statusConfig = {
-    open: { color: "bg-blue-100 text-blue-700", label: "Open" },
-    planned: { color: "bg-purple-100 text-purple-700", label: "Planned" },
-    in_progress: { color: "bg-amber-100 text-amber-700", label: "In Progress" },
-    completed: { color: "bg-green-100 text-green-700", label: "Completed" },
-    validated: { color: "bg-emerald-100 text-emerald-700", label: "Validated" },
+    open: { color: "bg-blue-100 text-blue-700", labelKey: "enums.Open" },
+    planned: { color: "bg-purple-100 text-purple-700", labelKey: "enums.Planned" },
+    in_progress: { color: "bg-amber-100 text-amber-700", labelKey: "enums.In Progress" },
+    completed: { color: "bg-green-100 text-green-700", labelKey: "enums.Completed" },
+    validated: { color: "bg-emerald-100 text-emerald-700", labelKey: "enums.Validated" },
   };
 
   const priorityConfig = {
@@ -817,14 +867,16 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onValidateAction })
             <ClipboardList className="w-5 h-5 text-green-600" />
           </div>
           <div>
-            <h3 className="font-semibold text-slate-900">Action Plan</h3>
+            <h3 className="font-semibold text-slate-900">{t("observationWorkspace.actionPlan")}</h3>
             <p className="text-xs text-slate-500">
-              {actions?.length || 0} action{actions?.length !== 1 ? "s" : ""} tracked
+              {(actions?.length || 0) === 1
+                ? interpolate(t("observationWorkspace.actionsTracked"), { count: actions?.length || 0 })
+                : interpolate(t("observationWorkspace.actionsTrackedPlural"), { count: actions?.length || 0 })}
             </p>
           </div>
         </div>
         <Button size="sm" variant="outline" onClick={onViewAll}>
-          View All
+          {t("observationWorkspace.viewAll")}
         </Button>
       </div>
 
@@ -844,14 +896,18 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onValidateAction })
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs text-slate-500 font-mono">{action.action_number}</span>
-                    <Badge className={`text-[10px] ${status.color}`}>{status.label}</Badge>
+                    <Badge className={`text-[10px] ${status.color}`}>{t(status.labelKey)}</Badge>
                   </div>
                   <div className="font-medium text-sm text-slate-900 truncate">{action.title}</div>
                   <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
                     {action.owner && <span>{action.owner}</span>}
                     {action.due_date && (
                       <>
-                        <span className={priority}>Due: {format(parseISO(action.due_date), "MMM d")}</span>
+                        <span className={priority}>
+                          {interpolate(t("observationWorkspace.dueDate"), {
+                            date: format(parseISO(action.due_date), "MMM d"),
+                          })}
+                        </span>
                       </>
                     )}
                   </div>
@@ -864,8 +920,8 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onValidateAction })
       ) : (
         <div className="text-center py-8 text-slate-500">
           <ClipboardList className="w-12 h-12 mx-auto mb-2 opacity-30" />
-          <p className="text-sm">No actions in plan</p>
-          <p className="text-xs text-slate-400 mt-1">Add recommendations to build your plan</p>
+          <p className="text-sm">{t("observationWorkspace.noActionsInPlan")}</p>
+          <p className="text-xs text-slate-400 mt-1">{t("observationWorkspace.noActionsInPlanHint")}</p>
         </div>
       )}
     </div>
@@ -876,6 +932,8 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onValidateAction })
  * Process Journey Tracker
  */
 const ProcessJourney = ({ stages }) => {
+  const { t } = useLanguage();
+  const translateEnum = useTranslateEnum();
   const stageConfig = {
     completed: { color: "bg-green-500", textColor: "text-green-700", icon: Check },
     in_progress: { color: "bg-blue-500", textColor: "text-blue-700", icon: Activity },
@@ -890,8 +948,8 @@ const ProcessJourney = ({ stages }) => {
           <TrendingUp className="w-5 h-5 text-slate-600" />
         </div>
         <div>
-          <h3 className="font-semibold text-slate-900">Process Journey</h3>
-          <p className="text-xs text-slate-500">Track workflow progress</p>
+          <h3 className="font-semibold text-slate-900">{t("observationWorkspace.processJourney")}</h3>
+          <p className="text-xs text-slate-500">{t("observationWorkspace.processJourneySubtitle")}</p>
         </div>
       </div>
 
@@ -909,7 +967,7 @@ const ProcessJourney = ({ stages }) => {
                   <Icon className="w-5 h-5" />
                 </div>
                 <div className={`text-xs font-medium ${config.textColor} text-center`}>
-                  {stage.stage}
+                  {translateEnum(stage.stage)}
                 </div>
                 {stage.date && (
                   <div className="text-[10px] text-slate-400 mt-0.5">
@@ -941,6 +999,7 @@ const ObservationWorkspacePage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t } = useLanguage();
+  const translateEnum = useTranslateEnum();
 
   // Fetch workspace data
   const { data: workspace, isLoading, error } = useQuery({
@@ -963,10 +1022,10 @@ const ObservationWorkspacePage = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["observation-workspace", id] });
       queryClient.invalidateQueries({ queryKey: ["actions"] });
-      toast.success(data.message || "Action added to plan");
+      toast.success(data.message || t("observationWorkspace.actionAddedToPlan"));
     },
     onError: () => {
-      toast.error("Failed to add action");
+      toast.error(t("observationWorkspace.actionAddFailed"));
     },
   });
 
@@ -976,7 +1035,7 @@ const ObservationWorkspacePage = () => {
   };
 
   const handleAddToStrategy = (action) => {
-    toast.info("Navigate to Strategy Editor to add action");
+    toast.info(t("observationWorkspace.navigateToStrategyEditor"));
     // Could open a dialog or navigate to strategy page
   };
 
@@ -996,7 +1055,7 @@ const ObservationWorkspacePage = () => {
       <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-slate-500">Loading workspace...</p>
+          <p className="text-slate-500">{t("observationWorkspace.loading")}</p>
         </div>
       </div>
     );
@@ -1009,10 +1068,10 @@ const ObservationWorkspacePage = () => {
         <div className="text-center py-16">
           <XCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-slate-700 mb-2">
-            {error?.response?.data?.detail || "Observation not found"}
+            {error?.response?.data?.detail || t("observationWorkspace.notFound")}
           </h2>
           <Button onClick={() => navigate("/threats")} variant="outline">
-            Back to Observations
+            {t("observations.backToObservations")}
           </Button>
         </div>
       </div>
@@ -1060,12 +1119,17 @@ const ObservationWorkspacePage = () => {
         {/* Row 1: Risk & Exposure Header */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <ExposureCard
-            type="Production Exposure"
+            type={t("observationWorkspace.productionExposure")}
             data={{
               primary: exposure?.production?.formatted_value || "$0",
-              secondary: `${exposure?.production?.estimated_downtime_hours || 0} Hours Downtime`,
+              secondary: interpolate(t("observationWorkspace.hoursDowntime"), {
+                hours: exposure?.production?.estimated_downtime_hours || 0,
+              }),
               tertiary: exposure?.production?.deferred_production 
-                ? `${exposure.production.deferred_production} ${exposure.production.deferred_production_unit || "bbl"} Deferred`
+                ? interpolate(t("observationWorkspace.deferredProduction"), {
+                    amount: exposure.production.deferred_production,
+                    unit: exposure.production.deferred_production_unit || "bbl",
+                  })
                 : null
             }}
             icon={DollarSign}
@@ -1076,10 +1140,14 @@ const ObservationWorkspacePage = () => {
           />
           
           <ExposureCard
-            type="Safety Exposure"
+            type={t("observationWorkspace.safetyExposure")}
             data={{
-              primary: `${exposure?.safety?.personnel_exposed || 0} Personnel`,
-              secondary: `${exposure?.safety?.severity || "Low"} Severity`,
+              primary: interpolate(t("observationWorkspace.personnelCount"), {
+                count: exposure?.safety?.personnel_exposed || 0,
+              }),
+              secondary: interpolate(t("observationWorkspace.severityLevel"), {
+                level: translateEnum(exposure?.safety?.severity || "Low"),
+              }),
             }}
             icon={Users}
             color="red"
@@ -1089,9 +1157,9 @@ const ObservationWorkspacePage = () => {
           />
           
           <ExposureCard
-            type="Environmental Impact"
+            type={t("observationWorkspace.environmentalImpact")}
             data={{
-              primary: exposure?.environmental?.impact_rating || "Low",
+              primary: translateEnum(exposure?.environmental?.impact_rating || "Low"),
             }}
             icon={Leaf}
             color="green"
@@ -1101,9 +1169,9 @@ const ObservationWorkspacePage = () => {
           />
 
           <ExposureCard
-            type="Reputation Impact"
+            type={t("observationWorkspace.reputationImpact")}
             data={{
-              primary: exposure?.reputation?.impact_rating || "Low",
+              primary: translateEnum(exposure?.reputation?.impact_rating || "Low"),
             }}
             icon={Star}
             color="purple"
@@ -1161,7 +1229,7 @@ const ObservationWorkspacePage = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Brain className="w-5 h-5 text-purple-600" />
-              Full Reliability Analysis
+              {t("observationWorkspace.fullReliabilityAnalysis")}
             </DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">

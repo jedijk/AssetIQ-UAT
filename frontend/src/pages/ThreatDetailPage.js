@@ -153,7 +153,7 @@ const ThreatDetailPage = () => {
     
     // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      toast.error('File size must be less than 10MB');
+      toast.error(t("threatDetail.fileSizeLimit"));
       return;
     }
     
@@ -178,17 +178,17 @@ const ThreatDetailPage = () => {
           ...prev,
           attachments: [...(prev.attachments || []), newAttachment]
         }));
-        toast.success(isImage ? 'Photo added' : 'File added');
+        toast.success(isImage ? t("threatDetail.photoAdded") : t("threatDetail.fileAdded"));
         setUploadingPhoto(false);
       };
       reader.onerror = () => {
-        toast.error('Failed to read file');
+        toast.error(t("threatDetail.fileReadFailed"));
         setUploadingPhoto(false);
       };
       reader.readAsDataURL(file);
     } catch (err) {
       console.error('Attachment upload error:', err);
-      toast.error('Failed to add file');
+      toast.error(t("threatDetail.fileAddFailed"));
       setUploadingPhoto(false);
     }
     
@@ -206,7 +206,7 @@ const ThreatDetailPage = () => {
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(shareableLink);
-      toast.success("Link copied to clipboard");
+      toast.success(t("observations.linkCopied"));
     } catch (err) {
       // Fallback for older browsers
       const textArea = document.createElement("textarea");
@@ -215,7 +215,7 @@ const ThreatDetailPage = () => {
       textArea.select();
       document.execCommand("copy");
       document.body.removeChild(textArea);
-      toast.success("Link copied to clipboard");
+      toast.success(t("observations.linkCopied"));
     }
   };
 
@@ -426,11 +426,11 @@ const ThreatDetailPage = () => {
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline", id] });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
-      toast.success("Threat updated");
+      toast.success(t("observations.observationUpdated"));
       setIsEditing(false);
     },
     onError: () => {
-      toast.error("Failed to update threat");
+      toast.error(t("observations.observationUpdateFailed"));
     },
   });
 
@@ -440,11 +440,11 @@ const ThreatDetailPage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
-      toast.success("Threat deleted");
+      toast.success(t("observations.observationDeleted"));
       navigate("/threats");
     },
     onError: () => {
-      toast.error("Failed to delete threat");
+      toast.error(t("observations.observationDeleteFailed"));
     },
   });
 
@@ -455,11 +455,16 @@ const ThreatDetailPage = () => {
       queryClient.invalidateQueries({ queryKey: ["threat", id] });
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline", id] });
-      toast.success(`Linked to ${data.threat.asset}. Score recalculated: ${data.score_calculation.final_score} (${data.score_calculation.risk_level})`);
+      toast.success(
+        t("observations.linkedEquipmentToast")
+          .replace("{asset}", data.threat.asset)
+          .replace("{score}", data.score_calculation.final_score)
+          .replace("{level}", data.score_calculation.risk_level)
+      );
       setShowLinkEquipmentDialog(false);
     },
     onError: () => {
-      toast.error("Failed to link equipment");
+      toast.error(t("observations.linkEquipmentFailed"));
     },
   });
 
@@ -480,13 +485,18 @@ const ThreatDetailPage = () => {
       queryClient.invalidateQueries({ queryKey: ["threat", id] });
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline", id] });
-      toast.success(`Linked to ${data.threat.failure_mode}. Score: ${data.score_calculation.final_score} (${data.score_calculation.risk_level})`);
+      toast.success(
+        t("observations.linkedFailureModeToast")
+          .replace("{failureMode}", data.threat.failure_mode)
+          .replace("{score}", data.score_calculation.final_score)
+          .replace("{level}", data.score_calculation.risk_level)
+      );
       setShowLinkFailureModeDialog(false);
       setSelectedFailureModeId(null);
       setFailureModeSearch("");
     },
     onError: () => {
-      toast.error("Failed to link failure mode");
+      toast.error(t("observations.linkFailureModeFailed"));
     },
   });
 
@@ -556,13 +566,13 @@ const ThreatDetailPage = () => {
   }
 
   if (error || !threat) {
-    let errorMessage = "Observation not found";
+    let errorMessage = t("observations.notFound");
     if (error?.response?.status === 503) {
-      errorMessage = "Server temporarily unavailable. Please try again.";
+      errorMessage = t("threatDetail.serverUnavailable");
     } else if (error?.response?.status === 504) {
-      errorMessage = "Request timed out. Please try again.";
+      errorMessage = t("threatDetail.requestTimeout");
     } else if (error?.code === 'ERR_NETWORK') {
-      errorMessage = "Network error. Please check your connection.";
+      errorMessage = t("threatDetail.networkError");
     } else if (error?.response?.data?.detail) {
       errorMessage = error.response.data.detail;
     } else if (error?.message) {

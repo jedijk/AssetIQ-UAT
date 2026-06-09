@@ -26,6 +26,15 @@ import {
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
 
+const getConfidenceLabel = (confidence, t) => {
+  const labels = {
+    high: t("ai.highConfidence"),
+    medium: t("ai.mediumConfidence"),
+    low: t("ai.lowConfidence"),
+  };
+  return labels[confidence?.toLowerCase()] || confidence;
+};
+
 const getCategoryConfig = (t) => ({
   technical_cause: { icon: Cog, label: t("ai.technicalCause"), color: "text-blue-600", bg: "bg-blue-100" },
   human_factor: { icon: Users, label: t("ai.humanFactor"), color: "text-purple-600", bg: "bg-purple-100" },
@@ -309,7 +318,7 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
     },
     onError: (error) => {
       console.error("Failed to create investigation:", error);
-      toast.error(getErrorMessage(error, "Failed to create investigation"));
+      toast.error(getErrorMessage(error, t("ai.createInvestigationFailed")));
     },
   });
   
@@ -503,7 +512,7 @@ export default function CausalIntelligencePanel({ threatId, threatData }) {
               
               {/* Confidence */}
               <div className="text-xs text-slate-400 text-right">
-                {t("ai.analysisConfidence")}: <span className="capitalize font-medium">{displayData.confidence}</span>
+                {t("ai.analysisConfidence")}: <span className="capitalize font-medium">{getConfidenceLabel(displayData.confidence, t)}</span>
               </div>
             </div>
           </motion.div>

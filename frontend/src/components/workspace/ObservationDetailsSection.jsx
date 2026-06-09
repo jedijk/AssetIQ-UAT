@@ -204,10 +204,10 @@ const ObservationDetailsSection = ({ threatId }) => {
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline", threatId] });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
-      toast.success("Observation updated");
+      toast.success(t("observations.observationUpdated"));
       setIsEditing(false);
     },
-    onError: () => toast.error("Failed to update observation"),
+    onError: () => toast.error(t("observations.observationUpdateFailed")),
   });
 
   const deleteMutation = useMutation({
@@ -215,10 +215,10 @@ const ObservationDetailsSection = ({ threatId }) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
-      toast.success("Observation deleted");
+      toast.success(t("observations.observationDeleted"));
       navigate("/threats");
     },
-    onError: () => toast.error("Failed to delete observation"),
+    onError: () => toast.error(t("observations.observationDeleteFailed")),
   });
 
   const linkEquipmentMutation = useMutation({
@@ -228,11 +228,14 @@ const ObservationDetailsSection = ({ threatId }) => {
       queryClient.invalidateQueries({ queryKey: ["observation-workspace", threatId] });
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       toast.success(
-        `Linked to ${data.threat.asset}. Score: ${data.score_calculation.final_score} (${data.score_calculation.risk_level})`
+        t("observations.linkedEquipmentToast")
+          .replace("{asset}", data.threat.asset)
+          .replace("{score}", data.score_calculation.final_score)
+          .replace("{level}", translateEnum(data.score_calculation.risk_level))
       );
       setShowLinkEquipmentDialog(false);
     },
-    onError: () => toast.error("Failed to link equipment"),
+    onError: () => toast.error(t("observations.linkEquipmentFailed")),
   });
 
   const linkFailureModeMutation = useMutation({
@@ -242,13 +245,16 @@ const ObservationDetailsSection = ({ threatId }) => {
       queryClient.invalidateQueries({ queryKey: ["observation-workspace", threatId] });
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       toast.success(
-        `Linked to ${data.threat.failure_mode}. Score: ${data.score_calculation.final_score} (${data.score_calculation.risk_level})`
+        t("observations.linkedFailureModeToast")
+          .replace("{failureMode}", data.threat.failure_mode)
+          .replace("{score}", data.score_calculation.final_score)
+          .replace("{level}", translateEnum(data.score_calculation.risk_level))
       );
       setShowLinkFailureModeDialog(false);
       setSelectedFailureModeId(null);
       setFailureModeSearch("");
     },
-    onError: () => toast.error("Failed to link failure mode"),
+    onError: () => toast.error(t("observations.linkFailureModeFailed")),
   });
 
   // --- Derived data ---------------------------------------------------------
@@ -409,16 +415,16 @@ const ObservationDetailsSection = ({ threatId }) => {
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(shareableLink);
-      toast.success("Link copied to clipboard");
+      toast.success(t("observations.linkCopied"));
     } catch {
-      toast.success("Link ready to copy");
+      toast.success(t("observations.linkReadyToCopy"));
     }
   };
   const shareLink = async () => {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: `Observation: ${threat.title || ""}`,
+          title: t("observations.shareObservationTitle").replace("{title}", threat.title || ""),
           text: `${threat.threat_number || ""} - ${threat.title || ""}`,
           url: shareableLink,
         });
@@ -441,7 +447,7 @@ const ObservationDetailsSection = ({ threatId }) => {
     { label: t("observations.equipmentType"), value: translateEquipmentTypeName(threat.equipment_type), icon: Target, field: "equipment_type", type: "searchable", options: equipmentTypeOptions },
     { label: t("observations.failureMode"), value: translateFailureModeName(threat.failure_mode), icon: AlertTriangle, field: "failure_mode", type: "searchable", options: failureModeOptions },
     { label: t("observations.frequency"), value: translateEnum(threat.frequency), icon: Clock, field: "frequency", type: "select", options: FREQUENCY_OPTIONS },
-    { label: "Discipline", value: disciplineDisplay, icon: Cog, field: "discipline", type: "discipline-select" },
+    { label: t("common.discipline"), value: disciplineDisplay, icon: Cog, field: "discipline", type: "discipline-select" },
   ];
 
   // --- Render ---------------------------------------------------------------
@@ -468,10 +474,10 @@ const ObservationDetailsSection = ({ threatId }) => {
               : threat.risk_level === "Medium" ? "bg-yellow-100 text-yellow-700"
               : "bg-green-100 text-green-700"
             }`}
-            title="Risk Score (right-click the card below for calculation details)"
+            title={t("observations.riskScoreTitle")}
             data-testid="hero-risk-score"
           >
-            Risk {threat.risk_score}
+            {t("observations.riskScoreBadge").replace("{score}", threat.risk_score)}
           </span>
         )}
         {rpnValue && (
@@ -482,7 +488,7 @@ const ObservationDetailsSection = ({ threatId }) => {
               : rpnValue >= 100 ? "bg-yellow-100 text-yellow-700"
               : "bg-green-100 text-green-700"
             }`}
-            title="Risk Priority Number"
+            title={t("observations.riskPriorityNumber")}
           >
             RPN {rpnValue}
           </span>
@@ -493,11 +499,11 @@ const ObservationDetailsSection = ({ threatId }) => {
         {isEditing ? (
           <>
             <Button size="sm" variant="outline" onClick={cancelEditing} data-testid="cancel-edit-btn">
-              <X className="w-3 h-3 mr-1" /> Cancel
+              <X className="w-3 h-3 mr-1" /> {t("common.cancel")}
             </Button>
             <Button size="sm" onClick={saveChanges} disabled={updateMutation.isPending} className="bg-green-600 hover:bg-green-700" data-testid="save-edit-btn">
               {updateMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}
-              Save
+              {t("common.save")}
             </Button>
           </>
         ) : (
@@ -516,11 +522,11 @@ const ObservationDetailsSection = ({ threatId }) => {
                 ))}
               </SelectContent>
             </Select>
-            <Button size="sm" variant="ghost" onClick={shareLink} title="Share" data-testid="workspace-share-btn">
+            <Button size="sm" variant="ghost" onClick={shareLink} title={t("observations.shareLink")} data-testid="workspace-share-btn">
               <Share2 className="w-4 h-4" />
             </Button>
             <Button size="sm" variant="outline" onClick={startEditing} data-testid="workspace-edit-btn">
-              <Edit className="w-3 h-3 mr-1" /> Edit
+              <Edit className="w-3 h-3 mr-1" /> {t("common.edit")}
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -530,20 +536,20 @@ const ObservationDetailsSection = ({ threatId }) => {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => setShowLinkEquipmentDialog(true)} data-testid="menu-link-equipment">
-                  <LinkIcon className="w-4 h-4 mr-2" /> Link Equipment
+                  <LinkIcon className="w-4 h-4 mr-2" /> {t("observations.linkEquipment")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setShowLinkFailureModeDialog(true)} data-testid="menu-link-failure-mode">
-                  <AlertTriangle className="w-4 h-4 mr-2" /> Link Failure Mode
+                  <AlertTriangle className="w-4 h-4 mr-2" /> {t("observations.linkFailureMode")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigate(`/threats/${threatId}`)}>
-                  Open Classic View
+                  {t("observations.openClassicView")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={(e) => { e.preventDefault(); setShowDeleteDialog(true); }}
                   className="text-red-600 focus:text-red-700 focus:bg-red-50"
                   data-testid="menu-delete-observation"
                 >
-                  <Trash2 className="w-4 h-4 mr-2" /> Delete Observation
+                  <Trash2 className="w-4 h-4 mr-2" /> {t("observations.deleteObservation")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -578,7 +584,7 @@ const ObservationDetailsSection = ({ threatId }) => {
             <div className="flex items-center justify-between px-3 py-2 border-b">
               <div className="flex items-center gap-2">
                 <Calculator className="w-4 h-4 text-blue-600" />
-                <h3 className="font-semibold text-sm">Score Calculation</h3>
+                <h3 className="font-semibold text-sm">{t("observations.scoreCalculation")}</h3>
               </div>
               <button onClick={() => setScoreCalcPopup({ show: false, x: 0, y: 0 })} className="p-1 hover:bg-slate-100 rounded">
                 <X className="w-4 h-4 text-slate-400" />
@@ -600,9 +606,9 @@ const ObservationDetailsSection = ({ threatId }) => {
               </div>
               <div className="bg-slate-50 rounded p-2 mb-2">
                 <div className="flex justify-between mb-1.5">
-                  <span className="text-xs font-medium">FMEA</span>
+                  <span className="text-xs font-medium">{t("observations.fmeaScore")}</span>
                   <button onClick={() => setShowLinkFailureModeDialog(true)} className="text-[9px] text-blue-600 hover:underline">
-                    {linkedFmData ? "Relink" : "Link"}
+                    {linkedFmData ? t("observations.relink") : t("observations.link")}
                   </button>
                 </div>
                 {linkedFmData ? (
@@ -612,13 +618,17 @@ const ObservationDetailsSection = ({ threatId }) => {
                     <div className="bg-white rounded p-1 text-center flex-1 border"><div className="text-sm font-bold text-blue-600">{linkedFmData.detectability}</div><div className="text-[8px] text-slate-400">D</div></div>
                     <div className="bg-blue-50 rounded p-1 text-center flex-1 border border-blue-200 font-bold text-blue-700 text-sm flex items-center justify-center">{fmBaseScore}</div>
                   </div>
-                ) : <div className="text-xs text-slate-400 italic">Not linked: <b>{fmBaseScore}</b></div>}
+                ) : (
+                  <div className="text-xs text-slate-400 italic">
+                    {t("observations.notLinkedScoreValue").replace("{score}", fmBaseScore)}
+                  </div>
+                )}
               </div>
               <div className="bg-slate-50 rounded p-2">
                 <div className="flex justify-between mb-1.5">
-                  <span className="text-xs font-medium">Criticality</span>
+                  <span className="text-xs font-medium">{t("observations.criticalityScore")}</span>
                   <button onClick={() => setShowLinkEquipmentDialog(true)} className="text-[9px] text-blue-600 hover:underline">
-                    {linkedCriticalityData ? "Relink" : "Link"}
+                    {linkedCriticalityData ? t("observations.relink") : t("observations.link")}
                   </button>
                 </div>
                 {linkedCriticalityData ? (
@@ -629,7 +639,9 @@ const ObservationDetailsSection = ({ threatId }) => {
                     <div className="bg-white rounded p-1 text-center flex-1 border"><div className="text-sm font-bold text-purple-600">{linkedCriticalityData.reputation_impact || 0}</div><div className="text-[8px] text-slate-400">R</div></div>
                     <div className="bg-purple-50 rounded p-1 text-center flex-1 border border-purple-200 font-bold text-purple-700 text-sm flex items-center justify-center">{criticalityScore}</div>
                   </div>
-                ) : <div className="text-xs text-slate-400 italic">Not linked: <b>0</b></div>}
+                ) : (
+                  <div className="text-xs text-slate-400 italic">{t("observations.notLinkedZero")}</div>
+                )}
               </div>
             </div>
           </div>
@@ -654,9 +666,9 @@ const ObservationDetailsSection = ({ threatId }) => {
                   options={item.options}
                   value={editForm[item.field] || ""}
                   onValueChange={(v) => setEditForm({ ...editForm, [item.field]: v })}
-                  placeholder={`Select ${item.label}...`}
-                  searchPlaceholder={`Search ${item.label.toLowerCase()}...`}
-                  emptyText="No results"
+                  placeholder={t("observations.selectLabel").replace("{label}", item.label)}
+                  searchPlaceholder={t("observations.searchLabel").replace("{label}", item.label.toLowerCase())}
+                  emptyText={t("observations.noResultsFound")}
                   allowCustom
                 />
               ) : item.type === "select" ? (
@@ -677,9 +689,9 @@ const ObservationDetailsSection = ({ threatId }) => {
                     }
                   }}
                 >
-                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Owner" /></SelectTrigger>
+                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder={t("common.owner")} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="_none">Not assigned</SelectItem>
+                    <SelectItem value="_none">{t("enums.Not assigned")}</SelectItem>
                     {usersList.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -688,9 +700,9 @@ const ObservationDetailsSection = ({ threatId }) => {
                   value={editForm.discipline || "_none"}
                   onValueChange={(v) => setEditForm({ ...editForm, discipline: v === "_none" ? "" : v })}
                 >
-                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Discipline" /></SelectTrigger>
+                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder={t("common.discipline")} /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="_none">Not specified</SelectItem>
+                    <SelectItem value="_none">{t("enums.Not specified")}</SelectItem>
                     {DISCIPLINES.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -705,7 +717,7 @@ const ObservationDetailsSection = ({ threatId }) => {
               <div className="flex items-center gap-1 justify-end sm:justify-start">
                 <span className="font-semibold text-slate-900 text-sm truncate">{item.value}</span>
                 {item.field === "failure_mode" && threat.is_new_failure_mode && (
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">NEW</span>
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200">{t("observations.newBadge")}</span>
                 )}
               </div>
             )}
@@ -722,9 +734,9 @@ const ObservationDetailsSection = ({ threatId }) => {
       <div className="bg-white rounded-xl border border-slate-200 p-4" data-testid="workspace-description">
         <div className="flex items-center gap-2 mb-2">
           <MessageSquare className="w-4 h-4 text-green-600" />
-          <h3 className="font-semibold text-slate-900 text-sm">Description</h3>
+          <h3 className="font-semibold text-slate-900 text-sm">{t("common.description")}</h3>
           {threat.context_added_at && !isEditing && (
-            <span className="text-xs text-slate-400">added {formatDateTime(threat.context_added_at)}</span>
+            <span className="text-xs text-slate-400">{t("observations.addedAtPrefix")} {formatDateTime(threat.context_added_at)}</span>
           )}
           {/* Paperclip — attach files without leaving the page. In view mode the upload is committed
               immediately; in edit mode it stages in editForm.attachments until Save. */}
@@ -732,11 +744,11 @@ const ObservationDetailsSection = ({ threatId }) => {
             type="button"
             onClick={() => attachmentInputRef.current?.click()}
             className="ml-auto inline-flex items-center gap-1 text-slate-500 hover:text-blue-600 text-xs px-2 py-1 rounded-md hover:bg-slate-50 transition-colors"
-            title="Attach files"
+            title={t("observations.attachFiles")}
             data-testid="description-attach-btn"
           >
             <Paperclip className="w-3.5 h-3.5" />
-            Attach
+            {t("observations.attach")}
           </button>
           <input
             ref={attachmentInputRef}
@@ -773,7 +785,7 @@ const ObservationDetailsSection = ({ threatId }) => {
           <Textarea
             value={editForm.user_context || ""}
             onChange={(e) => setEditForm({ ...editForm, user_context: e.target.value })}
-            placeholder="What did you observe? (this is the text you typed or dictated when reporting the observation)"
+            placeholder={t("observations.descriptionPlaceholder")}
             rows={4}
             className="text-sm"
           />
@@ -782,7 +794,7 @@ const ObservationDetailsSection = ({ threatId }) => {
             <p className="text-slate-700 whitespace-pre-wrap text-sm">{threat.user_context}</p>
           </div>
         ) : (
-          <p className="text-slate-400 text-sm italic">No description recorded.</p>
+          <p className="text-slate-400 text-sm italic">{t("observations.noDescriptionRecorded")}</p>
         )}
         {/* Attachments list (below description) */}
         {((isEditing ? editForm.attachments : threat.attachments) || []).length > 0 && (
@@ -793,7 +805,7 @@ const ObservationDetailsSection = ({ threatId }) => {
               editable={isEditing}
               isUploading={uploadingPhoto}
               getKey={(a) => a?.id}
-              getName={(a) => a?.name || a?.filename || "Attachment"}
+              getName={(a) => a?.name || a?.filename || t("observations.attachments")}
               getUrl={(a) => a?.data}
               getContentType={(a) => a?.mime || a?.content_type || a?.type}
               onAddFiles={() => attachmentInputRef.current?.click()}
@@ -821,15 +833,15 @@ const ObservationDetailsSection = ({ threatId }) => {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Observation</AlertDialogTitle>
+            <AlertDialogTitle>{t("observations.deleteObservation")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure? This action cannot be undone.
+              {t("observations.deleteConfirmShort")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={() => deleteMutation.mutate()} className="bg-red-600 hover:bg-red-700" data-testid="confirm-delete-btn">
-              {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
+              {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -841,17 +853,17 @@ const ObservationDetailsSection = ({ threatId }) => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Share2 className="w-5 h-5 text-blue-600" />
-              Share Observation
+              {t("observations.shareObservation")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-slate-500">Anyone with the link can view this observation.</p>
+            <p className="text-sm text-slate-500">{t("observations.anyoneWithLinkCanView")}</p>
             <div className="flex items-center gap-2">
               <div className="flex-1 p-3 bg-slate-100 rounded-lg border text-sm font-mono text-slate-600 truncate">
                 {shareableLink}
               </div>
               <Button size="sm" onClick={() => { copyLink(); setShareDialogOpen(false); }}>
-                <Copy className="w-4 h-4 mr-1" /> Copy
+                <Copy className="w-4 h-4 mr-1" /> {t("observations.copy")}
               </Button>
             </div>
           </div>
@@ -864,14 +876,14 @@ const ObservationDetailsSection = ({ threatId }) => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <LinkIcon className="w-5 h-5 text-purple-600" />
-              Link to Equipment
+              {t("observations.linkToEquipment")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Search equipment by tag, name, level…"
+                placeholder={t("observations.searchEquipmentPlaceholder")}
                 value={equipmentSearch}
                 onChange={(e) => setEquipmentSearch(e.target.value)}
                 className="pl-9"
@@ -892,19 +904,19 @@ const ObservationDetailsSection = ({ threatId }) => {
                 </button>
               ))}
               {filteredEquipmentList.length === 0 && (
-                <div className="text-center py-4 text-slate-400 text-sm">No equipment found</div>
+                <div className="text-center py-4 text-slate-400 text-sm">{t("observations.noEquipmentFound")}</div>
               )}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowLinkEquipmentDialog(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowLinkEquipmentDialog(false)}>{t("common.cancel")}</Button>
             <Button
               onClick={() => linkEquipmentMutation.mutate({ equipmentNodeId: selectedEquipmentId })}
               disabled={!selectedEquipmentId || linkEquipmentMutation.isPending}
               className="bg-purple-600 hover:bg-purple-700"
             >
               {linkEquipmentMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <LinkIcon className="w-4 h-4 mr-1" />}
-              Link & Recalculate
+              {t("observations.linkAndRecalculate")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -916,14 +928,14 @@ const ObservationDetailsSection = ({ threatId }) => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-amber-600" />
-              Link to Failure Mode
+              {t("observations.linkToFailureMode")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Search failure modes…"
+                placeholder={t("observations.searchFailureModes")}
                 value={failureModeSearch}
                 onChange={(e) => setFailureModeSearch(e.target.value)}
                 className="pl-9"
@@ -951,19 +963,19 @@ const ObservationDetailsSection = ({ threatId }) => {
                 </button>
               ))}
               {filteredFailureModes.length === 0 && (
-                <div className="text-center py-4 text-slate-400 text-sm">No failure modes found</div>
+                <div className="text-center py-4 text-slate-400 text-sm">{t("observations.noFailureModesFound")}</div>
               )}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowLinkFailureModeDialog(false); setSelectedFailureModeId(null); setFailureModeSearch(""); }}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setShowLinkFailureModeDialog(false); setSelectedFailureModeId(null); setFailureModeSearch(""); }}>{t("common.cancel")}</Button>
             <Button
               onClick={() => linkFailureModeMutation.mutate({ failureModeId: selectedFailureModeId })}
               disabled={!selectedFailureModeId || linkFailureModeMutation.isPending}
               className="bg-amber-600 hover:bg-amber-700"
             >
               {linkFailureModeMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <LinkIcon className="w-4 h-4 mr-1" />}
-              Link & Recalculate
+              {t("observations.linkAndRecalculate")}
             </Button>
           </DialogFooter>
         </DialogContent>

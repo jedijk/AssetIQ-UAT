@@ -151,7 +151,10 @@ const ForecastChart = ({ forecasts, t, currentScore = 60 }) => {
               </TooltipTrigger>
               <TooltipContent>
                 <p className="text-sm">
-                  <strong>Day {forecast.days_ahead}:</strong> Score {forecast.predicted_risk_score}, {forecast.predicted_probability}% probability
+                  {t("ai.forecastDayTooltip")
+                    .replace("{day}", forecast.days_ahead)
+                    .replace("{score}", forecast.predicted_risk_score)
+                    .replace("{probability}", forecast.predicted_probability)}
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -314,7 +317,7 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false,
           </div>
         </div>
         <p className="text-sm text-slate-600 mb-4">
-          {t("ai.riskAnalysis")}
+          {t("ai.riskAnalysisDesc")}
         </p>
         <Button 
           onClick={handleAnalyze}
@@ -344,7 +347,7 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false,
       <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-200 p-4">
         <div className="flex items-center justify-center py-6">
           <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
-          <span className="ml-2 text-sm text-slate-600">Analyzing threat...</span>
+          <span className="ml-2 text-sm text-slate-600">{t("ai.analyzingThreat")}</span>
         </div>
       </div>
     );

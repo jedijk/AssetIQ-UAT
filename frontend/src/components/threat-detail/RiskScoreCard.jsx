@@ -91,7 +91,7 @@ export const RiskScoreCard = ({ threat, rpnValue, linkedFMEAData, linkedCritical
             <div className="border-l border-slate-200 pl-8">
               <div className="text-sm font-medium text-slate-500 mb-1 flex items-center gap-2">
                 RPN
-                <span className="text-xs text-slate-400 font-normal">(Risk Priority Number)</span>
+                <span className="text-xs text-slate-400 font-normal">({t("maintenance.riskPriorityNumber")})</span>
               </div>
               <div className={`text-4xl font-bold ${
                 rpnValue >= 300 ? "text-red-600" :
@@ -130,7 +130,7 @@ export const RiskScoreCard = ({ threat, rpnValue, linkedFMEAData, linkedCritical
           <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
             <h4 className="font-semibold text-slate-900 flex items-center gap-2">
               <span className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center text-sm">📊</span>
-              Score Calculation
+              {t("observations.scoreCalculation")}
             </h4>
             <button
               onClick={() => setScoreCalcPopup({ show: false, x: 0, y: 0 })}
@@ -142,20 +142,20 @@ export const RiskScoreCard = ({ threat, rpnValue, linkedFMEAData, linkedCritical
 
           {/* Likelihood Score */}
           <div className="mb-4">
-            <div className="text-sm font-medium text-slate-700 mb-2">Likelihood Score = (S × O × D) / 10</div>
+            <div className="text-sm font-medium text-slate-700 mb-2">{t("threatDetail.likelihoodFormula")}</div>
             <div className="grid grid-cols-3 gap-2 text-xs mb-2">
               <div className="bg-slate-50 rounded-lg p-2 text-center">
-                <div className="text-slate-500">Severity</div>
+                <div className="text-slate-500">{t("threatDetail.severityLabel")}</div>
                 <div className="font-semibold text-slate-900">{severityValue}</div>
                 <div className="text-slate-400">{threat.impact}</div>
               </div>
               <div className="bg-slate-50 rounded-lg p-2 text-center">
-                <div className="text-slate-500">Occurrence</div>
+                <div className="text-slate-500">{t("threatDetail.occurrenceLabel")}</div>
                 <div className="font-semibold text-slate-900">{occurrenceValue}</div>
                 <div className="text-slate-400">{threat.frequency}</div>
               </div>
               <div className="bg-slate-50 rounded-lg p-2 text-center">
-                <div className="text-slate-500">Detection</div>
+                <div className="text-slate-500">{t("threatDetail.detectionLabel")}</div>
                 <div className="font-semibold text-slate-900">{detectionValue}</div>
                 <div className="text-slate-400">{threat.detectability}</div>
               </div>
@@ -168,22 +168,22 @@ export const RiskScoreCard = ({ threat, rpnValue, linkedFMEAData, linkedCritical
 
           {/* Criticality Score */}
           <div className="mb-4">
-            <div className="text-sm font-medium text-slate-700 mb-2">Criticality Score = (Safety×25 + Prod×20 + Env×15 + Rep×10) / 3.5</div>
+            <div className="text-sm font-medium text-slate-700 mb-2">{t("threatDetail.criticalityFormula")}</div>
             <div className="grid grid-cols-4 gap-2 text-xs mb-2">
               <div className="bg-slate-50 rounded-lg p-2 text-center">
-                <div className="text-slate-500">Safety</div>
+                <div className="text-slate-500">{t("observations.safety")}</div>
                 <div className="font-semibold text-slate-900">{critSafety}</div>
               </div>
               <div className="bg-slate-50 rounded-lg p-2 text-center">
-                <div className="text-slate-500">Production</div>
+                <div className="text-slate-500">{t("observations.production")}</div>
                 <div className="font-semibold text-slate-900">{critProduction}</div>
               </div>
               <div className="bg-slate-50 rounded-lg p-2 text-center">
-                <div className="text-slate-500">Environmental</div>
+                <div className="text-slate-500">{t("observations.environment")}</div>
                 <div className="font-semibold text-slate-900">{critEnvironmental}</div>
               </div>
               <div className="bg-slate-50 rounded-lg p-2 text-center">
-                <div className="text-slate-500">Reputation</div>
+                <div className="text-slate-500">{t("observations.reputation")}</div>
                 <div className="font-semibold text-slate-900">{critReputation}</div>
               </div>
             </div>
@@ -195,7 +195,7 @@ export const RiskScoreCard = ({ threat, rpnValue, linkedFMEAData, linkedCritical
 
           {/* Final Score */}
           <div className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-lg p-3 text-white">
-            <div className="text-xs opacity-75 mb-1">Final Score = (Criticality × 0.75) + (Likelihood × 0.25)</div>
+            <div className="text-xs opacity-75 mb-1">{t("threatDetail.finalScoreFormula")}</div>
             <div className="flex items-center justify-between">
               <span className="text-sm">= ({criticalityScore} × 0.75) + ({likelihoodScore} × 0.25)</span>
               <span className="text-2xl font-bold">{finalScore}</span>

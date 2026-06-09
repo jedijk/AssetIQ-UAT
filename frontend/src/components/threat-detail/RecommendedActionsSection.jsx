@@ -134,6 +134,18 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
   });
   const linkedActions = linkedActionsData || [];
 
+  const translateEnum = (value) => {
+    if (!value) return value;
+    const key = `enums.${value}`;
+    const out = t(key);
+    return out && out !== key ? out : value;
+  };
+
+  const getActionStatusLabel = (status) => {
+    const cfg = ACTION_STATUS_CONFIG[status] || ACTION_STATUS_CONFIG.open;
+    return translateEnum(cfg.label);
+  };
+
   // Promote to action mutation
   const promoteToActionMutation = useMutation({
     mutationFn: ({ text, action_type, discipline }) =>
@@ -150,11 +162,11 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["actions"] });
       queryClient.invalidateQueries({ queryKey: ["threatTimeline", threatId] });
-      toast.success("Action added to plan!");
+      toast.success(t("threatDetail.actionAddedToPlan"));
     },
     onError: (error) => {
       console.error("Failed to create action:", error);
-      toast.error("Failed to create action");
+      toast.error(t("threatDetail.actionCreateFailed"));
     },
   });
 
@@ -164,7 +176,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
       actionsAPI.validate(actionId, validatorName, validatorPosition, user?.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["actions"] });
-      toast.success("Action validated successfully!");
+      toast.success(t("threatDetail.actionValidated"));
       setShowValidateDialog(false);
       setActionToValidate(null);
       setValidatorName("");
@@ -172,7 +184,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
     },
     onError: (error) => {
       console.error("Failed to validate action:", error);
-      toast.error("Failed to validate action");
+      toast.error(t("threatDetail.actionValidateFailed"));
     },
   });
 
@@ -181,11 +193,11 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
     mutationFn: (actionId) => actionsAPI.unvalidate(actionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["actions"] });
-      toast.success("Validation removed");
+      toast.success(t("threatDetail.validationRemoved"));
     },
     onError: (error) => {
       console.error("Failed to remove validation:", error);
-      toast.error("Failed to remove validation");
+      toast.error(t("threatDetail.validationRemoveFailed"));
     },
   });
 
@@ -198,7 +210,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
 
   const handleValidateAction = () => {
     if (!validatorName.trim() || !validatorPosition.trim()) {
-      toast.error("Please fill in all fields");
+      toast.error(t("threatDetail.fillAllFields"));
       return;
     }
     validateActionMutation.mutate({
@@ -218,12 +230,12 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
       queryClient.invalidateQueries({ queryKey: ["threats"] });
-      toast.success("Recommended action added!");
+      toast.success(t("threatDetail.recommendedActionAdded"));
       setShowAddRecommendedDialog(false);
       setNewRecommendedAction({ action: "", action_type: "", discipline: "" });
     },
     onError: () => {
-      toast.error("Failed to add recommended action");
+      toast.error(t("threatDetail.recommendedActionAddFailed"));
     },
   });
 
@@ -237,13 +249,13 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
       queryClient.invalidateQueries({ queryKey: ["threats"] });
-      toast.success("Recommended action updated!");
+      toast.success(t("threatDetail.recommendedActionUpdated"));
       setShowEditRecommendedDialog(false);
       setEditingActionIndex(null);
       setEditRecommendedAction({ action: "", action_type: "", discipline: "" });
     },
     onError: () => {
-      toast.error("Failed to update recommended action");
+      toast.error(t("threatDetail.recommendedActionUpdateFailed"));
     },
   });
 
@@ -257,10 +269,10 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
       queryClient.invalidateQueries({ queryKey: ["threats"] });
-      toast.success("Recommended action deleted!");
+      toast.success(t("threatDetail.recommendedActionDeleted"));
     },
     onError: () => {
-      toast.error("Failed to delete recommended action");
+      toast.error(t("threatDetail.recommendedActionDeleteFailed"));
     },
   });
 
@@ -274,12 +286,12 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       queryClient.invalidateQueries({ queryKey: ["linked-actions", threatId] });
       queryClient.invalidateQueries({ queryKey: ["actions"] });
-      toast.success("Action updated!");
+      toast.success(t("threatDetail.actionUpdated"));
       setShowEditActionDialog(false);
       setEditingAction(null);
     },
     onError: () => {
-      toast.error("Failed to update action");
+      toast.error(t("threatDetail.actionUpdateFailed"));
     },
   });
 
@@ -294,10 +306,10 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
       queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       queryClient.invalidateQueries({ queryKey: ["actions"] });
-      toast.success("Action deleted!");
+      toast.success(t("threatDetail.actionDeleted"));
     },
     onError: () => {
-      toast.error("Failed to delete action");
+      toast.error(t("threatDetail.actionDeleteFailed"));
     },
   });
 
@@ -334,12 +346,12 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
       queryClient.invalidateQueries({ queryKey: ["threat", threatId] });
       queryClient.invalidateQueries({ queryKey: ["threats"] });
       queryClient.invalidateQueries({ queryKey: ["failure-modes"] });
-      toast.success("Failure mode created and linked to FMEA library!");
+      toast.success(t("threatDetail.failureModeCreated"));
       setShowCreateFMDialog(false);
       setFmData({ severity: 5, occurrence: 5, detection: 5, recommended_actions: [] });
     },
     onError: () => {
-      toast.error("Failed to create failure mode");
+      toast.error(t("threatDetail.failureModeCreateFailed"));
     },
   });
 
@@ -370,7 +382,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
 
   const handleAddRecommendedAction = () => {
     if (!newRecommendedAction.action.trim()) {
-      toast.error("Please enter an action description");
+      toast.error(t("threatDetail.enterActionDescription"));
       return;
     }
     addRecommendedActionMutation.mutate(newRecommendedAction);
@@ -391,7 +403,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
   // Save edited action
   const handleSaveEditedAction = () => {
     if (!editRecommendedAction.action.trim()) {
-      toast.error("Please enter an action description");
+      toast.error(t("threatDetail.enterActionDescription"));
       return;
     }
     editRecommendedActionMutation.mutate({
@@ -402,7 +414,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
 
   // Delete action with confirmation
   const handleDeleteAction = (index) => {
-    if (window.confirm("Are you sure you want to delete this recommended action?")) {
+    if (window.confirm(t("threatDetail.deleteRecommendedConfirm"))) {
       deleteRecommendedActionMutation.mutate(index);
     }
   };
@@ -424,7 +436,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
   // Save edited action plan item
   const handleSaveActionPlanItem = () => {
     if (!editActionForm.title.trim()) {
-      toast.error("Please enter an action title");
+      toast.error(t("threatDetail.enterActionTitle"));
       return;
     }
     editActionMutation.mutate({
@@ -435,7 +447,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
 
   // Delete action plan item with confirmation
   const handleDeleteActionPlanItem = (actionId) => {
-    if (window.confirm("Are you sure you want to delete this action? This cannot be undone.")) {
+    if (window.confirm(t("threatDetail.deleteActionConfirm"))) {
       deleteActionMutation.mutate(actionId);
     }
   };
@@ -479,13 +491,13 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               {/* Content */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px] px-1.5 py-0">
+                    <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px] px-1.5 py-0">
                     <Sparkles className="w-2.5 h-2.5 mr-0.5" />
-                    NEW
+                    {t("threatDetail.newBadge")}
                   </Badge>
                 </div>
                 <p className="text-xs text-slate-600">
-                  Add "{threat.failure_mode}" to FMEA library with RPN scoring.
+                  {t("threatDetail.addFailureModeToLibrary").replace("{failureMode}", threat.failure_mode)}
                 </p>
               </div>
 
@@ -496,7 +508,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                 data-testid="create-failure-mode-button"
               >
                 <Plus className="w-3 h-3 mr-1" />
-                Create
+                {t("common.create")}
               </Button>
             </div>
           )}
@@ -558,7 +570,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                   {isAlreadyActed && (
                     <div className="flex items-center gap-1 mt-1.5 text-green-600">
                       <CheckCircle className="w-3 h-3" />
-                      <span className="text-[10px] font-medium">In Action Plan</span>
+                      <span className="text-[10px] font-medium">{t("threatDetail.inActionPlan")}</span>
                     </div>
                   )}
                 </div>
@@ -571,7 +583,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                     size="sm"
                     onClick={() => handleEditAction(idx, action)}
                     className="opacity-0 group-hover:opacity-100 transition-all text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md p-1 h-7 w-7"
-                    title="Edit action"
+                    title={t("threatDetail.editAction")}
                     data-testid={`edit-action-${idx}`}
                   >
                     <Pencil className="w-3.5 h-3.5" />
@@ -584,7 +596,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                     onClick={() => handleDeleteAction(idx)}
                     disabled={deleteRecommendedActionMutation.isPending}
                     className="opacity-0 group-hover:opacity-100 transition-all text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-md p-1 h-7 w-7"
-                    title="Delete action"
+                    title={t("threatDetail.deleteAction")}
                     data-testid={`delete-action-${idx}`}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -635,7 +647,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
         >
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-slate-900 text-sm">Action Plan</h3>
+              <h3 className="font-semibold text-slate-900 text-sm">{t("threatDetail.actionPlan")}</h3>
               <Badge variant="secondary" className="text-xs">
                 {linkedActions.length}
               </Badge>
@@ -653,7 +665,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               onClick={() => navigate("/actions")}
               className="text-blue-600 hover:text-blue-700 h-7 text-xs px-2"
             >
-              View All
+              {t("threatDetail.viewAllActions")}
               <ExternalLink className="w-3 h-3 ml-1" />
             </Button>
           </div>
@@ -703,7 +715,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                       {/* Status Badge */}
                       <div className={`flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 ${statusCfg.bg}`}>
                         <StatusIcon className={`w-3 h-3 ${statusCfg.color}`} />
-                        <span className={`text-[10px] font-medium ${statusCfg.color}`}>{statusCfg.label}</span>
+                        <span className={`text-[10px] font-medium ${statusCfg.color}`}>{getActionStatusLabel(action.status)}</span>
                       </div>
                       {action.discipline && (
                         <span className="shrink-0 text-[10px] text-slate-400">{action.discipline}</span>
@@ -712,7 +724,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                       {action.is_validated && (
                         <Badge className="shrink-0 bg-green-100 text-green-700 border-green-200 text-[10px] px-1.5">
                           <ShieldCheck className="w-3 h-3 mr-0.5" />
-                          Validated
+                          {t("threatDetail.validated")}
                         </Badge>
                       )}
                       {action.priority && (
@@ -738,7 +750,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                       </p>
                     )}
                     {action.owner && !action.is_validated && (
-                      <p className="text-[10px] text-slate-400 mt-1">Owner: {action.owner}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">{t("threatDetail.ownerLabel").replace("{name}", action.owner)}</p>
                     )}
                   </div>
                   </div>
@@ -747,7 +759,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                   <div className="flex w-full flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-2 pl-11 sm:w-auto sm:flex-shrink-0 sm:flex-col sm:items-end sm:gap-1 sm:border-t-0 sm:pt-0 sm:pl-0">
                     {action.due_date && (
                       <p className="shrink-0 text-[10px] text-slate-500">
-                        Due: {formatDate(action.due_date)}
+                        {t("threatDetail.dueLabel").replace("{date}", formatDate(action.due_date))}
                       </p>
                     )}
 
@@ -761,7 +773,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                           handleEditActionPlanItem(action);
                         }}
                         className="opacity-0 group-hover:opacity-100 transition-all h-6 w-6 p-0 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
-                        title="Edit action"
+                        title={t("threatDetail.editAction")}
                         data-testid={`edit-action-plan-${action.id}`}
                       >
                         <Pencil className="w-3 h-3" />
@@ -775,7 +787,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                         }}
                         disabled={deleteActionMutation.isPending}
                         className="opacity-0 group-hover:opacity-100 transition-all h-6 w-6 p-0 text-slate-500 hover:text-red-600 hover:bg-red-50"
-                        title="Delete action"
+                        title={t("threatDetail.deleteAction")}
                         data-testid={`delete-action-plan-${action.id}`}
                       >
                         <Trash2 className="w-3 h-3" />
@@ -795,7 +807,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                         data-testid={`validate-action-${action.id}`}
                       >
                         <ShieldCheck className="w-3 h-3 mr-1" />
-                        Validate
+                        {t("threatDetail.validateAction")}
                       </Button>
                     ) : (
                       <Button
@@ -806,10 +818,10 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                           unvalidateActionMutation.mutate(action.id);
                         }}
                         className="h-6 text-[10px] px-2 text-slate-400 hover:text-red-500 mt-1"
-                        title="Remove validation"
+                        title={t("threatDetail.removeValidation")}
                         data-testid={`unvalidate-action-${action.id}`}
                       >
-                        Remove
+                        {t("common.remove")}
                       </Button>
                     )}
                   </div>
@@ -826,15 +838,15 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Plus className="w-5 h-5 text-green-600" />
-              Add Recommended Action
+              {t("threatDetail.addRecommendedAction")}
             </DialogTitle>
             <DialogDescription>
-              Add a maintenance recommendation to this observation. Specify the action type and discipline.
+              {t("threatDetail.addRecommendedActionDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="rec-action-text">Action Description *</Label>
+              <Label htmlFor="rec-action-text">{t("threatDetail.actionDescriptionRequired")}</Label>
               <Textarea
                 id="rec-action-text"
                 value={newRecommendedAction.action}
@@ -846,13 +858,13 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="rec-action-type">Action Type *</Label>
+                <Label htmlFor="rec-action-type">{t("threatDetail.actionTypeRequired")}</Label>
                 <Select
                   value={newRecommendedAction.action_type}
                   onValueChange={(v) => setNewRecommendedAction({ ...newRecommendedAction, action_type: v })}
                 >
                   <SelectTrigger data-testid="rec-action-type-select">
-                    <SelectValue placeholder="Select type..." />
+                    <SelectValue placeholder={t("threatDetail.selectType")} />
                   </SelectTrigger>
                   <SelectContent>
                     {ACTION_TYPES.map((type) => (
@@ -867,13 +879,13 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="rec-action-discipline">Discipline *</Label>
+                <Label htmlFor="rec-action-discipline">{t("threatDetail.disciplineRequired")}</Label>
                 <SearchableSelect
                   options={DISCIPLINES.map((disc) => ({ value: disc, label: disc }))}
                   value={newRecommendedAction.discipline}
                   onValueChange={(v) => setNewRecommendedAction({ ...newRecommendedAction, discipline: v })}
-                  placeholder="Select discipline..."
-                  searchPlaceholder="Search disciplines..."
+                  placeholder={t("observations.selectDiscipline")}
+                  searchPlaceholder={t("threatDetail.searchDisciplines")}
                   data-testid="rec-action-discipline-select"
                 />
               </div>
@@ -881,7 +893,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
             {/* Preview */}
             {newRecommendedAction.action && (
               <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <div className="text-xs text-slate-500 mb-2">Preview:</div>
+                <div className="text-xs text-slate-500 mb-2">{t("threatDetail.preview")}</div>
                 <div className="flex items-start gap-3">
                   {newRecommendedAction.action_type && (
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white text-xs font-bold ${
@@ -913,7 +925,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               }}
               data-testid="cancel-rec-action-button"
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={handleAddRecommendedAction}
@@ -931,7 +943,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               ) : (
                 <Plus className="w-4 h-4 mr-2" />
               )}
-              Add Recommendation
+              {t("threatDetail.addRecommendedAction")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -943,15 +955,15 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="w-5 h-5 text-blue-600" />
-              Edit Recommended Action
+              {t("threatDetail.editRecommendedAction")}
             </DialogTitle>
             <DialogDescription>
-              Update the maintenance recommendation. Changes will be saved automatically.
+              {t("threatDetail.addRecommendedActionDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-rec-action-text">Action Description *</Label>
+              <Label htmlFor="edit-rec-action-text">{t("threatDetail.actionDescriptionRequired")}</Label>
               <Textarea
                 id="edit-rec-action-text"
                 value={editRecommendedAction.action}
@@ -963,13 +975,13 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-rec-action-type">Action Type *</Label>
+                <Label htmlFor="edit-rec-action-type">{t("threatDetail.actionTypeRequired")}</Label>
                 <Select
                   value={editRecommendedAction.action_type}
                   onValueChange={(v) => setEditRecommendedAction({ ...editRecommendedAction, action_type: v })}
                 >
                   <SelectTrigger data-testid="edit-rec-action-type-select">
-                    <SelectValue placeholder="Select type..." />
+                    <SelectValue placeholder={t("threatDetail.selectType")} />
                   </SelectTrigger>
                   <SelectContent>
                     {ACTION_TYPES.map((type) => (
@@ -984,13 +996,13 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-rec-action-discipline">Discipline *</Label>
+                <Label htmlFor="edit-rec-action-discipline">{t("threatDetail.disciplineRequired")}</Label>
                 <SearchableSelect
                   options={DISCIPLINES.map((disc) => ({ value: disc, label: disc }))}
                   value={editRecommendedAction.discipline}
                   onValueChange={(v) => setEditRecommendedAction({ ...editRecommendedAction, discipline: v })}
-                  placeholder="Select discipline..."
-                  searchPlaceholder="Search disciplines..."
+                  placeholder={t("observations.selectDiscipline")}
+                  searchPlaceholder={t("threatDetail.searchDisciplines")}
                   data-testid="edit-rec-action-discipline-select"
                 />
               </div>
@@ -998,7 +1010,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
             {/* Preview */}
             {editRecommendedAction.action && (
               <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                <div className="text-xs text-slate-500 mb-2">Preview:</div>
+                <div className="text-xs text-slate-500 mb-2">{t("threatDetail.preview")}</div>
                 <div className="flex items-start gap-3">
                   {editRecommendedAction.action_type && (
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white text-xs font-bold ${
@@ -1031,7 +1043,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               }}
               data-testid="cancel-edit-rec-action-button"
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={handleSaveEditedAction}
@@ -1047,7 +1059,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               ) : (
                 <Pencil className="w-4 h-4 mr-2" />
               )}
-              Save Changes
+              {t("common.saveChanges")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1059,10 +1071,10 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings className="w-5 h-5 text-emerald-600" />
-              Create Failure Mode
+              {t("threatDetail.createFailureModeInLibrary")}
             </DialogTitle>
             <DialogDescription>
-              Add "{threat.failure_mode}" to the FMEA library with RPN scoring.
+              {t("threatDetail.addFailureModeToLibrary").replace("{failureMode}", threat.failure_mode)}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-6 py-4">
@@ -1070,11 +1082,11 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
             <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
-                  <span className="text-slate-500">Name:</span>
+                  <span className="text-slate-500">{t("common.name")}:</span>
                   <span className="ml-2 font-medium">{threat.failure_mode}</span>
                 </div>
                 <div>
-                  <span className="text-slate-500">Equipment:</span>
+                  <span className="text-slate-500">{t("observations.equipment")}:</span>
                   <span className="ml-2 font-medium">{threat.equipment_type}</span>
                 </div>
               </div>
@@ -1084,8 +1096,8 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
             <div className="space-y-6">
               <div className="flex items-center justify-between p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl border border-slate-200">
                 <div>
-                  <div className="text-sm font-medium text-slate-600">Risk Priority Number (RPN)</div>
-                  <div className="text-xs text-slate-500">Severity × Occurrence × Detection</div>
+                  <div className="text-sm font-medium text-slate-600">{t("maintenance.riskPriorityNumberShort")}</div>
+                  <div className="text-xs text-slate-500">{t("maintenance.severity")} × {t("maintenance.occurrence")} × {t("maintenance.detectability")}</div>
                 </div>
                 <div className={`text-4xl font-bold ${rpnColor}`}>
                   {rpn}
@@ -1095,7 +1107,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               {/* Severity */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Severity</Label>
+                  <Label className="text-sm font-medium">{t("threatDetail.severityLabel")}</Label>
                   <Badge variant="outline" className="text-sm">
                     {fmData.severity}/10
                   </Badge>
@@ -1117,7 +1129,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               {/* Occurrence */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Occurrence</Label>
+                  <Label className="text-sm font-medium">{t("threatDetail.occurrenceLabel")}</Label>
                   <Badge variant="outline" className="text-sm">
                     {fmData.occurrence}/10
                   </Badge>
@@ -1139,7 +1151,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               {/* Detection */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Detection</Label>
+                  <Label className="text-sm font-medium">{t("threatDetail.detectionLabel")}</Label>
                   <Badge variant="outline" className="text-sm">
                     {fmData.detection}/10
                   </Badge>
@@ -1161,7 +1173,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
 
             {/* Recommended Actions for FM */}
             <div className="space-y-3">
-              <Label className="text-sm font-medium">Recommended Actions</Label>
+              <Label className="text-sm font-medium">{t("threatDetail.recommendedActions")}</Label>
               <div className="flex gap-2 flex-wrap">
                 <Input
                   value={newFmAction}
@@ -1222,7 +1234,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                 setFmData({ severity: 5, occurrence: 5, detection: 5, recommended_actions: [] });
               }}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={() => createFailureModeMutation.mutate()}
@@ -1235,7 +1247,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               ) : (
                 <Plus className="w-4 h-4 mr-2" />
               )}
-              Create Failure Mode
+              {t("threatDetail.createFailureModeInLibrary")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1247,10 +1259,10 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-green-600" />
-              Validate Action
+              {t("threatDetail.validateActionTitle")}
             </DialogTitle>
             <DialogDescription>
-              Confirm this action has been reviewed and approved by a subject matter expert.
+              {t("threatDetail.validateActionDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1269,7 +1281,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="validator-name">Validator Name *</Label>
+              <Label htmlFor="validator-name">{t("threatDetail.validatorNameLabel")}</Label>
               <Input
                 id="validator-name"
                 value={validatorName}
@@ -1279,7 +1291,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="validator-position">Position / Role *</Label>
+              <Label htmlFor="validator-position">{t("threatDetail.validatorPositionLabel")}</Label>
               <Input
                 id="validator-position"
                 value={validatorPosition}
@@ -1299,7 +1311,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                 setValidatorPosition("");
               }}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={handleValidateAction}
@@ -1312,7 +1324,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               ) : (
                 <ShieldCheck className="w-4 h-4 mr-2" />
               )}
-              Confirm Validation
+              {t("threatDetail.confirmValidation")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1324,15 +1336,15 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="w-5 h-5 text-blue-600" />
-              Edit Action
+              {t("threatDetail.editActionPlanItem")}
             </DialogTitle>
             <DialogDescription>
-              Update the action details. Changes will be saved to the action plan.
+              {t("threatDetail.editActionPlanDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-action-title">Action Title *</Label>
+              <Label htmlFor="edit-action-title">{t("threatDetail.actionTitleRequired")}</Label>
               <Input
                 id="edit-action-title"
                 value={editActionForm.title}
@@ -1342,7 +1354,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-action-description">Description</Label>
+              <Label htmlFor="edit-action-description">{t("threatDetail.actionDescription")}</Label>
               <Textarea
                 id="edit-action-description"
                 value={editActionForm.description}
@@ -1354,13 +1366,13 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-action-type">Action Type</Label>
+                <Label htmlFor="edit-action-type">{t("threatDetail.actionTypeRequired").replace(" *", "")}</Label>
                 <Select
                   value={editActionForm.action_type}
                   onValueChange={(v) => setEditActionForm({ ...editActionForm, action_type: v })}
                 >
                   <SelectTrigger data-testid="edit-action-type-select">
-                    <SelectValue placeholder="Select type..." />
+                    <SelectValue placeholder={t("threatDetail.selectType")} />
                   </SelectTrigger>
                   <SelectContent>
                     {ACTION_TYPES.map((type) => (
@@ -1473,7 +1485,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
               ) : (
                 <Pencil className="w-4 h-4 mr-2" />
               )}
-              Save Changes
+              {t("common.saveChanges")}
             </Button>
           </DialogFooter>
         </DialogContent>
