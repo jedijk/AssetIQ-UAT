@@ -80,6 +80,7 @@ import {
   formAPI,
   FIELD_TYPES,
   TemplateCard,
+  TemplateRow,
   FieldPreview,
   FieldConfigDialog,
   SubmissionRow,
@@ -545,9 +546,9 @@ export default function FormsPage({ embedded = false }) {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-2">
               {templates.map((template) => (
-                <TemplateCard
+                <TemplateRow
                   key={template.id}
                   template={template}
                   onView={setSelectedTemplate}
