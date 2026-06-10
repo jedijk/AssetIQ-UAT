@@ -355,45 +355,33 @@ async def generate_observation_description(
     if not t:
         return ""
     
+    # Quick return for very short inputs - just expand slightly
+    if len(t.split()) <= 3:
+        # For very short inputs, just return a simple expansion
+        lang = "nl" if language == "nl" else "en"
+        if lang == "nl":
+            return f"Gemeld probleem: {t}. Verdere inspectie vereist."
+        else:
+            return f"Reported issue: {t}. Further inspection required."
+    
     try:
         lang_note = "Dutch" if language == "nl" else "English"
-        
-        context_parts = []
-        if equipment_name and equipment_name.lower() not in ["unknown", "to be confirmed", "unknown equipment"]:
-            context_parts.append(f"Equipment: {equipment_name}")
-        if failure_mode and failure_mode.lower() not in ["unknown", "unknown / not specified"]:
-            context_parts.append(f"Failure mode: {failure_mode}")
-        context = "\n".join(context_parts) if context_parts else ""
         
         out = await ai_gateway_chat(
             [
                 {
                     "role": "system",
-                    "content": f"""You are a reliability engineer writing observation descriptions for a maintenance management system.
-
-Write a professional, technical description in {lang_note} based on the operator's report. The description should:
-- Be 2-3 sentences maximum
-- Use professional engineering terminology
-- Describe the issue clearly and objectively
-- Include any relevant details from the input (what was observed, conditions, etc.)
-- Be suitable for a formal maintenance record
-
-Do NOT include:
-- Equipment name or failure mode in the description (these are stored separately)
-- Recommendations or actions (these are handled separately)
-- Speculation about causes unless mentioned by the operator
-
-Output only the description text, no labels or formatting.""",
+                    "content": f"Write a 1-2 sentence technical description in {lang_note} for a maintenance record. Be concise and professional.",
                 },
                 {
                     "role": "user",
-                    "content": f"Operator report: {t[:2000]}\n\n{context}".strip(),
+                    "content": f"Issue: {t[:500]}",
                 },
             ],
             endpoint="ai_helpers.generate_observation_description",
-            model=os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
-            temperature=0.3,
-            max_tokens=200,
+            model="gpt-4o-mini",
+            temperature=0.2,
+            max_tokens=100,
         )
         out = (out or "").strip()
         if out:
@@ -401,7 +389,7 @@ Output only the description text, no labels or formatting.""",
     except Exception as e:
         logger.warning("generate_observation_description fallback: %s", e)
     
-    # Fallback: return original text with basic formatting
+    # Fallback: return original text
     return t[:500]
 
 
@@ -416,22 +404,58 @@ async def translate_to_english_for_record(text: str, purpose: str = "threat regi
     low = t.lower()
     if low in {"unknown / not specified", "unknown", "unknown equipment", "n/a", "—", "-"}:
         return t
+    
+    # Quick dictionary lookup for common Dutch terms (avoids AI call)
+    DUTCH_TO_ENGLISH_QUICK = {
+        "oververhitting": "overheating",
+        "lekkage": "leakage", 
+        "lek": "leak",
+        "trillingen": "vibrations",
+        "trilling": "vibration",
+        "lawaai": "noise",
+        "geluid": "noise",
+        "storing": "malfunction",
+        "defect": "defect",
+        "kapot": "broken",
+        "schade": "damage",
+        "slijtage": "wear",
+        "corrosie": "corrosion",
+        "breuk": "fracture",
+        "blokkade": "blockage",
+        "verstopping": "clogging",
+        "motor": "motor",
+        "moter": "motor",
+        "pomp": "pump",
+        "ventilator": "fan",
+        "compressor": "compressor",
+        "lager": "bearing",
+        "kraan": "crane",
+        "klep": "valve",
+        "ventiel": "valve",
+    }
+    
+    # Check if it's a simple term we can translate directly
+    if low in DUTCH_TO_ENGLISH_QUICK:
+        return DUTCH_TO_ENGLISH_QUICK[low]
+    
+    # Check if it's already English (common English words)
+    english_indicators = ["overheating", "leaking", "broken", "noise", "vibration", 
+                          "motor", "pump", "fan", "valve", "bearing", "damage", "failure"]
+    if any(eng in low for eng in english_indicators):
+        return t  # Already English, return as-is
+    
     try:
         response = await _gateway_completion(
             "ai_helpers.translate_to_english_for_record",
             [
                 {
                     "role": "system",
-                    "content": (
-                        "Translate the following text to clear, concise English for an industrial "
-                        f"reliability / maintenance {purpose}. Keep equipment tags and model numbers "
-                        "unchanged. Output only the translated text, no quotes or explanation."
-                    ),
+                    "content": f"Translate to English for maintenance record. Output only the translation.",
                 },
-                {"role": "user", "content": t[:2000]},
+                {"role": "user", "content": t[:500]},
             ],
             temperature=0.1,
-            max_tokens=200,
+            max_tokens=100,
         )
         out = (response.choices[0].message.content or "").strip()
         if out:

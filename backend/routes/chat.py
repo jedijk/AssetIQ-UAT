@@ -1075,17 +1075,28 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
     logger.info(f"Chat flow check: state={state}, in_flow={in_flow}, has_image={bool(image_base64)}")
     
     if state == ChatState.INITIAL and not in_flow and not image_base64:
-        intent = await classify_user_intent(content, session_id)
-        if intent.get("is_data_query") and intent.get("confidence", 0) > 0.6:
-            data_ctx = await get_data_context(user_id, intent.get("entities"))
-            answer = (await answer_data_query(content, session_id, data_ctx)).get(
-                "answer", "I couldn't find the information you're looking for."
-            )
-            await _store_assistant_msg(user_id, answer, chat_state=ChatState.INITIAL, is_data_query=True)
-            return ChatResponse(message=answer, question_type="data_query", detected_language=detected_lang)
+        # Quick check: Skip intent classification if message looks like an issue report
+        # This saves ~1-2 seconds of AI call time
+        content_lower = content.lower()
+        issue_keywords = ["broken", "overheating", "leaking", "noise", "vibration", "failure", 
+                         "issue", "problem", "defect", "damage", "fault", "error", "malfunction",
+                         "kapot", "lek", "storing", "defect", "probleem", "schade", "fout",
+                         "reporting", "report", "equipment"]
+        looks_like_issue = any(kw in content_lower for kw in issue_keywords)
+        
+        # Only run intent classification if it doesn't look like an issue report
+        if not looks_like_issue:
+            intent = await classify_user_intent(content, session_id)
+            if intent.get("is_data_query") and intent.get("confidence", 0) > 0.6:
+                data_ctx = await get_data_context(user_id, intent.get("entities"))
+                answer = (await answer_data_query(content, session_id, data_ctx)).get(
+                    "answer", "I couldn't find the information you're looking for."
+                )
+                await _store_assistant_msg(user_id, answer, chat_state=ChatState.INITIAL, is_data_query=True)
+                return ChatResponse(message=answer, question_type="data_query", detected_language=detected_lang)
 
         # ------------------------------------------------------------------
-        # NEW: Check equipment confidence BEFORE summary
+        # Check equipment confidence BEFORE summary
         # If no high-confidence equipment match, ask user to select first
         # ------------------------------------------------------------------
         eq_matches = await search_equipment_hierarchy(db, content, user_id)
