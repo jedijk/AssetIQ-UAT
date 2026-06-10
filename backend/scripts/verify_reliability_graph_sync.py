@@ -18,6 +18,10 @@ from pathlib import Path
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_ROOT.parent
 
+# Ensure backend is in Python path for module imports
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
+
 
 def _static_path_checks() -> list[str]:
     """Return list of static check failures."""
