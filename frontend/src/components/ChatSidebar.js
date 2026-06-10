@@ -126,9 +126,11 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
   });
   
   /**
-   * Auto-skip on close: when the user closes the chat window while the assistant
-   * is awaiting more context AND the Skip button is the active option, fire a
-   * "skip" message in the background so the conversation is finalized rather
+   * Auto-skip on close: when the user closes the chat window while:
+   * 1) A skip countdown is actively running (autoSkipCountdown > 0), OR
+   * 2) The assistant is awaiting more context AND the Skip button is the active option
+   * 
+   * Fire a "skip" message in the background so the conversation is finalized rather
    * than left in limbo. Otherwise just close.
    */
   const handleCloseWithAutoSkip = () => {
@@ -153,12 +155,16 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
       && !hasFailureModeSuggestions
       && !hasMultipleMatches;
     
+    // Also auto-skip if countdown is actively running (regardless of other conditions)
+    const countdownIsRunning = autoSkipCountdown !== null && autoSkipCountdown > 0;
+    
     // 5-second cooldown: if a skip was already fired (manual button, timer, etc.)
     // very recently, don't fire another one. Prevents race conditions where
     // `messages` hasn't yet refetched after the previous skip's "Got it!" reply.
     const recentlyFired = Date.now() - lastSkipFiredAtRef.current < 5000;
     
-    if (skipIsTheOption && !contextSkipInFlightRef.current && !recentlyFired) {
+    // Fire auto-skip if: (skipIsTheOption OR countdownIsRunning) AND not in-flight AND not recently fired
+    if ((skipIsTheOption || countdownIsRunning) && !contextSkipInFlightRef.current && !recentlyFired) {
       contextSkipInFlightRef.current = true;
       lastSkipFiredAtRef.current = Date.now();
       if (autoSkipTimerRef.current) {
