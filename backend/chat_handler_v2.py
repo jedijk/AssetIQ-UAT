@@ -152,9 +152,63 @@ async def search_equipment_hierarchy(db, search_text: str, user_id: str) -> List
     """Search equipment at operational levels by name/tag/type/description."""
     import re
     
+    # Common Dutch to English equipment translations
+    DUTCH_TO_ENGLISH = {
+        "moter": "motor",
+        "pomp": "pump",
+        "compressor": "compressor",
+        "ventilator": "fan",
+        "ventiel": "valve",
+        "klep": "valve",
+        "motor": "motor",
+        "kraan": "crane",
+        "hijskraan": "crane",
+        "lager": "bearing",
+        "koppeling": "coupling",
+        "as": "shaft",
+        "tandwiel": "gear",
+        "versnellingsbak": "gearbox",
+        "reductor": "gearbox",
+        "aandrijving": "drive",
+        "transportband": "conveyor",
+        "oven": "furnace",
+        "ketel": "boiler",
+        "warmtewisselaar": "heat exchanger",
+        "koeler": "cooler",
+        "filter": "filter",
+        "cilinder": "cylinder",
+        "zuiger": "piston",
+        "schroef": "screw",
+        "bout": "bolt",
+        "pakking": "gasket",
+        "afdichting": "seal",
+        "sensor": "sensor",
+        "schakelaar": "switch",
+        "transformator": "transformer",
+        "generator": "generator",
+        "elektromotor": "electric motor",
+    }
+    
+    # Translate keywords from Dutch to English
+    def translate_keyword(kw):
+        kw_lower = kw.lower()
+        if kw_lower in DUTCH_TO_ENGLISH:
+            return DUTCH_TO_ENGLISH[kw_lower]
+        return kw
+    
     keywords = extract_keywords(search_text)
     if not keywords:
         return []
+    
+    # Add translated versions of keywords
+    translated_keywords = []
+    for kw in keywords:
+        translated_keywords.append(kw)
+        translated = translate_keyword(kw)
+        if translated != kw and translated not in translated_keywords:
+            translated_keywords.append(translated)
+    
+    keywords = translated_keywords
 
     operational_levels = ["subunit", "maintainable_item", "equipment", "component", "equipment_unit"]
     
