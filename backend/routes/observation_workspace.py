@@ -942,12 +942,14 @@ async def get_observation_workspace(
     if observation.get("asset"):
         lookup_filters.append({"name": observation["asset"]})
     
-    for f in lookup_filters:
-        equipment_node = await db.equipment_nodes.find_one(f, {"_id": 0})
+    # Use single query with $or for efficiency
+    if lookup_filters:
+        equipment_node = await db.equipment_nodes.find_one(
+            {"$or": lookup_filters},
+            {"_id": 0}
+        )
         if equipment_node:
             criticality = equipment_node.get("criticality")
-            if criticality:
-                break
     
     # Fall back to observation's stored criticality data if no equipment node found
     if not criticality and observation.get("equipment_criticality_data"):
@@ -973,14 +975,43 @@ async def get_observation_workspace(
         {"_id": 0}
     )
     
-    # Get action plan
-    action_plan = await get_action_plan(observation_id)
+    # Run independent queries in parallel for better performance
+    action_plan_task = asyncio.create_task(get_action_plan(observation_id))
+    criticality_definitions_task = asyncio.create_task(
+        get_criticality_definitions_for_equipment(equipment_node, current_user["id"])
+    )
+    production_exposure_task = asyncio.create_task(
+        calculate_production_exposure(observation, criticality, current_user["id"])
+    )
+    timeline_events_task = asyncio.create_task(
+        get_equipment_timeline_events(
+            equipment_id=observation.get("linked_equipment_id"),
+            asset_name=observation.get("asset"),
+            current_observation_id=observation_id
+        )
+    )
+    reliability_intelligence_task = asyncio.create_task(
+        get_reliability_intelligence(observation, failure_mode_data)
+    )
+    recommended_actions_task = asyncio.create_task(
+        get_recommended_actions(observation, failure_mode_data)
+    )
     
-    # Resolve criticality definitions for this observation's installation up-front
-    # so exposure cards can render the actual definition text (keeps the card
-    # primary/secondary labels in sync with the right-click popovers).
-    criticality_definitions = await get_criticality_definitions_for_equipment(
-        equipment_node, current_user["id"]
+    # Await all parallel tasks
+    (
+        action_plan,
+        criticality_definitions,
+        production_exposure,
+        timeline_events,
+        reliability_intelligence,
+        recommended_actions
+    ) = await asyncio.gather(
+        action_plan_task,
+        criticality_definitions_task,
+        production_exposure_task,
+        timeline_events_task,
+        reliability_intelligence_task,
+        recommended_actions_task
     )
     
     def _def_for(score: int) -> dict:
@@ -992,10 +1023,9 @@ async def get_observation_workspace(
                 return entry
         return {}
     
-    # Build all workspace components
+    # Build all workspace components - sync functions run immediately
     
-    # 1. Exposure data
-    production_exposure = await calculate_production_exposure(observation, criticality, current_user["id"])
+    # 1. Exposure data (sync calculations)
     safety_exposure = calculate_safety_exposure(observation, criticality)
     environmental_exposure = calculate_environmental_exposure(observation, criticality)
     reputation_exposure = calculate_reputation_exposure(observation, criticality)
@@ -1035,23 +1065,14 @@ async def get_observation_workspace(
         }
     }
     
-    # 2. Equipment timeline
-    timeline_events = await get_equipment_timeline_events(
-        equipment_id=observation.get("linked_equipment_id"),
-        asset_name=observation.get("asset"),
-        current_observation_id=observation_id
-    )
+    # 2-4 already fetched in parallel above
     
-    # 3. Reliability intelligence
-    reliability_intelligence = await get_reliability_intelligence(observation, failure_mode_data)
-    
-    # 4. Recommended actions — filter out items already added to the action plan
-    recommended_actions = await get_recommended_actions(observation, failure_mode_data)
+    # Filter recommended actions - remove items already added to the action plan
     added_recommendation_ids = {a.get("recommendation_id") for a in action_plan if a.get("recommendation_id")}
     if added_recommendation_ids:
         recommended_actions = [r for r in recommended_actions if r.get("id") not in added_recommendation_ids]
     
-    # 5. Process journey
+    # 6. Process journey
     process_journey = await get_process_journey(observation, action_plan, investigation)
     
     # Sync observation.status with the current stage of the process journey.
