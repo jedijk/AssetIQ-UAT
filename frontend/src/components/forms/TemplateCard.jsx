@@ -23,9 +23,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import { useLanguage } from "../../contexts/LanguageContext";
+import { getDisciplineLabel } from "../../constants/disciplines";
 
 // Compact list row variant
 export const TemplateRow = ({ template, onEdit, onDelete, onView }) => {
+  const { t } = useLanguage();
+  const disciplineLabel = getDisciplineLabel(template.discipline);
+  
   return (
     <div 
       className="bg-white border border-slate-200 rounded-lg px-3 py-2 hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer group flex items-center gap-3"
@@ -47,23 +52,23 @@ export const TemplateRow = ({ template, onEdit, onDelete, onView }) => {
             <Clock className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
           )}
         </div>
-        <p className="text-xs text-slate-500 truncate">{template.description || "No description"}</p>
+        <p className="text-xs text-slate-500 truncate">{template.description || t("forms.noDescription")}</p>
       </div>
       
       {/* Badges - hidden on mobile */}
       <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
         <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-          {template.discipline || "General"}
+          {t(`disciplines.${disciplineLabel}`) || disciplineLabel || t("forms.general")}
         </Badge>
         <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-          {template.fields?.length || 0} fields
+          {template.fields?.length || 0} {t("forms.fields")}
         </Badge>
         <Badge className="text-[10px] px-1.5 py-0 bg-slate-100 text-slate-600 border-slate-200">
           v{template.version || 1}
         </Badge>
         {template.label_print_config?.enabled && (
           <Badge className="text-[10px] px-1.5 py-0 bg-violet-100 text-violet-700 border-violet-200">
-            <LabelIcon className="w-2.5 h-2.5 mr-0.5" /> Print
+            <LabelIcon className="w-2.5 h-2.5 mr-0.5" /> {t("forms.print")}
           </Badge>
         )}
       </div>
@@ -78,17 +83,17 @@ export const TemplateRow = ({ template, onEdit, onDelete, onView }) => {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onView(template); }}>
-              <Eye className="w-4 h-4 mr-2" /> View
+              <Eye className="w-4 h-4 mr-2" /> {t("common.view")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(template); }}>
-              <Edit className="w-4 h-4 mr-2" /> Edit
+              <Edit className="w-4 h-4 mr-2" /> {t("common.edit")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem 
               className="text-red-600" 
               onClick={(e) => { e.stopPropagation(); onDelete(template); }}
             >
-              <Trash2 className="w-4 h-4 mr-2" /> Delete
+              <Trash2 className="w-4 h-4 mr-2" /> {t("common.delete")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

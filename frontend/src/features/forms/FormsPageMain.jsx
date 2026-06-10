@@ -9,7 +9,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { toast } from "sonner";
 import DesktopOnlyMessage from "../../components/DesktopOnlyMessage";
-import { DISCIPLINES } from "../../constants/disciplines";
+import { DISCIPLINES, getDisciplineLabel } from "../../constants/disciplines";
 import {
   FileText,
   Plus,

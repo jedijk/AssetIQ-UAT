@@ -69,7 +69,7 @@ import {
 import { TemplateDialog } from "../components/task-scheduler/TemplateDialog";
 import { PlanDialog } from "../components/task-scheduler/PlanDialog";
 import { CompleteDialog, DeleteExecutionDialog } from "../components/task-scheduler/ExecutionDialogs";
-import { DISCIPLINES, getDisciplineColor } from "../constants/disciplines";
+import { DISCIPLINES, getDisciplineColor, getDisciplineLabel } from "../constants/disciplines";
 
 // Get base URL without /api suffix
 import { taskSchedulerAPI as taskAPI, equipmentHierarchyAPI } from "../lib/api";
@@ -1025,7 +1025,7 @@ const TaskSchedulerPage = () => {
                       </div>
                       <div className="hidden sm:flex items-center gap-1.5 flex-shrink-0">
                         <Badge className={`text-[10px] px-1.5 py-0 ${getDisciplineColor(template.discipline)}`}>
-                          {t(`disciplines.${template.discipline}`) || template.discipline}
+                          {t(`disciplines.${getDisciplineLabel(template.discipline)}`) || getDisciplineLabel(template.discipline)}
                         </Badge>
                         {!template.is_adhoc && (
                           <Badge variant="outline" className="text-[10px] px-1.5 py-0">
