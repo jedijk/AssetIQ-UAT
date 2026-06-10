@@ -219,15 +219,30 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
     equ_id = obs_data.get("equipment_id")
     fm_id = obs_data.get("failure_mode_id")
     is_custom_fm = obs_data.get("is_custom_failure_mode", False)
+    
+    # Skip slow AI translations - use quick dictionary lookup only
+    # Background translation task will handle proper translation later
     if chat_lang in ("nl", "de"):
-        if is_custom_fm or not fm_id:
-            failure_mode_name = await translate_to_english_for_record(
-                failure_mode_name, "failure mode label"
-            )
-        if not equ_id and equipment_name:
-            equipment_name = await translate_to_english_for_record(
-                equipment_name, "equipment or asset label"
-            )
+        # Quick Dutch-English dictionary for common failure modes
+        QUICK_FM_TRANSLATE = {
+            "oververhitting": "Overheating",
+            "lekkage": "Leakage",
+            "lek": "Leak", 
+            "trillingen": "Vibrations",
+            "trilling": "Vibration",
+            "lawaai": "Noise",
+            "geluid": "Noise",
+            "storing": "Malfunction",
+            "defect": "Defect",
+            "kapot": "Broken",
+            "schade": "Damage",
+            "slijtage": "Wear",
+            "corrosie": "Corrosion",
+        }
+        fm_lower = failure_mode_name.lower() if failure_mode_name else ""
+        if fm_lower in QUICK_FM_TRANSLATE:
+            failure_mode_name = QUICK_FM_TRANSLATE[fm_lower]
+        # If not in dictionary, keep original - background task will translate
 
     fmea_data = obs_data.get("failure_mode", {})
     rpn = fmea_data.get("rpn", 100) if isinstance(fmea_data, dict) else 100

@@ -343,54 +343,38 @@ async def generate_observation_description(
     language: str = "en",
 ) -> str:
     """
-    Generate a professional engineer-style description for an observation
-    based on the user's input words.
-    
-    Takes the raw user input (e.g., "motor overheating") and generates
-    a proper technical description as a reliability engineer would write it.
+    Generate a professional engineer-style description for an observation.
+    Uses simple template expansion for speed - no AI call.
     """
-    from services.ai_gateway import chat as ai_gateway_chat
-    
     t = (user_input or "").strip()
     if not t:
         return ""
     
-    # Quick return for very short inputs - just expand slightly
-    if len(t.split()) <= 3:
-        # For very short inputs, just return a simple expansion
-        lang = "nl" if language == "nl" else "en"
-        if lang == "nl":
-            return f"Gemeld probleem: {t}. Verdere inspectie vereist."
-        else:
-            return f"Reported issue: {t}. Further inspection required."
+    # Simple template-based description (no AI call - instant)
+    # Just clean up and format the user input
+    t_clean = t.replace('"', '').strip()
     
-    try:
-        lang_note = "Dutch" if language == "nl" else "English"
-        
-        out = await ai_gateway_chat(
-            [
-                {
-                    "role": "system",
-                    "content": f"Write a 1-2 sentence technical description in {lang_note} for a maintenance record. Be concise and professional.",
-                },
-                {
-                    "role": "user",
-                    "content": f"Issue: {t[:500]}",
-                },
-            ],
-            endpoint="ai_helpers.generate_observation_description",
-            model="gpt-4o-mini",
-            temperature=0.2,
-            max_tokens=100,
-        )
-        out = (out or "").strip()
-        if out:
-            return out
-    except Exception as e:
-        logger.warning("generate_observation_description fallback: %s", e)
+    # Remove equipment name if it's at the start (redundant)
+    if equipment_name:
+        eq_lower = equipment_name.lower()
+        t_lower = t_clean.lower()
+        if t_lower.startswith(eq_lower):
+            t_clean = t_clean[len(equipment_name):].strip(" :-")
+        # Also check for "Reporting issue for equipment X:"
+        if "equipment" in t_lower and eq_lower in t_lower:
+            # Extract just the issue part after the colon
+            if ":" in t_clean:
+                t_clean = t_clean.split(":", 1)[-1].strip()
     
-    # Fallback: return original text
-    return t[:500]
+    # Capitalize first letter
+    if t_clean:
+        t_clean = t_clean[0].upper() + t_clean[1:] if len(t_clean) > 1 else t_clean.upper()
+    
+    # Add period if missing
+    if t_clean and not t_clean.endswith(('.', '!', '?')):
+        t_clean += "."
+    
+    return t_clean or t[:500]
 
 
 async def translate_to_english_for_record(text: str, purpose: str = "threat register") -> str:
