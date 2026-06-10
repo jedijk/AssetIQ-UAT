@@ -1076,6 +1076,7 @@
     "aiImprove": "AI verbeteren",
     "aiImproveTooltip": "Verbeter beschrijving met AI",
     "aiImproveDesc": "Beschrijving professioneler en technischer maken.",
+    "descriptionImproved": "Beschrijving verbeterd met AI",
     "noDescriptionRecorded": "Geen beschrijving vastgelegd.",
     "descriptionPlaceholder": "Wat heeft u waargenomen? (dit is de tekst die u typte of dicteerde bij het melden van de observatie)",
     "attachmentsCount": "{count} bijlage",

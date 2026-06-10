@@ -1,4 +1,13 @@
 import { api } from "../apiClient";
+import { queryKeys } from "../queryKeys";
+
+/** Invalidate and refetch workspace data for every cached UI language. */
+export async function refreshObservationWorkspace(queryClient, observationId) {
+  if (!observationId || !queryClient) return;
+  const queryKey = queryKeys.observationWorkspace.prefix(observationId);
+  await queryClient.invalidateQueries({ queryKey });
+  await queryClient.refetchQueries({ queryKey, type: "active" });
+}
 
 /**
  * Observation Workspace API

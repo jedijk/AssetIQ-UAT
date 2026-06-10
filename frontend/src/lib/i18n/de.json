@@ -1076,6 +1076,7 @@
     "aiImprove": "KI verbessern",
     "aiImproveTooltip": "Beschreibung mit KI verbessern",
     "aiImproveDesc": "Beschreibung professioneller und technischer gestalten.",
+    "descriptionImproved": "Beschreibung mit KI verbessert",
     "noDescriptionRecorded": "Keine Beschreibung erfasst.",
     "descriptionPlaceholder": "Was haben Sie beobachtet? (Dies ist der Text, den Sie bei der Beobachtungsmeldung eingegeben oder diktiert haben)",
     "attachmentsCount": "{count} Anhang",

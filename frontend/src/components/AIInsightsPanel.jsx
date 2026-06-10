@@ -165,7 +165,14 @@ const ForecastChart = ({ forecasts, t, currentScore = 60 }) => {
   );
 };
 
-export default function AIInsightsPanel({ threatId, threatData, compact = false, hideRecommendations = false, autoGenerate = false }) {
+export default function AIInsightsPanel({
+  threatId,
+  threatData,
+  compact = false,
+  hideRecommendations = false,
+  autoGenerate = false,
+  onAnalysisComplete,
+}) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { t, language } = useLanguage();
@@ -239,9 +246,11 @@ export default function AIInsightsPanel({ threatId, threatData, compact = false,
   // Mutation to analyze risk
   const analyzeMutation = useMutation({
     mutationFn: () => aiRiskAPI.analyzeRisk(threatId, { includeForecast: true, includeSimilarIncidents: true }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["ai-insights", threatId] });
-      setAddedRecommendations(new Set()); // Reset added state on new analysis
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["ai-insights", threatId] });
+      await queryClient.refetchQueries({ queryKey: ["ai-insights", threatId], type: "active" });
+      setAddedRecommendations(new Set());
+      await onAnalysisComplete?.();
       toast.success(t("ai.analysisComplete") || "AI analysis complete");
     },
     onError: (error) => {

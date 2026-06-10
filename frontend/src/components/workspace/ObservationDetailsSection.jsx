@@ -51,6 +51,7 @@ import {
   equipmentHierarchyAPI,
   failureModesAPI,
   usersAPI,
+  refreshObservationWorkspace,
 } from "../../lib/api";
 import { queryKeys } from "../../lib/queryKeys";
 import { useLanguage } from "../../contexts/LanguageContext";
@@ -110,7 +111,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { pushUndo } = useUndo();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const nodeNameMap = useEquipmentNodeNameMap();
   const typeNameMap = useEquipmentTypeNameMap();
   const fmNameMap = useFailureModeNameMap();
@@ -133,8 +134,8 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
 
   // --- Data fetches ---------------------------------------------------------
   const { data: threatData } = useQuery({
-    queryKey: queryKeys.threats.legacyDetail(threatId),
-    queryFn: () => threatsAPI.getById(threatId),
+    queryKey: [...queryKeys.threats.legacyDetail(threatId), language],
+    queryFn: () => threatsAPI.getById(threatId, { language }),
     enabled: !!threatId,
     staleTime: 30 * 1000,
   });
@@ -280,11 +281,15 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
 
   // AI improve description mutation
   const improveDescriptionMutation = useMutation({
-    mutationFn: () => threatsAPI.improveDescription(threatId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.threats.legacyDetail(threatId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(threatId) });
-      toast.success("Description improved with AI");
+    mutationFn: () => threatsAPI.improveDescription(threatId, { language }),
+    onSuccess: async () => {
+      await refreshObservationWorkspace(queryClient, threatId);
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+      await queryClient.refetchQueries({
+        queryKey: [...queryKeys.threats.legacyDetail(threatId), language],
+        type: "active",
+      });
+      toast.success(t("observationWorkspace.descriptionImproved") || "Description improved with AI");
       setAiImprovingDesc(false);
     },
     onError: (error) => {

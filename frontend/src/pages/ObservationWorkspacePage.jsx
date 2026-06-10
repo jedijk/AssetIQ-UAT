@@ -75,7 +75,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { observationWorkspaceAPI, actionsAPI } from "../lib/api";
+import { observationWorkspaceAPI, actionsAPI, refreshObservationWorkspace } from "../lib/api";
 import { queryKeys } from "../lib/queryKeys";
 import { aiRiskAPI } from "../lib/apis/aiRisk";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -1598,11 +1598,13 @@ const ObservationWorkspacePage = () => {
   });
   const criticalityDefs = workspace?.criticality_definitions || definitionsData?.criticality || [];
 
+  const refreshWorkspace = () => refreshObservationWorkspace(queryClient, id);
+
   // Add recommendation to plan mutation
   const addRecommendationMutation = useMutation({
     mutationFn: (recommendation) => observationWorkspaceAPI.addRecommendation(id, recommendation),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(id) });
+    onSuccess: async (data) => {
+      await refreshWorkspace();
       queryClient.invalidateQueries({ queryKey: ["actions"] });
       toast.success(data.message || t("observationWorkspace.actionAddedToPlan"));
     },
@@ -1614,8 +1616,8 @@ const ObservationWorkspacePage = () => {
   // Update action mutation
   const updateActionMutation = useMutation({
     mutationFn: ({ actionId, updates }) => actionsAPI.update(actionId, updates),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(id) });
+    onSuccess: async () => {
+      await refreshWorkspace();
       queryClient.invalidateQueries({ queryKey: ["actions"] });
       toast.success(t("observationWorkspace.actionUpdated"));
     },
@@ -1627,8 +1629,8 @@ const ObservationWorkspacePage = () => {
   // Delete action mutation
   const deleteActionMutation = useMutation({
     mutationFn: (actionId) => actionsAPI.delete(actionId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(id) });
+    onSuccess: async () => {
+      await refreshWorkspace();
       queryClient.invalidateQueries({ queryKey: ["actions"] });
       toast.success(t("observationWorkspace.actionRemovedFromPlan"));
     },
@@ -1652,8 +1654,8 @@ const ObservationWorkspacePage = () => {
       due_date: data.due_date,
       comments: data.comments || "",
     }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(id) });
+    onSuccess: async () => {
+      await refreshWorkspace();
       queryClient.invalidateQueries({ queryKey: ["actions"] });
       toast.success(t("observationWorkspace.actionAddedToPlan"));
     },
@@ -1664,9 +1666,10 @@ const ObservationWorkspacePage = () => {
 
   const generateAIMutation = useMutation({
     mutationFn: () => aiRiskAPI.analyzeRisk(id, { includeForecast: true, includeSimilarIncidents: true }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(id) });
-      queryClient.invalidateQueries({ queryKey: ["ai-insights", id] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["ai-insights", id] });
+      await queryClient.refetchQueries({ queryKey: ["ai-insights", id], type: "active" });
+      await refreshWorkspace();
       toast.success(t("ai.analysisComplete") || "AI analysis complete");
     },
     onError: (error) => {
@@ -1956,8 +1959,19 @@ const ObservationWorkspacePage = () => {
             </DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-4 pt-2">
-            <AIInsightsPanel threatId={id} threatData={observation} hideRecommendations autoGenerate />
-            <CausalIntelligencePanel threatId={id} threatData={observation} autoGenerate />
+            <AIInsightsPanel
+              threatId={id}
+              threatData={observation}
+              hideRecommendations
+              autoGenerate
+              onAnalysisComplete={refreshWorkspace}
+            />
+            <CausalIntelligencePanel
+              threatId={id}
+              threatData={observation}
+              autoGenerate
+              onAnalysisComplete={refreshWorkspace}
+            />
           </div>
         </DialogContent>
       </Dialog>

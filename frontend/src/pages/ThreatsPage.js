@@ -161,7 +161,7 @@ const ThreatsPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const getStatusLabel = (status) => {
     if (!status) return status;
     const key = STATUS_LABEL_KEYS[status];
@@ -258,9 +258,9 @@ const ThreatsPage = () => {
 
   // Fetch threats (fetch all, filter client-side for multi-select)
   const { data: rawThreats = [], isLoading, error: threatsError, isFetching, refetch: refetchThreats } = useQuery({
-    queryKey: queryKeys.threats.all(),
+    queryKey: [...queryKeys.threats.all(), language],
     queryFn: async () => {
-      const result = await threatsAPI.getAll(null);
+      const result = await threatsAPI.getAll(null, { language });
       // Ensure we always return an array
       if (!result || !Array.isArray(result)) {
         console.warn("Threats API returned non-array:", result);
@@ -1070,7 +1070,7 @@ const ThreatsPage = () => {
                 <div className="text-center hidden sm:block w-16">
                   <div className="text-xs text-slate-400 mb-0.5">{t("observations.actions")}</div>
                   <div className="text-lg font-bold text-slate-700 tabular-nums">
-                    {threat.recommended_actions?.length || 0}
+                    {threat.action_plan_count ?? 0}
                   </div>
                 </div>
 

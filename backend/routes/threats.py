@@ -8,7 +8,12 @@ import uuid
 import logging
 from database import db, failure_modes_service, efm_service, installation_filter
 from auth import require_permission
-from services.threat_enrichment import enrich_with_creator_info, enrich_with_equipment_tags
+from services.threat_enrichment import (
+    enrich_with_creator_info,
+    enrich_with_equipment_tags,
+    enrich_with_action_plan_counts,
+)
+from utils.observation_localization import enrich_observations_for_ui
 from services.tenant_schema import merge_tenant_filter, with_tenant_id
 from services.background_jobs import schedule_tracked_job
 from models.api_models import ThreatResponse, ThreatUpdate
@@ -130,6 +135,7 @@ async def generate_case_number(user_id: str) -> str:
 async def get_threats(
     status: Optional[str] = None,
     limit: int = 100,
+    language: Optional[str] = Query(None, description="UI language (en, nl, de) for localized titles"),
     current_user: dict = Depends(_threats_read)
 ):
     # Get user's installation filter data
@@ -167,6 +173,7 @@ async def get_threats(
     
     # Enrich with equipment tags
     threats = await enrich_with_equipment_tags(threats)
+    threats = await enrich_with_action_plan_counts(threats)
     
     # Ensure required fields have values and risk_score is int
     for idx, t in enumerate(threats):
@@ -190,16 +197,20 @@ async def get_threats(
             t["total_threats"] = total_count
         if "recommended_actions" not in t:
             t["recommended_actions"] = []
+        if "action_plan_count" not in t:
+            t["action_plan_count"] = 0
         if "occurrence_count" not in t:
             t["occurrence_count"] = 1
         # Ensure created_at is string
         if t.get("created_at") and not isinstance(t["created_at"], str):
             t["created_at"] = t["created_at"].isoformat() if hasattr(t["created_at"], 'isoformat') else str(t["created_at"])
+    threats = await enrich_observations_for_ui(threats, language, user_id=current_user.get("id"))
     return threats
 
 @router.get("/threats/top", response_model=List[ThreatResponse])
 async def get_top_threats(
     limit: int = 10,
+    language: Optional[str] = Query(None, description="UI language (en, nl, de) for localized titles"),
     current_user: dict = Depends(_threats_read)
 ):
     # Get user's installation filter data
@@ -233,6 +244,7 @@ async def get_top_threats(
     
     # Enrich with equipment tags
     threats = await enrich_with_equipment_tags(threats)
+    threats = await enrich_with_action_plan_counts(threats)
     
     # Ensure required fields have values and risk_score is int
     for idx, t in enumerate(threats):
@@ -256,11 +268,14 @@ async def get_top_threats(
             t["total_threats"] = total_count
         if "recommended_actions" not in t:
             t["recommended_actions"] = []
+        if "action_plan_count" not in t:
+            t["action_plan_count"] = 0
         if "occurrence_count" not in t:
             t["occurrence_count"] = 1
         # Ensure created_at is string
         if t.get("created_at") and not isinstance(t["created_at"], str):
             t["created_at"] = t["created_at"].isoformat() if hasattr(t["created_at"], 'isoformat') else str(t["created_at"])
+    threats = await enrich_observations_for_ui(threats, language, user_id=current_user.get("id"))
     return threats
 
 
@@ -402,6 +417,7 @@ async def recalculate_all_threat_scores(
 @router.get("/threats/{threat_id}", response_model=ThreatResponse)
 async def get_threat(
     threat_id: str,
+    language: Optional[str] = Query(None, description="UI language (en, nl, de) for localized titles"),
     current_user: dict = Depends(_threats_read)
 ):
     try:
@@ -585,7 +601,10 @@ async def get_threat(
         if threat.get("created_at") and not isinstance(threat["created_at"], str):
             threat["created_at"] = threat["created_at"].isoformat() if hasattr(threat["created_at"], 'isoformat') else str(threat["created_at"])
         
-        return threat
+        localized = await enrich_observations_for_ui(
+            [threat], language, user_id=current_user.get("id")
+        )
+        return localized[0]
     except HTTPException:
         raise
     except Exception as e:
@@ -1473,11 +1492,13 @@ async def get_threat_timeline(
 @router.post("/threats/{threat_id}/improve-description")
 async def improve_threat_description(
     threat_id: str,
+    background_tasks: BackgroundTasks,
+    language: Optional[str] = Query(None, description="UI language (en, nl, de) for improved text"),
     current_user: dict = Depends(require_permission("threats:write")),
 ):
     """
     Use AI to improve/enhance the observation description to be more professional
-    and engineer-like.
+    and engineer-like in the user's UI language.
     """
     from services.ai_gateway import chat as ai_gateway_chat
     
@@ -1491,13 +1512,18 @@ async def improve_threat_description(
     
     equipment_name = threat.get("asset") or ""
     failure_mode = threat.get("failure_mode") or ""
+    ui_lang = (language or "en").lower()[:2]
+    if ui_lang not in ("en", "nl", "de"):
+        ui_lang = "en"
+    output_language_names = {"en": "English", "nl": "Dutch", "de": "German"}
+    output_language = output_language_names[ui_lang]
     
     try:
         improved = await ai_gateway_chat(
             [
                 {
                     "role": "system",
-                    "content": """You are a reliability engineer improving observation descriptions for a maintenance management system.
+                    "content": f"""You are a reliability engineer improving observation descriptions for a maintenance management system.
 
 Rewrite the description to be:
 - Professional and technical
@@ -1505,7 +1531,9 @@ Rewrite the description to be:
 - Clear and objective
 - Using proper engineering terminology
 - Suitable for a formal maintenance record
+- Written entirely in {output_language}
 
+If the original text is in another language, translate and improve it into {output_language}.
 Keep the core meaning but improve clarity and professionalism.
 Output only the improved description text, no labels or formatting.""",
                 },
@@ -1532,6 +1560,19 @@ Output only the improved description text, no labels or formatting.""",
                 "description": improved,
                 "ai_improved_at": datetime.now(timezone.utc).isoformat(),
             }}
+        )
+
+        schedule_tracked_job(
+            background_tasks,
+            "translate_observation",
+            translate_observation,
+            threat_id,
+            {
+                "title": threat.get("title") or threat.get("name", ""),
+                "description": improved,
+            },
+            current_user["id"],
+            user_id=current_user["id"],
         )
         
         return {

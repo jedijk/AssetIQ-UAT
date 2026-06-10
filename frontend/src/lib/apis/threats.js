@@ -2,19 +2,27 @@ import { api, aiApi } from "../apiClient";
 
 // Threats API
 export const threatsAPI = {
-  getAll: async (status = null) => {
-    const params = status ? `?status=${status}` : "";
-    const response = await api.get(`/threats${params}`);
+  getAll: async (status = null, options = {}) => {
+    const params = new URLSearchParams();
+    if (status) params.append("status", status);
+    if (options.language) params.append("language", options.language);
+    const queryString = params.toString();
+    const response = await api.get(`/threats${queryString ? `?${queryString}` : ""}`);
     return response.data;
   },
 
-  getTop: async (limit = 10) => {
-    const response = await api.get(`/threats/top?limit=${limit}`);
+  getTop: async (limit = 10, options = {}) => {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (options.language) params.append("language", options.language);
+    const response = await api.get(`/threats/top?${params.toString()}`);
     return response.data;
   },
 
-  getById: async (id) => {
-    const response = await api.get(`/threats/${id}`);
+  getById: async (id, options = {}) => {
+    const params = new URLSearchParams();
+    if (options.language) params.append("language", options.language);
+    const queryString = params.toString();
+    const response = await api.get(`/threats/${id}${queryString ? `?${queryString}` : ""}`);
     return response.data;
   },
 
@@ -57,8 +65,13 @@ export const threatsAPI = {
     return response.data;
   },
 
-  improveDescription: async (id) => {
-    const response = await aiApi.post(`/threats/${id}/improve-description`);
+  improveDescription: async (id, options = {}) => {
+    const params = new URLSearchParams();
+    if (options.language) params.append("language", options.language);
+    const queryString = params.toString();
+    const response = await aiApi.post(
+      `/threats/${id}/improve-description${queryString ? `?${queryString}` : ""}`
+    );
     return response.data;
   },
 };

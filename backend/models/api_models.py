@@ -94,6 +94,8 @@ class ThreatResponse(BaseModel):
     context_added_at: Optional[str] = None
     # Equipment tag (from hierarchy)
     equipment_tag: Optional[str] = None
+    # Action plan items linked to this observation (central actions + investigation)
+    action_plan_count: Optional[int] = 0
 
 
 class ThreatUpdate(BaseModel):

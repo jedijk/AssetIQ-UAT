@@ -25,6 +25,6 @@ export { productionAPI, getErrorMessage } from "./apis/production";
 export { gdprAPI } from "./apis/gdpr";
 export { labelsAPI } from "./apis/labels";
 export { granulometryAPI } from "./apis/granulometry";
-export { observationWorkspaceAPI } from "./apis/observationWorkspace";
+export { observationWorkspaceAPI, refreshObservationWorkspace } from "./apis/observationWorkspace";
 
 export { api as default } from "./apiClient";

@@ -84,7 +84,7 @@ function resolveDashboardTab(tab) {
 }
 
 export default function DashboardPageMain({ initialTab }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
@@ -287,8 +287,8 @@ export default function DashboardPageMain({ initialTab }) {
   });
 
   const { data: observationsData = [] } = useQuery({
-    queryKey: queryKeys.threats.all(),
-    queryFn: () => threatsAPI.getAll(),
+    queryKey: [...queryKeys.threats.all(), language],
+    queryFn: () => threatsAPI.getAll(null, { language }),
   });
   const allObservations = Array.isArray(observationsData) ? observationsData : [];
 

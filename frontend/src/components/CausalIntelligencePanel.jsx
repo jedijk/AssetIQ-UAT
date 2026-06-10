@@ -166,7 +166,12 @@ const CauseCard = ({ cause, index, t }) => {
   );
 };
 
-export default function CausalIntelligencePanel({ threatId, threatData, autoGenerate = false }) {
+export default function CausalIntelligencePanel({
+  threatId,
+  threatData,
+  autoGenerate = false,
+  onAnalysisComplete,
+}) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { t, language } = useLanguage();
@@ -184,9 +189,9 @@ export default function CausalIntelligencePanel({ threatId, threatData, autoGene
   // Mutation to generate causes - works independently of AI Risk Insight
   const generateMutation = useMutation({
     mutationFn: () => aiRiskAPI.generateCauses(threatId, { maxCauses: 5, language }),
-    onSuccess: (data) => {
-      // Update the cache with the new data directly
+    onSuccess: async (data) => {
       queryClient.setQueryData(["ai-causal", threatId, language], data);
+      await onAnalysisComplete?.();
       toast.success(t("ai.analysisComplete") || "Causal analysis complete");
     },
     onError: (error) => {

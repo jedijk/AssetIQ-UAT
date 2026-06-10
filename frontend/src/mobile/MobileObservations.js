@@ -16,13 +16,13 @@ import {
 } from "lucide-react";
 
 const MobileObservations = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [filter, setFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: observations = [], isLoading, isError, refetch } = useQuery({
-    queryKey: queryKeys.threats.all(),
-    queryFn: () => threatsAPI.getAll(),
+    queryKey: [...queryKeys.threats.all(), language],
+    queryFn: () => threatsAPI.getAll(null, { language }),
     retry: 2,
     staleTime: 60 * 1000,
   });

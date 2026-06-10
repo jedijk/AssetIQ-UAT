@@ -179,9 +179,10 @@ Respond ONLY with the translated text, nothing else."""
         entity_type: EntityType,
         entity_id: str,
         entity_data: Dict[str, Any],
-        target_languages: List[str],
+        target_languages: List[str] = None,
         fields: Optional[List[str]] = None,
-        created_by: Optional[str] = None
+        created_by: Optional[str] = None,
+        source_language: Optional[str] = None,
     ) -> List[EntityTranslation]:
         """
         Translate all fields of an entity to target languages
@@ -192,8 +193,15 @@ Respond ONLY with the translated text, nothing else."""
         translatable_fields = TRANSLATABLE_FIELDS.get(entity_type, ["name", "description"])
         if fields:
             translatable_fields = [f for f in fields if f in translatable_fields]
+
+        src_lang = (source_language or "en").lower()[:2]
+        if not source_language:
+            from utils.text_language import detect_entity_source_language
+            src_lang = detect_entity_source_language(entity_data, translatable_fields)
         
         for language_code in target_languages:
+            if language_code == src_lang:
+                continue
             for field_name in translatable_fields:
                 # Get source value
                 source_value = entity_data.get(field_name)
@@ -208,7 +216,7 @@ Respond ONLY with the translated text, nothing else."""
                     # Translate the field
                     translated_text, confidence = await self.translate_text(
                         text=str(source_value),
-                        source_language="en",
+                        source_language=src_lang,
                         target_language=language_code,
                         context="industrial maintenance and reliability",
                         user_id=created_by or "system",

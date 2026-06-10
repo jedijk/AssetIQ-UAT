@@ -15,10 +15,12 @@ from datetime import datetime, timezone
 from database import db
 from models.translation import EntityType
 from services.translation_service import TranslationService
+from utils.text_language import detect_text_language
 
 logger = logging.getLogger(__name__)
 
 _TRANSLATABLE_LANGS = {"nl", "de"}
+_UI_LANGUAGES = {"en", "nl", "de"}
 
 
 async def _load_entity_fields(
@@ -26,7 +28,7 @@ async def _load_entity_fields(
     entity_id: str,
     language: str,
 ) -> Dict[str, str]:
-    if not entity_id or language not in _TRANSLATABLE_LANGS:
+    if not entity_id or language not in _UI_LANGUAGES:
         return {}
     fields: Dict[str, str] = {}
     async for doc in db.entity_translations.find(
@@ -50,7 +52,7 @@ async def _load_entity_fields_batch(
     language: str,
 ) -> Dict[str, Dict[str, str]]:
     """Load translation fields for many entities in one query."""
-    if not entity_ids or language not in _TRANSLATABLE_LANGS:
+    if not entity_ids or language not in _UI_LANGUAGES:
         return {}
     result: Dict[str, Dict[str, str]] = {}
     async for doc in db.entity_translations.find(
@@ -113,13 +115,18 @@ async def _translate_cached(
     cache: Dict[str, str],
     user_id: Optional[str],
     context: str = "industrial maintenance and reliability",
+    source_language: Optional[str] = None,
 ) -> str:
     raw = (text or "").strip()
-    if not raw or language not in _TRANSLATABLE_LANGS:
+    if not raw or language not in _UI_LANGUAGES:
         return text or ""
+
+    src = (source_language or detect_text_language(raw)).lower()[:2]
+    if src == language:
+        return raw
     
     # Check in-memory cache first
-    memory_key = f"{language}:{raw}"
+    memory_key = f"{src}:{language}:{raw}"
     if memory_key in cache:
         return cache[memory_key]
     
@@ -138,7 +145,7 @@ async def _translate_cached(
         try:
             translated, _ = await service.translate_text(
                 raw,
-                source_language="en",
+                source_language=src,
                 target_language=language,
                 context=context,
                 user_id=user_id or "system",
@@ -192,7 +199,7 @@ async def localize_workspace_payload(
 ) -> Dict[str, Any]:
     """Apply translations to workspace text fields in-place and return payload."""
     lang = (language or "en").lower()[:2]
-    if lang not in _TRANSLATABLE_LANGS:
+    if lang not in _UI_LANGUAGES:
         return payload
 
     service = TranslationService(db)
@@ -359,7 +366,7 @@ async def localize_ai_insights(
     if not insight:
         return insight
     lang = (language or "en").lower()[:2]
-    if lang not in _TRANSLATABLE_LANGS:
+    if lang not in _UI_LANGUAGES:
         return insight
 
     service = TranslationService(db)
@@ -504,7 +511,7 @@ async def localize_causal_analysis(
     if not analysis:
         return analysis
     lang = (language or "en").lower()[:2]
-    if lang not in _TRANSLATABLE_LANGS:
+    if lang not in _UI_LANGUAGES:
         return analysis
 
     service = TranslationService(db)

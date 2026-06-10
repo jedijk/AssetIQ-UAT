@@ -107,3 +107,80 @@ async def enrich_with_equipment_tags(items: list) -> list:
         item["equipment_tag"] = tag
 
     return items
+
+
+async def enrich_with_action_plan_counts(items: list) -> list:
+    """
+    Add action_plan_count per observation/threat: central_actions linked to the
+    observation plus one when a causal investigation exists (matches workspace action plan).
+    """
+    if not items:
+        return items
+
+    threat_ids = [item["id"] for item in items if item.get("id")]
+    if not threat_ids:
+        for item in items:
+            item["action_plan_count"] = 0
+        return items
+
+    action_counts = {tid: 0 for tid in threat_ids}
+
+    pipeline = [
+        {
+            "$match": {
+                "$or": [
+                    {"source_id": {"$in": threat_ids}},
+                    {"observation_id": {"$in": threat_ids}},
+                    {"threat_id": {"$in": threat_ids}},
+                ]
+            }
+        },
+        {
+            "$project": {
+                "linked_observation_id": {
+                    "$switch": {
+                        "branches": [
+                            {
+                                "case": {"$in": ["$threat_id", threat_ids]},
+                                "then": "$threat_id",
+                            },
+                            {
+                                "case": {"$in": ["$observation_id", threat_ids]},
+                                "then": "$observation_id",
+                            },
+                            {
+                                "case": {"$in": ["$source_id", threat_ids]},
+                                "then": "$source_id",
+                            },
+                        ],
+                        "default": None,
+                    }
+                }
+            }
+        },
+        {"$match": {"linked_observation_id": {"$ne": None}}},
+        {"$group": {"_id": "$linked_observation_id", "count": {"$sum": 1}}},
+    ]
+
+    async for row in db.central_actions.aggregate(pipeline):
+        linked_id = row.get("_id")
+        if linked_id in action_counts:
+            action_counts[linked_id] = row.get("count", 0)
+
+    investigation_threat_ids = set()
+    async for inv in db.investigations.find(
+        {"threat_id": {"$in": threat_ids}},
+        {"_id": 0, "threat_id": 1},
+    ):
+        threat_id = inv.get("threat_id")
+        if threat_id:
+            investigation_threat_ids.add(threat_id)
+
+    for item in items:
+        tid = item.get("id")
+        count = action_counts.get(tid, 0)
+        if tid in investigation_threat_ids:
+            count += 1
+        item["action_plan_count"] = count
+
+    return items

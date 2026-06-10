@@ -20,7 +20,8 @@ async def auto_translate_entity(
     entity_id: str,
     entity_data: Dict[str, Any],
     target_languages: List[str] = None,
-    created_by: str = None
+    created_by: str = None,
+    source_language: str = None,
 ):
     """
     Generic background task to auto-translate any entity to Dutch and German.
@@ -43,7 +44,8 @@ async def auto_translate_entity(
             entity_id=entity_id,
             entity_data=entity_data,
             target_languages=target_languages,
-            created_by=created_by
+            created_by=created_by,
+            source_language=source_language,
         )
         logger.info(f"Auto-translated {entity_type.value} {entity_id} to {', '.join(target_languages)}")
     except Exception as e:
@@ -98,17 +100,26 @@ async def translate_failure_mode(fm_id: str, fm_data: dict, created_by: str = No
 
 
 async def translate_observation(obs_id: str, obs_data: dict, created_by: str = None):
-    """Translate observation/threat"""
+    """Translate observation/threat to other UI languages (including English when source is NL/DE)."""
+    from utils.text_language import detect_entity_source_language
+
     data_for_translation = {
         "name": obs_data.get("title", obs_data.get("name", "")),
         "title": obs_data.get("title", obs_data.get("name", "")),
         "description": obs_data.get("description", ""),
     }
+    source_lang = detect_entity_source_language(data_for_translation, ["title", "name", "description"])
+    if source_lang == "en":
+        target_languages = ["nl", "de"]
+    else:
+        target_languages = ["en"] + [lang for lang in ("nl", "de") if lang != source_lang]
     await auto_translate_entity(
         EntityType.OBSERVATION,
         obs_id,
         data_for_translation,
-        created_by=created_by
+        target_languages=target_languages,
+        created_by=created_by,
+        source_language=source_lang,
     )
 
 

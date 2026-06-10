@@ -13,7 +13,7 @@ import { api } from "../lib/apiClient";
  * Uses a single backend call (/translations/batch/{type}) to avoid N+1 HTTP requests.
  */
 async function fetchBatchTranslations(entityType, entityIds, languageCode) {
-  if (!entityIds.length || languageCode === "en") return {};
+  if (!entityIds.length || !languageCode) return {};
   try {
     const response = await api.get(`/translations/batch/${entityType}`, {
       params: { language_code: languageCode }
@@ -224,14 +224,12 @@ export function useTranslatedObservations(observations = []) {
   const { data: translationsMap = {} } = useQuery({
     queryKey: ["obs-translations", language, obsIds.length, obsIds.slice(0, 5).join(",")],
     queryFn: () => fetchBatchTranslations("observation", obsIds, language),
-    enabled: language !== "en" && obsIds.length > 0,
+    enabled: obsIds.length > 0,
     staleTime: 1000 * 60 * 5,
     retry: false,
   });
   
   const translatedObs = useMemo(() => {
-    if (language === "en") return observations;
-    
     return observations.map(obs => {
       const trans = translationsMap[obs.id];
       if (!trans) return obs;
@@ -244,11 +242,11 @@ export function useTranslatedObservations(observations = []) {
         _originalTitle: obs.title,
       };
     });
-  }, [observations, translationsMap, language]);
+  }, [observations, translationsMap]);
   
   return {
     observations: translatedObs,
-    isTranslated: language !== "en" && Object.keys(translationsMap).length > 0,
+    isTranslated: Object.keys(translationsMap).length > 0,
   };
 }
 

@@ -21,6 +21,8 @@ export const queryKeys = {
   },
   observationWorkspace: {
     detail: (id, language = "en") => ["observation-workspace", id, language],
+    /** Prefix for invalidate/refetch across all UI languages */
+    prefix: (id) => ["observation-workspace", id],
   },
   investigations: {
     all: () => ["investigations"],

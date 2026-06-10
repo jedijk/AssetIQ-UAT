@@ -979,6 +979,7 @@
     "aiImprove": "AI improve",
     "aiImproveTooltip": "Improve description with AI",
     "aiImproveDesc": "Make the description more professional and technical.",
+    "descriptionImproved": "Description improved with AI",
     "noDescriptionRecorded": "No description recorded.",
     "descriptionPlaceholder": "What did you observe? (This is the text you typed or dictated when reporting the observation)",
     "attachmentsCount": "{count} attachment",
