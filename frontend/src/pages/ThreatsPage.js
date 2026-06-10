@@ -40,6 +40,7 @@ import {
   XCircle,
   ChevronDown,
   ChevronRight,
+  ArrowUpDown,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -187,6 +188,7 @@ const ThreatsPage = () => {
     "Observation", "Assessment", "Planning", "Investigation", "Action",
   ]);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false); // Mobile sort dropdown
   const [riskFilter, setRiskFilter] = useState("all"); // Filter by risk level
   const [sortBy, setSortBy] = useState("latest"); // Default: newest observations on top
   const [searchQuery, setSearchQuery] = useState("");
@@ -599,7 +601,7 @@ const ThreatsPage = () => {
           </button>
           
           {statusDropdownOpen && (
-            <div className="absolute top-full left-0 mt-1 w-48 sm:w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
+            <div className="absolute top-full right-0 mt-1 w-48 sm:w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
               {/* Clear All Option */}
               {statusFilter.length > 0 && (
                 <button
@@ -627,6 +629,71 @@ const ThreatsPage = () => {
                   )}
                 </button>
               ))}
+            </div>
+          )}
+        </div>
+        
+        {/* Mobile Sort Button */}
+        <div className="relative sm:hidden">
+          {/* Click outside to close dropdown */}
+          {sortDropdownOpen && (
+            <div 
+              className="fixed inset-0 z-40" 
+              onClick={() => setSortDropdownOpen(false)}
+            />
+          )}
+          
+          <button
+            onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+            className="flex items-center justify-center w-9 h-9 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-colors"
+            data-testid="mobile-sort-button"
+            aria-label={t("observations.sort")}
+          >
+            <ArrowUpDown className={`w-4 h-4 ${sortBy === 'latest' ? 'text-blue-600' : 'text-slate-400'}`} />
+          </button>
+          
+          {sortDropdownOpen && (
+            <div className="absolute top-full right-0 mt-1 w-44 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
+              <button
+                onClick={() => { setSortBy("latest"); setSortDropdownOpen(false); }}
+                className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-green-500" />
+                  <span className="text-sm text-slate-700">{t("observations.latestFirst")}</span>
+                </div>
+                {sortBy === "latest" && <Check className="w-4 h-4 text-blue-600" />}
+              </button>
+              <button
+                onClick={() => { setSortBy("oldest"); setSortDropdownOpen(false); }}
+                className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="text-sm text-slate-700">{t("observations.oldestFirst")}</span>
+                </div>
+                {sortBy === "oldest" && <Check className="w-4 h-4 text-blue-600" />}
+              </button>
+              <button
+                onClick={() => { setSortBy("business_risk"); setSortDropdownOpen(false); }}
+                className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Target className="w-3.5 h-3.5 text-purple-500" />
+                  <span className="text-sm text-slate-700">{t("observations.businessRisk")}</span>
+                </div>
+                {sortBy === "business_risk" && <Check className="w-4 h-4 text-blue-600" />}
+              </button>
+              <button
+                onClick={() => { setSortBy("rpn"); setSortDropdownOpen(false); }}
+                className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Activity className="w-3.5 h-3.5 text-blue-500" />
+                  <span className="text-sm text-slate-700">{t("observations.rpnFmea")}</span>
+                </div>
+                {sortBy === "rpn" && <Check className="w-4 h-4 text-blue-600" />}
+              </button>
             </div>
           )}
         </div>

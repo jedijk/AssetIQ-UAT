@@ -1,6 +1,6 @@
 import requests
 
-BASE_URL = "https://submit-timestamp.preview.emergentagent.com/api"
+BASE_URL = "https://mobile-filter-fix-3.preview.emergentagent.com/api"
 TEST_EMAIL = "jedijk@gmail.com"
 TEST_PASSWORD = "Jaap8019@"
 
