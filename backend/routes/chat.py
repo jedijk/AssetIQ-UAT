@@ -273,7 +273,7 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
         "base_risk_score": fmea_score,
         "rank": rank,
         "total_threats": total,
-        "status": "Open",
+        "status": "Observation",  # New status model: Observation -> Assessment -> Planning -> Learning
         "recommended_actions": (
             obs_data.get("recommended_actions")
             or (fmea_data.get("recommended_actions", []) if isinstance(fmea_data, dict) else [])
@@ -445,7 +445,7 @@ def _threat_to_response(threat: dict) -> ThreatResponse:
     data.setdefault("frequency", "First Time")
     data.setdefault("likelihood", "Possible")
     data.setdefault("detectability", "Moderate")
-    data.setdefault("status", "Open")
+    data.setdefault("status", "Observation")  # New status model
     data.setdefault("created_by", "")
     data.setdefault("created_at", datetime.now(timezone.utc).isoformat())
     return ThreatResponse(**data)
