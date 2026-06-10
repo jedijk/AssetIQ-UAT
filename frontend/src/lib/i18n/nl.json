@@ -1057,7 +1057,9 @@
     "clickToFindInHierarchy": "Klik om te vinden in hiërarchie",
     "riskScoreTooltip": "Risicoscore (rechtsklik op de kaart hieronder voor berekeningsdetails)",
     "rpnTooltip": "Risico Prioriteitsnummer",
-    "attachmentFallback": "Bijlage"
+    "attachmentFallback": "Bijlage",
+    "notLinked": "Niet gekoppeld",
+    "addedAtPrefix": "toegevoegd"
   },
   "causal": {
     "title": "Oorzaakanalyse",

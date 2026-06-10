@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import asyncio
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
 
@@ -41,6 +42,31 @@ async def _load_entity_fields(
         if field and value:
             fields[field] = value
     return fields
+
+
+async def _load_entity_fields_batch(
+    entity_type: EntityType,
+    entity_ids: List[str],
+    language: str,
+) -> Dict[str, Dict[str, str]]:
+    """Load translation fields for many entities in one query."""
+    if not entity_ids or language not in _TRANSLATABLE_LANGS:
+        return {}
+    result: Dict[str, Dict[str, str]] = {}
+    async for doc in db.entity_translations.find(
+        {
+            "entity_type": entity_type.value,
+            "entity_id": {"$in": entity_ids},
+            "language_code": language,
+        },
+        {"_id": 0, "entity_id": 1, "field_name": 1, "translation_value": 1},
+    ):
+        entity_id = doc.get("entity_id")
+        field = doc.get("field_name")
+        value = doc.get("translation_value")
+        if entity_id and field and value:
+            result.setdefault(entity_id, {})[field] = value
+    return result
 
 
 def _generate_cache_key(text: str, language: str, context: str) -> str:
@@ -105,7 +131,6 @@ async def _translate_cached(
         return db_cached
     
     # Call translation service with retry for rate limits
-    import asyncio
     max_retries = 2
     retry_delay = 2  # seconds
     
@@ -143,6 +168,22 @@ async def _translate_cached(
     return raw
 
 
+async def _translate_many(
+    service: TranslationService,
+    items: List[tuple],
+    language: str,
+    cache: Dict[str, str],
+    user_id: Optional[str],
+) -> List[str]:
+    """Translate many strings in parallel. Items are (text, context) tuples."""
+    if not items:
+        return []
+    return list(await asyncio.gather(*[
+        _translate_cached(service, text, language, cache, user_id, context)
+        for text, context in items
+    ]))
+
+
 async def localize_workspace_payload(
     payload: Dict[str, Any],
     language: Optional[str],
@@ -158,46 +199,64 @@ async def localize_workspace_payload(
     cache: Dict[str, str] = {}
 
     observation = payload.get("observation") or {}
-    obs_id = observation.get("id")
-    if obs_id:
-        obs_fields = await _load_entity_fields(EntityType.OBSERVATION, obs_id, lang)
-        if obs_fields.get("title"):
-            observation["title"] = obs_fields["title"]
-        elif observation.get("title"):
-            # No stored translation - translate on-the-fly via AI
-            observation["title"] = await _translate_cached(
-                service, observation["title"], lang, cache, user_id,
-                context="industrial equipment observation title"
-            )
-        if obs_fields.get("description"):
-            observation["description"] = obs_fields["description"]
-        elif observation.get("description"):
-            # No stored translation - translate on-the-fly via AI
-            observation["description"] = await _translate_cached(
-                service, observation["description"], lang, cache, user_id,
-                context="industrial equipment observation description"
-            )
-        # Translate user_context (the description text shown in green box)
-        if obs_fields.get("user_context"):
-            observation["user_context"] = obs_fields["user_context"]
-        elif observation.get("user_context"):
-            # No stored translation - translate on-the-fly via AI
-            observation["user_context"] = await _translate_cached(
-                service, observation["user_context"], lang, cache, user_id,
-                context="industrial equipment observation description from field operator"
-            )
-        if obs_fields.get("name") and not obs_fields.get("title"):
-            observation["title"] = obs_fields["name"]
-
     failure_mode = payload.get("failure_mode") or {}
+    investigation = payload.get("investigation") or {}
+    obs_id = observation.get("id")
     fm_key = failure_mode.get("name") or observation.get("failure_mode")
+    inv_id = investigation.get("id")
+
+    obs_fields: Dict[str, str] = {}
     fm_fields: Dict[str, str] = {}
+    inv_fields: Dict[str, str] = {}
+    load_tasks = []
+    load_keys = []
+    if obs_id:
+        load_tasks.append(_load_entity_fields(EntityType.OBSERVATION, obs_id, lang))
+        load_keys.append("obs")
     if fm_key:
-        fm_fields = await _load_entity_fields(EntityType.FAILURE_MODE, fm_key, lang)
-        if fm_fields.get("name"):
-            translated_name = fm_fields["name"]
-            failure_mode["name"] = translated_name
-            observation["failure_mode"] = translated_name
+        load_tasks.append(_load_entity_fields(EntityType.FAILURE_MODE, fm_key, lang))
+        load_keys.append("fm")
+    if inv_id:
+        load_tasks.append(_load_entity_fields(EntityType.INVESTIGATION, inv_id, lang))
+        load_keys.append("inv")
+    if load_tasks:
+        loaded = await asyncio.gather(*load_tasks)
+        for key, fields in zip(load_keys, loaded):
+            if key == "obs":
+                obs_fields = fields
+            elif key == "fm":
+                fm_fields = fields
+            elif key == "inv":
+                inv_fields = fields
+
+    obs_translate_items: List[tuple] = []
+    obs_translate_targets: List[str] = []
+    if obs_fields.get("title"):
+        observation["title"] = obs_fields["title"]
+    elif observation.get("title"):
+        obs_translate_targets.append("title")
+        obs_translate_items.append((observation["title"], "industrial equipment observation title"))
+    if obs_fields.get("description"):
+        observation["description"] = obs_fields["description"]
+    elif observation.get("description"):
+        obs_translate_targets.append("description")
+        obs_translate_items.append((observation["description"], "industrial equipment observation description"))
+    if obs_fields.get("user_context"):
+        observation["user_context"] = obs_fields["user_context"]
+    elif observation.get("user_context"):
+        obs_translate_targets.append("user_context")
+        obs_translate_items.append((observation["user_context"], "industrial equipment observation description from field operator"))
+    if obs_fields.get("name") and not obs_fields.get("title"):
+        observation["title"] = obs_fields["name"]
+    if obs_translate_items:
+        translated_obs = await _translate_many(service, obs_translate_items, lang, cache, user_id)
+        for target, value in zip(obs_translate_targets, translated_obs):
+            observation[target] = value
+
+    if fm_fields.get("name"):
+        translated_name = fm_fields["name"]
+        failure_mode["name"] = translated_name
+        observation["failure_mode"] = translated_name
 
     ri = payload.get("reliability_intelligence") or {}
     mlc = ri.get("most_likely_cause") or {}
@@ -208,64 +267,84 @@ async def localize_workspace_payload(
         elif fm_fields.get("causes") and name in (fm_fields.get("causes") or ""):
             mlc["name"] = fm_fields["causes"]
         else:
-            mlc["name"] = await _translate_cached(service, name, lang, cache, user_id)
+            mlc["name"] = (await _translate_many(
+                service, [(name, "industrial maintenance and reliability")], lang, cache, user_id
+            ))[0]
         ri["most_likely_cause"] = mlc
 
     factors = ri.get("contributing_factors") or []
-    for factor in factors:
-        if isinstance(factor, dict) and factor.get("factor"):
-            factor["factor"] = await _translate_cached(
-                service, factor["factor"], lang, cache, user_id
-            )
+    factor_items = [
+        (factor["factor"], "industrial maintenance and reliability")
+        for factor in factors
+        if isinstance(factor, dict) and factor.get("factor")
+    ]
+    if factor_items:
+        translated_factors = await _translate_many(service, factor_items, lang, cache, user_id)
+        idx = 0
+        for factor in factors:
+            if isinstance(factor, dict) and factor.get("factor"):
+                factor["factor"] = translated_factors[idx]
+                idx += 1
     ri["contributing_factors"] = factors
     payload["reliability_intelligence"] = ri
 
     recs = payload.get("recommended_actions") or []
+    rec_items: List[tuple] = []
+    rec_refs: List[tuple] = []
     for rec in recs:
         if not isinstance(rec, dict):
             continue
-        if rec.get("title"):
-            rec["title"] = await _translate_cached(service, rec["title"], lang, cache, user_id)
-        if rec.get("expected_impact"):
-            rec["expected_impact"] = await _translate_cached(
-                service, rec["expected_impact"], lang, cache, user_id
-            )
-        if rec.get("why_recommended"):
-            rec["why_recommended"] = await _translate_cached(
-                service, rec["why_recommended"], lang, cache, user_id
-            )
+        for field, context in (
+            ("title", "industrial maintenance and reliability"),
+            ("expected_impact", "industrial maintenance and reliability"),
+            ("why_recommended", "industrial maintenance and reliability"),
+        ):
+            if rec.get(field):
+                rec_items.append((rec[field], context))
+                rec_refs.append((rec, field))
+    if rec_items:
+        translated_recs = await _translate_many(service, rec_items, lang, cache, user_id)
+        for (rec, field), value in zip(rec_refs, translated_recs):
+            rec[field] = value
     payload["recommended_actions"] = recs
 
-    investigation = payload.get("investigation") or {}
-    if investigation.get("id"):
-        inv_fields = await _load_entity_fields(
-            EntityType.INVESTIGATION, investigation["id"], lang
-        )
-        if inv_fields.get("title"):
-            investigation["title"] = inv_fields["title"]
-        if inv_fields.get("name") and not inv_fields.get("title"):
-            investigation["title"] = inv_fields["name"]
+    if inv_fields.get("title"):
+        investigation["title"] = inv_fields["title"]
+    if inv_fields.get("name") and not inv_fields.get("title"):
+        investigation["title"] = inv_fields["name"]
 
     action_plan = payload.get("action_plan") or []
+    action_ids = [
+        action.get("id")
+        for action in action_plan
+        if isinstance(action, dict) and action.get("id") and not str(action.get("id")).startswith("inv-")
+    ]
+    action_fields_map = await _load_entity_fields_batch(EntityType.ACTION, action_ids, lang)
+
+    synthetic_items: List[tuple] = []
+    synthetic_refs: List[dict] = []
     for action in action_plan:
         if not isinstance(action, dict):
             continue
         action_id = action.get("id")
         if not action_id or str(action_id).startswith("inv-"):
             if action.get("title"):
-                action["title"] = await _translate_cached(
-                    service, action["title"], lang, cache, user_id
-                )
+                synthetic_items.append((action["title"], "industrial maintenance and reliability"))
+                synthetic_refs.append(action)
             continue
-        action_fields = await _load_entity_fields(EntityType.ACTION, action_id, lang)
+        action_fields = action_fields_map.get(action_id, {})
         if action_fields.get("title"):
             action["title"] = action_fields["title"]
         elif action.get("title"):
-            action["title"] = await _translate_cached(
-                service, action["title"], lang, cache, user_id
-            )
+            synthetic_items.append((action["title"], "industrial maintenance and reliability"))
+            synthetic_refs.append(action)
         if action_fields.get("description"):
             action["description"] = action_fields["description"]
+
+    if synthetic_items:
+        translated_actions = await _translate_many(service, synthetic_items, lang, cache, user_id)
+        for action, value in zip(synthetic_refs, translated_actions):
+            action["title"] = value
 
     return payload
 

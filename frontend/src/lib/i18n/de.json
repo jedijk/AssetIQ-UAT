@@ -1057,7 +1057,9 @@
     "clickToFindInHierarchy": "Klicken Sie, um in der Hierarchie zu finden",
     "riskScoreTooltip": "Risikoscore (Rechtsklick auf die Karte unten für Berechnungsdetails)",
     "rpnTooltip": "Risiko-Prioritätszahl",
-    "attachmentFallback": "Anhang"
+    "attachmentFallback": "Anhang",
+    "notLinked": "Nicht verknüpft",
+    "addedAtPrefix": "hinzugefügt"
   },
   "causal": {
     "title": "Ursachenanalyse",

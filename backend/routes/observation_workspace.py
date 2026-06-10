@@ -10,6 +10,7 @@ from pydantic import BaseModel
 import uuid
 import logging
 import asyncio
+import re
 
 from database import db
 from auth import get_current_user
@@ -286,7 +287,7 @@ async def get_criticality_definitions_for_equipment(equipment_node: dict, user_i
     return DEFAULT_CRITICALITY
 
 
-async def calculate_alarp_progress(observation_id: str, actions: list, investigation: dict = None) -> dict:
+async def calculate_alarp_progress(observation: dict, actions: list, investigation: dict = None) -> dict:
     """
     Stage-based mitigation progress aligned with the Process Journey:
         Observation reached               → 10%
@@ -299,7 +300,7 @@ async def calculate_alarp_progress(observation_id: str, actions: list, investiga
     """
     progress = 10  # Observation stage reached (the observation exists)
 
-    observation = await db.threats.find_one({"id": observation_id}, {"_id": 0}) or {}
+    observation = observation or {}
 
     # Assessment (+10) — requires failure mode + equipment + risk score
     has_fm = bool(observation.get("failure_mode") or observation.get("failure_mode_id"))
@@ -437,54 +438,63 @@ async def get_equipment_timeline_events(
         action_conditions.append({"observation_id": {"$in": obs_ids}})
     
     if action_conditions:
-        actions = await db.central_actions.find(
+        actions_task = db.central_actions.find(
             {"$or": action_conditions},
-            {"_id": 0, "id": 1, "title": 1, "created_at": 1, "status": 1, 
+            {"_id": 0, "id": 1, "title": 1, "created_at": 1, "status": 1,
              "action_number": 1, "action_type": 1}
         ).sort("created_at", -1).limit(limit).to_list(limit)
-        
-        for action in actions:
-            action_type = action.get("action_type", "corrective").lower()
-            
-            # Skip PM (preventive), PDM (predictive) and scheduled tasks — show only reactive/corrective history
-            if action_type in ["pm", "preventive", "preventive maintenance", "scheduled", "pdm", "predictive", "predictive maintenance"]:
-                continue
-            
-            event_type = "repair" if action_type in ["corrective", "repair", "cm"] else "work_order"
-            
-            events.append({
-                "id": action.get("id"),
-                "date": action.get("created_at", ""),
-                "event_type": event_type,
-                "title": action.get("title", "Action"),
-                "reference_id": action.get("action_number", ""),
-                "status": action.get("status", ""),
-                "action_type": action.get("action_type", "").upper()
-            })
-    
-    # 3. Get investigations (skip scheduled tasks section)
+    else:
+        async def _empty_actions():
+            return []
+        actions_task = _empty_actions()
+
     inv_conditions = []
     if asset_name:
         inv_conditions.append({"asset_name": asset_name})
     if obs_ids:
         inv_conditions.append({"threat_id": {"$in": obs_ids}})
-    
+
     if inv_conditions:
-        investigations = await db.investigations.find(
+        investigations_task = db.investigations.find(
             {"$or": inv_conditions},
             {"_id": 0, "id": 1, "title": 1, "created_at": 1, "status": 1, "case_number": 1}
         ).sort("created_at", -1).limit(10).to_list(10)
-        
-        for inv in investigations:
-            events.append({
-                "id": inv.get("id"),
-                "date": inv.get("created_at", ""),
-                "event_type": "investigation",
-                "title": inv.get("title", "Investigation"),
-                "reference_id": inv.get("case_number", ""),
-                "status": inv.get("status", "")
-            })
-    
+    else:
+        async def _empty_investigations():
+            return []
+        investigations_task = _empty_investigations()
+
+    actions, investigations = await asyncio.gather(actions_task, investigations_task)
+
+    for action in actions:
+        action_type = action.get("action_type", "corrective").lower()
+
+        # Skip PM (preventive), PDM (predictive) and scheduled tasks — show only reactive/corrective history
+        if action_type in ["pm", "preventive", "preventive maintenance", "scheduled", "pdm", "predictive", "predictive maintenance"]:
+            continue
+
+        event_type = "repair" if action_type in ["corrective", "repair", "cm"] else "work_order"
+
+        events.append({
+            "id": action.get("id"),
+            "date": action.get("created_at", ""),
+            "event_type": event_type,
+            "title": action.get("title", "Action"),
+            "reference_id": action.get("action_number", ""),
+            "status": action.get("status", ""),
+            "action_type": action.get("action_type", "").upper()
+        })
+
+    for inv in investigations:
+        events.append({
+            "id": inv.get("id"),
+            "date": inv.get("created_at", ""),
+            "event_type": "investigation",
+            "title": inv.get("title", "Investigation"),
+            "reference_id": inv.get("case_number", ""),
+            "status": inv.get("status", "")
+        })
+
     # Sort all events by date
     def parse_date(d):
         if not d:
@@ -526,23 +536,27 @@ async def get_reliability_intelligence(observation: dict, failure_mode_data: dic
     work_orders_count = 0
     
     if eq_conditions:
-        # Historical events on same equipment
-        historical_count = await db.threats.count_documents({"$or": eq_conditions})
-        
-        # Previous failures (closed observations)
-        previous_failures = await db.threats.count_documents({
-            "$or": eq_conditions,
-            "status": {"$in": ["Closed", "Mitigated", "closed", "mitigated"]}
-        })
-        
-        # Work orders
         action_conditions = []
         if equipment_id:
             action_conditions.append({"linked_equipment_id": equipment_id})
         if asset_name:
             action_conditions.append({"equipment_name": asset_name})
+
+        count_tasks = [
+            db.threats.count_documents({"$or": eq_conditions}),
+            db.threats.count_documents({
+                "$or": eq_conditions,
+                "status": {"$in": ["Closed", "Mitigated", "closed", "mitigated"]}
+            }),
+        ]
         if action_conditions:
-            work_orders_count = await db.central_actions.count_documents({"$or": action_conditions})
+            count_tasks.append(db.central_actions.count_documents({"$or": action_conditions}))
+        else:
+            async def _zero():
+                return 0
+            count_tasks.append(_zero())
+
+        historical_count, previous_failures, work_orders_count = await asyncio.gather(*count_tasks)
     
     # Count similar assets (same equipment type)
     equipment_type = observation.get("equipment_type")
@@ -713,7 +727,40 @@ async def get_recommended_actions(observation: dict, failure_mode_data: dict = N
     return recommendations
 
 
-async def get_action_plan(observation_id: str) -> List[dict]:
+async def _load_failure_mode_data(observation: dict) -> Optional[dict]:
+    """Load failure mode by id or name with at most two sequential lookups."""
+    failure_mode_id = observation.get("failure_mode_id")
+    failure_mode_name = observation.get("failure_mode")
+    if failure_mode_id:
+        failure_mode_data = await db.failure_modes.find_one(
+            {"id": failure_mode_id},
+            {"_id": 0}
+        )
+        if failure_mode_data:
+            return failure_mode_data
+    if failure_mode_name:
+        return await db.failure_modes.find_one(
+            {"failure_mode": {"$regex": f"^{re.escape(failure_mode_name)}$", "$options": "i"}},
+            {"_id": 0}
+        )
+    return None
+
+
+async def _load_equipment_node(observation: dict) -> Optional[dict]:
+    lookup_filters = []
+    if observation.get("linked_equipment_id"):
+        lookup_filters.append({"id": observation["linked_equipment_id"]})
+    if observation.get("equipment_tag"):
+        lookup_filters.append({"tag": observation["equipment_tag"]})
+        lookup_filters.append({"equipment_tag": observation["equipment_tag"]})
+    if observation.get("asset"):
+        lookup_filters.append({"name": observation["asset"]})
+    if not lookup_filters:
+        return None
+    return await db.equipment_nodes.find_one({"$or": lookup_filters}, {"_id": 0})
+
+
+async def get_action_plan(observation_id: str, investigation: dict = None) -> List[dict]:
     """
     Get actions linked to this observation (existing actions system).
     
@@ -735,7 +782,8 @@ async def get_action_plan(observation_id: str) -> List[dict]:
     action_plan = []
     
     # Surface the linked investigation (if any) as a synthetic IV entry
-    investigation = await db.investigations.find_one({"threat_id": observation_id}, {"_id": 0})
+    if investigation is None:
+        investigation = await db.investigations.find_one({"threat_id": observation_id}, {"_id": 0})
     if investigation:
         inv_status = (investigation.get("status") or "draft").lower()
         # Map investigation status → action plan status
@@ -926,57 +974,21 @@ async def get_observation_workspace(
     
     if not observation:
         raise HTTPException(status_code=404, detail="Observation not found")
-    
-    # Get equipment criticality data — try linked_equipment_id first, then fall back
-    # to matching by equipment_tag, then by asset name, so observations created via
-    # chat (where the equipment isn't formally linked) still pull in their criticality.
-    # Finally, check if the observation already has stored criticality data.
+
+    equipment_node, failure_mode_data, investigation = await asyncio.gather(
+        _load_equipment_node(observation),
+        _load_failure_mode_data(observation),
+        db.investigations.find_one({"threat_id": observation_id}, {"_id": 0}),
+    )
+
     criticality = None
-    equipment_node = None
-    lookup_filters = []
-    if observation.get("linked_equipment_id"):
-        lookup_filters.append({"id": observation["linked_equipment_id"]})
-    if observation.get("equipment_tag"):
-        lookup_filters.append({"tag": observation["equipment_tag"]})
-        lookup_filters.append({"equipment_tag": observation["equipment_tag"]})
-    if observation.get("asset"):
-        lookup_filters.append({"name": observation["asset"]})
-    
-    # Use single query with $or for efficiency
-    if lookup_filters:
-        equipment_node = await db.equipment_nodes.find_one(
-            {"$or": lookup_filters},
-            {"_id": 0}
-        )
-        if equipment_node:
-            criticality = equipment_node.get("criticality")
-    
-    # Fall back to observation's stored criticality data if no equipment node found
+    if equipment_node:
+        criticality = equipment_node.get("criticality")
     if not criticality and observation.get("equipment_criticality_data"):
         criticality = observation.get("equipment_criticality_data")
-    
-    # Get failure mode data
-    failure_mode_data = None
-    if observation.get("failure_mode_id"):
-        failure_mode_data = await db.failure_modes.find_one(
-            {"id": observation.get("failure_mode_id")},
-            {"_id": 0}
-        )
-    if not failure_mode_data and observation.get("failure_mode"):
-        # Try to find by name
-        failure_mode_data = await db.failure_modes.find_one(
-            {"failure_mode": {"$regex": f"^{observation.get('failure_mode')}$", "$options": "i"}},
-            {"_id": 0}
-        )
-    
-    # Get investigation linked to this observation
-    investigation = await db.investigations.find_one(
-        {"threat_id": observation_id},
-        {"_id": 0}
-    )
-    
+
     # Run independent queries in parallel for better performance
-    action_plan_task = asyncio.create_task(get_action_plan(observation_id))
+    action_plan_task = asyncio.create_task(get_action_plan(observation_id, investigation))
     criticality_definitions_task = asyncio.create_task(
         get_criticality_definitions_for_equipment(equipment_node, current_user["id"])
     )
@@ -1048,7 +1060,10 @@ async def get_observation_workspace(
             reputation_exposure["impact_rating"] = d.get("label") or d.get("name") or reputation_exposure.get("impact_rating", "Low")
             reputation_exposure["definition"] = d.get("reputation") or (d.get("definitions") or {}).get("reputation", "")
     
-    alarp_progress = await calculate_alarp_progress(observation_id, action_plan, investigation)
+    alarp_progress, process_journey = await asyncio.gather(
+        calculate_alarp_progress(observation, action_plan, investigation),
+        get_process_journey(observation, action_plan, investigation),
+    )
     
     exposure_data = {
         "production": production_exposure,
@@ -1072,9 +1087,6 @@ async def get_observation_workspace(
     if added_recommendation_ids:
         recommended_actions = [r for r in recommended_actions if r.get("id") not in added_recommendation_ids]
     
-    # 6. Process journey
-    process_journey = await get_process_journey(observation, action_plan, investigation)
-    
     # Sync observation.status with the current stage of the process journey.
     # The "current" stage is the furthest stage that is in_progress, or the latest
     # completed stage if none are in progress. Status values map 1:1 to stage names.
@@ -1089,15 +1101,19 @@ async def get_observation_workspace(
                 current_stage = stg.get("stage")
         # falls through to last completed
     if current_stage and observation.get("status") != current_stage:
-        try:
-            await db.threats.update_one(
-                {"id": observation_id},
-                {"$set": {"status": current_stage, "updated_at": datetime.now(timezone.utc).isoformat()}}
-            )
-            observation["status"] = current_stage
-        except Exception:
-            # Non-fatal — UI still shows the derived stage from process_journey
-            pass
+        new_status = current_stage
+        observation["status"] = new_status
+
+        async def _sync_observation_status():
+            try:
+                await db.threats.update_one(
+                    {"id": observation_id},
+                    {"$set": {"status": new_status, "updated_at": datetime.now(timezone.utc).isoformat()}}
+                )
+            except Exception:
+                pass
+
+        asyncio.create_task(_sync_observation_status())
     
     payload = {
         "observation_id": observation_id,

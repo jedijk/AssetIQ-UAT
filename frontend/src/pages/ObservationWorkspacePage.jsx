@@ -1576,7 +1576,8 @@ const ObservationWorkspacePage = () => {
   const { data: workspace, isLoading, error } = useQuery({
     queryKey: queryKeys.observationWorkspace.detail(id, language),
     queryFn: () => observationWorkspaceAPI.getWorkspace(id, { language }),
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: 2 * 60 * 1000,
+    placeholderData: (previousData) => previousData,
   });
 
   // Criticality definitions for the right-click popovers on exposure cards.
