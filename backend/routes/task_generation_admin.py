@@ -37,6 +37,11 @@ class FlushOverdueMyTasksRequest(BaseModel):
     tenant_id: Optional[str] = None
 
 
+class CleanupOrphanTasksRequest(BaseModel):
+    dry_run: bool = True
+    future_only: bool = True  # Only delete future tasks, not past/historical
+
+
 @router.post("/run")
 async def generate_tasks(
     payload: GenerateRequest,
@@ -73,6 +78,122 @@ async def flush_overdue_my_tasks(
         tenant_id=payload.tenant_id,
         include_actions=payload.include_actions,
     )
+
+
+@router.post("/cleanup-orphan-tasks")
+async def cleanup_orphan_tasks(
+    payload: CleanupOrphanTasksRequest,
+    current_user: dict = Depends(_admin_dep),
+):
+    """
+    Remove orphan scheduled_tasks that have no active maintenance program.
+    By default only removes future tasks (due_date >= today).
+    
+    Orphan tasks occur when:
+    - Maintenance programs are deleted but scheduled_tasks remain
+    - Strategy is removed but scheduled_tasks weren't cleaned up
+    - Task instances were created from programs that no longer exist
+    """
+    from datetime import date
+    
+    today = date.today().isoformat()
+    
+    # Get all active maintenance program IDs (both legacy and v2)
+    active_program_ids = set()
+    
+    # Legacy maintenance_programs
+    async for prog in db.maintenance_programs.find(
+        {"is_active": True},
+        {"id": 1, "_id": 0}
+    ):
+        if prog.get("id"):
+            active_program_ids.add(prog["id"])
+    
+    # V2 maintenance_programs
+    async for prog in db.maintenance_programs_v2.find(
+        {"status": {"$in": ["active", "draft"]}},
+        {"id": 1, "_id": 0}
+    ):
+        if prog.get("id"):
+            active_program_ids.add(prog["id"])
+    
+    # Build query for orphan scheduled_tasks
+    orphan_query = {
+        "status": {"$nin": ["completed", "cancelled"]},  # Only open tasks
+    }
+    
+    # Only future tasks if requested
+    if payload.future_only:
+        orphan_query["due_date"] = {"$gte": today}
+    
+    # Find tasks with program references
+    orphan_query["$or"] = [
+        # Tasks with maintenance_program_id not in active programs
+        {
+            "maintenance_program_id": {"$nin": list(active_program_ids), "$ne": None, "$exists": True}
+        },
+        # Tasks with v2_program_id not in active programs
+        {
+            "v2_program_id": {"$nin": list(active_program_ids), "$ne": None, "$exists": True}
+        },
+    ]
+    
+    # Find orphan task instances too
+    task_instance_query = {
+        "status": {"$nin": ["completed", "cancelled", "skipped"]},
+    }
+    if payload.future_only:
+        task_instance_query["due_date"] = {"$gte": today}
+    
+    task_instance_query["$or"] = [
+        {"plan_id": {"$nin": list(active_program_ids), "$ne": None, "$exists": True}},
+        {"maintenance_program_id": {"$nin": list(active_program_ids), "$ne": None, "$exists": True}},
+        {"v2_program_id": {"$nin": list(active_program_ids), "$ne": None, "$exists": True}},
+    ]
+    
+    if payload.dry_run:
+        # Count what would be deleted
+        scheduled_count = await db.scheduled_tasks.count_documents(orphan_query)
+        instance_count = await db.task_instances.count_documents(task_instance_query)
+        
+        # Get sample of what would be deleted
+        sample_scheduled = await db.scheduled_tasks.find(
+            orphan_query,
+            {"task_name": 1, "equipment_name": 1, "due_date": 1, "maintenance_program_id": 1, "_id": 0}
+        ).limit(10).to_list(10)
+        
+        sample_instances = await db.task_instances.find(
+            task_instance_query,
+            {"name": 1, "equipment_name": 1, "due_date": 1, "plan_id": 1, "_id": 0}
+        ).limit(10).to_list(10)
+        
+        return {
+            "dry_run": True,
+            "future_only": payload.future_only,
+            "active_programs_count": len(active_program_ids),
+            "orphan_scheduled_tasks_count": scheduled_count,
+            "orphan_task_instances_count": instance_count,
+            "total_to_delete": scheduled_count + instance_count,
+            "sample_scheduled_tasks": sample_scheduled,
+            "sample_task_instances": sample_instances,
+        }
+    else:
+        # Actually delete
+        scheduled_result = await db.scheduled_tasks.delete_many(orphan_query)
+        instance_result = await db.task_instances.delete_many(task_instance_query)
+        
+        # Also invalidate work item projections to refresh My Tasks view
+        await db.work_item_projections.delete_many({})
+        
+        return {
+            "dry_run": False,
+            "future_only": payload.future_only,
+            "active_programs_count": len(active_program_ids),
+            "scheduled_tasks_deleted": scheduled_result.deleted_count,
+            "task_instances_deleted": instance_result.deleted_count,
+            "total_deleted": scheduled_result.deleted_count + instance_result.deleted_count,
+            "projections_cleared": True,
+        }
 
 
 @router.get("/runs")

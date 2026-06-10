@@ -13,6 +13,7 @@ import {
   AlertCircle,
   CheckCircle2,
   FlaskConical,
+  Trash2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -59,6 +60,7 @@ function formatTs(iso) {
 export default function SettingsTaskGenerationPage() {
   const qc = useQueryClient();
   const [dryRunPreview, setDryRunPreview] = useState(null);
+  const [cleanupPreview, setCleanupPreview] = useState(null);
 
   const { data: runsData, isLoading: runsLoading } = useQuery({
     queryKey: ["task-generation-runs"],
@@ -81,6 +83,24 @@ export default function SettingsTaskGenerationPage() {
           } disciplines`,
         );
         qc.invalidateQueries({ queryKey: ["task-generation-runs"] });
+      }
+    },
+    onError: (e) => toast.error(apiErrorMessage(e)),
+  });
+
+  const cleanupMutation = useMutation({
+    mutationFn: async ({ dryRun }) =>
+      (await api.post("/admin/task-generation/cleanup-orphan-tasks", { dry_run: dryRun, future_only: true })).data,
+    onSuccess: (data) => {
+      if (data.dry_run) {
+        setCleanupPreview(data);
+      } else {
+        toast.success(
+          `Cleaned up ${data.total_deleted} orphan task(s) (${data.scheduled_tasks_deleted} scheduled, ${data.task_instances_deleted} instances)`,
+        );
+        qc.invalidateQueries({ queryKey: ["task-generation-runs"] });
+        qc.invalidateQueries({ queryKey: ["my-tasks"] });
+        qc.invalidateQueries({ queryKey: ["work-items"] });
       }
     },
     onError: (e) => toast.error(apiErrorMessage(e)),
@@ -218,6 +238,40 @@ export default function SettingsTaskGenerationPage() {
       {/* Schedule editor (P3) */}
       <ScheduleEditor />
 
+      {/* Cleanup Orphan Tasks */}
+      <SettingsCard
+        title="Cleanup Orphan Tasks"
+        description="Remove future scheduled tasks that no longer have an active maintenance program. This cleans up tasks left behind when programs are deleted."
+      >
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="destructive"
+            disabled={cleanupMutation.isPending}
+            onClick={() => cleanupMutation.mutate({ dryRun: false })}
+            data-testid="cleanup-orphans-btn"
+          >
+            {cleanupMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Trash2 className="w-4 h-4 mr-2" />
+            )}
+            Cleanup Orphans
+          </Button>
+          <Button
+            variant="outline"
+            disabled={cleanupMutation.isPending}
+            onClick={() => cleanupMutation.mutate({ dryRun: true })}
+            data-testid="cleanup-orphans-preview-btn"
+          >
+            <FlaskConical className="w-4 h-4 mr-2" />
+            Preview
+          </Button>
+        </div>
+        <p className="mt-3 text-xs text-slate-500">
+          Only removes <strong>future</strong> tasks (due date ≥ today) that have no active maintenance program.
+        </p>
+      </SettingsCard>
+
       {/* Dry-run preview dialog */}
       <Dialog open={!!dryRunPreview} onOpenChange={() => setDryRunPreview(null)}>
         <DialogContent className="max-w-md" data-testid="task-gen-preview-dialog">
@@ -265,6 +319,69 @@ export default function SettingsTaskGenerationPage() {
             >
               <Play className="w-4 h-4 mr-2" />
               Apply
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cleanup preview dialog */}
+      <Dialog open={!!cleanupPreview} onOpenChange={() => setCleanupPreview(null)}>
+        <DialogContent className="max-w-lg" data-testid="cleanup-preview-dialog">
+          <DialogHeader>
+            <DialogTitle>Cleanup Preview</DialogTitle>
+            <DialogDescription>
+              Found <strong>{cleanupPreview?.total_to_delete || 0}</strong> orphan task(s) to remove
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between border-b border-slate-100 py-1">
+              <span className="text-slate-500">Active maintenance programs</span>
+              <span className="font-mono">{cleanupPreview?.active_programs_count || 0}</span>
+            </div>
+            <div className="flex justify-between border-b border-slate-100 py-1">
+              <span className="text-slate-500">Orphan scheduled tasks</span>
+              <span className="font-mono text-rose-600">{cleanupPreview?.orphan_scheduled_tasks_count || 0}</span>
+            </div>
+            <div className="flex justify-between border-b border-slate-100 py-1">
+              <span className="text-slate-500">Orphan task instances</span>
+              <span className="font-mono text-rose-600">{cleanupPreview?.orphan_task_instances_count || 0}</span>
+            </div>
+            
+            {(cleanupPreview?.sample_scheduled_tasks?.length > 0 || cleanupPreview?.sample_task_instances?.length > 0) && (
+              <div className="pt-2">
+                <div className="font-medium text-slate-700 mb-2">Sample tasks to remove:</div>
+                <div className="max-h-40 overflow-y-auto space-y-1 bg-slate-50 rounded-md p-2">
+                  {cleanupPreview?.sample_scheduled_tasks?.map((t, i) => (
+                    <div key={`sched-${i}`} className="text-xs text-slate-600 flex justify-between">
+                      <span className="truncate max-w-[200px]">{t.task_name}</span>
+                      <span className="text-slate-400">{t.equipment_name}</span>
+                    </div>
+                  ))}
+                  {cleanupPreview?.sample_task_instances?.map((t, i) => (
+                    <div key={`inst-${i}`} className="text-xs text-slate-600 flex justify-between">
+                      <span className="truncate max-w-[200px]">{t.name}</span>
+                      <span className="text-slate-400">{t.equipment_name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCleanupPreview(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!cleanupPreview?.total_to_delete}
+              onClick={() => {
+                setCleanupPreview(null);
+                cleanupMutation.mutate({ dryRun: false });
+              }}
+              data-testid="cleanup-apply-btn"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete {cleanupPreview?.total_to_delete || 0} task(s)
             </Button>
           </DialogFooter>
         </DialogContent>
