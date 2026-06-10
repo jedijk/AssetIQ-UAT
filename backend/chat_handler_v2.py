@@ -14,9 +14,14 @@ from typing import List, Dict, Any, Optional
 logger = logging.getLogger(__name__)
 
 
-def _chat_ui(locale: str, en: str, nl: str) -> str:
-    """Pick Dutch or English assistant string for chat (not for stored threats)."""
-    return nl if (locale or "en").lower().startswith("nl") else en
+def _chat_ui(locale: str, en: str, nl: str, de: str | None = None) -> str:
+    """Pick localized assistant string for chat (not for stored threats)."""
+    loc = (locale or "en").lower()[:2]
+    if loc == "nl":
+        return nl
+    if loc == "de":
+        return de if de is not None else en
+    return en
 
 
 def _prompt_lang_from_user_text(text: str) -> Optional[str]:
@@ -39,6 +44,14 @@ def _prompt_lang_from_user_text(text: str) -> Optional[str]:
     )
     if any(m in low for m in nl_markers):
         return "nl"
+    de_markers = (
+        " der ", " die ", " das ", " und ", " ist ", " nicht ", " mit ", " eine ",
+        " ein ", " dem ", " den ", " auch ", " aber ", " oder ", " pumpe ", " ventil ",
+        " temperatur ", " undicht ", " defekt ", " stoerung ", " störung ", " meldung ",
+        " bitte ", " kein ", " keine ", " funktioniert ", " gerät ", " anlage ",
+    )
+    if any(m in low for m in de_markers):
+        return "de"
     en_markers = (
         " the ", " and ", " with ", " that ", " this ", " which ", " sensor ",
         " filter ", " valve ", " high ", " low ", " temperature ", " problem ",
@@ -87,6 +100,9 @@ def _message_indicates_unknown_equipment(message_content: str) -> bool:
     return inner in (
         "i don't know", "i dont know", "don't know", "dont know",
         "unknown", "not sure", "no idea", "unsure",
+        "weet niet", "onbekend", "geen idee",
+        "weiß nicht", "weiss nicht", "keine ahnung", "unbekannt",
+        "weiss es nicht", "weiß es nicht",
     )
 
 
@@ -148,67 +164,28 @@ def find_full_equipment_match(message: str, candidates: List[Dict]) -> Optional[
 # Equipment search
 # ------------------------------------------------------------------
 
-async def search_equipment_hierarchy(db, search_text: str, user_id: str) -> List[Dict[str, Any]]:
-    """Search equipment at operational levels by name/tag/type/description."""
+async def search_equipment_hierarchy(
+    db,
+    search_text: str,
+    user_id: str,
+    ui_language: str = "en",
+) -> List[Dict[str, Any]]:
+    """Search equipment at operational levels by name/tag/type/description and NL/DE translations."""
     import re
-    
-    # Common Dutch to English equipment translations
-    DUTCH_TO_ENGLISH = {
-        "moter": "motor",
-        "pomp": "pump",
-        "compressor": "compressor",
-        "ventilator": "fan",
-        "ventiel": "valve",
-        "klep": "valve",
-        "motor": "motor",
-        "kraan": "crane",
-        "hijskraan": "crane",
-        "lager": "bearing",
-        "koppeling": "coupling",
-        "as": "shaft",
-        "tandwiel": "gear",
-        "versnellingsbak": "gearbox",
-        "reductor": "gearbox",
-        "aandrijving": "drive",
-        "transportband": "conveyor",
-        "oven": "furnace",
-        "ketel": "boiler",
-        "warmtewisselaar": "heat exchanger",
-        "koeler": "cooler",
-        "filter": "filter",
-        "cilinder": "cylinder",
-        "zuiger": "piston",
-        "schroef": "screw",
-        "bout": "bolt",
-        "pakking": "gasket",
-        "afdichting": "seal",
-        "sensor": "sensor",
-        "schakelaar": "switch",
-        "transformator": "transformer",
-        "generator": "generator",
-        "elektromotor": "electric motor",
-    }
-    
-    # Translate keywords from Dutch to English
-    def translate_keyword(kw):
-        kw_lower = kw.lower()
-        if kw_lower in DUTCH_TO_ENGLISH:
-            return DUTCH_TO_ENGLISH[kw_lower]
-        return kw
-    
+    from utils.equipment_search_i18n import (
+        expand_equipment_keywords,
+        find_entity_ids_by_translation,
+        load_equipment_translation_fields,
+        score_keyword_against_translations,
+        translation_search_languages,
+    )
+
     keywords = extract_keywords(search_text)
     if not keywords:
         return []
-    
-    # Add translated versions of keywords
-    translated_keywords = []
-    for kw in keywords:
-        translated_keywords.append(kw)
-        translated = translate_keyword(kw)
-        if translated != kw and translated not in translated_keywords:
-            translated_keywords.append(translated)
-    
-    keywords = translated_keywords
+
+    keywords = expand_equipment_keywords(keywords)
+    translation_langs = translation_search_languages(ui_language)
 
     operational_levels = ["subunit", "maintainable_item", "equipment", "component", "equipment_unit"]
     
@@ -254,15 +231,52 @@ async def search_equipment_hierarchy(db, search_text: str, user_id: str) -> List
             search_conditions.append({"tag": flexible_regex})
             search_conditions.append({"tag_number": flexible_regex})
     
+    translation_node_ids, translation_type_ids = await find_entity_ids_by_translation(
+        db, keywords, translation_langs
+    )
+    if translation_node_ids:
+        search_conditions.append({"id": {"$in": list(translation_node_ids)}})
+    if translation_type_ids:
+        search_conditions.append({"equipment_type_id": {"$in": list(translation_type_ids)}})
+
     if not search_conditions:
         return []
 
+    equipment_projection = {
+        "_id": 0, "id": 1, "name": 1, "tag": 1, "tag_number": 1,
+        "equipment_type": 1, "equipment_type_name": 1, "equipment_type_id": 1,
+        "description": 1, "level": 1, "criticality": 1, "parent_id": 1,
+        "installation_id": 1,
+    }
+
     equipment_list = await db.equipment_nodes.find(
         {"$and": [{"level": {"$in": operational_levels}}, {"$or": search_conditions}]},
-        {"_id": 0, "id": 1, "name": 1, "tag": 1, "tag_number": 1,
-         "equipment_type": 1, "equipment_type_name": 1, "description": 1,
-         "level": 1, "criticality": 1, "parent_id": 1, "installation_id": 1}
-    ).limit(20).to_list(20)
+        equipment_projection,
+    ).limit(30).to_list(30)
+
+    if equipment_list and translation_node_ids:
+        seen_ids = {eq.get("id") for eq in equipment_list if eq.get("id")}
+        missing_node_ids = [eid for eid in translation_node_ids if eid not in seen_ids]
+        if missing_node_ids:
+            extra_rows = await db.equipment_nodes.find(
+                {
+                    "$and": [
+                        {"level": {"$in": operational_levels}},
+                        {"id": {"$in": missing_node_ids}},
+                    ]
+                },
+                equipment_projection,
+            ).limit(20).to_list(20)
+            for row in extra_rows:
+                row_id = row.get("id")
+                if row_id and row_id not in seen_ids:
+                    equipment_list.append(row)
+                    seen_ids.add(row_id)
+
+    entity_ids = [eq.get("id") for eq in equipment_list if eq.get("id")]
+    translations_by_lang = await load_equipment_translation_fields(
+        db, entity_ids, translation_langs
+    )
 
     # Batch-fetch parent names for maintainable items
     parent_ids = {eq["parent_id"] for eq in equipment_list
@@ -342,6 +356,10 @@ async def search_equipment_hierarchy(db, search_text: str, user_id: str) -> List
                 score += 5
             if kw in desc:
                 score += 3
+
+        eq_id = eq.get("id")
+        if eq_id and translations_by_lang:
+            score += score_keyword_against_translations(keywords, translations_by_lang, eq_id)
         
         # Also give score for exact/partial tag matches (even if keyword doesn't directly match)
         if exact_tag_match:
@@ -538,10 +556,10 @@ async def process_chat_message(
     """
     pending_data = dict(pending_data or {})
     ul = (ui_language or "en").lower()[:2]
-    if ul not in ("nl", "en"):
+    if ul not in ("nl", "en", "de"):
         ul = "en"
     inferred = _prompt_lang_from_user_text(message_content)
-    if inferred == "en" and ul == "nl":
+    if inferred == "en" and ul in ("nl", "de"):
         ul = "en"
     pending_data["chat_ui_language"] = ul
     loc = ul
@@ -569,6 +587,7 @@ async def process_chat_message(
                 loc,
                 "Cancelled. What would you like to report?",
                 "Geannuleerd. Wat wilt u melden?",
+                "Abgebrochen. Was möchten Sie melden?",
             ),
             state=ChatState.INITIAL,
             pending={"chat_ui_language": loc},
@@ -659,7 +678,7 @@ async def process_chat_message(
             if eq:
                 return _after_equipment_selected(eq, failure_modes_library, original_message, pending_data)
 
-        eq_matches = await search_equipment_hierarchy(db, message_content, user_id)
+        eq_matches = await search_equipment_hierarchy(db, message_content, user_id, ui_language=loc)
         if len(eq_matches) == 1:
             # Only auto-select if confidence >= 80%
             if eq_matches[0].get("confidence", 0) >= 80:
@@ -673,6 +692,7 @@ async def process_chat_message(
                         loc,
                         "I found one possible match. Please confirm or specify more details:",
                         "Ik heb één mogelijke match gevonden. Bevestig of geef meer details:",
+                        "Ich habe eine mögliche Übereinstimmung gefunden. Bitte bestätigen oder mehr Details angeben:",
                     ),
                     state=ChatState.AWAITING_EQUIPMENT, eq_sugg=eq_matches, orig=original_message)
         elif len(eq_matches) > 1:
@@ -683,6 +703,7 @@ async def process_chat_message(
                     loc,
                     "Which equipment? Please select:",
                     "Welk stuk apparatuur bedoelt u? Maak een keuze:",
+                    "Welche Anlage? Bitte auswählen:",
                 ),
                 state=ChatState.AWAITING_EQUIPMENT, eq_sugg=eq_matches, orig=original_message)
         else:
@@ -691,6 +712,7 @@ async def process_chat_message(
                     loc,
                     "I couldn't find that equipment. Please specify the equipment name or tag:",
                     "Ik heb dat apparaat niet gevonden. Geef de naam of het tag-nummer door:",
+                    "Ich habe diese Anlage nicht gefunden. Bitte geben Sie den Namen oder das Tag an:",
                 ),
                 state=ChatState.AWAITING_EQUIPMENT,
                 eq_sugg=prev_equipment_suggestions, orig=original_message)
@@ -816,7 +838,7 @@ async def process_chat_message(
     # Quick Report Flow: Create observation immediately with AI auto-selection
     # User can always edit equipment and failure mode later
     
-    eq_matches = await search_equipment_hierarchy(db, message_content, user_id)
+    eq_matches = await search_equipment_hierarchy(db, message_content, user_id, ui_language=loc)
     pd0 = {**pending_data, "original_description": message_content}
     
     # Auto-select equipment only if single match with >= 80% confidence
@@ -836,6 +858,7 @@ async def process_chat_message(
                 loc,
                 "Which equipment? Please select:",
                 "Welk stuk apparatuur bedoelt u? Maak een keuze:",
+                "Welche Anlage? Bitte auswählen:",
             ),
             state=ChatState.AWAITING_EQUIPMENT, eq_sugg=eq_matches, orig=message_content, pending=pd0)
     else:

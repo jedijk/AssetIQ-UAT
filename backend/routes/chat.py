@@ -27,7 +27,7 @@ from ai_helpers import (
     generate_observation_description,
 )
 from chat_handler_v2 import (
-    process_chat_message, ChatState, search_equipment_hierarchy,
+    process_chat_message, ChatState, search_equipment_hierarchy, _chat_ui,
 )
 from failure_modes import FAILURE_MODES_LIBRARY
 from services.threat_score_service import (
@@ -102,6 +102,11 @@ _LANG_WORDS = {
            "wat", "meer", "uit", "over", "zo", "dan", "hun", "werd", "heeft",
            "hoe", "nee", "ja", "kapot", "stuk", "lek", "pomp", "klep",
            "sensor", "storing", "onderhoud", "controleer", "draait"},
+    "de": {"der", "die", "das", "und", "ist", "nicht", "mit", "eine", "ein",
+           "dem", "den", "auch", "aber", "oder", "für", "auf", "aus", "bei",
+           "wie", "noch", "wird", "kann", "nach", "zum", "zur", "bitte", "kein",
+           "pumpe", "ventil", "sensor", "defekt", "undicht", "temperatur",
+           "anlage", "gerät", "stoerung", "störung", "meldung", "funktioniert"},
 }
 
 def detect_language(text: str) -> str:
@@ -738,11 +743,11 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
         or len(content.strip()) < 4
     )
     ul = (detected_lang or "en").lower()[:2]
-    if ul not in ("nl", "en"):
+    if ul not in ("nl", "en", "de"):
         ul = "en"
     if short_cmd and conv.get("chat_ui_language"):
         cul = conv.get("chat_ui_language")
-        if isinstance(cul, str) and cul.lower()[:2] in ("nl", "en"):
+        if isinstance(cul, str) and cul.lower()[:2] in ("nl", "en", "de"):
             ul = cul.lower()[:2]
     pending_data["chat_ui_language"] = ul
     await _write_conv(user_id, chat_ui_language=ul)
@@ -1129,7 +1134,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
         # Check equipment confidence BEFORE summary
         # If no high-confidence equipment match, ask user to select first
         # ------------------------------------------------------------------
-        eq_matches = await search_equipment_hierarchy(db, content, user_id)
+        eq_matches = await search_equipment_hierarchy(db, content, user_id, ui_language=ul)
         
         # Check if the TOP match has high confidence (>= 80%)
         # This covers both single matches and cases where exact tag gives 100% confidence
@@ -1151,10 +1156,11 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                 issue_description=content,
                 issue_summary=None,
             )
-            reply = (
-                "Welk stuk apparatuur bedoelt u? Maak een keuze:"
-                if ui_is_nl
-                else "Which equipment? Please select:"
+            reply = _chat_ui(
+                ul,
+                "Which equipment? Please select:",
+                "Welk stuk apparatuur bedoelt u? Maak een keuze:",
+                "Welche Anlage? Bitte auswählen:",
             )
             await _store_assistant_msg(
                 user_id, reply,
