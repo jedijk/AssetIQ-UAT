@@ -44,6 +44,7 @@ import {
   Image,
   Repeat,
   CalendarClock,
+  ArrowUpDown,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -142,6 +143,7 @@ export default function ActionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState(["open", "in_progress"]); // Default: only show active actions
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [sortDropdownOpen, setSortDropdownOpen] = useState(false); // Mobile sort dropdown
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [riskLevelFilter, setRiskLevelFilter] = useState("all"); // Filter by risk level (Critical/High/Medium/Low)
@@ -527,7 +529,7 @@ export default function ActionsPage() {
             </button>
             
             {statusDropdownOpen && (
-              <div className="absolute top-full left-0 mt-1 w-48 sm:w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
+              <div className="absolute top-full right-0 mt-1 w-48 sm:w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
                 {statusFilter.length > 0 && (
                   <button
                     onClick={clearStatusFilter}
@@ -575,9 +577,73 @@ export default function ActionsPage() {
             </SelectContent>
           </Select>
 
-          {/* Sort By - Shown on all screens */}
+          {/* Mobile Sort Button */}
+          <div className="relative sm:hidden">
+            {sortDropdownOpen && (
+              <div 
+                className="fixed inset-0 z-40" 
+                onClick={() => setSortDropdownOpen(false)}
+              />
+            )}
+            
+            <button
+              onClick={() => setSortDropdownOpen(!sortDropdownOpen)}
+              className="flex items-center justify-center w-9 h-9 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-colors"
+              data-testid="mobile-sort-button"
+              aria-label="Sort"
+            >
+              <ArrowUpDown className={`w-4 h-4 ${sortBy === 'latest' ? 'text-blue-600' : 'text-slate-400'}`} />
+            </button>
+            
+            {sortDropdownOpen && (
+              <div className="absolute top-full right-0 mt-1 w-44 bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
+                <button
+                  onClick={() => { setSortBy("latest"); setSortDropdownOpen(false); }}
+                  className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-3.5 h-3.5 text-green-500" />
+                    <span className="text-sm text-slate-700">Latest First</span>
+                  </div>
+                  {sortBy === "latest" && <Check className="w-4 h-4 text-blue-600" />}
+                </button>
+                <button
+                  onClick={() => { setSortBy("oldest"); setSortDropdownOpen(false); }}
+                  className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-sm text-slate-700">Oldest First</span>
+                  </div>
+                  {sortBy === "oldest" && <Check className="w-4 h-4 text-blue-600" />}
+                </button>
+                <button
+                  onClick={() => { setSortBy("risk_score"); setSortDropdownOpen(false); }}
+                  className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Target className="w-3.5 h-3.5 text-purple-500" />
+                    <span className="text-sm text-slate-700">Risk Score</span>
+                  </div>
+                  {sortBy === "risk_score" && <Check className="w-4 h-4 text-blue-600" />}
+                </button>
+                <button
+                  onClick={() => { setSortBy("rpn"); setSortDropdownOpen(false); }}
+                  className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-3.5 h-3.5 text-blue-500" />
+                    <span className="text-sm text-slate-700">RPN</span>
+                  </div>
+                  {sortBy === "rpn" && <Check className="w-4 h-4 text-blue-600" />}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Sort By - Hidden on mobile, shown on desktop */}
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-[90px] sm:w-36 h-9 text-xs sm:text-sm" data-testid="sort-by-select">
+            <SelectTrigger className="hidden sm:flex w-36 h-9 text-sm" data-testid="sort-by-select">
               <BarChart3 className="w-3.5 h-3.5 mr-1 text-slate-400" />
               <SelectValue placeholder="Sort" />
             </SelectTrigger>
