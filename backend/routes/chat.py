@@ -1090,14 +1090,15 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
         # ------------------------------------------------------------------
         eq_matches = await search_equipment_hierarchy(db, content, user_id)
         
-        # Check if we have a high-confidence single match (>= 80%)
+        # Check if the TOP match has high confidence (>= 80%)
+        # This covers both single matches and cases where exact tag gives 100% confidence
         has_high_confidence_match = (
-            len(eq_matches) == 1 and eq_matches[0].get("confidence", 0) >= 80
+            len(eq_matches) >= 1 and eq_matches[0].get("confidence", 0) >= 80
         )
         
         if eq_matches and not has_high_confidence_match:
-            # Multiple matches OR low confidence - ask for equipment selection FIRST
-            logger.info(f"Chat: {len(eq_matches)} equipment matches with low confidence, asking user to select first")
+            # No high-confidence match - ask for equipment selection FIRST
+            logger.info(f"Chat: {len(eq_matches)} equipment matches, top confidence={eq_matches[0].get('confidence', 0)}%, asking user to select first")
             await _write_conv(
                 user_id,
                 state=ChatState.AWAITING_EQUIPMENT,
@@ -1128,14 +1129,38 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                 detected_language=detected_lang,
             )
 
-        # High-confidence match or no matches - proceed to summary confirmation
+        # High-confidence match - auto-select equipment and proceed to observation creation
+        if has_high_confidence_match:
+            selected_equipment = eq_matches[0]
+            logger.info(f"Chat: Auto-selected equipment with {selected_equipment.get('confidence')}% confidence: {selected_equipment.get('name')} ({selected_equipment.get('tag')})")
+            
+            # Get failure modes library and auto-select failure mode
+            fm_library = await db.failure_modes.find({}, {"_id": 0}).to_list(1000)
+            
+            # Use chat_handler_v2 to process and auto-select failure mode
+            result = await process_chat_message(
+                db=db,
+                user_id=user_id,
+                message_content=selected_equipment.get("name", ""),  # Select equipment by name
+                failure_modes_library=fm_library,
+                current_state=ChatState.AWAITING_EQUIPMENT,
+                pending_data={"original_description": content, "chat_ui_language": ul},
+                prev_equipment_suggestions=[selected_equipment],
+                prev_failure_mode_suggestions=[],
+                original_message=content,
+            )
+            
+            # Process the result through _finalize_chat_machine_result if observation should be created
+            return await _finalize_chat_machine_result(user_id, session_id, detected_lang, None, result)
+
+        # No matches - proceed to summary confirmation
         # Generate improved summary for user confirmation
         summary = await summarize_issue_description(content, detected_lang)
         await _write_conv(
             user_id,
             state=ChatState.AWAITING_ISSUE_CONFIRM,
             pending_data={},
-            equipment_suggestions=eq_matches if has_high_confidence_match else None,
+            equipment_suggestions=None,
             failure_mode_suggestions=None,
             original_message=None,
             awaiting_context_for_threat=None,
