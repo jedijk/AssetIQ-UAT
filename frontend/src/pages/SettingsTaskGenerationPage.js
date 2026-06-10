@@ -338,6 +338,18 @@ export default function SettingsTaskGenerationPage() {
               <span className="text-slate-500">Active maintenance programs</span>
               <span className="font-mono">{cleanupPreview?.active_programs_count || 0}</span>
             </div>
+            {(cleanupPreview?.active_program_records !== undefined || cleanupPreview?.pm_import_equipment_count !== undefined) && (
+              <div className="ml-4 space-y-1 text-xs text-slate-400">
+                <div className="flex justify-between">
+                  <span>→ Program records</span>
+                  <span className="font-mono">{cleanupPreview?.active_program_records || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>→ Equipment with PM imports</span>
+                  <span className="font-mono">{cleanupPreview?.pm_import_equipment_count || 0}</span>
+                </div>
+              </div>
+            )}
             <div className="flex justify-between border-b border-slate-100 py-1">
               <span className="text-slate-500">Active V2 tasks</span>
               <span className="font-mono">{cleanupPreview?.active_v2_tasks_count || 0}</span>

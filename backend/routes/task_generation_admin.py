@@ -93,6 +93,9 @@ async def cleanup_orphan_tasks(
     - Maintenance programs are deleted but scheduled_tasks remain
     - Strategy is removed but scheduled_tasks weren't cleaned up
     - Task instances were created from programs that no longer exist
+    
+    Note: Equipment with active PM Import tasks (accepted/edited/implemented) 
+    are treated as having an "active program" to match Intelligence Map logic.
     """
     from datetime import date
     
@@ -127,12 +130,47 @@ async def cleanup_orphan_tasks(
             if task.get("id"):
                 active_v2_task_ids.add(task["id"])
     
+    # ========== PM IMPORT EQUIPMENT (matches Intelligence Map logic) ==========
+    # Equipment with active PM Import tasks are treated as having an "active program"
+    # This matches the Intelligence Map's definition of "active programs"
+    pm_import_equipment_match = {
+        "tasks_extracted.equipment_match.equipment_id": {"$ne": None},
+        "tasks_extracted.review_status": {"$ne": "rejected"},
+        "$or": [
+            {"tasks_extracted.import_status": {"$in": ["applied", "merged", "implemented"]}},
+            {"tasks_extracted.review_status": {"$in": ["accepted", "edited", "implemented"]}},
+        ],
+    }
+    
+    pm_equipment_pipeline = [
+        {"$unwind": "$tasks_extracted"},
+        {"$match": pm_import_equipment_match},
+        {"$group": {"_id": "$tasks_extracted.equipment_match.equipment_id"}},
+    ]
+    pm_equipment_result = await db.pm_import_sessions.aggregate(pm_equipment_pipeline).to_list(None)
+    equipment_ids_with_pm_import = set(r["_id"] for r in pm_equipment_result if r.get("_id"))
+    
+    # Equipment IDs that have actual v2 programs (strategy-based)
+    equipment_ids_with_strategy_program = set()
+    async for prog in db.maintenance_programs_v2.find(
+        {"status": {"$in": ["active", "draft"]}},
+        {"equipment_id": 1, "_id": 0}
+    ):
+        if prog.get("equipment_id"):
+            equipment_ids_with_strategy_program.add(prog["equipment_id"])
+    
+    # For display: count PM-only equipment (not already covered by strategy programs)
+    pm_only_equipment_count = len(equipment_ids_with_pm_import - equipment_ids_with_strategy_program)
+    
+    # Total "active programs" count matches Intelligence Map: programs_count + pm_only_equipment
+    total_active_programs_count = len(active_program_ids) + pm_only_equipment_count
+    
     # Build query for orphan scheduled_tasks
     # A task is orphan if:
     # 1. It has a maintenance_program_id that's not in active programs, OR
     # 2. It has a v2_program_id that's not in active programs, OR
     # 3. It has a v2_task_id that's not in active v2 tasks, OR
-    # 4. It has NO program reference at all (orphaned from creation)
+    # 4. It has NO program reference at all AND its equipment doesn't have PM import tasks
     
     base_query = {
         "status": {"$nin": ["completed", "cancelled"]},  # Only open tasks
@@ -174,14 +212,21 @@ async def cleanup_orphan_tasks(
             "v2_task_id": {"$ne": None, "$exists": True}
         })
     
-    # Also catch tasks with no program reference at all (completely orphaned)
-    orphan_conditions.append({
+    # Tasks with no program reference are orphan ONLY if their equipment
+    # doesn't have an active PM import (which acts as a virtual program)
+    no_program_ref_condition = {
         "$and": [
             {"$or": [{"maintenance_program_id": None}, {"maintenance_program_id": {"$exists": False}}]},
             {"$or": [{"v2_program_id": None}, {"v2_program_id": {"$exists": False}}]},
             {"$or": [{"v2_task_id": None}, {"v2_task_id": {"$exists": False}}]},
         ]
-    })
+    }
+    
+    # If there are equipment with PM imports, exclude them from the "no program ref" orphan condition
+    if equipment_ids_with_pm_import:
+        no_program_ref_condition["equipment_id"] = {"$nin": list(equipment_ids_with_pm_import)}
+    
+    orphan_conditions.append(no_program_ref_condition)
     
     orphan_query = {**base_query, "$or": orphan_conditions}
     
@@ -227,7 +272,10 @@ async def cleanup_orphan_tasks(
         return {
             "dry_run": True,
             "future_only": payload.future_only,
-            "active_programs_count": len(active_program_ids),
+            "active_programs_count": total_active_programs_count,  # Now matches Intelligence Map
+            "active_program_records": len(active_program_ids),  # Actual DB records
+            "pm_import_equipment_count": len(equipment_ids_with_pm_import),  # Equipment with PM imports
+            "pm_only_equipment_count": pm_only_equipment_count,  # PM-only (not strategy)
             "active_v2_tasks_count": len(active_v2_task_ids),
             "orphan_scheduled_tasks_count": scheduled_count,
             "orphan_task_instances_count": instance_count,
@@ -249,7 +297,9 @@ async def cleanup_orphan_tasks(
         return {
             "dry_run": False,
             "future_only": payload.future_only,
-            "active_programs_count": len(active_program_ids),
+            "active_programs_count": total_active_programs_count,  # Now matches Intelligence Map
+            "active_program_records": len(active_program_ids),  # Actual DB records
+            "pm_import_equipment_count": len(equipment_ids_with_pm_import),  # Equipment with PM imports
             "active_v2_tasks_count": len(active_v2_task_ids),
             "scheduled_tasks_deleted": scheduled_result.deleted_count,
             "task_instances_deleted": instance_count,
