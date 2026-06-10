@@ -502,7 +502,7 @@ const ObservationDetailsSection = ({ threatId }) => {
           <button
             onClick={() => handleTagClick(threat.equipment_tag)}
             className="text-[10px] sm:text-xs text-slate-600 font-mono bg-slate-100 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-pointer flex items-center gap-1"
-            title="Click to find in hierarchy"
+            title={t("observationWorkspace.clickToFindInHierarchy")}
           >
             <Search className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
             {threat.equipment_tag}
@@ -523,7 +523,7 @@ const ObservationDetailsSection = ({ threatId }) => {
               : threat.risk_level === "Medium" ? "bg-yellow-100 text-yellow-700"
               : "bg-green-100 text-green-700"
             }`}
-            title="Risk Score (right-click the card below for calculation details)"
+            title={t("observationWorkspace.riskScoreTooltip")}
             data-testid="hero-risk-score"
           >
             Risk {threat.risk_score}
@@ -537,7 +537,7 @@ const ObservationDetailsSection = ({ threatId }) => {
               : rpnValue >= 100 ? "bg-yellow-100 text-yellow-700"
               : "bg-green-100 text-green-700"
             }`}
-            title="Risk Priority Number"
+            title={t("observationWorkspace.rpnTooltip")}
           >
             RPN {rpnValue}
           </span>
@@ -548,11 +548,11 @@ const ObservationDetailsSection = ({ threatId }) => {
         {isEditing ? (
           <>
             <Button size="sm" variant="outline" onClick={cancelEditing} data-testid="cancel-edit-btn">
-              <X className="w-3 h-3 mr-1" /> Cancel
+              <X className="w-3 h-3 mr-1" /> {t("observationWorkspace.cancel")}
             </Button>
             <Button size="sm" onClick={saveChanges} disabled={updateMutation.isPending} className="bg-green-600 hover:bg-green-700" data-testid="save-edit-btn">
               {updateMutation.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}
-              Save
+              {t("observationWorkspace.save")}
             </Button>
           </>
         ) : (
@@ -586,11 +586,11 @@ const ObservationDetailsSection = ({ threatId }) => {
               variant="outline"
               onClick={startEditing}
               data-testid="workspace-edit-btn"
-              title="Edit observation"
+              title={t("observationWorkspace.edit")}
               className="hidden sm:inline-flex h-8 sm:w-auto p-0 sm:px-3"
             >
               <Edit className="w-3.5 h-3.5 sm:mr-1" />
-              <span className="hidden sm:inline">Edit</span>
+              <span className="hidden sm:inline">{t("observationWorkspace.edit")}</span>
             </Button>
             <Button
               size="sm"
@@ -717,9 +717,9 @@ const ObservationDetailsSection = ({ threatId }) => {
               </div>
               <div className="bg-slate-50 rounded p-2 mb-2">
                 <div className="flex justify-between mb-1.5">
-                  <span className="text-xs font-medium">FMEA</span>
+                  <span className="text-xs font-medium">{t("observationWorkspace.fmea")}</span>
                   <button onClick={() => setShowLinkFailureModeDialog(true)} className="text-[9px] text-blue-600 hover:underline">
-                    {linkedFmData ? "Relink" : "Link"}
+                    {linkedFmData ? t("observationWorkspace.relink") : t("observationWorkspace.link")}
                   </button>
                 </div>
                 {linkedFmData ? (
@@ -729,13 +729,13 @@ const ObservationDetailsSection = ({ threatId }) => {
                     <div className="bg-white rounded p-1 text-center flex-1 border"><div className="text-sm font-bold text-blue-600">{linkedFmData.detectability}</div><div className="text-[8px] text-slate-400">D</div></div>
                     <div className="bg-blue-50 rounded p-1 text-center flex-1 border border-blue-200 font-bold text-blue-700 text-sm flex items-center justify-center">{fmBaseScore}</div>
                   </div>
-                ) : <div className="text-xs text-slate-400 italic">Not linked: <b>{fmBaseScore}</b></div>}
+                ) : <div className="text-xs text-slate-400 italic">{t("observationWorkspace.notLinked")}: <b>{fmBaseScore}</b></div>}
               </div>
               <div className="bg-slate-50 rounded p-2">
                 <div className="flex justify-between mb-1.5">
-                  <span className="text-xs font-medium">Criticality</span>
+                  <span className="text-xs font-medium">{t("observationWorkspace.criticality")}</span>
                   <button onClick={() => setShowLinkEquipmentDialog(true)} className="text-[9px] text-blue-600 hover:underline">
-                    {linkedCriticalityData ? "Relink" : "Link"}
+                    {linkedCriticalityData ? t("observationWorkspace.relink") : t("observationWorkspace.link")}
                   </button>
                 </div>
                 {linkedCriticalityData ? (
@@ -746,7 +746,7 @@ const ObservationDetailsSection = ({ threatId }) => {
                     <div className="bg-white rounded p-1 text-center flex-1 border"><div className="text-sm font-bold text-purple-600">{linkedCriticalityData.reputation_impact || 0}</div><div className="text-[8px] text-slate-400">R</div></div>
                     <div className="bg-purple-50 rounded p-1 text-center flex-1 border border-purple-200 font-bold text-purple-700 text-sm flex items-center justify-center">{criticalityScore}</div>
                   </div>
-                ) : <div className="text-xs text-slate-400 italic">Not linked: <b>0</b></div>}
+                ) : <div className="text-xs text-slate-400 italic">{t("observationWorkspace.notLinked")}: <b>0</b></div>}
               </div>
             </div>
           </div>
@@ -861,9 +861,9 @@ const ObservationDetailsSection = ({ threatId }) => {
       <div className="bg-white rounded-xl border border-slate-200 p-4" data-testid="workspace-description">
         <div className="flex items-center gap-2 mb-2">
           <MessageSquare className="w-4 h-4 text-green-600" />
-          <h3 className="font-semibold text-slate-900 text-sm">Description</h3>
+          <h3 className="font-semibold text-slate-900 text-sm">{t("observationWorkspace.description")}</h3>
           {threat.context_added_at && !isEditing && (
-            <span className="text-xs text-slate-400">added {formatDateTime(threat.context_added_at)}</span>
+            <span className="text-xs text-slate-400">{t("observationWorkspace.addedAtPrefix")} {formatDateTime(threat.context_added_at)}</span>
           )}
           {/* Paperclip badge — shows attachment count; click to expand list. */}
           <div className="ml-auto flex items-center gap-1">
@@ -878,7 +878,7 @@ const ObservationDetailsSection = ({ threatId }) => {
                     ? "text-purple-600 bg-purple-50" 
                     : "text-slate-500 hover:text-purple-600 hover:bg-purple-50"
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
-                title="Improve description with AI"
+                title={t("observationWorkspace.aiImproveTooltip")}
                 data-testid="description-ai-improve-btn"
               >
                 {aiImprovingDesc ? (
@@ -890,9 +890,9 @@ const ObservationDetailsSection = ({ threatId }) => {
               {/* Tooltip */}
               <div className="absolute right-0 top-full mt-1 w-48 p-2 bg-slate-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                 <div className="font-semibold flex items-center gap-1 mb-1">
-                  <Sparkles className="w-3 h-3 text-purple-300" /> AI Improve
+                  <Sparkles className="w-3 h-3 text-purple-300" /> {t("observationWorkspace.aiImprove")}
                 </div>
-                <p className="text-slate-300">Enhance description to be more professional and technical.</p>
+                <p className="text-slate-300">{t("observationWorkspace.aiImproveDesc")}</p>
                 <div className="absolute -top-1 right-4 w-2 h-2 bg-slate-900 rotate-45"></div>
               </div>
             </div>
@@ -902,7 +902,7 @@ const ObservationDetailsSection = ({ threatId }) => {
                 type="button"
                 onClick={() => setShowAttList((s) => !s)}
                 className="inline-flex items-center gap-1 text-slate-500 hover:text-blue-600 text-xs px-2 py-1 rounded-md hover:bg-slate-50 transition-colors relative"
-                title={attachmentCount ? `${attachmentCount} attachment${attachmentCount > 1 ? "s" : ""}` : "Attach files"}
+                title={attachmentCount ? t("observationWorkspace.attachmentsCountPlural", { count: attachmentCount }) : t("observationWorkspace.attachFiles")}
                 data-testid="description-attach-btn"
               >
               <Paperclip className="w-3.5 h-3.5" />
@@ -911,7 +911,7 @@ const ObservationDetailsSection = ({ threatId }) => {
                   {attachmentCount}
                 </span>
               ) : (
-                <span>Attach</span>
+                <span>{t("observationWorkspace.attach")}</span>
               )}
             </button>
             {/* List of attachment titles */}
@@ -929,7 +929,7 @@ const ObservationDetailsSection = ({ threatId }) => {
                         className="flex-1 min-w-0 flex items-center gap-2 text-left text-slate-700 hover:text-blue-600"
                       >
                         <Paperclip className="w-3 h-3 flex-shrink-0 opacity-60" />
-                        <span className="truncate">{a.name || a.filename || "Attachment"}</span>
+                        <span className="truncate">{a.name || a.filename || t("observationWorkspace.attachmentFallback")}</span>
                       </button>
                       <button
                         type="button"
@@ -942,7 +942,7 @@ const ObservationDetailsSection = ({ threatId }) => {
                           }
                         }}
                         className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500"
-                        title="Remove"
+                        title={t("observationWorkspace.remove")}
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -954,7 +954,7 @@ const ObservationDetailsSection = ({ threatId }) => {
                   onClick={() => { attachmentInputRef.current?.click(); setShowAttList(false); }}
                   className="w-full px-3 py-2 text-xs text-blue-600 hover:bg-blue-50 border-t border-slate-100 flex items-center gap-1"
                 >
-                  <Paperclip className="w-3 h-3" /> Attach more files
+                  <Paperclip className="w-3 h-3" /> {t("observationWorkspace.attachMoreFiles")}
                 </button>
               </div>
             )}
@@ -995,7 +995,7 @@ const ObservationDetailsSection = ({ threatId }) => {
           <Textarea
             value={editForm.user_context || ""}
             onChange={(e) => setEditForm({ ...editForm, user_context: e.target.value })}
-            placeholder="What did you observe? (this is the text you typed or dictated when reporting the observation)"
+            placeholder={t("observationWorkspace.descriptionPlaceholder")}
             rows={4}
             className="text-sm"
           />
@@ -1004,7 +1004,7 @@ const ObservationDetailsSection = ({ threatId }) => {
             <p className="text-slate-700 whitespace-pre-wrap text-sm">{threat.user_context}</p>
           </div>
         ) : (
-          <p className="text-slate-400 text-sm italic">No description recorded.</p>
+          <p className="text-slate-400 text-sm italic">{t("observationWorkspace.noDescriptionRecorded")}</p>
         )}
         {/* Attachments are now shown only as a count badge on the paperclip; clicking
             a file title opens a preview dialog. No mini-thumbnails. */}
@@ -1017,14 +1017,14 @@ const ObservationDetailsSection = ({ threatId }) => {
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Paperclip className="w-4 h-4 text-blue-600" />
-                <span className="truncate">{previewAtt.name || previewAtt.filename || "Attachment"}</span>
+                <span className="truncate">{previewAtt.name || previewAtt.filename || t("observationWorkspace.attachmentFallback")}</span>
               </DialogTitle>
             </DialogHeader>
             <div className="flex-1 overflow-auto flex items-center justify-center bg-slate-50 rounded-lg">
               {(() => {
                 const ct = previewAtt.mime || previewAtt.content_type || previewAtt.type || "";
                 const url = previewAtt.data;
-                if (!url) return <div className="text-sm text-slate-400 p-8">No preview available</div>;
+                if (!url) return <div className="text-sm text-slate-400 p-8">{t("observationWorkspace.noPreviewAvailable")}</div>;
                 if (ct.startsWith("image/")) {
                   return <img src={url} alt={previewAtt.name} className="max-w-full max-h-[70vh] object-contain" />;
                 }
@@ -1040,13 +1040,13 @@ const ObservationDetailsSection = ({ threatId }) => {
                 return (
                   <div className="text-center p-8 text-sm text-slate-500">
                     <Paperclip className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <div>Preview not available for this file type.</div>
+                    <div>{t("observationWorkspace.previewNotAvailable")}</div>
                     <a
                       href={url}
                       download={previewAtt.name}
                       className="inline-block mt-3 px-3 py-1.5 bg-blue-600 text-white rounded-md text-xs font-medium hover:bg-blue-700"
                     >
-                      Download
+                      {t("observationWorkspace.download")}
                     </a>
                   </div>
                 );

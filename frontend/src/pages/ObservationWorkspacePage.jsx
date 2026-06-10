@@ -1836,7 +1836,8 @@ const ObservationWorkspacePage = () => {
                 const def = exposure?.environmental?.definition;
                 if (def) {
                   const first = def.split(/[.!?](\s|$)/)[0];
-                  return first || def;
+                  // Try to translate the definition text
+                  return translateEnum(t, first) || first || def;
                 }
                 return undefined;
               })(),
@@ -1856,7 +1857,8 @@ const ObservationWorkspacePage = () => {
                 const def = exposure?.reputation?.definition;
                 if (def) {
                   const first = def.split(/[.!?](\s|$)/)[0];
-                  return first || def;
+                  // Try to translate the definition text
+                  return translateEnum(t, first) || first || def;
                 }
                 return undefined;
               })(),
