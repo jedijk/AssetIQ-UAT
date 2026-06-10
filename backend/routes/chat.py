@@ -500,6 +500,8 @@ async def _finalize_chat_machine_result(
     new_state = result["state"]
     resp_text = result["response_text"]
     conv = await _read_conv(user_id)
+    
+    logger.info(f"_save_and_respond: create_observation={result.get('create_observation')}, has_obs_data={bool(result.get('observation_data'))}")
 
     if result.get("create_observation") and result.get("observation_data"):
         obs_data = result.get("observation_data") or {}
