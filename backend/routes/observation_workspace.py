@@ -1110,6 +1110,7 @@ async def get_observation_workspace(
             "equipment_type": observation.get("equipment_type"),
             "failure_mode": observation.get("failure_mode"),
             "description": observation.get("description"),
+            "user_context": observation.get("user_context"),
             "created_at": observation.get("created_at"),
             "updated_at": observation.get("updated_at"),
             "created_by_name": observation.get("created_by_name"),

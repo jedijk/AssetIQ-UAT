@@ -1876,7 +1876,7 @@ const ObservationWorkspacePage = () => {
         </div>
 
         {/* Observation details — all classic features (edit, status, share, delete, info grid, attachments, AI panels, link equipment / failure mode, score calc popup, cause, field notes) */}
-        <ObservationDetailsSection threatId={id} />
+        <ObservationDetailsSection threatId={id} workspaceObservation={observation} />
 
         {/* Row 2: Equipment Reliability Timeline */}
         <EquipmentReliabilityTimeline 

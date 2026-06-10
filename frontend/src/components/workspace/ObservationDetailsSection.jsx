@@ -106,7 +106,7 @@ const IMPACT_OPTIONS = ["Minor", "Moderate", "Significant", "Major", "Catastroph
 // Source: /app/backend/routes/observation_workspace.py get_process_journey().
 const STATUS_OPTIONS = ["Observation", "Assessment", "Planning", "Investigation", "Action", "Mitigated", "Learning"];
 
-const ObservationDetailsSection = ({ threatId }) => {
+const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { pushUndo } = useUndo();
@@ -132,12 +132,27 @@ const ObservationDetailsSection = ({ threatId }) => {
   };
 
   // --- Data fetches ---------------------------------------------------------
-  const { data: threat } = useQuery({
+  const { data: threatData } = useQuery({
     queryKey: queryKeys.threats.legacyDetail(threatId),
     queryFn: () => threatsAPI.getById(threatId),
     enabled: !!threatId,
     staleTime: 30 * 1000,
   });
+
+  // Merge workspace observation (translated) with full threat data
+  // The workspace observation has translated title/description/user_context
+  // The threatData has all the other fields needed for editing
+  const threat = useMemo(() => {
+    if (!threatData) return null;
+    if (!workspaceObservation) return threatData;
+    return {
+      ...threatData,
+      // Use translated fields from workspace if available
+      title: workspaceObservation.title || threatData.title,
+      description: workspaceObservation.description || threatData.description,
+      user_context: workspaceObservation.user_context || threatData.user_context,
+    };
+  }, [threatData, workspaceObservation]);
 
   const { data: equipmentNodesData } = useQuery({
     queryKey: queryKeys.equipment.nodes(),

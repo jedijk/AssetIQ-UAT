@@ -90,8 +90,29 @@ async def localize_workspace_payload(
         obs_fields = await _load_entity_fields(EntityType.OBSERVATION, obs_id, lang)
         if obs_fields.get("title"):
             observation["title"] = obs_fields["title"]
+        elif observation.get("title"):
+            # No stored translation - translate on-the-fly via AI
+            observation["title"] = await _translate_cached(
+                service, observation["title"], lang, cache, user_id,
+                context="industrial equipment observation title"
+            )
         if obs_fields.get("description"):
             observation["description"] = obs_fields["description"]
+        elif observation.get("description"):
+            # No stored translation - translate on-the-fly via AI
+            observation["description"] = await _translate_cached(
+                service, observation["description"], lang, cache, user_id,
+                context="industrial equipment observation description"
+            )
+        # Translate user_context (the description text shown in green box)
+        if obs_fields.get("user_context"):
+            observation["user_context"] = obs_fields["user_context"]
+        elif observation.get("user_context"):
+            # No stored translation - translate on-the-fly via AI
+            observation["user_context"] = await _translate_cached(
+                service, observation["user_context"], lang, cache, user_id,
+                context="industrial equipment observation description from field operator"
+            )
         if obs_fields.get("name") and not obs_fields.get("title"):
             observation["title"] = obs_fields["name"]
 
