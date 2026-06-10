@@ -8,7 +8,7 @@ import json
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://mobile-filter-fix-3.preview.emergentagent.com/api"
+BASE_URL = "https://settings-audit-4.preview.emergentagent.com/api"
 TEST_EMAIL = "jedijk@gmail.com"
 TEST_PASSWORD = "Jaap8019@"
 
