@@ -336,6 +336,75 @@ async def merge_issue_description_with_edit(
     return f"{ci}\n\n(Clarification / correction: {ed})"
 
 
+async def generate_observation_description(
+    user_input: str,
+    equipment_name: str = None,
+    failure_mode: str = None,
+    language: str = "en",
+) -> str:
+    """
+    Generate a professional engineer-style description for an observation
+    based on the user's input words.
+    
+    Takes the raw user input (e.g., "motor overheating") and generates
+    a proper technical description as a reliability engineer would write it.
+    """
+    from services.ai_gateway import chat as ai_gateway_chat
+    
+    t = (user_input or "").strip()
+    if not t:
+        return ""
+    
+    try:
+        lang_note = "Dutch" if language == "nl" else "English"
+        
+        context_parts = []
+        if equipment_name and equipment_name.lower() not in ["unknown", "to be confirmed", "unknown equipment"]:
+            context_parts.append(f"Equipment: {equipment_name}")
+        if failure_mode and failure_mode.lower() not in ["unknown", "unknown / not specified"]:
+            context_parts.append(f"Failure mode: {failure_mode}")
+        context = "\n".join(context_parts) if context_parts else ""
+        
+        out = await ai_gateway_chat(
+            [
+                {
+                    "role": "system",
+                    "content": f"""You are a reliability engineer writing observation descriptions for a maintenance management system.
+
+Write a professional, technical description in {lang_note} based on the operator's report. The description should:
+- Be 2-3 sentences maximum
+- Use professional engineering terminology
+- Describe the issue clearly and objectively
+- Include any relevant details from the input (what was observed, conditions, etc.)
+- Be suitable for a formal maintenance record
+
+Do NOT include:
+- Equipment name or failure mode in the description (these are stored separately)
+- Recommendations or actions (these are handled separately)
+- Speculation about causes unless mentioned by the operator
+
+Output only the description text, no labels or formatting.""",
+                },
+                {
+                    "role": "user",
+                    "content": f"Operator report: {t[:2000]}\n\n{context}".strip(),
+                },
+            ],
+            endpoint="ai_helpers.generate_observation_description",
+            model=os.environ.get("OPENAI_CHAT_MODEL", "gpt-4o-mini"),
+            temperature=0.3,
+            max_tokens=200,
+        )
+        out = (out or "").strip()
+        if out:
+            return out
+    except Exception as e:
+        logger.warning("generate_observation_description fallback: %s", e)
+    
+    # Fallback: return original text with basic formatting
+    return t[:500]
+
+
 async def translate_to_english_for_record(text: str, purpose: str = "threat register") -> str:
     """
     Translate operator-facing text to concise English for stored threats / actions.

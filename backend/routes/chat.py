@@ -24,6 +24,7 @@ from ai_helpers import (
     analyze_attachment_image, summarize_issue_description,
     merge_issue_description_with_edit,
     translate_to_english_for_record,
+    generate_observation_description,
 )
 from chat_handler_v2 import (
     process_chat_message, ChatState, search_equipment_hierarchy,
@@ -501,8 +502,18 @@ async def _finalize_chat_machine_result(
     conv = await _read_conv(user_id)
 
     if result.get("create_observation") and result.get("observation_data"):
-        # Get the description from issue_summary (same as shown in draft)
-        # Parse the summary to extract the Description line
+        obs_data = result.get("observation_data") or {}
+        
+        # Get the original user input for description generation
+        original_input = (
+            conv.get("issue_description") 
+            or conv.get("original_message") 
+            or result.get("original_message") 
+            or obs_data.get("original_description")
+            or ""
+        )
+        
+        # Try to get description from issue_summary first (if summary was generated)
         issue_summary = conv.get("issue_summary") or ""
         parsed_description = ""
         for line in issue_summary.split('\n'):
@@ -510,16 +521,26 @@ async def _finalize_chat_machine_result(
                 parsed_description = line.replace('**Description:**', '').replace('**Beschrijving:**', '').strip()
                 break
         
-        # Use parsed description from summary, fall back to original_message
-        user_description = parsed_description or result.get("original_message", "")
+        # If no parsed description from summary, generate one using AI
+        if not parsed_description and original_input:
+            chat_lang = (obs_data.get("chat_ui_language") or "en").lower()
+            parsed_description = await generate_observation_description(
+                user_input=original_input,
+                equipment_name=obs_data.get("equipment_name"),
+                failure_mode=obs_data.get("failure_mode_name"),
+                language=chat_lang,
+            )
+            logger.info(f"Generated observation description: {parsed_description[:100]}...")
         
-        obs = await _create_observation(user_id, result["observation_data"],
+        # Final fallback to original message
+        user_description = parsed_description or original_input or ""
+        
+        obs = await _create_observation(user_id, obs_data,
                                         session_id, image_thumbnail, user_description)
         threat = obs["threat"]
         auto_actions = obs["auto_created_actions"]
         new_threat_id = obs["threat_id"]
 
-        obs_data = result.get("observation_data") or {}
         ctx_nl = obs_data.get("chat_ui_language") == "nl"
 
         actions_info = ""
