@@ -150,11 +150,20 @@ def find_full_equipment_match(message: str, candidates: List[Dict]) -> Optional[
 
 async def search_equipment_hierarchy(db, search_text: str, user_id: str) -> List[Dict[str, Any]]:
     """Search equipment at operational levels by name/tag/type/description."""
+    import re
+    
     keywords = extract_keywords(search_text)
     if not keywords:
         return []
 
     operational_levels = ["subunit", "maintainable_item", "equipment", "component", "equipment_unit"]
+    
+    # Extract potential tag patterns (e.g., "1F-3001-0122", "1X-1001-0001")
+    # Common patterns: alphanumeric with dashes/underscores
+    tag_patterns = re.findall(r'\b[A-Za-z0-9]{1,3}[-_][A-Za-z0-9]{3,5}[-_][A-Za-z0-9]{3,5}\b', search_text)
+    
+    # Also look for quoted equipment names
+    quoted_names = re.findall(r'"([^"]+)"', search_text)
 
     search_conditions = []
     for kw in keywords:
@@ -188,12 +197,36 @@ async def search_equipment_hierarchy(db, search_text: str, user_id: str) -> List
     # Max score per keyword: 10 (name) + 8 (tag) + 5 (type) + 3 (desc) = 26
     max_possible_score = len(keywords) * 26 if keywords else 1
     
+    search_text_lower = search_text.lower()
+    
     for eq in equipment_list:
         score = 0
         name = (eq.get("name") or "").lower()
         tag = (eq.get("tag") or eq.get("tag_number") or "").lower()
         desc = (eq.get("description") or "").lower()
         eq_type = (eq.get("equipment_type") or eq.get("equipment_type_name") or "").lower()
+        
+        # Check for EXACT tag match - this should give 100% confidence
+        exact_tag_match = False
+        if tag:
+            for tp in tag_patterns:
+                if tp.lower() == tag:
+                    exact_tag_match = True
+                    break
+        
+        # Check for EXACT name match from quoted text
+        exact_name_match = False
+        for qn in quoted_names:
+            qn_lower = qn.lower()
+            # Check if quoted name matches equipment name (with or without tag)
+            if name == qn_lower or qn_lower.startswith(name) or name in qn_lower:
+                # Also verify tag if present in quoted name
+                if tag and tag in qn_lower:
+                    exact_name_match = True
+                    break
+                elif not tag and name == qn_lower:
+                    exact_name_match = True
+                    break
 
         for kw in keywords:
             if kw in name:
@@ -213,7 +246,11 @@ async def search_equipment_hierarchy(db, search_text: str, user_id: str) -> List
                     parent_name = p.get("name")
 
             # Calculate confidence as percentage (capped at 100%)
-            confidence = min(100, round((score / max_possible_score) * 100))
+            # Exact tag or name match = 100% confidence
+            if exact_tag_match or exact_name_match:
+                confidence = 100
+            else:
+                confidence = min(100, round((score / max_possible_score) * 100))
             
             scored.append({
                 "id": eq.get("id"), "name": eq.get("name"),
