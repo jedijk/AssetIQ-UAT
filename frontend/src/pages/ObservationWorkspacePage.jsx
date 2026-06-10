@@ -85,6 +85,13 @@ import ObservationDetailsSection from "../components/workspace/ObservationDetail
 import AIInsightsPanel from "../components/AIInsightsPanel";
 import CausalIntelligencePanel from "../components/CausalIntelligencePanel";
 import { translateEnum } from "../lib/translateEnum";
+import {
+  CRITICALITY_FIELD_BY_DIMENSION,
+  translateCriticalityDefinitionText,
+  translateCriticalityDimensionLabel,
+  translateCriticalityField,
+  translateCriticalityLabel,
+} from "../lib/criticalityDefinitionI18n";
 
 const EVENT_TYPE_ENUM = {
   observation: "Observation",
@@ -161,8 +168,7 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
   const effectiveColor = severityColorByScore[score] || color;
 
   // The field name on each criticality definition row that holds this dimension's description.
-  const fieldByDim = { safety: "safety", production: "production", environmental: "environment", reputation: "reputation" };
-  const field = fieldByDim[dimension];
+  const field = CRITICALITY_FIELD_BY_DIMENSION[dimension];
 
   // Sorted list of all 5 rank rows for the popover.
   const scaleRows = (criticalityDefs || [])
@@ -217,7 +223,7 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
             }}
           >
             <div className="flex items-center justify-between px-3 py-2 border-b">
-              <h3 className="font-semibold text-sm text-slate-800 capitalize">{t("observationWorkspace.criticalityTitle", { dimension })}</h3>
+              <h3 className="font-semibold text-sm text-slate-800">{t("observationWorkspace.criticalityTitle", { dimension: translateCriticalityDimensionLabel(dimension, t) })}</h3>
               <button onClick={() => setPopup({ show: false, x: 0, y: 0 })} className="p-1 hover:bg-slate-100 rounded">
                 <X className="w-4 h-4 text-slate-400" />
               </button>
@@ -229,8 +235,8 @@ const ExposureCard = ({ type, data, icon: Icon, color, dimension, score, critica
                     {currentRow.rank}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-slate-800">{currentRow.label || t("observationWorkspace.levelN", { rank: currentRow.rank })}</div>
-                    <div className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap mt-1">{currentRow[field]}</div>
+                    <div className="text-sm font-semibold text-slate-800">{translateCriticalityLabel(currentRow, t)}</div>
+                    <div className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap mt-1">{translateCriticalityField(currentRow, field, t)}</div>
                   </div>
                 </div>
               ) : (
@@ -1811,11 +1817,17 @@ const ObservationWorkspacePage = () => {
             data={{
               primary: exposure?.safety?.severity ? translateEnum(t, exposure.safety.severity) : t("observationWorkspace.notAssessed"),
               secondary: (() => {
-                const def = exposure?.safety?.definition;
-                if (def) {
-                  // Show first sentence so the card stays compact
-                  const first = def.split(/[.!?](\s|$)/)[0];
-                  return first || def;
+                const rank = exposure?.safety?.safety_impact_score;
+                const translated = translateCriticalityDefinitionText({
+                  criticalityDefs,
+                  rank,
+                  field: "safety",
+                  fallbackText: exposure?.safety?.definition,
+                  t,
+                });
+                if (translated) {
+                  const first = translated.split(/[.!?](\s|$)/)[0];
+                  return first || translated;
                 }
                 return t("observationWorkspace.severityLevel", {
                   level: translateEnum(t, exposure?.safety?.severity || t("observationWorkspace.severityLow")),
@@ -1834,11 +1846,17 @@ const ObservationWorkspacePage = () => {
             data={{
               primary: translateEnum(t, exposure?.environmental?.impact_rating || t("observationWorkspace.severityLow")),
               secondary: (() => {
-                const def = exposure?.environmental?.definition;
-                if (def) {
-                  const first = def.split(/[.!?](\s|$)/)[0];
-                  // Try to translate the definition text
-                  return translateEnum(t, first) || first || def;
+                const rank = exposure?.environmental?.environmental_impact_score;
+                const translated = translateCriticalityDefinitionText({
+                  criticalityDefs,
+                  rank,
+                  field: "environment",
+                  fallbackText: exposure?.environmental?.definition,
+                  t,
+                });
+                if (translated) {
+                  const first = translated.split(/[.!?](\s|$)/)[0];
+                  return first || translated;
                 }
                 return undefined;
               })(),
@@ -1855,11 +1873,17 @@ const ObservationWorkspacePage = () => {
             data={{
               primary: translateEnum(t, exposure?.reputation?.impact_rating || t("observationWorkspace.severityLow")),
               secondary: (() => {
-                const def = exposure?.reputation?.definition;
-                if (def) {
-                  const first = def.split(/[.!?](\s|$)/)[0];
-                  // Try to translate the definition text
-                  return translateEnum(t, first) || first || def;
+                const rank = exposure?.reputation?.reputation_impact_score;
+                const translated = translateCriticalityDefinitionText({
+                  criticalityDefs,
+                  rank,
+                  field: "reputation",
+                  fallbackText: exposure?.reputation?.definition,
+                  t,
+                });
+                if (translated) {
+                  const first = translated.split(/[.!?](\s|$)/)[0];
+                  return first || translated;
                 }
                 return undefined;
               })(),

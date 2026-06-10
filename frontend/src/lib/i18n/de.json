@@ -393,6 +393,43 @@
     "production": "Produktion",
     "environment": "Umwelt",
     "reputation": "Reputation",
+    "defaultCriticality": {
+      "1": {
+        "label": "Minimal",
+        "safety": "Keine Sicherheitsauswirkung. Normaler Betrieb.",
+        "production": "Keine Produktionsauswirkung. Redundanz verfügbar.",
+        "environment": "Keine Umweltauswirkung.",
+        "reputation": "Keine Reputationsauswirkung."
+      },
+      "2": {
+        "label": "Niedrig",
+        "safety": "Beinahe-Unfall oder leichte Beschwerden. Keine Verletzung.",
+        "production": "Geringe Produktionsauswirkung (<25%). Ausfallzeit <8 Stunden.",
+        "environment": "Vernachlässigbare Umweltauswirkung. Innerhalb der Genehmigungsgrenzen.",
+        "reputation": "Geringe Kundenbeschwerde. Nur interne Meldung."
+      },
+      "3": {
+        "label": "Mittel",
+        "safety": "Leichte Verletzung mit Erste Hilfe. Erfassbarer Vorfall.",
+        "production": "Mäßiger Produktionsverlust (25-50%). Ausfallzeit 8-24 Stunden.",
+        "environment": "Geringe Umweltauswirkung. Eingegrenzte Leckage oder Emission.",
+        "reputation": "Lokale Medienberichte. Kundenunzufriedenheit. Interne Untersuchung erforderlich."
+      },
+      "4": {
+        "label": "Hoch",
+        "safety": "Schwere Verletzung mit Krankenhausaufenthalt. Arbeitsunfall mit Ausfall.",
+        "production": "Erheblicher Produktionsverlust (>50%). Längere Ausfallzeit (>24 Stunden).",
+        "environment": "Erhebliche Umweltauswirkung. Sanierung vor Ort erforderlich.",
+        "reputation": "Nationale Medienberichte. Viele Kundenbeschwerden. Behördliche Prüfung."
+      },
+      "5": {
+        "label": "Kritisch",
+        "safety": "Todesfall oder dauerhafte Behinderung. Unmittelbare Gefahr für Personal.",
+        "production": "Vollständiger Anlagenstillstand. Totalverlust der Produktionskapazität (100%).",
+        "environment": "Schwerwiegende Umweltkatastrophe. Erhebliche Off-Site-Kontamination; Meldung an Behörden erforderlich.",
+        "reputation": "Internationale Medienberichte. Schwerer Reputationsschaden. Entzug der Betriebserlaubnis möglich."
+      }
+    },
     "ranking": "Rang",
     "effect": "Auswirkung",
     "customerEffect": "Kundenauswirkung (Endbenutzer)",

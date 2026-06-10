@@ -393,6 +393,43 @@
     "production": "Production",
     "environment": "Environment",
     "reputation": "Reputation",
+    "defaultCriticality": {
+      "1": {
+        "label": "Minimal",
+        "safety": "No safety impact. Normal operating conditions.",
+        "production": "No production impact. Redundancy available.",
+        "environment": "No environmental impact.",
+        "reputation": "No reputational impact."
+      },
+      "2": {
+        "label": "Low",
+        "safety": "Near miss or minor discomfort. No injury.",
+        "production": "Minor production impact (<25%). Downtime <8 hours.",
+        "environment": "Negligible environmental impact. Within permit limits.",
+        "reputation": "Minor customer complaint. Internal reporting only."
+      },
+      "3": {
+        "label": "Medium",
+        "safety": "Minor injury requiring first aid. Recordable incident.",
+        "production": "Moderate production loss (25-50%). Downtime 8-24 hours.",
+        "environment": "Minor environmental impact. Contained spill or emission.",
+        "reputation": "Local media coverage. Customer dissatisfaction. Internal investigation required."
+      },
+      "4": {
+        "label": "High",
+        "safety": "Serious injury requiring hospitalization. Lost time incident.",
+        "production": "Major production loss (>50%). Extended downtime (>24 hours).",
+        "environment": "Significant environmental impact. On-site contamination requiring remediation.",
+        "reputation": "National media coverage. Significant customer complaints. Regulatory scrutiny."
+      },
+      "5": {
+        "label": "Critical",
+        "safety": "Fatality or permanent disability. Immediate danger to personnel.",
+        "production": "Complete plant shutdown. Total loss of production capacity (100%).",
+        "environment": "Major environmental disaster. Significant off-site contamination requiring regulatory notification.",
+        "reputation": "International media coverage. Severe damage to company reputation. Loss of operating license possible."
+      }
+    },
     "ranking": "Rank",
     "effect": "Effect",
     "customerEffect": "Customer Effect (End User)",

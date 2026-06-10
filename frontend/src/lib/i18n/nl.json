@@ -393,6 +393,43 @@
     "production": "Productie",
     "environment": "Milieu",
     "reputation": "Reputatie",
+    "defaultCriticality": {
+      "1": {
+        "label": "Minimaal",
+        "safety": "Geen veiligheidsimpact. Normale bedrijfsomstandigheden.",
+        "production": "Geen productie-impact. Redundantie beschikbaar.",
+        "environment": "Geen milieu-impact.",
+        "reputation": "Geen reputatie-impact."
+      },
+      "2": {
+        "label": "Laag",
+        "safety": "Bijna-ongeval of licht ongemak. Geen letsel.",
+        "production": "Lichte productie-impact (<25%). Stilstand <8 uur.",
+        "environment": "Verwaarloosbare milieu-impact. Binnen vergunningsgrenzen.",
+        "reputation": "Kleine klacht van klant. Alleen interne rapportage."
+      },
+      "3": {
+        "label": "Middel",
+        "safety": "Licht letsel met EHBO. Registrerbaar incident.",
+        "production": "Matig productieverlies (25-50%). Stilstand 8-24 uur.",
+        "environment": "Lichte milieu-impact. Beperkte lekkage of emissie.",
+        "reputation": "Lokale media-aandacht. Klantontevredenheid. Intern onderzoek vereist."
+      },
+      "4": {
+        "label": "Hoog",
+        "safety": "Ernstig letsel met ziekenhuisopname. Incident met verzuim.",
+        "production": "Groot productieverlies (>50%). Langdurige stilstand (>24 uur).",
+        "environment": "Significante milieu-impact. Sanering op locatie vereist.",
+        "reputation": "Landelijke media-aandacht. Veel klachten. Toezicht door autoriteiten."
+      },
+      "5": {
+        "label": "Kritiek",
+        "safety": "Dodelijk slachtoffer of blijvende invaliditeit. Direct gevaar voor personeel.",
+        "production": "Volledige fabrieksstilstand. Totaal verlies van productiecapaciteit (100%).",
+        "environment": "Grote milieuramp. Significante off-site verontreiniging; melding aan autoriteiten vereist.",
+        "reputation": "Internationale media-aandacht. Ernstige reputatieschade. Verlies van vergunning mogelijk."
+      }
+    },
     "ranking": "Rang",
     "effect": "Effect",
     "customerEffect": "Klanteffect (Eindgebruiker)",
