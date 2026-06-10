@@ -31,7 +31,7 @@ const EVENT_TYPE_ENUM = {
 
 const getEventTypeLabel = (t, type) => translateEnum(t, EVENT_TYPE_ENUM[type] || "Event");
 
-function TimelineEventCard = ({ event, isCurrent }) => {
+function TimelineEventCard({ event, isCurrent }) {
   const navigate = useNavigate();
   const { t } = useLanguage();
   
@@ -134,7 +134,7 @@ function TimelineEventCard = ({ event, isCurrent }) => {
 /**
  * Equipment Reliability Timeline
  */
-export function EquipmentReliabilityTimeline = ({ events, aiEvidence }) => {
+export function EquipmentReliabilityTimeline({ events, aiEvidence }) {
   const { t } = useLanguage();
   const [viewMode, setViewMode] = useState("timeline"); // timeline or list
   const navigate = useNavigate();

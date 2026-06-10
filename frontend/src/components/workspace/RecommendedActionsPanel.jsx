@@ -5,7 +5,7 @@ import { Badge } from "../ui/badge";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useDisciplines } from "../../hooks/useDisciplines";
 
-function RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAdding, isInPlan }) => {
+function RecommendedActionCard({ action, onAddToPlan, onAddToStrategy, isAdding, isInPlan }) {
   const { t } = useLanguage();
   const { getLabel } = useDisciplines();
   const typeColors = {
@@ -87,7 +87,7 @@ function RecommendedActionCard = ({ action, onAddToPlan, onAddToStrategy, isAddi
 /**
  * Recommended Actions Panel
  */
-export function RecommendedActionsPanel = ({ recommendations, onAddToPlan, onAddToStrategy, onGenerateAI, isGeneratingAI }) => {
+export function RecommendedActionsPanel({ recommendations, onAddToPlan, onAddToStrategy, onGenerateAI, isGeneratingAI }) {
   const { t } = useLanguage();
   const [addingId, setAddingId] = useState(null);
 
