@@ -1332,28 +1332,50 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
             </div>
           </div>
           <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
-            {/* AI Mode Toggle */}
-            <button
-              onClick={() => setAiModeEnabled(!aiModeEnabled)}
-              className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] sm:text-xs font-medium transition-all ${
-                aiModeEnabled 
-                  ? "bg-purple-100 text-purple-700 border border-purple-300" 
-                  : "bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200"
-              }`}
-              title={aiModeEnabled ? "AI mode: Better descriptions (slower)" : "Fast mode: Quick responses"}
-            >
-              {aiModeEnabled ? (
-                <>
-                  <Sparkles className="w-3 h-3" />
-                  <span className="hidden sm:inline">AI</span>
-                </>
-              ) : (
-                <>
-                  <Zap className="w-3 h-3" />
-                  <span className="hidden sm:inline">Fast</span>
-                </>
-              )}
-            </button>
+            {/* AI Mode Toggle with Tooltip */}
+            <div className="relative group">
+              <button
+                onClick={() => setAiModeEnabled(!aiModeEnabled)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] sm:text-xs font-medium transition-all ${
+                  aiModeEnabled 
+                    ? "bg-purple-100 text-purple-700 border border-purple-300" 
+                    : "bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200"
+                }`}
+              >
+                {aiModeEnabled ? (
+                  <>
+                    <Sparkles className="w-3 h-3" />
+                    <span className="hidden sm:inline">AI</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-3 h-3" />
+                    <span className="hidden sm:inline">Fast</span>
+                  </>
+                )}
+              </button>
+              {/* Tooltip */}
+              <div className="absolute right-0 top-full mt-2 w-56 p-2 bg-slate-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                {aiModeEnabled ? (
+                  <>
+                    <div className="font-semibold flex items-center gap-1 mb-1">
+                      <Sparkles className="w-3 h-3 text-purple-300" /> AI Mode
+                    </div>
+                    <p className="text-slate-300">Uses AI to generate professional descriptions. Takes 2-3 seconds longer but produces better quality text.</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="font-semibold flex items-center gap-1 mb-1">
+                      <Zap className="w-3 h-3 text-yellow-300" /> Fast Mode
+                    </div>
+                    <p className="text-slate-300">Quick responses without AI processing. Best for rapid issue logging when speed matters.</p>
+                  </>
+                )}
+                <div className="text-slate-400 mt-1.5 text-[10px]">Click to switch modes</div>
+                {/* Arrow */}
+                <div className="absolute -top-1 right-4 w-2 h-2 bg-slate-900 rotate-45"></div>
+              </div>
+            </div>
             {messages.length > 0 && (
               <Button
                 variant="ghost"
