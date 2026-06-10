@@ -1719,10 +1719,23 @@ const ObservationWorkspacePage = () => {
   };
 
   const handleViewFullAnalysis = () => {
+    setRiskStepComplete(false);
     setShowAnalysisDialog(true);
   };
 
   const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
+  const [riskStepComplete, setRiskStepComplete] = useState(false);
+
+  const handleAnalysisDialogChange = (open) => {
+    setShowAnalysisDialog(open);
+    if (!open) {
+      setRiskStepComplete(false);
+    }
+  };
+
+  const handleRiskStepReady = () => {
+    setRiskStepComplete(true);
+  };
 
   // Loading state
   if (isLoading) {
@@ -1950,7 +1963,7 @@ const ObservationWorkspacePage = () => {
       </div>
 
       {/* Full Analysis Dialog — Causal Intelligence + AI Risk Analysis (without recommended actions) */}
-      <Dialog open={showAnalysisDialog} onOpenChange={setShowAnalysisDialog}>
+      <Dialog open={showAnalysisDialog} onOpenChange={handleAnalysisDialogChange}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto" data-testid="full-analysis-dialog">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1964,12 +1977,14 @@ const ObservationWorkspacePage = () => {
               threatData={observation}
               hideRecommendations
               autoGenerate
+              onRiskReady={handleRiskStepReady}
               onAnalysisComplete={refreshWorkspace}
             />
             <CausalIntelligencePanel
               threatId={id}
               threatData={observation}
               autoGenerate
+              autoGenerateEnabled={riskStepComplete}
               onAnalysisComplete={refreshWorkspace}
             />
           </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { aiRiskAPI, threatsAPI, equipmentHierarchyAPI, failureModesAPI } from "../lib/api";
@@ -172,12 +172,24 @@ export default function AIInsightsPanel({
   hideRecommendations = false,
   autoGenerate = false,
   onAnalysisComplete,
+  onRiskReady,
 }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { t, language } = useLanguage();
   const [expanded, setExpanded] = useState(!compact);
   const [addedRecommendations, setAddedRecommendations] = useState(new Set());
+  const riskReadySent = useRef(false);
+
+  useEffect(() => {
+    riskReadySent.current = false;
+  }, [threatId, autoGenerate]);
+
+  const notifyRiskReady = useCallback(() => {
+    if (riskReadySent.current) return;
+    riskReadySent.current = true;
+    onRiskReady?.();
+  }, [onRiskReady]);
   
   // Fetch existing insights
   const { data: insights, isLoading: loadingInsights, error: insightsError } = useQuery({
@@ -250,6 +262,7 @@ export default function AIInsightsPanel({
       await queryClient.invalidateQueries({ queryKey: ["ai-insights", threatId] });
       await queryClient.refetchQueries({ queryKey: ["ai-insights", threatId], type: "active" });
       setAddedRecommendations(new Set());
+      notifyRiskReady();
       await onAnalysisComplete?.();
       toast.success(t("ai.analysisComplete") || "AI analysis complete");
     },
@@ -317,6 +330,9 @@ export default function AIInsightsPanel({
   // Auto-trigger analysis when autoGenerate is on and no insights exist yet
   useEffect(() => {
     const hasData = insights && (insights.dynamic_risk || insights.summary || insights.risk_drivers);
+    if (autoGenerate && !loadingInsights && hasData && !analyzeMutation.isPending) {
+      notifyRiskReady();
+    }
     if (
       autoGenerate &&
       !loadingInsights &&
@@ -327,7 +343,7 @@ export default function AIInsightsPanel({
       analyzeMutation.mutate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoGenerate, loadingInsights, insights]);
+  }, [autoGenerate, loadingInsights, insights, notifyRiskReady]);
   
   // No insights yet (either 404 error or backend returned null/empty) - show analyze button
   const hasInsights = insights && (insights.dynamic_risk || insights.summary || insights.risk_drivers);

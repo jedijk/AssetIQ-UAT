@@ -170,6 +170,7 @@ export default function CausalIntelligencePanel({
   threatId,
   threatData,
   autoGenerate = false,
+  autoGenerateEnabled = true,
   onAnalysisComplete,
 }) {
   const queryClient = useQueryClient();
@@ -335,6 +336,7 @@ export default function CausalIntelligencePanel({
   useEffect(() => {
     if (
       autoGenerate &&
+      autoGenerateEnabled &&
       !loadingCausal &&
       !causalData &&
       !generateMutation.isPending &&
@@ -343,7 +345,7 @@ export default function CausalIntelligencePanel({
       generateMutation.mutate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoGenerate, loadingCausal, causalData]);
+  }, [autoGenerate, autoGenerateEnabled, loadingCausal, causalData]);
 
   const handleStartInvestigation = () => {
     const displayData = generateMutation.data || causalData;
@@ -379,6 +381,17 @@ export default function CausalIntelligencePanel({
         <div className="flex items-center justify-center py-6">
           <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
           <span className="ml-2 text-sm text-slate-600">{t("ai.loadingAnalysis") || "Loading analysis..."}</span>
+        </div>
+      </div>
+    );
+  }
+  // Waiting for AI risk analysis before auto-generating causal analysis
+  else if (autoGenerate && !autoGenerateEnabled && (!displayData || probableCauses.length === 0)) {
+    return (
+      <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-200 p-4">
+        <div className="flex items-center justify-center py-6">
+          <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
+          <span className="ml-2 text-sm text-slate-600">{t("ai.analyzingThreat")}</span>
         </div>
       </div>
     );
