@@ -254,6 +254,7 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
         "id": threat_id,
         "title": f"{equipment_name} - {failure_mode_name}",
         "description": user_description or "",
+        "user_context": user_description or "",  # Frontend uses this field for the description display
         "asset": equipment_name,
         "equipment_type": equipment_type,
         "failure_mode": failure_mode_name,
