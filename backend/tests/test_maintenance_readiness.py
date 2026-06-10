@@ -13,7 +13,14 @@ ADMIN_PATH = Path(__file__).resolve().parents[1] / "routes" / "admin.py"
 def _load_admin_module(mock_db):
     database_mod = types.ModuleType("database")
     database_mod.db = mock_db
+    database_mod.client = MagicMock()
     database_mod.ai_usage_tracker = MagicMock()
+    database_mod.JWT_SECRET = "test-secret"
+    database_mod.JWT_ALGORITHM = "HS256"
+    database_mod.JWT_EXPIRATION_HOURS = 24
+    database_mod.get_request_db = MagicMock(return_value=mock_db)
+    database_mod.AVAILABLE_DATABASES = {}
+    database_mod.rbac_service = MagicMock()
     sys.modules["database"] = database_mod
 
     auth_mod = types.ModuleType("routes.auth")
