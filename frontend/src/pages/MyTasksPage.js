@@ -500,9 +500,14 @@ const MyTasksPage = () => {
   };
 
   const getDisciplineDisplayText = () => {
-    if (selectedDisciplines.length === 0) return "All Disciplines";
+    if (selectedDisciplines.length === 0) {
+      return isMobileView ? t("common.discipline") : t("disciplines.allDisciplines");
+    }
     if (selectedDisciplines.length === 1) {
       return getDisciplineLabel(selectedDisciplines[0]);
+    }
+    if (isMobileView) {
+      return `${selectedDisciplines.length} ${t("observations.selected")}`;
     }
     return `${getDisciplineLabel(selectedDisciplines[0])} +${selectedDisciplines.length - 1}`;
   };
@@ -1120,20 +1125,27 @@ const MyTasksPage = () => {
               <button
                 type="button"
                 onClick={() => setDisciplineDropdownOpen(!disciplineDropdownOpen)}
-                className="flex items-center justify-between w-[90px] sm:w-[140px] h-9 px-2 sm:px-3 bg-white border border-slate-200 rounded-md text-xs sm:text-sm hover:bg-slate-50 transition-colors"
+                className="flex items-center justify-between w-[96px] sm:w-[140px] h-9 px-2 sm:px-3 bg-white border border-slate-200 rounded-md text-xs sm:text-sm hover:bg-slate-50 transition-colors min-w-0 overflow-hidden"
                 data-testid="discipline-filter"
+                title={
+                  selectedDisciplines.length === 0
+                    ? t("disciplines.allDisciplines")
+                    : selectedDisciplines.map((d) => getDisciplineLabel(d)).join(", ")
+                }
               >
-                <span
-                  className={cn(
-                    "truncate",
-                    selectedDisciplines.length > 0 ? "text-slate-900" : "text-slate-500"
-                  )}
-                >
-                  {getDisciplineDisplayText()}
-                </span>
+                <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+                  <span
+                    className={cn(
+                      "truncate min-w-0",
+                      selectedDisciplines.length > 0 ? "text-slate-900" : "text-slate-500"
+                    )}
+                  >
+                    {getDisciplineDisplayText()}
+                  </span>
+                </div>
                 <ChevronDown
                   className={cn(
-                    "w-3.5 h-3.5 text-slate-400 transition-transform flex-shrink-0 ml-1",
+                    "w-3.5 h-3.5 text-slate-400 transition-transform flex-shrink-0 ml-0.5",
                     disciplineDropdownOpen && "rotate-180"
                   )}
                 />
@@ -1151,7 +1163,7 @@ const MyTasksPage = () => {
                     )}
                     data-testid="discipline-option-all"
                   >
-                    All Disciplines
+                    {t("disciplines.allDisciplines")}
                   </button>
                   {disciplines.map((disc) => {
                     const isSelected = selectedDisciplines.includes(disc.value);
