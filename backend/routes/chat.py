@@ -319,26 +319,30 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
 
     await db.threats.insert_one(threat_doc)
 
-    asyncio.create_task(
-        translate_observation(
-            threat_id,
-            {
-                "title": threat_doc.get("title") or threat_doc.get("description", "")[:120],
-                "description": threat_doc.get("description", "") or "",
-            },
-            user_id,
-        )
-    )
+    # Skip auto-translation for faster response - can be done manually later if needed
+    # asyncio.create_task(
+    #     translate_observation(
+    #         threat_id,
+    #         {
+    #             "title": threat_doc.get("title") or threat_doc.get("description", "")[:120],
+    #             "description": threat_doc.get("description", "") or "",
+    #         },
+    #         user_id,
+    #     )
+    # )
 
     from services.reliability_graph import _run_graph_sync, sync_threat_edges
 
-    await _run_graph_sync(
-        sync_threat_edges(
-            threat_id=threat_id,
-            equipment_id=obs_data.get("equipment_id"),
-            failure_mode_id=obs_data.get("failure_mode_id"),
-        ),
-        "chat_threat_create",
+    # Run graph sync in background (non-blocking)
+    asyncio.create_task(
+        _run_graph_sync(
+            sync_threat_edges(
+                threat_id=threat_id,
+                equipment_id=obs_data.get("equipment_id"),
+                failure_mode_id=obs_data.get("failure_mode_id"),
+            ),
+            "chat_threat_create",
+        )
     )
 
     # Auto-create actions
@@ -370,16 +374,17 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
                 risk_level=threat_doc.get("risk_level"),
             )
             aid = action_doc["id"]
-            asyncio.create_task(
-                translate_action(
-                    aid,
-                    {
-                        "title": action_doc.get("title", ""),
-                        "description": action_doc.get("description", "") or "",
-                    },
-                    user_id,
-                )
-            )
+            # Skip auto-translation for faster response
+            # asyncio.create_task(
+            #     translate_action(
+            #         aid,
+            #         {
+            #             "title": action_doc.get("title", ""),
+            #             "description": action_doc.get("description", "") or "",
+            #         },
+            #         user_id,
+            #     )
+            # )
             auto_created.append({"id": aid, "title": desc[:100], "type": ra.get("action_type", "CM")})
 
     if auto_created:
@@ -388,7 +393,8 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
             {"$set": {"auto_created_action_ids": [a["id"] for a in auto_created]}}
         )
 
-    await update_all_ranks(user_id)
+    # Run rank update in background (non-blocking)
+    asyncio.create_task(update_all_ranks(user_id))
 
     updated = await db.threats.find_one({"id": threat_id}, {"_id": 0})
     if isinstance(updated.get("risk_score"), float):
@@ -1093,10 +1099,17 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
         # Quick check: Skip intent classification if message looks like an issue report
         # This saves ~1-2 seconds of AI call time
         content_lower = content.lower()
-        issue_keywords = ["broken", "overheating", "leaking", "noise", "vibration", "failure", 
-                         "issue", "problem", "defect", "damage", "fault", "error", "malfunction",
-                         "kapot", "lek", "storing", "defect", "probleem", "schade", "fout",
-                         "reporting", "report", "equipment"]
+        issue_keywords = [
+            # English
+            "broken", "overheating", "leaking", "noise", "vibration", "failure", 
+            "issue", "problem", "defect", "damage", "fault", "error", "malfunction",
+            "reporting", "report", "equipment", "hot", "cold", "high", "low",
+            # Dutch
+            "kapot", "lek", "storing", "defect", "probleem", "schade", "fout",
+            "temperatuur", "hoog", "laag", "warm", "koud", "geluid", "trilling",
+            "melding", "apparaat", "machine", "motor", "pomp", "falen",
+            "oververhitting", "lekkage", "slijtage", "breuk",
+        ]
         looks_like_issue = any(kw in content_lower for kw in issue_keywords)
         
         # Only run intent classification if it doesn't look like an issue report

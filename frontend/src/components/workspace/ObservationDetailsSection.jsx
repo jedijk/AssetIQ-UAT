@@ -38,6 +38,7 @@ import {
   Search,
   Share2,
   Shield,
+  Sparkles,
   Star,
   Target,
   Trash2,
@@ -183,6 +184,7 @@ const ObservationDetailsSection = ({ threatId }) => {
   const attachmentInputRef = useRef(null);
   const [showAttList, setShowAttList] = useState(false);
   const [previewAtt, setPreviewAtt] = useState(null);
+  const [aiImprovingDesc, setAiImprovingDesc] = useState(false);
 
   // --- Mutations ------------------------------------------------------------
   const updateMutation = useMutation({
