@@ -93,29 +93,9 @@ def _compress_image(b64_data: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Language detection
+# Language detection (utils/text_language.py)
 # ---------------------------------------------------------------------------
-_LANG_WORDS = {
-    "nl": {"de", "het", "een", "is", "van", "en", "in", "dat", "niet", "op",
-           "te", "zijn", "voor", "met", "aan", "er", "ook", "maar", "als",
-           "nog", "wel", "geen", "moet", "wordt", "kan", "naar", "bij", "dit",
-           "wat", "meer", "uit", "over", "zo", "dan", "hun", "werd", "heeft",
-           "hoe", "nee", "ja", "kapot", "stuk", "lek", "pomp", "klep",
-           "sensor", "storing", "onderhoud", "controleer", "draait"},
-    "de": {"der", "die", "das", "und", "ist", "nicht", "mit", "eine", "ein",
-           "dem", "den", "auch", "aber", "oder", "für", "auf", "aus", "bei",
-           "wie", "noch", "wird", "kann", "nach", "zum", "zur", "bitte", "kein",
-           "pumpe", "ventil", "sensor", "defekt", "undicht", "temperatur",
-           "anlage", "gerät", "stoerung", "störung", "meldung", "funktioniert"},
-}
-
-def detect_language(text: str) -> str:
-    words = set(text.lower().split())
-    if len(words) < 2:
-        return "en"
-    scores = {lang: len(words & lw) for lang, lw in _LANG_WORDS.items()}
-    best = max(scores, key=scores.get)
-    return best if scores[best] >= 2 else "en"
+from utils.text_language import analyze_text_languages, detect_language, resolve_chat_ui_language
 
 
 # ---------------------------------------------------------------------------
@@ -477,39 +457,24 @@ def _threat_to_response(threat: dict) -> ThreatResponse:
 
 def _issue_confirm_ui_lang_from_copy(summary: str, issue_body: str, fallback: str) -> str:
     """
-    Match issue-confirm chrome (intro + buttons) to the language users actually read
-    in the summary/issue text. Avoids Dutch UI when the summary is English but
-    chat_ui_language / detect_language skew nl (e.g. app set to NL, or 'is'/'in'
-    scoring false positives in detect_language).
+    Match issue-confirm chrome (intro + buttons) to readable language.
+    Mixed-language reports use the app/fallback language for buttons.
     """
     blob = f"{summary or ''}\n{issue_body or ''}".strip()
     if len(blob) < 3:
         fb = (fallback or "en").lower()[:2]
         return fb if fb == "nl" else "en"
 
-    low = f" {blob.lower()} "
+    profile = analyze_text_languages(blob)
+    if profile.get("is_mixed"):
+        fb = (fallback or "en").lower()[:2]
+        return fb if fb in ("nl", "de") else "en"
 
-    # Strong Dutch cues (articles / function words uncommon as false positives in EN)
-    nl_markers = (
-        " het ", " een ", " niet ", " naar ", " deze ", " wordt ", " graag ",
-        " geen ", " ook ", " alleen ", " kunt ", " kunnen ", " moeten ", " wij ",
-        " uw ", " u ", " bijvoorbeeld ", " melding ", " klep ", " pomp ",
-    )
-    if any(m in low for m in nl_markers):
+    primary = profile.get("primary") or "en"
+    if primary == "nl":
         return "nl"
-
-    # Strong English cues (typical issue-reporting vocabulary)
-    en_markers = (
-        " the ", " and ", " with ", " that ", " this ", " which ", " sensor ",
-        " filter ", " valve ", " high ", " low ", " temperature ", " problem ",
-        " issue ", " broken ", " leak ", " full ", " often ", " very ",
-    )
-    if any(m in low for m in en_markers):
+    if primary == "de":
         return "en"
-
-    d = detect_language(blob)
-    if d == "nl":
-        return "nl"
     return "en"
 
 
@@ -645,6 +610,7 @@ async def _finalize_chat_machine_result(
             question_type="context",
             awaiting_context_for_threat=new_threat_id,
             detected_language=detected_lang,
+            is_mixed_language=bool((obs_data or {}).get("mixed_language_input")),
         )
 
     await _write_conv(
@@ -679,6 +645,7 @@ async def _finalize_chat_machine_result(
         failure_mode_suggestions=result.get("failure_mode_suggestions"),
         show_new_failure_mode_option=result.get("show_new_failure_mode_option"),
         detected_language=detected_lang,
+        is_mixed_language=bool((result.get("pending_data") or {}).get("mixed_language_input")),
     )
 
 
@@ -715,7 +682,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
         _conv_peek = await _read_conv(user_id)
         if _conv_peek.get("state", ChatState.INITIAL) == ChatState.INITIAL:
             # Neither store the user message nor reply — keep the UI clean.
-            return ChatResponse(message="", detected_language=detected_lang)
+            return ChatResponse(message="", detected_language=detected_lang, is_mixed_language=is_mixed_language or None)
 
     # 1. Store user message
     user_msg = {
@@ -742,16 +709,23 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
         }
         or len(content.strip()) < 4
     )
-    ul = (detected_lang or "en").lower()[:2]
-    if ul not in ("nl", "en", "de"):
-        ul = "en"
-    if short_cmd and conv.get("chat_ui_language"):
-        cul = conv.get("chat_ui_language")
-        if isinstance(cul, str) and cul.lower()[:2] in ("nl", "en", "de"):
-            ul = cul.lower()[:2]
+    sticky_ul = conv.get("chat_ui_language")
+    explicit_ul = (detected_lang or "").lower()[:2] if detected_lang else None
+    if explicit_ul not in ("nl", "en", "de"):
+        explicit_ul = None
+    ul, lang_profile = resolve_chat_ui_language(
+        content,
+        explicit=explicit_ul,
+        fallback=explicit_ul or sticky_ul or "en",
+        sticky=sticky_ul,
+        short_command=short_cmd,
+    )
     pending_data["chat_ui_language"] = ul
+    if lang_profile.get("is_mixed"):
+        pending_data["mixed_language_input"] = True
     await _write_conv(user_id, chat_ui_language=ul)
     ui_is_nl = ul == "nl"
+    is_mixed_language = bool(lang_profile.get("is_mixed"))
     original_message = conv.get("original_message")
     eq_suggestions = conv.get("equipment_suggestions") or []
     fm_suggestions = conv.get("failure_mode_suggestions") or []
@@ -773,7 +747,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                 else "Cancelled. What would you like to report?"
             )
             await _store_assistant_msg(user_id, reply, chat_state=ChatState.INITIAL)
-            return ChatResponse(message=reply, detected_language=detected_lang)
+            return ChatResponse(message=reply, detected_language=detected_lang, is_mixed_language=is_mixed_language or None)
 
         if _issue_confirm_yes(content):
             if not issue_desc:
@@ -784,7 +758,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                     else "Please start again with a short description of the issue."
                 )
                 await _store_assistant_msg(user_id, reply, chat_state=ChatState.INITIAL)
-                return ChatResponse(message=reply, detected_language=detected_lang)
+                return ChatResponse(message=reply, detected_language=detected_lang, is_mixed_language=is_mixed_language or None)
             await _write_conv(user_id, issue_description=None, issue_summary=None)
             fm_library = await get_failure_modes_from_db()
             pd = {
@@ -830,6 +804,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                 follow_up_question=reply,
                 question_type="issue_redescribe",
                 detected_language=detected_lang,
+            is_mixed_language=is_mixed_language or None,
             )
 
         prior_summary = (conv.get("issue_summary") or "").strip()
@@ -865,6 +840,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             follow_up_question=reply,
             question_type="issue_confirm",
             detected_language=detected_lang,
+            is_mixed_language=is_mixed_language or None,
             issue_summary=summary,
             issue_confirm_language=ic_lang,
         )
@@ -878,7 +854,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                 else "Cancelled. What would you like to report?"
             )
             await _store_assistant_msg(user_id, reply, chat_state=ChatState.INITIAL)
-            return ChatResponse(message=reply, detected_language=detected_lang)
+            return ChatResponse(message=reply, detected_language=detected_lang, is_mixed_language=is_mixed_language or None)
         summary = await summarize_issue_description(content, detected_lang)
         await _write_conv(
             user_id,
@@ -903,6 +879,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             follow_up_question=reply,
             question_type="issue_confirm",
             detected_language=detected_lang,
+            is_mixed_language=is_mixed_language or None,
             issue_summary=summary,
             issue_confirm_language=ic_lang,
         )
@@ -1005,7 +982,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                 else "Got it! Your observation has been saved. What else would you like to report?"
             )
             await _store_assistant_msg(user_id, reply, chat_state=ChatState.INITIAL)
-            return ChatResponse(message=reply, detected_language=detected_lang)
+            return ChatResponse(message=reply, detected_language=detected_lang, is_mixed_language=is_mixed_language or None)
         
         # User added context - ask for more context (keep skip timer running)
         if image_base64 and analysis:
@@ -1087,6 +1064,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             question_type="context",
             awaiting_context_for_threat=threat_id,
             detected_language=detected_lang,
+            is_mixed_language=is_mixed_language or None,
         )
 
     # ------------------------------------------------------------------
@@ -1128,7 +1106,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                     "answer", "I couldn't find the information you're looking for."
                 )
                 await _store_assistant_msg(user_id, answer, chat_state=ChatState.INITIAL, is_data_query=True)
-                return ChatResponse(message=answer, question_type="data_query", detected_language=detected_lang)
+                return ChatResponse(message=answer, question_type="data_query", detected_language=detected_lang, is_mixed_language=is_mixed_language or None)
 
         # ------------------------------------------------------------------
         # Check equipment confidence BEFORE summary
@@ -1174,6 +1152,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                 question_type="equipment_select",
                 equipment_suggestions=eq_matches,
                 detected_language=detected_lang,
+            is_mixed_language=is_mixed_language or None,
             )
         
         if not eq_matches:
@@ -1207,6 +1186,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                 question_type="equipment_input",
                 equipment_suggestions=[],
                 detected_language=detected_lang,
+            is_mixed_language=is_mixed_language or None,
             )
 
         # High-confidence match - auto-select equipment and proceed to observation creation

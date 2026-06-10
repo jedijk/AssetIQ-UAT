@@ -35,6 +35,10 @@ import {
 } from '../ui/dropdown-menu';
 import { CRITICALITY_CONFIG } from '../maintenance/constants';
 import { computeCriticalityScore } from '../../lib/criticalityScore';
+import { useIsMobile } from '../../hooks/useIsMobile';
+
+const DIALOG_CONTENT_CLASS = 'w-[calc(100%-1rem)] max-w-lg max-h-[min(92dvh,100%)] overflow-y-auto sm:w-full';
+const FORM_GRID_CLASS = 'grid grid-cols-1 sm:grid-cols-2 gap-4';
 
 const STRATEGY_BAND_STYLES = {
   low: 'bg-green-50 text-green-700 border-green-200',
@@ -246,124 +250,140 @@ const SourceBadge = ({ source }) => {
 
 // Task row component
 const TaskRow = ({ task, onEdit, onDelete, onToggleActive, isExpanded, onToggleExpand, canToggle }) => {
+  const { t } = useLanguage();
   const categoryConfig = CATEGORY_CONFIG[task.task_category] || CATEGORY_CONFIG.preventive_maintenance;
   const CategoryIcon = categoryConfig.icon;
   const isActive = task.is_active !== false;
+
+  const metaBadges = (
+    <>
+      <SourceBadge source={task.task_source} />
+      <Badge variant="outline" className={`${PRIORITY_COLORS[task.priority]} text-xs`}>
+        {task.priority}
+      </Badge>
+      <Badge variant="outline" className="bg-gray-50 text-gray-600 text-xs gap-1">
+        <Clock className="h-3 w-3" />
+        {FREQUENCY_LABELS[task.frequency] || task.frequency}
+      </Badge>
+      <Badge variant="outline" className="bg-gray-50 text-gray-600 text-xs">
+        {task.estimated_duration_hours}h
+      </Badge>
+    </>
+  );
   
   return (
     <div className={`border rounded-lg mb-2 ${!isActive ? 'opacity-60' : ''}`}>
-      {/* Main row */}
-      <div 
-        className="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50"
+      <div
+        className="p-2.5 sm:p-3 cursor-pointer hover:bg-gray-50"
         onClick={onToggleExpand}
       >
-        <div className="flex-shrink-0">
-          {isExpanded ? (
-            <ChevronDown className="h-4 w-4 text-gray-400" />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-gray-400" />
-          )}
-        </div>
-        
-        <div className="flex-shrink-0">
-          <div className={`p-2 rounded-lg ${isActive ? 'bg-blue-50' : 'bg-gray-50'}`}>
-            <CategoryIcon className={`h-4 w-4 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
-          </div>
-        </div>
-        
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className={`font-medium truncate ${!isActive ? 'line-through text-gray-400' : ''}`}>
-              {task.task_title}
-            </span>
-            {!isActive && (
-              <Badge variant="outline" className="bg-slate-100 text-slate-600 text-xs">
-                Disabled
-              </Badge>
-            )}
-            {task.is_overridden && (
-              <Badge variant="outline" className="bg-orange-50 text-orange-600 text-xs">Overridden</Badge>
+        <div className="flex items-start gap-2 sm:gap-3">
+          <div className="flex-shrink-0 pt-0.5">
+            {isExpanded ? (
+              <ChevronDown className="h-4 w-4 text-gray-400" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-gray-400" />
             )}
           </div>
-          <div className="text-xs text-gray-500 mt-0.5 truncate">
-            {task.task_description || 'No description'}
+
+          <div className="flex-shrink-0">
+            <div className={`p-1.5 sm:p-2 rounded-lg ${isActive ? 'bg-blue-50' : 'bg-gray-50'}`}>
+              <CategoryIcon className={`h-4 w-4 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
+            </div>
           </div>
-        </div>
-        
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <SourceBadge source={task.task_source} />
-          
-          <Badge variant="outline" className={`${PRIORITY_COLORS[task.priority]} text-xs`}>
-            {task.priority}
-          </Badge>
-          
-          <Badge variant="outline" className="bg-gray-50 text-gray-600 text-xs gap-1">
-            <Clock className="h-3 w-3" />
-            {FREQUENCY_LABELS[task.frequency] || task.frequency}
-          </Badge>
-          
-          <Badge variant="outline" className="bg-gray-50 text-gray-600 text-xs">
-            {task.estimated_duration_hours}h
-          </Badge>
-        </div>
-        
-        <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-          {canToggle && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center gap-1.5">
-                    <Switch
-                      checked={isActive}
-                      onCheckedChange={() => onToggleActive(task, isActive)}
-                      aria-label={isActive ? 'Disable task' : 'Enable task'}
-                    />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>{isActive ? t("tooltips.disableTask") : t("tooltips.enableTask")}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {task.is_pm_import_pending ? (
-                <DropdownMenuItem disabled className="text-xs text-gray-500">
-                  Manage in Library → PM Import
-                </DropdownMenuItem>
-              ) : (
-                <>
-                  <DropdownMenuItem onClick={() => onEdit(task)}>
-                    <Edit className="h-4 w-4 mr-2" /> Edit Task
-                  </DropdownMenuItem>
-                  {canToggle && (
-                    <DropdownMenuItem onClick={() => onToggleActive(task, isActive)}>
-                      {isActive ? (
-                        <><Pause className="h-4 w-4 mr-2" /> Disable task</>
-                      ) : (
-                        <><Play className="h-4 w-4 mr-2" /> Enable task</>
-                      )}
-                    </DropdownMenuItem>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className={`font-medium text-sm sm:text-base break-words ${!isActive ? 'line-through text-gray-400' : ''}`}>
+                    {task.task_title}
+                  </span>
+                  {!isActive && (
+                    <Badge variant="outline" className="bg-slate-100 text-slate-600 text-xs">
+                      Disabled
+                    </Badge>
                   )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onDelete(task)} className="text-red-600">
-                    <Trash2 className="h-4 w-4 mr-2" /> Delete Task
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  {task.is_overridden && (
+                    <Badge variant="outline" className="bg-orange-50 text-orange-600 text-xs">Overridden</Badge>
+                  )}
+                </div>
+                <div className="text-xs text-gray-500 mt-0.5 line-clamp-2 sm:truncate">
+                  {task.task_description || 'No description'}
+                </div>
+              </div>
+
+              <div
+                className="flex items-center gap-1.5 flex-shrink-0"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {canToggle && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="flex items-center">
+                          <Switch
+                            checked={isActive}
+                            onCheckedChange={() => onToggleActive(task, isActive)}
+                            aria-label={isActive ? 'Disable task' : 'Enable task'}
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>{isActive ? t('tooltips.disableTask') : t('tooltips.enableTask')}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {task.is_pm_import_pending ? (
+                      <DropdownMenuItem disabled className="text-xs text-gray-500">
+                        Manage in Library → PM Import
+                      </DropdownMenuItem>
+                    ) : (
+                      <>
+                        <DropdownMenuItem onClick={() => onEdit(task)}>
+                          <Edit className="h-4 w-4 mr-2" /> Edit Task
+                        </DropdownMenuItem>
+                        {canToggle && (
+                          <DropdownMenuItem onClick={() => onToggleActive(task, isActive)}>
+                            {isActive ? (
+                              <><Pause className="h-4 w-4 mr-2" /> Disable task</>
+                            ) : (
+                              <><Play className="h-4 w-4 mr-2" /> Enable task</>
+                            )}
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => onDelete(task)} className="text-red-600">
+                          <Trash2 className="h-4 w-4 mr-2" /> Delete Task
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5 mt-2 sm:hidden">
+              {metaBadges}
+            </div>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-2 flex-shrink-0 self-center">
+            {metaBadges}
+          </div>
         </div>
       </div>
       
       {/* Expanded details */}
       {isExpanded && (
-        <div className="px-12 pb-3 border-t bg-gray-50">
-          <div className="grid grid-cols-2 gap-4 py-3">
+        <div className="px-3 sm:px-12 pb-3 border-t bg-gray-50">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 py-3">
             <div>
               <div className="text-xs font-medium text-gray-500 mb-1">Category</div>
               <div className="text-sm">{categoryConfig.label}</div>
@@ -494,7 +514,7 @@ const AddTaskDialog = ({ open, onClose, equipmentId, onSuccess }) => {
   
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className={DIALOG_CONTENT_CLASS}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Plus className="h-5 w-5 text-blue-600" />
@@ -525,7 +545,7 @@ const AddTaskDialog = ({ open, onClose, equipmentId, onSuccess }) => {
             />
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className={FORM_GRID_CLASS}>
             <div>
               <Label>Frequency</Label>
               <Select 
@@ -555,7 +575,7 @@ const AddTaskDialog = ({ open, onClose, equipmentId, onSuccess }) => {
             </div>
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className={FORM_GRID_CLASS}>
             <div>
               <Label>Category</Label>
               <Select 
@@ -594,7 +614,7 @@ const AddTaskDialog = ({ open, onClose, equipmentId, onSuccess }) => {
           
           <div>
             <Label>Procedure Steps</Label>
-            <div className="flex gap-2 mt-1">
+            <div className="flex flex-col sm:flex-row gap-2 mt-1">
               <Input
                 value={procedureInput}
                 onChange={(e) => setProcedureInput(e.target.value)}
@@ -680,7 +700,7 @@ const EditTaskDialog = ({ open, onClose, task, equipmentId, onSuccess }) => {
   
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className={DIALOG_CONTENT_CLASS}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Edit className="h-5 w-5 text-blue-600" />
@@ -711,7 +731,7 @@ const EditTaskDialog = ({ open, onClose, task, equipmentId, onSuccess }) => {
             />
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className={FORM_GRID_CLASS}>
             <div>
               <Label>Frequency</Label>
               <Select 
@@ -741,7 +761,7 @@ const EditTaskDialog = ({ open, onClose, task, equipmentId, onSuccess }) => {
             </div>
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className={FORM_GRID_CLASS}>
             <div>
               <Label>Category</Label>
               <Select 
@@ -778,7 +798,7 @@ const EditTaskDialog = ({ open, onClose, task, equipmentId, onSuccess }) => {
             </div>
           </div>
           
-          <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2">
             <div>
               <Label className="text-sm">Task enabled</Label>
               <p className="text-xs text-slate-500">Disabled tasks stay in the program but are not active.</p>
@@ -823,7 +843,7 @@ const VersionHistoryDialog = ({ open, onClose, equipmentId }) => {
   
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className={DIALOG_CONTENT_CLASS}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <History className="h-5 w-5 text-blue-600" />
@@ -834,7 +854,7 @@ const VersionHistoryDialog = ({ open, onClose, equipmentId }) => {
           </DialogDescription>
         </DialogHeader>
         
-        <ScrollArea className="h-[400px] pr-4">
+        <ScrollArea className="h-[min(50dvh,400px)] sm:h-[400px] pr-4">
           {isLoading ? (
             <div className="flex items-center justify-center h-32">
               <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
@@ -880,6 +900,7 @@ const VersionHistoryDialog = ({ open, onClose, equipmentId }) => {
 // Main Component
 const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
   const { t } = useLanguage();
+  const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [sourceFilter, setSourceFilter] = useState('all');
@@ -1096,11 +1117,11 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
       />
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <ClipboardList className="h-6 w-6 text-blue-600" />
-          <div>
-            <h2 className="text-lg font-semibold">{program.program_name}</h2>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3 min-w-0">
+          <ClipboardList className="h-6 w-6 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <h2 className="text-base sm:text-lg font-semibold break-words">{program.program_name}</h2>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               <StatusBadge status={program.status} />
               <span className="text-xs text-gray-500">v{program.version}</span>
@@ -1118,40 +1139,41 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           {!pmImportOnly && (
             <>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setShowVersionHistory(true)}
-                >
-                  <History className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{t("tooltips.versionHistory")}</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => regenerateMutation.mutate()}
-                  disabled={regenerateMutation.isPending}
-                >
-                  <RefreshCw className={`h-4 w-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{t("tooltips.regenerateFromStrategy")}</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowVersionHistory(true)}
+                      aria-label={t('tooltips.versionHistory')}
+                    >
+                      <History className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t('tooltips.versionHistory')}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => regenerateMutation.mutate()}
+                      disabled={regenerateMutation.isPending}
+                      aria-label={t('tooltips.regenerateFromStrategy')}
+                    >
+                      <RefreshCw className={`h-4 w-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t('tooltips.regenerateFromStrategy')}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </>
           )}
 
@@ -1169,16 +1191,16 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
               className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
             >
               {deleteProgramMutation.isPending ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                <RefreshCw className="h-4 w-4 sm:mr-2 animate-spin" />
               ) : (
-                <Trash2 className="h-4 w-4 mr-2" />
+                <Trash2 className="h-4 w-4 sm:mr-2" />
               )}
-              Delete Program
+              <span className="hidden sm:inline">Delete Program</span>
             </Button>
           )}
           
           {!pmImportOnly && (
-            <Button onClick={() => setShowAddDialog(true)}>
+            <Button size="sm" className="flex-1 sm:flex-none" onClick={() => setShowAddDialog(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Add Task
             </Button>
@@ -1186,6 +1208,8 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
           {pmImportOnly && (
             <Button
               variant="outline"
+              size="sm"
+              className="flex-1 sm:flex-none"
               onClick={() => syncProgramMutation.mutate()}
               disabled={syncProgramMutation.isPending}
             >
@@ -1201,37 +1225,37 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
       
       {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-6 gap-3">
-          <Card className="p-3">
-            <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+          <Card className="p-2.5 sm:p-3">
+            <div className="text-xl sm:text-2xl font-bold text-gray-900">{stats.total}</div>
             <div className="text-xs text-gray-500">Total Tasks</div>
           </Card>
-          <Card className="p-3">
-            <div className="text-2xl font-bold text-green-600">{stats.active}</div>
+          <Card className="p-2.5 sm:p-3">
+            <div className="text-xl sm:text-2xl font-bold text-green-600">{stats.active}</div>
             <div className="text-xs text-gray-500">Active</div>
           </Card>
-          <Card className="p-3">
-            <div className="text-2xl font-bold text-blue-600">{stats.strategy}</div>
+          <Card className="p-2.5 sm:p-3">
+            <div className="text-xl sm:text-2xl font-bold text-blue-600">{stats.strategy}</div>
             <div className="text-xs text-gray-500">From Strategy</div>
           </Card>
-          <Card className="p-3">
-            <div className="text-2xl font-bold text-purple-600">{stats.imported}</div>
+          <Card className="p-2.5 sm:p-3">
+            <div className="text-xl sm:text-2xl font-bold text-purple-600">{stats.imported}</div>
             <div className="text-xs text-gray-500">Imported</div>
           </Card>
-          <Card className="p-3">
-            <div className="text-2xl font-bold text-amber-600">{stats.ai}</div>
+          <Card className="p-2.5 sm:p-3">
+            <div className="text-xl sm:text-2xl font-bold text-amber-600">{stats.ai}</div>
             <div className="text-xs text-gray-500">AI Generated</div>
           </Card>
-          <Card className="p-3">
-            <div className="text-2xl font-bold text-green-600">{stats.manual}</div>
+          <Card className="p-2.5 sm:p-3">
+            <div className="text-xl sm:text-2xl font-bold text-green-600">{stats.manual}</div>
             <div className="text-xs text-gray-500">Manual</div>
           </Card>
         </div>
       )}
       
       {/* Filter Bar */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+        <div className="relative flex-1 w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             value={searchTerm}
@@ -1242,7 +1266,7 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
         </div>
         
         <Select value={sourceFilter} onValueChange={setSourceFilter}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-full sm:w-48">
             <Filter className="h-4 w-4 mr-2" />
             <SelectValue />
           </SelectTrigger>
@@ -1255,7 +1279,7 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
           </SelectContent>
         </Select>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center justify-between sm:justify-start gap-2 shrink-0">
           <Switch
             id="show-disabled-tasks"
             checked={showDisabledTasks}
@@ -1269,7 +1293,7 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
       
       {/* Tasks List */}
       <Card>
-        <CardContent className="p-4">
+        <CardContent className={isMobile ? 'p-2' : 'p-4'}>
           {filteredTasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-gray-500">
               <ClipboardList className="h-12 w-12 mb-3 text-gray-300" />

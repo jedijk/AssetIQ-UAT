@@ -1743,7 +1743,12 @@
     "attachFileTitle": "Bestand bijvoegen",
     "sendMessageTitle": "Bericht verzenden",
     "stopTranscribeTitle": "Stoppen en transcriberen",
-    "tapToRecordTitle": "Tik om op te nemen"
+    "tapToRecordTitle": "Tik om op te nemen",
+    "modeFast": "Snel",
+    "modeAi": "AI",
+    "responseMode": "Antwoordmodus",
+    "modeFastHint": "Snelle antwoorden zonder AI-verwerking",
+    "modeAiHint": "AI-gegenereerde beschrijvingen (2–3 seconden trager)"
   },
   "info": {
     "title": "AssetIQ - Risicomethodologie",

@@ -4,6 +4,7 @@ from utils.equipment_search_i18n import (
     GERMAN_TO_ENGLISH,
     expand_equipment_keywords,
     translation_search_languages,
+    translation_search_languages_for_text,
 )
 
 
@@ -34,3 +35,11 @@ def test_translation_search_languages():
     assert translation_search_languages("nl") == ("nl",)
     assert translation_search_languages("de") == ("de",)
     assert set(translation_search_languages("en")) == {"nl", "de"}
+
+
+def test_translation_search_languages_for_mixed_text():
+    langs = translation_search_languages_for_text(
+        "Pump leak, de klep is kapot",
+        "en",
+    )
+    assert "nl" in langs

@@ -14,7 +14,6 @@ import {
   AlertTriangle,
   ArrowRight,
   HelpCircle,
-  Plus,
   Settings,
   Globe,
   ChevronDown
@@ -38,8 +37,6 @@ const ChatPage = () => {
   const [imagePreview, setImagePreview] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [showNewFailureModeInput, setShowNewFailureModeInput] = useState(false);
-  const [newFailureModeName, setNewFailureModeName] = useState("");
   const [detectedLanguage, setDetectedLanguage] = useState(null);
   const [manualLanguage, setManualLanguage] = useState(null);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -67,7 +64,7 @@ const ChatPage = () => {
       if (data?.detected_language) {
         setDetectedLanguage(data.detected_language);
         const lang = data.detected_language;
-        if ((lang === "en" || lang === "nl") && lang !== appLanguage) {
+        if (!data?.is_mixed_language && (lang === "en" || lang === "nl") && lang !== appLanguage) {
           setAppLanguage(lang);
         }
       }
@@ -172,27 +169,8 @@ const ChatPage = () => {
     }
   };
 
-  // Handle clicking on a suggestion (equipment or failure mode)
   const handleSuggestionClick = (suggestionText) => {
-    setShowNewFailureModeInput(false);
-    setNewFailureModeName("");
     sendMutation.mutate({ content: suggestionText, image: null });
-  };
-
-  // Handle new failure mode submission
-  const handleNewFailureModeSubmit = () => {
-    if (newFailureModeName.trim().length >= 3) {
-      sendMutation.mutate({ content: `New failure mode: ${newFailureModeName.trim()}`, image: null });
-      setShowNewFailureModeInput(false);
-      setNewFailureModeName("");
-    } else {
-      toast.error("Failure mode name must be at least 3 characters");
-    }
-  };
-
-  // Handle clicking "New Failure Mode" button
-  const handleNewFailureModeClick = () => {
-    setShowNewFailureModeInput(true);
   };
 
   // Render message content
@@ -214,8 +192,6 @@ const ChatPage = () => {
     // AI message - check if it's a follow-up question
     const isFollowUp = msg.question_type || msg.content.includes("?");
     const hasEquipmentSuggestions = msg.equipment_suggestions && msg.equipment_suggestions.length > 0;
-    const hasFailureModeSuggestions = msg.failure_mode_suggestions && msg.failure_mode_suggestions.length > 0;
-    const showNewFailureModeOption = msg.failure_mode_suggestions !== undefined || msg.chat_state === "awaiting_failure_mode";
     const isContextPrompt = msg.chat_state === "awaiting_context" || msg.awaiting_context_for_threat;
     
     const issueConfirmStructured =
@@ -346,84 +322,6 @@ const ChatPage = () => {
           </div>
         )}
         
-        {/* Failure Mode Suggestions */}
-        {hasFailureModeSuggestions && (
-          <div className="mt-3 pt-3 border-t border-slate-100">
-            <p className="text-sm text-slate-500 mb-2">Select failure mode:</p>
-            <div className="flex flex-wrap gap-2">
-              {msg.failure_mode_suggestions.map((fm, idx) => (
-                <Button
-                  key={idx}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleSuggestionClick(`Failure mode: ${fm.failure_mode}`)}
-                  className="text-left justify-start text-blue-600 hover:bg-blue-50 border-blue-200"
-                  data-testid={`failure-mode-suggestion-${idx}`}
-                >
-                  {fm.failure_mode}
-                  {fm.rpn && <span className="ml-1 text-xs text-slate-400">(RPN: {fm.rpn})</span>}
-                </Button>
-              ))}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleSuggestionClick("Failure mode: I don't know")}
-                className="text-left justify-start text-slate-600 hover:bg-slate-50 border-slate-200"
-                data-testid="failure-mode-unknown-btn"
-              >
-                <HelpCircle className="w-3 h-3 mr-1 flex-shrink-0" />
-                I don&apos;t know
-              </Button>
-            </div>
-          </div>
-        )}
-        
-        {/* New Failure Mode Option */}
-        {showNewFailureModeOption && !hasEquipmentSuggestions && (
-          <div className="mt-3 pt-3 border-t border-slate-100">
-            {!showNewFailureModeInput ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleNewFailureModeClick}
-                className="text-left justify-start text-green-600 hover:bg-green-50 border-green-200"
-                data-testid="new-failure-mode-btn"
-              >
-                <Plus className="w-3 h-3 mr-1" />
-                {t("chat.newFailureMode")}
-              </Button>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-sm text-slate-600">{t("chat.specifyFailureMode")}</p>
-                <div className="flex gap-2">
-                  <Input
-                    value={newFailureModeName}
-                    onChange={(e) => setNewFailureModeName(e.target.value)}
-                    placeholder={t("chat.enterFailureModeName")}
-                    className="flex-1"
-                    data-testid="new-failure-mode-input"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleNewFailureModeSubmit();
-                      }
-                    }}
-                  />
-                  <Button
-                    size="sm"
-                    onClick={handleNewFailureModeSubmit}
-                    disabled={newFailureModeName.trim().length < 3}
-                    className="bg-green-600 hover:bg-green-700"
-                    data-testid="submit-new-failure-mode-btn"
-                  >
-                    <Send className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        
         {msg.threat_id && (
           <div className="mt-3 pt-3 border-t border-slate-100">
             <a 
@@ -436,7 +334,7 @@ const ChatPage = () => {
             </a>
           </div>
         )}
-        {isFollowUp && !msg.threat_id && !hasEquipmentSuggestions && !hasFailureModeSuggestions && !showNewFailureModeOption && (
+        {isFollowUp && !msg.threat_id && !hasEquipmentSuggestions && (
           <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 text-blue-600 text-sm">
             <HelpCircle className="w-4 h-4" />
             <span>{t("chat.provideMoreDetails")}</span>

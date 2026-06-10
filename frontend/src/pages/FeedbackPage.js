@@ -245,9 +245,20 @@ const FeedbackPage = () => {
         screenshot_url: screenshotUrl,
       });
     },
-    onSuccess: () => {
+    onSuccess: (created) => {
+      const prependCreated = (old) => {
+        const prevItems = old?.items || [];
+        const withoutDup = prevItems.filter((item) => item.id !== created.id);
+        return {
+          items: [created, ...withoutDup],
+          total: withoutDup.length + 1,
+        };
+      };
+      queryClient.setQueryData(["feedback", "my"], prependCreated);
+      if (canViewAll) {
+        queryClient.setQueryData(["feedback", "all"], prependCreated);
+      }
       queryClient.invalidateQueries({ queryKey: ["feedback"] });
-      // Notify owners about new feedback
       queryClient.invalidateQueries({ queryKey: ["unread-feedback-count"] });
       toast.success(t("feedback.submitted") || "Feedback submitted successfully");
       resetForm();
@@ -404,9 +415,20 @@ const FeedbackPage = () => {
     setTranscribedText("");
   };
 
+  const submitFeedbackData = (data) => {
+    if (isEditMode && editingFeedback) {
+      updateMutation.mutate({ id: editingFeedback.id, data });
+    } else {
+      submitMutation.mutate(data);
+    }
+  };
+
   const handleSubmit = () => {
-    if (!message.trim() && !audioBlob) {
-      toast.error(t("feedback.messageRequired") || "Please enter a message or record audio");
+    if (!message.trim() && !audioBlob && !screenshotFile) {
+      toast.error(
+        t("feedback.messageRequired")
+          || "Please enter a message, record audio, or attach a screenshot"
+      );
       return;
     }
 
@@ -414,28 +436,31 @@ const FeedbackPage = () => {
       type: feedbackType,
       message: message.trim(),
       severity: feedbackType === "issue" ? severity || "medium" : null,
-      has_audio: !!audioBlob,
     };
-    
-    // If there's audio, we need to convert it to base64 and include it
+
     if (audioBlob) {
       const reader = new FileReader();
+      reader.onerror = () => {
+        toast.error(
+          t("feedback.audioReadFailed")
+            || "Could not read the voice recording. Please try recording again."
+        );
+      };
       reader.onloadend = () => {
-        data.audio_data = reader.result;
-        if (isEditMode && editingFeedback) {
-          updateMutation.mutate({ id: editingFeedback.id, data });
-        } else {
-          submitMutation.mutate(data);
+        if (!reader.result) {
+          toast.error(
+            t("feedback.audioReadFailed")
+              || "Could not read the voice recording. Please try recording again."
+          );
+          return;
         }
+        submitFeedbackData({ ...data, audio_data: reader.result });
       };
       reader.readAsDataURL(audioBlob);
-    } else {
-      if (isEditMode && editingFeedback) {
-        updateMutation.mutate({ id: editingFeedback.id, data });
-      } else {
-        submitMutation.mutate(data);
-      }
+      return;
     }
+
+    submitFeedbackData(data);
   };
 
   const handleEdit = (feedback, e) => {

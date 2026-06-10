@@ -64,11 +64,20 @@ async def submit_feedback(
             logging.error(f"Error saving audio: {e}")
             # Continue without audio if it fails
     
+    message = (feedback.message or "").strip()
+    has_audio = bool(feedback.audio_data)
+    has_screenshot = bool(feedback.screenshot_url)
+    if not message and not has_audio and not has_screenshot:
+        raise HTTPException(
+            status_code=400,
+            detail="Feedback must include a message, voice recording, or screenshot",
+        )
+
     result = await create_feedback(
         user_id=current_user["id"],
         user_name=current_user.get("name", "Unknown"),
         feedback_type=feedback.type,
-        message=feedback.message,
+        message=message,
         severity=feedback.severity,
         screenshot_url=feedback.screenshot_url,
         module=feedback.module,
@@ -187,51 +196,6 @@ async def get_my_feedback(current_user: dict = Depends(get_current_user)):
     for item in items:
         item["user_name"] = current_user.get("name")
     return {"items": items, "total": len(items)}
-
-
-@router.get("/{feedback_id}", response_model=FeedbackResponse)
-async def get_feedback_detail(
-    feedback_id: str,
-    current_user: dict = Depends(get_current_user)
-):
-    """Get details of a specific feedback item (user can only see their own)."""
-    item = await get_feedback_by_id(feedback_id, user_id=current_user["id"])
-    if not item:
-        raise HTTPException(status_code=404, detail="Feedback not found")
-    return item
-
-
-@router.put("/{feedback_id}", response_model=FeedbackResponse)
-async def update_my_feedback(
-    feedback_id: str,
-    update: FeedbackUserUpdate,
-    current_user: dict = Depends(get_current_user)
-):
-    """Update user's own feedback (message, type, severity, status)."""
-    result = await update_user_feedback(
-        feedback_id=feedback_id,
-        user_id=current_user["id"],
-        message=update.message,
-        feedback_type=update.type,
-        severity=update.severity,
-        screenshot_url=update.screenshot_url,
-        status=update.status,
-    )
-    if not result:
-        raise HTTPException(status_code=404, detail="Feedback not found or not owned by user")
-    return result
-
-
-@router.delete("/{feedback_id}")
-async def delete_my_feedback(
-    feedback_id: str,
-    current_user: dict = Depends(get_current_user)
-):
-    """Delete user's own feedback."""
-    success = await delete_user_feedback(feedback_id, current_user["id"])
-    if not success:
-        raise HTTPException(status_code=404, detail="Feedback not found or not owned by user")
-    return {"status": "deleted", "id": feedback_id}
 
 
 @router.post("/bulk-status")
@@ -427,3 +391,49 @@ Generate a clear, actionable prompt that can be directly used with an AI develop
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate prompt: {str(e)}")
+
+
+# Parameterized user routes — keep after all static /admin/* and /my/* paths.
+@router.get("/{feedback_id}", response_model=FeedbackResponse)
+async def get_feedback_detail(
+    feedback_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get details of a specific feedback item (user can only see their own)."""
+    item = await get_feedback_by_id(feedback_id, user_id=current_user["id"])
+    if not item:
+        raise HTTPException(status_code=404, detail="Feedback not found")
+    return item
+
+
+@router.put("/{feedback_id}", response_model=FeedbackResponse)
+async def update_my_feedback(
+    feedback_id: str,
+    update: FeedbackUserUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update user's own feedback (message, type, severity, status)."""
+    result = await update_user_feedback(
+        feedback_id=feedback_id,
+        user_id=current_user["id"],
+        message=update.message,
+        feedback_type=update.type,
+        severity=update.severity,
+        screenshot_url=update.screenshot_url,
+        status=update.status,
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Feedback not found or not owned by user")
+    return result
+
+
+@router.delete("/{feedback_id}")
+async def delete_my_feedback(
+    feedback_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete user's own feedback."""
+    success = await delete_user_feedback(feedback_id, current_user["id"])
+    if not success:
+        raise HTTPException(status_code=404, detail="Feedback not found or not owned by user")
+    return {"status": "deleted", "id": feedback_id}

@@ -196,13 +196,19 @@ async def localize_workspace_payload(
     language: Optional[str],
     *,
     user_id: Optional[str] = None,
+    allow_live_translation: bool = False,
 ) -> Dict[str, Any]:
-    """Apply translations to workspace text fields in-place and return payload."""
+    """
+    Apply translations to workspace text fields in-place and return payload.
+
+    By default only stored entity_translations are applied (fast path).
+    Set allow_live_translation=True to fall back to on-demand AI for missing strings.
+    """
     lang = (language or "en").lower()[:2]
     if lang not in _UI_LANGUAGES:
         return payload
 
-    service = TranslationService(db)
+    service = TranslationService(db) if allow_live_translation else None
     cache: Dict[str, str] = {}
 
     observation = payload.get("observation") or {}
@@ -255,7 +261,7 @@ async def localize_workspace_payload(
         obs_translate_items.append((observation["user_context"], "industrial equipment observation description from field operator"))
     if obs_fields.get("name") and not obs_fields.get("title"):
         observation["title"] = obs_fields["name"]
-    if obs_translate_items:
+    if allow_live_translation and obs_translate_items:
         translated_obs = await _translate_many(service, obs_translate_items, lang, cache, user_id)
         for target, value in zip(obs_translate_targets, translated_obs):
             observation[target] = value
@@ -273,7 +279,7 @@ async def localize_workspace_payload(
             mlc["name"] = fm_fields["name"]
         elif fm_fields.get("causes") and name in (fm_fields.get("causes") or ""):
             mlc["name"] = fm_fields["causes"]
-        else:
+        elif allow_live_translation:
             mlc["name"] = (await _translate_many(
                 service, [(name, "industrial maintenance and reliability")], lang, cache, user_id
             ))[0]
@@ -285,7 +291,7 @@ async def localize_workspace_payload(
         for factor in factors
         if isinstance(factor, dict) and factor.get("factor")
     ]
-    if factor_items:
+    if allow_live_translation and factor_items:
         translated_factors = await _translate_many(service, factor_items, lang, cache, user_id)
         idx = 0
         for factor in factors:
@@ -309,7 +315,7 @@ async def localize_workspace_payload(
             if rec.get(field):
                 rec_items.append((rec[field], context))
                 rec_refs.append((rec, field))
-    if rec_items:
+    if allow_live_translation and rec_items:
         translated_recs = await _translate_many(service, rec_items, lang, cache, user_id)
         for (rec, field), value in zip(rec_refs, translated_recs):
             rec[field] = value
@@ -348,7 +354,7 @@ async def localize_workspace_payload(
         if action_fields.get("description"):
             action["description"] = action_fields["description"]
 
-    if synthetic_items:
+    if allow_live_translation and synthetic_items:
         translated_actions = await _translate_many(service, synthetic_items, lang, cache, user_id)
         for action, value in zip(synthetic_refs, translated_actions):
             action["title"] = value

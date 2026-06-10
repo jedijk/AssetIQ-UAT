@@ -94,6 +94,9 @@ class ThreatResponse(BaseModel):
     context_added_at: Optional[str] = None
     # Equipment tag (from hierarchy)
     equipment_tag: Optional[str] = None
+    # Localized display labels (list view, from stored translations)
+    asset_display: Optional[str] = None
+    failure_mode_display: Optional[str] = None
     # Action plan items linked to this observation (central actions + investigation)
     action_plan_count: Optional[int] = 0
 
@@ -134,6 +137,7 @@ class ChatResponse(BaseModel):
     show_new_failure_mode_option: Optional[bool] = None
     awaiting_context_for_threat: Optional[str] = None
     detected_language: Optional[str] = None  # ISO code: "en", "nl", "de", etc.
+    is_mixed_language: Optional[bool] = None
     issue_summary: Optional[str] = None
     issue_confirm_language: Optional[str] = None  # "en" | "nl" when question_type is issue_confirm
 

@@ -190,31 +190,6 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
             </div>
           )}
 
-          {/* Failure Mode Suggestions */}
-          {msg.failure_mode_suggestions?.length > 0 && (
-            <div className="suggestions">
-              {msg.failure_mode_suggestions.slice(0, 5).map((fm, i) => (
-                <button
-                  key={i}
-                  onClick={() => setMessage(fm.failure_mode)}
-                  className="suggestion-btn"
-                >
-                  {fm.failure_mode}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => sendMutation.mutate({ content: "Failure mode: I don't know" })}
-                disabled={sendMutation.isPending}
-                className="suggestion-btn suggestion-btn-muted"
-                data-testid="failure-mode-unknown-btn"
-              >
-                <HelpCircle className="w-3.5 h-3.5 inline mr-1 opacity-70" />
-                {t("chat.dontKnow")}
-              </button>
-            </div>
-          )}
-
           {/* Threat Created */}
           {msg.threat_summary && (
             <div className="threat-card">

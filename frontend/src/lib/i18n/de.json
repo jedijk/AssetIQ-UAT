@@ -1743,7 +1743,12 @@
     "attachFileTitle": "Datei anhängen",
     "sendMessageTitle": "Nachricht senden",
     "stopTranscribeTitle": "Stoppen und transkribieren",
-    "tapToRecordTitle": "Tippen zum Aufnehmen"
+    "tapToRecordTitle": "Tippen zum Aufnehmen",
+    "modeFast": "Schnell",
+    "modeAi": "KI",
+    "responseMode": "Antwortmodus",
+    "modeFastHint": "Schnelle Antworten ohne KI-Verarbeitung",
+    "modeAiHint": "KI-generierte Beschreibungen (2–3 Sekunden langsamer)"
   },
   "info": {
     "title": "AssetIQ - Risk Methodology",

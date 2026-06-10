@@ -25,7 +25,6 @@ import {
   Pause,
   Play,
   Square,
-  Plus,
   Globe,
   ChevronDown,
   FileUp,
@@ -56,8 +55,6 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [showNewFailureModeInput, setShowNewFailureModeInput] = useState(false);
-  const [newFailureModeName, setNewFailureModeName] = useState("");
   const [detectedLanguage, setDetectedLanguage] = useState(null);
   const [manualLanguage, setManualLanguage] = useState(null);
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -74,7 +71,6 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
   const textareaRef = useRef(null);
   const recordingTimerRef = useRef(null);
   const recognitionRef = useRef(null); // Speech recognition instance
-  const newFailureModeInputRef = useRef(null);
   const autoSkipTimerRef = useRef(null);
   /** Wall-clock deadline (ms) for auto-skip; survives closing/reopening the sidebar for the same prompt. */
   const contextSkipDeadlineMsRef = useRef(null);
@@ -354,13 +350,10 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
       setMessage("");
       setImageBase64(null);
       setImagePreview(null);
-      setShowNewFailureModeInput(false);
-      setNewFailureModeName("");
       if (data?.detected_language) {
         setDetectedLanguage(data.detected_language);
-        // Sync app language if detected language is supported (en/nl)
         const lang = data.detected_language;
-        if ((lang === "en" || lang === "nl") && lang !== appLanguage) {
+        if (!data?.is_mixed_language && (lang === "en" || lang === "nl") && lang !== appLanguage) {
           setAppLanguage(lang);
         }
       }
@@ -546,7 +539,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
       if (result?.detected_language) {
         setDetectedLanguage(result.detected_language);
         const lang = result.detected_language;
-        if ((lang === "en" || lang === "nl") && lang !== appLanguage) {
+        if (!result?.is_mixed_language && (lang === "en" || lang === "nl") && lang !== appLanguage) {
           setAppLanguage(lang);
         }
       }
@@ -628,7 +621,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
           if (result?.detected_language) {
             setDetectedLanguage(result.detected_language);
             const lang = result.detected_language;
-            if ((lang === "en" || lang === "nl") && lang !== appLanguage) {
+            if (!result?.is_mixed_language && (lang === "en" || lang === "nl") && lang !== appLanguage) {
               setAppLanguage(lang);
             }
           }
@@ -786,12 +779,6 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                     <span className="text-slate-400 font-mono">{msg.threat_equipment_tag}</span>
                   </div>
                 )}
-                {msg.threat_failure_mode && (
-                  <div className="flex items-center gap-1.5">
-                    <AlertTriangle className="w-3 h-3 text-slate-400" />
-                    <span><strong>{t("chat.failureModeLabel")}</strong> {msg.threat_failure_mode}</span>
-                  </div>
-                )}
                 {msg.threat_description && (
                   <div className="flex items-start gap-1.5 mt-1">
                     <MessageSquare className="w-3 h-3 text-slate-400 mt-0.5" />
@@ -879,17 +866,14 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 const content = msg.content || "";
                 const summary = msg.issue_summary || "";
                 
-                // Parse the summary to extract Equipment, Failure Mode, What's happening
+                // Parse the summary to extract Equipment and Description
                 const lines = summary.split('\n');
                 let equipment = "";
-                let failureMode = "";
                 let whatsHappening = "";
                 
                 lines.forEach(line => {
                   if (line.includes('**Equipment:**') || line.includes('**Apparatuur:**')) {
                     equipment = line.replace(/\*\*Equipment:\*\*|\*\*Apparatuur:\*\*/g, '').trim();
-                  } else if (line.includes('**Issue Type:**') || line.includes('**Type storing:**') || line.includes('**Storingstype:**') || line.includes('**Failure Mode:**') || line.includes('**Faalwijze:**')) {
-                    failureMode = line.replace(/\*\*Issue Type:\*\*|\*\*Type storing:\*\*|\*\*Storingstype:\*\*|\*\*Failure Mode:\*\*|\*\*Faalwijze:\*\*/g, '').trim();
                   } else if (line.includes('**Description:**') || line.includes('**Beschrijving:**')) {
                     whatsHappening = line.replace(/\*\*Description:\*\*|\*\*Beschrijving:\*\*/g, '').trim();
                   }
@@ -897,10 +881,10 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                 
                 return (
                   <>
-                    {/* Title/Failure Mode */}
+                    {/* Title from description */}
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <h4 className="font-semibold text-slate-900 text-sm leading-tight">
-                        {failureMode || t("chat.newObservation")}
+                        {whatsHappening || equipment || t("chat.newObservation")}
                       </h4>
                       <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
                         {t("chat.draftObservation")}
@@ -913,12 +897,6 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                         <div className="flex items-center gap-1.5">
                           <Wrench className="w-3.5 h-3.5 text-orange-400" />
                           <span><strong>{t("chat.equipmentLabel")}</strong> {equipment}</span>
-                        </div>
-                      )}
-                      {failureMode && (
-                        <div className="flex items-center gap-1.5">
-                          <AlertTriangle className="w-3.5 h-3.5 text-orange-400" />
-                          <span><strong>{t("chat.failureModeLabel")}</strong> {failureMode}</span>
                         </div>
                       )}
                       {whatsHappening && (
@@ -1107,193 +1085,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
           </div>
         )}
         
-        {/* Failure Mode Suggestions - only on latest message */}
-        {isInteractive && msg.failure_mode_suggestions && msg.failure_mode_suggestions.length > 0 && (
-          <div className="mt-3 space-y-2">
-            {msg.failure_mode_suggestions.map((fm) => (
-              <button
-                key={fm.id}
-                onClick={() => {
-                  // Directly submit with the selected failure mode
-                  const failureModeText = `Failure mode: ${fm.failure_mode}`;
-                  sendMutation.mutate({ content: failureModeText, image: null });
-                }}
-                disabled={isSending}
-                className="w-full text-left p-2.5 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="font-medium text-amber-900 text-sm">{fm.failure_mode}</span>
-                  </div>
-                  {isSending ? (
-                    <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
-                  ) : (
-                    <ArrowRight className="w-4 h-4 text-amber-400 group-hover:text-amber-600 transition-colors" />
-                  )}
-                </div>
-                <div className="flex items-center gap-2 mt-1">
-                  {fm.category && (
-                    <span className="text-xs text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">{fm.category}</span>
-                  )}
-                  {fm.equipment && (
-                    <span className="text-xs text-amber-500">{fm.equipment}</span>
-                  )}
-                  {fm.rpn && (
-                    <span className="text-xs text-amber-700 font-medium">RPN: {fm.rpn}</span>
-                  )}
-                </div>
-              </button>
-            ))}
-            
-            <button
-              onClick={() => {
-                sendMutation.mutate({ content: "Failure mode: I don't know", image: null });
-              }}
-              disabled={isSending}
-              className="w-full text-left p-2.5 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
-              data-testid="failure-mode-unknown-btn"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <HelpCircle className="w-4 h-4 text-slate-500" />
-                  <span className="font-medium text-slate-700 text-sm">{t("chat.dontKnow")}</span>
-                </div>
-                {isSending ? (
-                  <Loader2 className="w-4 h-4 text-slate-400 animate-spin" />
-                ) : (
-                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
-                )}
-              </div>
-              <span className="text-xs text-slate-500 ml-6">{t("chat.recordWithoutFailureMode")}</span>
-            </button>
-            
-            {/* New Failure Mode option */}
-            <button
-              onClick={() => {
-                setShowNewFailureModeInput(true);
-                setNewFailureModeName("");
-                setTimeout(() => {
-                  newFailureModeInputRef.current?.focus();
-                }, 100);
-              }}
-              disabled={isSending}
-              className="w-full text-left p-2.5 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
-              data-testid="new-failure-mode-option"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Plus className="w-4 h-4 text-green-600" />
-                  <span className="font-medium text-green-900 text-sm">{t("chat.newFailureMode")}</span>
-                </div>
-                <ArrowRight className="w-4 h-4 text-green-400 group-hover:text-green-600 transition-colors" />
-              </div>
-              <span className="text-xs text-green-600 ml-6">{t("chat.specifyCustomFailureMode")}</span>
-            </button>
-            
-            {/* Cancel option for failure modes */}
-            <button
-              onClick={async () => {
-                setShowNewFailureModeInput(false);
-                setNewFailureModeName("");
-                await chatAPI.cancelFlow();
-                queryClient.invalidateQueries({ queryKey: queryKeys.chat.history() });
-              }}
-              className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm"
-            >
-              <X className="w-3.5 h-3.5 inline mr-1" />
-              {t("chat.noneOfTheseDescribeDifferently")}
-            </button>
-          </div>
-        )}
-        
-        {/* New Failure Mode Input - shown when user clicks "New Failure Mode" */}
-        {showNewFailureModeInput && (
-          <div className="mt-3 space-y-2">
-            <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-              <label className="block text-sm font-medium text-green-800 mb-2">
-                {t("chat.specifyFailureMode")}
-              </label>
-              <div className="flex gap-2">
-                <input
-                  ref={newFailureModeInputRef}
-                  type="text"
-                  value={newFailureModeName}
-                  onChange={(e) => setNewFailureModeName(e.target.value)}
-                  placeholder={t("chat.failureModePlaceholder")}
-                  className="flex-1 px-3 py-2 text-sm border border-green-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && newFailureModeName.trim().length >= 3) {
-                      sendMutation.mutate({ content: `New failure mode: ${newFailureModeName.trim()}`, image: null });
-                      setShowNewFailureModeInput(false);
-                      setNewFailureModeName("");
-                    }
-                  }}
-                  disabled={isSending}
-                  data-testid="new-failure-mode-input"
-                />
-                <button
-                  onClick={() => {
-                    if (newFailureModeName.trim().length >= 3) {
-                      sendMutation.mutate({ content: `New failure mode: ${newFailureModeName.trim()}`, image: null });
-                      setShowNewFailureModeInput(false);
-                      setNewFailureModeName("");
-                    } else {
-                      toast.error(t("chat.failureModeMinCharsError"));
-                    }
-                  }}
-                  disabled={isSending || newFailureModeName.trim().length < 3}
-                  className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  data-testid="submit-new-failure-mode"
-                >
-                  {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                </button>
-              </div>
-              <p className="text-xs text-green-600 mt-1">{t("chat.minCharsRequired")}</p>
-            </div>
-            <button
-              onClick={() => {
-                setShowNewFailureModeInput(false);
-                setNewFailureModeName("");
-              }}
-              className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm"
-            >
-              <X className="w-3.5 h-3.5 inline mr-1" />
-              {t("chat.cancel")}
-            </button>
-          </div>
-        )}
-        
-        {/* Show "New Failure Mode" option when no failure modes found (empty array) */}
-        {/* New failure mode option - only on latest message */}
-        {isInteractive && msg.failure_mode_suggestions && msg.failure_mode_suggestions.length === 0 && !showNewFailureModeInput && (
-          <div className="mt-3 space-y-2">
-            <p className="text-sm text-amber-700">{t("chat.noMatchingFailureModesLibrary")}</p>
-            <button
-              onClick={() => {
-                setShowNewFailureModeInput(true);
-                setNewFailureModeName("");
-                setTimeout(() => {
-                  newFailureModeInputRef.current?.focus();
-                }, 100);
-              }}
-              disabled={isSending}
-              className="w-full text-left p-2.5 bg-green-50 hover:bg-green-100 rounded-lg border border-green-200 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
-              data-testid="new-failure-mode-empty-option"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Plus className="w-4 h-4 text-green-600" />
-                  <span className="font-medium text-green-900 text-sm">{t("chat.newFailureMode")}</span>
-                </div>
-                <ArrowRight className="w-4 h-4 text-green-400 group-hover:text-green-600 transition-colors" />
-              </div>
-              <span className="text-xs text-green-600 ml-6">{t("chat.specifyFailureMode")}</span>
-            </button>
-          </div>
-        )}
-        
         {/* Skip context - only on latest message */}
-        {isInteractive && isFollowUp && !msg.threat_id && !msg.equipment_suggestions && !msg.failure_mode_suggestions && !showNewFailureModeInput && (
+        {isInteractive && isFollowUp && !msg.threat_id && !msg.equipment_suggestions && (
           <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-1 text-blue-600 text-xs">
             <HelpCircle className="w-3 h-3" />
             <span>{t("chat.provideMoreDetails")}</span>
@@ -1331,50 +1124,44 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               <p className="text-[10px] sm:text-xs text-slate-500">{t("chat.headerSubtitle")}</p>
             </div>
           </div>
-          <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
-            {/* AI Mode Toggle with Tooltip */}
-            <div className="relative group">
+          <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
+            {/* Fast / AI mode — segmented control (touch-friendly) */}
+            <div
+              role="group"
+              aria-label={t("chat.responseMode")}
+              className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 p-0.5 shrink-0"
+              data-testid="chat-response-mode-toggle"
+            >
               <button
-                onClick={() => setAiModeEnabled(!aiModeEnabled)}
-                className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] sm:text-xs font-medium transition-all ${
-                  aiModeEnabled 
-                    ? "bg-purple-100 text-purple-700 border border-purple-300" 
-                    : "bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200"
+                type="button"
+                onClick={() => setAiModeEnabled(false)}
+                className={`flex items-center gap-1 rounded-full px-2 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-medium transition-all min-h-9 min-w-[4.25rem] sm:min-w-0 justify-center touch-manipulation ${
+                  !aiModeEnabled
+                    ? "bg-white text-slate-800 shadow-sm"
+                    : "text-slate-500 active:bg-slate-200/80"
                 }`}
+                aria-pressed={!aiModeEnabled}
+                title={t("chat.modeFastHint")}
+                data-testid="chat-fast-mode-btn"
               >
-                {aiModeEnabled ? (
-                  <>
-                    <Sparkles className="w-3 h-3" />
-                    <span className="hidden sm:inline">AI</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-3 h-3" />
-                    <span className="hidden sm:inline">Fast</span>
-                  </>
-                )}
+                <Zap className="w-3 h-3 flex-shrink-0" />
+                <span>{t("chat.modeFast")}</span>
               </button>
-              {/* Tooltip */}
-              <div className="absolute right-0 top-full mt-2 w-56 p-2 bg-slate-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                {aiModeEnabled ? (
-                  <>
-                    <div className="font-semibold flex items-center gap-1 mb-1">
-                      <Sparkles className="w-3 h-3 text-purple-300" /> AI Mode
-                    </div>
-                    <p className="text-slate-300">Uses AI to generate professional descriptions. Takes 2-3 seconds longer but produces better quality text.</p>
-                  </>
-                ) : (
-                  <>
-                    <div className="font-semibold flex items-center gap-1 mb-1">
-                      <Zap className="w-3 h-3 text-yellow-300" /> Fast Mode
-                    </div>
-                    <p className="text-slate-300">Quick responses without AI processing. Best for rapid issue logging when speed matters.</p>
-                  </>
-                )}
-                <div className="text-slate-400 mt-1.5 text-[10px]">Click to switch modes</div>
-                {/* Arrow */}
-                <div className="absolute -top-1 right-4 w-2 h-2 bg-slate-900 rotate-45"></div>
-              </div>
+              <button
+                type="button"
+                onClick={() => setAiModeEnabled(true)}
+                className={`flex items-center gap-1 rounded-full px-2 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-medium transition-all min-h-9 min-w-[3.5rem] sm:min-w-0 justify-center touch-manipulation ${
+                  aiModeEnabled
+                    ? "bg-white text-purple-700 shadow-sm"
+                    : "text-slate-500 active:bg-slate-200/80"
+                }`}
+                aria-pressed={aiModeEnabled}
+                title={t("chat.modeAiHint")}
+                data-testid="chat-ai-mode-btn"
+              >
+                <Sparkles className="w-3 h-3 flex-shrink-0" />
+                <span>{t("chat.modeAi")}</span>
+              </button>
             </div>
             {messages.length > 0 && (
               <Button

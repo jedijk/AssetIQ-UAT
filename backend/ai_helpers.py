@@ -232,36 +232,35 @@ async def classify_user_intent(message: str, session_id: str) -> dict:
 
 async def summarize_issue_description(text: str, language: str = "en") -> str:
     """
-    Rewrite the operator's issue description as a professional reliability engineer would,
-    and identify the equipment and potential failure mode.
-    Returns a structured summary with equipment/failure mode clearly visible.
+    Rewrite the operator's issue description as a professional reliability engineer would.
+    Supports mixed-language operator input (mirrors their language mix in the summary).
     """
     from services.ai_gateway import chat as ai_gateway_chat
+    from utils.text_language import ai_language_instruction
 
     t = (text or "").strip()
     if not t:
         return ""
     
     try:
-        lang_note = "Dutch" if language == "nl" else "English"
+        lang_rule = ai_language_instruction(t, fallback=language or "en")
         out = await ai_gateway_chat(
             [
                 {
                     "role": "system",
                     "content": f"""You are a reliability engineer creating a professional observation summary.
 
-Rewrite the user's issue report in {lang_note} as a professional reliability observation. Be concise but technical.
+{lang_rule}
 
-Output format (in {lang_note}):
+Output format (use the same language(s) as the operator):
 **Equipment:** [Identified equipment name/tag, or "To be confirmed" if unclear]
-**Issue Type:** [Failure mode category - e.g., Bearing Failure, Vibration, Leak, Noise, Overheating, etc.]
 **Description:** [1-2 sentences professionally describing the issue]
 
 Rules:
 - Extract equipment name/tag if mentioned (e.g., "Pump P-101", "Compressor C-201")
-- Identify the likely failure mode category
 - Write the description as a reliability engineer would document it
-- Keep it concise - max 3 lines total
+- Do not include a separate failure mode or issue type line
+- Keep it concise - max 2 lines total
 - Output only the formatted summary, no preamble""",
                 },
                 {"role": "user", "content": t[:4000]},
@@ -300,14 +299,17 @@ async def merge_issue_description_with_edit(
         return ed
 
     try:
-        lang = "Dutch" if language == "nl" else "English"
+        from utils.text_language import ai_language_instruction
+
+        lang_rule = ai_language_instruction(f"{ci}\n{ed}", fallback=language or "en")
         response = await _gateway_completion(
             "ai_helpers.merge_issue_description_with_edit",
             [
                 {
                     "role": "system",
                     "content": (
-                        f"You merge an equipment-issue report with the operator's correction ({lang}). "
+                        f"You merge an equipment-issue report with the operator's correction. "
+                        f"{lang_rule} "
                         "Return exactly one paragraph: the full updated issue report after applying their "
                         "instruction. Preserve technical details (tags, equipment names) unless the "
                         "correction says otherwise. If they give a completely new description, use that as "
@@ -358,7 +360,9 @@ async def generate_observation_description(
     # If AI mode is enabled, use GPT for better descriptions
     if use_ai:
         try:
-            lang_note = "Dutch" if language == "nl" else "English"
+            from utils.text_language import ai_language_instruction
+
+            lang_rule = ai_language_instruction(t, fallback=language or "en")
             
             context_parts = []
             if equipment_name and equipment_name.lower() not in ["unknown", "to be confirmed"]:
@@ -371,7 +375,10 @@ async def generate_observation_description(
                 [
                     {
                         "role": "system",
-                        "content": f"Write a 2-3 sentence professional technical description in {lang_note} for a maintenance observation record. Be concise and use engineering terminology.",
+                        "content": (
+                            f"Write a 2-3 sentence professional technical description for a maintenance "
+                            f"observation record. {lang_rule} Be concise and use engineering terminology."
+                        ),
                     },
                     {
                         "role": "user",

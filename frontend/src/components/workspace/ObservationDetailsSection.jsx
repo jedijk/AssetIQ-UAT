@@ -136,23 +136,25 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
   const { data: threatData } = useQuery({
     queryKey: [...queryKeys.threats.legacyDetail(threatId), language],
     queryFn: () => threatsAPI.getById(threatId, { language }),
-    enabled: !!threatId,
-    staleTime: 30 * 1000,
+    enabled: !!threatId && !!workspaceObservation,
+    staleTime: 60 * 1000,
   });
 
-  // Merge workspace observation (translated) with full threat data
-  // The workspace observation has translated title/description/user_context
-  // The threatData has all the other fields needed for editing
+  // Merge workspace observation (translated) with full threat data.
+  // Render immediately from workspaceObservation while the detail GET completes.
   const threat = useMemo(() => {
-    if (!threatData) return null;
-    if (!workspaceObservation) return threatData;
-    return {
-      ...threatData,
-      // Use translated fields from workspace if available
-      title: workspaceObservation.title || threatData.title,
-      description: workspaceObservation.description || threatData.description,
-      user_context: workspaceObservation.user_context || threatData.user_context,
-    };
+    if (threatData && workspaceObservation) {
+      return {
+        ...threatData,
+        title: workspaceObservation.title || threatData.title,
+        description: workspaceObservation.description || threatData.description,
+        user_context: workspaceObservation.user_context || threatData.user_context,
+      };
+    }
+    if (workspaceObservation) {
+      return workspaceObservation;
+    }
+    return threatData || null;
   }, [threatData, workspaceObservation]);
 
   const { data: equipmentNodesData } = useQuery({

@@ -120,6 +120,26 @@ def translation_search_languages(ui_language: str | None) -> Tuple[str, ...]:
     return _TRANSLATION_LANGS
 
 
+def translation_search_languages_for_text(
+    search_text: str,
+    ui_language: str | None,
+) -> Tuple[str, ...]:
+    """Include translation lookups for every language present in mixed operator text."""
+    from utils.text_language import language_scores
+
+    ul = (ui_language or "en").lower()[:2]
+    scores = language_scores(search_text or "")
+    langs: set = set()
+    if ul in _TRANSLATION_LANGS:
+        langs.add(ul)
+    for code in _TRANSLATION_LANGS:
+        if scores.get(code, 0) >= 1:
+            langs.add(code)
+    if langs:
+        return tuple(sorted(langs))
+    return translation_search_languages(ui_language)
+
+
 async def find_entity_ids_by_translation(
     db,
     keywords: List[str],

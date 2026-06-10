@@ -191,17 +191,16 @@ class TestFeedbackAPI:
         
         print(f"PASSED: All severity levels (low, medium, high, critical) work correctly")
     
-    def test_create_feedback_empty_message_fails(self):
-        """POST /api/feedback - should fail with empty message"""
+    def test_create_feedback_empty_message_without_attachments_fails(self):
+        """POST /api/feedback - reject empty message when no audio/screenshot"""
         payload = {
             "type": "issue",
             "message": ""
         }
         response = self.session.post(f"{BASE_URL}/api/feedback", json=payload)
         
-        # Should return 422 validation error
-        assert response.status_code == 422
-        print(f"PASSED: Empty message correctly rejected with 422")
+        assert response.status_code == 400
+        print(f"PASSED: Empty message without attachments correctly rejected with 400")
     
     def test_create_feedback_invalid_type_fails(self):
         """POST /api/feedback - should fail with invalid type"""

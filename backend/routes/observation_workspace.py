@@ -11,6 +11,7 @@ import uuid
 import logging
 import asyncio
 import re
+import time
 
 from database import db
 from auth import get_current_user
@@ -19,6 +20,59 @@ from utils.workspace_localization import localize_workspace_payload
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/observation-workspace", tags=["Observation Workspace"])
+
+# In-memory cache for per-user production loss config (avoids extra DB round-trip per load).
+_prod_loss_config_cache: Dict[str, tuple] = {}
+_PROD_LOSS_CACHE_TTL_SEC = 300
+
+_OBSERVATION_PAYLOAD_EXCLUDE = frozenset({"_id", "recommended_actions"})
+
+
+def _build_observation_payload(observation: dict, equipment_node: Optional[dict] = None) -> dict:
+    """Full observation fields for workspace + details section (single source, no second GET)."""
+    payload = {k: v for k, v in observation.items() if k not in _OBSERVATION_PAYLOAD_EXCLUDE}
+    if equipment_node:
+        tag = equipment_node.get("tag") or equipment_node.get("tag_number")
+        if tag:
+            payload["equipment_tag"] = tag
+    return payload
+
+
+async def _resolve_installation_id(equipment_node: Optional[dict]) -> Optional[str]:
+    """Find installation id without walking more than necessary."""
+    if not equipment_node:
+        return None
+    if equipment_node.get("level") == "installation":
+        return equipment_node.get("id")
+    if equipment_node.get("installation_id"):
+        return equipment_node.get("installation_id")
+
+    parent_id = equipment_node.get("parent_id")
+    for _ in range(15):
+        if not parent_id:
+            break
+        node = await db.equipment_nodes.find_one(
+            {"id": parent_id},
+            {"_id": 0, "id": 1, "level": 1, "parent_id": 1, "installation_id": 1},
+        )
+        if not node:
+            break
+        if node.get("level") == "installation":
+            return node.get("id")
+        if node.get("installation_id"):
+            return node.get("installation_id")
+        parent_id = node.get("parent_id")
+    return None
+
+
+async def _get_production_loss_config(user_id: str) -> dict:
+    now = time.monotonic()
+    cached = _prod_loss_config_cache.get(user_id)
+    if cached and cached[1] > now:
+        return cached[0]
+    doc = await db.production_loss_config.find_one({"created_by": user_id}, {"_id": 0}) or {}
+    _prod_loss_config_cache[user_id] = (doc, now + _PROD_LOSS_CACHE_TTL_SEC)
+    return doc
 
 
 # Permission dependency
@@ -101,10 +155,7 @@ async def calculate_production_exposure(observation: dict, criticality: dict, us
         return {"not_assessed": True, "production_impact_score": None, "formatted_value": "Not Assessed"}
     
     # Fetch user's production loss configuration
-    prod_loss_config = await db.production_loss_config.find_one(
-        {"created_by": user_id},
-        {"_id": 0}
-    )
+    prod_loss_config = await _get_production_loss_config(user_id)
     
     # Use config values or defaults
     hourly_cost = (prod_loss_config or {}).get("hourly_cost", 500.0)
@@ -251,35 +302,23 @@ async def get_criticality_definitions_for_equipment(equipment_node: dict, user_i
     and returns the user's custom criticality definitions saved for that installation
     if any exist. Falls back to the built-in DEFAULT_CRITICALITY otherwise.
     """
-    # Lazy import to avoid circular imports at module load time
     from routes.definitions import DEFAULT_CRITICALITY
 
     if not equipment_node:
         return DEFAULT_CRITICALITY
 
-    # Walk up to the installation
-    current = equipment_node
-    safety = 0  # avoid infinite loop on corrupt data
-    while current and current.get("level") != "installation" and safety < 20:
-        parent_id = current.get("parent_id")
-        if not parent_id:
-            break
-        current = await db.equipment_nodes.find_one({"id": parent_id}, {"_id": 0})
-        safety += 1
-
-    if not current or current.get("level") != "installation":
+    installation_id = await _resolve_installation_id(equipment_node)
+    if not installation_id:
         return DEFAULT_CRITICALITY
 
-    # Look up custom definitions for this installation (any user — fall back to the
-    # requesting user's own first, then any user's so shared workspaces still work).
     custom = await db.definitions.find_one(
-        {"equipment_id": current.get("id"), "created_by": user_id},
-        {"_id": 0}
+        {"equipment_id": installation_id, "created_by": user_id},
+        {"_id": 0, "criticality": 1},
     )
     if not custom:
         custom = await db.definitions.find_one(
-            {"equipment_id": current.get("id")},
-            {"_id": 0}
+            {"equipment_id": installation_id},
+            {"_id": 0, "criticality": 1},
         )
 
     if custom and custom.get("criticality"):
@@ -1117,23 +1156,7 @@ async def get_observation_workspace(
     
     payload = {
         "observation_id": observation_id,
-        "observation": {
-            "id": observation.get("id"),
-            "title": observation.get("title"),
-            "threat_number": observation.get("threat_number"),
-            "status": observation.get("status"),
-            "asset": observation.get("asset"),
-            "equipment_type": observation.get("equipment_type"),
-            "failure_mode": observation.get("failure_mode"),
-            "description": observation.get("description"),
-            "user_context": observation.get("user_context"),
-            "created_at": observation.get("created_at"),
-            "updated_at": observation.get("updated_at"),
-            "created_by_name": observation.get("created_by_name"),
-            "risk_score": observation.get("risk_score"),
-            "risk_level": observation.get("risk_level"),
-            "attachments": observation.get("attachments", [])
-        },
+        "observation": _build_observation_payload(observation, equipment_node),
         "equipment": {
             "id": equipment_node.get("id") if equipment_node else None,
             "name": equipment_node.get("name") if equipment_node else observation.get("asset"),
@@ -1184,6 +1207,7 @@ async def get_observation_workspace(
         payload,
         language,
         user_id=current_user.get("id"),
+        allow_live_translation=False,
     )
 
 

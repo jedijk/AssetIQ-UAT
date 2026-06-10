@@ -20,11 +20,11 @@ async def test_awaiting_equipment_unknown_sets_placeholder_and_advances():
     )
     assert result["pending_data"].get("equipment_name") == "Unknown equipment"
     assert result["pending_data"].get("equipment_id") is None
-    assert result["state"] in (ChatState.COMPLETE, ChatState.AWAITING_FAILURE_MODE)
+    assert result["state"] == ChatState.COMPLETE
 
 
 @pytest.mark.asyncio
-async def test_awaiting_failure_mode_unknown_records_custom():
+async def test_awaiting_failure_mode_auto_completes_without_selection():
     pending = {
         "original_description": "leak",
         "equipment": {"id": "e1", "name": "Pump A", "tag": "P-100"},
@@ -47,5 +47,4 @@ async def test_awaiting_failure_mode_unknown_records_custom():
     )
     assert result["state"] == ChatState.COMPLETE
     assert result.get("create_observation") is True
-    assert result["pending_data"]["failure_mode_name"] == "Unknown / not specified"
-    assert result["pending_data"].get("is_custom_failure_mode") is True
+    assert result["pending_data"].get("failure_mode_name")

@@ -177,7 +177,7 @@ async def search_equipment_hierarchy(
         find_entity_ids_by_translation,
         load_equipment_translation_fields,
         score_keyword_against_translations,
-        translation_search_languages,
+        translation_search_languages_for_text,
     )
 
     keywords = extract_keywords(search_text)
@@ -185,7 +185,7 @@ async def search_equipment_hierarchy(
         return []
 
     keywords = expand_equipment_keywords(keywords)
-    translation_langs = translation_search_languages(ui_language)
+    translation_langs = translation_search_languages_for_text(search_text, ui_language)
 
     operational_levels = ["subunit", "maintainable_item", "equipment", "component", "equipment_unit"]
     
@@ -534,6 +534,75 @@ def match_failure_mode_from_suggestions(message: str, suggestions: list) -> Dict
     return None
 
 
+def _build_complete_observation_result(
+    pdata: Dict,
+    equipment: Dict,
+    fm_library: List[Dict],
+    orig_msg: str,
+    loc: str,
+) -> Dict[str, Any]:
+    """Auto-assign failure mode and finish observation creation (no user selection step)."""
+    pdata = dict(pdata)
+    pdata["equipment"] = equipment
+    pdata["equipment_id"] = equipment.get("id")
+    pdata["equipment_name"] = equipment.get("name")
+    pdata["equipment_type"] = equipment.get("equipment_type")
+    pdata["criticality"] = equipment.get("criticality")
+    pdata["installation_id"] = equipment.get("installation_id")
+    pdata.setdefault("chat_ui_language", loc)
+
+    fm_matches = search_failure_modes(fm_library, orig_msg, equipment.get("equipment_type"))
+    if fm_matches:
+        fm = fm_matches[0]
+        pdata["failure_mode"] = fm
+        pdata["failure_mode_id"] = fm.get("id")
+        pdata["failure_mode_name"] = fm.get("failure_mode")
+        pdata["recommended_actions"] = fm.get("recommended_actions", [])
+        pdata["ai_auto_selected_failure_mode"] = True
+    else:
+        pdata["failure_mode_name"] = orig_msg[:100] if len(orig_msg) > 100 else orig_msg
+        pdata["is_custom_failure_mode"] = True
+        pdata["ai_auto_selected_failure_mode"] = False
+        pdata.pop("failure_mode", None)
+        pdata.pop("failure_mode_id", None)
+        pdata.pop("recommended_actions", None)
+
+    eq_label = _equip_label(equipment)
+    if not equipment.get("id"):
+        review_note = _chat_ui(
+            loc,
+            "\n\n⚠️ Please review and update the equipment in the observation details.",
+            "\n\n⚠️ Controleer en update de apparatuur in de observatiedetails.",
+            "\n\n⚠️ Bitte prüfen und aktualisieren Sie die Anlage in den Beobachtungsdetails.",
+        )
+    else:
+        review_note = _chat_ui(
+            loc,
+            "\n\n✓ You can edit details in the observation workspace if needed.",
+            "\n\n✓ U kunt details aanpassen in de observatiewerkruimte indien nodig.",
+            "\n\n✓ Sie können Details bei Bedarf im Beobachtungsbereich anpassen.",
+        )
+
+    text = _chat_ui(
+        loc,
+        f"Observation recorded!\n\n📍 Equipment: {eq_label}{review_note}",
+        f"Melding vastgelegd!\n\n📍 Apparatuur: {eq_label}{review_note}",
+        f"Beobachtung erfasst!\n\n📍 Anlage: {eq_label}{review_note}",
+    )
+
+    return {
+        "response_text": text,
+        "state": ChatState.COMPLETE,
+        "pending_data": pdata,
+        "equipment_suggestions": None,
+        "failure_mode_suggestions": None,
+        "show_new_failure_mode_option": False,
+        "create_observation": True,
+        "observation_data": pdata,
+        "original_message": orig_msg,
+    }
+
+
 # ------------------------------------------------------------------
 # Core state machine (pure logic)
 # ------------------------------------------------------------------
@@ -555,12 +624,18 @@ async def process_chat_message(
     Caller is responsible for reading/writing state to DB.
     """
     pending_data = dict(pending_data or {})
-    ul = (ui_language or "en").lower()[:2]
-    if ul not in ("nl", "en", "de"):
-        ul = "en"
-    inferred = _prompt_lang_from_user_text(message_content)
-    if inferred == "en" and ul in ("nl", "de"):
-        ul = "en"
+    from utils.text_language import resolve_chat_ui_language
+
+    short_command = len((message_content or "").strip()) < 4
+    ul, lang_profile = resolve_chat_ui_language(
+        message_content,
+        explicit=ui_language,
+        fallback=ui_language or pending_data.get("chat_ui_language") or "en",
+        sticky=pending_data.get("chat_ui_language"),
+        short_command=short_command,
+    )
+    if lang_profile.get("is_mixed"):
+        pending_data["mixed_language_input"] = True
     pending_data["chat_ui_language"] = ul
     loc = ul
     prev_equipment_suggestions = prev_equipment_suggestions or []
@@ -594,60 +669,19 @@ async def process_chat_message(
             orig=None,
         )
 
-    # --- Helper: after equipment is selected, auto-select failure mode (QUICK REPORT) ---
+    # --- Helper: after equipment is selected, auto-assign failure mode and complete ---
     def _after_equipment_selected(equipment, fm_library, orig_msg, pdata):
-        pdata["equipment"] = equipment
-        pdata["equipment_id"] = equipment.get("id")
-        pdata["equipment_name"] = equipment.get("name")
-        pdata["equipment_type"] = equipment.get("equipment_type")
-        pdata["criticality"] = equipment.get("criticality")
-        pdata["installation_id"] = equipment.get("installation_id")
-        pdata.setdefault("chat_ui_language", loc)
+        return _build_complete_observation_result(pdata, equipment, fm_library, orig_msg, loc)
 
-        fm_matches = search_failure_modes(fm_library, orig_msg, equipment.get("equipment_type"))
-
-        # QUICK REPORT: Auto-select best failure mode instead of asking
-        if len(fm_matches) >= 1:
-            # Use best match (highest scored)
-            fm = fm_matches[0]
-            pdata["failure_mode"] = fm
-            pdata["failure_mode_id"] = fm.get("id")
-            pdata["failure_mode_name"] = fm.get("failure_mode")
-            pdata["recommended_actions"] = fm.get("recommended_actions", [])
-            pdata["ai_auto_selected_failure_mode"] = True
-            
-            review_note = _chat_ui(
-                loc,
-                "\n\n✓ AI auto-selected failure mode. You can edit this in the observation details if needed.",
-                "\n\n✓ AI heeft automatisch de storingsmodus geselecteerd. U kunt deze aanpassen in de observatiedetails indien nodig.",
-            )
-            
-            return _result(
-                text=_chat_ui(
-                    loc,
-                    f"Observation recorded!\n\n📍 Equipment: {_equip_label(equipment)}\n⚠️ Issue: {fm.get('failure_mode')}{review_note}",
-                    f"Melding vastgelegd!\n\n📍 Apparatuur: {_equip_label(equipment)}\n⚠️ Storing: {fm.get('failure_mode')}{review_note}",
-                ),
-                state=ChatState.COMPLETE, pending=pdata, create=True, obs_data=pdata, orig=orig_msg)
-        else:
-            # No failure mode found - use original description as custom failure mode
-            pdata["failure_mode_name"] = orig_msg[:100] if len(orig_msg) > 100 else orig_msg
-            pdata["is_custom_failure_mode"] = True
-            pdata["ai_auto_selected_failure_mode"] = False
-            
-            review_note = _chat_ui(
-                loc,
-                "\n\n⚠️ No matching failure mode found. Please review and update the failure mode in the observation details.",
-                "\n\n⚠️ Geen passende storingsmodus gevonden. Controleer en update de storingsmodus in de observatiedetails.",
-            )
-            
-            return _result(
-                text=_chat_ui(
-                    loc,
-                    f"Observation recorded!\n\n📍 Equipment: {_equip_label(equipment)}\n⚠️ Issue: {pdata['failure_mode_name']}{review_note}",
-                    f"Melding vastgelegd!\n\n📍 Apparatuur: {_equip_label(equipment)}\n⚠️ Storing: {pdata['failure_mode_name']}{review_note}",
-                ),
-                state=ChatState.COMPLETE, pending=pdata, create=True, obs_data=pdata, orig=orig_msg)
+    # ==============================
+    # AWAITING_FAILURE_MODE / AWAITING_NEW_FAILURE_MODE (legacy — auto-complete)
+    # ==============================
+    if current_state in (ChatState.AWAITING_FAILURE_MODE, ChatState.AWAITING_NEW_FAILURE_MODE):
+        equipment = pending_data.get("equipment") or _unknown_equipment_placeholder(pending_data)
+        orig = pending_data.get("original_description") or original_message
+        return _build_complete_observation_result(
+            pending_data, equipment, failure_modes_library, orig, loc
+        )
 
     # ==============================
     # AWAITING_EQUIPMENT
@@ -718,121 +752,6 @@ async def process_chat_message(
                 eq_sugg=prev_equipment_suggestions, orig=original_message)
 
     # ==============================
-    # AWAITING_FAILURE_MODE
-    # ==============================
-    if current_state == ChatState.AWAITING_FAILURE_MODE:
-        if _message_indicates_unknown_failure_mode(message_content):
-            pending_data["failure_mode_name"] = "Unknown / not specified"
-            pending_data["is_custom_failure_mode"] = True
-            pending_data.pop("failure_mode", None)
-            pending_data.pop("failure_mode_id", None)
-            pending_data.pop("recommended_actions", None)
-            return _result(
-                text=_chat_ui(
-                    loc,
-                    f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
-                    f"Melding vastgelegd voor {_equip_label(pending_data.get('equipment', {}))}.",
-                ),
-                state=ChatState.COMPLETE, pending=pending_data, create=True, obs_data=pending_data)
-
-        # Custom failure mode
-        if message_content.lower().startswith("new failure mode:"):
-            custom = message_content.split(":", 1)[1].strip()
-            if custom and len(custom) >= 3:
-                pending_data["failure_mode_name"] = custom
-                pending_data["is_custom_failure_mode"] = True
-                return _result(
-                    text=_chat_ui(
-                        loc,
-                        f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
-                        f"Melding vastgelegd voor {_equip_label(pending_data.get('equipment', {}))}.",
-                    ),
-                    state=ChatState.COMPLETE, pending=pending_data, create=True, obs_data=pending_data)
-            return _result(
-                text=_chat_ui(
-                    loc,
-                    "Please provide a valid failure mode name (at least 3 characters):",
-                    "Geef een geldige storingsmodus (minimaal 3 tekens):",
-                ),
-                state=ChatState.AWAITING_FAILURE_MODE, fm_sugg=prev_failure_mode_suggestions,
-                new_fm_opt=True)
-
-        selected = match_failure_mode_from_suggestions(message_content, prev_failure_mode_suggestions)
-        if selected:
-            pending_data["failure_mode"] = selected
-            pending_data["failure_mode_id"] = selected.get("id")
-            pending_data["failure_mode_name"] = selected.get("failure_mode")
-            pending_data["recommended_actions"] = selected.get("recommended_actions", [])
-            return _result(
-                text=_chat_ui(
-                    loc,
-                    f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
-                    f"Melding vastgelegd voor {_equip_label(pending_data.get('equipment', {}))}.",
-                ),
-                state=ChatState.COMPLETE, pending=pending_data, create=True, obs_data=pending_data)
-
-        # Re-search
-        fm_matches = search_failure_modes(failure_modes_library, message_content,
-                                          pending_data.get("equipment_type"))
-        if len(fm_matches) == 1:
-            fm = fm_matches[0]
-            pending_data["failure_mode"] = fm
-            pending_data["failure_mode_id"] = fm.get("id")
-            pending_data["failure_mode_name"] = fm.get("failure_mode")
-            return _result(
-                text=_chat_ui(
-                    loc,
-                    f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
-                    f"Melding vastgelegd voor {_equip_label(pending_data.get('equipment', {}))}.",
-                ),
-                state=ChatState.COMPLETE, pending=pending_data, create=True, obs_data=pending_data)
-        elif len(fm_matches) > 1:
-            return _result(
-                text=_chat_ui(
-                    loc,
-                    f"Equipment: {_equip_label(pending_data.get('equipment', {}))}. "
-                    f"Which failure type? Please select:",
-                    f"Apparatuur: {_equip_label(pending_data.get('equipment', {}))}. "
-                    f"Welke storingscategorie? Maak een keuze:",
-                ),
-                state=ChatState.AWAITING_FAILURE_MODE, fm_sugg=fm_matches, new_fm_opt=True)
-        else:
-            return _result(
-                text=_chat_ui(
-                    loc,
-                    f"Equipment: {_equip_label(pending_data.get('equipment', {}))}. "
-                    f"No matching failure mode found. Would you like to specify the failure mode?",
-                    f"Apparatuur: {_equip_label(pending_data.get('equipment', {}))}. "
-                    f"Geen passende storingsmodus gevonden. Wilt u de storingsmodus zelf opgeven?",
-                ),
-                state=ChatState.AWAITING_FAILURE_MODE, fm_sugg=[], new_fm_opt=True)
-
-    # ==============================
-    # AWAITING_NEW_FAILURE_MODE
-    # ==============================
-    if current_state == ChatState.AWAITING_NEW_FAILURE_MODE:
-        custom = message_content.strip()
-        if custom.lower().startswith("new failure mode:"):
-            custom = custom.split(":", 1)[1].strip()
-        if custom and len(custom) >= 3:
-            pending_data["failure_mode_name"] = custom
-            pending_data["is_custom_failure_mode"] = True
-            return _result(
-                text=_chat_ui(
-                    loc,
-                    f"Observation recorded for {_equip_label(pending_data.get('equipment', {}))}.",
-                    f"Melding vastgelegd voor {_equip_label(pending_data.get('equipment', {}))}.",
-                ),
-                state=ChatState.COMPLETE, pending=pending_data, create=True, obs_data=pending_data)
-        return _result(
-            text=_chat_ui(
-                loc,
-                "Please provide a valid failure mode name (at least 3 characters):",
-                "Geef een geldige storingsmodus (minimaal 3 tekens):",
-            ),
-            state=ChatState.AWAITING_NEW_FAILURE_MODE)
-
-    # ==============================
     # INITIAL — fresh message (QUICK REPORT MODE)
     # ==============================
     # Quick Report Flow: Create observation immediately with AI auto-selection
@@ -867,66 +786,6 @@ async def process_chat_message(
         logger.info("Quick report: No equipment match, using unknown placeholder")
         pd0["ai_auto_selected_equipment"] = True
     
-    # Set equipment data in pending
-    pd0["equipment"] = selected_equipment
-    pd0["equipment_id"] = selected_equipment.get("id")
-    pd0["equipment_name"] = selected_equipment.get("name")
-    pd0["equipment_type"] = selected_equipment.get("equipment_type")
-    pd0["criticality"] = selected_equipment.get("criticality")
-    pd0["installation_id"] = selected_equipment.get("installation_id")
-    
-    # Auto-select best failure mode
-    fm_matches = search_failure_modes(failure_modes_library, message_content, selected_equipment.get("equipment_type"))
-    
-    if len(fm_matches) >= 1:
-        # Use the best match
-        fm = fm_matches[0]
-        pd0["failure_mode"] = fm
-        pd0["failure_mode_id"] = fm.get("id")
-        pd0["failure_mode_name"] = fm.get("failure_mode")
-        pd0["recommended_actions"] = fm.get("recommended_actions", [])
-        pd0["ai_auto_selected_failure_mode"] = True  # Flag that this was auto-selected
-        logger.info(f"Quick report: Auto-selected failure mode: {fm.get('failure_mode')}")
-    else:
-        # No failure mode found - use original description as failure mode name
-        pd0["failure_mode_name"] = message_content[:100] if len(message_content) > 100 else message_content
-        pd0["is_custom_failure_mode"] = True
-        pd0["ai_auto_selected_failure_mode"] = False
-        logger.info("Quick report: No failure mode match, using description as custom failure mode")
-    
-    # Build response message showing what was auto-selected
-    eq_label = _equip_label(selected_equipment)
-    fm_label = pd0.get("failure_mode_name", "Not specified")
-    
-    # Determine if selections need review
-    needs_review_items = []
-    if not selected_equipment.get("id"):
-        needs_review_items.append("equipment")
-    if not pd0.get("failure_mode_id"):
-        needs_review_items.append("failure mode")
-    
-    if needs_review_items:
-        review_note = _chat_ui(
-            loc,
-            f"\n\n⚠️ Please review and update the {' and '.join(needs_review_items)} in the observation details.",
-            f"\n\n⚠️ Controleer en update de {' en '.join(needs_review_items)} in de observatiedetails.",
-        )
-    else:
-        review_note = _chat_ui(
-            loc,
-            "\n\n✓ AI auto-selected equipment and failure mode. You can edit these in the observation details if needed.",
-            "\n\n✓ AI heeft automatisch apparatuur en storingsmodus geselecteerd. U kunt deze aanpassen in de observatiedetails indien nodig.",
-        )
-    
-    return _result(
-        text=_chat_ui(
-            loc,
-            f"Observation recorded!\n\n📍 Equipment: {eq_label}\n⚠️ Issue: {fm_label}{review_note}",
-            f"Melding vastgelegd!\n\n📍 Apparatuur: {eq_label}\n⚠️ Storing: {fm_label}{review_note}",
-        ),
-        state=ChatState.COMPLETE,
-        pending=pd0,
-        create=True,
-        obs_data=pd0,
-        orig=message_content
+    return _build_complete_observation_result(
+        pd0, selected_equipment, failure_modes_library, message_content, loc
     )
