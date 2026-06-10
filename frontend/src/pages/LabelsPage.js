@@ -50,6 +50,7 @@ import {
 } from "../components/ui/tooltip";
 import { labelsAPI } from "../lib/api";
 import { formAPI } from "../components/forms/formAPI";
+import { useLanguage } from "../contexts/LanguageContext";
 
 // ==================== HELPERS ====================
 
@@ -915,6 +916,7 @@ function PrintDialog({ open, template, onClose }) {
 // ==================== MAIN PAGE ====================
 
 export default function LabelsPage() {
+  const { t } = useLanguage();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -1068,7 +1070,7 @@ export default function LabelsPage() {
                             <Printer className="w-3.5 h-3.5" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Print</TooltipContent>
+                        <TooltipContent>{t("tooltips.print")}</TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -1076,7 +1078,7 @@ export default function LabelsPage() {
                             <Pencil className="w-3.5 h-3.5" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Edit</TooltipContent>
+                        <TooltipContent>{t("tooltips.edit")}</TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -1084,7 +1086,7 @@ export default function LabelsPage() {
                             <Copy className="w-3.5 h-3.5" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Duplicate</TooltipContent>
+                        <TooltipContent>{t("tooltips.duplicate")}</TooltipContent>
                       </Tooltip>
                       <div className="flex-1" />
                       {t.status !== "archived" && (
@@ -1099,7 +1101,7 @@ export default function LabelsPage() {
                               <Archive className="w-3.5 h-3.5" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Archive</TooltipContent>
+                          <TooltipContent>{t("tooltips.archive")}</TooltipContent>
                         </Tooltip>
                       )}
                     </div>

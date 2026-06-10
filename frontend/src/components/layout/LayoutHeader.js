@@ -170,7 +170,7 @@ export default function LayoutHeader({
                     size="icon"
                     className="h-6 w-6 sm:h-7 sm:w-7 text-[10px] sm:text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-transform hover:scale-105 active:scale-95"
                     data-testid="language-switcher"
-                    title="Change language"
+                    title={t("tooltips.changeLanguage")}
                   >
                     <span className="font-medium">{language.toUpperCase()}</span>
                   </Button>

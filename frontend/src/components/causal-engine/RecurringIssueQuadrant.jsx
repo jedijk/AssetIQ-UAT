@@ -29,6 +29,7 @@ import {
   TooltipTrigger,
 } from "../ui/tooltip";
 import { formatDate } from "../../lib/dateUtils";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 /**
  * Recurring Issue Quadrant Component
@@ -45,6 +46,7 @@ export default function RecurringIssueQuadrant({
   investigationAPI,
   disabled = false,
 }) {
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [isExpanded, setIsExpanded] = useState(false);
   const [quadrantData, setQuadrantData] = useState({
@@ -300,7 +302,7 @@ export default function RecurringIssueQuadrant({
                           )}
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>Unlink incident</TooltipContent>
+                      <TooltipContent>{t("tooltips.unlinkIncident")}</TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 )}
@@ -347,15 +349,15 @@ export default function RecurringIssueQuadrant({
             <div className="grid grid-cols-2 gap-3">
               {/* Row 1: Current Incident */}
               <QuadrantCell
-                title="CURRENT IS"
-                subtitle="Context true now"
+                title={t("tooltips.currentIs")}
+                subtitle={t("tooltips.contextTrueNow")}
                 quadrantKey="current_is"
                 bgColor="bg-green-50"
                 borderColor="border border-green-200"
               />
               <QuadrantCell
-                title="CURRENT IS NOT"
-                subtitle="Context not true now"
+                title={t("tooltips.currentIsNot")}
+                subtitle={t("tooltips.contextNotTrueNow")}
                 quadrantKey="current_is_not"
                 bgColor="bg-red-50"
                 borderColor="border border-red-200"
@@ -363,15 +365,15 @@ export default function RecurringIssueQuadrant({
 
               {/* Row 2: Past Incident */}
               <QuadrantCell
-                title="PAST WAS"
-                subtitle="Context true before"
+                title={t("tooltips.pastWas")}
+                subtitle={t("tooltips.contextTrueBefore")}
                 quadrantKey="past_was"
                 bgColor="bg-blue-50"
                 borderColor="border border-blue-200"
               />
               <QuadrantCell
-                title="PAST WAS NOT"
-                subtitle="Context not true before"
+                title={t("tooltips.pastWasNot")}
+                subtitle={t("tooltips.contextNotTrueBefore")}
                 quadrantKey="past_was_not"
                 bgColor="bg-slate-50"
                 borderColor="border border-slate-200"

@@ -320,7 +320,7 @@ const TaskRow = ({ task, onEdit, onDelete, onToggleActive, isExpanded, onToggleE
                     />
                   </div>
                 </TooltipTrigger>
-                <TooltipContent>{isActive ? 'Disable task' : 'Enable task'}</TooltipContent>
+                <TooltipContent>{isActive ? t("tooltips.disableTask") : t("tooltips.enableTask")}</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           )}
@@ -1132,7 +1132,7 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
                   <History className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Version History</TooltipContent>
+              <TooltipContent>{t("tooltips.versionHistory")}</TooltipContent>
             </Tooltip>
           </TooltipProvider>
           
@@ -1148,7 +1148,7 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
                   <RefreshCw className={`h-4 w-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Regenerate from Strategy</TooltipContent>
+              <TooltipContent>{t("tooltips.regenerateFromStrategy")}</TooltipContent>
             </Tooltip>
           </TooltipProvider>
 

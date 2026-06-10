@@ -593,7 +593,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
             </Select>
             {/* Share / Edit / Delete — desktop only (sm and up). On mobile,
                 these collapse into the ⋯ menu so the hero stays tidy. */}
-            <Button size="sm" variant="ghost" onClick={shareLink} title="Share" data-testid="workspace-share-btn" className="hidden sm:inline-flex h-8 w-8 p-0">
+            <Button size="sm" variant="ghost" onClick={shareLink} title={t("tooltips.share")} data-testid="workspace-share-btn" className="hidden sm:inline-flex h-8 w-8 p-0">
               <Share2 className="w-4 h-4" />
             </Button>
             <Button
@@ -601,7 +601,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
               variant="outline"
               onClick={startEditing}
               data-testid="workspace-edit-btn"
-              title={t("observationWorkspace.edit")}
+              title={t("tooltips.edit")}
               className="hidden sm:inline-flex h-8 sm:w-auto p-0 sm:px-3"
             >
               <Edit className="w-3.5 h-3.5 sm:mr-1" />
@@ -611,7 +611,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
               size="sm"
               variant="ghost"
               onClick={() => setShowDeleteDialog(true)}
-              title="Delete observation"
+              title={t("tooltips.deleteObservation")}
               data-testid="workspace-delete-btn"
               className="hidden sm:inline-flex h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
             >
@@ -851,7 +851,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
                     }}
                     style={{ minHeight: 0, minWidth: 0 }}
                     className="appearance-none p-0 m-0 border-0 bg-transparent font-semibold text-slate-900 text-xs sm:text-sm leading-tight truncate text-center block max-w-full hover:text-blue-600 hover:underline transition-colors cursor-pointer"
-                    title="Click to view in Failure Modes Library"
+                    title={t("tooltips.viewInFailureModesLibrary")}
                   >
                     {item.value}
                   </button>

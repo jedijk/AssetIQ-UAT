@@ -840,7 +840,7 @@ const ThreatDetailPage = () => {
                     variant="outline" 
                     onClick={() => navigate(`/threats/${id}/workspace`)}
                     className="h-7 px-2 text-xs bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
-                    title="Open Reliability Intelligence Workspace"
+                    title={t("tooltips.openReliabilityWorkspace")}
                   >
                     <Brain className="w-3 h-3 mr-1" />
                     Workspace

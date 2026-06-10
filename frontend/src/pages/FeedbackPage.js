@@ -1176,7 +1176,7 @@ const FeedbackPage = () => {
                       ? 'bg-white shadow-sm text-slate-900' 
                       : 'text-slate-500 hover:text-slate-700'
                   }`}
-                  title="List view"
+                  title={t("tooltips.listView")}
                   data-testid="view-list-btn"
                 >
                   <List className="w-4 h-4" />
@@ -1188,7 +1188,7 @@ const FeedbackPage = () => {
                       ? 'bg-white shadow-sm text-blue-600' 
                       : 'text-slate-500 hover:text-slate-700'
                   }`}
-                  title="Snowflake view (grouped by status)"
+                  title={t("tooltips.snowflakeView")}
                   data-testid="view-snowflake-btn"
                 >
                   <Snowflake className="w-4 h-4" />

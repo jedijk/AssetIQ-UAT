@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { Info } from "lucide-react";
+import { useLanguage } from "../contexts/LanguageContext";
 
 // Reliability Framework dimensions based on the provided framework
 const RELIABILITY_DIMENSIONS = [
@@ -87,6 +88,7 @@ export default function ReliabilitySnowflake({
   darkMode = true,
   onDimensionClick = null,
 }) {
+  const { t } = useLanguage();
   const centerX = size / 2;
   const centerY = size / 2;
   const radius = size / 2 - 60;
@@ -149,7 +151,7 @@ export default function ReliabilitySnowflake({
         </div>
         <button 
           className={`p-2 rounded-full ${darkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-100'}`}
-          title="View methodology"
+          title={t("tooltips.viewMethodology")}
         >
           <Info className={`w-5 h-5 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
         </button>

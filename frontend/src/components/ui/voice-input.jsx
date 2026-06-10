@@ -9,6 +9,7 @@ import { Button } from "./button";
 import { toast } from "sonner";
 import { voiceAPI } from "../../lib/api";
 import { cn } from "../../lib/utils";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 export const VoiceInput = ({ 
   onTranscribe, 
@@ -17,6 +18,7 @@ export const VoiceInput = ({
   size = "default", // "default" | "sm" | "lg"
   appendMode = true, // If true, appends to existing text. If false, replaces
 }) => {
+  const { t } = useLanguage();
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -155,7 +157,7 @@ export const VoiceInput = ({
         size="icon"
         disabled
         className={cn(sizeClasses[size], "relative", className)}
-        title="Transcribing..."
+        title={t("tooltips.transcribing")}
       >
         <Loader2 className={cn(iconSizeClasses[size], "animate-spin text-blue-500")} />
       </Button>
