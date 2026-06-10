@@ -26,7 +26,7 @@ from ai_helpers import (
     translate_to_english_for_record,
 )
 from chat_handler_v2 import (
-    process_chat_message, ChatState,
+    process_chat_message, ChatState, search_equipment_hierarchy,
 )
 from failure_modes import FAILURE_MODES_LIBRARY
 from services.threat_score_service import (
@@ -1056,13 +1056,58 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             await _store_assistant_msg(user_id, answer, chat_state=ChatState.INITIAL, is_data_query=True)
             return ChatResponse(message=answer, question_type="data_query", detected_language=detected_lang)
 
+        # ------------------------------------------------------------------
+        # NEW: Check equipment confidence BEFORE summary
+        # If no high-confidence equipment match, ask user to select first
+        # ------------------------------------------------------------------
+        eq_matches = await search_equipment_hierarchy(db, content, user_id)
+        
+        # Check if we have a high-confidence single match (>= 80%)
+        has_high_confidence_match = (
+            len(eq_matches) == 1 and eq_matches[0].get("confidence", 0) >= 80
+        )
+        
+        if eq_matches and not has_high_confidence_match:
+            # Multiple matches OR low confidence - ask for equipment selection FIRST
+            logger.info(f"Chat: {len(eq_matches)} equipment matches with low confidence, asking user to select first")
+            await _write_conv(
+                user_id,
+                state=ChatState.AWAITING_EQUIPMENT,
+                pending_data={"original_description": content, "chat_ui_language": ul},
+                equipment_suggestions=eq_matches,
+                failure_mode_suggestions=None,
+                original_message=content,
+                awaiting_context_for_threat=None,
+                issue_description=content,
+                issue_summary=None,
+            )
+            reply = (
+                "Welk stuk apparatuur bedoelt u? Maak een keuze:"
+                if ui_is_nl
+                else "Which equipment? Please select:"
+            )
+            await _store_assistant_msg(
+                user_id, reply,
+                chat_state=ChatState.AWAITING_EQUIPMENT,
+                question_type="equipment_select",
+                equipment_suggestions=eq_matches,
+            )
+            return ChatResponse(
+                message=reply,
+                follow_up_question=reply,
+                question_type="equipment_select",
+                equipment_suggestions=eq_matches,
+                detected_language=detected_lang,
+            )
+
+        # High-confidence match or no matches - proceed to summary confirmation
         # Generate improved summary for user confirmation
         summary = await summarize_issue_description(content, detected_lang)
         await _write_conv(
             user_id,
             state=ChatState.AWAITING_ISSUE_CONFIRM,
             pending_data={},
-            equipment_suggestions=None,
+            equipment_suggestions=eq_matches if has_high_confidence_match else None,
             failure_mode_suggestions=None,
             original_message=None,
             awaiting_context_for_threat=None,
