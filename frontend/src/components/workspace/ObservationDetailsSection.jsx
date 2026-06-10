@@ -258,11 +258,15 @@ const ObservationDetailsSection = ({ threatId }) => {
       );
       setShowLinkFailureModeDialog(false);
       setSelectedFailureModeId(null);
+      setFailureModeSearch("");
+    },
+    onError: () => toast.error(t("observations.linkFailureModeFailed")),
+  });
 
   // AI improve description mutation
   const improveDescriptionMutation = useMutation({
     mutationFn: () => threatsAPI.improveDescription(threatId),
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.threats.legacyDetail(threatId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(threatId) });
       toast.success("Description improved with AI");
@@ -283,10 +287,6 @@ const ObservationDetailsSection = ({ threatId }) => {
     setAiImprovingDesc(true);
     improveDescriptionMutation.mutate();
   };
-      setFailureModeSearch("");
-    },
-    onError: () => toast.error(t("observations.linkFailureModeFailed")),
-  });
 
   // --- Derived data ---------------------------------------------------------
   const linkedFmData = useMemo(() => {

@@ -7,6 +7,13 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.4** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Workspace — AI Improve Description build fix (VERIFIED via webpack compile + sanity screenshot)**:
+  - Fixed `react-hooks/rules-of-hooks` violation in `ObservationDetailsSection.jsx` where `improveDescriptionMutation` and `handleImproveDescription` were nested inside `linkFailureModeMutation.onSuccess` callback. Moved them out to the component's top level next to other mutations.
+  - The AI improve description feature (✨ button next to paperclip in Description card, calls `POST /api/threats/{id}/improve-description`) is now functional with hover tooltip.
+  - File: `/app/frontend/src/components/workspace/ObservationDetailsSection.jsx`.
+
+
+## Recent Changes
 - [Feb 2026] **Observation Workspace — Exposure Cards now use severity colors (VERIFIED via screenshot)**:
   - `ExposureCard` in `/app/frontend/src/pages/ObservationWorkspacePage.jsx` derives background/border/text colors from the dimension `score` (1-5) via `severityColorByScore` (1→green, 2→sky, 3→yellow, 4→orange, 5→red). The static `color` prop now only acts as a fallback when no score is present.
   - "Not assessed" cards continue to render in neutral slate.
