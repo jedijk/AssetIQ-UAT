@@ -184,6 +184,10 @@ async def search_equipment_hierarchy(db, search_text: str, user_id: str) -> List
         parent_map = {p["id"]: p for p in parents}
 
     scored = []
+    # Calculate max possible score for confidence calculation
+    # Max score per keyword: 10 (name) + 8 (tag) + 5 (type) + 3 (desc) = 26
+    max_possible_score = len(keywords) * 26 if keywords else 1
+    
     for eq in equipment_list:
         score = 0
         name = (eq.get("name") or "").lower()
@@ -208,6 +212,9 @@ async def search_equipment_hierarchy(db, search_text: str, user_id: str) -> List
                 if p:
                     parent_name = p.get("name")
 
+            # Calculate confidence as percentage (capped at 100%)
+            confidence = min(100, round((score / max_possible_score) * 100))
+            
             scored.append({
                 "id": eq.get("id"), "name": eq.get("name"),
                 "tag": eq.get("tag") or eq.get("tag_number"),
@@ -215,6 +222,7 @@ async def search_equipment_hierarchy(db, search_text: str, user_id: str) -> List
                 "description": eq.get("description"), "level": eq.get("level"),
                 "criticality": eq.get("criticality"), "parent_name": parent_name,
                 "score": score,
+                "confidence": confidence,
             })
 
     scored.sort(key=lambda x: x["score"], reverse=True)
@@ -502,13 +510,23 @@ async def process_chat_message(
 
         eq_matches = await search_equipment_hierarchy(db, message_content, user_id)
         if len(eq_matches) == 1:
-            return _after_equipment_selected(eq_matches[0], failure_modes_library, original_message, pending_data)
+            # Only auto-select if confidence >= 80%
+            if eq_matches[0].get("confidence", 0) >= 80:
+                logger.info(f"Auto-selected equipment with {eq_matches[0].get('confidence')}% confidence: {eq_matches[0].get('name')}")
+                return _after_equipment_selected(eq_matches[0], failure_modes_library, original_message, pending_data)
+            else:
+                # Low confidence single match - ask user to confirm
+                logger.info(f"Single match with low confidence ({eq_matches[0].get('confidence')}%), showing for user selection")
+                return _result(
+                    text=_chat_ui(
+                        loc,
+                        "I found one possible match. Please confirm or specify more details:",
+                        "Ik heb één mogelijke match gevonden. Bevestig of geef meer details:",
+                    ),
+                    state=ChatState.AWAITING_EQUIPMENT, eq_sugg=eq_matches, orig=original_message)
         elif len(eq_matches) > 1:
-            # Auto-select when a single full/exact match (by name or unique tag) is present
-            full = find_full_equipment_match(message_content, eq_matches)
-            if full:
-                logger.info(f"Auto-selected full equipment match: {full.get('name')} ({full.get('tag')})")
-                return _after_equipment_selected(full, failure_modes_library, original_message, pending_data)
+            # Multiple matches - always show list for user to select
+            logger.info(f"Multiple equipment matches ({len(eq_matches)}), showing list for user selection")
             return _result(
                 text=_chat_ui(
                     loc,
@@ -650,22 +668,30 @@ async def process_chat_message(
     eq_matches = await search_equipment_hierarchy(db, message_content, user_id)
     pd0 = {**pending_data, "original_description": message_content}
     
-    # Auto-select best equipment (first match or unknown if no matches)
+    # Auto-select equipment only if single match with >= 80% confidence
+    # Otherwise, show list for user selection (for multiple matches or low confidence)
     selected_equipment = None
-    if len(eq_matches) >= 1:
-        # Try exact match first
-        full = find_full_equipment_match(message_content, eq_matches)
-        if full:
-            selected_equipment = full
-            logger.info(f"Quick report: Auto-selected exact equipment match: {full.get('name')} ({full.get('tag')})")
-        else:
-            # Use the highest scored match
-            selected_equipment = eq_matches[0]
-            logger.info(f"Quick report: Auto-selected best equipment match: {selected_equipment.get('name')} ({selected_equipment.get('tag')})")
+    
+    if len(eq_matches) == 1 and eq_matches[0].get("confidence", 0) >= 80:
+        # High confidence single match - auto-select
+        selected_equipment = eq_matches[0]
+        logger.info(f"Quick report: Auto-selected equipment with {eq_matches[0].get('confidence')}% confidence: {selected_equipment.get('name')} ({selected_equipment.get('tag')})")
+        pd0["ai_auto_selected_equipment"] = True
+    elif len(eq_matches) >= 1:
+        # Multiple matches OR single low-confidence match - ask user to select
+        logger.info(f"Quick report: {len(eq_matches)} equipment match(es) found, asking user to select")
+        return _result(
+            text=_chat_ui(
+                loc,
+                "Which equipment? Please select:",
+                "Welk stuk apparatuur bedoelt u? Maak een keuze:",
+            ),
+            state=ChatState.AWAITING_EQUIPMENT, eq_sugg=eq_matches, orig=message_content, pending=pd0)
     else:
         # No equipment found - use unknown placeholder
         selected_equipment = _unknown_equipment_placeholder(pd0)
         logger.info("Quick report: No equipment match, using unknown placeholder")
+        pd0["ai_auto_selected_equipment"] = True
     
     # Set equipment data in pending
     pd0["equipment"] = selected_equipment
@@ -674,7 +700,6 @@ async def process_chat_message(
     pd0["equipment_type"] = selected_equipment.get("equipment_type")
     pd0["criticality"] = selected_equipment.get("criticality")
     pd0["installation_id"] = selected_equipment.get("installation_id")
-    pd0["ai_auto_selected_equipment"] = True  # Flag that this was auto-selected
     
     # Auto-select best failure mode
     fm_matches = search_failure_modes(failure_modes_library, message_content, selected_equipment.get("equipment_type"))
