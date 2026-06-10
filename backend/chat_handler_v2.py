@@ -158,12 +158,26 @@ async def search_equipment_hierarchy(db, search_text: str, user_id: str) -> List
 
     operational_levels = ["subunit", "maintainable_item", "equipment", "component", "equipment_unit"]
     
-    # Extract potential tag patterns (e.g., "1F-3001-0122", "1X-1001-0001")
-    # Common patterns: alphanumeric with dashes/underscores
-    tag_patterns = re.findall(r'\b[A-Za-z0-9]{1,3}[-_][A-Za-z0-9]{3,5}[-_][A-Za-z0-9]{3,5}\b', search_text)
+    # Extract potential tag patterns - with or without dashes
+    # Pattern 1: With dashes (e.g., "1F-3001-0122", "1X-1001-0001")
+    tag_patterns_with_dash = re.findall(r'\b[A-Za-z0-9]{1,3}[-_][A-Za-z0-9]{3,5}[-_][A-Za-z0-9]{3,5}\b', search_text)
+    
+    # Pattern 2: Without dashes - alphanumeric that looks like a tag (e.g., "1F30010122", "30010122")
+    # Match: optional 1-2 alphanumeric prefix + 6+ digits, OR alphanumeric string of 8+ chars containing mostly digits
+    tag_patterns_no_dash = re.findall(r'\b[A-Za-z0-9]{1,2}[0-9]{6,12}\b', search_text)
+    
+    # Pattern 3: Partial tags - at least 4 digits that could be part of a tag (e.g., "3001", "0122", "30010122")
+    partial_tag_patterns = re.findall(r'\b[0-9]{4,}\b', search_text)
+    
+    # Combine all tag patterns
+    all_tag_patterns = tag_patterns_with_dash + tag_patterns_no_dash
     
     # Also look for quoted equipment names
     quoted_names = re.findall(r'"([^"]+)"', search_text)
+    
+    # Helper function to normalize tag for comparison (remove dashes, underscores, lowercase)
+    def normalize_tag(t):
+        return re.sub(r'[-_\s]', '', t.lower()) if t else ''
 
     search_conditions = []
     for kw in keywords:
@@ -174,6 +188,20 @@ async def search_equipment_hierarchy(db, search_text: str, user_id: str) -> List
             continue
         search_conditions += [{"name": r}, {"tag": r}, {"tag_number": r},
                               {"description": r}, {"equipment_type": r}, {"equipment_type_name": r}]
+    
+    # Also add direct tag pattern searches (for cases where only tag number is provided)
+    # Create flexible regex that matches with or without dashes
+    for tp in all_tag_patterns + partial_tag_patterns:
+        if len(tp) >= 4:  # Only meaningful partial tags
+            # Create regex that allows optional dashes/underscores between characters
+            # e.g., "30010122" becomes "3[-_]?0[-_]?0[-_]?1[-_]?0[-_]?1[-_]?2[-_]?2"
+            flexible_pattern = '[-_]?'.join(list(tp))
+            flexible_regex = {"$regex": flexible_pattern, "$options": "i"}
+            search_conditions.append({"tag": flexible_regex})
+            search_conditions.append({"tag_number": flexible_regex})
+    
+    if not search_conditions:
+        return []
 
     equipment_list = await db.equipment_nodes.find(
         {"$and": [{"level": {"$in": operational_levels}}, {"$or": search_conditions}]},
@@ -198,30 +226,53 @@ async def search_equipment_hierarchy(db, search_text: str, user_id: str) -> List
     max_possible_score = len(keywords) * 26 if keywords else 1
     
     search_text_lower = search_text.lower()
+    search_text_normalized = normalize_tag(search_text)
     
     for eq in equipment_list:
         score = 0
         name = (eq.get("name") or "").lower()
         tag = (eq.get("tag") or eq.get("tag_number") or "").lower()
+        tag_normalized = normalize_tag(tag)
         desc = (eq.get("description") or "").lower()
         eq_type = (eq.get("equipment_type") or eq.get("equipment_type_name") or "").lower()
         
-        # Check for EXACT tag match - this should give 100% confidence
+        # Check for EXACT tag match (with or without dashes) - 100% confidence
         exact_tag_match = False
-        if tag:
-            for tp in tag_patterns:
-                if tp.lower() == tag:
+        if tag_normalized:
+            # Check full tag patterns (with dashes)
+            for tp in all_tag_patterns:
+                tp_normalized = normalize_tag(tp)
+                if tp_normalized == tag_normalized:
                     exact_tag_match = True
+                    break
+            
+            # Check if normalized tag appears in normalized search text
+            if not exact_tag_match and len(tag_normalized) >= 6:
+                if tag_normalized in search_text_normalized:
+                    exact_tag_match = True
+        
+        # Check for PARTIAL tag match - at least last 4+ digits match - 90% confidence
+        partial_tag_match = False
+        if tag_normalized and not exact_tag_match:
+            for ptp in partial_tag_patterns:
+                # Partial tag should be significant (at least 4 digits) and match end of tag
+                if len(ptp) >= 4 and tag_normalized.endswith(ptp):
+                    partial_tag_match = True
+                    break
+                # Or partial tag appears anywhere in normalized tag
+                if len(ptp) >= 6 and ptp in tag_normalized:
+                    partial_tag_match = True
                     break
         
         # Check for EXACT name match from quoted text
         exact_name_match = False
         for qn in quoted_names:
             qn_lower = qn.lower()
+            qn_normalized = normalize_tag(qn)
             # Check if quoted name matches equipment name (with or without tag)
             if name == qn_lower or qn_lower.startswith(name) or name in qn_lower:
                 # Also verify tag if present in quoted name
-                if tag and tag in qn_lower:
+                if tag and (tag in qn_lower or tag_normalized in qn_normalized):
                     exact_name_match = True
                     break
                 elif not tag and name == qn_lower:
@@ -237,6 +288,12 @@ async def search_equipment_hierarchy(db, search_text: str, user_id: str) -> List
                 score += 5
             if kw in desc:
                 score += 3
+        
+        # Also give score for exact/partial tag matches (even if keyword doesn't directly match)
+        if exact_tag_match:
+            score += 50  # High score for exact tag match
+        elif partial_tag_match:
+            score += 30  # Good score for partial tag match
 
         if score > 0:
             parent_name = None
@@ -247,8 +304,11 @@ async def search_equipment_hierarchy(db, search_text: str, user_id: str) -> List
 
             # Calculate confidence as percentage (capped at 100%)
             # Exact tag or name match = 100% confidence
+            # Partial tag match = 90% confidence
             if exact_tag_match or exact_name_match:
                 confidence = 100
+            elif partial_tag_match:
+                confidence = 90
             else:
                 confidence = min(100, round((score / max_possible_score) * 100))
             
