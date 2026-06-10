@@ -197,12 +197,23 @@ async def create_indexes():
     await db.adhoc_plans.create_index([("assigned_to", 1), ("status", 1)], background=True)
     print("   ✓ adhoc_plans indexes created")
     
+    # ============= PUSH SUBSCRIPTIONS =============
+    print("\n📋 Creating indexes for 'push_subscriptions' collection...")
+    await db.push_subscriptions.create_index("id", unique=True, background=True)
+    await db.push_subscriptions.create_index("user_id", background=True)
+    await db.push_subscriptions.create_index(
+        [("user_id", 1), ("endpoint", 1)],
+        unique=True,
+        background=True,
+    )
+    print("   ✓ push_subscriptions indexes created")
+
     # ============= FEEDBACK COLLECTION =============
     print("\n📋 Creating indexes for 'feedback' collection...")
     await db.feedback.create_index("id", unique=True, background=True)
-    await db.feedback.create_index("created_by", background=True)
+    await db.feedback.create_index("user_id", background=True)
     await db.feedback.create_index("status", background=True)
-    await db.feedback.create_index("created_at", background=True)
+    await db.feedback.create_index("timestamp", background=True)
     print("   ✓ feedback indexes created")
     
     print("\n✅ All database indexes created successfully!")

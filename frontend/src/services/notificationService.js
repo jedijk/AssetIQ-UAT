@@ -1,15 +1,83 @@
 /**
  * Push Notification Service
- * Handles browser push notification permissions, subscriptions, and local notifications
- * 
- * Platform Support:
- * - Android (Chrome/Firefox/Edge): Full support
- * - iOS Safari (16.4+): Requires PWA (Add to Home Screen)
- * - Desktop browsers: Full support
+ * Handles browser push notification permissions, subscriptions, and delivery.
+ *
+ * Background delivery (app closed / browser in background) requires:
+ * 1. push-sw.js service worker registered
+ * 2. PushManager subscription with server VAPID public key
+ * 3. Server-side Web Push (VAPID_PRIVATE_KEY on backend)
  */
 
+import { pushNotificationsAPI } from '../lib/api';
+
 const NOTIFICATION_SETTINGS_KEY = 'assetiq_notification_settings';
-const SUBSCRIPTION_KEY = 'assetiq_push_subscription';
+const PUSH_SW_URL = '/push-sw.js';
+
+/**
+ * Convert VAPID public key to Uint8Array for PushManager.subscribe()
+ */
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+/**
+ * Register the minimal push-only service worker (independent of PWA cache SW).
+ */
+export async function ensurePushServiceWorker() {
+  if (!('serviceWorker' in navigator)) return null;
+
+  const useMainServiceWorker = process.env.REACT_APP_ENABLE_SERVICE_WORKER === 'true';
+
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    const mainRegistration = registrations.find((reg) =>
+      reg.active?.scriptURL?.includes('service-worker.js')
+    );
+    if (mainRegistration) {
+      await navigator.serviceWorker.ready;
+      return mainRegistration;
+    }
+
+    const pushRegistration = registrations.find((reg) =>
+      reg.active?.scriptURL?.includes('push-sw.js')
+    );
+    if (pushRegistration) {
+      await navigator.serviceWorker.ready;
+      return pushRegistration;
+    }
+
+    const script = useMainServiceWorker ? '/service-worker.js' : PUSH_SW_URL;
+    const registration = await navigator.serviceWorker.register(script, {
+      scope: '/',
+      updateViaCache: 'none',
+    });
+    await navigator.serviceWorker.ready;
+    return registration;
+  } catch (error) {
+    console.error('[Notifications] Failed to register push service worker:', error);
+    return null;
+  }
+}
+
+/**
+ * Sync an existing browser subscription with the backend (e.g. after login).
+ */
+export async function syncPushSubscription() {
+  if (!isNotificationSupported()) return null;
+  if (getPermissionStatus() !== 'granted') return null;
+
+  const settings = getNotificationSettings();
+  if (!settings.enabled) return null;
+
+  return subscribeToPush();
+}
 
 // Default notification settings - enabled by default
 const DEFAULT_SETTINGS = {
@@ -130,12 +198,12 @@ export async function autoRequestPermission() {
   // Check if already granted or denied
   const permission = getPermissionStatus();
   if (permission === 'granted') {
-    // Already granted, ensure settings are enabled
     const settings = getNotificationSettings();
     if (!settings.enabled) {
       settings.enabled = true;
       saveNotificationSettings(settings);
     }
+    await subscribeToPush();
     return true;
   }
   
@@ -183,24 +251,43 @@ export function saveNotificationSettings(settings) {
 }
 
 /**
- * Subscribe to push notifications
+ * Subscribe to push notifications and register subscription on the server.
  */
 export async function subscribeToPush() {
   if (!isNotificationSupported()) return null;
+  if (getPermissionStatus() !== 'granted') return null;
 
   try {
-    const registration = await navigator.serviceWorker.ready;
-    
-    // Check if already subscribed
-    let subscription = await registration.pushManager.getSubscription();
-    
-    if (!subscription) {
-      // Create new subscription
-      // Note: In production, you'd need a VAPID public key from your server
-      // For now, we'll use local notifications which don't require VAPID
-      console.log('[Notifications] Push subscription not available without VAPID keys');
+    const registration = await ensurePushServiceWorker();
+    if (!registration?.pushManager) {
+      console.warn('[Notifications] PushManager not available');
+      return null;
     }
-    
+
+    let subscription = await registration.pushManager.getSubscription();
+
+    if (!subscription) {
+      let publicKey;
+      try {
+        const { publicKey: key } = await pushNotificationsAPI.getVapidPublicKey();
+        publicKey = key;
+      } catch (error) {
+        console.warn('[Notifications] Server Web Push not configured:', error?.response?.data?.detail || error.message);
+        return null;
+      }
+
+      if (!publicKey) {
+        console.warn('[Notifications] Missing VAPID public key from server');
+        return null;
+      }
+
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+    }
+
+    await pushNotificationsAPI.subscribe(subscription);
     return subscription;
   } catch (error) {
     console.error('Failed to subscribe to push:', error);
@@ -213,11 +300,24 @@ export async function subscribeToPush() {
  */
 export async function unsubscribeFromPush() {
   try {
-    const registration = await navigator.serviceWorker.ready;
-    const subscription = await registration.pushManager.getSubscription();
-    
+    const registration = await ensurePushServiceWorker();
+    const subscription = registration
+      ? await registration.pushManager.getSubscription()
+      : null;
+
     if (subscription) {
+      try {
+        await pushNotificationsAPI.unsubscribe(subscription.endpoint);
+      } catch (error) {
+        console.warn('[Notifications] Failed to remove server subscription:', error);
+      }
       await subscription.unsubscribe();
+    } else {
+      try {
+        await pushNotificationsAPI.unsubscribe();
+      } catch (error) {
+        console.warn('[Notifications] Failed to clear server subscriptions:', error);
+      }
     }
     
     // Update settings
@@ -233,7 +333,25 @@ export async function unsubscribeFromPush() {
 }
 
 /**
- * Show a local notification (works even when app is in foreground)
+ * Send a test notification via the server (works when the app is closed).
+ */
+export async function sendServerTestPush() {
+  if (getPermissionStatus() !== 'granted') {
+    return { success: false, error: 'Permission not granted' };
+  }
+
+  try {
+    await subscribeToPush();
+    const result = await pushNotificationsAPI.sendTest();
+    return { success: true, ...result };
+  } catch (error) {
+    const detail = error?.response?.data?.detail || error.message;
+    return { success: false, error: detail };
+  }
+}
+
+/**
+ * Show a local notification (foreground / same-tab fallback).
  */
 export async function showNotification(title, options = {}) {
   const settings = getNotificationSettings();
@@ -243,7 +361,10 @@ export async function showNotification(title, options = {}) {
   }
 
   try {
-    const registration = await navigator.serviceWorker.ready;
+    const registration = await ensurePushServiceWorker();
+    if (!registration) {
+      throw new Error('Push service worker unavailable');
+    }
     
     const notificationOptions = {
       body: options.body || '',
@@ -476,6 +597,10 @@ export default {
   requestPermission,
   getNotificationSettings,
   saveNotificationSettings,
+  ensurePushServiceWorker,
+  subscribeToPush,
+  syncPushSubscription,
+  sendServerTestPush,
   showNotification,
   notify,
   scheduleNotification,

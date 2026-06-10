@@ -15,6 +15,7 @@ import {
   saveNotificationSettings,
   notify,
   unsubscribeFromPush,
+  sendServerTestPush,
   isIOS,
   isStandalone,
   getNotificationSupportInfo,
@@ -26,6 +27,7 @@ export function NotificationSettings({ compact = false }) {
   const [settings, setSettings] = useState(getNotificationSettings());
   const [loading, setLoading] = useState(false);
   const [testSent, setTestSent] = useState(false);
+  const [testError, setTestError] = useState('');
   const [supportInfo, setSupportInfo] = useState({});
 
   useEffect(() => {
@@ -68,13 +70,28 @@ export function NotificationSettings({ compact = false }) {
 
   const sendTestNotification = async () => {
     setTestSent(false);
-    await notify.system(
+    setTestError('');
+    const serverResult = await sendServerTestPush();
+    if (serverResult.success) {
+      setTestSent(true);
+      setTimeout(() => setTestSent(false), 3000);
+      return;
+    }
+
+    // Fallback: local notification (foreground only) when server push is not configured
+    const localOk = await notify.system(
       '🔔 Test Notification',
-      'Push notifications are working! You will receive alerts even when the app is in the background.',
+      serverResult.error
+        ? `Local notification only: ${serverResult.error}`
+        : 'Push notifications are working in this tab. Configure VAPID keys on the server for background delivery.',
       '/dashboard'
     );
-    setTestSent(true);
-    setTimeout(() => setTestSent(false), 3000);
+    if (localOk) {
+      setTestSent(true);
+      setTimeout(() => setTestSent(false), 3000);
+    } else {
+      setTestError(serverResult.error || 'Could not send test notification');
+    }
   };
 
   if (!supported) {
@@ -344,6 +361,9 @@ export function NotificationSettings({ compact = false }) {
                   )}
                 </Button>
               </div>
+              {testError && (
+                <p className="text-xs text-amber-700 mt-2">{testError}</p>
+              )}
             </div>
           </div>
         )}

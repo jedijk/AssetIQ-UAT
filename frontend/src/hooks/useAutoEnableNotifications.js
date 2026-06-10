@@ -8,6 +8,7 @@ import { useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   autoRequestPermission,
+  syncPushSubscription,
   isNotificationSupported,
   getPermissionStatus,
   isIOS,
@@ -36,7 +37,11 @@ export function useAutoEnableNotifications() {
 
     // Check if already decided
     const permission = getPermissionStatus();
-    if (permission === 'granted' || permission === 'denied') return;
+    if (permission === 'granted') {
+      syncPushSubscription().catch(() => {});
+      return;
+    }
+    if (permission === 'denied') return;
 
     // Small delay to not interrupt login flow
     const timer = setTimeout(async () => {

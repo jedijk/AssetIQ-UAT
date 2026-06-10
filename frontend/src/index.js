@@ -16,6 +16,12 @@ import {
   installChunkRecoveryHandlers,
   scheduleChunkRecoveryFlagClear,
 } from "./lib/chunkRecovery";
+import {
+  getNotificationSettings,
+  getPermissionStatus,
+  isNotificationSupported,
+  syncPushSubscription,
+} from "./services/notificationService";
 
 // Patch ResizeObserver to prevent "loop completed with undelivered notifications" errors
 // This is a known issue with cmdk, Radix UI, and other libraries that use ResizeObserver
@@ -180,20 +186,23 @@ try {
 // REACT_APP_ENABLE_SERVICE_WORKER=true at build time.
 const ENABLE_SERVICE_WORKER = process.env.REACT_APP_ENABLE_SERVICE_WORKER === "true";
 
-// If SW is disabled, actively unregister any previously installed SW and clear caches.
-// This prevents iOS Safari getting stuck on white screens after chunking changes.
+// If SW is disabled, unregister the cache service worker only (keep push-sw.js).
 if ("serviceWorker" in navigator && !ENABLE_SERVICE_WORKER) {
   try {
     navigator.serviceWorker.getRegistrations().then(async (regs) => {
-      if (regs?.length) {
-        debugLog("sw_unreg_start", { count: regs.length });
+      const cacheRegs = (regs || []).filter((r) => {
+        const script = r.active?.scriptURL || r.installing?.scriptURL || "";
+        return !script.includes("push-sw.js");
+      });
+      if (cacheRegs.length) {
+        debugLog("sw_unreg_start", { count: cacheRegs.length });
       }
-      await Promise.all((regs || []).map((r) => r.unregister()));
+      await Promise.all(cacheRegs.map((r) => r.unregister()));
       if ("caches" in window) {
         const names = await caches.keys();
         await Promise.all(names.map((n) => caches.delete(n)));
       }
-      if (regs?.length) debugLog("sw_unreg_done", {});
+      if (cacheRegs.length) debugLog("sw_unreg_done", {});
     });
   } catch (_e) {}
 }
@@ -237,6 +246,17 @@ if ('serviceWorker' in navigator && ENABLE_SERVICE_WORKER) {
         debugLog("sw_update_check_visibility", {});
       });
     }
+  });
+}
+
+// Re-register Web Push subscription after reload when notifications are already enabled.
+if (typeof window !== "undefined" && isNotificationSupported()) {
+  window.addEventListener("load", () => {
+    setTimeout(() => {
+      if (getPermissionStatus() === "granted" && getNotificationSettings().enabled) {
+        syncPushSubscription().catch(() => {});
+      }
+    }, 1500);
   });
 }
 
