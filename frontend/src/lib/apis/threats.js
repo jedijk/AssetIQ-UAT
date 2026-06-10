@@ -1,4 +1,4 @@
-import { api } from "../apiClient";
+import { api, aiApi } from "../apiClient";
 
 // Threats API
 export const threatsAPI = {
@@ -56,6 +56,11 @@ export const threatsAPI = {
     const response = await api.get(`/threats/${threatId}/timeline`);
     return response.data;
   },
+
+  improveDescription: async (id) => {
+    const response = await aiApi.post(`/threats/${id}/improve-description`);
+    return response.data;
+  },
 };
 
 // Observations API
@@ -98,11 +103,6 @@ export const observationsAPI = {
     const response = await api.post(`/observations/${id}/close`, {
       resolution_notes: resolutionNotes,
     });
-    return response.data;
-  },
-
-  improveDescription: async (id) => {
-    const response = await api.post(`/threats/${id}/improve-description`);
     return response.data;
   },
 };
