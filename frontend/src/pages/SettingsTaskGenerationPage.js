@@ -339,6 +339,10 @@ export default function SettingsTaskGenerationPage() {
               <span className="font-mono">{cleanupPreview?.active_programs_count || 0}</span>
             </div>
             <div className="flex justify-between border-b border-slate-100 py-1">
+              <span className="text-slate-500">Active V2 tasks</span>
+              <span className="font-mono">{cleanupPreview?.active_v2_tasks_count || 0}</span>
+            </div>
+            <div className="flex justify-between border-b border-slate-100 py-1">
               <span className="text-slate-500">Orphan scheduled tasks</span>
               <span className="font-mono text-rose-600">{cleanupPreview?.orphan_scheduled_tasks_count || 0}</span>
             </div>

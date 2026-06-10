@@ -117,26 +117,73 @@ async def cleanup_orphan_tasks(
         if prog.get("id"):
             active_program_ids.add(prog["id"])
     
+    # Get all active v2 task IDs
+    active_v2_task_ids = set()
+    async for prog in db.maintenance_programs_v2.find(
+        {"status": {"$in": ["active", "draft"]}},
+        {"tasks": 1, "_id": 0}
+    ):
+        for task in prog.get("tasks", []):
+            if task.get("id"):
+                active_v2_task_ids.add(task["id"])
+    
     # Build query for orphan scheduled_tasks
-    orphan_query = {
+    # A task is orphan if:
+    # 1. It has a maintenance_program_id that's not in active programs, OR
+    # 2. It has a v2_program_id that's not in active programs, OR
+    # 3. It has a v2_task_id that's not in active v2 tasks, OR
+    # 4. It has NO program reference at all (orphaned from creation)
+    
+    base_query = {
         "status": {"$nin": ["completed", "cancelled"]},  # Only open tasks
     }
     
     # Only future tasks if requested
     if payload.future_only:
-        orphan_query["due_date"] = {"$gte": today}
+        base_query["due_date"] = {"$gte": today}
     
-    # Find tasks with program references
-    orphan_query["$or"] = [
+    # Find tasks with program references that are orphaned
+    orphan_conditions = []
+    
+    if active_program_ids:
         # Tasks with maintenance_program_id not in active programs
-        {
+        orphan_conditions.append({
             "maintenance_program_id": {"$nin": list(active_program_ids), "$ne": None, "$exists": True}
-        },
-        # Tasks with v2_program_id not in active programs
-        {
+        })
+        # Tasks with v2_program_id not in active programs  
+        orphan_conditions.append({
             "v2_program_id": {"$nin": list(active_program_ids), "$ne": None, "$exists": True}
-        },
-    ]
+        })
+    else:
+        # No active programs - all tasks with program refs are orphaned
+        orphan_conditions.append({
+            "maintenance_program_id": {"$ne": None, "$exists": True}
+        })
+        orphan_conditions.append({
+            "v2_program_id": {"$ne": None, "$exists": True}
+        })
+    
+    if active_v2_task_ids:
+        # Tasks with v2_task_id not in active v2 tasks
+        orphan_conditions.append({
+            "v2_task_id": {"$nin": list(active_v2_task_ids), "$ne": None, "$exists": True}
+        })
+    else:
+        # No active v2 tasks - all tasks with v2_task_id refs are orphaned
+        orphan_conditions.append({
+            "v2_task_id": {"$ne": None, "$exists": True}
+        })
+    
+    # Also catch tasks with no program reference at all (completely orphaned)
+    orphan_conditions.append({
+        "$and": [
+            {"$or": [{"maintenance_program_id": None}, {"maintenance_program_id": {"$exists": False}}]},
+            {"$or": [{"v2_program_id": None}, {"v2_program_id": {"$exists": False}}]},
+            {"$or": [{"v2_task_id": None}, {"v2_task_id": {"$exists": False}}]},
+        ]
+    })
+    
+    orphan_query = {**base_query, "$or": orphan_conditions}
     
     # Find orphan task instances too
     task_instance_query = {
@@ -145,32 +192,43 @@ async def cleanup_orphan_tasks(
     if payload.future_only:
         task_instance_query["due_date"] = {"$gte": today}
     
-    task_instance_query["$or"] = [
-        {"plan_id": {"$nin": list(active_program_ids), "$ne": None, "$exists": True}},
-        {"maintenance_program_id": {"$nin": list(active_program_ids), "$ne": None, "$exists": True}},
-        {"v2_program_id": {"$nin": list(active_program_ids), "$ne": None, "$exists": True}},
-    ]
+    instance_conditions = []
+    if active_program_ids:
+        instance_conditions.append({"plan_id": {"$nin": list(active_program_ids), "$ne": None, "$exists": True}})
+        instance_conditions.append({"maintenance_program_id": {"$nin": list(active_program_ids), "$ne": None, "$exists": True}})
+        instance_conditions.append({"v2_program_id": {"$nin": list(active_program_ids), "$ne": None, "$exists": True}})
+    
+    if instance_conditions:
+        task_instance_query["$or"] = instance_conditions
+    else:
+        # No instance conditions - skip task_instances query
+        task_instance_query = None
     
     if payload.dry_run:
         # Count what would be deleted
         scheduled_count = await db.scheduled_tasks.count_documents(orphan_query)
-        instance_count = await db.task_instances.count_documents(task_instance_query)
+        instance_count = 0
+        if task_instance_query:
+            instance_count = await db.task_instances.count_documents(task_instance_query)
         
         # Get sample of what would be deleted
         sample_scheduled = await db.scheduled_tasks.find(
             orphan_query,
-            {"task_name": 1, "equipment_name": 1, "due_date": 1, "maintenance_program_id": 1, "_id": 0}
+            {"task_name": 1, "equipment_name": 1, "due_date": 1, "maintenance_program_id": 1, "v2_task_id": 1, "_id": 0}
         ).limit(10).to_list(10)
         
-        sample_instances = await db.task_instances.find(
-            task_instance_query,
-            {"name": 1, "equipment_name": 1, "due_date": 1, "plan_id": 1, "_id": 0}
-        ).limit(10).to_list(10)
+        sample_instances = []
+        if task_instance_query:
+            sample_instances = await db.task_instances.find(
+                task_instance_query,
+                {"name": 1, "equipment_name": 1, "due_date": 1, "plan_id": 1, "_id": 0}
+            ).limit(10).to_list(10)
         
         return {
             "dry_run": True,
             "future_only": payload.future_only,
             "active_programs_count": len(active_program_ids),
+            "active_v2_tasks_count": len(active_v2_task_ids),
             "orphan_scheduled_tasks_count": scheduled_count,
             "orphan_task_instances_count": instance_count,
             "total_to_delete": scheduled_count + instance_count,
@@ -180,7 +238,10 @@ async def cleanup_orphan_tasks(
     else:
         # Actually delete
         scheduled_result = await db.scheduled_tasks.delete_many(orphan_query)
-        instance_result = await db.task_instances.delete_many(task_instance_query)
+        instance_count = 0
+        if task_instance_query:
+            instance_result = await db.task_instances.delete_many(task_instance_query)
+            instance_count = instance_result.deleted_count
         
         # Also invalidate work item projections to refresh My Tasks view
         await db.work_item_projections.delete_many({})
@@ -189,9 +250,10 @@ async def cleanup_orphan_tasks(
             "dry_run": False,
             "future_only": payload.future_only,
             "active_programs_count": len(active_program_ids),
+            "active_v2_tasks_count": len(active_v2_task_ids),
             "scheduled_tasks_deleted": scheduled_result.deleted_count,
-            "task_instances_deleted": instance_result.deleted_count,
-            "total_deleted": scheduled_result.deleted_count + instance_result.deleted_count,
+            "task_instances_deleted": instance_count,
+            "total_deleted": scheduled_result.deleted_count + instance_count,
             "projections_cleared": True,
         }
 
