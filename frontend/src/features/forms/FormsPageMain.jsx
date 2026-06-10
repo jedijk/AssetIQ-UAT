@@ -486,7 +486,7 @@ export default function FormsPage({ embedded = false }) {
             <div className="relative flex-1 sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Search..."
+                placeholder={t("forms.searchTemplates")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -494,14 +494,16 @@ export default function FormsPage({ embedded = false }) {
               />
             </div>
             <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-[160px]" title={t("forms.filterByDiscipline")}>
                 <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Discipline" />
+                <SelectValue placeholder={t("forms.discipline")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="all">{t("forms.allDisciplines")}</SelectItem>
                 {DISCIPLINES.map((d) => (
-                  <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                  <SelectItem key={d.value} value={d.value}>
+                    {t(`disciplines.${d.label}`) || d.label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
