@@ -157,12 +157,20 @@ export default function FormsPage({ embedded = false }) {
     }
   });
 
-  // Fetch submissions
+  // Fetch submissions (only when tab is active)
   const { data: submissionsData, isLoading: loadingSubmissions, isError: submissionsError } = useQuery({
     queryKey: ["form-submissions"],
     queryFn: () => formAPI.getSubmissions({ limit: 200 }),
     enabled: activeTab === "submissions",
     retry: 2,
+  });
+
+  // Fetch submission stats for KPI counters (always enabled)
+  const { data: submissionStats } = useQuery({
+    queryKey: ["form-submission-stats"],
+    queryFn: () => formAPI.getSubmissionStats(),
+    staleTime: 30 * 1000, // Cache for 30 seconds
+    retry: 1,
   });
 
   // Create template mutation
@@ -350,12 +358,12 @@ export default function FormsPage({ embedded = false }) {
     }
   }, [templates, selectedTemplate]);
 
-  // Stats for cards
+  // Stats for cards - use dedicated stats query for reliable counts
   const stats = {
     totalTemplates: templates.length,
-    totalSubmissions: submissionsData?.total || 0,
-    warningCount: submissions.filter(s => s.has_warnings).length,
-    criticalCount: submissions.filter(s => s.has_critical).length,
+    totalSubmissions: submissionStats?.total || 0,
+    warningCount: submissionStats?.warningCount || 0,
+    criticalCount: submissionStats?.criticalCount || 0,
   };
 
   // Mobile: Show desktop-only message
@@ -414,7 +422,7 @@ export default function FormsPage({ embedded = false }) {
           <CardContent className="p-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-slate-500">Templates</p>
+                <p className="text-xs text-slate-500">{t("forms.templates")}</p>
                 <p className="text-xl font-bold text-slate-900">{stats.totalTemplates}</p>
               </div>
               <div className="h-8 w-8 rounded-lg bg-indigo-100 flex items-center justify-center">
@@ -429,7 +437,7 @@ export default function FormsPage({ embedded = false }) {
               <CardContent className="p-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-slate-500">Submissions</p>
+                    <p className="text-xs text-slate-500">{t("forms.submissions")}</p>
                     <p className="text-xl font-bold text-slate-900">{stats.totalSubmissions}</p>
                   </div>
                   <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
@@ -442,7 +450,7 @@ export default function FormsPage({ embedded = false }) {
               <CardContent className="p-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-slate-500">Warnings</p>
+                    <p className="text-xs text-slate-500">{t("forms.warnings")}</p>
                     <p className="text-xl font-bold text-amber-600">{stats.warningCount}</p>
                   </div>
                   <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center">
@@ -455,7 +463,7 @@ export default function FormsPage({ embedded = false }) {
               <CardContent className="p-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-slate-500">Critical</p>
+                    <p className="text-xs text-slate-500">{t("forms.critical")}</p>
                     <p className="text-xl font-bold text-red-600">{stats.criticalCount}</p>
                   </div>
                   <div className="h-8 w-8 rounded-lg bg-red-100 flex items-center justify-center">

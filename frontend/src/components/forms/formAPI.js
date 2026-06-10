@@ -54,6 +54,17 @@ export const formAPI = {
     return response.data;
   },
 
+  getSubmissionStats: async () => {
+    // Get minimal stats for KPI counters - just counts
+    const response = await api.get("/form-submissions", { params: { limit: 500 } });
+    const submissions = response.data?.submissions || response.data || [];
+    return {
+      total: response.data?.total || submissions.length,
+      warningCount: submissions.filter(s => s.has_warnings).length,
+      criticalCount: submissions.filter(s => s.has_critical).length,
+    };
+  },
+
   getTemplateAnalytics: async (templateId) => {
     const response = await api.get(`/form-templates/${templateId}/analytics`);
     return response.data;
