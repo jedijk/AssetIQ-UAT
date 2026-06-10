@@ -804,36 +804,34 @@ const RecommendedActionsPanel = ({ recommendations, onAddToPlan, onAddToStrategy
             </div>
           </div>
           {aiActions.length === 0 && onGenerateAI && (
-            <span className="relative inline-flex flex-shrink-0">
-              {!isGeneratingAI && (
-                <span className="ai-recommendation-glow-ring" aria-hidden="true" />
-              )}
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="sm"
-                      onClick={onGenerateAI}
-                      disabled={isGeneratingAI}
-                      className={`relative z-10 flex-shrink-0 bg-purple-600 hover:bg-purple-700 text-white h-8 w-8 p-0 ${
-                        isGeneratingAI ? "" : "ai-recommendation-glow-btn"
-                      }`}
-                      aria-label={t("ai.generateAiq")}
-                      data-testid="run-ai-recommendations-btn"
-                    >
-                      {isGeneratingAI ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Sparkles className="w-4 h-4 ai-recommendation-sparkle-icon" />
-                      )}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    {t("ai.generateAiq")}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </span>
+            <div className="relative group flex-shrink-0">
+              <button
+                type="button"
+                onClick={onGenerateAI}
+                disabled={isGeneratingAI}
+                className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md transition-colors ${
+                  isGeneratingAI
+                    ? "text-purple-600 bg-purple-50"
+                    : "text-slate-500 hover:text-purple-600 hover:bg-purple-50"
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                aria-label={t("ai.generateAiq")}
+                data-testid="run-ai-recommendations-btn"
+              >
+                {isGeneratingAI ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+              </button>
+              {/* Tooltip */}
+              <div className="absolute right-0 top-full mt-1 w-48 p-2 bg-slate-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
+                <div className="font-semibold flex items-center gap-1 mb-1">
+                  <Sparkles className="w-3 h-3 text-purple-300" /> {t("ai.generateAiq")}
+                </div>
+                <p className="text-slate-300">Generate AI-powered recommended actions for this observation.</p>
+                <div className="absolute -top-1 right-4 w-2 h-2 bg-slate-900 rotate-45"></div>
+              </div>
+            </div>
           )}
         </div>
       </div>
