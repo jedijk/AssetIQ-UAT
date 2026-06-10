@@ -1,12 +1,15 @@
 """
 Localize observation workspace and AI insight payloads for non-English UI languages.
 Uses stored entity_translations first, then on-demand AI translation for free text.
+Translations are cached in translation_cache collection to avoid repeated API calls.
 """
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
 
 from database import db
 from models.translation import EntityType
@@ -40,6 +43,43 @@ async def _load_entity_fields(
     return fields
 
 
+def _generate_cache_key(text: str, language: str, context: str) -> str:
+    """Generate a unique cache key for the text."""
+    content = f"{language}:{context}:{text}"
+    return hashlib.sha256(content.encode()).hexdigest()
+
+
+async def _get_cached_translation(cache_key: str) -> Optional[str]:
+    """Retrieve cached translation from database."""
+    doc = await db.translation_cache.find_one({"cache_key": cache_key})
+    if doc and doc.get("translated_text"):
+        return doc["translated_text"]
+    return None
+
+
+async def _store_cached_translation(cache_key: str, original: str, translated: str, language: str, context: str):
+    """Store translation in database cache."""
+    try:
+        await db.translation_cache.update_one(
+            {"cache_key": cache_key},
+            {
+                "$set": {
+                    "original_text": original,
+                    "translated_text": translated,
+                    "language": language,
+                    "context": context,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                },
+                "$setOnInsert": {
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }
+            },
+            upsert=True
+        )
+    except Exception as exc:
+        logger.warning("Failed to cache translation: %s", exc)
+
+
 async def _translate_cached(
     service: TranslationService,
     text: Optional[str],
@@ -51,23 +91,56 @@ async def _translate_cached(
     raw = (text or "").strip()
     if not raw or language not in _TRANSLATABLE_LANGS:
         return text or ""
-    cache_key = f"{language}:{raw}"
-    if cache_key in cache:
-        return cache[cache_key]
-    try:
-        translated, _ = await service.translate_text(
-            raw,
-            source_language="en",
-            target_language=language,
-            context=context,
-            user_id=user_id or "system",
-        )
-        result = (translated or raw).strip() or raw
-    except Exception as exc:
-        logger.warning("workspace localization translate failed: %s", exc)
-        result = raw
-    cache[cache_key] = result
-    return result
+    
+    # Check in-memory cache first
+    memory_key = f"{language}:{raw}"
+    if memory_key in cache:
+        return cache[memory_key]
+    
+    # Check database cache
+    db_cache_key = _generate_cache_key(raw, language, context)
+    db_cached = await _get_cached_translation(db_cache_key)
+    if db_cached:
+        cache[memory_key] = db_cached
+        return db_cached
+    
+    # Call translation service with retry for rate limits
+    import asyncio
+    max_retries = 2
+    retry_delay = 2  # seconds
+    
+    for attempt in range(max_retries + 1):
+        try:
+            translated, _ = await service.translate_text(
+                raw,
+                source_language="en",
+                target_language=language,
+                context=context,
+                user_id=user_id or "system",
+            )
+            result = (translated or raw).strip() or raw
+            
+            # Store in database cache if translation was successful
+            if result != raw:
+                await _store_cached_translation(db_cache_key, raw, result, language, context)
+            
+            cache[memory_key] = result
+            return result
+        except Exception as exc:
+            error_str = str(exc)
+            # Check if it's a rate limit error
+            if "429" in error_str or "rate limit" in error_str.lower():
+                if attempt < max_retries:
+                    logger.info(f"Rate limit hit, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                    continue
+            logger.warning("workspace localization translate failed: %s", exc)
+            break
+    
+    # Return original text if all retries failed
+    cache[memory_key] = raw
+    return raw
 
 
 async def localize_workspace_payload(

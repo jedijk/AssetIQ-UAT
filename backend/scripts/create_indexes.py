@@ -332,6 +332,13 @@ INDEX_DEFINITIONS = {
         {"keys": [("content_type", 1)]},
     ],
 
+    # Translation cache - stores AI translations to avoid repeated API calls
+    "translation_cache": [
+        {"keys": [("cache_key", 1)], "unique": True},
+        {"keys": [("language", 1)]},
+        {"keys": [("created_at", -1)]},
+    ],
+
     # Maintenance scheduler (Phase 2)
     "maintenance_programs_v2": [
         {"keys": [("id", 1)], "unique": True},
