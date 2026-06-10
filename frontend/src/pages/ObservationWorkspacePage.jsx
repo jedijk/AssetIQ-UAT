@@ -83,16 +83,13 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { useDisciplines } from "../hooks/useDisciplines";
 import RiskBadge from "../components/RiskBadge";
 import ObservationDetailsSection from "../components/workspace/ObservationDetailsSection";
+import { ALARPCard, ExposureCard, RiskSummaryCard } from "../components/workspace/ExposureCards";
 import ActionPlanPanel from "../components/workspace/ActionPlanPanel";
 import AIInsightsPanel from "../components/AIInsightsPanel";
 import CausalIntelligencePanel from "../components/CausalIntelligencePanel";
 import { translateEnum } from "../lib/translateEnum";
 import {
-  CRITICALITY_FIELD_BY_DIMENSION,
   translateCriticalityDefinitionText,
-  translateCriticalityDimensionLabel,
-  translateCriticalityField,
-  translateCriticalityLabel,
 } from "../lib/criticalityDefinitionI18n";
 
 const EVENT_TYPE_ENUM = {
