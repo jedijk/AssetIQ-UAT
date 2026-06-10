@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { aiRiskAPI, threatsAPI, equipmentHierarchyAPI, failureModesAPI } from "../lib/api";
+import { showAiMutationError } from "../lib/aiMutationErrors";
 import { useLanguage } from "../contexts/LanguageContext";
 import { formatDateTime } from "../lib/dateUtils";
 import { toast } from "sonner";
@@ -200,10 +201,12 @@ export default function AIInsightsPanel({
   });
 
   // Fetch equipment types to check if threat's equipment type exists
+  const needsLibraryCheck = Boolean(threatData?.equipment_type || threatData?.failure_mode);
   const { data: equipmentTypesData } = useQuery({
     queryKey: ["equipment-types"],
     queryFn: equipmentHierarchyAPI.getEquipmentTypes,
     staleTime: 5 * 60 * 1000,
+    enabled: needsLibraryCheck,
   });
 
   // Fetch failure modes to check if threat's failure mode exists
@@ -211,6 +214,7 @@ export default function AIInsightsPanel({
     queryKey: ["failure-modes-all"],
     queryFn: () => failureModesAPI.getAll({}),
     staleTime: 5 * 60 * 1000,
+    enabled: needsLibraryCheck,
   });
 
   // Check if equipment type exists in library - use fuzzy matching
@@ -268,22 +272,7 @@ export default function AIInsightsPanel({
     },
     onError: (error) => {
       console.error("AI analysis failed:", error);
-      
-      // Check for timeout errors - show different message
-      if (error?.isTimeout || error?.code === 'ECONNABORTED') {
-        toast.error(t("ai.analysisTakingLonger") || "AI analysis taking longer than expected. Please wait and try again.");
-        return;
-      }
-      
-      // Check for specific error types
-      const errorMessage = error?.response?.data?.detail || error?.message;
-      if (errorMessage?.includes("rate limit")) {
-        toast.error(t("ai.rateLimitExceeded") || "AI rate limit exceeded. Please wait a moment and try again.");
-      } else if (errorMessage?.includes("token") || errorMessage?.includes("key")) {
-        toast.error(t("ai.configurationError") || "AI service configuration error. Please contact support.");
-      } else {
-        toast.error(t("ai.analysisFailed") || errorMessage || "AI analysis failed");
-      }
+      showAiMutationError(error, t);
     },
   });
 

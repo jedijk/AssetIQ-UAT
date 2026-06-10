@@ -1,26 +1,23 @@
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowRight } from "lucide-react";
-import { threatsAPI } from "../lib/api";
+import { useLanguage } from "../contexts/LanguageContext";
+import { schedulePrefetchObservationWorkspace } from "../lib/prefetchObservationWorkspace";
 import RiskBadge from "./RiskBadge";
 
 const ThreatCard = ({ threat, compact = false }) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { language } = useLanguage();
 
-  // Prefetch threat details on hover
   const handleMouseEnter = () => {
-    queryClient.prefetchQuery({
-      queryKey: ["threat", threat.id],
-      queryFn: () => threatsAPI.getById(threat.id),
-      staleTime: 5 * 60 * 1000, // Keep prefetched data fresh for 5 minutes
-    });
+    schedulePrefetchObservationWorkspace(queryClient, threat.id, language);
   };
 
   if (compact) {
     return (
       <div
-        onClick={() => navigate(`/threats/${threat.id}`)}
+        onClick={() => navigate(`/threats/${threat.id}/workspace`)}
         onMouseEnter={handleMouseEnter}
         className="p-4 bg-slate-50 rounded-xl border border-slate-200 hover:border-slate-300 hover:shadow-sm cursor-pointer transition-all"
         data-testid={`threat-card-compact-${threat.id}`}
@@ -39,7 +36,7 @@ const ThreatCard = ({ threat, compact = false }) => {
 
   return (
     <div
-      onClick={() => navigate(`/threats/${threat.id}`)}
+      onClick={() => navigate(`/threats/${threat.id}/workspace`)}
       onMouseEnter={handleMouseEnter}
       className={`group card p-6 cursor-pointer border-l-4 ${
         threat.risk_level === "Critical" ? "border-l-red-500" :

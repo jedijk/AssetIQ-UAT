@@ -22,6 +22,7 @@ import {
   isNotificationSupported,
   syncPushSubscription,
 } from "./services/notificationService";
+import { isIOSLikeDevice } from "./lib/deviceUtils";
 
 // Patch ResizeObserver to prevent "loop completed with undelivered notifications" errors
 // This is a known issue with cmdk, Radix UI, and other libraries that use ResizeObserver
@@ -95,9 +96,7 @@ try {
 
 function isIOSWebAppStandalone() {
   try {
-    const ua = typeof navigator !== "undefined" ? (navigator.userAgent || "") : "";
-    const isIOSLike = /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Mac") && "ontouchend" in document); // iPadOS desktop mode
-    if (!isIOSLike) return false;
+    if (!isIOSLikeDevice()) return false;
     const navStandalone = typeof navigator !== "undefined" && navigator.standalone === true; // iOS Safari A2HS
     const mqlStandalone =
       typeof window !== "undefined" &&

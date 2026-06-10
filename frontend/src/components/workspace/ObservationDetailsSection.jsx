@@ -198,6 +198,8 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
   const [selectedFailureModeId, setSelectedFailureModeId] = useState(null);
   const [failureModeSearch, setFailureModeSearch] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [mobileMoreMenuOpen, setMobileMoreMenuOpen] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const attachmentInputRef = useRef(null);
   const [showAttList, setShowAttList] = useState(false);
@@ -624,7 +626,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
             >
               <Trash2 className="w-4 h-4" />
             </Button>
-            <DropdownMenu>
+            <DropdownMenu open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <Button size="sm" variant="ghost" className="h-8 w-8 p-0" data-testid="workspace-more-menu">
                   <MoreVertical className="w-4 h-4" />
@@ -632,21 +634,50 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {/* Mobile-only quick actions */}
-                <DropdownMenuItem className="sm:hidden" onClick={shareLink} data-testid="menu-share">
+                <DropdownMenuItem
+                  className="sm:hidden"
+                  onSelect={() => {
+                    setMoreMenuOpen(false);
+                    shareLink();
+                  }}
+                  data-testid="menu-share"
+                >
                   <Share2 className="w-4 h-4 mr-2" /> Share
                 </DropdownMenuItem>
-                <DropdownMenuItem className="sm:hidden" onClick={startEditing} data-testid="menu-edit">
+                <DropdownMenuItem
+                  className="sm:hidden"
+                  onSelect={() => {
+                    setMoreMenuOpen(false);
+                    startEditing();
+                  }}
+                  data-testid="menu-edit"
+                >
                   <Edit className="w-4 h-4 mr-2" /> Edit
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setShowLinkEquipmentDialog(true)} data-testid="menu-link-equipment">
+                <DropdownMenuItem
+                  onSelect={() => {
+                    setMoreMenuOpen(false);
+                    setShowLinkEquipmentDialog(true);
+                  }}
+                  data-testid="menu-link-equipment"
+                >
                   <LinkIcon className="w-4 h-4 mr-2" /> Link Equipment
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setShowLinkFailureModeDialog(true)} data-testid="menu-link-failure-mode">
+                <DropdownMenuItem
+                  onSelect={() => {
+                    setMoreMenuOpen(false);
+                    setShowLinkFailureModeDialog(true);
+                  }}
+                  data-testid="menu-link-failure-mode"
+                >
                   <AlertTriangle className="w-4 h-4 mr-2" /> Link Failure Mode
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="sm:hidden text-red-600 focus:text-red-700 focus:bg-red-50"
-                  onClick={(e) => { e.preventDefault(); setShowDeleteDialog(true); }}
+                  onSelect={() => {
+                    setMoreMenuOpen(false);
+                    setShowDeleteDialog(true);
+                  }}
                   data-testid="menu-delete-observation"
                 >
                   <Trash2 className="w-4 h-4 mr-2" /> Delete
@@ -661,27 +692,50 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
 
   // Compact mobile menu — just the ⋯ dropdown with all actions.
   const mobileMenu = (
-    <DropdownMenu>
+    <DropdownMenu open={mobileMoreMenuOpen} onOpenChange={setMobileMoreMenuOpen}>
       <DropdownMenuTrigger asChild>
         <Button size="sm" variant="ghost" className="h-7 w-7 p-0 -mr-1" data-testid="workspace-mobile-more-menu">
           <MoreVertical className="w-4 h-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={shareLink}>
+        <DropdownMenuItem
+          onSelect={() => {
+            setMobileMoreMenuOpen(false);
+            shareLink();
+          }}
+        >
           <Share2 className="w-4 h-4 mr-2" /> Share
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={startEditing}>
+        <DropdownMenuItem
+          onSelect={() => {
+            setMobileMoreMenuOpen(false);
+            startEditing();
+          }}
+        >
           <Edit className="w-4 h-4 mr-2" /> Edit
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setShowLinkEquipmentDialog(true)}>
+        <DropdownMenuItem
+          onSelect={() => {
+            setMobileMoreMenuOpen(false);
+            setShowLinkEquipmentDialog(true);
+          }}
+        >
           <LinkIcon className="w-4 h-4 mr-2" /> Link Equipment
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setShowLinkFailureModeDialog(true)}>
+        <DropdownMenuItem
+          onSelect={() => {
+            setMobileMoreMenuOpen(false);
+            setShowLinkFailureModeDialog(true);
+          }}
+        >
           <AlertTriangle className="w-4 h-4 mr-2" /> Link Failure Mode
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={(e) => { e.preventDefault(); setShowDeleteDialog(true); }}
+          onSelect={() => {
+            setMobileMoreMenuOpen(false);
+            setShowDeleteDialog(true);
+          }}
           className="text-red-600 focus:text-red-700 focus:bg-red-50"
         >
           <Trash2 className="w-4 h-4 mr-2" /> Delete

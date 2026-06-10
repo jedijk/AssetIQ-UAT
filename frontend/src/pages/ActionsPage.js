@@ -10,6 +10,7 @@ import { usePermissions } from "../contexts/PermissionsContext";
 import { formatDate as formatDateUtil, formatDateTime } from "../lib/dateUtils";
 import { useTranslatedActions } from "../hooks/useTranslatedEntities";
 import { queryKeys } from "../lib/queryKeys";
+import { isIOSLikeDevice } from "../lib/deviceUtils";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import {
@@ -158,16 +159,7 @@ export default function ActionsPage() {
   const canDelete = hasPermission("actions", "delete");
   
   const isMobile = useIsMobile();
-  // iOS Safari has had rare crashes in virtualized list rendering; disable
-  // virtualization on iOS to avoid blank-screen runtime TypeErrors.
-  const isIOSLike = (() => {
-    try {
-      const ua = typeof navigator !== "undefined" ? (navigator.userAgent || "") : "";
-      return /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Mac") && "ontouchend" in document);
-    } catch (_e) {
-      return false;
-    }
-  })();
+  const isIOSLike = isIOSLikeDevice();
 
   // Toggle status in multi-select
   const toggleStatus = (status) => {

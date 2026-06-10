@@ -255,9 +255,8 @@ const ThreatDetailPage = () => {
   const { data: threat, isLoading, error, refetch: refetchThreat } = useQuery({
     queryKey: [...queryKeys.threats.legacyDetail(id), language],
     queryFn: () => threatsAPI.getById(id, { language }),
-    refetchOnMount: "always", // Always refetch when component mounts
-    staleTime: 0, // Consider data always stale
-    retry: 3, // Retry up to 3 times on failure (handles 503 errors)
+    staleTime: 60 * 1000,
+    retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000), // Exponential backoff
   });
 

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useEquipmentNodeIdMap } from "../../hooks/useTranslatedEntities";
+import { isIOSLikeDevice } from "../../lib/deviceUtils";
 import { failureModesAPI, qrCodeAPI, equipmentHierarchyAPI, definitionsAPI } from "../../lib/api";
 import { queryKeys } from "../../lib/queryKeys";
 import {
@@ -255,10 +256,7 @@ function EquipmentFiles({ equipmentId }) {
     try {
       const blob = await equipmentHierarchyAPI.downloadEquipmentFile(fileId);
       const url = window.URL.createObjectURL(blob);
-      const ua = typeof navigator !== "undefined" ? (navigator.userAgent || "") : "";
-      const isIOSLike = /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Mac") && typeof document !== "undefined" && "ontouchend" in document);
-
-      if (isIOSLike) {
+      if (isIOSLikeDevice()) {
         // iOS Safari often ignores `a.download` for blob URLs; open the blob so the user can
         // Save/Share from the viewer.
         const w = window.open(url, "_blank", "noopener,noreferrer");

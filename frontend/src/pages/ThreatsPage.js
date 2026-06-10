@@ -3,6 +3,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { threatsAPI, statsAPI } from "../lib/api";
 import { queryKeys } from "../lib/queryKeys";
+import { isIOSLikeDevice } from "../lib/deviceUtils";
+import {
+  cancelPrefetchObservationWorkspace,
+  prefetchTopObservationWhenIdle,
+  schedulePrefetchObservationWorkspace,
+} from "../lib/prefetchObservationWorkspace";
 import { useLanguage } from "../contexts/LanguageContext";
 import { usePermissions } from "../contexts/PermissionsContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -170,16 +176,7 @@ const ThreatsPage = () => {
   const { hasPermission } = usePermissions();
   const { user } = useAuth();
   const isMobile = useIsMobile();
-  // iOS Safari has had rare crashes in virtualized list rendering; disable
-  // virtualization on iOS to avoid blank-screen runtime TypeErrors.
-  const isIOSLike = (() => {
-    try {
-      const ua = typeof navigator !== "undefined" ? (navigator.userAgent || "") : "";
-      return /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Mac") && "ontouchend" in document);
-    } catch (_e) {
-      return false;
-    }
-  })();
+  const isIOSLike = isIOSLikeDevice();
   const caps = useCapabilities();
   const [searchParams, setSearchParams] = useSearchParams();
   // Default: show the 5 active in-progress stages (excludes terminal Mitigated & Learning)
@@ -290,34 +287,28 @@ const ThreatsPage = () => {
     enabled: !!user,
   });
 
-  // Prefetch top observation details (desktop only — mobile radios / older CPUs choke on many parallel GETs)
+  // Prefetch the top workspace when idle (desktop only).
   useEffect(() => {
     if (!threats?.length || isMobile) return;
-      // Sort threats by current sort order and prefetch top 10
-      const sortedThreats = [...threats].sort((a, b) => {
-        if (sortBy === "rpn") {
-          return ((b.rpn || b.risk_priority_number || 0) - (a.rpn || a.risk_priority_number || 0));
-        } else if (sortBy === "latest") {
-          return new Date(b?.created_at || 0) - new Date(a?.created_at || 0);
-        } else if (sortBy === "oldest") {
-          return new Date(a?.created_at || 0) - new Date(b?.created_at || 0);
-        }
-        return ((b.risk_score || 0) - (a.risk_score || 0));
-      });
-      
-      // Prefetch top 10 with staggered delays to avoid overwhelming the server
-      const threatsToPreload = sortedThreats.slice(0, 3);
-      threatsToPreload.forEach((threat, index) => {
-        // Stagger prefetch requests by 200ms each to avoid concurrent load
-        setTimeout(() => {
-          queryClient.prefetchQuery({
-            queryKey: queryKeys.threats.legacyDetail(threat.id),
-            queryFn: () => threatsAPI.getById(threat.id),
-            staleTime: 5 * 60 * 1000, // Keep prefetched data fresh for 5 minutes
-          });
-        }, index * 200);
-      });
-  }, [threats, sortBy, queryClient, isMobile]);
+
+    const sortedThreats = [...threats].sort((a, b) => {
+      if (sortBy === "rpn") {
+        return (b.rpn || b.risk_priority_number || 0) - (a.rpn || a.risk_priority_number || 0);
+      }
+      if (sortBy === "latest") {
+        return new Date(b?.created_at || 0) - new Date(a?.created_at || 0);
+      }
+      if (sortBy === "oldest") {
+        return new Date(a?.created_at || 0) - new Date(b?.created_at || 0);
+      }
+      return (b.risk_score || 0) - (a.risk_score || 0);
+    });
+
+    const topThreat = sortedThreats[0];
+    if (!topThreat?.id) return undefined;
+
+    return prefetchTopObservationWhenIdle(queryClient, topThreat.id, language);
+  }, [threats, sortBy, queryClient, isMobile, language]);
   
   // Log error if fetch fails - only show toast once
   const [errorShown, setErrorShown] = useState(false);
@@ -839,21 +830,21 @@ const ThreatsPage = () => {
                 const rpnValue = threat.fmea_rpn || threat.rpn || threat.failure_mode_data?.rpn || null;
 
                 const handleMouseEnter = () => {
-                  queryClient.prefetchQuery({
-                    queryKey: queryKeys.threats.legacyDetail(threat.id),
-                    queryFn: () => threatsAPI.getById(threat.id),
-                    staleTime: 5 * 60 * 1000,
-                  });
+                  schedulePrefetchObservationWorkspace(queryClient, threat.id, language);
+                };
+                const handleMouseLeave = () => {
+                  cancelPrefetchObservationWorkspace(threat.id, language);
                 };
 
                 return (
                   <motion.div
                     key={threat.id}
-                    initial={caps.animations ? { opacity: 0, y: 10 } : false}
+                    initial={false}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={caps.animations ? { delay: idx * 0.01 } : { duration: 0 }}
+                    transition={{ duration: 0 }}
                     onClick={() => navigate(`/threats/${threat.id}/workspace`)}
                     onMouseEnter={handleMouseEnter}
+                    onMouseLeave={handleMouseLeave}
                     className={`priority-item group relative ${
                       threat.status === "Mitigated" || threat.status === "Learning" 
                         ? "sm:opacity-100 border-l-4 " + (threat.status === "Mitigated" ? "border-l-green-500 bg-green-50/30" : "border-l-slate-400 bg-slate-50/50")
@@ -942,13 +933,11 @@ const ThreatsPage = () => {
             const EquipmentIcon = getEquipmentIcon(threat.equipment_type, threat.asset);
             const rpnValue = threat.fmea_rpn || threat.rpn || threat.failure_mode_data?.rpn || null;
             
-            // Prefetch threat details on hover
             const handleMouseEnter = () => {
-              queryClient.prefetchQuery({
-                queryKey: queryKeys.threats.legacyDetail(threat.id),
-                queryFn: () => threatsAPI.getById(threat.id),
-                staleTime: 5 * 60 * 1000,
-              });
+              schedulePrefetchObservationWorkspace(queryClient, threat.id, language);
+            };
+            const handleMouseLeave = () => {
+              cancelPrefetchObservationWorkspace(threat.id, language);
             };
             
             return (
@@ -956,9 +945,10 @@ const ThreatsPage = () => {
               key={threat.id}
               initial={caps.animations ? { opacity: 0, y: 10 } : false}
               animate={{ opacity: 1, y: 0 }}
-              transition={caps.animations ? { delay: idx * 0.05 } : { duration: 0 }}
+              transition={caps.animations ? { delay: Math.min(idx * 0.05, 0.2) } : { duration: 0 }}
               onClick={() => navigate(`/threats/${threat.id}/workspace`)}
               onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
               className={`priority-item group relative ${
                 threat.status === "Mitigated" || threat.status === "Learning" 
                   ? "sm:opacity-100 border-l-4 " + (threat.status === "Mitigated" ? "border-l-green-500 bg-green-50/30" : "border-l-slate-400 bg-slate-50/50")

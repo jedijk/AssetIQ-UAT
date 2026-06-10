@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { aiRiskAPI, investigationAPI, getErrorMessage } from "../lib/api";
+import { showAiMutationError } from "../lib/aiMutationErrors";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -197,22 +198,7 @@ export default function CausalIntelligencePanel({
     },
     onError: (error) => {
       console.error("Failed to generate causal analysis:", error);
-      
-      // Check for timeout errors
-      if (error?.isTimeout || error?.code === 'ECONNABORTED') {
-        toast.error(t("ai.analysisTakingLonger") || "AI analysis taking longer than expected. Please wait and try again.");
-        return;
-      }
-      
-      // Check for specific error types
-      const errorMessage = error?.response?.data?.detail || error?.message || "Failed to generate causal analysis";
-      if (errorMessage.includes("rate limit")) {
-        toast.error(t("ai.rateLimitExceeded") || "AI rate limit exceeded. Please wait a moment and try again.");
-      } else if (errorMessage.includes("token") || errorMessage.includes("key")) {
-        toast.error(t("ai.configurationError") || "AI service configuration error. Please contact support.");
-      } else {
-        toast.error(t("ai.analysisFailed") || errorMessage);
-      }
+      showAiMutationError(error, t);
     },
   });
 

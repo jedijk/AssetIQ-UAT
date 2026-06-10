@@ -8,7 +8,7 @@ from database import db
 from models.translation import EntityType
 from services.cache_service import cache
 from utils.mongo_regex import exact_case_insensitive_any
-from utils.workspace_localization import _load_entity_fields_batch
+from utils.workspace_localization import load_entity_fields_batch
 
 THREAT_LIST_PROJECTION = {
     "_id": 0,
@@ -213,8 +213,8 @@ async def enrich_with_display_labels(items: list, language: Optional[str] = None
     })
 
     node_trans, fm_trans = await asyncio.gather(
-        _load_entity_fields_batch(EntityType.EQUIPMENT_NODE, equipment_ids, lang),
-        _load_entity_fields_batch(EntityType.FAILURE_MODE, failure_mode_names, lang),
+        load_entity_fields_batch(EntityType.EQUIPMENT_NODE, equipment_ids, lang),
+        load_entity_fields_batch(EntityType.FAILURE_MODE, failure_mode_names, lang),
     )
 
     for item in items:

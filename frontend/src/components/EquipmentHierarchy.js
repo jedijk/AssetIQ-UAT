@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { equipmentHierarchyAPI, threatsAPI } from "../lib/api";
+import { isIOSLikeDevice } from "../lib/deviceUtils";
 import { queryKeys } from "../lib/queryKeys";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useEquipmentNodeIdMap } from "../hooks/useTranslatedEntities";
@@ -578,10 +579,7 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
     try {
       const blob = await equipmentHierarchyAPI.downloadEquipmentFile(fileId);
       const url = window.URL.createObjectURL(blob);
-      const ua = typeof navigator !== "undefined" ? (navigator.userAgent || "") : "";
-      const isIOSLike = /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Mac") && typeof document !== "undefined" && "ontouchend" in document);
-
-      if (isIOSLike) {
+      if (isIOSLikeDevice()) {
         const w = window.open(url, "_blank", "noopener,noreferrer");
         if (!w) window.location.href = url;
         window.setTimeout(() => window.URL.revokeObjectURL(url), 30_000);

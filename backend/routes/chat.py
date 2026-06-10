@@ -26,9 +26,8 @@ from ai_helpers import (
     translate_to_english_for_record,
     generate_observation_description,
 )
-from chat_handler_v2 import (
-    process_chat_message, ChatState, search_equipment_hierarchy, _chat_ui,
-)
+from chat_handler_v2 import process_chat_message, ChatState, _chat_ui
+from services.equipment_search_service import search_equipment_hierarchy
 from failure_modes import FAILURE_MODES_LIBRARY
 from services.threat_score_service import (
     calculate_rank, update_all_ranks, get_risk_settings_for_installation, calculate_risk_score,
@@ -194,6 +193,23 @@ async def _store_assistant_msg(user_id: str, content: str, **extra) -> dict:
 # ---------------------------------------------------------------------------
 # Observation creation
 # ---------------------------------------------------------------------------
+def _chat_observation_title(equipment_name: str, user_description: str) -> str:
+    """Title for chat-created observations — reflects the report, not auto-mapped failure mode."""
+    eq = (equipment_name or "").strip()
+    if eq in ("Unknown", "Unknown equipment"):
+        eq = ""
+    desc = (user_description or "").strip()
+    if len(desc) > 100:
+        desc = desc[:97].rstrip() + "..."
+    if eq and desc:
+        return f"{eq} - {desc}"
+    if desc:
+        return desc
+    if eq:
+        return eq
+    return "New observation"
+
+
 async def _create_observation(user_id: str, obs_data: dict, session_id: str,
                               image_thumbnail: str = None, user_description: str = None) -> dict:
     threat_id = str(uuid.uuid4())
@@ -247,9 +263,14 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
     final_risk_score, risk_level = calculate_risk_score(criticality_score, fmea_score, risk_settings)
     rank, total = await calculate_rank(final_risk_score, user_id)
 
+    observation_title = _chat_observation_title(
+        equipment_name,
+        user_description or obs_data.get("original_description") or "",
+    )
+
     threat_doc = {
         "id": threat_id,
-        "title": f"{equipment_name} - {failure_mode_name}",
+        "title": observation_title,
         "description": user_description or "",
         "user_context": user_description or "",  # Frontend uses this field for the description display
         "asset": equipment_name,
@@ -593,7 +614,6 @@ async def _finalize_chat_machine_result(
             threat_asset=threat["asset"],
             threat_equipment_type=threat.get("equipment_type"),
             threat_equipment_tag=eq_data.get("tag"),
-            threat_failure_mode=threat["failure_mode"],
             threat_description=threat.get("description", ""),
             threat_risk_level=threat["risk_level"],
             threat_risk_score=threat["risk_score"],

@@ -25,17 +25,9 @@ import DOMPurify from "dompurify";
 
 // Get the API base URL for document proxying
 import { getBackendUrl } from '../lib/apiConfig';
+import { isIOSLikeDevice } from '../lib/deviceUtils';
 const API_BASE_URL = getBackendUrl();
 const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
-
-function isIOSLikeDevice() {
-  try {
-    const ua = typeof navigator !== "undefined" ? (navigator.userAgent || "") : "";
-    return /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Mac") && typeof document !== "undefined" && "ontouchend" in document);
-  } catch (_e) {
-    return false;
-  }
-}
 
 function getAuthFetchInit(extra = {}) {
   const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;

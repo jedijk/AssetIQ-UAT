@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { chatAPI, voiceAPI, threatsAPI } from "../lib/api";
+import { chatAPI, voiceAPI } from "../lib/api";
+import { pickAudioMimeType } from "../lib/mediaRecorderUtils";
 import { queryKeys } from "../lib/queryKeys";
+import { ChatMessageList } from "./chat/ChatMessageContent";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -450,14 +452,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
-      // Try to use a supported MIME type
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm')
-          ? 'audio/webm'
-          : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
-            ? 'audio/ogg;codecs=opus'
-            : 'audio/webm';
+      const mimeType = pickAudioMimeType();
       
       const recorder = new MediaRecorder(stream, { mimeType, audioBitsPerSecond: 32000 });
       const chunks = [];
@@ -713,387 +708,38 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
     }
   }, [message, interimTranscript, isListening]);
 
-  // Render message content
-  const renderMessageContent = (msg, isInteractive = true) => {
-    if (msg.role === "user") {
-      return (
-        <div className="bg-blue-600 text-white rounded-2xl rounded-tr-sm p-3 max-w-[85%] shadow-sm text-sm">
-          {msg.has_image && msg.image_data && (
-            <div className="mb-2 -mx-1 -mt-1">
-              <img 
-                src={msg.image_data.startsWith("data:") ? msg.image_data : `data:image/jpeg;base64,${msg.image_data}`}
-                alt="Attached"
-                className="rounded-lg w-full max-h-60 object-contain bg-black/10"
-              />
-            </div>
-          )}
-          {msg.has_image && !msg.image_data && (
-            <div className="mb-2 p-3 bg-blue-500/50 rounded-lg flex items-center gap-2 text-blue-100">
-              <ImageIcon className="w-4 h-4" />
-              <span className="text-xs">{t("chat.imageAttached")}</span>
-            </div>
-          )}
-          <p className="whitespace-pre-wrap">{msg.content}</p>
-        </div>
-      );
-    }
-
-    const isFollowUp = msg.question_type || (msg.content.includes("?") && !msg.threat_id);
-    
-    return (
-      <div className={`bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm p-3 max-w-[90%] shadow-sm text-sm ${isFollowUp ? "border-l-4 border-l-blue-400" : ""}`}>
-        {/* Combined Observation Card with Context Prompt */}
-        {msg.threat_id && (
-          <div className="bg-gradient-to-b from-green-50 to-white rounded-lg border border-green-200 overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center gap-2 text-green-700 px-3 py-2 bg-green-100/50 border-b border-green-200">
-              <CheckCircle2 className="w-4 h-4" />
-              <span className="font-semibold text-sm">{t("chat.observationRecorded")}</span>
-            </div>
-            
-            {/* Threat Details */}
-            <div className="p-3">
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <h4 className="font-semibold text-slate-900 text-sm leading-tight">
-                  {msg.threat_title || t("chat.threatLogged")}
-                </h4>
-                <span className={`flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold ${
-                  msg.threat_risk_level === "Critical" ? "bg-red-100 text-red-700" :
-                  msg.threat_risk_level === "High" ? "bg-orange-100 text-orange-700" :
-                  msg.threat_risk_level === "Medium" ? "bg-yellow-100 text-yellow-700" :
-                  "bg-green-100 text-green-700"
-                }`}>
-                  {translateEnum(t, msg.threat_risk_level) || translateEnum(t, "Medium")}
-                </span>
-              </div>
-              
-              <div className="space-y-1 text-xs text-slate-600 mb-3">
-                {msg.threat_asset && (
-                  <div className="flex items-center gap-1.5">
-                    <Wrench className="w-3 h-3 text-slate-400" />
-                    <span><strong>{t("chat.equipmentLabel")}</strong> {msg.threat_asset}</span>
-                  </div>
-                )}
-                {msg.threat_equipment_tag && (
-                  <div className="flex items-center gap-1.5 ml-[18px]">
-                    <span className="text-slate-400 font-mono">{msg.threat_equipment_tag}</span>
-                  </div>
-                )}
-                {msg.threat_description && (
-                  <div className="flex items-start gap-1.5 mt-1">
-                    <MessageSquare className="w-3 h-3 text-slate-400 mt-0.5" />
-                    <span><strong>{t("chat.whatsHappening")}</strong> {msg.threat_description}</span>
-                  </div>
-                )}
-                {msg.threat_risk_score && (
-                  <div className="flex items-center gap-1.5">
-                    <Activity className="w-3 h-3 text-slate-400" />
-                    <span><strong>{t("chat.riskScoreLabel")}</strong> {msg.threat_risk_score} • <strong>{t("chat.rankLabel")}</strong> #{msg.threat_rank}</span>
-                  </div>
-                )}
-              </div>
-              
-              <a 
-                href={`/threats/${msg.threat_id}`}
-                onClick={handleCloseAndClearTimer}
-                className="inline-flex items-center gap-1 text-blue-600 text-xs font-medium hover:underline"
-              >
-                {t("chat.viewFullDetails")}
-                <ArrowRight className="w-3 h-3" />
-              </a>
-            </div>
-            
-            {/* Context Prompt - Inside the same card */}
-            {(msg.chat_state === "awaiting_context" || msg.awaiting_context_for_threat) && (
-              <div className="px-3 pb-3 pt-2 border-t border-slate-200 bg-slate-50/50">
-                <p className="text-xs text-slate-600 mb-2">
-                  {t("chat.contextPrompt")}{" "}
-                  <span className="text-slate-500">
-                    {t("chat.contextTimerHint")}
-                  </span>
-                </p>
-                <div className="flex flex-wrap gap-2 items-center">
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isSending}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-green-300 text-green-700 rounded-lg hover:bg-green-50 transition-colors text-xs font-medium disabled:opacity-50"
-                    data-testid="add-photo-btn"
-                  >
-                    <ImageIcon className="w-3.5 h-3.5" />
-                    {t("chat.addPhoto")}
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (autoSkipTimerRef.current) {
-                        clearInterval(autoSkipTimerRef.current);
-                      }
-                      setAutoSkipCountdown(null);
-                      lastSkipFiredAtRef.current = Date.now();
-                      sendMutation.mutate({ content: "skip", image: null });
-                    }}
-                    disabled={isSending}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-500 rounded-lg hover:bg-slate-100 transition-colors text-xs font-medium disabled:opacity-50"
-                    data-testid="skip-context-btn"
-                  >
-                    {t("chat.skip")} {autoSkipCountdown && `(${autoSkipCountdown}s)`}
-                  </button>
-                  {autoSkipCountdown && (
-                    <span className="text-xs text-slate-400 ml-1">
-                      {t("chat.autoSkipIn", { seconds: autoSkipCountdown })}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        
-        {/* Issue summary confirm — structured summary + Accept / Revise / Cancel */}
-        {!msg.threat_id && msg.question_type === "issue_confirm" && msg.issue_summary && (
-          <div className="bg-gradient-to-b from-orange-50 to-white rounded-lg border border-orange-200 overflow-hidden">
-            {/* Header - Draft indicator */}
-            <div className="flex items-center gap-2 text-orange-700 px-3 py-2 bg-orange-100/50 border-b border-orange-200">
-              <AlertTriangle className="w-4 h-4" />
-              <span className="font-semibold text-sm">{t("chat.draftObservation")}</span>
-              <span className="ml-auto text-xs bg-orange-200 text-orange-800 px-2 py-0.5 rounded-full font-medium">
-                {t("chat.pending")}
-              </span>
-            </div>
-            
-            {/* Observation Details */}
-            <div className="p-3">
-              {(() => {
-                const content = msg.content || "";
-                const summary = msg.issue_summary || "";
-                
-                // Parse the summary to extract Equipment and Description
-                const lines = summary.split('\n');
-                let equipment = "";
-                let whatsHappening = "";
-                
-                lines.forEach(line => {
-                  if (line.includes('**Equipment:**') || line.includes('**Apparatuur:**')) {
-                    equipment = line.replace(/\*\*Equipment:\*\*|\*\*Apparatuur:\*\*/g, '').trim();
-                  } else if (line.includes('**Description:**') || line.includes('**Beschrijving:**')) {
-                    whatsHappening = line.replace(/\*\*Description:\*\*|\*\*Beschrijving:\*\*/g, '').trim();
-                  }
-                });
-                
-                return (
-                  <>
-                    {/* Title from description */}
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <h4 className="font-semibold text-slate-900 text-sm leading-tight">
-                        {whatsHappening || equipment || t("chat.newObservation")}
-                      </h4>
-                      <span className="flex-shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
-                        {t("chat.draftObservation")}
-                      </span>
-                    </div>
-                    
-                    {/* Details */}
-                    <div className="space-y-1.5 text-xs text-slate-600 mb-3">
-                      {equipment && (
-                        <div className="flex items-center gap-1.5">
-                          <Wrench className="w-3.5 h-3.5 text-orange-400" />
-                          <span><strong>{t("chat.equipmentLabel")}</strong> {equipment}</span>
-                        </div>
-                      )}
-                      {whatsHappening && (
-                        <div className="flex items-start gap-1.5 mt-2">
-                          <MessageSquare className="w-3.5 h-3.5 text-orange-400 mt-0.5" />
-                          <div>
-                            <strong>{t("chat.whatsHappening")}</strong>
-                            <p className="text-slate-700 mt-0.5">{whatsHappening}</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Action Buttons */}
-                    {isInteractive && (
-                      <div className="flex gap-2 pt-2 border-t border-orange-100">
-                        <button
-                          type="button"
-                          onClick={() => sendMutation.mutate({ content: "accept", image: null })}
-                          disabled={isSending}
-                          className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
-                          data-testid="issue-confirm-accept-btn"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                          {t("chat.accept")}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            textareaRef.current?.focus();
-                            setMessage(t("chat.changePrefix"));
-                          }}
-                          disabled={isSending}
-                          className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-white border border-orange-300 text-orange-700 text-xs font-medium hover:bg-orange-50 disabled:opacity-50 transition-colors"
-                          data-testid="issue-confirm-revise-btn"
-                        >
-                          {t("chat.revise")}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            try {
-                              setIsSending(true);
-                              await chatAPI.cancelFlow();
-                              queryClient.invalidateQueries({ queryKey: queryKeys.chat.history() });
-                              queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
-                            } catch (e) {
-                              toast.error(t("chat.cancelFailed"));
-                            } finally {
-                              setIsSending(false);
-                            }
-                          }}
-                          disabled={isSending}
-                          className="flex-1 inline-flex items-center justify-center px-3 py-2 rounded-lg bg-white border border-red-300 text-red-600 text-xs font-medium hover:bg-red-50 disabled:opacity-50 transition-colors"
-                          data-testid="issue-confirm-cancel-btn"
-                        >
-                          {t("chat.cancel")}
-                        </button>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-          </div>
-        )}
-        {/* Show content for non-threat messages */}
-        {!msg.threat_id && !(msg.question_type === "issue_confirm" && msg.issue_summary) && (
-          <p className="whitespace-pre-wrap">{msg.content}</p>
-        )}
-        
-        {/* Context Prompt for non-threat messages (e.g., after adding context) */}
-        {!msg.threat_id && isInteractive && (msg.chat_state === "awaiting_context" || msg.awaiting_context_for_threat) && (
-          <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-            <p className="text-xs text-slate-500 mb-2">
-              {t("chat.contextTimerHint")}
-            </p>
-            <div className="flex flex-wrap gap-2 items-center">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isSending}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-green-300 text-green-700 rounded-lg hover:bg-green-50 transition-colors text-xs font-medium disabled:opacity-50"
-                data-testid="add-more-photo-btn"
-              >
-                <ImageIcon className="w-3.5 h-3.5" />
-                {t("chat.addPhoto")}
-              </button>
-              <button
-                onClick={() => {
-                  if (autoSkipTimerRef.current) {
-                    clearInterval(autoSkipTimerRef.current);
-                  }
-                  setAutoSkipCountdown(null);
-                  lastSkipFiredAtRef.current = Date.now();
-                  sendMutation.mutate({ content: "skip", image: null });
-                }}
-                disabled={isSending}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-500 rounded-lg hover:bg-slate-100 transition-colors text-xs font-medium disabled:opacity-50"
-                data-testid="skip-more-context-btn"
-              >
-                {t("chat.done")} {autoSkipCountdown && `(${autoSkipCountdown}s)`}
-              </button>
-              {autoSkipCountdown && (
-                <span className="text-xs text-slate-400 ml-1">
-                  {t("chat.autoContinueIn", { seconds: autoSkipCountdown })}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
-        
-        {/* Equipment Suggestions - only on latest message */}
-        {isInteractive && msg.equipment_suggestions && msg.equipment_suggestions.length > 0 && (
-          <div className="mt-3 space-y-2">
-            {msg.equipment_suggestions.map((eq) => (
-              <button
-                key={eq.id}
-                onClick={() => {
-                  // Directly submit with the selected equipment
-                  const equipmentText = eq.tag ? `${eq.name} (${eq.tag})` : eq.name;
-                  sendMutation.mutate({ content: equipmentText, image: null });
-                }}
-                disabled={isSending}
-                className="w-full text-left p-2.5 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-blue-900 text-sm">{eq.name}</span>
-                      {eq.tag && (
-                        <span className="text-blue-600 text-xs">({eq.tag})</span>
-                      )}
-                    </div>
-                    {/* Show parent subunit for maintainable items */}
-                    {eq.parent_name && (
-                      <div className="text-xs text-slate-500 mt-0.5 truncate">
-                        {t("chat.equipmentInParent", { parent: eq.parent_name })}
-                      </div>
-                    )}
-                  </div>
-                  {isSending ? (
-                    <Loader2 className="w-4 h-4 text-blue-400 animate-spin flex-shrink-0" />
-                  ) : (
-                    <ArrowRight className="w-4 h-4 text-blue-400 group-hover:text-blue-600 transition-colors flex-shrink-0" />
-                  )}
-                </div>
-                {eq.equipment_type && (
-                  <span className="text-xs text-blue-500">{eq.equipment_type}</span>
-                )}
-              </button>
-            ))}
-            
-            <button
-              onClick={() => {
-                sendMutation.mutate({ content: "Equipment: I don't know", image: null });
-              }}
-              disabled={isSending}
-              className="w-full text-left p-2.5 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
-              data-testid="equipment-unknown-btn"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <HelpCircle className="w-4 h-4 text-slate-500" />
-                  <span className="font-medium text-slate-700 text-sm">{t("chat.dontKnow")}</span>
-                </div>
-                {isSending ? (
-                  <Loader2 className="w-4 h-4 text-slate-400 animate-spin flex-shrink-0" />
-                ) : (
-                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors flex-shrink-0" />
-                )}
-              </div>
-              <span className="text-xs text-slate-500 ml-6">{t("chat.continueWithoutEquipment")}</span>
-            </button>
-            
-            {/* Cancel option */}
-            <button
-              onClick={async () => {
-                await chatAPI.cancelFlow();
-                queryClient.invalidateQueries({ queryKey: queryKeys.chat.history() });
-              }}
-              className="w-full text-center p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors text-sm"
-            >
-              <X className="w-3.5 h-3.5 inline mr-1" />
-              {t("chat.noneOfTheseCancel")}
-            </button>
-          </div>
-        )}
-        
-        {/* Skip context - only on latest message */}
-        {isInteractive && isFollowUp && !msg.threat_id && !msg.equipment_suggestions && (
-          <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-1 text-blue-600 text-xs">
-            <HelpCircle className="w-3 h-3" />
-            <span>{t("chat.provideMoreDetails")}</span>
-          </div>
-        )}
-      </div>
-    );
+  const chatMessageProps = {
+    variant: "sidebar",
+    t,
+    isSending,
+    autoSkipCountdown,
+    onSendMessage: (content, image = null) => sendMutation.mutate({ content, image }),
+    onReviseInput: () => {
+      textareaRef.current?.focus();
+      setMessage(t("chat.changePrefix"));
+    },
+    onCancelFlow: async () => {
+      try {
+        setIsSending(true);
+        await chatAPI.cancelFlow();
+        queryClient.invalidateQueries({ queryKey: queryKeys.chat.history() });
+        queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+      } catch {
+        toast.error(t("chat.cancelFailed"));
+      } finally {
+        setIsSending(false);
+      }
+    },
+    onAddPhoto: () => fileInputRef.current?.click(),
+    onSkip: () => {
+      if (autoSkipTimerRef.current) {
+        clearInterval(autoSkipTimerRef.current);
+      }
+      setAutoSkipCountdown(null);
+      lastSkipFiredAtRef.current = Date.now();
+      sendMutation.mutate({ content: "skip", image: null });
+    },
+    onThreatLinkClick: handleCloseAndClearTimer,
   };
 
   // Don't render anything if not open
@@ -1218,23 +864,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
             </div>
           ) : (
             <>
-              {messages.map((msg, idx) => {
-                // Hide "skip" user messages — they're internal signals to advance the
-                // conversation, not real content the user wants to see.
-                if (msg.role === "user" && (msg.content || "").trim().toLowerCase() === "skip") {
-                  return null;
-                }
-                const isLastAssistant = msg.role === "assistant" && 
-                  !messages.slice(idx + 1).some(m => m.role === "assistant");
-                return (
-                  <div
-                    key={msg.id || idx}
-                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                  >
-                    {renderMessageContent(msg, isLastAssistant)}
-                  </div>
-                );
-              })}
+              <ChatMessageList messages={messages} messageProps={chatMessageProps} />
               {/* AI Processing Indicator */}
               {(isSending || isTranscribing) && (
                 <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">

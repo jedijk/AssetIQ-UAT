@@ -17,6 +17,7 @@
  *    back to downloading the PDF so the user can Share → Print.
  */
 import { labelsAPI } from "./api";
+import { isIOS } from "./deviceUtils";
 
 export const isMobileDevice = () => {
   if (typeof navigator === "undefined") return false;
@@ -26,15 +27,6 @@ export const isMobileDevice = () => {
   // small viewport should still use the PDF iframe print path.
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
 };
-
-
-export const isIOS = () => {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent || "";
-  return /iPhone|iPad|iPod/i.test(ua)
-    || (ua.includes("Mac") && "ontouchend" in document); // iPadOS desktop mode
-};
-
 
 /**
  * Call this synchronously from a user-gesture click handler BEFORE any await,

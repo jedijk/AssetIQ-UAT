@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { chatAPI, voiceAPI } from "../lib/api";
+import { pickAudioMimeType } from "../lib/mediaRecorderUtils";
 import { queryKeys } from "../lib/queryKeys";
-import { X, Send, Mic, MicOff, Loader2, Trash2, HelpCircle } from "lucide-react";
+import { X, Send, Mic, MicOff, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "../contexts/LanguageContext";
-import { translateEnum } from "../lib/translateEnum";
+import { ChatMessageList } from "../components/chat/ChatMessageContent";
 
 const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
   const { t } = useLanguage();
@@ -63,14 +64,7 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
-      // Try to use a supported MIME type
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') 
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm')
-          ? 'audio/webm'
-          : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
-            ? 'audio/ogg;codecs=opus'
-            : 'audio/webm';
+      const mimeType = pickAudioMimeType();
       
       const recorder = new MediaRecorder(stream, { mimeType });
       const chunks = [];
@@ -108,106 +102,12 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
     }
   };
 
-  const renderMessage = (msg, idx, isLastAssistant) => {
-    const isUser = msg.role === "user";
-    const issueConfirmStructured =
-      !isUser && msg.question_type === "issue_confirm" && msg.issue_summary;
-
-    return (
-      <div key={msg.id || idx} className={`chat-message ${isUser ? "user" : "assistant"}`}>
-        <div className="message-bubble">
-          {issueConfirmStructured ? (
-            <div className="issue-confirm-block">
-              {(() => {
-                const chunks = (msg.content || "").split(/\n\n+/);
-                const intro = chunks[0] || "";
-                const promptText = chunks.slice(1).join("\n\n").trim();
-                return (
-                  <>
-                    <p className="issue-confirm-intro">{intro}</p>
-                    <p className="issue-confirm-summary">{msg.issue_summary}</p>
-                    {promptText ? <p className="issue-confirm-prompt">{promptText}</p> : null}
-                    {isLastAssistant && (
-                      <div className="issue-confirm-actions">
-                        <button
-                          type="button"
-                          className="issue-confirm-yes"
-                          onClick={() => sendMutation.mutate({ content: "yes" })}
-                          disabled={sendMutation.isPending}
-                          data-testid="issue-confirm-yes-btn"
-                        >
-                          {t("chat.accept")}
-                        </button>
-                        <button
-                          type="button"
-                          className="issue-confirm-revise"
-                          onClick={() => sendMutation.mutate({ content: "revise" })}
-                          disabled={sendMutation.isPending}
-                          data-testid="issue-confirm-revise-btn"
-                        >
-                          {t("chat.revise")}
-                        </button>
-                      </div>
-                    )}
-                    {isLastAssistant && (
-                      <p className="issue-confirm-hint">
-                        {t("chat.issueConfirmHint")}
-                      </p>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-          ) : (
-            <p>{msg.content}</p>
-          )}
-          
-          {/* Equipment Suggestions */}
-          {msg.equipment_suggestions?.length > 0 && (
-            <div className="suggestions">
-              {msg.equipment_suggestions.slice(0, 5).map((eq, i) => (
-                <button
-                  key={i}
-                  onClick={() => setMessage(eq.name)}
-                  className="suggestion-btn"
-                >
-                  <span>{eq.name}</span>
-                  {eq.parent_name && (
-                    <span className="text-xs text-slate-400 block">{t("chat.equipmentInParent", { parent: eq.parent_name })}</span>
-                  )}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => sendMutation.mutate({ content: "Equipment: I don't know" })}
-                disabled={sendMutation.isPending}
-                className="suggestion-btn suggestion-btn-muted"
-                data-testid="equipment-unknown-btn"
-              >
-                <HelpCircle className="w-3.5 h-3.5 inline mr-1 opacity-70" />
-                {t("chat.dontKnow")}
-              </button>
-            </div>
-          )}
-
-          {/* Threat Created */}
-          {msg.threat_summary && (
-            <div className="threat-card">
-              <div className="threat-header">
-                <span className="threat-icon">✓</span>
-                <span>{t("chat.observationRecorded")}</span>
-              </div>
-              <p className="threat-title">{msg.threat_title}</p>
-              <div className="threat-meta">
-                <span>{translateEnum(t, msg.threat_risk_level) || msg.threat_risk_level}</span>
-                <span>{t("chat.riskScoreLabel")} {msg.threat_risk_score}</span>
-                <span>{t("chat.rankLabel")} #{msg.threat_rank}</span>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    );
+  const chatMessageProps = {
+    variant: "mobile",
+    t,
+    isSending: sendMutation.isPending,
+    onSendMessage: (content) => sendMutation.mutate({ content }),
+    onEquipmentPrefill: (name) => setMessage(name),
   };
 
   return (
@@ -244,12 +144,7 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
             <p className="hint">{t("chat.example1")} · {t("chat.example3")}</p>
           </div>
         ) : (
-          messages.map((msg, idx) => {
-            const isLastAssistant =
-              msg.role === "assistant" &&
-              !messages.slice(idx + 1).some((m) => m.role === "assistant");
-            return renderMessage(msg, idx, isLastAssistant);
-          })
+          <ChatMessageList messages={messages} messageProps={chatMessageProps} />
         )}
         <div ref={messagesEndRef} />
       </div>

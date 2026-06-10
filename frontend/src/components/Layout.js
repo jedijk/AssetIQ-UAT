@@ -15,7 +15,6 @@ import { AlertTriangle, LogOut, Menu, X, BookOpen, MessageSquare, Plus, PanelLef
 import AnimatedDrawer from "./animations/AnimatedDrawer";
 import { pageTransition, pageVariants, springPresets } from "./animations/constants";
 import IntroOverlay, { useIntroOverlay } from "./IntroOverlay";
-import { useNotificationTriggers } from "../hooks/useNotificationTriggers";
 import { useAutoEnableNotifications } from "../hooks/useAutoEnableNotifications";
 import { publicAssetUrl } from "../lib/assetUrl";
 import LayoutHeader from "./layout/LayoutHeader";
@@ -66,8 +65,6 @@ import { useOfflineSync } from "../hooks/useOfflineSync";
 import { usePageTracking } from "../hooks/useAnalyticsTracking";
 import { AppErrorBoundary } from "./AppErrorBoundary";
 import { useCapabilities } from "../core/performance";
-import { notify, getNotificationSettings, isNotificationSupported, getPermissionStatus } from "../services/notificationService";
-
 const Layout = () => {
   const { user, logout, mustChangePassword, mustAcceptTerms } = useAuth();
   const { hasPermission, canSeeNavItem } = usePermissions();
@@ -438,14 +435,6 @@ const Layout = () => {
       setSelectedImageSrc(null);
     }
   };
-
-  // Trigger push notifications for overdue actions and other events
-  useNotificationTriggers({
-    actions: [],
-    tasks: [],
-    observations: [],
-    enabled: !!user,
-  });
 
   // Auto-request notification permission on login
   useAutoEnableNotifications();

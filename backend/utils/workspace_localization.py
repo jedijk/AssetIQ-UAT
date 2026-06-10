@@ -46,7 +46,7 @@ async def _load_entity_fields(
     return fields
 
 
-async def _load_entity_fields_batch(
+async def load_entity_fields_batch(
     entity_type: EntityType,
     entity_ids: List[str],
     language: str,
@@ -108,7 +108,7 @@ async def _store_cached_translation(cache_key: str, original: str, translated: s
         logger.warning("Failed to cache translation: %s", exc)
 
 
-async def _translate_cached(
+async def translate_cached(
     service: TranslationService,
     text: Optional[str],
     language: str,
@@ -186,7 +186,7 @@ async def _translate_many(
     if not items:
         return []
     return list(await asyncio.gather(*[
-        _translate_cached(service, text, language, cache, user_id, context)
+        translate_cached(service, text, language, cache, user_id, context)
         for text, context in items
     ]))
 
@@ -332,7 +332,7 @@ async def localize_workspace_payload(
         for action in action_plan
         if isinstance(action, dict) and action.get("id") and not str(action.get("id")).startswith("inv-")
     ]
-    action_fields_map = await _load_entity_fields_batch(EntityType.ACTION, action_ids, lang)
+    action_fields_map = await load_entity_fields_batch(EntityType.ACTION, action_ids, lang)
 
     synthetic_items: List[tuple] = []
     synthetic_refs: List[dict] = []
@@ -380,7 +380,7 @@ async def localize_ai_insights(
     data = dict(insight)
 
     if data.get("summary"):
-        data["summary"] = await _translate_cached(
+        data["summary"] = await translate_cached(
             service, data["summary"], lang, cache, user_id, "AI reliability risk analysis"
         )
 
@@ -389,13 +389,13 @@ async def localize_ai_insights(
     for item in key_insights:
         if isinstance(item, str):
             translated_insights.append(
-                await _translate_cached(service, item, lang, cache, user_id, "reliability insight")
+                await translate_cached(service, item, lang, cache, user_id, "reliability insight")
             )
         elif isinstance(item, dict):
             copy = dict(item)
             for field in ("insight", "title", "description", "text"):
                 if copy.get(field):
-                    copy[field] = await _translate_cached(
+                    copy[field] = await translate_cached(
                         service, copy[field], lang, cache, user_id, "reliability insight"
                     )
             translated_insights.append(copy)
@@ -408,13 +408,13 @@ async def localize_ai_insights(
     for rec in recommendations:
         if isinstance(rec, str):
             translated_recs.append(
-                await _translate_cached(service, rec, lang, cache, user_id, "maintenance recommendation")
+                await translate_cached(service, rec, lang, cache, user_id, "maintenance recommendation")
             )
         elif isinstance(rec, dict):
             copy = dict(rec)
             for field in ("action", "title", "description", "impact", "expected_impact"):
                 if copy.get(field):
-                    copy[field] = await _translate_cached(
+                    copy[field] = await translate_cached(
                         service, copy[field], lang, cache, user_id, "maintenance recommendation"
                     )
             translated_recs.append(copy)
@@ -427,13 +427,13 @@ async def localize_ai_insights(
     for driver in drivers:
         if isinstance(driver, str):
             translated_drivers.append(
-                await _translate_cached(service, driver, lang, cache, user_id, "risk driver")
+                await translate_cached(service, driver, lang, cache, user_id, "risk driver")
             )
         elif isinstance(driver, dict):
             copy = dict(driver)
             for field in ("driver", "title", "description", "text"):
                 if copy.get(field):
-                    copy[field] = await _translate_cached(
+                    copy[field] = await translate_cached(
                         service, copy[field], lang, cache, user_id, "risk driver"
                     )
             translated_drivers.append(copy)
@@ -447,13 +447,13 @@ async def localize_ai_insights(
     for factor in factors:
         if isinstance(factor, str):
             translated_factors.append(
-                await _translate_cached(service, factor, lang, cache, user_id, "industrial equipment risk factor analysis")
+                await translate_cached(service, factor, lang, cache, user_id, "industrial equipment risk factor analysis")
             )
         elif isinstance(factor, dict):
             copy = dict(factor)
             for field in ("factor", "title", "description", "text", "analysis"):
                 if copy.get(field):
-                    copy[field] = await _translate_cached(
+                    copy[field] = await translate_cached(
                         service, copy[field], lang, cache, user_id, "industrial equipment risk factor analysis"
                     )
             translated_factors.append(copy)
@@ -469,13 +469,13 @@ async def localize_ai_insights(
         for factor in dyn_factors:
             if isinstance(factor, str):
                 translated_dyn_factors.append(
-                    await _translate_cached(service, factor, lang, cache, user_id, "industrial equipment risk factor analysis")
+                    await translate_cached(service, factor, lang, cache, user_id, "industrial equipment risk factor analysis")
                 )
             elif isinstance(factor, dict):
                 copy = dict(factor)
                 for field in ("factor", "title", "description", "text", "analysis"):
                     if copy.get(field):
-                        copy[field] = await _translate_cached(
+                        copy[field] = await translate_cached(
                             service, copy[field], lang, cache, user_id, "industrial equipment risk factor analysis"
                         )
                 translated_dyn_factors.append(copy)
@@ -487,14 +487,14 @@ async def localize_ai_insights(
     forecasts = data.get("forecasts") or []
     for forecast in forecasts:
         if isinstance(forecast, dict) and forecast.get("description"):
-            forecast["description"] = await _translate_cached(
+            forecast["description"] = await translate_cached(
                 service, forecast["description"], lang, cache, user_id, "risk forecast"
             )
     data["forecasts"] = forecasts
 
     dyn = data.get("dynamic_risk")
     if isinstance(dyn, dict) and dyn.get("time_to_failure_display"):
-        dyn["time_to_failure_display"] = await _translate_cached(
+        dyn["time_to_failure_display"] = await translate_cached(
             service,
             dyn["time_to_failure_display"],
             lang,
@@ -525,7 +525,7 @@ async def localize_causal_analysis(
     data = dict(analysis)
 
     if data.get("summary"):
-        data["summary"] = await _translate_cached(
+        data["summary"] = await translate_cached(
             service, data["summary"], lang, cache, user_id, "causal root cause analysis"
         )
 
@@ -537,13 +537,13 @@ async def localize_causal_analysis(
             continue
         copy = dict(cause)
         if copy.get("description"):
-            copy["description"] = await _translate_cached(
+            copy["description"] = await translate_cached(
                 service, copy["description"], lang, cache, user_id, "probable failure cause"
             )
         evidence = copy.get("evidence") or []
         if evidence:
             copy["evidence"] = [
-                await _translate_cached(service, item, lang, cache, user_id, "supporting evidence")
+                await translate_cached(service, item, lang, cache, user_id, "supporting evidence")
                 if isinstance(item, str)
                 else item
                 for item in evidence
@@ -551,7 +551,7 @@ async def localize_causal_analysis(
         supporting_data = copy.get("supporting_data") or []
         if supporting_data:
             copy["supporting_data"] = [
-                await _translate_cached(service, item, lang, cache, user_id, "supporting data")
+                await translate_cached(service, item, lang, cache, user_id, "supporting data")
                 if isinstance(item, str)
                 else item
                 for item in supporting_data
@@ -562,7 +562,7 @@ async def localize_causal_analysis(
             for action in mitigations:
                 if isinstance(action, str):
                     translated_mits.append(
-                        await _translate_cached(
+                        await translate_cached(
                             service, action, lang, cache, user_id, "mitigation action"
                         )
                     )
@@ -570,7 +570,7 @@ async def localize_causal_analysis(
                     act_copy = dict(action)
                     for field in ("action", "title", "description"):
                         if act_copy.get(field):
-                            act_copy[field] = await _translate_cached(
+                            act_copy[field] = await translate_cached(
                                 service, act_copy[field], lang, cache, user_id, "mitigation action"
                             )
                     translated_mits.append(act_copy)
@@ -582,7 +582,7 @@ async def localize_causal_analysis(
 
     factors = data.get("contributing_factors") or []
     data["contributing_factors"] = [
-        await _translate_cached(service, factor, lang, cache, user_id, "contributing factor")
+        await translate_cached(service, factor, lang, cache, user_id, "contributing factor")
         if isinstance(factor, str)
         else factor
         for factor in factors

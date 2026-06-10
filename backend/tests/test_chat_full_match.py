@@ -1,5 +1,5 @@
 """Regression tests for chat full-match auto-selection."""
-from chat_handler_v2 import find_full_equipment_match
+from services.equipment_search_service import find_full_equipment_match
 
 
 def test_no_match_returns_none():

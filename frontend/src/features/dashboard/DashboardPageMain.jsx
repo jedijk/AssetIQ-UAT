@@ -335,8 +335,7 @@ export default function DashboardPageMain({ initialTab }) {
   const { data: investigationsData = { investigations: [] }, isLoading: isLoadingInvestigations, error: investigationsError } = useQuery({
     queryKey: queryKeys.investigations.all(),
     queryFn: () => investigationAPI.getAll(),
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: 60 * 1000,
     retry: 2,
   });
   const allInvestigations = Array.isArray(investigationsData?.investigations) ? investigationsData.investigations : (Array.isArray(investigationsData) ? investigationsData : []);

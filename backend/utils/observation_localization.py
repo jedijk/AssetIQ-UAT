@@ -11,8 +11,8 @@ from models.translation import EntityType
 from services.translation_service import TranslationService
 from utils.text_language import detect_text_language
 from utils.workspace_localization import (
-    _load_entity_fields_batch,
-    _translate_cached,
+    load_entity_fields_batch,
+    translate_cached,
 )
 
 logger = logging.getLogger(__name__)
@@ -72,7 +72,7 @@ async def localize_observation_record(
 
     if allow_live_translation and translate_items and svc:
         translated_values = await asyncio.gather(*[
-            _translate_cached(
+            translate_cached(
                 svc,
                 text,
                 lang,
@@ -102,7 +102,7 @@ async def enrich_observations_for_ui(
         return observations
 
     obs_ids = [obs.get("id") for obs in observations if obs.get("id")]
-    stored_by_id = await _load_entity_fields_batch(EntityType.OBSERVATION, obs_ids, lang)
+    stored_by_id = await load_entity_fields_batch(EntityType.OBSERVATION, obs_ids, lang)
 
     service = TranslationService(db) if allow_live_translation else None
     cache: Dict[str, str] = {}

@@ -1,5 +1,6 @@
 import React from "react";
 import { Virtuoso } from "react-virtuoso";
+import { isIOSLikeDevice } from "../../lib/deviceUtils";
 
 /**
  * Small wrapper to standardize list virtualization defaults.
@@ -22,15 +23,6 @@ class VirtuosoErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) return this.props.fallback || null;
     return this.props.children;
-  }
-}
-
-function isIOSLikeDevice() {
-  try {
-    const ua = typeof navigator !== "undefined" ? (navigator.userAgent || "") : "";
-    return /iPhone|iPad|iPod/i.test(ua) || (ua.includes("Mac") && typeof document !== "undefined" && "ontouchend" in document);
-  } catch (_e) {
-    return false;
   }
 }
 
