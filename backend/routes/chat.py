@@ -1046,6 +1046,8 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
         ChatState.AWAITING_NEW_FAILURE_MODE,
     }
     
+    logger.info(f"Chat flow check: state={state}, in_flow={in_flow}, has_image={bool(image_base64)}")
+    
     if state == ChatState.INITIAL and not in_flow and not image_base64:
         intent = await classify_user_intent(content, session_id)
         if intent.get("is_data_query") and intent.get("confidence", 0) > 0.6:
