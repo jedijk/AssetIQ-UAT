@@ -6,12 +6,12 @@ from typing import List, Optional, Union
 from datetime import datetime, timezone
 import uuid
 import logging
+import asyncio
 from database import db, failure_modes_service, efm_service, installation_filter
 from auth import require_permission
 from services.threat_enrichment import (
-    enrich_with_creator_info,
-    enrich_with_equipment_tags,
-    enrich_with_action_plan_counts,
+    enrich_threat_list,
+    THREAT_LIST_PROJECTION,
 )
 from utils.observation_localization import enrich_observations_for_ui
 from services.tenant_schema import merge_tenant_filter, with_tenant_id
@@ -145,11 +145,13 @@ async def get_threats(
     if not installation_ids:
         return []
     
-    equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
-        installation_ids, current_user["id"]
-    )
-    equipment_names = await installation_filter.get_equipment_names_for_installations(
-        installation_ids, current_user["id"]
+    equipment_ids, equipment_names = await asyncio.gather(
+        installation_filter.get_all_equipment_ids_for_installations(
+            installation_ids, current_user["id"]
+        ),
+        installation_filter.get_equipment_names_for_installations(
+            installation_ids, current_user["id"]
+        ),
     )
     
     # Build filter with installation scope
@@ -165,15 +167,13 @@ async def get_threats(
         return []
     
     query = merge_tenant_filter(query, current_user)
-    threats = await db.threats.find(query, {"_id": 0}).sort("rank", 1).limit(limit).to_list(limit)
+    threats = await db.threats.find(query, THREAT_LIST_PROJECTION).sort("rank", 1).limit(limit).to_list(limit)
     total_count = len(threats)
     
-    # Enrich with creator info
-    threats = await enrich_with_creator_info(threats)
-    
-    # Enrich with equipment tags
-    threats = await enrich_with_equipment_tags(threats)
-    threats = await enrich_with_action_plan_counts(threats)
+    # Enrich in parallel (creator, tags, action counts, display labels, localization)
+    threats = await enrich_threat_list(
+        threats, language, user_id=current_user.get("id")
+    )
     
     # Ensure required fields have values and risk_score is int
     for idx, t in enumerate(threats):
@@ -204,7 +204,6 @@ async def get_threats(
         # Ensure created_at is string
         if t.get("created_at") and not isinstance(t["created_at"], str):
             t["created_at"] = t["created_at"].isoformat() if hasattr(t["created_at"], 'isoformat') else str(t["created_at"])
-    threats = await enrich_observations_for_ui(threats, language, user_id=current_user.get("id"))
     return threats
 
 @router.get("/threats/top", response_model=List[ThreatResponse])
@@ -220,11 +219,13 @@ async def get_top_threats(
     if not installation_ids:
         return []
     
-    equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
-        installation_ids, current_user["id"]
-    )
-    equipment_names = await installation_filter.get_equipment_names_for_installations(
-        installation_ids, current_user["id"]
+    equipment_ids, equipment_names = await asyncio.gather(
+        installation_filter.get_all_equipment_ids_for_installations(
+            installation_ids, current_user["id"]
+        ),
+        installation_filter.get_equipment_names_for_installations(
+            installation_ids, current_user["id"]
+        ),
     )
     
     # Build filter with installation scope
@@ -236,15 +237,12 @@ async def get_top_threats(
         return []
     
     query = merge_tenant_filter(query, current_user)
-    threats = await db.threats.find(query, {"_id": 0}).sort("risk_score", -1).limit(limit).to_list(limit)
+    threats = await db.threats.find(query, THREAT_LIST_PROJECTION).sort("risk_score", -1).limit(limit).to_list(limit)
     total_count = len(threats)
     
-    # Enrich with creator info (name, picture, position)
-    threats = await enrich_with_creator_info(threats)
-    
-    # Enrich with equipment tags
-    threats = await enrich_with_equipment_tags(threats)
-    threats = await enrich_with_action_plan_counts(threats)
+    threats = await enrich_threat_list(
+        threats, language, user_id=current_user.get("id")
+    )
     
     # Ensure required fields have values and risk_score is int
     for idx, t in enumerate(threats):
@@ -275,7 +273,6 @@ async def get_top_threats(
         # Ensure created_at is string
         if t.get("created_at") and not isinstance(t["created_at"], str):
             t["created_at"] = t["created_at"].isoformat() if hasattr(t["created_at"], 'isoformat') else str(t["created_at"])
-    threats = await enrich_observations_for_ui(threats, language, user_id=current_user.get("id"))
     return threats
 
 

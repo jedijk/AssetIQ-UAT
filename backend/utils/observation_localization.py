@@ -29,6 +29,7 @@ async def localize_observation_record(
     service: Optional[TranslationService] = None,
     cache: Optional[Dict[str, str]] = None,
     user_id: Optional[str] = None,
+    allow_live_translation: bool = False,
 ) -> Dict[str, Any]:
     """Return a copy of the observation with title/description localized."""
     lang = (target_lang or "en").lower()[:2]
@@ -37,7 +38,9 @@ async def localize_observation_record(
 
     result = dict(observation)
     fields = stored_fields or {}
-    svc = service or TranslationService(db)
+    svc = service if allow_live_translation else None
+    if allow_live_translation and svc is None:
+        svc = TranslationService(db)
     mem_cache = cache if cache is not None else {}
 
     translate_items: List[tuple] = []
@@ -67,7 +70,7 @@ async def localize_observation_record(
         )
         translate_items.append((str(raw), context, source_lang))
 
-    if translate_items:
+    if allow_live_translation and translate_items and svc:
         translated_values = await asyncio.gather(*[
             _translate_cached(
                 svc,
@@ -91,6 +94,7 @@ async def enrich_observations_for_ui(
     target_lang: str,
     *,
     user_id: Optional[str] = None,
+    allow_live_translation: bool = False,
 ) -> List[Dict[str, Any]]:
     """Localize a list of observations/threats for the requested UI language."""
     lang = (target_lang or "en").lower()[:2]
@@ -100,22 +104,18 @@ async def enrich_observations_for_ui(
     obs_ids = [obs.get("id") for obs in observations if obs.get("id")]
     stored_by_id = await _load_entity_fields_batch(EntityType.OBSERVATION, obs_ids, lang)
 
-    service = TranslationService(db)
+    service = TranslationService(db) if allow_live_translation else None
     cache: Dict[str, str] = {}
-    localized: List[Dict[str, Any]] = []
 
-    for obs in observations:
-        obs_id = obs.get("id")
-        stored = stored_by_id.get(obs_id, {}) if obs_id else {}
-        localized.append(
-            await localize_observation_record(
-                obs,
-                lang,
-                stored_fields=stored,
-                service=service,
-                cache=cache,
-                user_id=user_id,
-            )
+    return list(await asyncio.gather(*[
+        localize_observation_record(
+            obs,
+            lang,
+            stored_fields=stored_by_id.get(obs.get("id"), {}) if obs.get("id") else {},
+            service=service,
+            cache=cache,
+            user_id=user_id,
+            allow_live_translation=allow_live_translation,
         )
-
-    return localized
+        for obs in observations
+    ]))

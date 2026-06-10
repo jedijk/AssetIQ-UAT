@@ -1,9 +1,22 @@
 """
 Threat list enrichment helpers (creator info, equipment tags).
 """
+import asyncio
+from typing import Optional
+
 from database import db
+from models.translation import EntityType
 from services.cache_service import cache
 from utils.mongo_regex import exact_case_insensitive_any
+from utils.workspace_localization import _load_entity_fields_batch
+
+THREAT_LIST_PROJECTION = {
+    "_id": 0,
+    "description": 0,
+    "user_context": 0,
+    "attachments": 0,
+    "recommended_actions": 0,
+}
 
 
 async def enrich_with_creator_info(items: list) -> list:
@@ -184,3 +197,63 @@ async def enrich_with_action_plan_counts(items: list) -> list:
         item["action_plan_count"] = count
 
     return items
+
+
+async def enrich_with_display_labels(items: list, language: Optional[str] = None) -> list:
+    """Add asset_display / failure_mode_display from stored translations (list-only)."""
+    lang = (language or "en").lower()[:2]
+    if lang not in {"nl", "de"} or not items:
+        return items
+
+    equipment_ids = list({
+        item.get("linked_equipment_id") for item in items if item.get("linked_equipment_id")
+    })
+    failure_mode_names = list({
+        item.get("failure_mode") for item in items if item.get("failure_mode")
+    })
+
+    node_trans, fm_trans = await asyncio.gather(
+        _load_entity_fields_batch(EntityType.EQUIPMENT_NODE, equipment_ids, lang),
+        _load_entity_fields_batch(EntityType.FAILURE_MODE, failure_mode_names, lang),
+    )
+
+    for item in items:
+        eq_id = item.get("linked_equipment_id")
+        if eq_id:
+            translated_asset = (node_trans.get(eq_id) or {}).get("name")
+            if translated_asset:
+                item["asset_display"] = translated_asset
+
+        fm_name = item.get("failure_mode")
+        if fm_name:
+            translated_fm = (fm_trans.get(fm_name) or {}).get("name")
+            if translated_fm:
+                item["failure_mode_display"] = translated_fm
+
+    return items
+
+
+async def enrich_threat_list(
+    items: list,
+    language: Optional[str] = None,
+    *,
+    user_id: Optional[str] = None,
+) -> list:
+    """Run all list enrichments with parallel DB work and fast-path localization."""
+    if not items:
+        return items
+
+    from utils.observation_localization import enrich_observations_for_ui
+
+    await asyncio.gather(
+        enrich_with_creator_info(items),
+        enrich_with_equipment_tags(items),
+        enrich_with_action_plan_counts(items),
+        enrich_with_display_labels(items, language),
+    )
+    return await enrich_observations_for_ui(
+        items,
+        language,
+        user_id=user_id,
+        allow_live_translation=False,
+    )

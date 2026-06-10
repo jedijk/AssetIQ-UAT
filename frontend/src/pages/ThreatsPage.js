@@ -9,7 +9,6 @@ import { useAuth } from "../contexts/AuthContext";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { useNotificationTriggers } from "../hooks/useNotificationTriggers";
-import { useTranslatedObservations, useEquipmentTypeNameMap, useEquipmentNodeNameMap } from "../hooks/useTranslatedEntities";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { 
   AlertTriangle, 
@@ -278,19 +277,11 @@ const ThreatsPage = () => {
   });
 
   // Apply translations based on current language
-  const { observations: translatedThreats } = useTranslatedObservations(rawThreats);
-  const equipmentTypeNameMap = useEquipmentTypeNameMap();
-  const equipmentNodeNameMap = useEquipmentNodeNameMap();
-  
-  const translateEquipmentTypeName = (name) => {
-    if (!name) return name;
-    const key = String(name).trim().toLowerCase();
-    // Try node name first (asset names are typically hierarchy nodes),
-    // then fall back to equipment type names.
-    return equipmentNodeNameMap[key] || equipmentTypeNameMap[key] || name;
-  };
-  const threats = translatedThreats;
+  const threats = rawThreats;
 
+  const displayAssetName = (threat) => threat?.asset_display || threat?.asset || "";
+  const displayFailureMode = (threat) => threat?.failure_mode_display || threat?.failure_mode || "";
+  
   // Trigger push notifications for high-severity observations
   useNotificationTriggers({
     observations: threats || [],
@@ -315,7 +306,7 @@ const ThreatsPage = () => {
       });
       
       // Prefetch top 10 with staggered delays to avoid overwhelming the server
-      const threatsToPreload = sortedThreats.slice(0, 10);
+      const threatsToPreload = sortedThreats.slice(0, 3);
       threatsToPreload.forEach((threat, index) => {
         // Stagger prefetch requests by 200ms each to avoid concurrent load
         setTimeout(() => {
@@ -588,16 +579,16 @@ const ThreatsPage = () => {
           
           <button
             onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
-            className="flex items-center justify-between w-[90px] sm:w-40 h-9 px-2 sm:px-3 bg-white border border-slate-200 rounded-md text-xs sm:text-sm hover:bg-slate-50 transition-colors"
+            className="flex items-center justify-between w-[96px] sm:w-40 h-9 px-2 sm:px-3 bg-white border border-slate-200 rounded-md text-xs sm:text-sm hover:bg-slate-50 transition-colors min-w-0 overflow-hidden"
             data-testid="status-filter-select"
           >
-            <div className="flex items-center gap-1.5">
-              <Filter className="w-3.5 h-3.5 text-slate-400" />
-              <span className={`truncate ${statusFilter.length > 0 ? "text-slate-900" : "text-slate-500"}`}>
+            <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+              <Filter className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+              <span className={`truncate min-w-0 ${statusFilter.length > 0 ? "text-slate-900" : "text-slate-500"}`}>
                 {statusFilter.length === 0 ? t("observations.status") : statusFilter.length === 1 ? getStatusLabel(statusFilter[0]) : `${statusFilter.length} ${t("observations.selected")}`}
               </span>
             </div>
-            <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform flex-shrink-0 ${statusDropdownOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform flex-shrink-0 ml-0.5 ${statusDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           
           {statusDropdownOpen && (
@@ -797,7 +788,7 @@ const ThreatsPage = () => {
             </div>
           )}
           {/* Threats List */}
-          {isLoading ? (
+          {isLoading && rawThreats.length === 0 ? (
         <div className="py-6 space-y-3" data-testid="threats-skeleton">
           {Array.from({ length: 8 }).map((_, i) => (
             <div key={i} className="bg-white border border-slate-200 rounded-xl p-4">
@@ -902,7 +893,7 @@ const ThreatsPage = () => {
 
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-2 sm:line-clamp-1 mb-0.5">
-                        <span className="sm:hidden">{threat.failure_mode || threat.title}</span>
+                        <span className="sm:hidden">{displayFailureMode(threat) || threat.title}</span>
                         <span className="hidden sm:inline">{threat.title}</span>
                       </h3>
                       {threat.equipment_tag && (
@@ -913,8 +904,8 @@ const ThreatsPage = () => {
                           <RiskBadge level={threat.risk_level} size="sm" />
                         </span>
                         <span className="text-xs sm:text-sm text-slate-500 truncate">
-                          <span className="sm:hidden">{threat.equipment_name || translateEquipmentTypeName(threat.asset)}</span>
-                          <span className="hidden sm:inline">{translateEquipmentTypeName(threat.asset)}</span>
+                          <span className="sm:hidden">{threat.equipment_name || displayAssetName(threat)}</span>
+                          <span className="hidden sm:inline">{displayAssetName(threat)}</span>
                         </span>
                         {/* Registration Date */}
                         {threat.created_at && (
@@ -1011,7 +1002,7 @@ const ThreatsPage = () => {
               <div className="flex-1 min-w-0">
                 {/* Mobile: Show failure mode as header, Desktop: Show title */}
                 <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-2 sm:line-clamp-1 mb-0.5">
-                  <span className="sm:hidden">{threat.failure_mode || threat.title}</span>
+                  <span className="sm:hidden">{displayFailureMode(threat) || threat.title}</span>
                   <span className="hidden sm:inline">{threat.title}</span>
                 </h3>
                 {/* Tag displayed under title */}
@@ -1025,8 +1016,8 @@ const ThreatsPage = () => {
                   </span>
                   {/* Mobile: Show equipment, Desktop: Show asset */}
                   <span className="text-xs sm:text-sm text-slate-500 truncate">
-                    <span className="sm:hidden">{translateEquipmentTypeName(threat.asset) || threat.title}</span>
-                    <span className="hidden sm:inline">{translateEquipmentTypeName(threat.asset)}</span>
+                    <span className="sm:hidden">{displayAssetName(threat) || threat.title}</span>
+                    <span className="hidden sm:inline">{displayAssetName(threat)}</span>
                   </span>
                   {/* Registration Date */}
                   {threat.created_at && (

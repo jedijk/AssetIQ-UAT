@@ -46,3 +46,20 @@ async def test_localize_observation_record_uses_stored_english_translation():
     assert result["title"] == "Failure at pump"
     assert result["description"] == "Leakage"
     mock_service.translate_text.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_localize_observation_record_skips_live_translation_by_default():
+    mock_service = MagicMock()
+
+    result = await localize_observation_record(
+        {"id": "obs-1", "title": "Storing aan pomp", "description": "Lekkage"},
+        "en",
+        stored_fields={},
+        service=mock_service,
+        cache={},
+        allow_live_translation=False,
+    )
+
+    assert result["title"] == "Storing aan pomp"
+    mock_service.translate_text.assert_not_called()
