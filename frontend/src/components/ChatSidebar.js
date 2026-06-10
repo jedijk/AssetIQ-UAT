@@ -29,7 +29,9 @@ import {
   Globe,
   ChevronDown,
   FileUp,
-  ImagePlus
+  ImagePlus,
+  Sparkles,
+  Zap
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
@@ -63,6 +65,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
   const [isListening, setIsListening] = useState(false); // Real-time speech recognition
   const [interimTranscript, setInterimTranscript] = useState(""); // Partial transcript while speaking
   const [autoSkipCountdown, setAutoSkipCountdown] = useState(null); // Countdown timer for auto-skip
+  const [aiModeEnabled, setAiModeEnabled] = useState(false); // AI mode for better descriptions (slower)
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -315,7 +318,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
 
   // Send message mutation
   const sendMutation = useMutation({
-    mutationFn: ({ content, image }) => chatAPI.sendMessage(content, image, manualLanguage),
+    mutationFn: ({ content, image }) => chatAPI.sendMessage(content, image, manualLanguage, aiModeEnabled),
     onMutate: () => {
       setIsSending(true);
       // Clear auto-skip timer when user sends any message
@@ -1329,6 +1332,28 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
             </div>
           </div>
           <div className="flex items-center gap-0.5 sm:gap-1 flex-shrink-0">
+            {/* AI Mode Toggle */}
+            <button
+              onClick={() => setAiModeEnabled(!aiModeEnabled)}
+              className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] sm:text-xs font-medium transition-all ${
+                aiModeEnabled 
+                  ? "bg-purple-100 text-purple-700 border border-purple-300" 
+                  : "bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200"
+              }`}
+              title={aiModeEnabled ? "AI mode: Better descriptions (slower)" : "Fast mode: Quick responses"}
+            >
+              {aiModeEnabled ? (
+                <>
+                  <Sparkles className="w-3 h-3" />
+                  <span className="hidden sm:inline">AI</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="w-3 h-3" />
+                  <span className="hidden sm:inline">Fast</span>
+                </>
+              )}
+            </button>
             {messages.length > 0 && (
               <Button
                 variant="ghost"

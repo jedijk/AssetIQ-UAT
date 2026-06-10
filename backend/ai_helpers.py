@@ -341,17 +341,55 @@ async def generate_observation_description(
     equipment_name: str = None,
     failure_mode: str = None,
     language: str = "en",
+    use_ai: bool = False,
 ) -> str:
     """
     Generate a professional engineer-style description for an observation.
-    Uses simple template expansion for speed - no AI call.
+    
+    use_ai: When True, uses AI for better descriptions (slower).
+            When False, uses simple template expansion (fast).
     """
+    from services.ai_gateway import chat as ai_gateway_chat
+    
     t = (user_input or "").strip()
     if not t:
         return ""
     
-    # Simple template-based description (no AI call - instant)
-    # Just clean up and format the user input
+    # If AI mode is enabled, use GPT for better descriptions
+    if use_ai:
+        try:
+            lang_note = "Dutch" if language == "nl" else "English"
+            
+            context_parts = []
+            if equipment_name and equipment_name.lower() not in ["unknown", "to be confirmed"]:
+                context_parts.append(f"Equipment: {equipment_name}")
+            if failure_mode and failure_mode.lower() not in ["unknown", "unknown / not specified"]:
+                context_parts.append(f"Failure mode: {failure_mode}")
+            context = "\n".join(context_parts) if context_parts else ""
+            
+            out = await ai_gateway_chat(
+                [
+                    {
+                        "role": "system",
+                        "content": f"Write a 2-3 sentence professional technical description in {lang_note} for a maintenance observation record. Be concise and use engineering terminology.",
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Issue report: {t[:1000]}\n{context}".strip(),
+                    },
+                ],
+                endpoint="ai_helpers.generate_observation_description",
+                model="gpt-4o-mini",
+                temperature=0.3,
+                max_tokens=150,
+            )
+            out = (out or "").strip()
+            if out:
+                return out
+        except Exception as e:
+            logger.warning("generate_observation_description AI fallback: %s", e)
+    
+    # Fast mode: Simple template-based description (no AI call - instant)
     t_clean = t.replace('"', '').strip()
     
     # Remove equipment name if it's at the start (redundant)

@@ -42,6 +42,7 @@ class ChatMessageCreate(BaseModel):
     content: str
     image_base64: Optional[str] = None
     language: Optional[str] = None
+    ai_mode: Optional[bool] = False  # Enable AI for better descriptions (slower)
 
 
 class ThreatResponse(BaseModel):

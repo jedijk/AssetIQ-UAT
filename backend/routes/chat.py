@@ -216,9 +216,6 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
     failure_mode_name = obs_data.get("failure_mode_name", "Unknown")
 
     chat_lang = (obs_data.get("chat_ui_language") or "en").lower()
-    equ_id = obs_data.get("equipment_id")
-    fm_id = obs_data.get("failure_mode_id")
-    is_custom_fm = obs_data.get("is_custom_failure_mode", False)
     
     # Skip slow AI translations - use quick dictionary lookup only
     # Background translation task will handle proper translation later
@@ -517,13 +514,14 @@ async def _finalize_chat_machine_result(
     detected_lang: str,
     image_thumbnail: Optional[str],
     result: dict,
+    ai_mode: bool = False,
 ) -> ChatResponse:
     """Persist state + assistant message after `process_chat_message` (observation or in-flow)."""
     new_state = result["state"]
     resp_text = result["response_text"]
     conv = await _read_conv(user_id)
     
-    logger.info(f"_save_and_respond: create_observation={result.get('create_observation')}, has_obs_data={bool(result.get('observation_data'))}")
+    logger.info(f"_save_and_respond: create_observation={result.get('create_observation')}, has_obs_data={bool(result.get('observation_data'))}, ai_mode={ai_mode}")
 
     if result.get("create_observation") and result.get("observation_data"):
         obs_data = result.get("observation_data") or {}
@@ -545,7 +543,7 @@ async def _finalize_chat_machine_result(
                 parsed_description = line.replace('**Description:**', '').replace('**Beschrijving:**', '').strip()
                 break
         
-        # If no parsed description from summary, generate one using AI
+        # If no parsed description from summary, generate one (AI if enabled, else fast)
         if not parsed_description and original_input:
             chat_lang = (obs_data.get("chat_ui_language") or "en").lower()
             parsed_description = await generate_observation_description(
@@ -553,8 +551,9 @@ async def _finalize_chat_machine_result(
                 equipment_name=obs_data.get("equipment_name"),
                 failure_mode=obs_data.get("failure_mode_name"),
                 language=chat_lang,
+                use_ai=ai_mode,
             )
-            logger.info(f"Generated observation description: {parsed_description[:100]}...")
+            logger.info(f"Generated observation description (ai_mode={ai_mode}): {parsed_description[:100]}...")
         
         # Final fallback to original message
         user_description = parsed_description or original_input or ""
@@ -682,12 +681,15 @@ async def _finalize_chat_machine_result(
 # Core chat processing (shared by text and voice endpoints)
 # ---------------------------------------------------------------------------
 async def _core_chat_process(user_id: str, content: str, session_id: str,
-                             detected_lang: str, image_base64: str = None):
+                             detected_lang: str, image_base64: str = None, ai_mode: bool = False):
     """
     Central chat processing used by both /chat/send and /chat/voice-send.
     Returns a ChatResponse-compatible dict.
+    
+    ai_mode: When True, enables AI-powered description generation and better
+             language detection (slower). When False, uses fast text processing.
     """
-    logger.info(f"=== CHAT REQUEST === user={user_id}, content={content[:50] if content else 'None'}...")
+    logger.info(f"=== CHAT REQUEST === user={user_id}, content={content[:50] if content else 'None'}..., ai_mode={ai_mode}")
     
     image_thumbnail = None
     if image_base64:
@@ -798,7 +800,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                 ui_language=detected_lang,
             )
             return await _finalize_chat_machine_result(
-                user_id, session_id, detected_lang, image_thumbnail, result
+                user_id, session_id, detected_lang, image_thumbnail, result, ai_mode
             )
 
         if _issue_confirm_no(content):
@@ -1223,7 +1225,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
             )
             
             # Process the result through _finalize_chat_machine_result if observation should be created
-            return await _finalize_chat_machine_result(user_id, session_id, detected_lang, None, result)
+            return await _finalize_chat_machine_result(user_id, session_id, detected_lang, None, result, ai_mode)
 
     # ------------------------------------------------------------------
     # 6. Process with state machine (equipment / failure mode flow)
@@ -1244,7 +1246,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
     )
 
     return await _finalize_chat_machine_result(
-        user_id, session_id, detected_lang, image_thumbnail, result
+        user_id, session_id, detected_lang, image_thumbnail, result, ai_mode
     )
 
 
@@ -1261,7 +1263,8 @@ async def send_chat_message(
     detected_lang = message.language or detect_language(message.content)
     try:
         return await _core_chat_process(
-            current_user["id"], message.content, session_id, detected_lang, message.image_base64
+            current_user["id"], message.content, session_id, detected_lang, 
+            message.image_base64, message.ai_mode
         )
     except HTTPException:
         raise
