@@ -276,6 +276,49 @@ async def localize_ai_insights(
             translated_drivers.append(driver)
     data["risk_drivers"] = translated_drivers
 
+    # Translate factors (key risk factors) - these are the detailed risk analysis items
+    factors = data.get("factors") or []
+    translated_factors: List[Any] = []
+    for factor in factors:
+        if isinstance(factor, str):
+            translated_factors.append(
+                await _translate_cached(service, factor, lang, cache, user_id, "industrial equipment risk factor analysis")
+            )
+        elif isinstance(factor, dict):
+            copy = dict(factor)
+            for field in ("factor", "title", "description", "text", "analysis"):
+                if copy.get(field):
+                    copy[field] = await _translate_cached(
+                        service, copy[field], lang, cache, user_id, "industrial equipment risk factor analysis"
+                    )
+            translated_factors.append(copy)
+        else:
+            translated_factors.append(factor)
+    data["factors"] = translated_factors
+
+    # Also translate factors in dynamic_risk if present
+    dyn = data.get("dynamic_risk")
+    if isinstance(dyn, dict):
+        dyn_factors = dyn.get("factors") or []
+        translated_dyn_factors: List[Any] = []
+        for factor in dyn_factors:
+            if isinstance(factor, str):
+                translated_dyn_factors.append(
+                    await _translate_cached(service, factor, lang, cache, user_id, "industrial equipment risk factor analysis")
+                )
+            elif isinstance(factor, dict):
+                copy = dict(factor)
+                for field in ("factor", "title", "description", "text", "analysis"):
+                    if copy.get(field):
+                        copy[field] = await _translate_cached(
+                            service, copy[field], lang, cache, user_id, "industrial equipment risk factor analysis"
+                        )
+                translated_dyn_factors.append(copy)
+            else:
+                translated_dyn_factors.append(factor)
+        dyn["factors"] = translated_dyn_factors
+        data["dynamic_risk"] = dyn
+
     forecasts = data.get("forecasts") or []
     for forecast in forecasts:
         if isinstance(forecast, dict) and forecast.get("description"):
