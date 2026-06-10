@@ -100,5 +100,10 @@ export const observationsAPI = {
     });
     return response.data;
   },
+
+  improveDescription: async (id) => {
+    const response = await api.post(`/threats/${id}/improve-description`);
+    return response.data;
+  },
 };
 

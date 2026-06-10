@@ -1468,3 +1468,80 @@ async def get_threat_timeline(
             "investigations": len([i for i in timeline_items if i["type"] == "investigation"])
         }
     }
+
+
+@router.post("/threats/{threat_id}/improve-description")
+async def improve_threat_description(
+    threat_id: str,
+    current_user: dict = Depends(require_permission("threats:write")),
+):
+    """
+    Use AI to improve/enhance the observation description to be more professional
+    and engineer-like.
+    """
+    from services.ai_gateway import chat as ai_gateway_chat
+    
+    threat = await db.threats.find_one({"id": threat_id})
+    if not threat:
+        raise HTTPException(status_code=404, detail="Observation not found")
+    
+    current_desc = threat.get("user_context") or threat.get("description") or ""
+    if not current_desc.strip():
+        raise HTTPException(status_code=400, detail="No description to improve")
+    
+    equipment_name = threat.get("asset") or ""
+    failure_mode = threat.get("failure_mode") or ""
+    
+    try:
+        improved = await ai_gateway_chat(
+            [
+                {
+                    "role": "system",
+                    "content": """You are a reliability engineer improving observation descriptions for a maintenance management system.
+
+Rewrite the description to be:
+- Professional and technical
+- 2-4 sentences maximum
+- Clear and objective
+- Using proper engineering terminology
+- Suitable for a formal maintenance record
+
+Keep the core meaning but improve clarity and professionalism.
+Output only the improved description text, no labels or formatting.""",
+                },
+                {
+                    "role": "user",
+                    "content": f"Equipment: {equipment_name}\nFailure mode: {failure_mode}\n\nOriginal description: {current_desc[:1500]}",
+                },
+            ],
+            endpoint="threats.improve_description",
+            model="gpt-4o-mini",
+            temperature=0.3,
+            max_tokens=300,
+        )
+        
+        improved = (improved or "").strip()
+        if not improved:
+            raise HTTPException(status_code=500, detail="AI returned empty response")
+        
+        # Update the threat with improved description
+        await db.threats.update_one(
+            {"id": threat_id},
+            {"$set": {
+                "user_context": improved,
+                "description": improved,
+                "ai_improved_at": datetime.now(timezone.utc).isoformat(),
+            }}
+        )
+        
+        return {
+            "success": True,
+            "improved_description": improved,
+            "original_description": current_desc,
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to improve description: %s", e)
+        raise HTTPException(status_code=500, detail=f"AI processing failed: {str(e)}")

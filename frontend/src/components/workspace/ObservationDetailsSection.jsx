@@ -258,6 +258,31 @@ const ObservationDetailsSection = ({ threatId }) => {
       );
       setShowLinkFailureModeDialog(false);
       setSelectedFailureModeId(null);
+
+  // AI improve description mutation
+  const improveDescriptionMutation = useMutation({
+    mutationFn: () => threatsAPI.improveDescription(threatId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.threats.legacyDetail(threatId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(threatId) });
+      toast.success("Description improved with AI");
+      setAiImprovingDesc(false);
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.detail || "Failed to improve description");
+      setAiImprovingDesc(false);
+    },
+  });
+
+  const handleImproveDescription = () => {
+    const currentDesc = threat?.user_context || threat?.description || "";
+    if (!currentDesc.trim()) {
+      toast.error("No description to improve");
+      return;
+    }
+    setAiImprovingDesc(true);
+    improveDescriptionMutation.mutate();
+  };
       setFailureModeSearch("");
     },
     onError: () => toast.error(t("observations.linkFailureModeFailed")),
@@ -841,14 +866,45 @@ const ObservationDetailsSection = ({ threatId }) => {
             <span className="text-xs text-slate-400">added {formatDateTime(threat.context_added_at)}</span>
           )}
           {/* Paperclip badge — shows attachment count; click to expand list. */}
-          <div className="ml-auto relative">
-            <button
-              type="button"
-              onClick={() => setShowAttList((s) => !s)}
-              className="inline-flex items-center gap-1 text-slate-500 hover:text-blue-600 text-xs px-2 py-1 rounded-md hover:bg-slate-50 transition-colors relative"
-              title={attachmentCount ? `${attachmentCount} attachment${attachmentCount > 1 ? "s" : ""}` : "Attach files"}
-              data-testid="description-attach-btn"
-            >
+          <div className="ml-auto flex items-center gap-1">
+            {/* AI Improve Description Button */}
+            <div className="relative group">
+              <button
+                type="button"
+                onClick={handleImproveDescription}
+                disabled={aiImprovingDesc || !threat?.user_context && !threat?.description}
+                className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md transition-colors ${
+                  aiImprovingDesc 
+                    ? "text-purple-600 bg-purple-50" 
+                    : "text-slate-500 hover:text-purple-600 hover:bg-purple-50"
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                title="Improve description with AI"
+                data-testid="description-ai-improve-btn"
+              >
+                {aiImprovingDesc ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+              </button>
+              {/* Tooltip */}
+              <div className="absolute right-0 top-full mt-1 w-48 p-2 bg-slate-900 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <div className="font-semibold flex items-center gap-1 mb-1">
+                  <Sparkles className="w-3 h-3 text-purple-300" /> AI Improve
+                </div>
+                <p className="text-slate-300">Enhance description to be more professional and technical.</p>
+                <div className="absolute -top-1 right-4 w-2 h-2 bg-slate-900 rotate-45"></div>
+              </div>
+            </div>
+            {/* Attach button */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowAttList((s) => !s)}
+                className="inline-flex items-center gap-1 text-slate-500 hover:text-blue-600 text-xs px-2 py-1 rounded-md hover:bg-slate-50 transition-colors relative"
+                title={attachmentCount ? `${attachmentCount} attachment${attachmentCount > 1 ? "s" : ""}` : "Attach files"}
+                data-testid="description-attach-btn"
+              >
               <Paperclip className="w-3.5 h-3.5" />
               {attachmentCount > 0 ? (
                 <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-semibold bg-blue-600 text-white">
@@ -902,6 +958,7 @@ const ObservationDetailsSection = ({ threatId }) => {
                 </button>
               </div>
             )}
+            </div>
           </div>
           <input
             ref={attachmentInputRef}
