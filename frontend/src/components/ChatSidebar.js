@@ -190,6 +190,22 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
     onClose();
   };
   
+  /**
+   * Close and clear timer without triggering auto-skip.
+   * Used when user intentionally navigates away (e.g., clicking "View Full Details").
+   */
+  const handleCloseAndClearTimer = () => {
+    // Clear the timer without firing auto-skip
+    if (autoSkipTimerRef.current) {
+      clearInterval(autoSkipTimerRef.current);
+      autoSkipTimerRef.current = null;
+    }
+    setAutoSkipCountdown(null);
+    contextSkipDeadlineMsRef.current = null;
+    contextSkipTrackedMessageIdRef.current = null;
+    onClose();
+  };
+  
   // Track database environment changes
   useEffect(() => {
     if (isOpen) {
@@ -789,7 +805,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               
               <a 
                 href={`/threats/${msg.threat_id}`}
-                onClick={onClose}
+                onClick={handleCloseAndClearTimer}
                 className="inline-flex items-center gap-1 text-blue-600 text-xs font-medium hover:underline"
               >
                 {t("chat.viewFullDetails")}
