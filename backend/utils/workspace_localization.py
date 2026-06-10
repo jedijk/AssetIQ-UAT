@@ -456,6 +456,14 @@ async def localize_causal_analysis(
                 else item
                 for item in evidence
             ]
+        supporting_data = copy.get("supporting_data") or []
+        if supporting_data:
+            copy["supporting_data"] = [
+                await _translate_cached(service, item, lang, cache, user_id, "supporting data")
+                if isinstance(item, str)
+                else item
+                for item in supporting_data
+            ]
         mitigations = copy.get("mitigation_actions") or []
         if mitigations:
             translated_mits: List[Any] = []
