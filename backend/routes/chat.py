@@ -642,6 +642,8 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
     Central chat processing used by both /chat/send and /chat/voice-send.
     Returns a ChatResponse-compatible dict.
     """
+    logger.info(f"=== CHAT REQUEST === user={user_id}, content={content[:50] if content else 'None'}...")
+    
     image_thumbnail = None
     if image_base64:
         image_thumbnail = _compress_image(image_base64)
