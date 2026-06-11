@@ -433,7 +433,7 @@ export default function ExecutiveDashboard() {
       {/* Waterfall Chart */}
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
-          <span>Reliability Value Waterfall</span>
+          <span>Exposure Waterfall</span>
           <HoverCard>
             <HoverCardTrigger>
               <Info className="w-4 h-4 text-slate-400 cursor-help" />
