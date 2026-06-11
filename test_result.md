@@ -1937,3 +1937,38 @@ agent_communication:
     message: "Test the Executive Dashboard to verify it now shows data based on OBSERVATIONS (not threats). Test URL: https://observation-cinema.preview.emergentagent.com. Login credentials: jedijk@gmail.com / Jaap8019@. Expected Data: User has 8 observations with various equipment and severities. Most are 'low' severity, one is 'medium' severity. Total exposure calculated from observations: ~€29,000. Verify: (1) Total Lifecycle Exposure: ~€29K (8 observations), (2) Active Threat Exposure: ~€29K (all 8 observations are 'open' status), (3) AI Summary mentions 'observations' not 'threats', (4) Evidence count shows 8 observations."
   - agent: "testing"
     message: "EXECUTIVE DASHBOARD OBSERVATIONS TEST COMPLETE - ALL TESTS PASSING ✓. Successfully verified that the Executive Dashboard displays data based on OBSERVATIONS (not threats) and uses correct terminology. TEST RESULTS: (1) Total Lifecycle Exposure: €29K ✓ EXACTLY matches expected value for 8 observations. (2) Active Threat Exposure: €29K with '8 evidence items' label ✓ CONFIRMED - all 8 observations are in open status. (3) Critical Active Exposure: €29K with '8 evidence items' label ✓ CONFIRMED. (4) Waterfall Chart: Displays all 5 metrics with actual values - Total Lifecycle Exposure €29K (gray bar), Covered by Controls €0 (green), Uncovered Exposure €29K (orange), Active Threat Exposure €29K (orange), Critical Active Exposure €29K (red) ✓ ALL VALUES CORRECT. (5) AI Executive Summary: 'AssetIQ is tracking 8 identified reliability observations with a total lifecycle exposure of €29K. €0 (0%) of this exposure is covered by active reliability control strategies.' ✓ CORRECTLY USES 'OBSERVATIONS' TERMINOLOGY, NOT 'THREATS'. (6) Evidence Count: Both Active Threat Exposure and Critical Active Exposure cards display '8 evidence items' ✓ MATCHES EXPECTED OBSERVATION COUNT. (7) KPI Cards: All 5 KPI cards displayed correctly - Exposure Coverage 0%, Active Threat Exposure €29K, Critical Active Exposure €29K, PM Compliance 0%, Digital Execution 0%. Backend Code Verification: Reviewed /app/backend/routes/executive_dashboard.py and confirmed: (1) Line 157 queries db.observations collection (not db.threats), (2) Line 488 AI summary uses 'observations' terminology, (3) All calculations based on observations data with proper severity mapping and status filtering. The Executive Dashboard is correctly implemented to use observations as the primary data source and displays the correct terminology throughout the UI. All expected values match actual results. Feature is production-ready."
+
+
+# Cinematic "Create Your First Observation" Tour
+
+user_problem_statement: "Build a cinematic onboarding tour called 'Create Your First Observation' — Apple-style 9-scene product walkthrough with Framer Motion, dark cinematic theme, smooth zoom & spotlight transitions, narration cards, progress indicator, Skip + Next/Previous, auto-play + manual mode."
+
+frontend:
+  - task: "Cinematic Observation Tour (9-scene walkthrough)"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/tour/ObservationTour.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Replaced legacy tooltip ObservationTour with a cinematic Apple-style 9-scene tour. Architecture under /components/tour/: sceneConfig.js (9 scenes), SpotlightEngine.jsx (animated SVG mask, spring-based morphing between targets, pulse ring), FloatingNarrationCard.jsx (frosted glass card with gradient sheen, Skip/Prev/Next/Auto-play controls, keyboard hints), ProgressTracker.jsx (animated dot indicator + scene/chapter label, click-to-jump), SceneMocks.jsx (workspace overview, hierarchy zoom, context menu with faux cursor, Quick-Add pulse, AI detection with TypewriterText + 'Equipment matched' badge, clarification dialog with equipment search, describe with AI-extracted tags, submit success state, KPI flow with CounterAnimation), TypewriterText.jsx, CounterAnimation.jsx, and ObservationTour.jsx (orchestrator with portal rendering, keyboard nav ← → Space Esc, auto-play loop 6s, LocalStorage completion tracking via 'assetiq.observation_tour_v2.completed'). Scenes 1-4 spotlight REAL DOM elements ([data-testid='hierarchy-sidebar'] and [data-testid='fab-report-observation']) with cinematic mock visuals layered alongside; scenes 5-9 are pure cinematic mocks. Drop-in compatible: /components/ObservationTour.js converted to a re-export shim so existing Layout.js wiring works unchanged. Added 'Create Your First Observation' menu item to LayoutHeader Help dropdown (lucide Sparkles icon, data-testid='observation-tour-menu-item'). Visual verification screenshots confirm: Scene 2 spotlights real hierarchy sidebar with hovered Pump P-101, Scene 5 shows typewriter typing 'Oil leak observed on Pump P-101 near mechanical seal.' with 'Equipment matched' badge appearing after analysis, Scene 9 shows full 6-step KPI flow (Observation → Threat → AI → Actions → Work → Exposure) with animated counters (3 threats, 6 actions, 34% exposure reduced). Frontend compiled successfully."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 16
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Cinematic Observation Tour (9-scene walkthrough)"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Implemented cinematic 'Create Your First Observation' tour as Apple-style 9-scene product walkthrough. Replaces legacy tooltip ObservationTour (drop-in via re-export shim). New components under /components/tour/. Trigger: Help dropdown → 'Create Your First Observation' (data-testid='observation-tour-menu-item'). Manual mode default; Auto-play toggle at 6s/scene. Real DOM spotlights for scenes 1-4 (hierarchy + FAB), cinematic mock visuals for scenes 5-9 (AI detection, clarification, describe, submit, next-steps with KPI flow). Verified visually with screenshots. Awaiting user feedback before extending to deep_testing_frontend_v2."

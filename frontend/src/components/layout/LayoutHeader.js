@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Menu, X, PanelLeftOpen, PanelLeftClose, Settings, HelpCircle, LogOut, User, Shield, Eye,
-  Info, MessageCircleQuestion, Tag,
+  Info, MessageCircleQuestion, Tag, Sparkles,
 } from "lucide-react";
 import AnimatedDrawer from "../animations/AnimatedDrawer";
 import { springPresets } from "../animations/constants";
@@ -231,6 +231,16 @@ export default function LayoutHeader({
                 >
                   <Info className="w-3.5 h-3.5 mr-2" />
                   Replay Tour
+                </DropdownMenuItem>
+                )}
+                {!isOperatorActive && setObservationTourOpen && (
+                <DropdownMenuItem
+                  onClick={() => setObservationTourOpen(true)}
+                  className="cursor-pointer text-sm"
+                  data-testid="observation-tour-menu-item"
+                >
+                  <Sparkles className="w-3.5 h-3.5 mr-2 text-blue-500" />
+                  Create Your First Observation
                 </DropdownMenuItem>
                 )}
                 <DropdownMenuItem 
