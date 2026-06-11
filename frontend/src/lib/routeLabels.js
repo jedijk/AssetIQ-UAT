@@ -138,6 +138,33 @@ export function normalizeBreadcrumbPath(path) {
   return path;
 }
 
+/**
+ * Parent route when breadcrumb history has no previous entry (e.g. deep link).
+ */
+export function getParentBreadcrumbPath(path) {
+  const normalized = normalizeBreadcrumbPath(path);
+  if (!normalized || normalized === '/dashboard') {
+    return null;
+  }
+  if (/^\/threats\/[^/]+\/workspace$/.test(normalized)) {
+    return '/threats';
+  }
+  if (/^\/actions\/[^/]+$/.test(normalized)) {
+    return '/actions';
+  }
+  if (/^\/reliability\/cases\/[^/]+$/.test(normalized)) {
+    return '/reliability/cases';
+  }
+  if (normalized.startsWith('/settings/')) {
+    return '/settings';
+  }
+  const parts = normalized.split('/').filter(Boolean);
+  if (parts.length > 1) {
+    return `/${parts.slice(0, -1).join('/')}`;
+  }
+  return '/dashboard';
+}
+
 // Routes to exclude from breadcrumb tracking
 export const excludedRoutes = [
   '/login',

@@ -12,7 +12,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 import {
-  ArrowLeft,
   AlertTriangle,
   Clock,
   DollarSign,
@@ -338,9 +337,6 @@ const ObservationWorkspacePage = () => {
           <h2 className="text-xl font-semibold text-slate-700 mb-2">
             {error?.response?.data?.detail || t("observationWorkspace.notFound")}
           </h2>
-          <Button onClick={() => navigate("/threats")} variant="outline">
-            {t("observations.backToObservations")}
-          </Button>
         </div>
       </div>
     );
@@ -357,15 +353,6 @@ const ObservationWorkspacePage = () => {
               Desktop: everything inline on a single row. */}
           <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-3 py-2">
             <div className="flex items-start sm:items-center gap-2 sm:gap-3 min-w-0">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/threats")}
-                className="p-1 -ml-1 flex-shrink-0"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
-
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <RiskBadge level={observation?.risk_level} size="sm" />

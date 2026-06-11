@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { formatDate, formatDateTime } from '../lib/dateUtils';
 import { 
-  ArrowLeft, Save, Trash2, ExternalLink, Calendar, User,
+  Save, Trash2, ExternalLink, Calendar, User,
   FileText, Brain, Search, AlertTriangle, Loader2, Check,
   CalendarClock, CheckCircle, CheckCircle2, Paperclip, Upload,
   X, Image, File, Download, Eye, Share2, Link2, Copy
@@ -221,10 +221,6 @@ export default function ActionDetailPage() {
       <div className="container mx-auto px-4 py-8 max-w-2xl text-center">
         <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
         <h2 className="text-lg font-semibold text-slate-900">Action not found</h2>
-        <Button variant="outline" onClick={() => navigate("/actions")} className="mt-4">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Actions
-        </Button>
       </div>
     );
   }
@@ -357,14 +353,6 @@ export default function ActionDetailPage() {
         <div className="container mx-auto px-3 sm:px-4 max-w-2xl">
           <div className="py-2.5 sm:py-3 space-y-2">
             <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/actions")}
-                className="p-2 -ml-1 shrink-0"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
               <span className="shrink-0 px-2 py-0.5 bg-slate-100 rounded text-xs font-mono text-slate-600">
                 {action.action_number}
               </span>

@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { getRouteLabel, normalizeBreadcrumbPath, shouldExcludeRoute } from '../lib/routeLabels';
+import {
+  getParentBreadcrumbPath,
+  getRouteLabel,
+  normalizeBreadcrumbPath,
+  shouldExcludeRoute,
+} from '../lib/routeLabels';
 
 function sanitizeHistory(entries) {
   if (!Array.isArray(entries)) return [];
@@ -121,6 +126,35 @@ export function BreadcrumbProvider({ children }) {
     }
   }, [history, navigate]);
 
+  const canGoBack = useCallback(() => {
+    const currentPath = normalizeBreadcrumbPath(location.pathname);
+    if (history.length > 1) {
+      return true;
+    }
+    const parent = getParentBreadcrumbPath(location.pathname);
+    return Boolean(parent && parent !== currentPath);
+  }, [history.length, location.pathname]);
+
+  const goBack = useCallback(() => {
+    if (history.length > 1) {
+      navigateTo(history.length - 2);
+      return;
+    }
+
+    const currentPath = normalizeBreadcrumbPath(location.pathname);
+    const parent = getParentBreadcrumbPath(location.pathname);
+    const targetPath = parent && parent !== currentPath ? parent : '/dashboard';
+    lastPathRef.current = targetPath;
+    setHistory((prev) => {
+      const existingIndex = prev.findIndex((entry) => entry.path === targetPath);
+      if (existingIndex !== -1) {
+        return prev.slice(0, existingIndex + 1);
+      }
+      return prev;
+    });
+    navigate(targetPath);
+  }, [history, location.pathname, navigate, navigateTo]);
+
   /**
    * Clear all breadcrumb history
    */
@@ -145,6 +179,8 @@ export function BreadcrumbProvider({ children }) {
   const value = {
     history,
     navigateTo,
+    goBack,
+    canGoBack: canGoBack(),
     clearHistory,
     getBreadcrumbs,
     currentPath: location.pathname,
