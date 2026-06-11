@@ -52,6 +52,9 @@ class KPICard(BaseModel):
     evidence_count: int = 0
     total_submitted_count: Optional[int] = None
     week_submitted_count: Optional[int] = None
+    previous_formatted: Optional[str] = None
+    report_period_label: Optional[str] = None
+    previous_period_label: Optional[str] = None
 
 
 class ExecutiveDashboardResponse(BaseModel):
@@ -62,6 +65,7 @@ class ExecutiveDashboardResponse(BaseModel):
     ai_summary: str
     evidence_drill_down: Dict[str, List[Dict[str, Any]]]
     last_updated: str
+    report_period: Dict[str, Any]
 
 
 def severity_to_production_impact(severity: str) -> int:
@@ -184,6 +188,22 @@ async def get_executive_dashboard(
     now = datetime.now(timezone.utc)
     current_period_start = now - timedelta(days=period_days)
     previous_period_start = current_period_start - timedelta(days=period_days)
+    current_period_start_iso = current_period_start.isoformat()
+    previous_period_start_iso = previous_period_start.isoformat()
+    now_iso = now.isoformat()
+
+    def _format_report_period_label(start: datetime, end: datetime) -> str:
+        return f"{start.strftime('%d %b %Y')} – {end.strftime('%d %b %Y')}"
+
+    report_period = {
+        "period_days": period_days,
+        "from": current_period_start_iso,
+        "to": now_iso,
+        "previous_from": previous_period_start_iso,
+        "previous_to": current_period_start_iso,
+        "label": _format_report_period_label(current_period_start, now),
+        "previous_label": _format_report_period_label(previous_period_start, current_period_start),
+    }
     
     # ============= Fetch Data =============
     
@@ -249,6 +269,7 @@ async def get_executive_dashboard(
             "total_tasks": 1,
             "tasks": 1,
             "created_at": 1,
+            "status": 1,
         },
     ).to_list(5000)
 
@@ -259,16 +280,21 @@ async def get_executive_dashboard(
             return True
         return len(program.get("tasks") or []) > 0
 
+    def _program_is_active(program: dict) -> bool:
+        status = (program.get("status") or "active").lower()
+        return status not in ("archived", "superseded") and _program_has_tasks(program)
+
     covered_equipment_ids = {
         prog.get("equipment_id")
         for prog in maintenance_programs
-        if prog.get("equipment_id") and _program_has_tasks(prog)
+        if prog.get("equipment_id") and _program_is_active(prog)
     }
+    active_maintenance_program_count = len(covered_equipment_ids)
     previous_period_program_equipment_ids = {
         prog.get("equipment_id")
         for prog in maintenance_programs
         if prog.get("equipment_id")
-        and _program_has_tasks(prog)
+        and _program_is_active(prog)
         and (prog.get("created_at") or "") < current_period_start.isoformat()
     }
 
@@ -461,10 +487,9 @@ async def get_executive_dashboard(
     
     # ============= Calculate KPIs =============
     
-    # 1. Exposure Coverage %
+    # 1. Exposure coverage (value covered by active maintenance programs)
     coverage_current = (covered_by_controls / total_lifecycle_exposure * 100) if total_lifecycle_exposure > 0 else 0
-    coverage_previous = (prev_covered / total_lifecycle_exposure * 100) if total_lifecycle_exposure > 0 else coverage_current
-    coverage_change, coverage_trend = calculate_trend(coverage_current, coverage_previous, higher_is_better=True)
+    coverage_change, coverage_trend = calculate_trend(covered_by_controls, prev_covered, higher_is_better=True)
     
     # 2. PM Compliance %
     current_completed = len([t for t in current_tasks if t.get("status") == "completed"])
@@ -477,22 +502,16 @@ async def get_executive_dashboard(
     
     pm_change, pm_trend = calculate_trend(pm_compliance_current, pm_compliance_previous, higher_is_better=True)
     
-    # 3. Digital execution — tasks/forms submitted this week vs last week
-    this_week_start = now - timedelta(days=7)
-    last_week_start = now - timedelta(days=14)
-    this_week_start_iso = this_week_start.isoformat()
-    last_week_start_iso = last_week_start.isoformat()
-    now_iso = now.isoformat()
-
-    digital_this_week = await count_digital_executions(
-        this_week_start_iso, now_iso, user_id, current_user
+    # 3. Digital execution — tasks/forms submitted in report period vs previous period
+    digital_current_period = await count_digital_executions(
+        current_period_start_iso, now_iso, user_id, current_user
     )
-    digital_last_week = await count_digital_executions(
-        last_week_start_iso, this_week_start_iso, user_id, current_user
+    digital_previous_period = await count_digital_executions(
+        previous_period_start_iso, current_period_start_iso, user_id, current_user
     )
     digital_total_submitted = await count_digital_executions_total(user_id, current_user)
     digital_change, digital_trend = calculate_trend(
-        float(digital_this_week), float(digital_last_week), higher_is_better=True
+        float(digital_current_period), float(digital_previous_period), higher_is_better=True
     )
     
     # 4. Active Threat Exposure trend
@@ -507,13 +526,17 @@ async def get_executive_dashboard(
     
     kpi_cards = {
         "exposure_coverage": KPICard(
-            value=round(coverage_current, 1),
-            formatted_value=f"{coverage_current:.0f}%",
-            previous_value=round(coverage_previous, 1),
+            value=covered_by_controls,
+            formatted_value=format_currency(covered_by_controls, currency_symbol),
+            previous_value=prev_covered,
+            previous_formatted=format_currency(prev_covered, currency_symbol),
             change_percent=coverage_change,
             trend=coverage_trend,
-            tooltip="Percentage of assessed production exposure covered by equipment with a maintenance program.",
-            evidence_count=covered_equipment_count
+            tooltip=(
+                f"Total assessed production exposure covered by {active_maintenance_program_count} "
+                f"equipment with active maintenance programs ({coverage_current:.0f}% of total assessed exposure)."
+            ),
+            evidence_count=active_maintenance_program_count,
         ),
         "active_threat_exposure": KPICard(
             value=active_threat_exposure,
@@ -546,15 +569,17 @@ async def get_executive_dashboard(
             evidence_count=current_completed
         ),
         "digital_execution_rate": KPICard(
-            value=float(digital_this_week),
-            formatted_value=f"{digital_this_week:,}",
-            previous_value=float(digital_last_week),
+            value=float(digital_current_period),
+            formatted_value=f"{digital_current_period:,}",
+            previous_value=float(digital_previous_period),
             change_percent=digital_change,
             trend=digital_trend,
-            tooltip="Tasks and forms submitted through AssetIQ.",
+            tooltip="Tasks and forms submitted through AssetIQ in the selected report period.",
             evidence_count=0,
             total_submitted_count=digital_total_submitted,
-            week_submitted_count=digital_this_week,
+            week_submitted_count=digital_current_period,
+            report_period_label=report_period["label"],
+            previous_period_label=report_period["previous_label"],
         )
     }
     
@@ -576,7 +601,7 @@ async def get_executive_dashboard(
             "formatted": format_currency(covered_by_controls, currency_symbol),
             "type": "positive",
             "color": "#22c55e",
-            "count": covered_equipment_count,
+            "count": active_maintenance_program_count,
             "count_unit": "equipment",
         },
         {
@@ -590,7 +615,7 @@ async def get_executive_dashboard(
             "count_unit": "equipment",
         },
         {
-            "name": "Active Threat Exposure",
+            "name": "Active Exposure",
             "value": active_threat_exposure,
             "formatted": format_currency(active_threat_exposure, currency_symbol),
             "type": "warning",
@@ -617,7 +642,7 @@ async def get_executive_dashboard(
 
 All {total_obs} observations represent {format_currency(active_threat_exposure, currency_symbol)} in total production exposure. {len(critical_evidence)} active observations with a risk score above {CRITICAL_ACTIVE_RISK_THRESHOLD} represent {format_currency(critical_active_exposure, currency_symbol)} and require immediate attention.
 
-PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvement"} at {pm_compliance_current:.0f}%. Digital execution recorded {digital_this_week} tasks and forms submitted this week ({digital_last_week} last week)."""
+PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvement"} at {pm_compliance_current:.0f}%. Digital execution recorded {digital_current_period} tasks and forms in the report period ({report_period['label']}) versus {digital_previous_period} in the previous period."""
     
     # ============= Evidence Drill-Down =============
     
@@ -641,7 +666,8 @@ PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvemen
         waterfall_data=waterfall_data,
         ai_summary=ai_summary,
         evidence_drill_down=evidence_drill_down,
-        last_updated=now.isoformat()
+        last_updated=now.isoformat(),
+        report_period=report_period,
     )
 
 

@@ -50,10 +50,18 @@ import {
 } from "../../components/ui/hover-card";
 
 // Fetch executive dashboard data
-const fetchExecutiveDashboard = async () => {
-  const response = await api.get("/executive-dashboard");
+const fetchExecutiveDashboard = async (periodDays) => {
+  const response = await api.get("/executive-dashboard", {
+    params: { period_days: periodDays },
+  });
   return response.data;
 };
+
+const REPORT_PERIOD_OPTIONS = [
+  { days: 7, label: "7D" },
+  { days: 30, label: "30D" },
+  { days: 90, label: "90D" },
+];
 
 // Trend indicator component
 const TrendIndicator = ({ trend, changePercent }) => {
@@ -111,8 +119,14 @@ const KPICard = ({ title, kpi, icon: Icon, colorClass, onClick }) => {
           
           {kpi.evidence_count > 0 && (
             <div className="mt-2 flex items-center gap-1 text-xs text-slate-500">
-              <span>{kpi.evidence_count} evidence items</span>
-              <ChevronRight className="w-3 h-3" />
+              <span>
+                {kpi.total_submitted_count != null
+                  ? `${kpi.evidence_count} evidence items`
+                  : title === "Exposure Coverage"
+                    ? `${kpi.evidence_count} active maintenance program${kpi.evidence_count === 1 ? "" : "s"}`
+                    : `${kpi.evidence_count} evidence items`}
+              </span>
+              {title !== "Exposure Coverage" && <ChevronRight className="w-3 h-3" />}
             </div>
           )}
         </motion.div>
@@ -126,22 +140,28 @@ const KPICard = ({ title, kpi, icon: Icon, colorClass, onClick }) => {
                 Total submitted tasks/forms: {Number(kpi.total_submitted_count).toLocaleString()}
               </p>
               <p className="text-xs text-slate-500">
-                This week: {Number(kpi.week_submitted_count ?? kpi.value).toLocaleString()}
+                {kpi.report_period_label
+                  ? `This period (${kpi.report_period_label}): ${Number(kpi.week_submitted_count ?? kpi.value).toLocaleString()}`
+                  : `This period: ${Number(kpi.week_submitted_count ?? kpi.value).toLocaleString()}`}
               </p>
             </>
           )}
           {kpi.total_submitted_count == null && kpi.previous_value !== null && (
             <p className="text-xs text-slate-500">
-              Previous period: {kpi.formatted_value.includes('%')
-                ? (typeof kpi.previous_value === 'number' && kpi.previous_value > 1000
-                  ? kpi.formatted_value.replace(/[\d.,]+/, kpi.previous_value.toLocaleString())
-                  : `${kpi.previous_value?.toFixed?.(1) ?? kpi.previous_value}%`)
-                : Number(kpi.previous_value).toLocaleString()}
+              Previous period: {kpi.previous_formatted ?? (
+                kpi.formatted_value.includes('%')
+                  ? (typeof kpi.previous_value === 'number' && kpi.previous_value > 1000
+                    ? kpi.formatted_value.replace(/[\d.,]+/, kpi.previous_value.toLocaleString())
+                    : `${kpi.previous_value?.toFixed?.(1) ?? kpi.previous_value}%`)
+                  : Number(kpi.previous_value).toLocaleString()
+              )}
             </p>
           )}
           {kpi.total_submitted_count != null && kpi.previous_value != null && (
             <p className="text-xs text-slate-500">
-              Last week: {Number(kpi.previous_value).toLocaleString()}
+              {kpi.previous_period_label
+                ? `Previous period (${kpi.previous_period_label}): ${Number(kpi.previous_value).toLocaleString()}`
+                : `Previous period: ${Number(kpi.previous_value).toLocaleString()}`}
             </p>
           )}
         </div>
@@ -338,10 +358,11 @@ const EvidencePanel = ({ isOpen, onClose, title, evidence, metricType }) => {
 export default function ExecutiveDashboard() {
   const { t } = useLanguage();
   const [selectedEvidence, setSelectedEvidence] = useState(null);
+  const [periodDays, setPeriodDays] = useState(30);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["executive-dashboard"],
-    queryFn: fetchExecutiveDashboard,
+    queryKey: ["executive-dashboard", periodDays],
+    queryFn: () => fetchExecutiveDashboard(periodDays),
     staleTime: 60000, // 1 minute
     refetchInterval: 300000, // 5 minutes
   });
@@ -366,13 +387,13 @@ export default function ExecutiveDashboard() {
 
   if (!data) return null;
 
-  const { exposure_metrics, kpi_cards, waterfall_data, ai_summary, evidence_drill_down } = data;
+  const { exposure_metrics, kpi_cards, waterfall_data, ai_summary, evidence_drill_down, report_period } = data;
   const currencySymbol = exposure_metrics?.currency_symbol || "€";
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-slate-900">
             Reliability Value Management
@@ -381,9 +402,33 @@ export default function ExecutiveDashboard() {
             Executive overview of production value exposure and reliability controls
           </p>
         </div>
-        <Badge variant="outline" className="text-xs">
-          Updated {new Date(data.last_updated).toLocaleTimeString()}
-        </Badge>
+        <div className="flex flex-col items-start sm:items-end gap-2">
+          <div className="inline-flex h-8 items-center rounded-lg bg-slate-100 p-0.5 gap-0.5" data-testid="executive-report-period">
+            {REPORT_PERIOD_OPTIONS.map((opt) => (
+              <button
+                key={opt.days}
+                type="button"
+                onClick={() => setPeriodDays(opt.days)}
+                className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  periodDays === opt.days
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+                data-testid={`executive-period-${opt.days}d`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {report_period?.label && (
+            <p className="text-xs text-slate-500" data-testid="executive-report-period-label">
+              Report period: {report_period.label}
+            </p>
+          )}
+          <Badge variant="outline" className="text-xs">
+            Updated {new Date(data.last_updated).toLocaleTimeString()}
+          </Badge>
+        </div>
       </div>
 
       {/* KPI Cards Row */}
@@ -395,13 +440,13 @@ export default function ExecutiveDashboard() {
           colorClass="border-l-4 border-l-green-500"
         />
         <KPICard
-          title="Active Threat Exposure"
+          title="Active Exposure"
           kpi={kpi_cards?.active_threat_exposure}
           icon={AlertTriangle}
           colorClass="border-l-4 border-l-orange-500"
           onClick={() => setSelectedEvidence({
             type: "active_threat_exposure",
-            title: "Active Threat Exposure Evidence",
+            title: "Active Exposure Evidence",
             data: evidence_drill_down?.active_threat_exposure || []
           })}
         />
