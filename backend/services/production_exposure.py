@@ -64,3 +64,55 @@ def calculate_total_equipment_lifecycle_exposure(
         total += production_exposure_monetary_value(impact, hourly_cost)
         count += 1
     return total, count
+
+
+def equipment_assessed_exposure_value(equipment: dict, hourly_cost: float) -> float:
+    """Monetary exposure for one equipment item, or 0 when not assessed."""
+    impact = production_impact_from_criticality(equipment.get("criticality"))
+    if not impact:
+        return 0.0
+    return production_exposure_monetary_value(impact, hourly_cost)
+
+
+def calculate_covered_assessed_exposure(
+    equipment_nodes: List[dict],
+    covered_equipment_ids: set,
+    hourly_cost: float,
+) -> Tuple[float, int]:
+    """
+    Sum assessed production exposure for equipment covered by a maintenance program.
+    """
+    total = 0.0
+    count = 0
+    for equipment in equipment_nodes or []:
+        equipment_id = equipment.get("id")
+        if not equipment_id or equipment_id not in covered_equipment_ids:
+            continue
+        value = equipment_assessed_exposure_value(equipment, hourly_cost)
+        if value <= 0:
+            continue
+        total += value
+        count += 1
+    return total, count
+
+
+def calculate_uncovered_assessed_exposure(
+    equipment_nodes: List[dict],
+    covered_equipment_ids: set,
+    hourly_cost: float,
+) -> Tuple[float, int]:
+    """
+    Sum assessed production exposure for equipment without a maintenance program.
+    """
+    total = 0.0
+    count = 0
+    for equipment in equipment_nodes or []:
+        equipment_id = equipment.get("id")
+        if not equipment_id or equipment_id in covered_equipment_ids:
+            continue
+        value = equipment_assessed_exposure_value(equipment, hourly_cost)
+        if value <= 0:
+            continue
+        total += value
+        count += 1
+    return total, count

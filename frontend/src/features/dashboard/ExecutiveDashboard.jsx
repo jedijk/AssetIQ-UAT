@@ -120,11 +120,28 @@ const KPICard = ({ title, kpi, icon: Icon, colorClass, onClick }) => {
       <HoverCardContent className="w-80">
         <div className="space-y-2">
           <p className="text-sm text-slate-600">{kpi.tooltip}</p>
-          {kpi.previous_value !== null && (
+          {kpi.total_submitted_count != null && (
+            <>
+              <p className="text-xs text-slate-500">
+                Total submitted tasks/forms: {Number(kpi.total_submitted_count).toLocaleString()}
+              </p>
+              <p className="text-xs text-slate-500">
+                This week: {Number(kpi.week_submitted_count ?? kpi.value).toLocaleString()}
+              </p>
+            </>
+          )}
+          {kpi.total_submitted_count == null && kpi.previous_value !== null && (
             <p className="text-xs text-slate-500">
-              Previous period: {typeof kpi.previous_value === 'number' && kpi.previous_value > 1000 
-                ? kpi.formatted_value.replace(/[\d.,]+/, kpi.previous_value.toLocaleString())
-                : `${kpi.previous_value?.toFixed?.(1) || kpi.previous_value}${kpi.formatted_value.includes('%') ? '%' : ''}`}
+              Previous period: {kpi.formatted_value.includes('%')
+                ? (typeof kpi.previous_value === 'number' && kpi.previous_value > 1000
+                  ? kpi.formatted_value.replace(/[\d.,]+/, kpi.previous_value.toLocaleString())
+                  : `${kpi.previous_value?.toFixed?.(1) ?? kpi.previous_value}%`)
+                : Number(kpi.previous_value).toLocaleString()}
+            </p>
+          )}
+          {kpi.total_submitted_count != null && kpi.previous_value != null && (
+            <p className="text-xs text-slate-500">
+              Last week: {Number(kpi.previous_value).toLocaleString()}
             </p>
           )}
         </div>
@@ -134,6 +151,30 @@ const KPICard = ({ title, kpi, icon: Icon, colorClass, onClick }) => {
 };
 
 // Waterfall Chart component
+const formatWaterfallCount = (count, unit) => {
+  const n = Number(count) || 0;
+  if (unit === "observations") {
+    return `${n} observation${n === 1 ? "" : "s"}`;
+  }
+  return `${n} equipment item${n === 1 ? "" : "s"}`;
+};
+
+const WaterfallTooltip = ({ active, payload }) => {
+  if (!active || !payload?.length) return null;
+  const item = payload[0]?.payload;
+  if (!item) return null;
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-md">
+      <p className="text-sm font-semibold text-slate-900">{item.name}</p>
+      <p className="text-sm text-slate-700 mt-0.5">{item.formatted}</p>
+      <p className="text-xs text-slate-500 mt-1">
+        {formatWaterfallCount(item.count, item.count_unit)}
+      </p>
+    </div>
+  );
+};
+
 const WaterfallChart = ({ data, currencySymbol }) => {
   if (!data || data.length === 0) return null;
 
@@ -199,15 +240,7 @@ const WaterfallChart = ({ data, currencySymbol }) => {
             tickLine={false}
             tick={{ fill: "#334155", fontSize: 13, fontWeight: 500 }}
           />
-          <Tooltip
-            formatter={(value, name, props) => [props.payload.formatted, props.payload.name]}
-            contentStyle={{
-              backgroundColor: "white",
-              border: "1px solid #e2e8f0",
-              borderRadius: "8px",
-              boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-            }}
-          />
+          <Tooltip content={<WaterfallTooltip />} />
           <Bar dataKey="displayValue" radius={[0, 4, 4, 0]}>
             {waterfallData.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.color} />
@@ -407,7 +440,8 @@ export default function ExecutiveDashboard() {
             </HoverCardTrigger>
             <HoverCardContent className="w-80">
               <p className="text-sm text-slate-600">
-                Shows the flow from total identified lifecycle exposure to actively managed and unmanaged exposure.
+                Shows the flow from total assessed exposure to actively managed and unmanaged exposure.
+                Uncovered exposure is assessed production impact for equipment without a maintenance program.
               </p>
             </HoverCardContent>
           </HoverCard>

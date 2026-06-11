@@ -1,5 +1,7 @@
 from services.production_exposure import (
     calculate_total_equipment_lifecycle_exposure,
+    calculate_covered_assessed_exposure,
+    calculate_uncovered_assessed_exposure,
     production_exposure_hours,
     production_exposure_monetary_value,
 )
@@ -25,3 +27,23 @@ def test_total_lifecycle_exposure_sums_assessed_equipment_only():
     total, count = calculate_total_equipment_lifecycle_exposure(nodes, hourly_cost=500.0)
     assert count == 2
     assert total == production_exposure_monetary_value(3, 500.0) + production_exposure_monetary_value(4, 500.0)
+
+
+def test_covered_assessed_exposure_sums_program_equipment_only():
+    nodes = [
+        {"id": "a", "criticality": {"production_impact": 3}},
+        {"id": "d", "criticality": {"production_impact": 4}},
+    ]
+    covered, count = calculate_covered_assessed_exposure(nodes, {"a"}, hourly_cost=500.0)
+    assert count == 1
+    assert covered == production_exposure_monetary_value(3, 500.0)
+
+
+def test_uncovered_assessed_exposure_sums_equipment_without_program():
+    nodes = [
+        {"id": "a", "criticality": {"production_impact": 3}},
+        {"id": "d", "criticality": {"production_impact": 4}},
+    ]
+    uncovered, count = calculate_uncovered_assessed_exposure(nodes, {"a"}, hourly_cost=500.0)
+    assert count == 1
+    assert uncovered == production_exposure_monetary_value(4, 500.0)
