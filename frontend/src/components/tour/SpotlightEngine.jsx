@@ -2,16 +2,15 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const SPOTLIGHT_INSET = 12;
-const FALLBACK_RECT = (vw, vh) => ({
-  top: vh * 0.5 - 160,
-  left: vw * 0.5 - 240,
-  width: 480,
-  height: 320,
-});
 
 /**
  * Cinematic spotlight that animates between target rectangles.
  * Uses an animated SVG mask to cut out the dark backdrop.
+ *
+ * Behavior when there is no resolvable target:
+ *  - No cutout is rendered: the full dark backdrop covers the screen.
+ *    This is the right look for "cinematic" scenes that don't anchor to a
+ *    real DOM element (e.g. the AI detection / next-steps narrative scenes).
  */
 export default function SpotlightEngine({
   targetSelector,
@@ -77,9 +76,26 @@ export default function SpotlightEngine({
     };
   }, [active, recomputeRect]);
 
-  const effectiveRect = rect || FALLBACK_RECT(viewport.w, viewport.h);
   const hasTarget = !!rect;
   const maskId = maskIdRef.current;
+
+  // When there is no resolvable target, render a full dark backdrop with no cutout.
+  if (!hasTarget) {
+    return (
+      <div
+        className="fixed inset-0 pointer-events-none"
+        aria-hidden="true"
+        data-testid="tour-spotlight-engine"
+      >
+        <div
+          className="absolute inset-0"
+          style={{ background: "rgba(2, 6, 23, 0.78)" }}
+        />
+      </div>
+    );
+  }
+
+  const effectiveRect = rect;
 
   return (
     <div
@@ -105,8 +121,8 @@ export default function SpotlightEngine({
                 damping: 22,
                 mass: 0.9,
               }}
-              rx={hasTarget ? 16 : 24}
-              ry={hasTarget ? 16 : 24}
+              rx={16}
+              ry={16}
               fill="black"
             />
           </mask>
@@ -128,30 +144,28 @@ export default function SpotlightEngine({
 
       {/* Glowing border ring around the spotlight */}
       <AnimatePresence>
-        {hasTarget && (
-          <motion.div
-            key="spotlight-ring"
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.96 }}
-            transition={{ duration: 0.45, ease: "easeOut" }}
-            className="absolute pointer-events-none"
-            style={{
-              top: effectiveRect.top,
-              left: effectiveRect.left,
-              width: effectiveRect.width,
-              height: effectiveRect.height,
-              borderRadius: 16,
-              boxShadow:
-                "0 0 0 1px rgba(96, 165, 250, 0.55), 0 0 0 6px rgba(59, 130, 246, 0.18), 0 0 60px rgba(59, 130, 246, 0.35)",
-            }}
-          />
-        )}
+        <motion.div
+          key="spotlight-ring"
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.96 }}
+          transition={{ duration: 0.45, ease: "easeOut" }}
+          className="absolute pointer-events-none"
+          style={{
+            top: effectiveRect.top,
+            left: effectiveRect.left,
+            width: effectiveRect.width,
+            height: effectiveRect.height,
+            borderRadius: 16,
+            boxShadow:
+              "0 0 0 1px rgba(96, 165, 250, 0.55), 0 0 0 6px rgba(59, 130, 246, 0.18), 0 0 60px rgba(59, 130, 246, 0.35)",
+          }}
+        />
       </AnimatePresence>
 
       {/* Pulsing accent ring when requested */}
       <AnimatePresence>
-        {hasTarget && pulse && (
+        {pulse && (
           <motion.div
             key="spotlight-pulse"
             initial={{ opacity: 0.7, scale: 1 }}

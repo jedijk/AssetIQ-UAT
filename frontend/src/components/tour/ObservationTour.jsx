@@ -154,7 +154,7 @@ export default function ObservationTour({
   }, []);
 
   /* ------------------------------------------------------------------
-   * Auto-play loop \u2014 per-scene durations, pause when tab hidden
+   * Auto-play loop — per-scene durations, pause when tab hidden
    * ------------------------------------------------------------------ */
 
   useEffect(() => {
@@ -310,8 +310,19 @@ export default function ObservationTour({
           dragElastic={0.18}
           onDragEnd={handleSwipe}
         >
-          {/* Mock visual stage \u2014 fills available space and scrolls if too tall */}
-          <div className="flex-1 min-h-0 flex items-center justify-center px-3 sm:px-4 pt-14 sm:pt-10 pb-2 sm:pb-4 overflow-y-auto overflow-x-hidden">
+          {/* Mock visual stage — fills available space and scrolls if too tall.
+              When cardPosition is "left"/"right" we bias the mock to the same
+              side as the narration card so it never overlaps with a spotlight
+              on the opposite edge of the screen (e.g. the chat sidebar). */}
+          <div
+            className={`flex-1 min-h-0 flex items-center px-3 sm:px-4 pt-14 sm:pt-10 pb-2 sm:pb-4 overflow-y-auto overflow-x-hidden ${
+              scene.cardPosition === "left"
+                ? "justify-center sm:justify-start sm:pl-6 lg:pl-10"
+                : scene.cardPosition === "right"
+                ? "justify-center sm:justify-end sm:pr-6 lg:pr-10"
+                : "justify-center"
+            }`}
+          >
             <AnimatePresence mode="wait">
               {scene.mockVisual && (
                 <motion.div

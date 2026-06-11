@@ -83,9 +83,9 @@ export const TOUR_SCENES = [
     narration:
       "Describe the issue in natural language. AssetIQ will attempt to identify the affected equipment from your description.",
     mockVisual: "aiDetection",
-    target: null,
+    target: '[data-testid="chat-sidebar"]',
     cardPosition: "left",
-    ensureChat: "closed",
+    ensureChat: "open",
     ensureHierarchy: "closed",
     pulseTarget: false,
     spotlightZoom: 1,
