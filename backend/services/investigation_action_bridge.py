@@ -11,7 +11,9 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from database import db
-from services.action_number_service import allocate_central_action_number = "investigation"
+from services.action_number_service import allocate_central_action_number
+
+_INVESTIGATION_SOURCE = "investigation"
 
 
 def _map_status(status: Optional[str]) -> str:
