@@ -3,10 +3,13 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { useLanguage } from './LanguageContext';
 import {
+  getDetailAnchorPath,
   getHomeBreadcrumbPath,
   getParentBreadcrumbPath,
   getRouteLabel,
+  isActionDetailPath,
   isHomeBreadcrumbPath,
+  isObservationWorkspacePath,
   normalizeBreadcrumbPath,
   shouldExcludeRoute,
 } from '../lib/routeLabels';
@@ -23,22 +26,56 @@ function makeHomeEntry(homeLabel) {
   };
 }
 
+function collapseSiblingDetailPaths(entries) {
+  if (!entries.length) return entries;
+
+  const lastPath = normalizeBreadcrumbPath(entries[entries.length - 1].path);
+  return entries.filter((entry, index) => {
+    if (index === entries.length - 1) return true;
+    const path = normalizeBreadcrumbPath(entry.path);
+    if (isActionDetailPath(lastPath) && isActionDetailPath(path)) return false;
+    if (isObservationWorkspacePath(lastPath) && isObservationWorkspacePath(path)) {
+      return false;
+    }
+    return true;
+  });
+}
+
 function normalizeBreadcrumbHistory(entries, homeLabel, max = MAX_BREADCRUMBS) {
   if (!Array.isArray(entries) || entries.length === 0) {
     return [];
   }
 
-  let result = entries;
+  let result = collapseSiblingDetailPaths(entries);
   if (!isHomeBreadcrumbPath(result[0].path)) {
     result = [makeHomeEntry(homeLabel), ...result];
   } else {
     result = [{ ...result[0], label: homeLabel }, ...result.slice(1)];
   }
 
-  if (result.length > max) {
-    return [result[0], ...result.slice(-(max - 1))];
+  if (result.length <= max) {
+    return result;
   }
-  return result;
+
+  const current = result[result.length - 1];
+  const anchorPath = getDetailAnchorPath(current.path);
+  if (anchorPath) {
+    const anchorEntry = result.find((entry) => entry.path === anchorPath);
+    if (anchorEntry) {
+      const trimmed = [result[0]];
+      if (anchorEntry.path !== result[0].path) {
+        trimmed.push(anchorEntry);
+      }
+      if (current.path !== trimmed[trimmed.length - 1]?.path) {
+        trimmed.push(current);
+      }
+      return trimmed.map((entry) => (
+        isHomeBreadcrumbPath(entry.path) ? { ...entry, label: homeLabel } : entry
+      ));
+    }
+  }
+
+  return [result[0], ...result.slice(-(max - 1))];
 }
 
 function sanitizeHistory(entries, homeLabel) {
@@ -191,6 +228,30 @@ export function BreadcrumbProvider({ children }) {
 
   const goBack = useCallback(() => {
     if (history.length > 1) {
+      const previous = history[history.length - 2];
+      const current = history[history.length - 1];
+      const parentPath = getParentBreadcrumbPath(current.path);
+
+      if (
+        parentPath
+        && isHomeBreadcrumbPath(previous.path)
+        && parentPath !== normalizeBreadcrumbPath(current.path)
+      ) {
+        lastPathRef.current = parentPath;
+        setHistory((prev) => {
+          const existingIndex = prev.findIndex((entry) => entry.path === parentPath);
+          const next = existingIndex !== -1
+            ? prev.slice(0, existingIndex + 1)
+            : normalizeBreadcrumbHistory(
+              [...prev, { path: parentPath, label: getRouteLabel(parentPath), timestamp: Date.now() }],
+              getHomeLabel(),
+            );
+          return normalizeBreadcrumbHistory(next, getHomeLabel());
+        });
+        navigate(parentPath);
+        return;
+      }
+
       navigateTo(history.length - 2);
       return;
     }

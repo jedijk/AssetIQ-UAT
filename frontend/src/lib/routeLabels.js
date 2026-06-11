@@ -149,6 +149,29 @@ export function isHomeBreadcrumbPath(path) {
   return normalizeBreadcrumbPath(path) === HOME_BREADCRUMB_PATH;
 }
 
+/** List route to keep when trimming detail pages (e.g. /actions for action detail). */
+export function getDetailAnchorPath(path) {
+  const normalized = normalizeBreadcrumbPath(path);
+  if (/^\/actions\/[^/]+$/.test(normalized)) {
+    return '/actions';
+  }
+  if (/^\/threats\/[^/]+\/workspace$/.test(normalized)) {
+    return '/threats';
+  }
+  if (/^\/reliability\/cases\/[^/]+$/.test(normalized)) {
+    return '/reliability/cases';
+  }
+  return null;
+}
+
+export function isActionDetailPath(path) {
+  return /^\/actions\/[^/]+$/.test(normalizeBreadcrumbPath(path));
+}
+
+export function isObservationWorkspacePath(path) {
+  return /^\/threats\/[^/]+\/workspace$/.test(normalizeBreadcrumbPath(path));
+}
+
 /**
  * Parent route when breadcrumb history has no previous entry (e.g. deep link).
  */

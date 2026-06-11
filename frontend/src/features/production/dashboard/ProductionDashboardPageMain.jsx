@@ -983,8 +983,8 @@ export default function ProductionDashboardPage() {
           data-testid="production-db-env-warning"
         >
           You are viewing the <strong>Production</strong> database on UAT. Production forms and KPIs
-          live in UAT are in the <strong>UAT</strong> database — use the DB switcher in the header
-          (beaker icon) to switch to UAT.
+          live in UAT are in the <strong>UAT</strong> database — switch to UAT under
+          Settings → Database Environment.
         </div>
       )}
       {isError && (
