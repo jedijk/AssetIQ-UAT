@@ -1,6 +1,24 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { getRouteLabel, shouldExcludeRoute } from '../lib/routeLabels';
+import { getRouteLabel, normalizeBreadcrumbPath, shouldExcludeRoute } from '../lib/routeLabels';
+
+function sanitizeHistory(entries) {
+  if (!Array.isArray(entries)) return [];
+  const sanitized = [];
+  for (const entry of entries) {
+    const path = normalizeBreadcrumbPath(entry?.path);
+    if (!path) continue;
+    if (sanitized.length > 0 && sanitized[sanitized.length - 1].path === path) {
+      continue;
+    }
+    sanitized.push({
+      path,
+      label: getRouteLabel(path),
+      timestamp: entry?.timestamp || Date.now(),
+    });
+  }
+  return sanitized;
+}
 
 const STORAGE_KEY = 'assetiq_breadcrumb_history';
 const MAX_BREADCRUMBS = 3;
@@ -26,7 +44,7 @@ export function BreadcrumbProvider({ children }) {
     try {
       const stored = sessionStorage.getItem(STORAGE_KEY);
       if (stored) {
-        return JSON.parse(stored);
+        return sanitizeHistory(JSON.parse(stored));
       }
     } catch (e) {
       console.warn('Failed to load breadcrumb history:', e);
@@ -48,10 +66,10 @@ export function BreadcrumbProvider({ children }) {
 
   // Track page navigation
   useEffect(() => {
-    const currentPath = location.pathname;
+    const currentPath = normalizeBreadcrumbPath(location.pathname);
 
     // Skip excluded routes (auth pages, mobile, etc.)
-    if (shouldExcludeRoute(currentPath)) {
+    if (shouldExcludeRoute(location.pathname)) {
       return;
     }
 
@@ -95,9 +113,11 @@ export function BreadcrumbProvider({ children }) {
   const navigateTo = useCallback((index) => {
     if (index >= 0 && index < history.length) {
       const entry = history[index];
-      // Truncate history to this point before navigating
+      const targetPath = normalizeBreadcrumbPath(entry.path);
+      // Truncate history and skip the pathname tracker on the next navigation
+      lastPathRef.current = targetPath;
       setHistory(prev => prev.slice(0, index + 1));
-      navigate(entry.path);
+      navigate(targetPath);
     }
   }, [history, navigate]);
 
