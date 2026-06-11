@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { format, parseISO } from "date-fns";
 import {
@@ -338,6 +338,7 @@ const TimelineItem = ({ item, onClick, isFirst, isLast }) => {
 const EquipmentTimeline = ({ equipmentId, equipmentName, threatId }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const [selectedItem, setSelectedItem] = useState(null);
   const [filter, setFilter] = useState("all");
   const [scrollPosition, setScrollPosition] = useState(0);
@@ -359,7 +360,7 @@ const EquipmentTimeline = ({ equipmentId, equipmentName, threatId }) => {
     if (item.type === "observation") {
       navigate(`/threats/${item.id}`);
     } else if (item.type === "action") {
-      navigate(`/actions/${item.id}`);
+      navigate(`/actions/${item.id}`, { state: { breadcrumbOrigin: location.pathname } });
     } else if (item.type === "task") {
       navigate(`/my-tasks`);
     } else if (item.type === "investigation") {

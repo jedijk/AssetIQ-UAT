@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import { ClipboardList, Plus, Pencil, Trash2 } from "lucide-react";
 import { Button } from "../ui/button";
@@ -11,6 +11,7 @@ import { EditActionDialog, DeleteActionDialog, AddActionDialog } from "./ActionP
 const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onAddAction, isCreating }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const { getLabel } = useDisciplines();
   const [editingAction, setEditingAction] = useState(null);
   const [deletingAction, setDeletingAction] = useState(null);
@@ -41,7 +42,9 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
       return;
     }
     if (action.id) {
-      navigate(`/actions/${action.id}`);
+      navigate(`/actions/${action.id}`, {
+        state: { breadcrumbOrigin: location.pathname },
+      });
     }
   };
 

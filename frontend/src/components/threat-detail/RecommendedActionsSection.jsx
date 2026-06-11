@@ -27,7 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useDisciplines } from "../../hooks/useDisciplines";
@@ -62,6 +62,7 @@ const ACTION_STATUS_CONFIG = {
 export const RecommendedActionsSection = ({ threat, threatId }) => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useLanguage();
   const { user } = useAuth();
   const { selectOptions, getLabel, normalize } = useDisciplines();
@@ -710,7 +711,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                   </div>
 
                   {/* Content */}
-                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/actions/${action.id}`)}>
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/actions/${action.id}`, { state: { breadcrumbOrigin: location.pathname } })}>
                     <div className="mb-1 flex flex-wrap items-center gap-x-1.5 gap-y-1">
                       {/* Action ID */}
                       {action.action_number && (

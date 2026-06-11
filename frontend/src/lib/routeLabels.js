@@ -236,6 +236,49 @@ export function getParentBreadcrumbPath(path) {
   return '/dashboard';
 }
 
+/** Read explicit breadcrumb origin from router location state. */
+export function readBreadcrumbOrigin(locationState) {
+  const origin = locationState?.breadcrumbOrigin;
+  if (!origin || typeof origin !== 'string') return null;
+  return normalizeBreadcrumbPath(origin);
+}
+
+/**
+ * Trim breadcrumb history to max items while keeping home, the page before the
+ * current one (actual navigation source), and the current page.
+ */
+export function trimBreadcrumbHistory(entries, homeLabel, max = 3) {
+  if (!entries?.length || entries.length <= max) {
+    return entries;
+  }
+
+  const current = entries[entries.length - 1];
+  const prior = entries.length >= 2 ? entries[entries.length - 2] : null;
+  const trimmed = [entries[0]];
+
+  if (prior && !isHomeBreadcrumbPath(prior.path) && prior.path !== current.path) {
+    if (prior.path !== trimmed[0].path) {
+      trimmed.push(prior);
+    }
+  } else {
+    const anchorPath = getDetailAnchorPath(current.path);
+    if (anchorPath) {
+      const anchorEntry = entries.find((entry) => entry.path === anchorPath);
+      if (anchorEntry && anchorEntry.path !== trimmed[0].path) {
+        trimmed.push(anchorEntry);
+      }
+    }
+  }
+
+  if (current.path !== trimmed[trimmed.length - 1]?.path) {
+    trimmed.push(current);
+  }
+
+  return trimmed.map((entry) => (
+    isHomeBreadcrumbPath(entry.path) ? { ...entry, label: homeLabel } : entry
+  ));
+}
+
 // Routes to exclude from breadcrumb tracking
 export const excludedRoutes = [
   '/login',

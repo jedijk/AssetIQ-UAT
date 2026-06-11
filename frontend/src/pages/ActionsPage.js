@@ -728,7 +728,7 @@ export default function ActionsPage() {
                       isClosed ? "border-l-4 border-l-slate-400 bg-slate-50/50" : ""
                     }`}
                     data-testid={`action-row-${action.id}`}
-                    onClick={() => navigate(`/actions/${action.id}`)}
+                    onClick={() => navigate(`/actions/${action.id}`, { state: { breadcrumbOrigin: '/actions' } })}
                   >
                     {(isCompleted || isClosed) && (
                       <div className="sm:hidden absolute top-2 right-2">
@@ -808,7 +808,7 @@ export default function ActionsPage() {
                   isClosed ? "border-l-4 border-l-slate-400 bg-slate-50/50" : ""
                 }`}
                 data-testid={`action-row-${action.id}`}
-                onClick={() => navigate(`/actions/${action.id}`)}
+                onClick={() => navigate(`/actions/${action.id}`, { state: { breadcrumbOrigin: '/actions' } })}
               >
                 {/* Mobile Status Indicator - Only visible on mobile for Completed/Closed */}
                 {(isCompleted || isClosed) && (
