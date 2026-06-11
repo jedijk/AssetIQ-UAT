@@ -172,6 +172,40 @@ export function isObservationWorkspacePath(path) {
   return /^\/threats\/[^/]+\/workspace$/.test(normalizeBreadcrumbPath(path));
 }
 
+/** Skip auto-inserting /actions when the user arrived from these routes. */
+export function shouldSkipDetailAnchorInjection(entries) {
+  if (!entries || entries.length < 2) return false;
+  const beforeDetail = entries[entries.length - 2];
+  const beforePath = normalizeBreadcrumbPath(beforeDetail.path);
+  return (
+    beforePath === '/my-tasks'
+    || isObservationWorkspacePath(beforePath)
+    || beforePath === '/actions'
+    || beforePath === '/threats'
+    || beforePath === '/reliability/cases'
+  );
+}
+
+/**
+ * Ensure list routes (e.g. /actions) appear before detail pages in the trail.
+ */
+export function ensureDetailAnchors(entries) {
+  if (!entries.length) return entries;
+
+  const last = entries[entries.length - 1];
+  const anchorPath = getDetailAnchorPath(last.path);
+  if (!anchorPath) return entries;
+  if (entries.some((entry) => entry.path === anchorPath)) return entries;
+  if (shouldSkipDetailAnchorInjection(entries)) return entries;
+
+  const anchorEntry = {
+    path: anchorPath,
+    label: getRouteLabel(anchorPath),
+    timestamp: (last.timestamp || Date.now()) - 1,
+  };
+  return [...entries.slice(0, -1), anchorEntry, last];
+}
+
 /**
  * Parent route when breadcrumb history has no previous entry (e.g. deep link).
  */
