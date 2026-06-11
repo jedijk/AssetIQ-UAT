@@ -12,6 +12,7 @@ import SpotlightEngine from "./SpotlightEngine";
 import ProgressTracker from "./ProgressTracker";
 import FloatingNarrationCard from "./FloatingNarrationCard";
 import SceneMocks from "./SceneMocks";
+import AutoFitScale from "./AutoFitScale";
 import {
   TOUR_SCENES,
   AUTO_PLAY_DURATION_MS,
@@ -310,12 +311,13 @@ export default function ObservationTour({
           dragElastic={0.18}
           onDragEnd={handleSwipe}
         >
-          {/* Mock visual stage — fills available space and scrolls if too tall.
-              When cardPosition is "left"/"right" we bias the mock to the same
-              side as the narration card so it never overlaps with a spotlight
-              on the opposite edge of the screen (e.g. the chat sidebar). */}
+          {/* Mock visual stage — fills available space and auto-scales to fit
+              via AutoFitScale (no scrolling, no overlap with the narration
+              dock below). When cardPosition is "left"/"right" we bias the
+              mock to the same side as the narration card so it never overlaps
+              with a spotlight on the opposite edge of the screen. */}
           <div
-            className={`flex-1 min-h-0 flex items-center px-3 sm:px-4 pt-14 sm:pt-10 pb-2 sm:pb-4 overflow-y-auto overflow-x-hidden ${
+            className={`flex-1 min-h-0 flex items-stretch px-3 sm:px-4 pt-14 sm:pt-10 pb-2 sm:pb-4 overflow-hidden ${
               scene.cardPosition === "left"
                 ? "justify-center sm:justify-start sm:pl-6 lg:pl-10"
                 : scene.cardPosition === "right"
@@ -334,7 +336,11 @@ export default function ObservationTour({
                   className="w-full max-w-full flex items-center justify-center pointer-events-auto"
                   data-testid={`tour-scene-${scene.id}`}
                 >
-                  <SceneMocks mockKey={scene.mockVisual} typedText={scene.typedText} />
+                  <AutoFitScale minScale={0.3} maxScale={1}>
+                    <div style={{ width: "min(92vw, 880px)" }}>
+                      <SceneMocks mockKey={scene.mockVisual} typedText={scene.typedText} />
+                    </div>
+                  </AutoFitScale>
                 </motion.div>
               )}
             </AnimatePresence>

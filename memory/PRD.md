@@ -7,6 +7,14 @@ Create a robust full-stack platform optimized for multi-environment execution wi
 **v3.7.4** (Updated: May 2026)
 
 ## Recent Changes
+- [Feb 2026] **Cinematic Observation Tour — AutoFitScale integration (VERIFIED via screenshot at 1440x800 and 1100x620)**:
+  - Wrapped `<SceneMocks>` in `/app/frontend/src/components/tour/ObservationTour.jsx` with `AutoFitScale` so cinematic mock visuals (workspace, hierarchy zoom, context menu, AI detection, clarification, describe, submit, next-steps) auto-scale down (min 30%) to always fit the available stage height/width.
+  - Switched the mock stage from `overflow-y-auto` to `overflow-hidden` — visuals no longer scroll, they scale via CSS transform instead.
+  - Updated `AutoFitScale.jsx`: content wrapper now uses `display: inline-block` so it measures the children's intrinsic size (not the stretched flex width); inner wrapper has a fixed preferred width of `min(92vw, 880px)` for consistent intrinsic measurement.
+  - Result: narration card and mock visuals never overlap on any viewport, including cramped laptop heights.
+  - Files: `/app/frontend/src/components/tour/AutoFitScale.jsx`, `/app/frontend/src/components/tour/ObservationTour.jsx`.
+
+
 - [Feb 2026] **Workspace — AI Improve Description build fix (VERIFIED via webpack compile + sanity screenshot)**:
   - Fixed `react-hooks/rules-of-hooks` violation in `ObservationDetailsSection.jsx` where `improveDescriptionMutation` and `handleImproveDescription` were nested inside `linkFailureModeMutation.onSuccess` callback. Moved them out to the component's top level next to other mutations.
   - The AI improve description feature (✨ button next to paperclip in Description card, calls `POST /api/threats/{id}/improve-description`) is now functional with hover tooltip.

@@ -91,10 +91,11 @@ export default function AutoFitScale({
           transform: `scale(${scale})`,
           transformOrigin: "center center",
           willChange: "transform",
-          // Prevent the un-scaled box from forcing the parent to scroll while
-          // we are still measuring \u2014 the visual content is what matters and
-          // the parent already clips with overflow-hidden.
-          maxWidth: "100%",
+          // inline-block so the wrapper takes the intrinsic size of its
+          // children (rather than being stretched by the flex parent).
+          // This lets AutoFitScale measure the true unscaled width/height
+          // and shrink it via CSS transform when the viewport is small.
+          display: "inline-block",
         }}
       >
         {children}
