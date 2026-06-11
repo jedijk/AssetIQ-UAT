@@ -702,7 +702,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
         _conv_peek = await _read_conv(user_id)
         if _conv_peek.get("state", ChatState.INITIAL) == ChatState.INITIAL:
             # Neither store the user message nor reply — keep the UI clean.
-            return ChatResponse(message="", detected_language=detected_lang, is_mixed_language=is_mixed_language or None)
+            return ChatResponse(message="", detected_language=detected_lang, is_mixed_language=None)
 
     # 1. Store user message
     user_msg = {

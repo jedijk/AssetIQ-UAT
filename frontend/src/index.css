@@ -470,11 +470,3 @@
     color: #1d4ed8;
 }
 
-@layer utilities {
-    /* Maintenance Program dialog: ~40% smaller on mobile for better fit */
-    @media (max-width: 767px) {
-        .maintenance-program--mobile-compact {
-            zoom: 0.6;
-        }
-    }
-}

@@ -36,6 +36,9 @@ import {
 import { CRITICALITY_CONFIG } from '../maintenance/constants';
 import { computeCriticalityScore } from '../../lib/criticalityScore';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { cn } from '../../lib/utils';
+
+const PANEL_ROOT_CLASS = 'min-w-0 max-w-full overflow-x-hidden space-y-3 sm:space-y-4';
 
 const DIALOG_CONTENT_CLASS = 'w-[calc(100%-1rem)] max-w-lg max-h-[min(92dvh,100%)] overflow-y-auto sm:w-full';
 const FORM_GRID_CLASS = 'grid grid-cols-1 sm:grid-cols-2 gap-4';
@@ -127,45 +130,54 @@ const ProgramCriticalityBanner = ({ program, strategyUpdateAvailable, t }) => {
   if (!equipmentLevel && !strategyBand) return null;
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 sm:px-3 sm:py-2 text-xs sm:text-sm min-w-0">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
         {equipmentLevel && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-slate-500">{t('equipment.programEquipmentCriticality')}:</span>
-            <Badge
-              variant="outline"
-              className={`text-xs gap-1 ${equipConfig?.bgColor || ''} ${equipConfig?.textColor || ''} ${equipConfig?.borderColor || ''}`}
-            >
-              {EquipIcon && <EquipIcon className="h-3 w-3" />}
-              {equipConfig?.label || equipmentLevel.replace(/_/g, ' ')}
-            </Badge>
-            {criticalityScore != null && (
-              <span className="text-xs text-slate-600">
-                {criticalityScore}/100
-              </span>
-            )}
+          <div className="flex flex-col gap-0.5 min-w-0 sm:flex-row sm:items-center sm:gap-1.5">
+            <span className="text-[10px] sm:text-xs text-slate-500 leading-tight">
+              {t('equipment.programEquipmentCriticality')}
+            </span>
+            <div className="flex flex-wrap items-center gap-1">
+              <Badge
+                variant="outline"
+                className={cn(
+                  'text-[10px] sm:text-xs gap-0.5 sm:gap-1 px-1.5 py-0',
+                  equipConfig?.bgColor,
+                  equipConfig?.textColor,
+                  equipConfig?.borderColor,
+                )}
+              >
+                {EquipIcon && <EquipIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3" />}
+                {equipConfig?.label || equipmentLevel.replace(/_/g, ' ')}
+              </Badge>
+              {criticalityScore != null && (
+                <span className="text-[10px] sm:text-xs text-slate-600">{criticalityScore}/100</span>
+              )}
+            </div>
           </div>
         )}
         {strategyBand && (
-          <>
-            <span className="text-slate-300 hidden sm:inline">→</span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-slate-500">{t('equipment.programStrategyBand')}:</span>
-              <Badge variant="outline" className={`text-xs ${STRATEGY_BAND_STYLES[strategyBand] || ''}`}>
-                {bandLabel || strategyBand}
-              </Badge>
-            </div>
-          </>
+          <div className="flex flex-col gap-0.5 min-w-0 sm:flex-row sm:items-center sm:gap-1.5">
+            <span className="text-[10px] sm:text-xs text-slate-500 leading-tight">
+              {t('equipment.programStrategyBand')}
+            </span>
+            <Badge
+              variant="outline"
+              className={cn('text-[10px] sm:text-xs px-1.5 py-0 w-fit', STRATEGY_BAND_STYLES[strategyBand])}
+            >
+              {bandLabel || strategyBand}
+            </Badge>
+          </div>
         )}
         {(appliedVersion || latestVersion) && (
-          <div className="flex items-center gap-1.5 text-xs text-slate-600">
-            <span className="text-slate-500">{t('equipment.programStrategyVersion')}:</span>
-            {renderStrategyVersion()}
+          <div className="flex flex-col gap-0.5 min-w-0 text-[10px] sm:text-xs text-slate-600 sm:flex-row sm:items-center sm:gap-1.5">
+            <span className="text-slate-500 shrink-0">{t('equipment.programStrategyVersion')}</span>
+            <span className="min-w-0 break-words">{renderStrategyVersion()}</span>
           </div>
         )}
       </div>
       {strategyBand && (
-        <p className="text-xs text-slate-500 mt-1.5">
+        <p className="text-[10px] sm:text-xs text-slate-500 mt-1.5 leading-snug">
           {t('equipment.programCriticalityUsedHint')
             .replace('{band}', bandLabel || strategyBand)
             .replace('{version}', versionForHint)}
@@ -233,7 +245,7 @@ const StatusBadge = ({ status }) => {
     superseded: { color: 'bg-amber-100 text-amber-700', label: 'Superseded' },
   };
   const { color, label } = config[status] || config.draft;
-  return <Badge variant="outline" className={`${color} text-xs`}>{label}</Badge>;
+  return <Badge variant="outline" className={`${color} text-[10px] sm:text-xs px-1.5 py-0`}>{label}</Badge>;
 };
 
 // Source badge component
@@ -241,8 +253,8 @@ const SourceBadge = ({ source }) => {
   const config = SOURCE_CONFIG[source] || SOURCE_CONFIG.manual;
   const IconComponent = config.icon;
   return (
-    <Badge variant="outline" className={`${config.color} text-xs gap-1`}>
-      <IconComponent className="h-3 w-3" />
+    <Badge variant="outline" className={`${config.color} text-[10px] sm:text-xs gap-0.5 sm:gap-1 px-1.5 py-0`}>
+      <IconComponent className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
       {config.label}
     </Badge>
   );
@@ -258,26 +270,26 @@ const TaskRow = ({ task, onEdit, onDelete, onToggleActive, isExpanded, onToggleE
   const metaBadges = (
     <>
       <SourceBadge source={task.task_source} />
-      <Badge variant="outline" className={`${PRIORITY_COLORS[task.priority]} text-xs`}>
+      <Badge variant="outline" className={`${PRIORITY_COLORS[task.priority]} text-[10px] sm:text-xs px-1.5 py-0`}>
         {task.priority}
       </Badge>
-      <Badge variant="outline" className="bg-gray-50 text-gray-600 text-xs gap-1">
-        <Clock className="h-3 w-3" />
+      <Badge variant="outline" className="bg-gray-50 text-gray-600 text-[10px] sm:text-xs gap-0.5 sm:gap-1 px-1.5 py-0">
+        <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
         {FREQUENCY_LABELS[task.frequency] || task.frequency}
       </Badge>
-      <Badge variant="outline" className="bg-gray-50 text-gray-600 text-xs">
+      <Badge variant="outline" className="bg-gray-50 text-gray-600 text-[10px] sm:text-xs px-1.5 py-0">
         {task.estimated_duration_hours}h
       </Badge>
     </>
   );
   
   return (
-    <div className={`border rounded-lg mb-2 ${!isActive ? 'opacity-60' : ''}`}>
+    <div className={`border rounded-lg mb-1.5 sm:mb-2 min-w-0 ${!isActive ? 'opacity-60' : ''}`}>
       <div
-        className="p-2.5 sm:p-3 cursor-pointer hover:bg-gray-50"
+        className="p-2 sm:p-3 cursor-pointer hover:bg-gray-50"
         onClick={onToggleExpand}
       >
-        <div className="flex items-start gap-2 sm:gap-3">
+        <div className="flex items-start gap-1.5 sm:gap-3 min-w-0">
           <div className="flex-shrink-0 pt-0.5">
             {isExpanded ? (
               <ChevronDown className="h-4 w-4 text-gray-400" />
@@ -296,16 +308,16 @@ const TaskRow = ({ task, onEdit, onDelete, onToggleActive, isExpanded, onToggleE
             <div className="flex items-start gap-2">
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className={`font-medium text-sm sm:text-base break-words ${!isActive ? 'line-through text-gray-400' : ''}`}>
+                  <span className={`font-medium text-xs sm:text-base break-words ${!isActive ? 'line-through text-gray-400' : ''}`}>
                     {task.task_title}
                   </span>
                   {!isActive && (
-                    <Badge variant="outline" className="bg-slate-100 text-slate-600 text-xs">
+                    <Badge variant="outline" className="bg-slate-100 text-slate-600 text-[10px] sm:text-xs px-1.5 py-0">
                       Disabled
                     </Badge>
                   )}
                   {task.is_overridden && (
-                    <Badge variant="outline" className="bg-orange-50 text-orange-600 text-xs">Overridden</Badge>
+                    <Badge variant="outline" className="bg-orange-50 text-orange-600 text-[10px] sm:text-xs px-1.5 py-0">Overridden</Badge>
                   )}
                 </div>
                 <div className="text-xs text-gray-500 mt-0.5 line-clamp-2 sm:truncate">
@@ -369,7 +381,7 @@ const TaskRow = ({ task, onEdit, onDelete, onToggleActive, isExpanded, onToggleE
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-1.5 mt-2 sm:hidden">
+            <div className="flex flex-wrap items-center gap-1 mt-1.5 sm:hidden">
               {metaBadges}
             </div>
           </div>
@@ -1066,7 +1078,7 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
   
   if (isLoadingProgram) {
     return (
-      <div className="maintenance-program--mobile-compact">
+      <div className={PANEL_ROOT_CLASS}>
         <Card>
           <CardContent className="flex items-center justify-center h-64">
             <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
@@ -1083,7 +1095,7 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
   // No stored program and no PM Import tasks for this equipment
   if (!programData?.exists && !hasTaskList) {
     return (
-      <div className="maintenance-program--mobile-compact">
+      <div className={PANEL_ROOT_CLASS}>
       <Card>
         <CardContent className="flex flex-col items-center justify-center h-64 gap-4">
           <ClipboardList className="h-16 w-16 text-gray-300" />
@@ -1113,16 +1125,16 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
   const pmImportOnly = !programData?.exists && hasTaskList;
   
   return (
-    <div className="maintenance-program--mobile-compact space-y-4 max-sm:space-y-2">
+    <div className={PANEL_ROOT_CLASS}>
       <ProgramCriticalityBanner
         program={program}
         strategyUpdateAvailable={programData.strategy_update_available}
         t={t}
       />
 
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3 min-w-0">
+      {/* Header — title lives in dialog chrome on mobile */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between min-w-0">
+        <div className="hidden sm:flex items-start gap-3 min-w-0">
           <ClipboardList className="h-6 w-6 text-blue-600 flex-shrink-0 mt-0.5" />
           <div className="min-w-0">
             <h2 className="text-base sm:text-lg font-semibold break-words">{program.program_name}</h2>
@@ -1142,8 +1154,23 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
             </div>
           </div>
         </div>
+
+        <div className="flex flex-wrap items-center gap-1.5 sm:hidden min-w-0">
+          <StatusBadge status={program.status} />
+          <span className="text-[10px] text-gray-500">v{program.version}</span>
+          {pmImportOnly && (
+            <Badge variant="outline" className="bg-purple-50 text-purple-700 text-[10px] px-1.5 py-0">
+              PM Import
+            </Badge>
+          )}
+          {programData.strategy_update_available && (
+            <Badge variant="outline" className="bg-amber-50 text-amber-600 text-[10px] px-1.5 py-0">
+              Update
+            </Badge>
+          )}
+        </div>
         
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 sm:justify-end">
           {!pmImportOnly && (
             <>
               <TooltipProvider>
@@ -1152,10 +1179,11 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
                     <Button
                       variant="outline"
                       size="sm"
+                      className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                       onClick={() => setShowVersionHistory(true)}
                       aria-label={t('tooltips.versionHistory')}
                     >
-                      <History className="h-4 w-4" />
+                      <History className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>{t('tooltips.versionHistory')}</TooltipContent>
@@ -1168,11 +1196,12 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
                     <Button
                       variant="outline"
                       size="sm"
+                      className="h-8 w-8 p-0 sm:h-9 sm:w-9"
                       onClick={() => regenerateMutation.mutate()}
                       disabled={regenerateMutation.isPending}
                       aria-label={t('tooltips.regenerateFromStrategy')}
                     >
-                      <RefreshCw className={`h-4 w-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
+                      <RefreshCw className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>{t('tooltips.regenerateFromStrategy')}</TooltipContent>
@@ -1204,23 +1233,24 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
           )}
           
           {!pmImportOnly && (
-            <Button size="sm" className="flex-1 sm:flex-none" onClick={() => setShowAddDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Task
+            <Button size="sm" className="flex-1 sm:flex-none h-8 text-xs sm:text-sm" onClick={() => setShowAddDialog(true)}>
+              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Add Task</span>
+              <span className="sm:hidden">Add</span>
             </Button>
           )}
           {pmImportOnly && (
             <Button
               variant="outline"
               size="sm"
-              className="flex-1 sm:flex-none"
+              className="flex-1 sm:flex-none h-8 text-xs sm:text-sm"
               onClick={() => syncProgramMutation.mutate()}
               disabled={syncProgramMutation.isPending}
             >
               {syncProgramMutation.isPending ? (
-                <><RefreshCw className="h-4 w-4 mr-2 animate-spin" /> {t('equipment.programSyncing')}</>
+                <><RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2 animate-spin" /> <span className="hidden sm:inline">{t('equipment.programSyncing')}</span></>
               ) : (
-                <><RefreshCw className="h-4 w-4 mr-2" /> {t('equipment.programSync')}</>
+                <><RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" /> {t('equipment.programSync')}</>
               )}
             </Button>
           )}
@@ -1229,49 +1259,58 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
       
       {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
-          <Card className="p-2.5 sm:p-3">
-            <div className="text-xl sm:text-2xl font-bold text-gray-900">{stats.total}</div>
-            <div className="text-xs text-gray-500">Total Tasks</div>
+        <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-1 sm:gap-3">
+          <Card className="p-1.5 sm:p-3 min-w-0">
+            <div className="text-base sm:text-2xl font-bold text-gray-900 leading-none">{stats.total}</div>
+            <div className="text-[9px] sm:text-xs text-gray-500 mt-0.5 leading-tight">
+              <span className="sm:hidden">Total</span>
+              <span className="hidden sm:inline">Total Tasks</span>
+            </div>
           </Card>
-          <Card className="p-2.5 sm:p-3">
-            <div className="text-xl sm:text-2xl font-bold text-green-600">{stats.active}</div>
-            <div className="text-xs text-gray-500">Active</div>
+          <Card className="p-1.5 sm:p-3 min-w-0">
+            <div className="text-base sm:text-2xl font-bold text-green-600 leading-none">{stats.active}</div>
+            <div className="text-[9px] sm:text-xs text-gray-500 mt-0.5 leading-tight">Active</div>
           </Card>
-          <Card className="p-2.5 sm:p-3">
-            <div className="text-xl sm:text-2xl font-bold text-blue-600">{stats.strategy}</div>
-            <div className="text-xs text-gray-500">From Strategy</div>
+          <Card className="p-1.5 sm:p-3 min-w-0">
+            <div className="text-base sm:text-2xl font-bold text-blue-600 leading-none">{stats.strategy}</div>
+            <div className="text-[9px] sm:text-xs text-gray-500 mt-0.5 leading-tight">
+              <span className="sm:hidden">Strategy</span>
+              <span className="hidden sm:inline">From Strategy</span>
+            </div>
           </Card>
-          <Card className="p-2.5 sm:p-3">
-            <div className="text-xl sm:text-2xl font-bold text-purple-600">{stats.imported}</div>
-            <div className="text-xs text-gray-500">Imported</div>
+          <Card className="p-1.5 sm:p-3 min-w-0">
+            <div className="text-base sm:text-2xl font-bold text-purple-600 leading-none">{stats.imported}</div>
+            <div className="text-[9px] sm:text-xs text-gray-500 mt-0.5 leading-tight">Imported</div>
           </Card>
-          <Card className="p-2.5 sm:p-3">
-            <div className="text-xl sm:text-2xl font-bold text-amber-600">{stats.ai}</div>
-            <div className="text-xs text-gray-500">AI Generated</div>
+          <Card className="p-1.5 sm:p-3 min-w-0">
+            <div className="text-base sm:text-2xl font-bold text-amber-600 leading-none">{stats.ai}</div>
+            <div className="text-[9px] sm:text-xs text-gray-500 mt-0.5 leading-tight">
+              <span className="sm:hidden">AI</span>
+              <span className="hidden sm:inline">AI Generated</span>
+            </div>
           </Card>
-          <Card className="p-2.5 sm:p-3">
-            <div className="text-xl sm:text-2xl font-bold text-green-600">{stats.manual}</div>
-            <div className="text-xs text-gray-500">Manual</div>
+          <Card className="p-1.5 sm:p-3 min-w-0">
+            <div className="text-base sm:text-2xl font-bold text-green-600 leading-none">{stats.manual}</div>
+            <div className="text-[9px] sm:text-xs text-gray-500 mt-0.5 leading-tight">Manual</div>
           </Card>
         </div>
       )}
       
       {/* Filter Bar */}
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-        <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3 min-w-0">
+        <div className="relative flex-1 w-full min-w-0">
+          <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
           <Input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search tasks..."
-            className="pl-9"
+            className="pl-8 sm:pl-9 h-8 sm:h-10 text-xs sm:text-sm"
           />
         </div>
         
         <Select value={sourceFilter} onValueChange={setSourceFilter}>
-          <SelectTrigger className="w-full sm:w-48">
-            <Filter className="h-4 w-4 mr-2" />
+          <SelectTrigger className="w-full sm:w-48 h-8 sm:h-10 text-xs sm:text-sm">
+            <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2 shrink-0" />
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1283,13 +1322,14 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
           </SelectContent>
         </Select>
 
-        <div className="flex items-center justify-between sm:justify-start gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <Switch
             id="show-disabled-tasks"
             checked={showDisabledTasks}
             onCheckedChange={setShowDisabledTasks}
+            className="scale-90 sm:scale-100"
           />
-          <Label htmlFor="show-disabled-tasks" className="text-xs text-gray-600 cursor-pointer">
+          <Label htmlFor="show-disabled-tasks" className="text-[10px] sm:text-xs text-gray-600 cursor-pointer">
             Show disabled
           </Label>
         </div>
