@@ -15,6 +15,7 @@ import SceneMocks from "./SceneMocks";
 import {
   TOUR_SCENES,
   AUTO_PLAY_DURATION_MS,
+  SCENE_DURATIONS_MS,
   TOUR_COMPLETION_STORAGE_KEY,
   TOUR_LAST_RUN_STORAGE_KEY,
 } from "./sceneConfig";
@@ -34,7 +35,7 @@ export default function ObservationTour({
   setHierarchyOpen,
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const autoPlayTimerRef = useRef(null);
   const scenes = TOUR_SCENES;
   const scene = scenes[currentIndex];
@@ -48,7 +49,8 @@ export default function ObservationTour({
   useEffect(() => {
     if (isOpen) {
       setCurrentIndex(0);
-      setIsAutoPlaying(false);
+      // Auto-play is ON by default; the user can pause from the controls.
+      setIsAutoPlaying(true);
       try {
         localStorage.setItem(TOUR_LAST_RUN_STORAGE_KEY, new Date().toISOString());
       } catch (e) {
@@ -119,6 +121,8 @@ export default function ObservationTour({
   }, [onClose, setChatOpen, setChatPrefillMessage, setHierarchyOpen]);
 
   const handleNext = useCallback(() => {
+    // Any manual advance pauses auto-play so the user can read at their own pace.
+    setIsAutoPlaying(false);
     if (currentIndex < scenes.length - 1) {
       setCurrentIndex((i) => i + 1);
     } else {
@@ -128,6 +132,7 @@ export default function ObservationTour({
   }, [currentIndex, scenes.length, markCompleted, closeTour]);
 
   const handlePrev = useCallback(() => {
+    setIsAutoPlaying(false);
     if (currentIndex > 0) setCurrentIndex((i) => i - 1);
   }, [currentIndex]);
 
@@ -138,6 +143,7 @@ export default function ObservationTour({
 
   const handleJumpTo = useCallback(
     (idx) => {
+      setIsAutoPlaying(false);
       if (idx >= 0 && idx < scenes.length) setCurrentIndex(idx);
     },
     [scenes.length]
@@ -148,26 +154,39 @@ export default function ObservationTour({
   }, []);
 
   /* ------------------------------------------------------------------
-   * Auto-play loop
+   * Auto-play loop \u2014 per-scene durations, pause when tab hidden
    * ------------------------------------------------------------------ */
 
   useEffect(() => {
     if (!isOpen || !isAutoPlaying) return undefined;
     if (autoPlayTimerRef.current) clearTimeout(autoPlayTimerRef.current);
+    const duration =
+      (scene && SCENE_DURATIONS_MS[scene.id]) || AUTO_PLAY_DURATION_MS;
     autoPlayTimerRef.current = setTimeout(() => {
       if (currentIndex < scenes.length - 1) {
+        // Auto-advance does NOT use handleNext, so it doesn't toggle isAutoPlaying off.
         setCurrentIndex((i) => i + 1);
       } else {
         setIsAutoPlaying(false);
       }
-    }, AUTO_PLAY_DURATION_MS);
+    }, duration);
     return () => {
       if (autoPlayTimerRef.current) {
         clearTimeout(autoPlayTimerRef.current);
         autoPlayTimerRef.current = null;
       }
     };
-  }, [isOpen, isAutoPlaying, currentIndex, scenes.length]);
+  }, [isOpen, isAutoPlaying, currentIndex, scene, scenes.length]);
+
+  // Pause auto-play when the browser tab is hidden (sensible auto-pause).
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onVisibility = () => {
+      if (document.hidden) setIsAutoPlaying(false);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [isOpen]);
 
   /* ------------------------------------------------------------------
    * Keyboard nav

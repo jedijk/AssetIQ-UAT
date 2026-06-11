@@ -161,5 +161,23 @@ export const TOUR_SCENES = [
 ];
 
 export const AUTO_PLAY_DURATION_MS = 6000;
+
+/**
+ * Per-scene auto-play durations (ms). Scenes that contain typewriter or
+ * multi-step internal animations need more time so auto-play doesn't skip
+ * mid-animation. Falls back to AUTO_PLAY_DURATION_MS.
+ */
+export const SCENE_DURATIONS_MS = {
+  welcome: 6000,
+  "select-equipment": 6000,
+  "context-menu": 8000,        // context menu + cursor + success state
+  "quick-add": 6000,
+  "ai-detection": 8500,        // typewriter (~2s) + analyzing (1.1s) + read time
+  clarification: 10000,         // typewriter + dialog + search animation + selection
+  describe: 8500,               // longer typewriter + AI tag extraction
+  submit: 7000,                 // submit pulse + success slide
+  "next-steps": 9000,           // 6-step flow stagger + counter animations
+};
+
 export const TOUR_COMPLETION_STORAGE_KEY = "assetiq.observation_tour_v2.completed";
 export const TOUR_LAST_RUN_STORAGE_KEY = "assetiq.observation_tour_v2.last_run";
