@@ -8,6 +8,7 @@ import { RolePreviewProvider } from "./contexts/RolePreviewContext";
 import { PermissionsProvider, usePermissions } from "./contexts/PermissionsContext";
 import { UndoProvider } from "./contexts/UndoContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
+import { BreadcrumbProvider } from "./contexts/BreadcrumbContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Layout from "./components/Layout";
 import ChangePasswordDialog from "./components/ChangePasswordDialog";
@@ -383,6 +384,7 @@ function App() {
               <PermissionsProvider>
                 <UndoProvider>
                   <BrowserRouter>
+                    <BreadcrumbProvider>
                     <AuthExpiredListener />
                     <ProductionReleaseToast />
                     <Toaster 
@@ -505,6 +507,7 @@ function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
             <NotificationPrompt />
+            </BreadcrumbProvider>
             </BrowserRouter>
           </UndoProvider>
         </PermissionsProvider>

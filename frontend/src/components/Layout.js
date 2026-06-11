@@ -60,6 +60,7 @@ import ChatSidebar from "./ChatSidebar";
 import ImageEditor from "./ImageEditor";
 import EquipmentHierarchy from "./EquipmentHierarchy";
 import ObservationTour from "./ObservationTour";
+import NavigationBreadcrumb from "./NavigationBreadcrumb";
 import { actionsAPI, feedbackAPI } from "../lib/api";
 import { useOfflineSync } from "../hooks/useOfflineSync";
 import { usePageTracking } from "../hooks/useAnalyticsTracking";
@@ -678,6 +679,8 @@ const Layout = () => {
                 title="This page crashed"
                 subtitle="Something went wrong while rendering this screen. Tap reload to recover."
               >
+                {/* Breadcrumb Navigation */}
+                <NavigationBreadcrumb className="px-4 sm:px-6 pt-4" />
                 <Outlet />
               </AppErrorBoundary>
             </motion.div>
