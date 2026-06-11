@@ -135,7 +135,6 @@ export function BreadcrumbProvider({ children }) {
   });
 
   const lastPathRef = useRef(null);
-  const pendingNavTargetRef = useRef(null);
   const historyRef = useRef(history);
   historyRef.current = history;
 
@@ -152,25 +151,25 @@ export function BreadcrumbProvider({ children }) {
   }, [history]);
 
   const navigateToPath = useCallback((targetPath, nextHistory) => {
-    pendingNavTargetRef.current = normalizeBreadcrumbPath(targetPath);
-    lastPathRef.current = null;
+    const normalizedTarget = normalizeBreadcrumbPath(targetPath);
     historyRef.current = nextHistory;
     setHistory(nextHistory);
-    navigate(targetPath);
+    lastPathRef.current = normalizedTarget;
+    navigate(normalizedTarget, { state: null });
+
+    // Recover if navigation did not occur (e.g. stale router state on detail pages).
+    window.setTimeout(() => {
+      const actualPath = normalizeBreadcrumbPath(window.location.pathname);
+      if (actualPath !== normalizedTarget && lastPathRef.current === normalizedTarget) {
+        lastPathRef.current = actualPath;
+      }
+    }, 400);
   }, [navigate]);
 
   useEffect(() => {
     const currentPath = normalizeBreadcrumbPath(location.pathname);
 
     if (shouldExcludeRoute(location.pathname)) {
-      return;
-    }
-
-    if (pendingNavTargetRef.current) {
-      if (currentPath === pendingNavTargetRef.current) {
-        pendingNavTargetRef.current = null;
-        lastPathRef.current = currentPath;
-      }
       return;
     }
 
@@ -216,18 +215,32 @@ export function BreadcrumbProvider({ children }) {
     });
   }, [getHomeLabel, location.pathname, location.state]);
 
+  const navigateToHome = useCallback(() => {
+    const homePath = getHomeBreadcrumbPath();
+    const nextHistory = normalizeBreadcrumbHistory(
+      [makeHomeEntry(getHomeLabel())],
+      getHomeLabel(),
+    );
+    navigateToPath(homePath, nextHistory);
+  }, [getHomeLabel, navigateToPath]);
+
   const navigateTo = useCallback((index) => {
     const prev = historyRef.current;
     if (index < 0 || index >= prev.length) return;
 
     const entry = prev[index];
+    if (isHomeBreadcrumbPath(entry.path)) {
+      navigateToHome();
+      return;
+    }
+
     const targetPath = normalizeBreadcrumbPath(entry.path);
     const nextHistory = normalizeBreadcrumbHistory(
       prev.slice(0, index + 1),
       getHomeLabel(),
     );
     navigateToPath(targetPath, nextHistory);
-  }, [getHomeLabel, navigateToPath]);
+  }, [getHomeLabel, navigateToHome, navigateToPath]);
 
   const canGoBack = useCallback(() => {
     const currentPath = normalizeBreadcrumbPath(location.pathname);
@@ -308,6 +321,7 @@ export function BreadcrumbProvider({ children }) {
   const value = {
     history,
     navigateTo,
+    navigateToHome,
     goBack,
     canGoBack: canGoBack(),
     clearHistory,

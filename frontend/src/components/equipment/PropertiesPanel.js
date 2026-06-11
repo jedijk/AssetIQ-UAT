@@ -987,17 +987,17 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
       
       {/* Maintenance Program Dialog */}
       <Dialog open={showMaintenanceProgramDialog} onOpenChange={setShowMaintenanceProgramDialog}>
-        <DialogContent className="max-w-4xl w-[calc(100%-0.5rem)] max-h-[min(92dvh,100%)] sm:max-h-[85vh] overflow-hidden flex flex-col gap-2 sm:gap-4 p-3 sm:p-6">
-          <DialogHeader className="flex-shrink-0 pr-8">
-            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
-              <ClipboardList className="h-5 w-5 text-blue-600 flex-shrink-0" />
+        <DialogContent className="max-w-4xl w-[calc(100%-0.5rem)] max-h-[min(92dvh,100%)] sm:max-h-[85vh] overflow-hidden flex flex-col gap-1 sm:gap-4 p-2 sm:p-6">
+          <DialogHeader className="flex-shrink-0 pr-8 max-sm:space-y-0.5">
+            <DialogTitle className="flex items-center gap-1.5 text-sm sm:text-lg">
+              <ClipboardList className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
               {t("equipment.maintenanceProgram")}
             </DialogTitle>
-            <DialogDescription className="line-clamp-2 sm:line-clamp-none">
+            <DialogDescription className="text-xs sm:text-sm line-clamp-2 sm:line-clamp-none">
               {translatedName || node?.name}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto min-h-0 py-1 sm:py-4 -mx-1 px-1">
+          <div className="flex-1 overflow-y-auto min-h-0 py-0 sm:py-4 -mx-1 px-1">
             <MaintenanceProgramPanel 
               equipmentId={node?.id} 
               equipmentName={translatedName || node?.name}

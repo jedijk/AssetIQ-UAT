@@ -101,7 +101,7 @@ export default function LayoutHeader({
               className="flex items-center gap-2 flex-shrink-0 cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate("/dashboard");
+                navigate("/dashboard", { state: null });
               }}
               data-testid="app-logo-link"
             >

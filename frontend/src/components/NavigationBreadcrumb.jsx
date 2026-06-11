@@ -32,7 +32,7 @@ const NavigationBreadcrumb = ({ className = '' }) => {
   }
 
   return (
-    <div className={`flex items-center gap-2 mb-0.5 sm:mb-4 ${className}`}>
+    <div className={`relative z-40 flex items-center gap-2 mb-0.5 sm:mb-4 ${className}`}>
       {canGoBack && (
         <button
           type="button"

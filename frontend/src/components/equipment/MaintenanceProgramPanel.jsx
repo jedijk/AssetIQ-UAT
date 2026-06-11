@@ -1066,11 +1066,13 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
   
   if (isLoadingProgram) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center h-64">
-          <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
-        </CardContent>
-      </Card>
+      <div className="maintenance-program--mobile-compact">
+        <Card>
+          <CardContent className="flex items-center justify-center h-64">
+            <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+          </CardContent>
+        </Card>
+      </div>
     );
   }
   
@@ -1081,6 +1083,7 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
   // No stored program and no PM Import tasks for this equipment
   if (!programData?.exists && !hasTaskList) {
     return (
+      <div className="maintenance-program--mobile-compact">
       <Card>
         <CardContent className="flex flex-col items-center justify-center h-64 gap-4">
           <ClipboardList className="h-16 w-16 text-gray-300" />
@@ -1102,6 +1105,7 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
           </Button>
         </CardContent>
       </Card>
+      </div>
     );
   }
   
@@ -1109,7 +1113,7 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
   const pmImportOnly = !programData?.exists && hasTaskList;
   
   return (
-    <div className="space-y-4">
+    <div className="maintenance-program--mobile-compact space-y-4 max-sm:space-y-2">
       <ProgramCriticalityBanner
         program={program}
         strategyUpdateAvailable={programData.strategy_update_available}
