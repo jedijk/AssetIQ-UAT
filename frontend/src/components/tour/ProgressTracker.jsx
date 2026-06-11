@@ -9,7 +9,7 @@ export default function ProgressTracker({ scenes, currentIndex, onJumpTo }) {
   return (
     <div className="flex flex-col items-center gap-2 select-none">
       <div
-        className="flex items-center gap-1.5"
+        className="flex items-center gap-1 sm:gap-1.5"
         role="tablist"
         aria-label="Tour scene progress"
       >
@@ -24,9 +24,10 @@ export default function ProgressTracker({ scenes, currentIndex, onJumpTo }) {
               aria-label={`Go to scene ${idx + 1}: ${scene.chapter || scene.title}`}
               aria-current={isActive ? "step" : undefined}
               role="tab"
-              className="group relative h-2 cursor-pointer"
+              className={`group relative cursor-pointer h-1 sm:h-2 ${
+                isActive ? "w-[18px] sm:w-9" : "w-1 sm:w-2.5"
+              }`}
               data-testid={`tour-progress-dot-${idx}`}
-              style={{ width: isActive ? 36 : 10 }}
             >
               <motion.span
                 layout
