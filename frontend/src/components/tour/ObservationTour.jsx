@@ -228,6 +228,17 @@ export default function ObservationTour({
 
   const variant = transitionVariant[scene.transition] || transitionVariant.fade;
 
+  const handleSwipe = (_evt, info) => {
+    const offsetX = info?.offset?.x ?? 0;
+    const velocityX = info?.velocity?.x ?? 0;
+    // Threshold suited for thumb-flicks
+    if (offsetX < -60 || velocityX < -500) {
+      handleNext();
+    } else if (offsetX > 60 || velocityX > 500) {
+      handlePrev();
+    }
+  };
+
   const overlay = (
     <AnimatePresence>
       <motion.div
@@ -236,7 +247,7 @@ export default function ObservationTour({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.35 }}
-        className="fixed inset-0 z-[10000]"
+        className="fixed inset-0 z-[10000] overflow-hidden"
         data-testid="observation-tour-overlay"
       >
         {/* Subtle gradient halo behind everything */}
@@ -261,63 +272,76 @@ export default function ObservationTour({
         <button
           type="button"
           onClick={handleSkip}
-          className="absolute top-4 right-4 z-[1] inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white border border-white/15 transition-colors"
+          className="absolute top-3 right-3 sm:top-4 sm:right-4 z-[2] inline-flex items-center justify-center w-10 h-10 sm:w-9 sm:h-9 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white border border-white/15 transition-colors"
           aria-label="Exit tour"
           data-testid="observation-tour-close-btn"
         >
           <X className="w-4 h-4" />
         </button>
 
-        {/* Centered stage — holds the optional mock visual */}
-        <div className="absolute inset-0 flex items-start sm:items-center justify-center pt-12 sm:pt-0 px-4">
-          <AnimatePresence mode="wait">
-            {scene.mockVisual && (
-              <motion.div
-                key={`mock-${scene.id}`}
-                initial={variant.initial}
-                animate={variant.animate}
-                exit={variant.exit}
-                transition={variant.transition}
-                className="w-full flex items-center justify-center pointer-events-auto"
-                data-testid={`tour-scene-${scene.id}`}
-              >
-                <SceneMocks mockKey={scene.mockVisual} typedText={scene.typedText} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Bottom dock: narration card + progress */}
-        <div className="absolute inset-x-0 bottom-0 px-4 pb-6 sm:pb-8 pointer-events-none">
-          <div className="max-w-5xl mx-auto flex flex-col items-center gap-4">
+        {/*
+         * Flex column layout: mock visual on top (shrinks/scrolls to fit),
+         * narration card + progress docked at the bottom. This guarantees
+         * the two never overlap on small screens.
+         */}
+        <motion.div
+          className="relative h-full w-full flex flex-col"
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.18}
+          onDragEnd={handleSwipe}
+        >
+          {/* Mock visual stage \u2014 fills available space and scrolls if too tall */}
+          <div className="flex-1 min-h-0 flex items-center justify-center px-3 sm:px-4 pt-14 sm:pt-10 pb-2 sm:pb-4 overflow-y-auto overflow-x-hidden">
             <AnimatePresence mode="wait">
-              <FloatingNarrationCard
-                key={`card-${scene.id}`}
-                title={scene.title}
-                narration={scene.narration}
-                badge={scene.badge}
-                sceneIndex={currentIndex}
-                totalScenes={scenes.length}
-                isFirst={isFirst}
-                isLast={isLast}
-                isAutoPlaying={isAutoPlaying}
-                onPrev={handlePrev}
-                onNext={handleNext}
-                onSkip={handleSkip}
-                onToggleAutoPlay={handleToggleAutoPlay}
-                position={scene.cardPosition}
-              />
+              {scene.mockVisual && (
+                <motion.div
+                  key={`mock-${scene.id}`}
+                  initial={variant.initial}
+                  animate={variant.animate}
+                  exit={variant.exit}
+                  transition={variant.transition}
+                  className="w-full max-w-full flex items-center justify-center pointer-events-auto"
+                  data-testid={`tour-scene-${scene.id}`}
+                >
+                  <SceneMocks mockKey={scene.mockVisual} typedText={scene.typedText} />
+                </motion.div>
+              )}
             </AnimatePresence>
+          </div>
 
-            <div className="pointer-events-auto">
-              <ProgressTracker
-                scenes={scenes}
-                currentIndex={currentIndex}
-                onJumpTo={handleJumpTo}
-              />
+          {/* Bottom dock: narration card + progress */}
+          <div className="shrink-0 px-3 sm:px-4 pb-4 sm:pb-8 pointer-events-none">
+            <div className="max-w-5xl mx-auto flex flex-col items-center gap-3 sm:gap-4">
+              <AnimatePresence mode="wait">
+                <FloatingNarrationCard
+                  key={`card-${scene.id}`}
+                  title={scene.title}
+                  narration={scene.narration}
+                  badge={scene.badge}
+                  sceneIndex={currentIndex}
+                  totalScenes={scenes.length}
+                  isFirst={isFirst}
+                  isLast={isLast}
+                  isAutoPlaying={isAutoPlaying}
+                  onPrev={handlePrev}
+                  onNext={handleNext}
+                  onSkip={handleSkip}
+                  onToggleAutoPlay={handleToggleAutoPlay}
+                  position={scene.cardPosition}
+                />
+              </AnimatePresence>
+
+              <div className="pointer-events-auto">
+                <ProgressTracker
+                  scenes={scenes}
+                  currentIndex={currentIndex}
+                  onJumpTo={handleJumpTo}
+                />
+              </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       </motion.div>
     </AnimatePresence>
   );

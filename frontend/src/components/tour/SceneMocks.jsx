@@ -61,13 +61,13 @@ function MockWorkspace() {
   return (
     <PanelShell className="w-full max-w-3xl" data-testid="tour-mock-workspace">
       <FakeWindowChrome title="AssetIQ Workspace" />
-      <div className="grid grid-cols-12 gap-3 p-4">
+      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 p-3 sm:p-4">
         {/* Hierarchy column */}
         <motion.div
           initial={{ opacity: 0, x: -16 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.15 }}
-          className="col-span-4 rounded-xl border border-white/10 bg-white/5 p-3"
+          className="sm:col-span-4 rounded-xl border border-white/10 bg-white/5 p-3"
         >
           <div className="flex items-center gap-2 mb-3 text-blue-300 text-xs uppercase tracking-wider">
             <Layers className="w-3.5 h-3.5" />
@@ -104,7 +104,7 @@ function MockWorkspace() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="col-span-8 grid grid-cols-3 gap-3"
+          className="sm:col-span-8 grid grid-cols-3 gap-2 sm:gap-3"
         >
           {[
             { label: "Observations", value: 42, Icon: Eye, color: "text-blue-300" },
@@ -158,7 +158,7 @@ function MockHierarchyZoom() {
   return (
     <PanelShell className="w-full max-w-md" data-testid="tour-mock-hierarchy-zoom">
       <FakeWindowChrome title="Asset hierarchy — zoomed" />
-      <div className="p-4">
+      <div className="p-3 sm:p-4">
         <ul className="space-y-1.5 text-sm text-slate-200">
           <li className="flex items-center gap-1.5">
             <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
@@ -211,7 +211,7 @@ function MockContextMenu() {
     <div className="relative w-full max-w-lg" data-testid="tour-mock-context-menu">
       <PanelShell>
         <FakeWindowChrome title="Right-click equipment" />
-        <div className="p-4">
+        <div className="p-3 sm:p-4">
           <div className="relative">
             <ul className="space-y-1.5 text-sm text-slate-200">
               <li className="flex items-center gap-1.5">
@@ -229,7 +229,7 @@ function MockContextMenu() {
               initial={{ opacity: 0, scale: 0.9, y: -4 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               transition={{ delay: 0.25, duration: 0.35 }}
-              className="absolute top-9 left-32 w-60 rounded-xl border border-white/15 bg-slate-800/95 backdrop-blur-xl shadow-2xl overflow-hidden"
+              className="absolute top-9 left-10 sm:left-32 w-[14rem] sm:w-60 max-w-[calc(100%-2.5rem)] rounded-xl border border-white/15 bg-slate-800/95 backdrop-blur-xl shadow-2xl overflow-hidden"
             >
               <div className="px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-slate-400 border-b border-white/10">
                 Pump P-101
@@ -313,7 +313,7 @@ function MockContextMenu() {
 function MockQuickAdd() {
   return (
     <PanelShell className="w-full max-w-md" data-testid="tour-mock-quick-add">
-      <div className="p-5 flex flex-col items-center text-center">
+      <div className="p-4 sm:p-5 flex flex-col items-center text-center">
         <div className="relative">
           <motion.div
             animate={{
@@ -368,7 +368,7 @@ function MockAIDetection({ typedText }) {
   return (
     <PanelShell className="w-full max-w-2xl" data-testid="tour-mock-ai-detection">
       <FakeWindowChrome title="New observation" />
-      <div className="p-5 space-y-4">
+      <div className="p-4 sm:p-5 space-y-3 sm:space-y-4">
         <div>
           <label className="block text-[11px] uppercase tracking-[0.22em] text-slate-400 mb-2">
             Describe the issue
@@ -458,7 +458,7 @@ function MockClarification({ typedText }) {
   return (
     <PanelShell className="w-full max-w-2xl" data-testid="tour-mock-clarification">
       <FakeWindowChrome title="New observation" />
-      <div className="p-5 space-y-4">
+      <div className="p-4 sm:p-5 space-y-3 sm:space-y-4">
         <div className="rounded-xl border border-white/15 bg-white/5 p-3 text-slate-100 text-[15px] leading-relaxed min-h-[52px]">
           <TypewriterText text={typedText} onComplete={() => setTypingDone(true)} />
         </div>
@@ -563,7 +563,7 @@ function MockDescribe({ typedText }) {
   return (
     <PanelShell className="w-full max-w-2xl" data-testid="tour-mock-describe">
       <FakeWindowChrome title="Describe the observation" />
-      <div className="p-5 space-y-4">
+      <div className="p-4 sm:p-5 space-y-3 sm:space-y-4">
         <div>
           <label className="block text-[11px] uppercase tracking-[0.22em] text-slate-400 mb-2">
             Description
@@ -623,7 +623,7 @@ function MockSubmit() {
   return (
     <PanelShell className="w-full max-w-xl" data-testid="tour-mock-submit">
       <FakeWindowChrome title="Ready to submit" />
-      <div className="p-5">
+      <div className="p-3 sm:p-5">
         <div className="rounded-xl border border-white/15 bg-white/5 p-4">
           <div className="text-[11px] uppercase tracking-[0.22em] text-slate-300/80 mb-1">
             Observation
@@ -724,7 +724,7 @@ function MockNextSteps() {
   return (
     <PanelShell className="w-full max-w-3xl" data-testid="tour-mock-next-steps">
       <FakeWindowChrome title="AssetIQ intelligence workflow" />
-      <div className="p-5">
+      <div className="p-3 sm:p-5">
         <div className="grid grid-cols-1 sm:grid-cols-6 gap-2.5">
           {FLOW_STEPS.map((step, i) => (
             <motion.div

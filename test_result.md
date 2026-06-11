@@ -1972,3 +1972,139 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: "Implemented cinematic 'Create Your First Observation' tour as Apple-style 9-scene product walkthrough. Replaces legacy tooltip ObservationTour (drop-in via re-export shim). New components under /components/tour/. Trigger: Help dropdown → 'Create Your First Observation' (data-testid='observation-tour-menu-item'). Manual mode default; Auto-play toggle at 6s/scene. Real DOM spotlights for scenes 1-4 (hierarchy + FAB), cinematic mock visuals for scenes 5-9 (AI detection, clarification, describe, submit, next-steps with KPI flow). Verified visually with screenshots. Awaiting user feedback before extending to deep_testing_frontend_v2."
+
+
+
+# Observation Tour Mobile Compatibility Testing
+
+user_problem_statement: "Verify the cinematic 'Create Your First Observation' tour is mobile-compatible"
+
+frontend:
+  - task: "Observation Tour Mobile Responsiveness"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/tour/ObservationTour.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED on mobile viewport (390x844 - iPhone 13 Pro). All 9 scenes render correctly without horizontal scroll. Mock visuals (workspace, hierarchyZoom, contextMenu, quickAdd, aiDetection, clarification, describe, submit, nextSteps) are fully visible and properly sized. No overlap between scene content and narration card. Layout uses flex column with flex-1 for mock visual stage and shrink-0 for bottom dock, ensuring proper spacing on mobile."
+
+  - task: "Observation Tour Narration Card Mobile Layout"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/tour/FloatingNarrationCard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: Narration card anchored at bottom, fully readable on mobile. Title text (text-xl sm:text-3xl) scales appropriately. Body text (text-[14px] sm:text-base) is readable. Badge component displays correctly with 'Equipment matched' and 'Needs clarification' badges visible in appropriate scenes. Card uses responsive padding (px-5 sm:px-8, pt-5 sm:pt-6, pb-4 sm:pb-5). No text clipping observed across all 9 scenes."
+
+  - task: "Observation Tour Controls Mobile Usability"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/tour/FloatingNarrationCard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: All controls are tappable and functional on mobile. Skip button (data-testid='tour-skip-btn') works correctly and closes tour. Auto-play button (data-testid='tour-autoplay-btn') toggles play/pause. Previous button (data-testid='tour-prev-btn') navigates backward (disabled on first scene). Next button (data-testid='tour-next-btn') advances scenes, shows 'Finish' text on final scene. Close (×) button (data-testid='observation-tour-close-btn') in top-right corner (w-10 h-10 on mobile) is easily tappable. Button sizes appropriate for touch targets (h-9 for controls, w-10 h-10 for close button)."
+
+  - task: "Observation Tour Progress Tracker Mobile"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/tour/ProgressTracker.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: Progress dots row visible at bottom of tour. All 9 dots (data-testid='tour-progress-dot-0' through 'tour-progress-dot-8') are visible and tappable. Active dot expands to 36px width, inactive dots are 10px. Dot navigation works correctly - tapping dot 2 jumps to Scene 3 (context-menu). Scene counter displays correctly (Scene 1 / 9, Scene 2 / 9, etc.) with chapter labels. Progress tracker uses gap-1.5 for dot spacing, appropriate for mobile touch targets."
+
+  - task: "Observation Tour Swipe Gestures"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/tour/ObservationTour.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: Swipe gestures work correctly on mobile. Swipe left (drag ~150px left) advances to next scene. Swipe right (drag ~150px right) goes back to previous scene. Gesture detection uses Framer Motion drag with dragConstraints and dragElastic=0.18. handleSwipe function checks offset.x and velocity.x with thresholds (offsetX < -60 or velocityX < -500 for next, offsetX > 60 or velocityX > 500 for previous). Gestures feel natural and responsive on mobile viewport."
+
+  - task: "Observation Tour Mobile Hint Text"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/tour/FloatingNarrationCard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: Mobile hint text displays correctly. 'Swipe left or right to navigate' hint is visible on mobile (classes: mt-2 sm:hidden, display: block on 390px viewport). Keyboard hint ('Use ← → to navigate · Space to play / pause · Esc to exit') is correctly hidden on mobile (classes: mt-3 hidden sm:block, display: none on 390px viewport). Responsive behavior working as expected - mobile users see swipe hint, desktop users (>=640px) see keyboard hint."
+
+  - task: "Observation Tour Scene Content Mobile"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/tour/SceneMocks.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: All 9 scene mock visuals render correctly on mobile. Scene 1 (welcome) - workspace mock visible. Scene 2 (select-equipment) - hierarchyZoom with spotlight on hierarchy sidebar. Scene 3 (context-menu) - right-click menu mock visible. Scene 4 (quick-add) - Quick Add FAB spotlighted with 1.4x zoom. Scene 5 (ai-detection) - typewriter animation displays 'Oil leak observed on Pump P-101 near mechanical seal' with 'Equipment matched' badge. Scene 6 (clarification) - typewriter shows 'Found oil leak near production area' with 'Needs clarification' badge. Scene 7 (describe) - typewriter displays 'High vibration detected on Pump P-101. Abnormal noise present during operation.' Scene 8 (submit) - submit button mock. Scene 9 (next-steps) - KPI flow visualization. All scenes use max-w-full and flex items-center justify-center for proper mobile centering."
+
+  - task: "Observation Tour Spotlight Engine Mobile"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/tour/SpotlightEngine.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: Spotlight engine works correctly on mobile. Scenes 1-3 spotlight hierarchy sidebar (data-testid='hierarchy-sidebar') with appropriate zoom levels (1.0, 1.05, 1.05). Scene 4 spotlights Quick Add FAB (data-testid='fab-report-observation') with 1.4x zoom. Pulse animation visible on scenes 1 and 4 (pulseTarget: true). Spotlight cuts proper hole in dark backdrop, allowing underlying UI to be visible. No issues with spotlight positioning or sizing on mobile viewport. Scenes 5-9 have no spotlight (target: null), showing only mock visuals."
+
+  - task: "Observation Tour Navigation Flow"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/components/tour/ObservationTour.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: Complete navigation flow works correctly. Next button advances through all 9 scenes sequentially. Previous button navigates backward (disabled on Scene 1). Progress dot navigation allows jumping to any scene (tested jumping from Scene 9 to Scene 3). Final scene (Scene 9) shows 'Finish' button instead of 'Next'. Clicking Finish closes tour and marks completion in localStorage (TOUR_COMPLETION_STORAGE_KEY). Skip button exits tour from any scene. Close (×) button exits tour from any scene. Tour can be relaunched multiple times via Help menu > 'Create Your First Observation' (data-testid='observation-tour-menu-item'). All navigation methods tested and working."
+
+metadata:
+  created_by: "testing_agent"
+  version: "1.0"
+  test_sequence: 3
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "Observation Tour Mobile Responsiveness"
+    - "Observation Tour Swipe Gestures"
+    - "Observation Tour Mobile Hint Text"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "user"
+    message: "Verify the cinematic 'Create Your First Observation' tour is mobile-compatible. Test on mobile viewport (390x844 - iPhone 13 Pro). Verify all 9 scenes render correctly, narration card is readable, controls are tappable, swipe gestures work, mobile hint text is visible (keyboard hint hidden), no horizontal scroll, and all navigation methods work (Next, Previous, Skip, Close, Finish, progress dots, swipe left/right)."
+  - agent: "testing"
+    message: "OBSERVATION TOUR MOBILE COMPATIBILITY TESTING COMPLETE - ALL TESTS PASSED (9/9 tasks). Comprehensive testing performed on mobile viewport (390x844 - iPhone 13 Pro). ✅ ALL 9 SCENES RENDER CORRECTLY: All scene mock visuals (workspace, hierarchyZoom, contextMenu, quickAdd, aiDetection with typewriter, clarification, describe, submit, nextSteps) display properly without horizontal scroll or overlap. ✅ NARRATION CARD MOBILE LAYOUT: Card anchored at bottom, fully readable with responsive text sizing (text-xl sm:text-3xl for title, text-[14px] sm:text-base for body). Badges display correctly ('Equipment matched', 'Needs clarification'). No text clipping observed. ✅ CONTROLS MOBILE USABILITY: All controls tappable and functional - Skip, Auto-play, Previous, Next, Close (×) buttons work correctly. Button sizes appropriate for touch targets (h-9 for controls, w-10 h-10 for close). ✅ PROGRESS TRACKER: All 9 progress dots visible and tappable. Dot navigation works (tested jumping from Scene 9 to Scene 3). Scene counter displays correctly. ✅ SWIPE GESTURES: Swipe left advances to next scene, swipe right goes back. Gestures feel natural and responsive with proper thresholds (offsetX ±60px, velocityX ±500). ✅ MOBILE HINT TEXT: 'Swipe left or right to navigate' hint visible on mobile (display: block). Keyboard hint correctly hidden (display: none). Responsive behavior working as expected. ✅ SPOTLIGHT ENGINE: Spotlight works correctly on mobile for scenes 1-4. Proper zoom levels applied (1.0-1.4x). Pulse animation visible on scenes 1 and 4. ✅ NAVIGATION FLOW: All navigation methods work - Next/Previous buttons, progress dots, swipe gestures, Skip button, Close (×) button, Finish button. Tour can be relaunched multiple times. ✅ NO HORIZONTAL SCROLL: Confirmed no horizontal scroll across all scenes. Layout uses flex column with proper constraints. SCREENSHOTS CAPTURED: 13 screenshots documenting all scenes, controls, gestures, and navigation. Mobile tour is production-ready and fully functional."
