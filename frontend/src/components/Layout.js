@@ -681,7 +681,9 @@ const Layout = () => {
               >
                 {/* Breadcrumb Navigation */}
                 <NavigationBreadcrumb className="px-4 sm:px-6 pt-4" />
-                <Outlet />
+                <div className="max-sm:-mt-2.5 sm:mt-0">
+                  <Outlet />
+                </div>
               </AppErrorBoundary>
             </motion.div>
           </AnimatePresence>
