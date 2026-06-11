@@ -138,6 +138,17 @@ export function normalizeBreadcrumbPath(path) {
   return path;
 }
 
+/** Ops dashboard or simple-mode landing — both live at /dashboard. */
+export const HOME_BREADCRUMB_PATH = '/dashboard';
+
+export function getHomeBreadcrumbPath() {
+  return HOME_BREADCRUMB_PATH;
+}
+
+export function isHomeBreadcrumbPath(path) {
+  return normalizeBreadcrumbPath(path) === HOME_BREADCRUMB_PATH;
+}
+
 /**
  * Parent route when breadcrumb history has no previous entry (e.g. deep link).
  */
@@ -211,6 +222,10 @@ export function getRouteLabel(path) {
  * Lucide icon component for a route path (mobile breadcrumb icons).
  */
 export function getRouteIcon(path) {
+  if (isHomeBreadcrumbPath(path)) {
+    return LayoutDashboard;
+  }
+
   if (staticRouteIcons[path]) {
     return staticRouteIcons[path];
   }

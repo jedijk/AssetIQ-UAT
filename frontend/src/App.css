@@ -1064,26 +1064,18 @@ a, button, input, select, textarea {
   background-color: #f8fafc !important;
 }
 
-/* Mobile simple mode: hero stays below sticky header; buttons scroll independently */
+/* Mobile simple mode: vertically center logo, greeting, and action buttons */
 .operator-landing-layout {
-  height: calc(100dvh - var(--app-header-offset));
-  max-height: calc(100dvh - var(--app-header-offset));
-  overflow: hidden;
-}
-
-.operator-landing-hero {
-  flex-shrink: 0;
-  background-color: #f8fafc;
-}
-
-.operator-landing-actions {
-  flex: 1;
-  min-height: 0;
+  min-height: calc(100dvh - var(--app-header-offset));
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
-  padding-top: 0.5rem;
-  padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px));
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
+}
+
+.operator-landing-content {
+  flex-shrink: 0;
+  width: 100%;
 }
 
 /* Badge sits on the button corner without shrinking the button width */
@@ -1101,11 +1093,6 @@ a, button, input, select, textarea {
 }
 .theme-assetiq .operator-landing-surface,
 [data-theme="assetiq"] .operator-landing-surface {
-  background-color: #f8fafc !important;
-}
-
-.theme-assetiq .operator-landing-hero,
-[data-theme="assetiq"] .operator-landing-hero {
   background-color: #f8fafc !important;
 }
 

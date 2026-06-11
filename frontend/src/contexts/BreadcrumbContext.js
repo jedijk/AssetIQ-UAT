@@ -1,13 +1,47 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from './AuthContext';
+import { useLanguage } from './LanguageContext';
 import {
+  getHomeBreadcrumbPath,
   getParentBreadcrumbPath,
   getRouteLabel,
+  isHomeBreadcrumbPath,
   normalizeBreadcrumbPath,
   shouldExcludeRoute,
 } from '../lib/routeLabels';
 
-function sanitizeHistory(entries) {
+const STORAGE_KEY = 'assetiq_breadcrumb_history';
+const MAX_BREADCRUMBS = 3;
+const MOBILE_MEDIA_QUERY = '(max-width: 639px)';
+
+function makeHomeEntry(homeLabel) {
+  return {
+    path: getHomeBreadcrumbPath(),
+    label: homeLabel,
+    timestamp: 0,
+  };
+}
+
+function normalizeBreadcrumbHistory(entries, homeLabel, max = MAX_BREADCRUMBS) {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return [];
+  }
+
+  let result = entries;
+  if (!isHomeBreadcrumbPath(result[0].path)) {
+    result = [makeHomeEntry(homeLabel), ...result];
+  } else {
+    result = [{ ...result[0], label: homeLabel }, ...result.slice(1)];
+  }
+
+  if (result.length > max) {
+    return [result[0], ...result.slice(-(max - 1))];
+  }
+  return result;
+}
+
+function sanitizeHistory(entries, homeLabel) {
   if (!Array.isArray(entries)) return [];
   const sanitized = [];
   for (const entry of entries) {
@@ -18,15 +52,12 @@ function sanitizeHistory(entries) {
     }
     sanitized.push({
       path,
-      label: getRouteLabel(path),
+      label: isHomeBreadcrumbPath(path) ? homeLabel : getRouteLabel(path),
       timestamp: entry?.timestamp || Date.now(),
     });
   }
-  return sanitized;
+  return normalizeBreadcrumbHistory(sanitized, homeLabel);
 }
-
-const STORAGE_KEY = 'assetiq_breadcrumb_history';
-const MAX_BREADCRUMBS = 3;
 
 /**
  * @typedef {Object} BreadcrumbEntry
@@ -37,6 +68,36 @@ const MAX_BREADCRUMBS = 3;
 
 const BreadcrumbContext = createContext(null);
 
+function useSimpleModeHome() {
+  const { user } = useAuth();
+  const [operatorView, setOperatorView] = useState(
+    () => typeof window !== 'undefined' && localStorage.getItem('operatorViewEnabled') === 'true',
+  );
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(MOBILE_MEDIA_QUERY).matches,
+  );
+
+  useEffect(() => {
+    const onOperatorViewChange = () => {
+      setOperatorView(localStorage.getItem('operatorViewEnabled') === 'true');
+    };
+    const mediaQuery = window.matchMedia(MOBILE_MEDIA_QUERY);
+    const onViewportChange = () => setIsMobile(mediaQuery.matches);
+
+    window.addEventListener('operatorViewChanged', onOperatorViewChange);
+    window.addEventListener('storage', onOperatorViewChange);
+    mediaQuery.addEventListener('change', onViewportChange);
+
+    return () => {
+      window.removeEventListener('operatorViewChanged', onOperatorViewChange);
+      window.removeEventListener('storage', onOperatorViewChange);
+      mediaQuery.removeEventListener('change', onViewportChange);
+    };
+  }, []);
+
+  return isMobile && (user?.role === 'operator' || operatorView);
+}
+
 /**
  * BreadcrumbProvider - Manages navigation history for breadcrumb display
  * Tracks up to 3 most recent pages visited
@@ -44,12 +105,18 @@ const BreadcrumbContext = createContext(null);
 export function BreadcrumbProvider({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useLanguage();
+  const isSimpleModeHome = useSimpleModeHome();
+  const getHomeLabel = useCallback(
+    () => (isSimpleModeHome ? t('simpleMode.home') : t('nav.dashboard')),
+    [isSimpleModeHome, t],
+  );
+
   const [history, setHistory] = useState(() => {
-    // Initialize from sessionStorage
     try {
       const stored = sessionStorage.getItem(STORAGE_KEY);
       if (stored) {
-        return sanitizeHistory(JSON.parse(stored));
+        return sanitizeHistory(JSON.parse(stored), 'Dashboard');
       }
     } catch (e) {
       console.warn('Failed to load breadcrumb history:', e);
@@ -57,10 +124,12 @@ export function BreadcrumbProvider({ children }) {
     return [];
   });
 
-  // Track the last path to prevent duplicate entries
   const lastPathRef = useRef(null);
 
-  // Persist history to sessionStorage
+  useEffect(() => {
+    setHistory((prev) => normalizeBreadcrumbHistory(prev, getHomeLabel()));
+  }, [getHomeLabel]);
+
   useEffect(() => {
     try {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(history));
@@ -69,62 +138,47 @@ export function BreadcrumbProvider({ children }) {
     }
   }, [history]);
 
-  // Track page navigation
   useEffect(() => {
     const currentPath = normalizeBreadcrumbPath(location.pathname);
 
-    // Skip excluded routes (auth pages, mobile, etc.)
     if (shouldExcludeRoute(location.pathname)) {
       return;
     }
 
-    // Skip if same as last path (prevent duplicates on re-renders)
     if (lastPathRef.current === currentPath) {
       return;
     }
     lastPathRef.current = currentPath;
 
-    // Add new entry to history
-    setHistory(prev => {
-      // Check if this path already exists in history
-      const existingIndex = prev.findIndex(entry => entry.path === currentPath);
+    setHistory((prev) => {
+      const existingIndex = prev.findIndex((entry) => entry.path === currentPath);
 
       if (existingIndex !== -1) {
-        // Path exists - truncate history to this point
-        // This happens when user clicks a breadcrumb
-        return prev.slice(0, existingIndex + 1);
+        return normalizeBreadcrumbHistory(
+          prev.slice(0, existingIndex + 1),
+          getHomeLabel(),
+        );
       }
 
-      // Add new entry
       const newEntry = {
         path: currentPath,
-        label: getRouteLabel(currentPath),
+        label: isHomeBreadcrumbPath(currentPath) ? getHomeLabel() : getRouteLabel(currentPath),
         timestamp: Date.now(),
       };
 
-      // Keep only the last MAX_BREADCRUMBS entries
-      const newHistory = [...prev, newEntry];
-      if (newHistory.length > MAX_BREADCRUMBS) {
-        return newHistory.slice(-MAX_BREADCRUMBS);
-      }
-      return newHistory;
+      return normalizeBreadcrumbHistory([...prev, newEntry], getHomeLabel());
     });
-  }, [location.pathname]);
+  }, [getHomeLabel, location.pathname]);
 
-  /**
-   * Navigate to a breadcrumb entry
-   * @param {number} index - Index in the history array
-   */
   const navigateTo = useCallback((index) => {
     if (index >= 0 && index < history.length) {
       const entry = history[index];
       const targetPath = normalizeBreadcrumbPath(entry.path);
-      // Truncate history and skip the pathname tracker on the next navigation
       lastPathRef.current = targetPath;
-      setHistory(prev => prev.slice(0, index + 1));
+      setHistory((prev) => normalizeBreadcrumbHistory(prev.slice(0, index + 1), getHomeLabel()));
       navigate(targetPath);
     }
-  }, [history, navigate]);
+  }, [getHomeLabel, history, navigate]);
 
   const canGoBack = useCallback(() => {
     const currentPath = normalizeBreadcrumbPath(location.pathname);
@@ -143,21 +197,19 @@ export function BreadcrumbProvider({ children }) {
 
     const currentPath = normalizeBreadcrumbPath(location.pathname);
     const parent = getParentBreadcrumbPath(location.pathname);
-    const targetPath = parent && parent !== currentPath ? parent : '/dashboard';
+    const targetPath = parent && parent !== currentPath ? parent : getHomeBreadcrumbPath();
     lastPathRef.current = targetPath;
     setHistory((prev) => {
-      const existingIndex = prev.findIndex((entry) => entry.path === targetPath);
+      const normalized = normalizeBreadcrumbHistory(prev, getHomeLabel());
+      const existingIndex = normalized.findIndex((entry) => entry.path === targetPath);
       if (existingIndex !== -1) {
-        return prev.slice(0, existingIndex + 1);
+        return normalized.slice(0, existingIndex + 1);
       }
-      return prev;
+      return normalized;
     });
     navigate(targetPath);
-  }, [history, location.pathname, navigate, navigateTo]);
+  }, [getHomeLabel, history, location.pathname, navigate, navigateTo]);
 
-  /**
-   * Clear all breadcrumb history
-   */
   const clearHistory = useCallback(() => {
     setHistory([]);
     lastPathRef.current = null;
@@ -168,13 +220,14 @@ export function BreadcrumbProvider({ children }) {
     }
   }, []);
 
-  /**
-   * Get the current breadcrumb trail
-   * @returns {BreadcrumbEntry[]}
-   */
-  const getBreadcrumbs = useCallback(() => {
-    return history;
-  }, [history]);
+  const getBreadcrumbs = useCallback(() => history, [history]);
+
+  const getDisplayLabel = useCallback((entry) => {
+    if (isHomeBreadcrumbPath(entry.path)) {
+      return getHomeLabel();
+    }
+    return entry.label;
+  }, [getHomeLabel]);
 
   const value = {
     history,
@@ -183,6 +236,8 @@ export function BreadcrumbProvider({ children }) {
     canGoBack: canGoBack(),
     clearHistory,
     getBreadcrumbs,
+    getDisplayLabel,
+    isHomeBreadcrumbPath,
     currentPath: location.pathname,
   };
 
@@ -193,10 +248,6 @@ export function BreadcrumbProvider({ children }) {
   );
 }
 
-/**
- * Hook to access breadcrumb navigation
- * @returns {Object} Breadcrumb context value
- */
 export function useBreadcrumb() {
   const context = useContext(BreadcrumbContext);
   if (!context) {

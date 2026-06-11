@@ -204,7 +204,8 @@
     "prompt": "What would you like to do?",
     "equipment": "Equipment",
     "production": "Production",
-    "openTasksAria": "Open tasks: {count}"
+    "openTasksAria": "Open tasks: {count}",
+    "home": "Home"
   },
   "rolePreview": {
     "menu": "Als Rol anzeigen",

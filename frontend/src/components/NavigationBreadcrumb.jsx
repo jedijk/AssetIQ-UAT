@@ -16,7 +16,14 @@ import {
  * Mobile: icon-only trail; desktop: text labels
  */
 const NavigationBreadcrumb = ({ className = '' }) => {
-  const { history, navigateTo, goBack, canGoBack } = useBreadcrumb();
+  const {
+    history,
+    navigateTo,
+    goBack,
+    canGoBack,
+    getDisplayLabel,
+    isHomeBreadcrumbPath,
+  } = useBreadcrumb();
   const breadcrumbs = history || [];
   const showTrail = breadcrumbs.length > 1;
 
@@ -48,8 +55,9 @@ const NavigationBreadcrumb = ({ className = '' }) => {
           >
             {breadcrumbs.map((entry, index) => {
               const isLast = index === breadcrumbs.length - 1;
-              const isFirst = index === 0;
-              const Icon = getRouteIcon(entry.path);
+              const isHome = isHomeBreadcrumbPath(entry.path);
+              const label = getDisplayLabel(entry);
+              const Icon = isHome ? Home : getRouteIcon(entry.path);
               const iconClass = 'w-4 h-4 flex-shrink-0';
 
               return (
@@ -60,8 +68,8 @@ const NavigationBreadcrumb = ({ className = '' }) => {
                   {isLast ? (
                     <span
                       aria-current="page"
-                      aria-label={entry.label}
-                      title={entry.label}
+                      aria-label={label}
+                      title={label}
                       className="inline-flex items-center justify-center p-2 rounded-md bg-slate-100 text-slate-900"
                       style={{ minHeight: '36px', minWidth: '36px' }}
                     >
@@ -71,16 +79,12 @@ const NavigationBreadcrumb = ({ className = '' }) => {
                     <button
                       type="button"
                       onClick={() => navigateTo(index)}
-                      aria-label={entry.label}
-                      title={entry.label}
+                      aria-label={label}
+                      title={label}
                       className="inline-flex items-center justify-center p-2 rounded-md text-slate-500 hover:text-blue-600 hover:bg-blue-50 active:bg-blue-100 transition-colors touch-manipulation"
                       style={{ minHeight: '36px', minWidth: '36px' }}
                     >
-                      {isFirst ? (
-                        <Home className={iconClass} aria-hidden="true" />
-                      ) : (
-                        <Icon className={iconClass} aria-hidden="true" />
-                      )}
+                      <Icon className={iconClass} aria-hidden="true" />
                     </button>
                   )}
                 </React.Fragment>
@@ -93,14 +97,15 @@ const NavigationBreadcrumb = ({ className = '' }) => {
             <BreadcrumbList>
               {breadcrumbs.map((entry, index) => {
                 const isLast = index === breadcrumbs.length - 1;
-                const isFirst = index === 0;
+                const isHome = isHomeBreadcrumbPath(entry.path);
+                const label = getDisplayLabel(entry);
 
                 return (
                   <React.Fragment key={entry.path + '-' + index}>
                     <BreadcrumbItem>
                       {isLast ? (
                         <BreadcrumbPage className="text-slate-900 font-medium max-w-[200px] truncate">
-                          {entry.label}
+                          {label}
                         </BreadcrumbPage>
                       ) : (
                         <BreadcrumbLink asChild>
@@ -109,10 +114,10 @@ const NavigationBreadcrumb = ({ className = '' }) => {
                             onClick={() => navigateTo(index)}
                             className="flex items-center gap-1.5 text-slate-500 hover:text-blue-600 transition-colors cursor-pointer bg-transparent border-none p-0 max-w-[180px]"
                           >
-                            {isFirst && (
+                            {isHome && (
                               <Home className="w-3.5 h-3.5 flex-shrink-0" />
                             )}
-                            <span className="truncate">{entry.label}</span>
+                            <span className="truncate">{label}</span>
                           </button>
                         </BreadcrumbLink>
                       )}

@@ -75,12 +75,11 @@ export default function OperatorLandingPage() {
 
   return (
     <div
-      className="operator-landing-surface operator-landing-layout flex flex-col items-center w-full"
+      className="operator-landing-surface operator-landing-layout flex flex-col items-center justify-center w-full"
       data-testid="operator-landing"
     >
-      {/* Hero stays pinned below the app header; only the action buttons scroll */}
-      <div className="operator-landing-hero flex flex-col items-center px-6 pt-2 pb-2 w-full">
-        <div className="flex w-full max-w-sm flex-col items-center text-center">
+      <div className="operator-landing-content w-full max-w-xs mx-auto px-6 py-6 flex flex-col items-center">
+        <div className="flex w-full flex-col items-center text-center">
           <img
             src={publicAssetUrl("/logo.png")}
             alt=""
@@ -95,10 +94,8 @@ export default function OperatorLandingPage() {
           </h1>
           <p className="operator-landing-subtitle mt-1 text-sm">{t("simpleMode.prompt")}</p>
         </div>
-      </div>
 
-      <div className="operator-landing-actions px-6 pb-8 w-full max-w-xs mx-auto">
-        <div className="grid grid-cols-2 gap-4 w-full pt-2">
+        <div className="grid grid-cols-2 gap-4 w-full mt-6">
           <div className="operator-landing-my-tasks-slot col-span-2">
             <button
               onClick={handleClick(() => navigate("/my-tasks"))}

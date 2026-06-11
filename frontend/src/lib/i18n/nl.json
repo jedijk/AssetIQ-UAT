@@ -204,7 +204,8 @@
     "prompt": "Wat wilt u doen?",
     "equipment": "Apparatuur",
     "production": "Productie",
-    "openTasksAria": "Open taken: {count}"
+    "openTasksAria": "Open taken: {count}",
+    "home": "Home"
   },
   "rolePreview": {
     "menu": "Bekijk als rol",
