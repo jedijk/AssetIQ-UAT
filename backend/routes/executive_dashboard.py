@@ -51,41 +51,23 @@ class ExecutiveDashboardResponse(BaseModel):
     last_updated: str
 
 
-def get_currency_config(user_id: str) -> tuple:
-    """Get currency configuration for user"""
-    # Currency symbols mapping
-    currency_symbols = {
-        "EUR": "€",
-        "USD": "$",
-        "GBP": "£",
-        "CHF": "CHF ",
-        "NOK": "kr ",
-        "SEK": "kr ",
-        "DKK": "kr "
-    }
-    # Default to EUR, but could be fetched from user preferences
-    currency = "EUR"
-    return currency, currency_symbols.get(currency, "€")
-
-
 def calculate_production_value(production_impact: int, hourly_cost: float) -> float:
     """
     Convert production impact score (1-5) to monetary value.
     Based on downtime ranges from observation_workspace.py
     """
-    # Downtime ranges (hours) based on production impact score
     downtime_ranges = {
-        1: (0, 0),      # Minimal: No production impact
-        2: (0, 8),      # Low: < 8 hours
+        1: (0, 4),      # Minimal: 0-4 hours
+        2: (4, 8),      # Low: 4-8 hours
         3: (8, 24),     # Medium: 8-24 hours
         4: (24, 72),    # High: 24-72 hours
-        5: (72, 168),   # Critical: > 72 hours (capped at 1 week for calculation)
+        5: (72, 168),   # Critical: 72+ hours (capped at 1 week)
     }
     
     min_hours, max_hours = downtime_ranges.get(production_impact, (8, 24))
-    # Use max hours for exposure calculation (worst case)
-    hours = max_hours if max_hours else min_hours
-    return hours * hourly_cost
+    # Use average for lifecycle exposure calculation
+    avg_hours = (min_hours + max_hours) / 2
+    return avg_hours * hourly_cost
 
 
 def format_currency(value: float, symbol: str) -> str:
@@ -100,34 +82,22 @@ def format_currency(value: float, symbol: str) -> str:
         return f"{symbol}{value:,.0f}"
 
 
-def calculate_trend(current: float, previous: float) -> tuple:
+def calculate_trend(current: float, previous: float, higher_is_better: bool = False) -> tuple:
     """Calculate trend and percentage change"""
     if previous == 0:
-        return None, "stable"
+        if current == 0:
+            return 0, "stable"
+        return 100 if current > 0 else -100, "degrading" if not higher_is_better else "improving"
     
     change_percent = ((current - previous) / previous) * 100
     
-    if abs(change_percent) < 1:
+    if abs(change_percent) < 2:
         return round(change_percent, 1), "stable"
-    elif change_percent > 0:
-        return round(change_percent, 1), "degrading"  # Higher exposure = degrading
-    else:
-        return round(change_percent, 1), "improving"  # Lower exposure = improving
-
-
-def calculate_coverage_trend(current: float, previous: float) -> tuple:
-    """Calculate trend for coverage percentage (higher = better)"""
-    if previous == 0:
-        return None, "stable"
     
-    change_percent = current - previous  # Absolute change for percentages
-    
-    if abs(change_percent) < 1:
-        return round(change_percent, 1), "stable"
-    elif change_percent > 0:
-        return round(change_percent, 1), "improving"  # Higher coverage = improving
+    if higher_is_better:
+        return round(change_percent, 1), "improving" if change_percent > 0 else "degrading"
     else:
-        return round(change_percent, 1), "degrading"  # Lower coverage = degrading
+        return round(change_percent, 1), "degrading" if change_percent > 0 else "improving"
 
 
 @router.get("")
@@ -143,10 +113,9 @@ async def get_executive_dashboard(
     - AI executive summary
     """
     user_id = current_user["id"]
-    # base_tenant_filter used implicitly through merge_tenant_filter calls
     
     # Get user's production loss configuration
-    hourly_cost = 500.0  # Default
+    hourly_cost = 500.0  # Default EUR/hour
     currency = "EUR"
     currency_symbol = "€"
     
@@ -168,18 +137,29 @@ async def get_executive_dashboard(
     
     # ============= Fetch Data =============
     
-    # 1. Equipment nodes with criticality
-    equipment_filter = merge_tenant_filter({"created_by": user_id}, current_user)
-    equipment_nodes = await db.equipment_nodes.find(
-        equipment_filter,
+    # 1. Get all threats/observations with their criticality data
+    threat_filter = merge_tenant_filter({"created_by": user_id}, current_user)
+    all_threats = await db.threats.find(
+        threat_filter,
         {
-            "_id": 0, "id": 1, "name": 1, "level": 1,
-            "equipment_type_id": 1, "equipment_type": 1,
-            "criticality": 1, "tag": 1
+            "_id": 0, "id": 1, "title": 1, "status": 1, "risk_level": 1, "risk_score": 1,
+            "asset": 1, "equipment_type": 1, "failure_mode": 1, "failure_mode_id": 1,
+            "equipment_criticality_data": 1, "equipment_criticality": 1,
+            "linked_equipment_id": 1, "created_at": 1, "updated_at": 1
         }
-    ).to_list(5000)
+    ).to_list(10000)
     
-    # 2. Equipment type strategies (controls)
+    # 2. Get all observations
+    obs_filter = merge_tenant_filter({"created_by": user_id}, current_user)
+    all_observations = await db.observations.find(
+        obs_filter,
+        {
+            "_id": 0, "id": 1, "equipment_name": 1, "failure_mode_name": 1,
+            "status": 1, "severity": 1, "created_at": 1, "equipment_id": 1
+        }
+    ).to_list(10000)
+    
+    # 3. Get maintenance strategies (controls)
     strategy_filter = merge_tenant_filter({}, current_user)
     strategies = await db.equipment_type_strategies.find(
         strategy_filter,
@@ -188,42 +168,46 @@ async def get_executive_dashboard(
     
     # Build set of equipment types with active controls
     controlled_equipment_types = set()
+    controlled_failure_modes = set()
     for strategy in strategies:
-        if strategy.get("status") == "active" or strategy.get("failure_mode_strategies"):
+        if strategy.get("status") == "active":
             controlled_equipment_types.add(strategy.get("equipment_type_id"))
+        # Also check individual failure mode strategies
+        fm_strategies = strategy.get("failure_mode_strategies") or []
+        for fms in fm_strategies:
+            if fms.get("tasks") or fms.get("pm_tasks") or fms.get("inspection_tasks"):
+                controlled_failure_modes.add(fms.get("failure_mode_id"))
     
-    # 3. Threats/Observations (evidence of degradation)
-    threat_filter = merge_tenant_filter({"created_by": user_id}, current_user)
-    threats = await db.threats.find(
-        threat_filter,
-        {
-            "_id": 0, "id": 1, "title": 1, "status": 1, "risk_level": 1,
-            "asset_name": 1, "equipment_tag": 1, "equipment_id": 1,
-            "created_at": 1, "risk_score": 1, "failure_mode": 1
-        }
+    # 4. Get failure modes from library
+    fm_filter = merge_tenant_filter({}, current_user)
+    failure_modes = await db.failure_modes.find(
+        fm_filter,
+        {"_id": 0, "id": 1, "legacy_id": 1, "failure_mode": 1, "equipment": 1, 
+         "severity": 1, "rpn": 1, "equipment_type_ids": 1}
     ).to_list(5000)
     
-    # 4. Investigations (count for potential future metrics)
-    inv_filter = merge_tenant_filter({"created_by": user_id}, current_user)
-    _ = await db.investigations.count_documents(inv_filter)  # Reserved for future use
+    # Build FM lookup
+    fm_lookup = {}
+    for fm in failure_modes:
+        fm_id = fm.get("id") or fm.get("legacy_id")
+        if fm_id:
+            fm_lookup[fm_id] = fm
     
     # 5. Scheduled tasks (PM compliance)
-    task_filter = merge_tenant_filter({}, current_user)
+    task_filter = merge_tenant_filter({"created_by": user_id}, current_user)
     
-    # Current period tasks
     current_tasks = await db.scheduled_tasks.find({
         **task_filter,
         "scheduled_date": {"$gte": current_period_start.isoformat(), "$lte": now.isoformat()}
     }).to_list(5000)
     
-    # Previous period tasks
     previous_tasks = await db.scheduled_tasks.find({
         **task_filter,
         "scheduled_date": {"$gte": previous_period_start.isoformat(), "$lt": current_period_start.isoformat()}
     }).to_list(5000)
     
     # 6. Form submissions (digital execution)
-    forms_filter = merge_tenant_filter({}, current_user)
+    forms_filter = merge_tenant_filter({"created_by": user_id}, current_user)
     
     current_submissions = await db.form_submissions.find({
         **forms_filter,
@@ -243,154 +227,177 @@ async def get_executive_dashboard(
     active_threat_exposure = 0.0
     critical_active_exposure = 0.0
     
+    # Previous period metrics for trend
+    prev_total_exposure = 0.0
+    prev_covered = 0.0
+    prev_active_threat = 0.0
+    prev_critical = 0.0
+    
     # Evidence drill-down data
     uncovered_evidence = []
     active_threat_evidence = []
     critical_evidence = []
     
-    # Build equipment name to node mapping
-    equipment_map = {}
-    for node in equipment_nodes:
-        name_lower = node.get("name", "").lower()
-        tag = node.get("tag", "")
-        equipment_map[name_lower] = node
-        if tag:
-            equipment_map[tag.lower()] = node
+    # Open statuses
+    open_statuses = {"Open", "open", "New", "new", "In Progress", "in_progress", "Planning", "planning", "Active", "active"}
+    closed_statuses = {"Closed", "closed", "Resolved", "resolved", "Completed", "completed", "Done", "done"}
     
-    # Open threats/observations
-    open_threats = [t for t in threats if t.get("status") not in ["Closed", "closed", "Resolved", "resolved"]]
-    open_threat_equipment = set()
-    for threat in open_threats:
-        asset_name = threat.get("asset_name", "").lower()
-        equipment_tag = threat.get("equipment_tag", "").lower()
-        equipment_id = threat.get("equipment_id", "")
-        if asset_name:
-            open_threat_equipment.add(asset_name)
-        if equipment_tag:
-            open_threat_equipment.add(equipment_tag)
-        if equipment_id:
-            open_threat_equipment.add(equipment_id)
-    
-    # Calculate exposure for each equipment
-    for node in equipment_nodes:
-        criticality = node.get("criticality") or {}
-        production_impact = criticality.get("production_impact") or criticality.get("production", 0) or 0
+    # Process each threat for exposure calculation
+    for threat in all_threats:
+        # Get production impact from criticality data
+        crit_data = threat.get("equipment_criticality_data") or {}
+        production_impact = crit_data.get("production_impact", 0)
         
-        if not production_impact or production_impact < 1:
-            continue
+        # If no criticality data, estimate from risk_score
+        if not production_impact:
+            risk_score = threat.get("risk_score") or threat.get("fmea_score") or 0
+            if risk_score >= 15:
+                production_impact = 5
+            elif risk_score >= 10:
+                production_impact = 4
+            elif risk_score >= 6:
+                production_impact = 3
+            elif risk_score >= 3:
+                production_impact = 2
+            else:
+                production_impact = 1
         
         # Calculate monetary exposure
         exposure_value = calculate_production_value(production_impact, hourly_cost)
+        
+        # Determine if created in current or previous period
+        created_at = threat.get("created_at", "")
+        is_previous_period = (
+            created_at >= previous_period_start.isoformat() and 
+            created_at < current_period_start.isoformat()
+        ) if created_at else False
+        
+        # Always count toward total lifecycle exposure
         total_lifecycle_exposure += exposure_value
+        if is_previous_period:
+            prev_total_exposure += exposure_value
         
-        # Check if equipment type has controls
-        equipment_type = node.get("equipment_type_id") or node.get("equipment_type")
-        has_control = equipment_type in controlled_equipment_types
-        
-        # Check if equipment has active threats
-        node_name_lower = node.get("name", "").lower()
-        node_tag = (node.get("tag") or "").lower()
-        node_id = node.get("id", "")
-        
-        has_active_threat = (
-            node_name_lower in open_threat_equipment or
-            node_tag in open_threat_equipment or
-            node_id in open_threat_equipment
+        # Check if has control
+        equipment_type = threat.get("equipment_type")
+        failure_mode_id = threat.get("failure_mode_id")
+        has_control = (
+            equipment_type in controlled_equipment_types or
+            failure_mode_id in controlled_failure_modes
         )
+        
+        # Check if threat is open/active
+        status = threat.get("status", "")
+        is_open = status in open_statuses or status not in closed_statuses
         
         if has_control:
             covered_by_controls += exposure_value
+            if is_previous_period:
+                prev_covered += exposure_value
         else:
             uncovered_exposure += exposure_value
             uncovered_evidence.append({
-                "asset": node.get("name"),
-                "tag": node.get("tag"),
+                "asset": threat.get("asset") or threat.get("title", "").split(" - ")[0],
+                "failure_mode": threat.get("failure_mode") or threat.get("title"),
                 "equipment_type": equipment_type,
                 "production_impact": production_impact,
-                "exposure_value": exposure_value,
-                "exposure_formatted": format_currency(exposure_value, currency_symbol)
-            })
-        
-        if has_active_threat:
-            active_threat_exposure += exposure_value
-            # Find related threats
-            related_threats = [
-                t for t in open_threats
-                if (t.get("asset_name", "").lower() == node_name_lower or
-                    t.get("equipment_tag", "").lower() == node_tag or
-                    t.get("equipment_id") == node_id)
-            ]
-            active_threat_evidence.append({
-                "asset": node.get("name"),
-                "tag": node.get("tag"),
+                "risk_level": threat.get("risk_level"),
+                "risk_score": threat.get("risk_score"),
                 "exposure_value": exposure_value,
                 "exposure_formatted": format_currency(exposure_value, currency_symbol),
-                "observation_count": len(related_threats),
-                "observations": [{"id": t.get("id"), "title": t.get("title"), "risk_level": t.get("risk_level")} for t in related_threats[:5]]
+                "status": status,
+                "id": threat.get("id")
+            })
+        
+        if is_open:
+            active_threat_exposure += exposure_value
+            if is_previous_period:
+                prev_active_threat += exposure_value
+            
+            active_threat_evidence.append({
+                "asset": threat.get("asset") or threat.get("title", "").split(" - ")[0],
+                "failure_mode": threat.get("failure_mode") or threat.get("title"),
+                "exposure_value": exposure_value,
+                "exposure_formatted": format_currency(exposure_value, currency_symbol),
+                "risk_level": threat.get("risk_level"),
+                "risk_score": threat.get("risk_score"),
+                "status": status,
+                "control_status": "Controlled" if has_control else "No Control",
+                "id": threat.get("id")
             })
             
             if not has_control:
                 critical_active_exposure += exposure_value
+                if is_previous_period:
+                    prev_critical += exposure_value
+                
                 critical_evidence.append({
-                    "asset": node.get("name"),
-                    "tag": node.get("tag"),
+                    "asset": threat.get("asset") or threat.get("title", "").split(" - ")[0],
+                    "failure_mode": threat.get("failure_mode") or threat.get("title"),
                     "equipment_type": equipment_type,
                     "exposure_value": exposure_value,
                     "exposure_formatted": format_currency(exposure_value, currency_symbol),
-                    "observation_count": len(related_threats),
+                    "risk_level": threat.get("risk_level"),
+                    "risk_score": threat.get("risk_score"),
                     "control_status": "No Active Control",
-                    "priority": "Critical"
+                    "priority": "Critical" if threat.get("risk_level") in ["High", "Critical"] else "High",
+                    "id": threat.get("id")
                 })
+    
+    # Also count open observations as active evidence
+    for obs in all_observations:
+        obs_status = obs.get("status", "")
+        if obs_status in open_statuses or obs_status not in closed_statuses:
+            # Estimate exposure from severity
+            severity = obs.get("severity", "Medium")
+            severity_map = {"Critical": 5, "High": 4, "Medium": 3, "Low": 2, "Minimal": 1}
+            prod_impact = severity_map.get(severity, 3)
+            obs_exposure = calculate_production_value(prod_impact, hourly_cost)
+            
+            # Only add if not already counted via threats
+            equipment_id = obs.get("equipment_id")
+            if equipment_id and not any(t.get("linked_equipment_id") == equipment_id for t in all_threats):
+                active_threat_exposure += obs_exposure
     
     # ============= Calculate KPIs =============
     
     # 1. Exposure Coverage %
     coverage_current = (covered_by_controls / total_lifecycle_exposure * 100) if total_lifecycle_exposure > 0 else 0
-    # For previous period, we'd need historical data - using current as baseline for now
-    coverage_previous = coverage_current * 0.95  # Simulated previous (5% lower)
-    coverage_change, coverage_trend = calculate_coverage_trend(coverage_current, coverage_previous)
+    coverage_previous = (prev_covered / prev_total_exposure * 100) if prev_total_exposure > 0 else coverage_current
+    coverage_change, coverage_trend = calculate_trend(coverage_current, coverage_previous, higher_is_better=True)
     
     # 2. PM Compliance %
     current_completed = len([t for t in current_tasks if t.get("status") == "completed"])
-    current_total = len(current_tasks) if current_tasks else 1
+    current_total = len(current_tasks) if current_tasks else 0
     pm_compliance_current = (current_completed / current_total * 100) if current_total > 0 else 0
     
     previous_completed = len([t for t in previous_tasks if t.get("status") == "completed"])
-    previous_total = len(previous_tasks) if previous_tasks else 1
-    pm_compliance_previous = (previous_completed / previous_total * 100) if previous_total > 0 else 0
+    previous_total = len(previous_tasks) if previous_tasks else 0
+    pm_compliance_previous = (previous_completed / previous_total * 100) if previous_total > 0 else pm_compliance_current
     
-    pm_change, pm_trend = calculate_coverage_trend(pm_compliance_current, pm_compliance_previous)
+    pm_change, pm_trend = calculate_trend(pm_compliance_current, pm_compliance_previous, higher_is_better=True)
     
     # 3. Digital Execution Rate %
     current_digital = len(current_submissions)
     previous_digital = len(previous_submissions)
     
-    # Estimate planned digital tasks based on active forms
-    forms_count = await db.forms.count_documents({**forms_filter, "status": "active"})
-    planned_digital_current = max(forms_count * period_days // 7, current_digital)  # At least actual submissions
-    planned_digital_previous = max(forms_count * period_days // 7, previous_digital)
+    # Calculate execution rate relative to previous period
+    # (Using rate for trend, display percentage for card)
     
-    digital_rate_current = (current_digital / planned_digital_current * 100) if planned_digital_current > 0 else 0
-    digital_rate_previous = (previous_digital / planned_digital_previous * 100) if planned_digital_previous > 0 else 0
+    digital_change, digital_trend = calculate_trend(current_digital, previous_digital, higher_is_better=True)
     
-    digital_change, digital_trend = calculate_coverage_trend(digital_rate_current, digital_rate_previous)
+    # For display, show actual count-based rate
+    forms_count = await db.forms.count_documents(merge_tenant_filter({"status": "active"}, current_user))
+    expected_submissions = max(forms_count * period_days // 7, 1)  # At least 1 per week per form
+    digital_execution_pct = min((current_digital / expected_submissions * 100), 100) if expected_submissions > 0 else 0
+    prev_digital_pct = min((previous_digital / expected_submissions * 100), 100) if expected_submissions > 0 else 0
+    
+    digital_change, digital_trend = calculate_trend(digital_execution_pct, prev_digital_pct, higher_is_better=True)
     
     # 4. Active Threat Exposure trend
-    # Count current vs previous period threats
-    current_threat_count = len([t for t in open_threats if t.get("created_at", "") >= current_period_start.isoformat()])
-    previous_threat_count = len([t for t in threats if 
-        t.get("status") not in ["Closed", "closed", "Resolved", "resolved"] and
-        t.get("created_at", "") >= previous_period_start.isoformat() and
-        t.get("created_at", "") < current_period_start.isoformat()
-    ])
-    
-    # Estimate previous active threat exposure
-    previous_active_exposure = active_threat_exposure * (previous_threat_count / max(current_threat_count, 1)) if current_threat_count > 0 else active_threat_exposure * 0.9
-    active_change, active_trend = calculate_trend(active_threat_exposure, previous_active_exposure)
+    active_change, active_trend = calculate_trend(active_threat_exposure, prev_active_threat, higher_is_better=False)
     
     # 5. Critical Active Exposure trend
-    previous_critical_exposure = critical_active_exposure * 0.85  # Simulated (assuming improvement)
-    critical_change, critical_trend = calculate_trend(critical_active_exposure, previous_critical_exposure)
+    critical_change, critical_trend = calculate_trend(critical_active_exposure, prev_critical, higher_is_better=False)
     
     # ============= Build KPI Cards =============
     
@@ -402,21 +409,21 @@ async def get_executive_dashboard(
             change_percent=coverage_change,
             trend=coverage_trend,
             tooltip="Percentage of identified lifecycle exposure currently covered by a reliability control strategy.",
-            evidence_count=len([n for n in equipment_nodes if (n.get("equipment_type_id") or n.get("equipment_type")) in controlled_equipment_types])
+            evidence_count=len([s for s in strategies if s.get("status") == "active"])
         ),
         "active_threat_exposure": KPICard(
             value=active_threat_exposure,
             formatted_value=format_currency(active_threat_exposure, currency_symbol),
-            previous_value=previous_active_exposure,
+            previous_value=prev_active_threat,
             change_percent=active_change,
             trend=active_trend,
             tooltip="Production impact currently associated with active observations, findings, investigations, or alerts.",
-            evidence_count=len(open_threats)
+            evidence_count=len([t for t in all_threats if t.get("status") in open_statuses or t.get("status") not in closed_statuses])
         ),
         "critical_active_exposure": KPICard(
             value=critical_active_exposure,
             formatted_value=format_currency(critical_active_exposure, currency_symbol),
-            previous_value=previous_critical_exposure,
+            previous_value=prev_critical,
             change_percent=critical_change,
             trend=critical_trend,
             tooltip="Production impact associated with active evidence and no control strategy. Requires immediate attention.",
@@ -432,9 +439,9 @@ async def get_executive_dashboard(
             evidence_count=current_completed
         ),
         "digital_execution_rate": KPICard(
-            value=round(digital_rate_current, 1),
-            formatted_value=f"{digital_rate_current:.0f}%",
-            previous_value=round(digital_rate_previous, 1),
+            value=round(digital_execution_pct, 1),
+            formatted_value=f"{digital_execution_pct:.0f}%",
+            previous_value=round(prev_digital_pct, 1),
             change_percent=digital_change,
             trend=digital_trend,
             tooltip="Percentage of reliability activities successfully executed through AssetIQ digital workflows.",
@@ -484,18 +491,23 @@ async def get_executive_dashboard(
     
     # ============= Generate AI Summary =============
     
-    ai_summary = f"""AssetIQ currently manages {format_currency(covered_by_controls, currency_symbol)} of identified lifecycle exposure representing {coverage_current:.0f}% coverage of known reliability threats.
+    threat_count = len(all_threats)
+    open_threat_count = len([t for t in all_threats if t.get("status") in open_statuses or t.get("status") not in closed_statuses])
+    
+    ai_summary = f"""AssetIQ is tracking {threat_count} identified reliability threats with a total lifecycle exposure of {format_currency(total_lifecycle_exposure, currency_symbol)}.
 
-{format_currency(active_threat_exposure, currency_symbol)} of exposure is currently showing active degradation signals. Of this, {format_currency(critical_active_exposure, currency_symbol)} has no active control strategy and requires immediate attention.
+{format_currency(covered_by_controls, currency_symbol)} ({coverage_current:.0f}%) of this exposure is covered by active reliability control strategies.
 
-PM compliance {"remains strong" if pm_compliance_current >= 85 else "needs improvement"} at {pm_compliance_current:.0f}%, with {digital_rate_current:.0f}% of reliability activities executed digitally through AssetIQ."""
+Currently, {open_threat_count} threats representing {format_currency(active_threat_exposure, currency_symbol)} are showing active status. Of these, {format_currency(critical_active_exposure, currency_symbol)} has no active control strategy and requires immediate attention.
+
+PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvement"} at {pm_compliance_current:.0f}%, with {current_digital} digital workflow executions recorded this period."""
     
     # ============= Evidence Drill-Down =============
     
     evidence_drill_down = {
-        "uncovered_exposure": sorted(uncovered_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:20],
-        "active_threat_exposure": sorted(active_threat_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:20],
-        "critical_active_exposure": sorted(critical_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:20]
+        "uncovered_exposure": sorted(uncovered_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:25],
+        "active_threat_exposure": sorted(active_threat_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:25],
+        "critical_active_exposure": sorted(critical_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:25]
     }
     
     return ExecutiveDashboardResponse(
@@ -527,7 +539,6 @@ async def get_evidence_detail(
     Get detailed evidence for a specific metric.
     metric_type: uncovered_exposure, active_threat_exposure, critical_active_exposure
     """
-    # Get full dashboard data and extract the relevant evidence
     dashboard = await get_executive_dashboard(current_user=current_user)
     
     if metric_type not in dashboard.evidence_drill_down:
