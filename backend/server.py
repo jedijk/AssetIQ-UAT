@@ -525,7 +525,7 @@ async def add_security_headers(request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = (
-        "accelerometer=(), autoplay=(), camera=(), clipboard-read=(), clipboard-write=(), "
+        "accelerometer=(), autoplay=(), camera=(), clipboard-read=(), clipboard-write=(self), "
         "geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), "
         "picture-in-picture=(), usb=()"
     )

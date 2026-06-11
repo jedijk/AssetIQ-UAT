@@ -66,6 +66,25 @@ import { useOfflineSync } from "../hooks/useOfflineSync";
 import { usePageTracking } from "../hooks/useAnalyticsTracking";
 import { AppErrorBoundary } from "./AppErrorBoundary";
 import { useCapabilities } from "../core/performance";
+
+/** Skip pull-to-refresh when the user is scrolling inside a nested pane (tiles, chat, etc.). */
+function touchIsInNestedScrollPane(target) {
+  let el = target instanceof Element ? target : null;
+  while (el && el !== document.documentElement) {
+    if (el.classList.contains("mobile-scroll-pane")) return true;
+    if (el.closest?.('[data-testid="chat-sidebar"]')) return true;
+    const style = window.getComputedStyle(el);
+    const overflowY = style.overflowY;
+    const isScrollable =
+      (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") &&
+      el.scrollHeight > el.clientHeight + 1;
+    const hasMaxHeight = style.maxHeight && style.maxHeight !== "none";
+    if (isScrollable && hasMaxHeight) return true;
+    el = el.parentElement;
+  }
+  return false;
+}
+
 const Layout = () => {
   const { user, logout, mustChangePassword, mustAcceptTerms } = useAuth();
   const { hasPermission, canSeeNavItem } = usePermissions();
@@ -175,6 +194,11 @@ const Layout = () => {
       // Store the initial scroll position and touch position
       startScrollY = window.scrollY;
       touchStartY.current = e.touches[0].clientY;
+
+      if (touchIsInNestedScrollPane(e.target)) {
+        setIsPulling(false);
+        return;
+      }
       
       // Only enable pull-to-refresh when:
       // 1. Truly at the top (scrollY === 0)
@@ -189,6 +213,14 @@ const Layout = () => {
     };
 
     const handleTouchMove = (e) => {
+      if (touchIsInNestedScrollPane(e.target)) {
+        if (isPulling) {
+          setPullDistance(0);
+          setIsPulling(false);
+        }
+        return;
+      }
+
       // Exit early if not pulling or already refreshing
       if (!isPulling || isRefreshing) return;
       

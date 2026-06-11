@@ -9,6 +9,8 @@ import {
   PRODUCTION_DASH_INFO_ACTION_BTN,
   PRODUCTION_DASH_INFO_ACTION_EDIT,
   PRODUCTION_DASH_INFO_ACTION_DELETE,
+  PRODUCTION_TILE_SCROLL_CLASS,
+  PRODUCTION_TILE_SCROLL_CLASS_SM,
 } from "./productionDashboardShared";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -58,7 +60,7 @@ export function ProductionShiftPanels({
                   )}
                 </div>
               </div>
-              <div className="max-h-[240px] overflow-y-auto">
+              <div className={PRODUCTION_TILE_SCROLL_CLASS}>
                 {data?.end_of_shift_entries?.length > 0 ? (
                   <table className="w-full text-xs">
                     <thead>
@@ -213,7 +215,7 @@ export function ProductionShiftPanels({
                   )}
                 </div>
               </div>
-              <div className={isMobile ? "" : "max-h-[200px] overflow-y-auto"}>
+              <div className={PRODUCTION_TILE_SCROLL_CLASS_SM}>
                 {data?.big_bag_entries?.length > 0 ? (
                   isMobile ? (
                     /* Mobile Card View for Big Bag */
@@ -330,7 +332,7 @@ export function ProductionShiftPanels({
                   )}
                 </div>
               </div>
-              <div className={isMobile ? "" : "max-h-[200px] overflow-y-auto"}>
+              <div className={PRODUCTION_TILE_SCROLL_CLASS_SM}>
                 {data?.information_entries?.length > 0 ? (
                   <div className="space-y-2">
                     {sortedInformationEntries.map((row, i) => (

@@ -290,7 +290,7 @@ export default function DashboardPageMain({ initialTab }) {
   }, [viewingImage, closeImageLightbox]);
 
   // Navigation state for back button support
-  const navState = { from: "dashboard", fromPage: "Dashboard" };
+  const navState = { from: "dashboard", fromPage: "Dashboard", breadcrumbOrigin: "/dashboard" };
   
   // Fetch users for owner filter
   const { data: usersData } = useQuery({
@@ -695,7 +695,7 @@ export default function DashboardPageMain({ initialTab }) {
       </div>
       
       {/* Scrollable Tab Content */}
-      <div className="flex-1 overflow-y-auto px-6 pb-6">
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6">
         <div className="max-w-7xl mx-auto">
           {/* Operational Dashboard Tab */}
           {activeTab === "operational" && canShowOperational && (

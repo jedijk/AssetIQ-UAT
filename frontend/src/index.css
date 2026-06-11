@@ -271,6 +271,14 @@
     .animate-pulse-ring {
         animation: pulseRing 1.5s ease-out infinite;
     }
+
+    .mobile-scroll-pane {
+        min-height: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-y: contain;
+        touch-action: pan-y;
+    }
 }
 
 @keyframes fadeIn {

@@ -168,6 +168,10 @@ export function formTemplateFieldTypeKey(field) {
   return typeof raw === "string" ? raw.trim().toLowerCase() : "text";
 }
 
+/** Scrollable production tile body — keeps nested touch scroll working on mobile. */
+export const PRODUCTION_TILE_SCROLL_CLASS = "max-h-[240px] mobile-scroll-pane";
+export const PRODUCTION_TILE_SCROLL_CLASS_SM = "max-h-[200px] mobile-scroll-pane";
+
 /** Production Log–style icon buttons for dashboard tables */
 export const PRODUCTION_DASH_ACTION_EDIT = "p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors";
 export const PRODUCTION_DASH_ACTION_DELETE = "p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors";
@@ -269,7 +273,7 @@ export function WasteReportingPanel({
           )}
         </div>
       </div>
-      <div className="max-h-[240px] overflow-y-auto">
+      <div className={PRODUCTION_TILE_SCROLL_CLASS}>
         {entries?.length > 0 ? (
           isMobile ? (
             <div className="space-y-1">

@@ -110,7 +110,7 @@ export function MooneyViscosityChart({
                   </ComposedChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="overflow-x-auto max-h-[260px] overflow-y-auto rounded-lg border border-slate-100 -mx-1">
+                <div className="overflow-x-auto max-h-[260px] mobile-scroll-pane rounded-lg border border-slate-100 -mx-1">
                   <table className="w-full text-[11px]">
                     <thead className="sticky top-0 bg-slate-50 text-slate-600 z-[1]">
                       <tr>

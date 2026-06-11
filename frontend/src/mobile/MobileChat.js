@@ -188,9 +188,11 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
         .mobile-chat {
           position: fixed;
           inset: 0;
+          height: 100dvh;
           background: #f1f5f9;
           display: flex;
           flex-direction: column;
+          min-height: 0;
           z-index: 200;
         }
 
@@ -198,6 +200,7 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
           display: flex;
           align-items: center;
           justify-content: space-between;
+          flex-shrink: 0;
           padding: 16px;
           background: #ffffff;
           border-bottom: 1px solid #e2e8f0;
@@ -255,8 +258,12 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
         }
 
         .chat-messages {
-          flex: 1;
+          flex: 1 1 auto;
+          min-height: 0;
           overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+          overscroll-behavior-y: contain;
+          touch-action: pan-y;
           padding: 16px;
         }
 
@@ -470,6 +477,7 @@ const MobileChat = ({ onClose, prefillMessage, onPrefillConsumed }) => {
         }
 
         .chat-input-container {
+          flex-shrink: 0;
           padding: 12px 16px;
           padding-bottom: max(16px, env(safe-area-inset-bottom));
           background: #ffffff;

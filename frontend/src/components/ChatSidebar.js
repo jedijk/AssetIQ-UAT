@@ -756,11 +756,11 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
 
       {/* Sidebar */}
       <div
-        className="fixed right-0 top-0 h-full w-full sm:w-[400px] bg-slate-50 shadow-2xl z-[220] flex flex-col"
+        className="fixed right-0 top-0 h-[100dvh] w-full sm:w-[400px] bg-slate-50 shadow-2xl z-[220] flex flex-col min-h-0"
         data-testid="chat-sidebar"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-3 py-2.5 sm:p-4 border-b border-slate-200 bg-white">
+        <div className="flex-shrink-0 flex items-center justify-between px-3 py-2.5 sm:p-4 border-b border-slate-200 bg-white">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
               <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
@@ -835,7 +835,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
         </div>
 
         {/* Messages */}
-        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-2 py-3 sm:p-4 space-y-3 sm:space-y-4 custom-scrollbar">
+        <div ref={messagesContainerRef} className="flex-1 min-h-0 mobile-scroll-pane px-2 py-3 sm:p-4 space-y-3 sm:space-y-4 custom-scrollbar">
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
               <div className="loading-dots">
@@ -892,7 +892,7 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
         </div>
 
         {/* Input Area - WhatsApp Style */}
-        <div className="border-t border-slate-200 bg-slate-100 px-2 py-2 sm:p-3">
+        <div className="flex-shrink-0 border-t border-slate-200 bg-slate-100 px-2 py-2 sm:p-3">
           {/* Image Preview */}
           {imagePreview && (
             <div className="mb-2 sm:mb-3 px-1">
