@@ -208,30 +208,72 @@ function MockHierarchyZoom() {
 
 function MockContextMenu() {
   return (
-    <div className="relative w-full max-w-lg" data-testid="tour-mock-context-menu">
+    <div className="relative w-full max-w-2xl" data-testid="tour-mock-context-menu">
       <PanelShell>
-        <FakeWindowChrome title="Right-click equipment" />
+        <FakeWindowChrome title="Asset Hierarchy" />
         <div className="p-3 sm:p-4">
-          <div className="relative">
-            <ul className="space-y-1.5 text-sm text-slate-200">
+          <div className="relative min-h-[220px] sm:min-h-[260px]">
+            {/* Hierarchy list */}
+            <ul className="space-y-1.5 text-sm text-slate-200 w-full sm:w-1/2">
               <li className="flex items-center gap-1.5">
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <Factory className="w-3.5 h-3.5 text-blue-300" />
+                Plant Alpha
+              </li>
+              <li className="pl-5 flex items-center gap-1.5">
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                 <Cpu className="w-3.5 h-3.5 text-blue-300" />
                 Production Line 1
               </li>
-              <li className="pl-5 flex items-center gap-1.5 text-blue-100 font-medium">
+
+              {/* The highlighted row — anchor for context menu + cursor */}
+              <li className="pl-10 relative">
+                <motion.div
+                  id="ctxmenu-anchor"
+                  initial={{ backgroundColor: "rgba(59,130,246,0)" }}
+                  animate={{
+                    backgroundColor: [
+                      "rgba(59,130,246,0)",
+                      "rgba(59,130,246,0.20)",
+                      "rgba(59,130,246,0.28)",
+                    ],
+                  }}
+                  transition={{ duration: 0.6, delay: 0.6 }}
+                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 border border-blue-400/40 text-blue-100 font-medium"
+                >
+                  <Gauge className="w-3.5 h-3.5" />
+                  Pump P-101
+                  <motion.span
+                    initial={{ opacity: 0, scale: 0.85 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 1.0, duration: 0.3 }}
+                    className="ml-auto inline-flex items-center gap-1 rounded-md bg-slate-900/70 border border-white/15 text-[10px] uppercase tracking-wider text-blue-200 px-1.5 py-0.5"
+                  >
+                    Right-click
+                  </motion.span>
+                </motion.div>
+              </li>
+
+              <li className="pl-10 flex items-center gap-1.5 text-slate-300/80">
                 <Gauge className="w-3.5 h-3.5" />
-                Pump P-101
+                Pump P-102
+              </li>
+              <li className="pl-10 flex items-center gap-1.5 text-slate-300/80">
+                <Cpu className="w-3.5 h-3.5" />
+                Motor M-201
               </li>
             </ul>
 
-            {/* Context menu */}
+            {/* Context menu — anchored to the right of the highlighted row */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: -4 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ delay: 0.25, duration: 0.35 }}
-              className="absolute top-9 left-10 sm:left-32 w-[14rem] sm:w-60 max-w-[calc(100%-2.5rem)] rounded-xl border border-white/15 bg-slate-800/95 backdrop-blur-xl shadow-2xl overflow-hidden"
+              initial={{ opacity: 0, scale: 0.92, y: -6, x: -8 }}
+              animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
+              transition={{ delay: 1.2, duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              style={{ transformOrigin: "top left" }}
+              className="absolute top-[80px] sm:top-[78px] left-[38%] sm:left-[48%] w-[15rem] sm:w-64 max-w-[calc(100%-1rem)] rounded-xl border border-white/15 bg-slate-800/95 backdrop-blur-xl shadow-[0_20px_60px_-12px_rgba(0,0,0,0.7)] overflow-hidden"
             >
-              <div className="px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-slate-400 border-b border-white/10">
+              <div className="px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-slate-400 border-b border-white/10 flex items-center gap-1.5">
+                <Gauge className="w-3 h-3 text-blue-300" />
                 Pump P-101
               </div>
               <motion.button
@@ -240,48 +282,98 @@ function MockContextMenu() {
                 animate={{
                   backgroundColor: [
                     "rgba(59,130,246,0)",
-                    "rgba(59,130,246,0.22)",
-                    "rgba(59,130,246,0)",
+                    "rgba(59,130,246,0.32)",
+                    "rgba(59,130,246,0.12)",
                   ],
                 }}
-                transition={{ duration: 1.6, repeat: Infinity, delay: 1.1 }}
-                className="w-full px-3 py-2 flex items-center gap-2 text-sm text-blue-200 hover:bg-blue-500/20 text-left"
+                transition={{ duration: 1.4, delay: 1.8, repeat: Infinity, repeatType: "reverse" }}
+                className="w-full px-3 py-2 flex items-center gap-2 text-sm text-blue-100 text-left"
               >
-                <Plus className="w-4 h-4" />
-                Add Observation
+                <Plus className="w-4 h-4 text-blue-300" />
+                <span className="font-medium">Add Observation</span>
+                <motion.span
+                  initial={{ opacity: 0, x: -4 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 2.0 }}
+                  className="ml-auto"
+                >
+                  <ChevronRight className="w-3.5 h-3.5 text-blue-300/70" />
+                </motion.span>
               </motion.button>
               <button
                 type="button"
-                className="w-full px-3 py-2 flex items-center gap-2 text-sm text-slate-200 hover:bg-white/10 text-left"
+                className="w-full px-3 py-2 flex items-center gap-2 text-sm text-slate-200 text-left hover:bg-white/5"
               >
-                <Activity className="w-4 h-4" />
+                <Activity className="w-4 h-4 text-slate-400" />
                 View Timeline
               </button>
               <button
                 type="button"
-                className="w-full px-3 py-2 flex items-center gap-2 text-sm text-slate-200 hover:bg-white/10 text-left"
+                className="w-full px-3 py-2 flex items-center gap-2 text-sm text-slate-200 text-left hover:bg-white/5"
               >
-                <Wrench className="w-4 h-4" />
+                <Wrench className="w-4 h-4 text-slate-400" />
                 Linked Actions
+              </button>
+              <button
+                type="button"
+                className="w-full px-3 py-2 flex items-center gap-2 text-sm text-slate-200 text-left hover:bg-white/5"
+              >
+                <Eye className="w-4 h-4 text-slate-400" />
+                Open details
               </button>
             </motion.div>
 
-            {/* Faux cursor */}
+            {/* Faux cursor with right-click indicator */}
             <motion.div
-              initial={{ x: 60, y: 8, opacity: 0 }}
-              animate={{ x: 156, y: 56, opacity: 1 }}
-              transition={{ delay: 0.4, duration: 0.8, ease: "easeInOut" }}
-              className="absolute top-0 left-0 pointer-events-none"
+              initial={{ left: "8%", top: 6, opacity: 0 }}
+              animate={{
+                left: ["8%", "26%", "26%", "48%"],
+                top: [6, 78, 78, 116],
+                opacity: [0, 1, 1, 1],
+              }}
+              transition={{
+                duration: 1.6,
+                times: [0, 0.5, 0.75, 1],
+                delay: 0.1,
+                ease: "easeInOut",
+              }}
+              className="absolute pointer-events-none"
             >
-              <div className="w-3 h-3 rotate-[-12deg]">
-                <svg viewBox="0 0 16 16" className="w-full h-full drop-shadow-lg">
+              <div className="relative">
+                {/* Cursor arrow */}
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-5 h-5 drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]"
+                >
                   <path
-                    d="M1 1 L11 6 L6 7 L4 12 Z"
+                    d="M3 2 L18 11 L11 12 L8 19 Z"
                     fill="white"
                     stroke="black"
-                    strokeWidth="0.8"
+                    strokeWidth="1"
+                    strokeLinejoin="round"
                   />
                 </svg>
+                {/* Right-click ripple */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.4 }}
+                  animate={{ opacity: [0, 0.9, 0], scale: [0.4, 1.6, 1.6] }}
+                  transition={{ duration: 0.7, delay: 0.95, times: [0, 0.4, 1] }}
+                  className="absolute -left-1.5 -top-1.5 w-8 h-8 rounded-full border-2 border-blue-300"
+                />
+                {/* Right-click badge — fades out after the click ripple */}
+                <motion.div
+                  initial={{ opacity: 0, y: -4, scale: 0.85 }}
+                  animate={{ opacity: [0, 1, 1, 0], y: [-4, 0, 0, 0], scale: [0.85, 1, 1, 1] }}
+                  transition={{
+                    duration: 1.4,
+                    delay: 1.0,
+                    times: [0, 0.15, 0.7, 1],
+                  }}
+                  className="absolute left-5 top-2 inline-flex items-center gap-1 rounded-md bg-slate-900/95 border border-white/20 text-[10px] uppercase tracking-wider text-blue-200 px-1.5 py-0.5 whitespace-nowrap shadow-lg"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                  Right click
+                </motion.div>
               </div>
             </motion.div>
           </div>
@@ -292,7 +384,7 @@ function MockContextMenu() {
       <motion.div
         initial={{ opacity: 0, x: 60 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 2.4, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ delay: 2.6, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         className="mt-3"
       >
         <PanelShell className="py-3 px-4">
