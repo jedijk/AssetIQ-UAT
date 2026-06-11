@@ -13,7 +13,7 @@ export default defineConfig({
   use: {
     baseURL: process.env.CI
       ? (process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000')
-      : (process.env.REACT_APP_BACKEND_URL || 'https://trail-back.preview.emergentagent.com'),
+      : (process.env.REACT_APP_BACKEND_URL || 'https://navigation-ops-patch.preview.emergentagent.com'),
     screenshot: 'on',
     trace: 'on-first-retry',
     headless: true,

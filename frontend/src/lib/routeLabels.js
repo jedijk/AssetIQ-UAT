@@ -183,6 +183,8 @@ export function shouldSkipDetailAnchorInjection(entries) {
     || beforePath === '/actions'
     || beforePath === '/threats'
     || beforePath === '/reliability/cases'
+    || beforePath === '/dashboard'  // Skip anchor injection when coming from ops dashboard
+    || beforePath === '/'  // Also skip when from root
   );
 }
 

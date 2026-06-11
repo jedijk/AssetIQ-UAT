@@ -743,6 +743,40 @@ agent_communication:
   - agent: "main"
     message: "Implemented PM Import Extraction Engine enhancements per the AssetIQ spec. Key changes: (1) Enhanced _parse_excel to treat worksheets as hierarchical documents, not row-by-row. (2) Column A is the ONLY source for equipment tags. (3) EVERY equipment tag now results in a separate task record - if 50 tags share the same task, 50 records are created. (4) Proper merged cell handling - merged task descriptions apply to all equipment tags in the block. (5) Tags above/below tasks are properly associated. (6) Expansion happens BEFORE AI enrichment. (7) Added self-validation to verify tag count == record count. Please test the PM Import upload endpoint with an Excel file containing multiple equipment tags sharing tasks."
 
+user_problem_statement: "Test the breadcrumb navigation fix for the Actions page - When navigating from Dashboard to Action Detail, breadcrumb should show Dashboard > Action Detail (NOT Dashboard > Actions > Action Detail)"
+
+frontend:
+  - task: "Breadcrumb Navigation Fix for Actions Page"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/lib/routeLabels.js, /app/frontend/src/contexts/BreadcrumbContext.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: Breadcrumb navigation fix is working correctly. When navigating from Dashboard (Ops dashboard) to an Action Detail page by clicking on an action in the 'Recent Actions' section, the breadcrumb correctly shows 'Dashboard > Action Detail' WITHOUT the Actions list page in between. The fix in routeLabels.js line 186 (shouldSkipDetailAnchorInjection function) correctly skips injecting the /actions list page when coming from /dashboard. Back navigation also works correctly - clicking the Back button returns to Dashboard (not to Actions list). Visual verification from screenshots confirms the breadcrumb displays correctly with Home icon + Dashboard > Action Detail. Test scenario: (1) Login successful, (2) Switched to Operational dashboard tab, (3) Found 5 action items in Recent Actions section, (4) Clicked on action item, navigated to action detail page, (5) Breadcrumb showed 'Dashboard > Action Detail' (verified visually in screenshot), (6) Back button clicked, returned to Dashboard. All expected behaviors confirmed working."
+
+metadata:
+  created_by: "testing_agent"
+  version: "1.0"
+  test_sequence: 2
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "Breadcrumb Navigation Fix for Actions Page"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "user"
+    message: "Test the breadcrumb navigation fix for the Actions page. Scenario: (1) Login, (2) From Dashboard (ops dashboard), locate Recent Actions section, (3) Click on action item to navigate to action detail page, (4) Verify breadcrumb shows Dashboard > Action Detail (NOT Dashboard > Actions > Action Detail), (5) Click Back button to verify it returns to Dashboard (NOT to Actions list page)."
+  - agent: "testing"
+    message: "BREADCRUMB NAVIGATION FIX VERIFIED - TEST PASSED. Successfully tested the breadcrumb navigation fix for Actions page. When navigating from Dashboard to Action Detail by clicking on an action in the Recent Actions section, the breadcrumb correctly displays 'Dashboard > Action Detail' without the Actions list page in between. The fix in /app/frontend/src/lib/routeLabels.js (shouldSkipDetailAnchorInjection function, line 186) correctly identifies when navigation comes from /dashboard and skips injecting the /actions anchor. Back navigation also works correctly - clicking the Back button returns to Dashboard instead of the Actions list page. Visual verification from screenshots confirms the breadcrumb UI displays correctly. Test completed successfully with all expected behaviors confirmed."
+
 # PM Import Extraction Engine Enhancement
 backend:
   - task: "PM Import Extraction Engine - Hierarchical Document Processing"

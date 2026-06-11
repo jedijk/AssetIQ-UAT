@@ -230,37 +230,13 @@ export function BreadcrumbProvider({ children }) {
   const goBack = useCallback(() => {
     const prev = historyRef.current;
     if (prev.length > 1) {
-      const previous = prev[prev.length - 2];
-      const current = prev[prev.length - 1];
-      const parentPath = getParentBreadcrumbPath(current.path);
-
-      if (
-        parentPath
-        && isHomeBreadcrumbPath(previous.path)
-        && parentPath !== normalizeBreadcrumbPath(current.path)
-      ) {
-        const existingIndex = prev.findIndex((entry) => entry.path === parentPath);
-        const nextHistory = existingIndex !== -1
-          ? normalizeBreadcrumbHistory(prev.slice(0, existingIndex + 1), getHomeLabel())
-          : normalizeBreadcrumbHistory(
-            [
-              ...prev,
-              {
-                path: parentPath,
-                label: getRouteLabel(parentPath),
-                timestamp: Date.now(),
-              },
-            ],
-            getHomeLabel(),
-          );
-        navigateToPath(parentPath, nextHistory);
-        return;
-      }
-
+      // Simply go back to the previous entry in history
+      // This respects the actual navigation path the user took
       navigateTo(prev.length - 2);
       return;
     }
 
+    // If no history, fall back to parent path or home
     const currentPath = normalizeBreadcrumbPath(location.pathname);
     const parent = getParentBreadcrumbPath(location.pathname);
     const targetPath = parent && parent !== currentPath ? parent : getHomeBreadcrumbPath();
