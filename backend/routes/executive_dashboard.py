@@ -1,6 +1,8 @@
 """
 Executive Dashboard - Reliability Value Management
 Provides executives with visibility into production value exposure and reliability controls.
+
+NOTE: In AssetIQ, "threats" are called "observations" - this is the primary data source.
 """
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional, Dict, Any, List
@@ -49,6 +51,19 @@ class ExecutiveDashboardResponse(BaseModel):
     ai_summary: str
     evidence_drill_down: Dict[str, List[Dict[str, Any]]]
     last_updated: str
+
+
+def severity_to_production_impact(severity: str) -> int:
+    """Convert observation severity to production impact score (1-5)"""
+    severity_map = {
+        "critical": 5,
+        "high": 4,
+        "medium": 3,
+        "low": 2,
+        "minimal": 1,
+        "none": 1
+    }
+    return severity_map.get((severity or "").lower(), 3)
 
 
 def calculate_production_value(production_impact: int, hourly_cost: float) -> float:
@@ -107,7 +122,7 @@ async def get_executive_dashboard(
 ) -> ExecutiveDashboardResponse:
     """
     Get executive dashboard data including:
-    - Exposure waterfall metrics
+    - Exposure waterfall metrics based on OBSERVATIONS (threats)
     - KPI cards with trends
     - Drill-down evidence data
     - AI executive summary
@@ -137,27 +152,28 @@ async def get_executive_dashboard(
     
     # ============= Fetch Data =============
     
-    # 1. Get all threats/observations with their criticality data
-    threat_filter = merge_tenant_filter({"created_by": user_id}, current_user)
-    all_threats = await db.threats.find(
-        threat_filter,
-        {
-            "_id": 0, "id": 1, "title": 1, "status": 1, "risk_level": 1, "risk_score": 1,
-            "asset": 1, "equipment_type": 1, "failure_mode": 1, "failure_mode_id": 1,
-            "equipment_criticality_data": 1, "equipment_criticality": 1,
-            "linked_equipment_id": 1, "created_at": 1, "updated_at": 1
-        }
-    ).to_list(10000)
-    
-    # 2. Get all observations
+    # 1. Get all OBSERVATIONS (these are the threats in AssetIQ)
     obs_filter = merge_tenant_filter({"created_by": user_id}, current_user)
     all_observations = await db.observations.find(
         obs_filter,
         {
-            "_id": 0, "id": 1, "equipment_name": 1, "failure_mode_name": 1,
-            "status": 1, "severity": 1, "created_at": 1, "equipment_id": 1
+            "_id": 0, "id": 1, "equipment_id": 1, "equipment_name": 1,
+            "failure_mode_id": 1, "failure_mode_name": 1, "description": 1,
+            "severity": 1, "status": 1, "observation_type": 1, "source": 1,
+            "linked_action_ids": 1, "efm_id": 1,
+            "created_at": 1, "updated_at": 1, "created_by": 1
         }
     ).to_list(10000)
+    
+    # 2. Get equipment nodes with criticality data
+    equipment_filter = merge_tenant_filter({"created_by": user_id}, current_user)
+    equipment_nodes = await db.equipment_nodes.find(
+        equipment_filter,
+        {"_id": 0, "id": 1, "name": 1, "criticality": 1, "equipment_type_id": 1}
+    ).to_list(5000)
+    
+    # Build equipment lookup
+    equipment_map = {eq.get("id"): eq for eq in equipment_nodes if eq.get("id")}
     
     # 3. Get maintenance strategies (controls)
     strategy_filter = merge_tenant_filter({}, current_user)
@@ -166,32 +182,30 @@ async def get_executive_dashboard(
         {"_id": 0, "equipment_type_id": 1, "status": 1, "failure_mode_strategies": 1}
     ).to_list(500)
     
-    # Build set of equipment types with active controls
+    # Build set of equipment types and failure modes with active controls
     controlled_equipment_types = set()
     controlled_failure_modes = set()
     for strategy in strategies:
         if strategy.get("status") == "active":
             controlled_equipment_types.add(strategy.get("equipment_type_id"))
-        # Also check individual failure mode strategies
         fm_strategies = strategy.get("failure_mode_strategies") or []
         for fms in fm_strategies:
             if fms.get("tasks") or fms.get("pm_tasks") or fms.get("inspection_tasks"):
                 controlled_failure_modes.add(fms.get("failure_mode_id"))
     
-    # 4. Get failure modes from library
-    fm_filter = merge_tenant_filter({}, current_user)
-    failure_modes = await db.failure_modes.find(
-        fm_filter,
-        {"_id": 0, "id": 1, "legacy_id": 1, "failure_mode": 1, "equipment": 1, 
-         "severity": 1, "rpn": 1, "equipment_type_ids": 1}
+    # 4. Get Equipment Failure Modes (EFMs) for additional control info
+    efm_filter = merge_tenant_filter({}, current_user)
+    efms = await db.equipment_failure_modes.find(
+        efm_filter,
+        {"_id": 0, "id": 1, "equipment_id": 1, "failure_mode_id": 1, "has_strategy": 1}
     ).to_list(5000)
     
-    # Build FM lookup
-    fm_lookup = {}
-    for fm in failure_modes:
-        fm_id = fm.get("id") or fm.get("legacy_id")
-        if fm_id:
-            fm_lookup[fm_id] = fm
+    # Build EFM control lookup
+    efm_with_strategy = set()
+    for efm in efms:
+        if efm.get("has_strategy"):
+            efm_with_strategy.add(efm.get("id"))
+            efm_with_strategy.add(f"{efm.get('equipment_id')}_{efm.get('failure_mode_id')}")
     
     # 5. Scheduled tasks (PM compliance)
     task_filter = merge_tenant_filter({"created_by": user_id}, current_user)
@@ -239,34 +253,32 @@ async def get_executive_dashboard(
     critical_evidence = []
     
     # Open statuses
-    open_statuses = {"Open", "open", "New", "new", "In Progress", "in_progress", "Planning", "planning", "Active", "active"}
-    closed_statuses = {"Closed", "closed", "Resolved", "resolved", "Completed", "completed", "Done", "done"}
+    open_statuses = {"open", "new", "in_progress", "planning", "active", "investigating"}
+    closed_statuses = {"closed", "resolved", "completed", "done", "dismissed"}
     
-    # Process each threat for exposure calculation
-    for threat in all_threats:
-        # Get production impact from criticality data
-        crit_data = threat.get("equipment_criticality_data") or {}
-        production_impact = crit_data.get("production_impact", 0)
+    # Process each OBSERVATION for exposure calculation
+    for obs in all_observations:
+        # Get production impact from equipment criticality or observation severity
+        equipment_id = obs.get("equipment_id")
+        equipment = equipment_map.get(equipment_id) if equipment_id else None
         
-        # If no criticality data, estimate from risk_score
-        if not production_impact:
-            risk_score = threat.get("risk_score") or threat.get("fmea_score") or 0
-            if risk_score >= 15:
-                production_impact = 5
-            elif risk_score >= 10:
-                production_impact = 4
-            elif risk_score >= 6:
-                production_impact = 3
-            elif risk_score >= 3:
-                production_impact = 2
-            else:
-                production_impact = 1
+        # Priority: Equipment criticality > Observation severity
+        production_impact = 3  # Default medium
+        if equipment and equipment.get("criticality"):
+            crit = equipment.get("criticality")
+            if isinstance(crit, dict):
+                production_impact = crit.get("production_impact") or crit.get("production", 3)
+            elif isinstance(crit, (int, float)):
+                production_impact = int(crit)
+        else:
+            # Fall back to observation severity
+            production_impact = severity_to_production_impact(obs.get("severity"))
         
         # Calculate monetary exposure
         exposure_value = calculate_production_value(production_impact, hourly_cost)
         
         # Determine if created in current or previous period
-        created_at = threat.get("created_at", "")
+        created_at = obs.get("created_at", "")
         is_previous_period = (
             created_at >= previous_period_start.isoformat() and 
             created_at < current_period_start.isoformat()
@@ -278,16 +290,36 @@ async def get_executive_dashboard(
             prev_total_exposure += exposure_value
         
         # Check if has control
-        equipment_type = threat.get("equipment_type")
-        failure_mode_id = threat.get("failure_mode_id")
+        failure_mode_id = obs.get("failure_mode_id")
+        efm_id = obs.get("efm_id")
+        equipment_type_id = equipment.get("equipment_type_id") if equipment else None
+        
         has_control = (
-            equipment_type in controlled_equipment_types or
-            failure_mode_id in controlled_failure_modes
+            equipment_type_id in controlled_equipment_types or
+            failure_mode_id in controlled_failure_modes or
+            efm_id in efm_with_strategy or
+            f"{equipment_id}_{failure_mode_id}" in efm_with_strategy or
+            bool(obs.get("linked_action_ids"))  # Has linked remediation actions
         )
         
-        # Check if threat is open/active
-        status = threat.get("status", "")
-        is_open = status in open_statuses or status not in closed_statuses
+        # Check if observation is open/active
+        status = (obs.get("status") or "").lower()
+        is_open = status in open_statuses or (status and status not in closed_statuses)
+        
+        observation_data = {
+            "asset": obs.get("equipment_name") or "Unassigned",
+            "failure_mode": obs.get("failure_mode_name") or obs.get("description", "")[:50],
+            "description": obs.get("description", "")[:100],
+            "equipment_type": equipment_type_id,
+            "production_impact": production_impact,
+            "severity": obs.get("severity"),
+            "exposure_value": exposure_value,
+            "exposure_formatted": format_currency(exposure_value, currency_symbol),
+            "status": obs.get("status"),
+            "source": obs.get("source"),
+            "id": obs.get("id"),
+            "has_actions": bool(obs.get("linked_action_ids"))
+        }
         
         if has_control:
             covered_by_controls += exposure_value
@@ -296,16 +328,8 @@ async def get_executive_dashboard(
         else:
             uncovered_exposure += exposure_value
             uncovered_evidence.append({
-                "asset": threat.get("asset") or threat.get("title", "").split(" - ")[0],
-                "failure_mode": threat.get("failure_mode") or threat.get("title"),
-                "equipment_type": equipment_type,
-                "production_impact": production_impact,
-                "risk_level": threat.get("risk_level"),
-                "risk_score": threat.get("risk_score"),
-                "exposure_value": exposure_value,
-                "exposure_formatted": format_currency(exposure_value, currency_symbol),
-                "status": status,
-                "id": threat.get("id")
+                **observation_data,
+                "control_status": "No Control Strategy"
             })
         
         if is_open:
@@ -314,15 +338,8 @@ async def get_executive_dashboard(
                 prev_active_threat += exposure_value
             
             active_threat_evidence.append({
-                "asset": threat.get("asset") or threat.get("title", "").split(" - ")[0],
-                "failure_mode": threat.get("failure_mode") or threat.get("title"),
-                "exposure_value": exposure_value,
-                "exposure_formatted": format_currency(exposure_value, currency_symbol),
-                "risk_level": threat.get("risk_level"),
-                "risk_score": threat.get("risk_score"),
-                "status": status,
-                "control_status": "Controlled" if has_control else "No Control",
-                "id": threat.get("id")
+                **observation_data,
+                "control_status": "Controlled" if has_control else "No Control"
             })
             
             if not has_control:
@@ -331,32 +348,10 @@ async def get_executive_dashboard(
                     prev_critical += exposure_value
                 
                 critical_evidence.append({
-                    "asset": threat.get("asset") or threat.get("title", "").split(" - ")[0],
-                    "failure_mode": threat.get("failure_mode") or threat.get("title"),
-                    "equipment_type": equipment_type,
-                    "exposure_value": exposure_value,
-                    "exposure_formatted": format_currency(exposure_value, currency_symbol),
-                    "risk_level": threat.get("risk_level"),
-                    "risk_score": threat.get("risk_score"),
+                    **observation_data,
                     "control_status": "No Active Control",
-                    "priority": "Critical" if threat.get("risk_level") in ["High", "Critical"] else "High",
-                    "id": threat.get("id")
+                    "priority": "Critical" if obs.get("severity", "").lower() in ["high", "critical"] else "High"
                 })
-    
-    # Also count open observations as active evidence
-    for obs in all_observations:
-        obs_status = obs.get("status", "")
-        if obs_status in open_statuses or obs_status not in closed_statuses:
-            # Estimate exposure from severity
-            severity = obs.get("severity", "Medium")
-            severity_map = {"Critical": 5, "High": 4, "Medium": 3, "Low": 2, "Minimal": 1}
-            prod_impact = severity_map.get(severity, 3)
-            obs_exposure = calculate_production_value(prod_impact, hourly_cost)
-            
-            # Only add if not already counted via threats
-            equipment_id = obs.get("equipment_id")
-            if equipment_id and not any(t.get("linked_equipment_id") == equipment_id for t in all_threats):
-                active_threat_exposure += obs_exposure
     
     # ============= Calculate KPIs =============
     
@@ -380,12 +375,7 @@ async def get_executive_dashboard(
     current_digital = len(current_submissions)
     previous_digital = len(previous_submissions)
     
-    # Calculate execution rate relative to previous period
-    # (Using rate for trend, display percentage for card)
-    
-    digital_change, digital_trend = calculate_trend(current_digital, previous_digital, higher_is_better=True)
-    
-    # For display, show actual count-based rate
+    # Calculate execution rate based on expected submissions
     forms_count = await db.forms.count_documents(merge_tenant_filter({"status": "active"}, current_user))
     expected_submissions = max(forms_count * period_days // 7, 1)  # At least 1 per week per form
     digital_execution_pct = min((current_digital / expected_submissions * 100), 100) if expected_submissions > 0 else 0
@@ -400,6 +390,8 @@ async def get_executive_dashboard(
     critical_change, critical_trend = calculate_trend(critical_active_exposure, prev_critical, higher_is_better=False)
     
     # ============= Build KPI Cards =============
+    
+    open_obs_count = len([o for o in all_observations if (o.get("status") or "").lower() in open_statuses or (o.get("status") or "").lower() not in closed_statuses])
     
     kpi_cards = {
         "exposure_coverage": KPICard(
@@ -418,7 +410,7 @@ async def get_executive_dashboard(
             change_percent=active_change,
             trend=active_trend,
             tooltip="Production impact currently associated with active observations, findings, investigations, or alerts.",
-            evidence_count=len([t for t in all_threats if t.get("status") in open_statuses or t.get("status") not in closed_statuses])
+            evidence_count=open_obs_count
         ),
         "critical_active_exposure": KPICard(
             value=critical_active_exposure,
@@ -491,14 +483,13 @@ async def get_executive_dashboard(
     
     # ============= Generate AI Summary =============
     
-    threat_count = len(all_threats)
-    open_threat_count = len([t for t in all_threats if t.get("status") in open_statuses or t.get("status") not in closed_statuses])
+    total_obs = len(all_observations)
     
-    ai_summary = f"""AssetIQ is tracking {threat_count} identified reliability threats with a total lifecycle exposure of {format_currency(total_lifecycle_exposure, currency_symbol)}.
+    ai_summary = f"""AssetIQ is tracking {total_obs} identified reliability observations with a total lifecycle exposure of {format_currency(total_lifecycle_exposure, currency_symbol)}.
 
 {format_currency(covered_by_controls, currency_symbol)} ({coverage_current:.0f}%) of this exposure is covered by active reliability control strategies.
 
-Currently, {open_threat_count} threats representing {format_currency(active_threat_exposure, currency_symbol)} are showing active status. Of these, {format_currency(critical_active_exposure, currency_symbol)} has no active control strategy and requires immediate attention.
+Currently, {open_obs_count} observations representing {format_currency(active_threat_exposure, currency_symbol)} are showing active status. Of these, {format_currency(critical_active_exposure, currency_symbol)} has no active control strategy and requires immediate attention.
 
 PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvement"} at {pm_compliance_current:.0f}%, with {current_digital} digital workflow executions recorded this period."""
     

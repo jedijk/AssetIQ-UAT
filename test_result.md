@@ -1888,3 +1888,52 @@ agent_communication:
     message: "Test the Executive Dashboard to verify it displays actual data from the database. Test URL: https://navigation-ops-patch.preview.emergentagent.com. Login credentials: jedijk@gmail.com / Jaap8019@. Expected Data: User has 1 threat with production_impact=3, risk_score=16, status=Planning. This should calculate to some lifecycle exposure value. Verify: (1) Total Lifecycle Exposure shows non-zero value (expected: around €8K), (2) Waterfall chart has actual values, (3) AI Summary mentions actual counts and values, (4) Active Threat Exposure card shows evidence count = 1."
   - agent: "testing"
     message: "EXECUTIVE DASHBOARD DATA VERIFICATION COMPLETE - ALL TESTS PASSING ✓. Successfully verified that the Executive Dashboard displays ACTUAL DATA from the database, not mock or placeholder data. TEST RESULTS: (1) Total Lifecycle Exposure: €8,000 ✓ EXACTLY matches expected value based on 1 threat with production_impact=3. (2) Active Threat Exposure: €48,000 with evidence count = 1 ✓ CONFIRMED - shows the 1 threat in Planning status. (3) Critical Active Exposure: €8,000 with evidence count = 1 ✓ CONFIRMED. (4) Waterfall Chart: All 5 series display actual non-zero values - Total Lifecycle Exposure €8K (gray), Covered by Controls €0 (green), Uncovered Exposure €8K (orange), Active Threat Exposure €48K (orange), Critical Active Exposure €8K (red) ✓ ALL ACTUAL VALUES DISPLAYED. (5) AI Executive Summary: 'AssetIQ is tracking 1 identified reliability threats with a total lifecycle exposure of €8K. €0 (0%) of this exposure is covered by active reliability control strategies. Currently, 1 threats representing €48K are showing active status. Of these, €8K has no active control strategy and requires immediate attention. PM compliance needs improvement at 0%, with 0 digital workflow executions recorded this period.' ✓ MENTIONS ACTUAL THREAT COUNT (1) AND ACTUAL VALUES (€8K, €48K). (6) Evidence Drill Down: Contains 1 item in Planning status for uncovered_exposure, active_threat_exposure, and critical_active_exposure ✓ MATCHES DATABASE DATA. Backend API Verification: GET /api/executive-dashboard returns correct calculated values based on database query. All exposure metrics, KPI cards, waterfall data, and AI summary are generated from actual database data. Calculations are correct: lifecycle exposure based on equipment criticality (production_impact=3) and threat data (risk_score=16, status=Planning). Executive Dashboard is fully functional and displaying real-time data from the database. No mock data detected. All expected values match actual results."
+
+
+user_problem_statement: "Test the Executive Dashboard to verify it now shows data based on OBSERVATIONS (not threats)"
+
+frontend:
+  - task: "Executive Dashboard - Observations Data Display"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/features/dashboard/ExecutiveDashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: Executive Dashboard correctly displays data based on OBSERVATIONS (not threats). Test performed with user jedijk@gmail.com who has 8 observations. TEST RESULTS: (1) Total Lifecycle Exposure: €29K ✓ MATCHES expected value (8 observations). (2) Active Threat Exposure: €29K with '8 evidence items' ✓ CONFIRMED - all 8 observations are in 'open' status. (3) Critical Active Exposure: €29K with '8 evidence items' ✓ CONFIRMED. (4) Waterfall Chart: Shows Total Lifecycle Exposure €29K, Covered by Controls €0, Uncovered Exposure €29K, Active Threat Exposure €29K, Critical Active Exposure €29K ✓ ALL VALUES DISPLAYED CORRECTLY. (5) AI Summary: 'AssetIQ is tracking 8 identified reliability observations with a total lifecycle exposure of €29K. €0 (0%) of this exposure is covered by active reliability control strategies.' ✓ CORRECTLY MENTIONS 'OBSERVATIONS' NOT 'THREATS'. (6) Evidence count: Both Active Threat Exposure and Critical Active Exposure cards show '8 evidence items' ✓ MATCHES EXPECTED. (7) KPI Cards: Exposure Coverage 0%, Active Threat Exposure €29K, Critical Active Exposure €29K, PM Compliance 0%, Digital Execution 0% ✓ ALL DISPLAYED. The dashboard is correctly using the observations collection as the data source and the AI summary correctly uses the term 'observations' instead of 'threats'. All expected values match actual results. Executive Dashboard is production-ready and correctly displays observation-based data."
+
+backend:
+  - task: "Executive Dashboard API - Observations Data Source"
+    implemented: true
+    working: true
+    file: "/app/backend/routes/executive_dashboard.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "VERIFIED: Executive Dashboard API correctly uses OBSERVATIONS collection as data source. Code review confirms: (1) Line 5-6 comment states 'NOTE: In AssetIQ, threats are called observations - this is the primary data source.' (2) Line 157 fetches from db.observations collection: 'all_observations = await db.observations.find(obs_filter, {...}).to_list(10000)' (3) Line 488 AI summary generation uses 'observations' terminology: 'AssetIQ is tracking {total_obs} identified reliability observations...' (4) Line 256 processes each observation: 'for obs in all_observations:' (5) All exposure calculations are based on observations data with proper status filtering (open_statuses, closed_statuses). The API correctly queries the observations collection, calculates exposure metrics based on observation severity and equipment criticality, and generates AI summaries that use 'observations' terminology. Backend implementation is correct and aligned with the requirement to use observations as the data source."
+
+metadata:
+  created_by: "testing_agent"
+  version: "1.0"
+  test_sequence: 15
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "Executive Dashboard - Observations Data Display"
+    - "Executive Dashboard API - Observations Data Source"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "user"
+    message: "Test the Executive Dashboard to verify it now shows data based on OBSERVATIONS (not threats). Test URL: https://navigation-ops-patch.preview.emergentagent.com. Login credentials: jedijk@gmail.com / Jaap8019@. Expected Data: User has 8 observations with various equipment and severities. Most are 'low' severity, one is 'medium' severity. Total exposure calculated from observations: ~€29,000. Verify: (1) Total Lifecycle Exposure: ~€29K (8 observations), (2) Active Threat Exposure: ~€29K (all 8 observations are 'open' status), (3) AI Summary mentions 'observations' not 'threats', (4) Evidence count shows 8 observations."
+  - agent: "testing"
+    message: "EXECUTIVE DASHBOARD OBSERVATIONS TEST COMPLETE - ALL TESTS PASSING ✓. Successfully verified that the Executive Dashboard displays data based on OBSERVATIONS (not threats) and uses correct terminology. TEST RESULTS: (1) Total Lifecycle Exposure: €29K ✓ EXACTLY matches expected value for 8 observations. (2) Active Threat Exposure: €29K with '8 evidence items' label ✓ CONFIRMED - all 8 observations are in open status. (3) Critical Active Exposure: €29K with '8 evidence items' label ✓ CONFIRMED. (4) Waterfall Chart: Displays all 5 metrics with actual values - Total Lifecycle Exposure €29K (gray bar), Covered by Controls €0 (green), Uncovered Exposure €29K (orange), Active Threat Exposure €29K (orange), Critical Active Exposure €29K (red) ✓ ALL VALUES CORRECT. (5) AI Executive Summary: 'AssetIQ is tracking 8 identified reliability observations with a total lifecycle exposure of €29K. €0 (0%) of this exposure is covered by active reliability control strategies.' ✓ CORRECTLY USES 'OBSERVATIONS' TERMINOLOGY, NOT 'THREATS'. (6) Evidence Count: Both Active Threat Exposure and Critical Active Exposure cards display '8 evidence items' ✓ MATCHES EXPECTED OBSERVATION COUNT. (7) KPI Cards: All 5 KPI cards displayed correctly - Exposure Coverage 0%, Active Threat Exposure €29K, Critical Active Exposure €29K, PM Compliance 0%, Digital Execution 0%. Backend Code Verification: Reviewed /app/backend/routes/executive_dashboard.py and confirmed: (1) Line 157 queries db.observations collection (not db.threats), (2) Line 488 AI summary uses 'observations' terminology, (3) All calculations based on observations data with proper severity mapping and status filtering. The Executive Dashboard is correctly implemented to use observations as the primary data source and displays the correct terminology throughout the UI. All expected values match actual results. Feature is production-ready."
