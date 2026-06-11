@@ -2,6 +2,7 @@
 import pytest
 
 from database import normalize_db_env_key, REQUIRE_JWT_SECRET_KEY, ENVIRONMENT
+from auth import _role_can_switch_database
 from services.rbac_service import RBACService
 
 
@@ -15,6 +16,13 @@ def test_normalize_db_env_key_aliases():
     assert normalize_db_env_key("prod") == "production"
     assert normalize_db_env_key(None) is None
     assert normalize_db_env_key("unknown") is None
+
+
+def test_role_can_switch_database_owner_only():
+    assert _role_can_switch_database("owner") is True
+    assert _role_can_switch_database("admin") is False
+    assert _role_can_switch_database("viewer") is False
+    assert _role_can_switch_database(None) is False
 
 
 def test_rbac_has_permission_owner():

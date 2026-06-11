@@ -63,7 +63,7 @@ import {
 } from "../../hooks/useTranslatedEntities";
 import { formatDateTime } from "../../lib/dateUtils";
 import { computeCriticalityScore } from "../../lib/criticalityScore";
-import { DISCIPLINES } from "../../constants/disciplines";
+import { useDisciplines } from "../../hooks/useDisciplines";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
@@ -112,6 +112,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
   const queryClient = useQueryClient();
   const { pushUndo } = useUndo();
   const { t, language } = useLanguage();
+  const { disciplines, getLabel, normalize: normalizeDiscipline } = useDisciplines();
   const nodeNameMap = useEquipmentNodeNameMap();
   const typeNameMap = useEquipmentTypeNameMap();
   const fmNameMap = useFailureModeNameMap();
@@ -458,7 +459,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
       status: threat.status,
       owner_id: threat.owner_id || "",
       owner_name: threat.owner_name || "",
-      discipline: threat.discipline || "",
+      discipline: normalizeDiscipline(threat.discipline || "") || "",
       user_context: threat.user_context || "",
       attachments: threat.attachments || [],
     });
@@ -468,7 +469,13 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
     setIsEditing(false);
     setEditForm({});
   };
-  const saveChanges = () => updateMutation.mutate(editForm);
+  const saveChanges = () => {
+    const payload = { ...editForm };
+    if ("discipline" in payload) {
+      payload.discipline = normalizeDiscipline(payload.discipline) || payload.discipline || null;
+    }
+    updateMutation.mutate(payload);
+  };
 
   const shareableLink = `${window.location.origin}/threats/${threatId}/workspace`;
   const copyLink = async () => {
@@ -495,12 +502,9 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
     }
   };
 
-  const disciplineDisplay = (() => {
-    const v = threat.discipline;
-    if (!v) return translateEnum("Not specified");
-    const found = DISCIPLINES.find((d) => d.value === v || d.label === v);
-    return found?.label || v;
-  })();
+  const disciplineDisplay = threat.discipline
+    ? getLabel(threat.discipline)
+    : translateEnum("Not specified");
 
   const infoItems = [
     { label: t("observations.equipmentType"), value: translateEquipmentTypeName(threat.equipment_type), icon: Target, field: "equipment_type", type: "searchable", options: equipmentTypeOptions },
@@ -880,13 +884,17 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
                 </Select>
               ) : item.type === "discipline-select" ? (
                 <Select
-                  value={editForm.discipline || "_none"}
+                  value={normalizeDiscipline(editForm.discipline) || editForm.discipline || "_none"}
                   onValueChange={(v) => setEditForm({ ...editForm, discipline: v === "_none" ? "" : v })}
                 >
-                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Discipline" /></SelectTrigger>
+                  <SelectTrigger className="h-7 text-xs">
+                    <SelectValue placeholder={t("observations.selectDiscipline")} />
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="_none">Not specified</SelectItem>
-                    {DISCIPLINES.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+                    <SelectItem value="_none">{translateEnum("Not specified")}</SelectItem>
+                    {disciplines.map((d) => (
+                      <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               ) : (

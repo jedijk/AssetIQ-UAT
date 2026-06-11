@@ -54,6 +54,7 @@ import { DocumentViewer } from "../components/DocumentViewer";
 import AttachmentsPanel from "../components/attachments/AttachmentsPanel";
 import { getBackendUrl } from "../lib/apiConfig";
 import { useIsMobile } from "../hooks/useIsMobile";
+import { useDisciplines } from "../hooks/useDisciplines";
 
 const API_BASE_URL = getBackendUrl();
 
@@ -82,6 +83,7 @@ export default function ActionDetailPage() {
   const queryClient = useQueryClient();
   const { t } = useLanguage();
   const isMobile = useIsMobile();
+  const { disciplines, normalize: normalizeDiscipline } = useDisciplines();
   
   const [editForm, setEditForm] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(false);
@@ -158,13 +160,13 @@ export default function ActionDetailPage() {
         assignee: action.assignee || "",
         due_date: action.due_date ? action.due_date.split("T")[0] : "",
         action_type: action.action_type || "",
-        discipline: action.discipline || "",
+        discipline: normalizeDiscipline(action.discipline || "") || "",
         comments: action.comments || "",
         completion_notes: action.completion_notes || "",
         attachments: action.attachments || [],
       });
     }
-  }, [action]);
+  }, [action, normalizeDiscipline]);
 
   // Update mutation
   const updateMutation = useMutation({
@@ -194,7 +196,11 @@ export default function ActionDetailPage() {
   });
 
   const handleSave = () => {
-    updateMutation.mutate(editForm);
+    const payload = { ...editForm };
+    if ("discipline" in payload) {
+      payload.discipline = normalizeDiscipline(payload.discipline) || payload.discipline || null;
+    }
+    updateMutation.mutate(payload);
   };
 
   const handleQuickStatusChange = (newStatus) => {
@@ -535,12 +541,20 @@ export default function ActionDetailPage() {
                   </div>
                   <div>
                     <label className={fieldLabelClass}>Discipline</label>
-                    <Input
-                      value={editForm.discipline}
-                      onChange={(e) => setEditForm({ ...editForm, discipline: e.target.value })}
-                      placeholder="Mechanical"
-                      className={`${fieldInputClass} text-xs`}
-                    />
+                    <Select
+                      value={normalizeDiscipline(editForm.discipline) || editForm.discipline || "none"}
+                      onValueChange={(v) => setEditForm({ ...editForm, discipline: v === "none" ? "" : v })}
+                    >
+                      <SelectTrigger className={`${fieldInputClass} text-xs`} data-testid="action-discipline-select">
+                        <SelectValue placeholder={t("observations.selectDiscipline") || "Select discipline"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">—</SelectItem>
+                        {disciplines.map((d) => (
+                          <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>

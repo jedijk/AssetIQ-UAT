@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import LayoutNotificationsMenu from "./LayoutNotificationsMenu";
+import DatabaseEnvSwitcher from "../DatabaseEnvSwitcher";
 
 const APP_VERSION = process.env.REACT_APP_VERSION || "3.7.4";
 
@@ -161,6 +162,8 @@ export default function LayoutHeader({
               dismissedNotifications={dismissedNotifications}
               setDismissedNotifications={setDismissedNotifications}
             />
+
+            {isOwner && <DatabaseEnvSwitcher />}
 
             {/* Language Switcher - Compact */}
             <DropdownMenu>

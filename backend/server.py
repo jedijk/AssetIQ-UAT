@@ -415,14 +415,13 @@ async def set_database_context(request, call_next):
     Set the database context for multi-database support.
 
     Priority order:
-    1) Explicit header: X-Database-Environment (owner/admin only)
-    2) Explicit query param: ?db_env=uat|production (owner/admin only)
-    3) Cookie: assetiq_db_env (owner/admin only)
-    4) Host-based inference (e.g. *uat* domains default to uat)
-    5) Fallback: production/default
+    1) Explicit header: X-Database-Environment
+    2) Explicit query param: ?db_env=uat|production
+    3) Cookie: assetiq_db_env
+    4) Fallback: production (always)
 
-    Explicit overrides require owner or admin role to prevent cross-environment
-    data access by regular authenticated users.
+    UAT is opt-in for owners only. Production is the default on all hosts,
+    including UAT deployments.
     """
     from database import (
         set_request_db,
@@ -447,34 +446,21 @@ async def set_database_context(request, call_next):
         except Exception:
             explicit_env = None
 
-    host_inferred_env = None
-    try:
-        host = (request.headers.get("host") or "").lower()
-        if "uat" in host:
-            host_inferred_env = "uat"
-    except Exception:
-        host_inferred_env = None
-
-    db_env = None
+    db_env = "production"
     if explicit_env:
         user = await get_optional_user_from_request(request)
         role = user.get("role") if user else None
-        # Allow explicit override when it matches host inference (normal UAT/prod routing).
-        # Cross-environment switching (e.g. prod host + uat header) requires owner/admin.
-        host_default = host_inferred_env or "production"
-        if explicit_env == host_default or _role_can_switch_database(role):
-            db_env = explicit_env
-        else:
-            logger.warning(
-                "Ignored cross-environment database override (%s, host=%s) for role=%s path=%s",
-                explicit_env,
-                host_default,
-                role or "anonymous",
-                request.url.path,
-            )
-            db_env = host_default
-    else:
-        db_env = host_inferred_env or "production"
+        if explicit_env == "uat":
+            if _role_can_switch_database(role):
+                db_env = "uat"
+            else:
+                logger.warning(
+                    "Ignored UAT database override for role=%s path=%s",
+                    role or "anonymous",
+                    request.url.path,
+                )
+        elif explicit_env == "production":
+            db_env = "production"
 
     if db_env in AVAILABLE_DATABASES:
         db_name = AVAILABLE_DATABASES[db_env]["name"]

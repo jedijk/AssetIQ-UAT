@@ -144,7 +144,8 @@ async def get_optional_user_from_request(request: Request) -> Optional[dict]:
 
 
 def _role_can_switch_database(role: Optional[str]) -> bool:
-    return role in ("owner", "admin")
+    """Only the owner may select the UAT database; everyone else stays on production."""
+    return role == "owner"
 
 
 def require_roles(*allowed_roles: str):

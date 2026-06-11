@@ -3,6 +3,7 @@ import axios from "axios";
 import { getApiUrl } from "../lib/apiConfig";
 import { updateCachedPreferences, clearCachedPreferences } from "../lib/dateUtils";
 import { clearRolePreviewStorage } from "./RolePreviewContext";
+import { enforceDatabaseEnvironmentForRole } from "../lib/databaseEnv";
 
 const AuthContext = createContext(null);
 const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
@@ -86,6 +87,7 @@ export const AuthProvider = ({ children }) => {
         withCredentials: AUTH_MODE === "cookie",
       });
       setUser(response.data);
+      enforceDatabaseEnvironmentForRole(response.data?.role);
       setMustChangePassword(response.data.must_change_password || false);
 
       // Check if user needs to accept terms (new or updated terms)
@@ -168,6 +170,7 @@ export const AuthProvider = ({ children }) => {
       setToken(null);
     }
     setUser(userData);
+    enforceDatabaseEnvironmentForRole(userData?.role);
     setLoading(false);
     setMustChangePassword(must_change_password || userData.must_change_password || false);
     
@@ -228,6 +231,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       setUser(userData);
+      enforceDatabaseEnvironmentForRole(userData?.role);
       setLoading(false);
       setMustChangePassword(userData.must_change_password || false);
 
@@ -302,6 +306,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       setUser(meResponse.data);
+      enforceDatabaseEnvironmentForRole(meResponse.data?.role);
       setMustAcceptTerms(false);
 
       // Now show intro if user hasn't seen it
@@ -341,6 +346,7 @@ export const AuthProvider = ({ children }) => {
     axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
     setToken(newToken);
     setUser(userData);
+    enforceDatabaseEnvironmentForRole(userData?.role);
     
     return userData;
   };

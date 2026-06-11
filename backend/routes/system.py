@@ -50,7 +50,7 @@ class DatabaseSwitchRequest(BaseModel):
 
 @router.get("/system/databases")
 async def get_databases(
-    current_user: dict = Depends(require_roles("owner", "admin"))
+    current_user: dict = Depends(require_roles("owner")),
 ):
     """
     Get available database environments.
@@ -90,7 +90,7 @@ async def get_databases(
 @router.post("/system/databases/switch")
 async def switch_database(
     request: DatabaseSwitchRequest,
-    current_user: dict = Depends(require_roles("owner", "admin")),
+    current_user: dict = Depends(require_roles("owner")),
 ):
     """
     Switch to a different database environment.
