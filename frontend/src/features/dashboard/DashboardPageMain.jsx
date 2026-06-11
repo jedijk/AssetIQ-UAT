@@ -74,6 +74,7 @@ const ProductionDashboardPage = lazy(() => import("../../pages/ProductionDashboa
 const SmartDashboardBuilderPanel = lazy(() =>
   import("../dashboardBuilder/SmartDashboardBuilderPanel").then((m) => ({ default: m.SmartDashboardBuilderPanel }))
 );
+const ExecutiveDashboard = lazy(() => import("./ExecutiveDashboard"));
 
 
 const DISABLED_DASHBOARD_TABS = new Set(["reliability", "lab"]);
@@ -475,6 +476,17 @@ export default function DashboardPageMain({ initialTab }) {
               <span className="hidden xs:inline">{t("dashboard.production")}</span>
               <span className="xs:hidden">{t("dashboard.productionShort")}</span>
             </button>
+            {isOwner && (
+              <button 
+                onClick={() => setActiveTab("executive")}
+                className={`flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "executive" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
+                data-testid="executive-tab"
+              >
+                <TrendingUp className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden xs:inline">Executive</span>
+                <span className="xs:hidden">Exec</span>
+              </button>
+            )}
             {canShowBuilder && (
               <button
                 onClick={() => setActiveTab("builder")}
@@ -1120,6 +1132,21 @@ export default function DashboardPageMain({ initialTab }) {
                 }
               >
                 <ProductionDashboardPage />
+              </Suspense>
+            </div>
+          )}
+
+          {/* Executive Dashboard Tab */}
+          {activeTab === "executive" && isOwner && (
+            <div className="animate-fade-in">
+              <Suspense
+                fallback={
+                  <div className="bg-white border border-slate-200 rounded-xl p-6 text-sm text-slate-500">
+                    Loading executive dashboard…
+                  </div>
+                }
+              >
+                <ExecutiveDashboard />
               </Suspense>
             </div>
           )}
