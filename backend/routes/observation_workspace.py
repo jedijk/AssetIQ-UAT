@@ -15,6 +15,7 @@ import time
 
 from database import db
 from auth import get_current_user
+from services.action_number_service import allocate_central_action_number
 from utils.auto_translate import translate_action
 from utils.workspace_localization import localize_workspace_payload
 
@@ -1226,9 +1227,7 @@ async def add_action_to_plan(
     if not observation:
         raise HTTPException(status_code=404, detail="Observation not found")
     
-    # Generate action number
-    count = await db.central_actions.count_documents({})
-    action_number = f"ACT-{count + 1:05d}"
+    action_number = await allocate_central_action_number()
     
     # Create action
     action_id = str(uuid.uuid4())
@@ -1292,9 +1291,7 @@ async def add_recommendation_to_plan(
     if not observation:
         raise HTTPException(status_code=404, detail="Observation not found")
     
-    # Generate action number
-    count = await db.central_actions.count_documents({})
-    action_number = f"ACT-{count + 1:05d}"
+    action_number = await allocate_central_action_number()
     
     # Map action type to action_type
     action_type_map = {

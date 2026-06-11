@@ -35,6 +35,10 @@ async def test_create_chat_central_action_inserts_central_actions():
     mock_db.central_actions.insert_one = AsyncMock()
 
     with patch("services.chat_central_action_service.db", mock_db), patch(
+        "services.chat_central_action_service.allocate_central_action_number",
+        new_callable=AsyncMock,
+        return_value="ACT-0003",
+    ), patch(
         "services.reliability_graph._run_graph_sync", new_callable=AsyncMock
     ), patch(
         "services.reliability_graph.sync_action_edges", return_value=MagicMock()

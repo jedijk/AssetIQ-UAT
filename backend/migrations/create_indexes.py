@@ -55,7 +55,7 @@ async def create_indexes():
     # ============= CENTRAL ACTIONS COLLECTION =============
     print("\n📋 Creating indexes for 'central_actions' collection...")
     await db.central_actions.create_index("id", unique=True, background=True)
-    await db.central_actions.create_index("action_number", background=True)  # Not unique - may have duplicates
+    await db.central_actions.create_index("action_number", unique=True, sparse=True, background=True)
     await db.central_actions.create_index("created_by", background=True)
     await db.central_actions.create_index("status", background=True)
     await db.central_actions.create_index("assignee", background=True)

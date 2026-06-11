@@ -11,8 +11,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from database import db
-
-_INVESTIGATION_SOURCE = "investigation"
+from services.action_number_service import allocate_central_action_number = "investigation"
 
 
 def _map_status(status: Optional[str]) -> str:
@@ -77,6 +76,14 @@ async def upsert_central_from_action_item(
 ) -> Dict[str, Any]:
     """Insert or update the central_actions mirror for an action_item."""
     central = action_item_to_central_doc(action_item, investigation, created_by=created_by)
+    existing = await db.central_actions.find_one(
+        {"id": central["id"]},
+        {"action_number": 1},
+    )
+    if existing and existing.get("action_number"):
+        central["action_number"] = existing["action_number"]
+    else:
+        central["action_number"] = await allocate_central_action_number()
     await db.central_actions.update_one(
         {"id": central["id"]},
         {"$set": central},

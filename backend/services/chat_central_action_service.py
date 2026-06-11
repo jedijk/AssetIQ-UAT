@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from database import db
+from services.action_number_service import allocate_central_action_number
 
 _ACTION_TYPE_MAP = {
     "PM": "preventive",
@@ -13,23 +14,6 @@ _ACTION_TYPE_MAP = {
     "PDM": "predictive",
     "OP": "operational",
 }
-
-
-async def _next_action_number() -> str:
-    counter_id = "central_actions"
-    existing_count = await db.central_actions.count_documents({})
-    await db.action_counters.update_one(
-        {"_id": counter_id},
-        {"$setOnInsert": {"seq": existing_count}},
-        upsert=True,
-    )
-    counter = await db.action_counters.find_one_and_update(
-        {"_id": counter_id},
-        {"$inc": {"seq": 1}},
-        return_document=True,
-    )
-    seq = (counter or {}).get("seq", existing_count + 1)
-    return f"ACT-{seq:04d}"
 
 
 def _normalize_priority(value: Optional[str]) -> str:
@@ -66,7 +50,7 @@ async def create_chat_central_action(
     """Insert a central_actions document for chat auto-created work items."""
     action_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
-    action_number = await _next_action_number()
+    action_number = await allocate_central_action_number()
 
     action_doc: Dict[str, Any] = {
         "id": action_id,

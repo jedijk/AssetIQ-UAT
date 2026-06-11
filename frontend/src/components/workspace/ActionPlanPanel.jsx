@@ -35,6 +35,19 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
     validated: { color: "bg-emerald-50 text-emerald-600 border-emerald-200", label: getActionStatusLabel(t, "validated") },
   };
 
+  const handleActionClick = (action) => {
+    if (action.is_synthetic && action.linked_investigation_id) {
+      navigate(`/causal-engine?id=${action.linked_investigation_id}`);
+      return;
+    }
+    if (action.id) {
+      navigate(`/actions/${action.id}`);
+    }
+  };
+
+  const isActionClickable = (action) =>
+    Boolean(action.id) || (action.is_synthetic && action.linked_investigation_id);
+
   const handleEdit = (action, e) => {
     e.stopPropagation();
     setEditingAction(action);
@@ -114,14 +127,20 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
           {actions.slice(0, 5).map((action) => {
             const status = statusConfig[action.status?.toLowerCase()] || statusConfig.open;
             const actionType = normalizeActionType(action.action_type);
-            const isInvestigationAction = !!action.linked_investigation_id;
+            const clickable = isActionClickable(action);
 
             return (
               <div 
                 key={action.id}
-                className={`p-2 rounded-lg bg-slate-50 border border-slate-100 hover:border-slate-200 transition-colors group ${isInvestigationAction ? "cursor-pointer hover:bg-purple-50" : ""}`}
-                onClick={isInvestigationAction ? () => navigate(`/causal-engine?id=${action.linked_investigation_id}`) : undefined}
-                title={isInvestigationAction ? t("observationWorkspace.openLinkedInvestigation") : undefined}
+                className={`p-2 rounded-lg bg-slate-50 border border-slate-100 hover:border-slate-200 transition-colors group ${
+                  clickable ? "cursor-pointer hover:bg-slate-100" : ""
+                }`}
+                onClick={clickable ? () => handleActionClick(action) : undefined}
+                title={
+                  action.is_synthetic
+                    ? t("observationWorkspace.openLinkedInvestigation")
+                    : undefined
+                }
                 data-testid={`action-plan-item-${action.id}`}
               >
                 <div className="flex items-start gap-2">

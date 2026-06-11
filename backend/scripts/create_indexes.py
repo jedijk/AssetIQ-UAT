@@ -63,6 +63,7 @@ INDEX_DEFINITIONS = {
     # Central Actions - common list views
     "central_actions": [
         {"keys": [("id", 1)], "unique": True},
+        {"keys": [("action_number", 1)], "unique": True, "sparse": True},
         {"keys": [("status", 1)]},
         {"keys": [("priority", 1)]},
         {"keys": [("due_date", 1)]},
@@ -453,6 +454,7 @@ async def create_indexes():
         for idx_def in indexes:
             keys = idx_def["keys"]
             unique = idx_def.get("unique", False)
+            sparse = idx_def.get("sparse", False)
             expire_after = idx_def.get("expireAfterSeconds")
             
             # Generate index name from keys
@@ -464,6 +466,8 @@ async def create_indexes():
             
             try:
                 index_kwargs = {"unique": unique, "name": idx_name}
+                if sparse:
+                    index_kwargs["sparse"] = True
                 if expire_after is not None:
                     index_kwargs["expireAfterSeconds"] = expire_after
                 # For unique indexes on 'id' field, use partial filter to exclude null values

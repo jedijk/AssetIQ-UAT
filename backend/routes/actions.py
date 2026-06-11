@@ -12,6 +12,7 @@ from auth import require_permission
 from services.cache_service import cache
 from services.tenant_schema import merge_tenant_filter, with_tenant_id
 from services.background_jobs import schedule_tracked_job
+from services.action_number_service import allocate_central_action_number
 from utils.auto_translate import translate_action
 logger = logging.getLogger(__name__)
 
@@ -380,27 +381,7 @@ async def create_central_action(
             if eq_id:
                 await installation_filter.assert_user_can_access_equipment(current_user, eq_id)
     action_id = str(uuid.uuid4())
-    
-    # Generate action number atomically using a single global counter.
-    # Previously we used count_documents() per user which is (a) racy and
-    # (b) produces duplicate numbers (e.g. two `ACT-0001`s) when actions live
-    # in a shared workspace and are authored by different users.
-    # First-call seeding: if no counter doc exists yet, initialise its seq
-    # from the total existing action count so legacy numbers don't get reused.
-    counter_id = "central_actions"
-    existing_count = await db.central_actions.count_documents({})
-    await db.action_counters.update_one(
-        {"_id": counter_id},
-        {"$setOnInsert": {"seq": existing_count}},
-        upsert=True,
-    )
-    counter = await db.action_counters.find_one_and_update(
-        {"_id": counter_id},
-        {"$inc": {"seq": 1}},
-        return_document=True,
-    )
-    seq = (counter or {}).get("seq", existing_count + 1)
-    action_number = f"ACT-{seq:04d}"
+    action_number = await allocate_central_action_number()
     
     # Initialize RPN and risk values from input or defaults
     rpn = data.rpn

@@ -18,7 +18,7 @@ from typing import Optional
 import uuid
 
 from database import db
-
+from services.action_number_service import allocate_central_action_number
 
 INVESTIGATION_ACTION_TITLE = "Complete causal investigation"
 
@@ -45,8 +45,7 @@ async def create_investigation_action(
     if threat_id:
         observation = await db.threats.find_one({"id": threat_id}, {"_id": 0})
 
-    count = await db.central_actions.count_documents({})
-    action_number = f"ACT-{count + 1:05d}"
+    action_number = await allocate_central_action_number()
     now = datetime.now(timezone.utc).isoformat()
 
     new_action = {
