@@ -1,6 +1,18 @@
 /** Permission feature groupings — keep aligned with backend FEATURES. */
 export const PERMISSION_SECTIONS = [
   {
+    id: "dashboards",
+    label: "Dashboards",
+    labelKey: "permissions.sections.dashboards",
+    features: [
+      "dashboard_operational",
+      "dashboard_production",
+      "dashboard_executive",
+      "dashboard_builder",
+      "reliability_intelligence",
+    ],
+  },
+  {
     id: "observations",
     label: "Observations",
     labelKey: "permissions.sections.observations",
@@ -11,12 +23,6 @@ export const PERMISSION_SECTIONS = [
     label: "Operations",
     labelKey: "permissions.sections.operations",
     features: ["actions", "tasks", "scheduler", "forms"],
-  },
-  {
-    id: "reliability_intelligence",
-    label: "Reliability Intelligence",
-    labelKey: "permissions.sections.reliabilityIntelligence",
-    features: ["reliability_intelligence"],
   },
   {
     id: "reliability",

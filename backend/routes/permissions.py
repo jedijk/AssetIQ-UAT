@@ -44,6 +44,10 @@ DEFAULT_PERMISSIONS = {
         "library": {"read": True, "write": True, "delete": True},
         "library_ai_tools": {"read": True, "write": True, "delete": True},
         "reliability_intelligence": {"read": True, "write": True, "delete": True},
+        "dashboard_operational": {"read": True, "write": True, "delete": True},
+        "dashboard_production": {"read": True, "write": True, "delete": True},
+        "dashboard_executive": {"read": True, "write": True, "delete": True},
+        "dashboard_builder": {"read": True, "write": True, "delete": True},
         "chat": {"read": True, "write": True, "delete": True},
         "statistics": {"read": True, "write": True, "delete": True},
         "feedback": {"read": True, "write": True, "delete": True},
@@ -61,6 +65,10 @@ DEFAULT_PERMISSIONS = {
         "library": {"read": True, "write": True, "delete": True},
         "library_ai_tools": {"read": True, "write": True, "delete": False},
         "reliability_intelligence": {"read": True, "write": True, "delete": False},
+        "dashboard_operational": {"read": True, "write": False, "delete": False},
+        "dashboard_production": {"read": True, "write": False, "delete": False},
+        "dashboard_executive": {"read": False, "write": False, "delete": False},
+        "dashboard_builder": {"read": False, "write": False, "delete": False},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": True, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": True},
@@ -78,6 +86,10 @@ DEFAULT_PERMISSIONS = {
         "library": {"read": True, "write": True, "delete": False},
         "library_ai_tools": {"read": False, "write": False, "delete": False},
         "reliability_intelligence": {"read": True, "write": True, "delete": False},
+        "dashboard_operational": {"read": True, "write": False, "delete": False},
+        "dashboard_production": {"read": True, "write": False, "delete": False},
+        "dashboard_executive": {"read": False, "write": False, "delete": False},
+        "dashboard_builder": {"read": False, "write": False, "delete": False},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": True, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": False},
@@ -95,6 +107,10 @@ DEFAULT_PERMISSIONS = {
         "library": {"read": True, "write": False, "delete": False},
         "library_ai_tools": {"read": False, "write": False, "delete": False},
         "reliability_intelligence": {"read": True, "write": False, "delete": False},
+        "dashboard_operational": {"read": True, "write": False, "delete": False},
+        "dashboard_production": {"read": True, "write": False, "delete": False},
+        "dashboard_executive": {"read": False, "write": False, "delete": False},
+        "dashboard_builder": {"read": False, "write": False, "delete": False},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": False, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": False},
@@ -112,6 +128,10 @@ DEFAULT_PERMISSIONS = {
         "library": {"read": True, "write": False, "delete": False},
         "library_ai_tools": {"read": False, "write": False, "delete": False},
         "reliability_intelligence": {"read": True, "write": False, "delete": False},
+        "dashboard_operational": {"read": True, "write": False, "delete": False},
+        "dashboard_production": {"read": True, "write": False, "delete": False},
+        "dashboard_executive": {"read": False, "write": False, "delete": False},
+        "dashboard_builder": {"read": False, "write": False, "delete": False},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": False, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": False},
@@ -129,6 +149,10 @@ DEFAULT_PERMISSIONS = {
         "library": {"read": True, "write": False, "delete": False},
         "library_ai_tools": {"read": False, "write": False, "delete": False},
         "reliability_intelligence": {"read": True, "write": False, "delete": False},
+        "dashboard_operational": {"read": True, "write": False, "delete": False},
+        "dashboard_production": {"read": True, "write": False, "delete": False},
+        "dashboard_executive": {"read": False, "write": False, "delete": False},
+        "dashboard_builder": {"read": False, "write": False, "delete": False},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": False, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": False},
@@ -157,7 +181,23 @@ FEATURES = {
     },
     "tasks": {
         "name": "My Tasks",
-        "description": "My Tasks execution queue"
+        "description": "My Tasks execution queue and work items"
+    },
+    "dashboard_operational": {
+        "name": "Ops Dashboard",
+        "description": "Operational risk overview dashboard tab"
+    },
+    "dashboard_production": {
+        "name": "Production Dashboard",
+        "description": "Production metrics and monitoring dashboard tab"
+    },
+    "dashboard_executive": {
+        "name": "Executive Dashboard",
+        "description": "Executive summary and KPI dashboard tab"
+    },
+    "dashboard_builder": {
+        "name": "Dashboard Builder",
+        "description": "Smart dashboard builder tab for custom layouts"
     },
     "scheduler": {
         "name": "Execution",
@@ -181,7 +221,7 @@ FEATURES = {
     },
     "reliability_intelligence": {
         "name": "Reliability Intelligence",
-        "description": "Reliability Intelligence main page and case management"
+        "description": "Reliability Intelligence dashboard tab and case management"
     },
     "chat": {
         "name": "AI Chat",
@@ -257,6 +297,13 @@ def _backfill_permissions(stored_perms: Dict) -> Dict:
         if "insights" in merged and "reliability_intelligence" not in merged:
             merged["reliability_intelligence"] = dict(merged["insights"])
         merged.pop("insights", None)
+        if "dashboard_production" not in merged and "tasks" in merged:
+            tasks_read = bool(merged["tasks"].get("read"))
+            merged["dashboard_production"] = {
+                "read": tasks_read,
+                "write": bool(merged["tasks"].get("write")) and tasks_read,
+                "delete": False,
+            }
         defaults_for_role = DEFAULT_PERMISSIONS.get(role_name) or DEFAULT_PERMISSIONS["viewer"]
         for feature_key in FEATURES.keys():
             if feature_key not in merged:

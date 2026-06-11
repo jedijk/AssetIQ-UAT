@@ -77,7 +77,6 @@ const SettingsAuditLogPage = lazy(() => import("./pages/SettingsAuditLogPage"));
 const GranulometryPage = lazy(() => import("./pages/GranulometryPage"));
 
 // RIL (Reliability Intelligence Layer) Pages
-const RILDashboardPage = lazy(() => import("./pages/RILDashboardPage"));
 const RILCasesPage = lazy(() => import("./pages/RILCasesPage"));
 const RILCaseDetailPage = lazy(() => import("./pages/RILCaseDetailPage"));
 
@@ -449,6 +448,7 @@ function App() {
                 <Route index element={<Suspense fallback={<RouteFallback />}><DashboardPage /></Suspense>} />
                 <Route path="dashboard" element={<Suspense fallback={<RouteFallback />}><DashboardPage /></Suspense>} />
                 <Route path="production" element={<Suspense fallback={<RouteFallback />}><DashboardPage initialTab="production" /></Suspense>} />
+                <Route path="reliability" element={<Suspense fallback={<RouteFallback />}><DashboardPage initialTab="reliability" /></Suspense>} />
                 <Route path="definitions" element={<Suspense fallback={<RouteFallback />}><DefinitionsPage /></Suspense>} />
                 <Route path="threats" element={<Suspense fallback={<RouteFallback />}><ThreatsPage /></Suspense>} />
                 {/* /threats/:id legacy "classic" view is obsolete — redirect to workspace */}
@@ -469,7 +469,6 @@ function App() {
                 <Route path="feedback" element={<Suspense fallback={<RouteFallback />}><FeedbackPage /></Suspense>} />
                 
                 {/* Reliability Intelligence Layer (RIL) Routes */}
-                <Route path="reliability" element={<Suspense fallback={<RouteFallback />}><RILDashboardPage /></Suspense>} />
                 <Route path="reliability/cases" element={<Suspense fallback={<RouteFallback />}><RILCasesPage /></Suspense>} />
                 <Route path="reliability/cases/:id" element={<Suspense fallback={<RouteFallback />}><RILCaseDetailPage /></Suspense>} />
                 

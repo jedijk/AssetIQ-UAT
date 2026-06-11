@@ -18,6 +18,7 @@ from auth import get_current_user
 from services.action_number_service import allocate_central_action_number
 from utils.auto_translate import translate_action
 from utils.workspace_localization import localize_workspace_payload
+from services.production_exposure import PRODUCTION_DOWNTIME_RANGES, production_exposure_monetary_value
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/observation-workspace", tags=["Observation Workspace"])
@@ -173,30 +174,14 @@ async def calculate_production_exposure(observation: dict, criticality: dict, us
         "DKK": "kr "
     }
     currency_symbol = currency_symbols.get(currency, currency + " ")
-    
-    # Downtime ranges based on production criticality level (1-5 scale).
-    # Aligned with the default Production Criticality definitions:
-    #   1 — Minimal:  No production impact / redundancy available
-    #   2 — Low:      Downtime < 8 hours
-    #   3 — Medium:   Downtime 8 – 24 hours
-    #   4 — High:     Downtime > 24 hours (capped at 72 for the range upper bound)
-    #   5 — Critical: Complete plant shutdown (> 72 hours, open-ended)
-    # Returns (min_hours, max_hours). max_hours = None means "open-ended" (>min_hours).
-    downtime_ranges = {
-        1: (0, 0),
-        2: (0, 8),
-        3: (8, 24),
-        4: (24, 72),
-        5: (72, None),  # open-ended
-    }
-    min_hours, max_hours = downtime_ranges.get(production_impact, (8, 24))
-    
+
+    min_hours, max_hours = PRODUCTION_DOWNTIME_RANGES.get(production_impact, (8, 24))
+
     # Maximum exposure value:
     #   - Closed range (max_hours set): max_hours × hourly_cost  → "Up to €X"
     #   - Open-ended (max_hours = None): min_hours × hourly_cost → "More than €X"
     open_ended = max_hours is None
-    hours_for_value = max_hours if not open_ended else min_hours
-    max_exposure_value = hours_for_value * hourly_cost
+    max_exposure_value = production_exposure_monetary_value(production_impact, hourly_cost)
     
     # Build the human-readable downtime label
     if open_ended:

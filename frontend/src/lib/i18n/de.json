@@ -218,6 +218,7 @@
   },
   "permissions": {
     "sections": {
+      "dashboards": "Dashboards",
       "observations": "Beobachtungen",
       "operations": "Betrieb",
       "reliabilityIntelligence": "Zuverlässigkeitsintelligenz",
@@ -226,6 +227,22 @@
       "administration": "Administration"
     },
     "features": {
+      "dashboard_operational": {
+        "name": "Betriebs-Dashboard",
+        "description": "Dashboard-Tab für operativen Risikoüberblick"
+      },
+      "dashboard_production": {
+        "name": "Produktions-Dashboard",
+        "description": "Dashboard-Tab für Produktionskennzahlen und Monitoring"
+      },
+      "dashboard_executive": {
+        "name": "Executive-Dashboard",
+        "description": "Dashboard-Tab für Management-Zusammenfassung und KPIs"
+      },
+      "dashboard_builder": {
+        "name": "Dashboard-Builder",
+        "description": "Smart-Dashboard-Builder-Tab für eigene Layouts"
+      },
       "observations": {
         "description": "Beobachtungsseite und Risikomanagement"
       },
@@ -236,7 +253,7 @@
         "description": "Maßnahmenseite und korrektive/präventive Arbeit"
       },
       "tasks": {
-        "description": "Meine Aufgaben-Ausführungswarteschlange"
+        "description": "Meine Aufgaben-Ausführungswarteschlange und Arbeitsposten"
       },
       "scheduler": {
         "description": "Ausführungsplaner und Aufgabenplanung"
@@ -255,7 +272,7 @@
         "description": "KI-Tools in Strategie: Ausfallmodi vorschlagen, Massenverbesserung, Disziplinen prüfen, Ähnliches finden, Anlagentypen vorschlagen und Nicht-verbessert-Filter"
       },
       "reliability_intelligence": {
-        "description": "Zuverlässigkeitsintelligenz-Hauptseite und Fallverwaltung"
+        "description": "Zuverlässigkeitsintelligenz-Dashboard-Tab und Fallverwaltung"
       },
       "chat": {
         "name": "KI-Chat",
@@ -502,6 +519,8 @@
     "operationalShort": "Betrieb",
     "production": "Produktion",
     "productionShort": "Prod",
+    "reliability": "Zuverlässigkeitsintelligenz",
+    "reliabilityShort": "RIL",
     "builder": "Dashboard-Builder",
     "builderShort": "Build",
     "refresh": "Aktualisieren",

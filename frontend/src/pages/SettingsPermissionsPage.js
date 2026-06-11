@@ -36,6 +36,10 @@ import {
   Sparkles,
   BarChart3,
   Brain,
+  LayoutDashboard,
+  Activity,
+  Gauge,
+  TrendingUp,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -117,6 +121,10 @@ const ROLE_CONFIG = {
 
 // Feature icons
 const FEATURE_ICONS = {
+  dashboard_operational: Activity,
+  dashboard_production: Gauge,
+  dashboard_executive: TrendingUp,
+  dashboard_builder: LayoutDashboard,
   observations: Target,
   investigations: FileText,
   actions: ClipboardList,

@@ -3,6 +3,10 @@
  * Keep feature keys in sync with backend FEATURES in `backend/routes/permissions.py`.
  */
 export const PERMISSION_FEATURE_NAME_KEYS = {
+  dashboard_operational: "permissions.features.dashboard_operational.name",
+  dashboard_production: "permissions.features.dashboard_production.name",
+  dashboard_executive: "permissions.features.dashboard_executive.name",
+  dashboard_builder: "permissions.features.dashboard_builder.name",
   observations: "nav.observations",
   investigations: "nav.causalEngine",
   actions: "nav.actions",
@@ -21,6 +25,10 @@ export const PERMISSION_FEATURE_NAME_KEYS = {
 };
 
 export const PERMISSION_FEATURE_DESC_KEYS = {
+  dashboard_operational: "permissions.features.dashboard_operational.description",
+  dashboard_production: "permissions.features.dashboard_production.description",
+  dashboard_executive: "permissions.features.dashboard_executive.description",
+  dashboard_builder: "permissions.features.dashboard_builder.description",
   observations: "permissions.features.observations.description",
   investigations: "permissions.features.investigations.description",
   actions: "permissions.features.actions.description",
@@ -39,6 +47,7 @@ export const PERMISSION_FEATURE_DESC_KEYS = {
 };
 
 export const PERMISSION_SECTION_LABEL_KEYS = {
+  dashboards: "permissions.sections.dashboards",
   observations: "permissions.sections.observations",
   operations: "permissions.sections.operations",
   reliability_intelligence: "permissions.sections.reliabilityIntelligence",

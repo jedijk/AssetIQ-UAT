@@ -159,7 +159,7 @@ const HealthScoreGauge = ({ score }) => {
   );
 };
 
-export default function RILDashboardPage() {
+export default function RILDashboardPage({ embedded = false }) {
   const navigate = useNavigate();
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [knowledgeGraphOpen, setKnowledgeGraphOpen] = useState(false);
@@ -198,49 +198,59 @@ export default function RILDashboardPage() {
 
   const isLoading = execLoading || intelLoading;
 
+  const actionButtons = (
+    <div className="flex items-center gap-3">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => refetchExec()}
+        disabled={isLoading}
+      >
+        <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+        Refresh
+      </Button>
+      <Button
+        onClick={() => setCopilotOpen(true)}
+        className="bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700"
+      >
+        <Sparkles className="w-4 h-4 mr-2" />
+        Ask Copilot
+      </Button>
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950" data-testid="ril-dashboard">
-      {/* Header */}
-      <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg">
-              <Brain className="w-6 h-6 text-white" />
+    <div
+      className={embedded ? "bg-zinc-50 dark:bg-zinc-950" : "min-h-screen bg-zinc-50 dark:bg-zinc-950"}
+      data-testid="ril-dashboard"
+    >
+      {embedded ? (
+        <div className="flex justify-end px-4 sm:px-6 pt-2 pb-4">{actionButtons}</div>
+      ) : (
+        <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg">
+                <Brain className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1
+                  className="text-2xl font-bold text-zinc-900 dark:text-white"
+                  data-testid="ril-dashboard-title"
+                >
+                  Reliability Intelligence
+                </h1>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  Predictive insights and reliability management
+                </p>
+              </div>
             </div>
-            <div>
-              <h1
-                className="text-2xl font-bold text-zinc-900 dark:text-white"
-                data-testid="ril-dashboard-title"
-              >
-                Reliability Intelligence
-              </h1>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Predictive insights and reliability management
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetchExec()}
-              disabled={isLoading}
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
-            <Button
-              onClick={() => setCopilotOpen(true)}
-              className="bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700"
-            >
-              <Sparkles className="w-4 h-4 mr-2" />
-              Ask Copilot
-            </Button>
+            {actionButtons}
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="p-6 max-w-7xl mx-auto">
+      <div className={embedded ? "px-4 sm:px-6 max-w-7xl mx-auto" : "p-6 max-w-7xl mx-auto"}>
         {/* Executive KPIs */}
         <div
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6"

@@ -218,6 +218,7 @@
   },
   "permissions": {
     "sections": {
+      "dashboards": "Dashboards",
       "observations": "Observaties",
       "operations": "Operaties",
       "reliabilityIntelligence": "Betrouwbaarheidsintelligentie",
@@ -226,6 +227,22 @@
       "administration": "Beheer"
     },
     "features": {
+      "dashboard_operational": {
+        "name": "Operationeel dashboard",
+        "description": "Dashboard-tab voor operationeel risico-overzicht"
+      },
+      "dashboard_production": {
+        "name": "Productiedashboard",
+        "description": "Dashboard-tab voor productie-indicatoren en monitoring"
+      },
+      "dashboard_executive": {
+        "name": "Executive dashboard",
+        "description": "Dashboard-tab voor managementoverzicht en KPI's"
+      },
+      "dashboard_builder": {
+        "name": "Dashboard-bouwer",
+        "description": "Smart dashboard-bouwer tab voor aangepaste layouts"
+      },
       "observations": {
         "description": "Observatiespagina en dreigingsbeheer"
       },
@@ -236,7 +253,7 @@
         "description": "Actiespagina en corrigerend/preventief werk"
       },
       "tasks": {
-        "description": "Mijn Taken-uitvoeringswachtrij"
+        "description": "Mijn Taken-uitvoeringswachtrij en werkitems"
       },
       "scheduler": {
         "description": "Uitvoeringsplanner en taakplanning"
@@ -255,7 +272,7 @@
         "description": "AI-tools in Strategie: storingsmodi voorstellen, bulk verbeteren, disciplines beoordelen, vergelijkbaar zoeken, apparatuurtypes voorstellen en het niet-verbeterd-filter"
       },
       "reliability_intelligence": {
-        "description": "Betrouwbaarheidsintelligentie hoofdpagina en casusbeheer"
+        "description": "Betrouwbaarheidsintelligentie dashboard-tab en casusbeheer"
       },
       "chat": {
         "name": "AI-chat",
@@ -502,6 +519,8 @@
     "operationalShort": "Oper.",
     "production": "Productie",
     "productionShort": "Prod",
+    "reliability": "Betrouwbaarheidsintelligentie",
+    "reliabilityShort": "RIL",
     "builder": "Dashboard-bouwer",
     "builderShort": "Bouw",
     "refresh": "Vernieuwen",

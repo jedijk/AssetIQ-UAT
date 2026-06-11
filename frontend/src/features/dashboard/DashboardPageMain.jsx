@@ -7,6 +7,7 @@ import { queryKeys } from "../../lib/queryKeys";
 import { formAPI } from "../../components/forms";
 import { useAuth } from "../../contexts/AuthContext";
 import { useEffectiveRole } from "../../contexts/RolePreviewContext";
+import { usePermissions } from "../../contexts/PermissionsContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { getBackendUrl, getAuthHeaders } from "../../lib/apiConfig";
 import { formatDate, formatDateTime, formatDateTimeCompact } from "../../lib/dateUtils";
@@ -75,13 +76,40 @@ const SmartDashboardBuilderPanel = lazy(() =>
   import("../dashboardBuilder/SmartDashboardBuilderPanel").then((m) => ({ default: m.SmartDashboardBuilderPanel }))
 );
 const ExecutiveDashboard = lazy(() => import("./ExecutiveDashboard"));
+const RILDashboardPage = lazy(() => import("../../pages/RILDashboardPage"));
 
-
-const DISABLED_DASHBOARD_TABS = new Set(["reliability", "lab"]);
+const DISABLED_DASHBOARD_TABS = new Set(["lab"]);
 
 function resolveDashboardTab(tab) {
   if (!tab || DISABLED_DASHBOARD_TABS.has(tab)) return null;
   return tab;
+}
+
+function isDashboardTabAllowed(tab, flags) {
+  switch (tab) {
+    case "operational":
+      return flags.canShowOperational;
+    case "production":
+      return flags.canShowProduction;
+    case "reliability":
+      return flags.canShowReliability;
+    case "executive":
+      return flags.canShowExecutive;
+    case "builder":
+      return flags.canShowBuilder;
+    default:
+      return false;
+  }
+}
+
+function pickFirstAllowedDashboardTab({ preferBuilder, ...flags }) {
+  if (preferBuilder && flags.canShowBuilder) return "builder";
+  if (flags.canShowOperational) return "operational";
+  if (flags.canShowProduction) return "production";
+  if (flags.canShowReliability) return "reliability";
+  if (flags.canShowExecutive) return "executive";
+  if (flags.canShowBuilder) return "builder";
+  return "operational";
 }
 
 export default function DashboardPageMain({ initialTab }) {
@@ -90,6 +118,7 @@ export default function DashboardPageMain({ initialTab }) {
   const location = useLocation();
   const { user } = useAuth();
   const { effectiveRole } = useEffectiveRole();
+  const { hasPermission } = usePermissions();
   const queryClient = useQueryClient();
   const isFetchingAny = useIsFetching() > 0;
   // ON by default; disable explicitly with REACT_APP_ENABLE_SMART_DASHBOARD_BUILDER=false
@@ -98,12 +127,26 @@ export default function DashboardPageMain({ initialTab }) {
   // Operator view: shown on mobile when role is operator or owner has toggled it
   const initialIsMobileViewport = window.innerWidth < 768;
   const [isMobileViewport, setIsMobileViewport] = useState(() => initialIsMobileViewport);
-  const isOwner = effectiveRole === "owner";
-  const canShowBuilder = manualBuilderEnabled && !isMobileViewport && isOwner;
+  const canShowOperational = hasPermission("dashboard_operational", "read");
+  const canShowProduction = hasPermission("dashboard_production", "read");
+  const canShowReliability = hasPermission("reliability_intelligence", "read") && !isMobileViewport;
+  const canShowExecutive = hasPermission("dashboard_executive", "read") && !isMobileViewport;
+  const canShowBuilder =
+    manualBuilderEnabled && !isMobileViewport && hasPermission("dashboard_builder", "read");
+  const dashboardTabFlags = {
+    canShowOperational,
+    canShowProduction,
+    canShowReliability,
+    canShowExecutive,
+    canShowBuilder,
+  };
   const [activeTab, setActiveTab] = useState(
     resolveDashboardTab(initialTab) ||
       resolveDashboardTab(location.state?.activeTab) ||
-      (manualBuilderEnabled && !initialIsMobileViewport ? "builder" : "operational")
+      pickFirstAllowedDashboardTab({
+        preferBuilder: manualBuilderEnabled && !initialIsMobileViewport,
+        ...dashboardTabFlags,
+      })
   );
   const [operatorToggle, setOperatorToggle] = useState(
     () => localStorage.getItem("operatorViewEnabled") === "true"
@@ -166,12 +209,18 @@ export default function DashboardPageMain({ initialTab }) {
     }
   }, [activeTab, isMobileViewport]);
 
-  // If user is not allowed to see builder, force back to operational.
   useEffect(() => {
-    if (!canShowBuilder && activeTab === "builder") {
-      setActiveTab("operational");
+    if (!isDashboardTabAllowed(activeTab, dashboardTabFlags)) {
+      setActiveTab(pickFirstAllowedDashboardTab({ preferBuilder: false, ...dashboardTabFlags }));
     }
-  }, [activeTab, canShowBuilder]);
+  }, [
+    activeTab,
+    canShowOperational,
+    canShowProduction,
+    canShowReliability,
+    canShowExecutive,
+    canShowBuilder,
+  ]);
 
   useEffect(() => {
     if (DISABLED_DASHBOARD_TABS.has(activeTab)) {
@@ -458,26 +507,41 @@ export default function DashboardPageMain({ initialTab }) {
         <div className="flex items-center justify-between gap-4">
           <div className="max-w-full overflow-x-auto">
             <div className="inline-flex h-10 items-center rounded-lg bg-slate-100 p-1 gap-1 min-w-max">
-            <button 
-              onClick={() => setActiveTab("operational")}
-              className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "operational" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
-              data-testid="operational-tab"
-            >
-              <Activity className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden xs:inline">{t("dashboard.operational")}</span>
-              <span className="xs:hidden">{t("dashboard.operationalShort")}</span>
-            </button>
-            <button 
-              onClick={() => setActiveTab("production")}
-              className={`flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "production" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
-              data-testid="production-tab"
-            >
-              <Gauge className="w-4 h-4 flex-shrink-0" />
-              <span className="hidden xs:inline">{t("dashboard.production")}</span>
-              <span className="xs:hidden">{t("dashboard.productionShort")}</span>
-            </button>
-            {isOwner && (
-              <button 
+            {canShowOperational && (
+              <button
+                onClick={() => setActiveTab("operational")}
+                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "operational" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
+                data-testid="operational-tab"
+              >
+                <Activity className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden xs:inline">{t("dashboard.operational")}</span>
+                <span className="xs:hidden">{t("dashboard.operationalShort")}</span>
+              </button>
+            )}
+            {canShowProduction && (
+              <button
+                onClick={() => setActiveTab("production")}
+                className={`flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "production" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
+                data-testid="production-tab"
+              >
+                <Gauge className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden xs:inline">{t("dashboard.production")}</span>
+                <span className="xs:hidden">{t("dashboard.productionShort")}</span>
+              </button>
+            )}
+            {canShowReliability && (
+              <button
+                onClick={() => setActiveTab("reliability")}
+                className={`flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "reliability" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
+                data-testid="reliability-tab"
+              >
+                <Sparkles className="w-4 h-4 flex-shrink-0" />
+                <span className="hidden xs:inline">{t("dashboard.reliability")}</span>
+                <span className="xs:hidden">{t("dashboard.reliabilityShort")}</span>
+              </button>
+            )}
+            {canShowExecutive && (
+              <button
                 onClick={() => setActiveTab("executive")}
                 className={`flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-md transition-colors text-sm font-medium ${activeTab === "executive" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:bg-white/50"}`}
                 data-testid="executive-tab"
@@ -634,7 +698,7 @@ export default function DashboardPageMain({ initialTab }) {
       <div className="flex-1 overflow-y-auto px-6 pb-6">
         <div className="max-w-7xl mx-auto">
           {/* Operational Dashboard Tab */}
-          {activeTab === "operational" && (
+          {activeTab === "operational" && canShowOperational && (
             <div className="animate-fade-in">
       {/* Key Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -1122,7 +1186,7 @@ export default function DashboardPageMain({ initialTab }) {
           )}
 
           {/* Production Dashboard Tab */}
-          {activeTab === "production" && (
+          {activeTab === "production" && canShowProduction && (
             <div className="animate-fade-in -mx-4 sm:-mx-6">
               <Suspense
                 fallback={
@@ -1136,8 +1200,23 @@ export default function DashboardPageMain({ initialTab }) {
             </div>
           )}
 
+          {/* Reliability Intelligence Dashboard Tab */}
+          {activeTab === "reliability" && canShowReliability && (
+            <div className="animate-fade-in -mx-4 sm:-mx-6">
+              <Suspense
+                fallback={
+                  <div className="bg-white border border-slate-200 rounded-xl p-6 text-sm text-slate-500 mx-4 sm:mx-6">
+                    Loading reliability intelligence…
+                  </div>
+                }
+              >
+                <RILDashboardPage embedded />
+              </Suspense>
+            </div>
+          )}
+
           {/* Executive Dashboard Tab */}
-          {activeTab === "executive" && isOwner && (
+          {activeTab === "executive" && canShowExecutive && (
             <div className="animate-fade-in">
               <Suspense
                 fallback={

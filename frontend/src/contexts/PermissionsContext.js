@@ -8,12 +8,20 @@ const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "co
 
 // Feature to route path mapping (used for route-gating + nav visibility).
 // Keep this aligned with backend FEATURES in `backend/routes/permissions.py`.
+const DASHBOARD_HUB_FEATURES = [
+  "dashboard_operational",
+  "dashboard_production",
+  "dashboard_executive",
+  "dashboard_builder",
+];
+
 const FEATURE_PATHS = {
   observations: ["/threats", "/observations"],
   investigations: ["/investigations", "/causal-engine", "/decision-engine"],
   actions: ["/actions"],
-  // "tasks" is execution / personal work queue + production dashboard
-  tasks: ["/my-tasks", "/production"],
+  tasks: ["/my-tasks"],
+  dashboard_operational: ["/dashboard"],
+  dashboard_production: ["/production"],
   // "scheduler" is the planner / scheduling UI (route is `/tasks`)
   scheduler: ["/tasks"],
   forms: ["/forms", "/form-submissions", "/granulometry"],
@@ -51,7 +59,7 @@ const FEATURE_PATHS = {
 };
 
 // Authenticated routes that do not map to a feature permission check.
-const AUTHENTICATED_PUBLIC_PATHS = ["/", "/dashboard"];
+const AUTHENTICATED_PUBLIC_PATHS = ["/"];
 
 // Personal settings pages are always accessible to authenticated users.
 const PERSONAL_SETTINGS_PATHS = [
@@ -124,6 +132,10 @@ export const PermissionsProvider = ({ children }) => {
 
     if (AUTHENTICATED_PUBLIC_PATHS.some((p) => path === p || path.startsWith(`${p}/`))) {
       return true;
+    }
+
+    if (path === "/dashboard") {
+      return DASHBOARD_HUB_FEATURES.some((feature) => hasPermission(feature, "read"));
     }
 
     if (PERSONAL_SETTINGS_PATHS.some((p) => path === p || path.startsWith(`${p}/`))) {

@@ -13,6 +13,11 @@ from database import db
 from auth import get_current_user, require_permission
 from services.tenant_schema import merge_tenant_filter, tenant_id_from_user
 from services.cache_service import cache
+from services.production_exposure import (
+    calculate_total_equipment_lifecycle_exposure,
+    production_exposure_monetary_value,
+    production_impact_from_criticality,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,22 +72,8 @@ def severity_to_production_impact(severity: str) -> int:
 
 
 def calculate_production_value(production_impact: int, hourly_cost: float) -> float:
-    """
-    Convert production impact score (1-5) to monetary value.
-    Based on downtime ranges from observation_workspace.py
-    """
-    downtime_ranges = {
-        1: (0, 4),      # Minimal: 0-4 hours
-        2: (4, 8),      # Low: 4-8 hours
-        3: (8, 24),     # Medium: 8-24 hours
-        4: (24, 72),    # High: 24-72 hours
-        5: (72, 168),   # Critical: 72+ hours (capped at 1 week)
-    }
-    
-    min_hours, max_hours = downtime_ranges.get(production_impact, (8, 24))
-    # Use average for lifecycle exposure calculation
-    avg_hours = (min_hours + max_hours) / 2
-    return avg_hours * hourly_cost
+    """Convert production impact score (1-5) to monetary value (workspace-aligned)."""
+    return production_exposure_monetary_value(production_impact, hourly_cost)
 
 
 def format_currency(value: float, symbol: str) -> str:
@@ -122,7 +113,8 @@ async def get_executive_dashboard(
 ) -> ExecutiveDashboardResponse:
     """
     Get executive dashboard data including:
-    - Exposure waterfall metrics based on OBSERVATIONS (threats)
+    - Total lifecycle exposure from equipment production criticality assessments
+    - Observation-based waterfall metrics (covered, active, critical)
     - KPI cards with trends
     - Drill-down evidence data
     - AI executive summary
@@ -234,15 +226,18 @@ async def get_executive_dashboard(
     }).to_list(5000)
     
     # ============= Calculate Exposure Metrics =============
-    
-    total_lifecycle_exposure = 0.0
+
+    total_lifecycle_exposure, assessed_equipment_count = calculate_total_equipment_lifecycle_exposure(
+        equipment_nodes,
+        hourly_cost,
+    )
+
     covered_by_controls = 0.0
     uncovered_exposure = 0.0
     active_threat_exposure = 0.0
     critical_active_exposure = 0.0
-    
+
     # Previous period metrics for trend
-    prev_total_exposure = 0.0
     prev_covered = 0.0
     prev_active_threat = 0.0
     prev_critical = 0.0
@@ -265,16 +260,12 @@ async def get_executive_dashboard(
         # Priority: Equipment criticality > Observation severity
         production_impact = 3  # Default medium
         if equipment and equipment.get("criticality"):
-            crit = equipment.get("criticality")
-            if isinstance(crit, dict):
-                production_impact = crit.get("production_impact") or crit.get("production", 3)
-            elif isinstance(crit, (int, float)):
-                production_impact = int(crit)
+            production_impact = production_impact_from_criticality(equipment.get("criticality")) or 3
         else:
             # Fall back to observation severity
             production_impact = severity_to_production_impact(obs.get("severity"))
         
-        # Calculate monetary exposure
+        # Calculate monetary exposure (same max-hours logic as observation workspace)
         exposure_value = calculate_production_value(production_impact, hourly_cost)
         
         # Determine if created in current or previous period
@@ -283,11 +274,6 @@ async def get_executive_dashboard(
             created_at >= previous_period_start.isoformat() and 
             created_at < current_period_start.isoformat()
         ) if created_at else False
-        
-        # Always count toward total lifecycle exposure
-        total_lifecycle_exposure += exposure_value
-        if is_previous_period:
-            prev_total_exposure += exposure_value
         
         # Check if has control
         failure_mode_id = obs.get("failure_mode_id")
@@ -357,7 +343,7 @@ async def get_executive_dashboard(
     
     # 1. Exposure Coverage %
     coverage_current = (covered_by_controls / total_lifecycle_exposure * 100) if total_lifecycle_exposure > 0 else 0
-    coverage_previous = (prev_covered / prev_total_exposure * 100) if prev_total_exposure > 0 else coverage_current
+    coverage_previous = (prev_covered / total_lifecycle_exposure * 100) if total_lifecycle_exposure > 0 else coverage_current
     coverage_change, coverage_trend = calculate_trend(coverage_current, coverage_previous, higher_is_better=True)
     
     # 2. PM Compliance %
@@ -485,7 +471,7 @@ async def get_executive_dashboard(
     
     total_obs = len(all_observations)
     
-    ai_summary = f"""AssetIQ is tracking {total_obs} identified reliability observations with a total lifecycle exposure of {format_currency(total_lifecycle_exposure, currency_symbol)}.
+    ai_summary = f"""AssetIQ is tracking {total_obs} identified reliability observations against {assessed_equipment_count} equipment assets with assessed production criticality, representing a total lifecycle exposure of {format_currency(total_lifecycle_exposure, currency_symbol)}.
 
 {format_currency(covered_by_controls, currency_symbol)} ({coverage_current:.0f}%) of this exposure is covered by active reliability control strategies.
 

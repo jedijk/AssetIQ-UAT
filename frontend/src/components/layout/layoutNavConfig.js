@@ -1,6 +1,5 @@
 import {
   LayoutDashboard,
-  Sparkles,
   AlertTriangle,
   GitBranch,
   ClipboardList,
@@ -22,7 +21,6 @@ import {
 export function buildNavItems(t) {
   return [
     { path: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
-    { path: "/reliability", label: t("nav.reliabilityIntelligence"), icon: Sparkles, desktopOnly: true, feature: "reliability_intelligence" },
     { path: "/threats", label: t("nav.observations"), icon: AlertTriangle, feature: "observations" },
     { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch, desktopOnly: true, feature: "investigations" },
     { path: "/actions", label: t("nav.actions"), icon: ClipboardList, feature: "actions" },
@@ -53,7 +51,7 @@ export function buildSettingsMenuItems(t) {
 export function filterNavItems(items, { isMobileView, canSeeNavItem }) {
   return items.filter((item) => {
     if (isMobileView && item.desktopOnly) return false;
-    if (item.feature && !canSeeNavItem(item.path)) return false;
+    if (!canSeeNavItem(item.path)) return false;
     return true;
   });
 }

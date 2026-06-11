@@ -218,6 +218,7 @@
   },
   "permissions": {
     "sections": {
+      "dashboards": "Dashboards",
       "observations": "Observations",
       "operations": "Operations",
       "reliabilityIntelligence": "Reliability Intelligence",
@@ -226,6 +227,22 @@
       "administration": "Administration"
     },
     "features": {
+      "dashboard_operational": {
+        "name": "Ops Dashboard",
+        "description": "Operational risk overview dashboard tab"
+      },
+      "dashboard_production": {
+        "name": "Production Dashboard",
+        "description": "Production metrics and monitoring dashboard tab"
+      },
+      "dashboard_executive": {
+        "name": "Executive Dashboard",
+        "description": "Executive summary and KPI dashboard tab"
+      },
+      "dashboard_builder": {
+        "name": "Dashboard Builder",
+        "description": "Smart dashboard builder tab for custom layouts"
+      },
       "observations": {
         "description": "Observations page and threat management"
       },
@@ -236,7 +253,7 @@
         "description": "Actions page and corrective/preventive work"
       },
       "tasks": {
-        "description": "My Tasks execution queue"
+        "description": "My Tasks execution queue and work items"
       },
       "scheduler": {
         "description": "Execution planner and task scheduling"
@@ -255,7 +272,7 @@
         "description": "AI tools inside Strategy: suggest failure modes, bulk improve, review disciplines, find similar, suggest equipment types, and the not-improved filter"
       },
       "reliability_intelligence": {
-        "description": "Reliability Intelligence main page and case management"
+        "description": "Reliability Intelligence dashboard tab and case management"
       },
       "chat": {
         "name": "AI Chat",
@@ -502,6 +519,8 @@
     "operationalShort": "Ops",
     "production": "Production",
     "productionShort": "Prod",
+    "reliability": "Reliability Intelligence",
+    "reliabilityShort": "RIL",
     "builder": "Builder",
     "builderShort": "Build",
     "refresh": "Refresh",
