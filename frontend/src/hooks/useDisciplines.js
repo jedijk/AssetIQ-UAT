@@ -1,6 +1,7 @@
 /**
  * useDisciplines — read-only hook backed by the Disciplines configurator API.
  */
+import { useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   DISCIPLINES as LEGACY_DISCIPLINES,
@@ -36,19 +37,7 @@ export function useDisciplines({ includeInactive = false } = {}) {
     return found?.color || "bg-slate-100 text-slate-700";
   };
 
-  const getLabel = (value) => {
-    if (!value) return "";
-    const normalized = normalize(value);
-    const found = disciplines.find(
-      (d) =>
-        d.value?.toLowerCase() === normalized.toLowerCase() ||
-        d.value?.toLowerCase() === String(value).toLowerCase() ||
-        d.label?.toLowerCase() === String(value).toLowerCase(),
-    );
-    return found?.label || value;
-  };
-
-  const normalize = (value) => {
+  const normalize = useCallback((value) => {
     if (!value) return "";
     const lower = String(value).toLowerCase();
     const direct = disciplines.find(
@@ -61,6 +50,18 @@ export function useDisciplines({ includeInactive = false } = {}) {
     );
     if (viaAlias) return viaAlias.value;
     return legacyNormalize(value);
+  }, [disciplines]);
+
+  const getLabel = (value) => {
+    if (!value) return "";
+    const normalized = normalize(value);
+    const found = disciplines.find(
+      (d) =>
+        d.value?.toLowerCase() === normalized.toLowerCase() ||
+        d.value?.toLowerCase() === String(value).toLowerCase() ||
+        d.label?.toLowerCase() === String(value).toLowerCase(),
+    );
+    return found?.label || value;
   };
 
   const selectOptions = disciplines.map((d) => ({
