@@ -448,15 +448,22 @@ async def set_database_context(request, call_next):
 
     db_env = "production"
     if explicit_env:
+        # For UAT requests, temporarily set the request DB to UAT before authenticating
+        # This ensures the user lookup finds the user in the UAT database
+        if explicit_env == "uat":
+            set_request_db(AVAILABLE_DATABASES["uat"]["name"])
+        
         user = await get_optional_user_from_request(request)
         role = user.get("role") if user else None
+        user_email = user.get("email") if user else "none"
         if explicit_env == "uat":
             if _role_can_switch_database(role):
                 db_env = "uat"
             else:
                 logger.warning(
-                    "Ignored UAT database override for role=%s path=%s",
+                    "Ignored UAT database override for role=%s email=%s path=%s",
                     role or "anonymous",
+                    user_email,
                     request.url.path,
                 )
         elif explicit_env == "production":
@@ -468,6 +475,10 @@ async def set_database_context(request, call_next):
         db_name = DEFAULT_DB_NAME
 
     set_request_db(db_name)
+    
+    # Debug logging for database context
+    if "link-failure-mode" in request.url.path:
+        logger.info(f"DB Context for {request.method} {request.url.path}: env={db_env}, db_name={db_name}, cookie={request.cookies.get('assetiq_db_env')}")
 
     response = await call_next(request)
     return response

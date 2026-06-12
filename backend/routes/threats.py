@@ -873,9 +873,14 @@ async def link_threat_to_failure_mode(
     """
     Link a threat to a failure mode from the FMEA library and recalculate the risk score.
     """
+    from database import get_current_db_name
+    current_db = get_current_db_name()
+    logger.info(f"link_threat_to_failure_mode: Looking for threat {threat_id} in database {current_db}")
+    
     # Get the threat (shared entity - no created_by filter)
     threat = await db.threats.find_one({"id": threat_id})
     if not threat:
+        logger.warning(f"link_threat_to_failure_mode: Threat {threat_id} NOT FOUND in database {current_db}")
         raise HTTPException(status_code=404, detail="Threat not found")
     await _assert_threat_installation_scope(current_user, threat)
     
