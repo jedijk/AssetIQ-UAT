@@ -932,6 +932,28 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
                         sev = analysis["severity"].lower()
                         if sev in ("critical", "high"):
                             analysis_update["ai_severity"] = sev
+                    
+                    # Build AI analysis text to append to description
+                    ai_analysis_parts = []
+                    if analysis.get("image_description"):
+                        ai_analysis_parts.append(f"AI Photo Analysis: {analysis['image_description']}")
+                    if analysis.get("visible_damage"):
+                        ai_analysis_parts.append("Visible damage: " + "; ".join(analysis["visible_damage"]))
+                    if analysis.get("safety_concerns"):
+                        ai_analysis_parts.append("Safety concerns: " + "; ".join(analysis["safety_concerns"]))
+                    
+                    # Merge AI analysis into description field
+                    if ai_analysis_parts:
+                        ai_analysis_text = "\n".join(ai_analysis_parts)
+                        # Get current description and append AI analysis
+                        current_threat = await db.threats.find_one({"id": threat_id}, {"_id": 0, "description": 1})
+                        current_desc = (current_threat or {}).get("description", "") or ""
+                        if current_desc:
+                            new_desc = f"{current_desc}\n\n{ai_analysis_text}"
+                        else:
+                            new_desc = ai_analysis_text
+                        analysis_update["description"] = new_desc
+                    
                     await db.threats.update_one({"id": threat_id}, {"$set": analysis_update})
 
                     # Create actions from AI recommendations
