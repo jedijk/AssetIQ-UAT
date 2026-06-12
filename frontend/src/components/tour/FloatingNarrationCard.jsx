@@ -30,6 +30,7 @@ export default function FloatingNarrationCard({
   onSkip,
   onToggleAutoPlay,
   position = "center",
+  tourLabel = "Create Your First Observation",
   children,
 }) {
   // We intentionally don't fight the SpotlightEngine: this card is anchored
@@ -68,7 +69,7 @@ export default function FloatingNarrationCard({
           <div className="flex items-center justify-between gap-3 mb-2.5 sm:mb-3">
             <div className="flex items-center gap-2 text-[10px] sm:text-[11px] uppercase tracking-[0.2em] sm:tracking-[0.22em] text-blue-300/90">
               <Sparkles className="w-3.5 h-3.5" />
-              <span className="truncate">Create Your First Observation</span>
+              <span className="truncate">{tourLabel}</span>
             </div>
             {badge ? (
               <motion.span

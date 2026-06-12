@@ -60,6 +60,7 @@ import ChatSidebar from "./ChatSidebar";
 import ImageEditor from "./ImageEditor";
 import EquipmentHierarchy from "./EquipmentHierarchy";
 import ObservationTour from "./ObservationTour";
+import ProgressObservationTour from "./ProgressObservationTour";
 import NavigationBreadcrumb from "./NavigationBreadcrumb";
 import { actionsAPI, feedbackAPI } from "../lib/api";
 import { useOfflineSync } from "../hooks/useOfflineSync";
@@ -110,6 +111,7 @@ const Layout = () => {
   const avatarObjectUrlRef = useRef(null);
   const [dismissedNotifications, setDismissedNotifications] = useState(false);
   const [observationTourOpen, setObservationTourOpen] = useState(false);
+  const [progressObservationTourOpen, setProgressObservationTourOpen] = useState(false);
   
   // Profile edit dialog state
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
@@ -593,6 +595,7 @@ const Layout = () => {
         t={t}
         resetIntro={resetIntro}
         setObservationTourOpen={setObservationTourOpen}
+        setProgressObservationTourOpen={setProgressObservationTourOpen}
         user={user}
         avatarUrl={avatarUrl}
         openProfileDialog={openProfileDialog}
@@ -753,6 +756,11 @@ const Layout = () => {
         setChatOpen={setChatOpen}
         setChatPrefillMessage={setChatPrefillMessage}
         setHierarchyOpen={setHierarchyOpen}
+      />
+
+      <ProgressObservationTour
+        isOpen={progressObservationTourOpen}
+        onClose={() => setProgressObservationTourOpen(false)}
       />
 
       {/* Info Dialog */}

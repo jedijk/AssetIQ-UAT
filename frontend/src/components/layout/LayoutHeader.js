@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Menu, X, PanelLeftOpen, PanelLeftClose, Settings, HelpCircle, LogOut, User, Shield, Eye,
-  Info, MessageCircleQuestion, Tag, Sparkles,
+  Info, MessageCircleQuestion, Tag, Sparkles, Route,
 } from "lucide-react";
 import AnimatedDrawer from "../animations/AnimatedDrawer";
 import { springPresets } from "../animations/constants";
@@ -37,6 +37,7 @@ export default function LayoutHeader({
   t,
   resetIntro,
   setObservationTourOpen,
+  setProgressObservationTourOpen,
   user,
   avatarUrl,
   openProfileDialog,
@@ -241,6 +242,16 @@ export default function LayoutHeader({
                 >
                   <Sparkles className="w-3.5 h-3.5 mr-2 text-blue-500" />
                   Create Your First Observation
+                </DropdownMenuItem>
+                )}
+                {!isOperatorActive && setProgressObservationTourOpen && (
+                <DropdownMenuItem
+                  onClick={() => setProgressObservationTourOpen(true)}
+                  className="cursor-pointer text-sm"
+                  data-testid="progress-observation-tour-menu-item"
+                >
+                  <Route className="w-3.5 h-3.5 mr-2 text-purple-500" />
+                  Progress an Observation
                 </DropdownMenuItem>
                 )}
                 <DropdownMenuItem 

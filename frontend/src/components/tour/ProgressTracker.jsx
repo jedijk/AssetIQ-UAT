@@ -9,7 +9,7 @@ export default function ProgressTracker({ scenes, currentIndex, onJumpTo }) {
   return (
     <div className="tour-progress-tracker flex flex-col items-center gap-0.5 sm:gap-2 select-none">
       <div
-        className="tour-progress-dots flex items-center justify-center gap-px sm:gap-1.5 max-w-full px-1"
+        className="tour-progress-dots flex items-center justify-center gap-px sm:gap-1.5 max-w-full px-1 overflow-x-auto flex-nowrap scrollbar-none"
         role="tablist"
         aria-label="Tour scene progress"
       >
