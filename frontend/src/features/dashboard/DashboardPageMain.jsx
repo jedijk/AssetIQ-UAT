@@ -1062,8 +1062,7 @@ export default function DashboardPageMain({ initialTab }) {
           renderItem={(item, idx) => (
             <div 
               key={item.id || `action-${idx}`} 
-              className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
-              onClick={(e) => { e.stopPropagation(); navigate(`/actions/${item.id}`, { state: navState }); }}
+              className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 transition-colors"
               data-testid={`action-item-${item.id}`}
             >
               <UserAvatar 

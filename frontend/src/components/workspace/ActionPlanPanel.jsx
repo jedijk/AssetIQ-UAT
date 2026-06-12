@@ -37,19 +37,16 @@ const ActionPlanPanel = ({ actions, onViewAll, onEditAction, onDeleteAction, onA
   };
 
   const handleActionClick = (action) => {
+    // Only allow navigation to causal engine for synthetic investigation entries
     if (action.is_synthetic && action.linked_investigation_id) {
       navigate(`/causal-engine?id=${action.linked_investigation_id}`);
       return;
     }
-    if (action.id) {
-      navigate(`/actions/${action.id}`, {
-        state: { breadcrumbOrigin: location.pathname },
-      });
-    }
+    // No deep linking to action detail page - actions are managed inline
   };
 
   const isActionClickable = (action) =>
-    Boolean(action.id) || (action.is_synthetic && action.linked_investigation_id);
+    Boolean(action.is_synthetic && action.linked_investigation_id);
 
   const handleEdit = (action, e) => {
     e.stopPropagation();
