@@ -334,13 +334,11 @@
         padding: 0.5rem 0.75rem !important;
     }
     
-    .header-content {
-        gap: 0.5rem !important;
-    }
-    
-    /* Smaller buttons on mobile */
-    .app-header button {
-        min-width: unset;
+    /* Header icons stay compact; global 44px tap targets apply elsewhere */
+    .app-header button,
+    .app-header [role="button"] {
+        min-width: unset !important;
+        min-height: unset !important;
     }
     
     /* Prevent horizontal scroll */

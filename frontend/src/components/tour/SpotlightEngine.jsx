@@ -17,6 +17,7 @@ export default function SpotlightEngine({
   spotlightZoom = 1,
   pulse = false,
   active = true,
+  backdropOpacity = 0.78,
 }) {
   const [rect, setRect] = useState(null);
   const [viewport, setViewport] = useState({ w: typeof window !== "undefined" ? window.innerWidth : 1280, h: typeof window !== "undefined" ? window.innerHeight : 800 });
@@ -89,7 +90,7 @@ export default function SpotlightEngine({
       >
         <div
           className="absolute inset-0"
-          style={{ background: "rgba(2, 6, 23, 0.78)" }}
+          style={{ background: `rgba(2, 6, 23, ${backdropOpacity})` }}
         />
       </div>
     );
@@ -137,7 +138,7 @@ export default function SpotlightEngine({
           y="0"
           width="100%"
           height="100%"
-          fill="rgba(2, 6, 23, 0.78)"
+          fill={`rgba(2, 6, 23, ${backdropOpacity})`}
           mask={`url(#${maskId})`}
         />
       </svg>

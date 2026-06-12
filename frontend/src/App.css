@@ -252,7 +252,7 @@ html, body {
 }
 
 .header-content {
-    @apply px-4 h-12 flex items-center justify-between w-full;
+    @apply px-4 h-12 flex items-center w-full min-w-0 gap-2;
 }
 
 /* Navigation */

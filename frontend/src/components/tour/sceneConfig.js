@@ -1,181 +1,106 @@
 /**
- * Scene configuration for the cinematic "Create Your First Observation" tour.
+ * Guided "Create Your First Observation" tour — spotlights real UI controls.
  *
- * Each scene defines:
- *  - id:            unique identifier (used for analytics + LocalStorage)
- *  - title:         large headline (Apple-style)
- *  - narration:     concise body copy (max ~2 short sentences)
- *  - mockVisual:    key identifier for SceneMocks renderer (or null)
- *  - target:        CSS selector for the real DOM element to spotlight (or null)
- *  - cardPosition:  'center' | 'left' | 'right' | 'bottom' — preferred narration position
- *  - ensureChat:    'open' | 'closed' | null — UI state pre-requisite
- *  - ensureHierarchy: 'open' | 'closed' | null
- *  - pulseTarget:   show a pulsing ring around the spotlighted DOM element
- *  - spotlightZoom: cinematic scale multiplier applied to the spotlight (default 1)
- *  - transition:    'fade' | 'zoom' | 'pan' | 'spotlight' (controls Framer animation preset)
- *  - typedText:     text rendered with the typewriter animation inside mock visuals
- *  - badge:         optional status badge text shown in narration card
+ * Each scene:
+ *  - target: CSS selector for a live DOM element (required for guided steps)
+ *  - ensureChat / ensureHierarchy: prep the app before spotlighting
+ *  - prefillMessage: optional chat input prefill when chat opens
+ *  - actionHint: short instruction shown under the narration
+ *  - mockVisual: null (no cinematic mocks — use the real product)
  */
 
 export const TOUR_SCENES = [
   {
-    id: "welcome",
-    title: "Observations are where reliability intelligence begins",
+    id: "observations",
+    title: "Where observations live",
     narration:
-      "Observations capture problems, abnormalities and opportunities for improvement. Every threat, investigation and action starts with an observation.",
-    mockVisual: "workspace",
-    target: '[data-testid="hierarchy-sidebar"]',
+      "Observations record equipment issues. AssetIQ scores them and drives investigations and actions.",
+    actionHint: "Open Observations anytime from the menu.",
+    mockVisual: null,
+    target: '[data-testid="nav-observations"], [data-testid="mobile-nav-observations"]',
     cardPosition: "center",
     ensureChat: "closed",
-    ensureHierarchy: "open",
-    pulseTarget: true,
-    spotlightZoom: 1,
+    ensureHierarchy: "closed",
+    pulseTarget: false,
+    spotlightZoom: 1.15,
     transition: "fade",
-    chapter: "Welcome",
+    chapter: "Observations",
   },
   {
-    id: "select-equipment",
-    title: "Find the affected equipment",
+    id: "report",
+    title: "Start a new report",
     narration:
-      "Navigate through the hierarchy and select the equipment where the issue was observed.",
-    mockVisual: "hierarchyZoom",
-    target: '[data-testid="hierarchy-sidebar"]',
-    cardPosition: "right",
-    ensureChat: "closed",
-    ensureHierarchy: "open",
-    pulseTarget: false,
-    spotlightZoom: 1.05,
-    transition: "zoom",
-    chapter: "Select equipment",
-  },
-  {
-    id: "context-menu",
-    title: "Create directly from the hierarchy",
-    narration: "Right-click any equipment and select Add Observation.",
-    mockVisual: "contextMenu",
-    target: '[data-testid="hierarchy-sidebar"]',
-    cardPosition: "right",
-    ensureChat: "closed",
-    ensureHierarchy: "open",
-    pulseTarget: false,
-    spotlightZoom: 1.05,
-    transition: "spotlight",
-    chapter: "From the hierarchy",
-  },
-  {
-    id: "quick-add",
-    title: "Use the Quick Add button",
-    narration:
-      "You can also create an observation using the + button available throughout AssetIQ.",
-    mockVisual: "quickAdd",
+      "Click the + button to open the observation assistant. It works from any page.",
+    actionHint: "Try clicking the + button now.",
+    mockVisual: null,
     target: '[data-testid="fab-report-observation"]',
     cardPosition: "left",
     ensureChat: "closed",
     ensureHierarchy: "closed",
     pulseTarget: true,
-    spotlightZoom: 1.4,
+    spotlightZoom: 1.35,
     transition: "pan",
-    chapter: "Quick add",
-  },
-  {
-    id: "ai-detection",
-    title: "AssetIQ identifies the equipment automatically",
-    narration:
-      "Describe the issue in natural language. AssetIQ will attempt to identify the affected equipment from your description.",
-    mockVisual: "aiDetection",
-    target: '[data-testid="chat-sidebar"]',
-    cardPosition: "left",
-    ensureChat: "open",
-    ensureHierarchy: "closed",
-    pulseTarget: false,
-    spotlightZoom: 1,
-    transition: "fade",
-    typedText: "Oil leak observed near the mechanical seal during operation.",
-    badge: "Equipment matched",
-    chapter: "AI detection",
-  },
-  {
-    id: "clarification",
-    title: "When equipment is unclear",
-    narration:
-      "If AssetIQ cannot confidently determine the affected equipment, it will help you find the correct asset.",
-    mockVisual: "clarification",
-    target: null,
-    cardPosition: "left",
-    ensureChat: "closed",
-    ensureHierarchy: "closed",
-    pulseTarget: false,
-    spotlightZoom: 1,
-    transition: "fade",
-    badge: "Needs clarification",
-    chapter: "Clarification",
+    chapter: "Report",
   },
   {
     id: "describe",
-    title: "Capture what was observed",
+    title: "Describe what you saw",
     narration:
-      "Describe the issue as clearly as possible. AssetIQ uses this information for risk analysis and recommendations.",
-    mockVisual: "describe",
-    target: null,
+      "Type the issue in plain language. Mention equipment name or tag if you can — AssetIQ will match equipment and suggest a failure mode.",
+    actionHint: "Edit the example text or type your own issue, then continue.",
+    mockVisual: null,
+    target: '[data-testid="sidebar-chat-message-input"]',
     cardPosition: "left",
-    ensureChat: "closed",
+    ensureChat: "open",
     ensureHierarchy: "closed",
+    prefillMessage: "High vibration on Pump P-101 during operation.",
     pulseTarget: false,
-    spotlightZoom: 1,
+    spotlightZoom: 1.08,
     transition: "fade",
-    typedText:
-      "High vibration detected on Pump P-101. Abnormal noise present during operation.",
-    chapter: "Describe the problem",
+    chapter: "Describe",
   },
   {
-    id: "submit",
-    title: "Create the observation",
+    id: "send",
+    title: "Submit the report",
     narration:
-      "Submit the observation to begin AssetIQ's intelligence workflow.",
-    mockVisual: "submit",
-    target: null,
+      "Press Send. AssetIQ summarises your report, matches equipment, and asks you to confirm before creating the observation.",
+    actionHint: "Click Send when you are ready — or tap Next to continue the tour.",
+    mockVisual: null,
+    target: '[data-testid="sidebar-send-message-button"]',
     cardPosition: "left",
-    ensureChat: "closed",
+    ensureChat: "open",
     ensureHierarchy: "closed",
-    pulseTarget: false,
-    spotlightZoom: 1,
-    transition: "fade",
+    pulseTarget: true,
+    spotlightZoom: 1.2,
+    transition: "spotlight",
     chapter: "Submit",
   },
   {
-    id: "next-steps",
-    title: "AssetIQ goes to work",
+    id: "complete",
+    title: "You are ready",
     narration:
-      "The observation becomes the foundation for threat assessment, AI risk analysis, investigations and recommended actions.",
-    mockVisual: "nextSteps",
-    target: null,
+      "Confirmed observations appear in the list. From there, validate the failure mode, build an action plan, and track exposure reduction.",
+    actionHint: "Finish the tour and try reporting a real observation.",
+    mockVisual: null,
+    target: '[data-testid="nav-observations"], [data-testid="mobile-nav-observations"]',
     cardPosition: "center",
     ensureChat: "closed",
     ensureHierarchy: "closed",
     pulseTarget: false,
-    spotlightZoom: 1,
+    spotlightZoom: 1.1,
     transition: "fade",
-    chapter: "What happens next",
+    chapter: "Done",
   },
 ];
 
-export const AUTO_PLAY_DURATION_MS = 6000;
+export const AUTO_PLAY_DURATION_MS = 8000;
 
-/**
- * Per-scene auto-play durations (ms). Scenes that contain typewriter or
- * multi-step internal animations need more time so auto-play doesn't skip
- * mid-animation. Falls back to AUTO_PLAY_DURATION_MS.
- */
 export const SCENE_DURATIONS_MS = {
-  welcome: 6000,
-  "select-equipment": 6000,
-  "context-menu": 8000,        // context menu + cursor + success state
-  "quick-add": 6000,
-  "ai-detection": 8500,        // typewriter (~2s) + analyzing (1.1s) + read time
-  clarification: 7500,         // equipment search dialog + selection (no retype animations)
-  describe: 8500,               // longer typewriter + AI tag extraction
-  submit: 7000,                 // submit pulse + success slide
-  "next-steps": 9000,           // 6-step flow stagger + counter animations
+  observations: 8000,
+  report: 10000,
+  describe: 12000,
+  send: 10000,
+  complete: 8000,
 };
 
 export const TOUR_COMPLETION_STORAGE_KEY = "assetiq.observation_tour_v2.completed";

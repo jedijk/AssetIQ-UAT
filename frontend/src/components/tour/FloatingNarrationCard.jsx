@@ -31,6 +31,7 @@ export default function FloatingNarrationCard({
   onToggleAutoPlay,
   position = "center",
   tourLabel = "Create Your First Observation",
+  actionHint,
   children,
 }) {
   // We intentionally don't fight the SpotlightEngine: this card is anchored
@@ -97,6 +98,15 @@ export default function FloatingNarrationCard({
           >
             {narration}
           </p>
+
+          {actionHint ? (
+            <p
+              className="mt-2 sm:mt-3 text-blue-200/90 text-[13px] sm:text-sm leading-relaxed border-l-2 border-blue-400/50 pl-3"
+              data-testid="tour-action-hint"
+            >
+              {actionHint}
+            </p>
+          ) : null}
 
           {children ? <div className="mt-3 sm:mt-4">{children}</div> : null}
         </div>
@@ -189,7 +199,7 @@ export default function FloatingNarrationCard({
 
       {/* Swipe hint \u2014 mobile only */}
       <div className="mt-2 sm:hidden text-center text-[11px] text-white/45 tracking-wide">
-        Swipe left or right to navigate
+        Use the highlighted control, then tap Next
       </div>
     </motion.div>
   );

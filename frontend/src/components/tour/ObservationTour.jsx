@@ -22,7 +22,7 @@ import {
 } from "./sceneConfig";
 
 /**
- * Cinematic "Create Your First Observation" tour.
+ * Guided "Create Your First Observation" tour — spotlights real UI controls.
  *
  * Public API (kept identical to the previous ObservationTour for drop-in):
  *  - isOpen, onClose
@@ -36,7 +36,7 @@ export default function ObservationTour({
   setHierarchyOpen,
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const autoPlayTimerRef = useRef(null);
   const scenes = TOUR_SCENES;
   const scene = scenes[currentIndex];
@@ -50,8 +50,7 @@ export default function ObservationTour({
   useEffect(() => {
     if (isOpen) {
       setCurrentIndex(0);
-      // Auto-play is ON by default; the user can pause from the controls.
-      setIsAutoPlaying(true);
+      setIsAutoPlaying(false);
       try {
         localStorage.setItem(TOUR_LAST_RUN_STORAGE_KEY, new Date().toISOString());
       } catch (e) {
@@ -86,8 +85,11 @@ export default function ObservationTour({
     }
 
     if (typeof setChatPrefillMessage === "function") {
-      // The cinematic tour does not pre-fill the live chat; clear any leftover.
-      setChatPrefillMessage(null);
+      if (scene.prefillMessage) {
+        setChatPrefillMessage(scene.prefillMessage);
+      } else {
+        setChatPrefillMessage(null);
+      }
     }
   }, [
     isOpen,
@@ -96,6 +98,20 @@ export default function ObservationTour({
     setHierarchyOpen,
     setChatPrefillMessage,
   ]);
+
+  // Re-measure spotlight after chat / hierarchy panels finish opening.
+  useEffect(() => {
+    if (!isOpen || !scene) return undefined;
+    const fire = () => window.dispatchEvent(new Event("resize"));
+    const t1 = setTimeout(fire, 280);
+    const t2 = setTimeout(fire, 650);
+    const t3 = setTimeout(fire, 1100);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [isOpen, scene?.id, scene?.ensureChat, scene?.ensureHierarchy, scene?.target]);
 
   /* ------------------------------------------------------------------
    * Navigation
@@ -259,6 +275,8 @@ export default function ObservationTour({
     }
   };
 
+  const guidedTour = !scene?.mockVisual;
+
   const overlay = (
     <AnimatePresence>
       <motion.div
@@ -286,13 +304,14 @@ export default function ObservationTour({
           spotlightZoom={scene.spotlightZoom || 1}
           pulse={!!scene.pulseTarget}
           active
+          backdropOpacity={guidedTour ? 0.52 : 0.78}
         />
 
-        {/* Top-right close affordance (mirrors Skip but always visible) */}
+        {/* Top-right close affordance */}
         <button
           type="button"
           onClick={handleSkip}
-          className="absolute top-3 right-3 sm:top-4 sm:right-4 z-[2] inline-flex items-center justify-center w-10 h-10 sm:w-9 sm:h-9 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white border border-white/15 transition-colors"
+          className="absolute top-3 right-3 sm:top-4 sm:right-4 z-[2] pointer-events-auto inline-flex items-center justify-center w-10 h-10 sm:w-9 sm:h-9 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white border border-white/15 transition-colors"
           aria-label="Exit tour"
           data-testid="observation-tour-close-btn"
         >
@@ -305,17 +324,13 @@ export default function ObservationTour({
          * the two never overlap on small screens.
          */}
         <motion.div
-          className="relative h-full w-full flex flex-col"
+          className="relative h-full w-full flex flex-col pointer-events-none"
           drag="x"
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.18}
           onDragEnd={handleSwipe}
         >
-          {/* Mock visual stage — fills available space and auto-scales to fit
-              via AutoFitScale (no scrolling, no overlap with the narration
-              dock below). When cardPosition is "left"/"right" we bias the
-              mock to the same side as the narration card so it never overlaps
-              with a spotlight on the opposite edge of the screen. */}
+          {scene.mockVisual ? (
           <div
             className={`flex-1 min-h-0 flex items-stretch px-3 sm:px-4 pt-14 sm:pt-10 pb-2 sm:pb-4 overflow-hidden ${
               scene.cardPosition === "left"
@@ -326,25 +341,26 @@ export default function ObservationTour({
             }`}
           >
             <AnimatePresence mode="wait">
-              {scene.mockVisual && (
-                <motion.div
-                  key={`mock-${scene.id}`}
-                  initial={variant.initial}
-                  animate={variant.animate}
-                  exit={variant.exit}
-                  transition={variant.transition}
-                  className="w-full max-w-full flex items-center justify-center pointer-events-auto"
-                  data-testid={`tour-scene-${scene.id}`}
-                >
-                  <AutoFitScale minScale={0.3} maxScale={1}>
-                    <div style={{ width: "min(92vw, 880px)" }}>
-                      <SceneMocks mockKey={scene.mockVisual} typedText={scene.typedText} />
-                    </div>
-                  </AutoFitScale>
-                </motion.div>
-              )}
+              <motion.div
+                key={`mock-${scene.id}`}
+                initial={variant.initial}
+                animate={variant.animate}
+                exit={variant.exit}
+                transition={variant.transition}
+                className="w-full max-w-full flex items-center justify-center pointer-events-auto"
+                data-testid={`tour-scene-${scene.id}`}
+              >
+                <AutoFitScale minScale={0.3} maxScale={1}>
+                  <div style={{ width: "min(92vw, 880px)" }}>
+                    <SceneMocks mockKey={scene.mockVisual} typedText={scene.typedText} />
+                  </div>
+                </AutoFitScale>
+              </motion.div>
             </AnimatePresence>
           </div>
+          ) : (
+            <div className="flex-1 min-h-0" aria-hidden="true" />
+          )}
 
           {/* Bottom dock: narration card + progress */}
           <div className="shrink-0 px-3 sm:px-4 pb-4 sm:pb-8 pointer-events-none">
@@ -355,6 +371,7 @@ export default function ObservationTour({
                   title={scene.title}
                   narration={scene.narration}
                   badge={scene.badge}
+                  actionHint={scene.actionHint}
                   sceneIndex={currentIndex}
                   totalScenes={scenes.length}
                   isFirst={isFirst}

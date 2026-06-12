@@ -55,7 +55,7 @@ export default function LayoutHeader({
     <header className="app-header bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 pointer-events-auto">
         <div className="header-content relative max-w-full px-4">
           {/* Left Section - Logo & Nav */}
-          <div className="flex items-center gap-3 lg:gap-6">
+          <div className="flex items-center gap-2 sm:gap-3 lg:gap-6 min-w-0 flex-1 overflow-hidden">
             {/* Mobile Menu Toggle - LEFT side on mobile */}
             {!isOperatorActive && (
             <motion.button
@@ -113,7 +113,7 @@ export default function LayoutHeader({
                   className="w-8 h-8 block object-cover"
                 />
               </span>
-              <span className="text-base font-semibold text-slate-900 dark:text-white" data-testid="app-logo">
+              <span className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white truncate" data-testid="app-logo">
                 <span>Asset</span>
                 <span className="text-blue-600 dark:text-blue-400">IQ</span>
               </span>
@@ -154,8 +154,8 @@ export default function LayoutHeader({
             </nav>
           </div>
 
-          {/* Right Side */}
-          <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2">
+          {/* Right Side - packed cluster, never grows/shrinks into logo */}
+          <div className="flex items-center flex-nowrap shrink-0 ml-auto gap-0.5 sm:gap-1 md:gap-2">
             <LayoutNotificationsMenu
               open={openHeaderMenu === "notifications"}
               onOpenChange={(open) => setOpenHeaderMenu(open ? "notifications" : null)}
