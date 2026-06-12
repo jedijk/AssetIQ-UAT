@@ -713,7 +713,7 @@ const Layout = () => {
               >
                 {/* Breadcrumb Navigation */}
                 <NavigationBreadcrumb className="px-4 sm:px-6 pt-4" />
-                <div className="max-sm:-mt-2.5 sm:mt-0">
+                <div className="sm:mt-0">
                   <Outlet />
                 </div>
               </AppErrorBoundary>
