@@ -46,6 +46,7 @@ import {
   ChevronDown,
   ChevronRight,
   ArrowUpDown,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -75,6 +76,8 @@ import { VirtualList } from "../components/ui/VirtualList";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useCapabilities } from "../core/performance";
 import { translateEnum } from "../lib/translateEnum";
+
+const OBSERVATIONS_REFETCH_MS = 30_000;
 
 const STATUS_LABEL_KEYS = {
   Observation: "observations.statusObservation",
@@ -247,7 +250,7 @@ const ThreatsPage = () => {
   };
 
   // Fetch stats
-  const { data: stats } = useQuery({
+  const { data: stats, refetch: refetchStats } = useQuery({
     queryKey: queryKeys.stats.all(),
     queryFn: statsAPI.get,
   });
@@ -264,14 +267,20 @@ const ThreatsPage = () => {
       }
       return result;
     },
-    staleTime: 5 * 60 * 1000, // Keep data fresh for 5 minutes (reduced refetches)
+    staleTime: 30 * 1000,
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
     retry: 3, // Retry 3 times on failure
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000), // Exponential backoff
-    refetchOnWindowFocus: false, // Don't refetch when window regains focus
-    refetchInterval: false, // Disable automatic background refetching
+    refetchOnWindowFocus: true,
+    refetchInterval: OBSERVATIONS_REFETCH_MS,
+    refetchIntervalInBackground: false,
     placeholderData: (previousData) => previousData, // Keep previous data while refetching
   });
+
+  const handleRefreshList = () => {
+    refetchThreats();
+    refetchStats();
+  };
 
   // Apply translations based on current language
   const threats = rawThreats;
@@ -493,15 +502,30 @@ const ThreatsPage = () => {
             <h1 className="text-lg sm:text-xl font-bold text-slate-900">{t("observations.title")}</h1>
             <p className="text-xs text-slate-500 hidden sm:block">{t("observations.subtitle")}</p>
           </div>
-          {/* Mobile: Inline stats */}
-          <div className="flex sm:hidden items-center gap-2 text-xs">
-            <span className="bg-slate-100 px-2 py-0.5 rounded-full font-medium">
-              {displayThreats.length}
-              {threatsTruncated ? "+" : ""}
-            </span>
-            {(stats?.critical_count || 0) > 0 && (
-              <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">{t("observations.criticalCount", { count: stats?.critical_count })}</span>
-            )}
+          <div className="flex items-center gap-2">
+            {/* Mobile: Inline stats */}
+            <div className="flex sm:hidden items-center gap-2 text-xs">
+              <span className="bg-slate-100 px-2 py-0.5 rounded-full font-medium">
+                {displayThreats.length}
+                {threatsTruncated ? "+" : ""}
+              </span>
+              {(stats?.critical_count || 0) > 0 && (
+                <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">{t("observations.criticalCount", { count: stats?.critical_count })}</span>
+              )}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 shrink-0"
+              onClick={handleRefreshList}
+              disabled={isFetching}
+              aria-label={t("observations.refresh")}
+              title={t("observations.refreshTooltip")}
+              data-testid="observations-refresh-button"
+            >
+              <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
+            </Button>
           </div>
         </div>
         
@@ -771,7 +795,7 @@ const ThreatsPage = () => {
                 className="mt-3 border-amber-300 bg-white hover:bg-amber-100"
                 onClick={() => {
                   setErrorShown(false);
-                  refetchThreats();
+                  handleRefreshList();
                 }}
               >
                 {t("observations.retry")}

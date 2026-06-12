@@ -12,19 +12,25 @@ import {
   Search,
   MapPin,
   TrendingUp,
-  Eye
+  Eye,
+  RefreshCw,
 } from "lucide-react";
+
+const OBSERVATIONS_REFETCH_MS = 30_000;
 
 const MobileObservations = () => {
   const { t, language } = useLanguage();
   const [filter, setFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const { data: observations = [], isLoading, isError, refetch } = useQuery({
+  const { data: observations = [], isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: [...queryKeys.threats.all(), language],
     queryFn: () => threatsAPI.getAll(null, { language }),
     retry: 2,
-    staleTime: 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchInterval: OBSERVATIONS_REFETCH_MS,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 
   const filteredObs = observations.filter((obs) => {
@@ -84,9 +90,22 @@ const MobileObservations = () => {
           <h1>{t("observations.title")}</h1>
           <p className="subtitle">{t("observations.mobileSubtitle")}</p>
         </div>
-        <div className="header-badge">
-          <span className="badge-count">{stats.open}</span>
-          <span className="badge-label">{t("observations.statusOpen")}</span>
+        <div className="header-actions">
+          <button
+            type="button"
+            className="refresh-btn"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            aria-label={t("observations.refresh")}
+            title={t("observations.refreshTooltip")}
+            data-testid="observations-refresh-button"
+          >
+            <RefreshCw size={18} className={isFetching ? "spinning" : ""} />
+          </button>
+          <div className="header-badge">
+            <span className="badge-count">{stats.open}</span>
+            <span className="badge-label">{t("observations.statusOpen")}</span>
+          </div>
         </div>
       </header>
 
@@ -243,6 +262,40 @@ const MobileObservations = () => {
           opacity: 0.9;
           margin: 4px 0 0 0;
           font-weight: 400;
+        }
+
+        .header-actions {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .refresh-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 40px;
+          height: 40px;
+          border: none;
+          border-radius: 12px;
+          background: rgba(255,255,255,0.2);
+          color: white;
+          backdrop-filter: blur(10px);
+          cursor: pointer;
+        }
+
+        .refresh-btn:disabled {
+          opacity: 0.7;
+          cursor: default;
+        }
+
+        .refresh-btn .spinning {
+          animation: obs-refresh-spin 0.8s linear infinite;
+        }
+
+        @keyframes obs-refresh-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
 
         .header-badge {
