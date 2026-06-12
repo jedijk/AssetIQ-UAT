@@ -1005,9 +1005,9 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
             {showAttList && attachmentCount > 0 && (
               <div className="absolute right-0 top-full mt-1 z-30 w-64 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
                 <div className="max-h-64 overflow-y-auto py-1">
-                  {((isEditing ? editForm.attachments : threat.attachments) || []).map((a) => (
+                  {((isEditing ? editForm.attachments : threat.attachments) || []).map((a, idx) => (
                     <div
-                      key={a.id}
+                      key={a.id || `att-${idx}`}
                       className="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-50 text-xs group"
                     >
                       <button
