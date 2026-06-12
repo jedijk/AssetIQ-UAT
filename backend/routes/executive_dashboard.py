@@ -11,7 +11,7 @@ from pydantic import BaseModel
 import logging
 from database import db
 from auth import get_current_user, require_permission
-from services.tenant_schema import merge_tenant_filter, tenant_id_from_user
+from services.tenant_schema import merge_tenant_filter, tenant_id_from_user, prepend_tenant_match
 from services.cache_service import cache
 from services.production_exposure import (
     calculate_total_equipment_lifecycle_exposure,
@@ -27,7 +27,40 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/executive-dashboard", tags=["Executive Dashboard"])
 
 _dashboard_read = require_permission("observations:read")
-CRITICAL_ACTIVE_RISK_THRESHOLD = 60
+HIGH_ACTIVE_RISK_THRESHOLD = 50
+
+# Equipment with accepted/imported PM Import tasks (Intelligence Map parity).
+PM_IMPORT_EQUIPMENT_LINKED_TASK_MATCH = {
+    "tasks_extracted.equipment_match.equipment_id": {"$ne": None},
+    "tasks_extracted.review_status": {"$ne": "rejected"},
+    "$or": [
+        {"tasks_extracted.import_status": {"$in": ["applied", "merged", "implemented"]}},
+        {"tasks_extracted.review_status": {"$in": ["accepted", "edited", "implemented"]}},
+    ],
+}
+
+
+async def _equipment_ids_with_active_pm_import(
+    current_user: dict,
+    *,
+    created_before: Optional[str] = None,
+) -> set:
+    """Equipment covered by an imported PM plan (even without a strategy-based v2 program)."""
+    pre_stages: List[dict] = []
+    if created_before:
+        pre_stages.append({"$match": {"created_at": {"$lt": created_before}}})
+
+    pipeline = prepend_tenant_match(
+        [
+            *pre_stages,
+            {"$unwind": "$tasks_extracted"},
+            {"$match": PM_IMPORT_EQUIPMENT_LINKED_TASK_MATCH},
+            {"$group": {"_id": "$tasks_extracted.equipment_match.equipment_id"}},
+        ],
+        current_user,
+    )
+    rows = await db.pm_import_sessions.aggregate(pipeline).to_list(5000)
+    return {row["_id"] for row in rows if row.get("_id")}
 
 
 class ExposureMetrics(BaseModel):
@@ -116,40 +149,59 @@ def calculate_trend(current: float, previous: float, higher_is_better: bool = Fa
         return round(change_percent, 1), "degrading" if change_percent > 0 else "improving"
 
 
+def _datetime_range_query(field: str, start: datetime, end: datetime) -> dict:
+    """Match a field stored as BSON datetime or ISO string."""
+    start_iso = start.isoformat()
+    end_iso = end.isoformat()
+    return {
+        "$or": [
+            {field: {"$gte": start, "$lt": end}},
+            {field: {"$gte": start_iso, "$lt": end_iso}},
+        ]
+    }
+
+
 async def count_digital_executions(
-    start_iso: str,
-    end_iso: str,
-    user_id: str,
+    start: datetime,
+    end: datetime,
     current_user: dict,
 ) -> int:
-    """Count form submissions and completed tasks executed through AssetIQ in a time window."""
-    forms_filter = merge_tenant_filter({"created_by": user_id}, current_user)
-    form_count = await db.form_submissions.count_documents({
-        **forms_filter,
+    """Count tenant-wide form submissions and completed tasks in a time window."""
+    form_window = {
         "$or": [
-            {"created_at": {"$gte": start_iso, "$lt": end_iso}},
-            {"submitted_at": {"$gte": start_iso, "$lt": end_iso}},
-        ],
-    })
-    task_filter = merge_tenant_filter({"created_by": user_id}, current_user)
-    task_count = await db.scheduled_tasks.count_documents({
-        **task_filter,
-        "status": "completed",
-        "completed_at": {"$gte": start_iso, "$lt": end_iso},
-    })
+            _datetime_range_query("submitted_at", start, end),
+            _datetime_range_query("created_at", start, end),
+        ]
+    }
+    form_count = await db.form_submissions.count_documents(
+        merge_tenant_filter(form_window, current_user)
+    )
+
+    task_window = merge_tenant_filter(
+        {
+            "status": "completed",
+            **_datetime_range_query("completed_at", start, end),
+        },
+        current_user,
+    )
+    task_count = await db.scheduled_tasks.count_documents(task_window)
     return form_count + task_count
 
 
-async def count_digital_executions_total(user_id: str, current_user: dict) -> int:
-    """All-time count of form submissions and completed tasks via AssetIQ."""
-    forms_filter = merge_tenant_filter({"created_by": user_id}, current_user)
-    form_count = await db.form_submissions.count_documents(forms_filter)
-    task_filter = merge_tenant_filter({"created_by": user_id}, current_user)
-    task_count = await db.scheduled_tasks.count_documents({
-        **task_filter,
-        "status": "completed",
-        "completed_at": {"$exists": True, "$nin": [None, ""]},
-    })
+async def count_digital_executions_total(current_user: dict) -> int:
+    """All-time tenant-wide count of form submissions and completed tasks."""
+    form_count = await db.form_submissions.count_documents(
+        merge_tenant_filter({}, current_user)
+    )
+    task_count = await db.scheduled_tasks.count_documents(
+        merge_tenant_filter(
+            {
+                "status": "completed",
+                "completed_at": {"$exists": True, "$nin": [None, ""]},
+            },
+            current_user,
+        )
+    )
     return form_count + task_count
 
 
@@ -267,6 +319,7 @@ async def get_executive_dashboard(
             "equipment_tag": 1,
             "active_tasks": 1,
             "total_tasks": 1,
+            "imported_tasks": 1,
             "tasks": 1,
             "created_at": 1,
             "status": 1,
@@ -277,6 +330,8 @@ async def get_executive_dashboard(
         if (program.get("active_tasks") or 0) > 0:
             return True
         if (program.get("total_tasks") or 0) > 0:
+            return True
+        if (program.get("imported_tasks") or 0) > 0:
             return True
         return len(program.get("tasks") or []) > 0
 
@@ -289,6 +344,8 @@ async def get_executive_dashboard(
         for prog in maintenance_programs
         if prog.get("equipment_id") and _program_is_active(prog)
     }
+    pm_import_equipment_ids = await _equipment_ids_with_active_pm_import(current_user)
+    covered_equipment_ids |= pm_import_equipment_ids
     active_maintenance_program_count = len(covered_equipment_ids)
     previous_period_program_equipment_ids = {
         prog.get("equipment_id")
@@ -297,6 +354,11 @@ async def get_executive_dashboard(
         and _program_is_active(prog)
         and (prog.get("created_at") or "") < current_period_start.isoformat()
     }
+    previous_period_pm_import_ids = await _equipment_ids_with_active_pm_import(
+        current_user,
+        created_before=current_period_start.isoformat(),
+    )
+    previous_period_program_equipment_ids |= previous_period_pm_import_ids
 
     # 4. Get maintenance strategies (for observation control status)
     strategy_filter = merge_tenant_filter({}, current_user)
@@ -472,7 +534,7 @@ async def get_executive_dashboard(
             "control_status": "Controlled" if has_control else "No Control"
         })
         
-        if is_open and observation_data["risk_score"] > CRITICAL_ACTIVE_RISK_THRESHOLD:
+        if is_open and observation_data["risk_score"] >= HIGH_ACTIVE_RISK_THRESHOLD:
             critical_active_exposure += exposure_value
             if equipment_id:
                 critical_active_equipment_ids.add(equipment_id)
@@ -504,12 +566,12 @@ async def get_executive_dashboard(
     
     # 3. Digital execution — tasks/forms submitted in report period vs previous period
     digital_current_period = await count_digital_executions(
-        current_period_start_iso, now_iso, user_id, current_user
+        current_period_start, now, current_user
     )
     digital_previous_period = await count_digital_executions(
-        previous_period_start_iso, current_period_start_iso, user_id, current_user
+        previous_period_start, current_period_start, current_user
     )
-    digital_total_submitted = await count_digital_executions_total(user_id, current_user)
+    digital_total_submitted = await count_digital_executions_total(current_user)
     digital_change, digital_trend = calculate_trend(
         float(digital_current_period), float(digital_previous_period), higher_is_better=True
     )
@@ -517,7 +579,7 @@ async def get_executive_dashboard(
     # 4. Active Threat Exposure trend
     active_change, active_trend = calculate_trend(active_threat_exposure, prev_active_threat, higher_is_better=False)
     
-    # 5. Critical Active Exposure trend
+    # 5. High exposure trend
     critical_change, critical_trend = calculate_trend(critical_active_exposure, prev_critical, higher_is_better=False)
     
     # ============= Build KPI Cards =============
@@ -534,7 +596,8 @@ async def get_executive_dashboard(
             trend=coverage_trend,
             tooltip=(
                 f"Total assessed production exposure covered by {active_maintenance_program_count} "
-                f"equipment with active maintenance programs ({coverage_current:.0f}% of total assessed exposure)."
+                f"equipment with an active maintenance program or imported PM plan "
+                f"({coverage_current:.0f}% of total assessed exposure)."
             ),
             evidence_count=active_maintenance_program_count,
         ),
@@ -554,8 +617,8 @@ async def get_executive_dashboard(
             change_percent=critical_change,
             trend=critical_trend,
             tooltip=(
-                "Production impact from active observations with a risk score above "
-                f"{CRITICAL_ACTIVE_RISK_THRESHOLD}."
+                "Production impact from active observations with a risk score of "
+                f"{HIGH_ACTIVE_RISK_THRESHOLD} or above."
             ),
             evidence_count=len(critical_evidence)
         ),
@@ -624,7 +687,7 @@ async def get_executive_dashboard(
             "count_unit": "equipment",
         },
         {
-            "name": "Critical Active Exposure",
+            "name": "High Exposure",
             "value": critical_active_exposure,
             "formatted": format_currency(critical_active_exposure, currency_symbol),
             "type": "critical",
@@ -638,9 +701,9 @@ async def get_executive_dashboard(
     
     ai_summary = f"""AssetIQ is tracking {total_obs} identified reliability observations against {assessed_equipment_count} equipment assets with assessed production criticality, representing a total assessed exposure of {format_currency(total_lifecycle_exposure, currency_symbol)}.
 
-{format_currency(covered_by_controls, currency_symbol)} ({coverage_current:.0f}%) of assessed exposure is covered by equipment with a maintenance program. {format_currency(uncovered_exposure, currency_symbol)} remains uncovered across {uncovered_equipment_count} assessed assets without a maintenance program.
+{format_currency(covered_by_controls, currency_symbol)} ({coverage_current:.0f}%) of assessed exposure is covered by equipment with a maintenance program or imported PM plan. {format_currency(uncovered_exposure, currency_symbol)} remains uncovered across {uncovered_equipment_count} assessed assets without active controls.
 
-All {total_obs} observations represent {format_currency(active_threat_exposure, currency_symbol)} in total production exposure. {len(critical_evidence)} active observations with a risk score above {CRITICAL_ACTIVE_RISK_THRESHOLD} represent {format_currency(critical_active_exposure, currency_symbol)} and require immediate attention.
+All {total_obs} observations represent {format_currency(active_threat_exposure, currency_symbol)} in total production exposure. {len(critical_evidence)} active observations with a risk score of {HIGH_ACTIVE_RISK_THRESHOLD} or above represent {format_currency(critical_active_exposure, currency_symbol)} and require immediate attention.
 
 PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvement"} at {pm_compliance_current:.0f}%. Digital execution recorded {digital_current_period} tasks and forms in the report period ({report_period['label']}) versus {digital_previous_period} in the previous period."""
     

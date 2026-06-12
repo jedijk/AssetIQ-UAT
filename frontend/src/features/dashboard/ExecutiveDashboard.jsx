@@ -451,13 +451,13 @@ export default function ExecutiveDashboard() {
           })}
         />
         <KPICard
-          title="Critical Active Exposure"
+          title="High Exposure"
           kpi={kpi_cards?.critical_active_exposure}
           icon={AlertOctagon}
           colorClass="border-l-4 border-l-red-500"
           onClick={() => setSelectedEvidence({
             type: "critical_active_exposure",
-            title: "Critical Active Exposure Evidence",
+            title: "High Exposure Evidence",
             data: evidence_drill_down?.critical_active_exposure || []
           })}
         />
