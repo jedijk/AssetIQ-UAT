@@ -371,6 +371,27 @@
         min-height: 44px;
         min-width: 44px;
     }
+
+    /* Tour progress dots: tiny visuals (~80% smaller), modest tap target */
+    button[data-tour-progress-dot] {
+        min-height: 0 !important;
+        min-width: 0 !important;
+        width: 14px !important;
+        height: 14px !important;
+        padding: 0 !important;
+        border: none;
+        background: transparent;
+    }
+
+    button[data-tour-progress-dot] .tour-progress-dot-visual {
+        width: 3px;
+        height: 3px;
+    }
+
+    button[data-tour-progress-dot][aria-current="step"] .tour-progress-dot-visual {
+        width: 10px;
+        height: 3px;
+    }
     
     /* Fix overlapping elements */
     .flex.items-center.gap-2,
