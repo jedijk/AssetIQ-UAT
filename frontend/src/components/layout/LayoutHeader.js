@@ -443,6 +443,7 @@ export default function LayoutHeader({
               whileHover={{ scale: 1.02, x: 4 }}
               whileTap={{ scale: 0.98 }}
               transition={springPresets.snappy}
+              data-testid="mobile-nav-hierarchy"
             >
               <PanelLeftOpen className="w-5 h-5" />
               {t("equipment.equipmentHierarchyTitle")}

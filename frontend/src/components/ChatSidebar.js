@@ -1152,6 +1152,8 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               }`}>
                 <textarea
                   ref={textareaRef}
+                  id="sidebar-chat-message-input"
+                  name="sidebar-chat-message-input"
                   value={message + (interimTranscript ? interimTranscript : "")}
                   onChange={(e) => {
                     // Only update if not from interim transcript

@@ -116,7 +116,9 @@ const ForgotPasswordPage = () => {
                   <Label htmlFor="email">{t("auth.email")}</Label>
                   <Input
                     id="email"
+                    name="email"
                     type="email"
+                    autoComplete="email"
                     placeholder="you@company.com"
                     value={email}
                     onChange={(e) => {

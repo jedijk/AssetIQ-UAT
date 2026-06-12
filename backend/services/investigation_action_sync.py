@@ -45,6 +45,16 @@ async def create_investigation_action(
     if threat_id:
         observation = await db.threats.find_one({"id": threat_id}, {"_id": 0})
 
+    investigation = await db.investigations.find_one(
+        {"id": investigation_id},
+        {"_id": 0, "title": 1, "case_number": 1},
+    )
+    investigation_title = (
+        (investigation or {}).get("title")
+        or (investigation or {}).get("case_number")
+        or "Investigation"
+    )
+
     action_number = await allocate_central_action_number()
     now = datetime.now(timezone.utc).isoformat()
 
@@ -57,9 +67,9 @@ async def create_investigation_action(
         "status": "open",
         "priority": "medium",
         "discipline": "Reliability",
-        "source": "investigation",
         "source_type": "investigation",
         "source_id": investigation_id,
+        "source_name": investigation_title,
         "linked_investigation_id": investigation_id,
         "threat_id": threat_id,
         "observation_id": threat_id,

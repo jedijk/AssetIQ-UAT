@@ -67,6 +67,90 @@ async def _assert_action_installation_scope(user: dict, action: dict) -> None:
     raise HTTPException(status_code=403, detail="Action not in your assigned installations")
 
 
+def _normalize_action_source_type(action: dict) -> Optional[str]:
+    """Map legacy ``source`` values to ``source_type``."""
+    source_type = action.get("source_type")
+    if source_type:
+        return source_type
+    legacy = action.get("source")
+    if legacy in ("observation", "threat", "recommendation"):
+        return "threat"
+    if legacy == "investigation":
+        return "investigation"
+    return None
+
+
+async def _enrich_actions_source_names(actions: List[dict]) -> List[dict]:
+    """Backfill source_name / source_type for legacy or incomplete action documents."""
+    if not actions:
+        return actions
+
+    threat_ids: set = set()
+    inv_ids: set = set()
+    pending: List[dict] = []
+
+    for action in actions:
+        if action.get("source_name"):
+            continue
+        pending.append(action)
+        source_type = _normalize_action_source_type(action)
+        source_id = (
+            action.get("source_id")
+            or action.get("observation_id")
+            or action.get("threat_id")
+        )
+        if source_type == "threat" and source_id:
+            threat_ids.add(source_id)
+        elif source_type == "investigation" and source_id:
+            inv_ids.add(source_id)
+        elif action.get("threat_id"):
+            threat_ids.add(action["threat_id"])
+
+    threat_map: Dict[str, dict] = {}
+    if threat_ids:
+        threats = await db.threats.find(
+            {"id": {"$in": list(threat_ids)}},
+            {"_id": 0, "id": 1, "title": 1, "asset": 1},
+        ).to_list(500)
+        threat_map = {t["id"]: t for t in threats}
+
+    inv_map: Dict[str, dict] = {}
+    if inv_ids:
+        investigations = await db.investigations.find(
+            {"id": {"$in": list(inv_ids)}},
+            {"_id": 0, "id": 1, "title": 1, "case_number": 1},
+        ).to_list(500)
+        inv_map = {i["id"]: i for i in investigations}
+
+    for action in pending:
+        source_type = _normalize_action_source_type(action)
+        if source_type and not action.get("source_type"):
+            action["source_type"] = source_type
+
+        source_id = (
+            action.get("source_id")
+            or action.get("observation_id")
+            or action.get("threat_id")
+        )
+        resolved_name = None
+        if source_type == "threat":
+            threat = threat_map.get(source_id) or threat_map.get(action.get("threat_id"))
+            if threat:
+                resolved_name = threat.get("title") or threat.get("asset")
+        elif source_type == "investigation":
+            investigation = inv_map.get(source_id)
+            if investigation:
+                resolved_name = investigation.get("title") or investigation.get("case_number")
+
+        if not resolved_name:
+            resolved_name = action.get("equipment_name") or action.get("threat_asset")
+
+        if resolved_name:
+            action["source_name"] = resolved_name
+
+    return actions
+
+
 # Helper function to enrich items with creator info (with caching)
 async def enrich_with_creator_info(items: list) -> list:
     """Add creator name and initials to items based on created_by field.
@@ -239,6 +323,7 @@ async def get_all_actions(
     
     # Enrich with creator info (uses caching)
     actions = await enrich_with_creator_info(actions)
+    actions = await _enrich_actions_source_names(actions)
     
     # Batch fetch threat data for actions that need enrichment
     threat_ids_to_fetch = []
@@ -487,6 +572,9 @@ async def get_central_action(
     
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
+
+    enriched = await _enrich_actions_source_names([action])
+    action = enriched[0]
     
     # Enrich with equipment tag from linked threat
     threat_id = action.get("threat_id") or (action.get("source_id") if action.get("source_type") == "threat" else None)

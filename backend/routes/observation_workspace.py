@@ -1217,6 +1217,7 @@ async def add_action_to_plan(
     # Create action
     action_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
+    observation_title = observation.get("title") or observation.get("asset") or "Observation"
     
     new_action = {
         "id": action_id,
@@ -1226,7 +1227,8 @@ async def add_action_to_plan(
         "action_type": action_data.get("action_type", "corrective"),
         "status": "open",
         "priority": action_data.get("priority", "medium"),
-        "source": "observation",
+        "source_type": "threat",
+        "source_name": observation_title,
         "source_id": observation_id,
         "observation_id": observation_id,
         "threat_id": observation_id,
@@ -1288,6 +1290,9 @@ async def add_recommendation_to_plan(
     
     action_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
+    observation_title = observation.get("title") or observation.get("asset") or "Observation"
+    rec_source = recommendation.get("source", "recommendation")
+    source_type = "ai_recommendation" if rec_source == "ai_generated" else "threat"
     
     new_action = {
         "id": action_id,
@@ -1298,7 +1303,8 @@ async def add_recommendation_to_plan(
         "status": "open",
         "priority": "medium",
         "discipline": recommendation.get("discipline"),
-        "source": recommendation.get("source", "recommendation"),
+        "source_type": source_type,
+        "source_name": observation_title,
         "source_id": observation_id,
         "observation_id": observation_id,
         "threat_id": observation_id,

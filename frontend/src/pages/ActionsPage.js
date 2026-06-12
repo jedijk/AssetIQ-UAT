@@ -134,6 +134,16 @@ const sourceConfig = {
   ai_recommendation: { label: "AI", icon: Brain, color: "text-purple-600" },
 };
 
+function actionSourceLabel(action) {
+  return (
+    action?.source_name
+    || action?.equipment_name
+    || action?.threat_asset
+    || action?.assignee
+    || "No source"
+  );
+}
+
 export default function ActionsPage() {
   const queryClient = useQueryClient();
   const location = useLocation();
@@ -489,6 +499,8 @@ export default function ActionsPage() {
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input
+              id="actions-search"
+              name="actions-search"
               placeholder="Search..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -893,7 +905,7 @@ export default function ActionsPage() {
                     </div>
                     {/* Source info - Simplified on mobile */}
                     <div className="text-[10px] sm:text-xs text-slate-500 mt-0.5 sm:mt-1 truncate">
-                      {action.source_name || action.assignee || "No source"}
+                      {actionSourceLabel(action)}
                     </div>
                   </div>
 

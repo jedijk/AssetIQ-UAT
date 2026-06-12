@@ -113,6 +113,47 @@ export default function ObservationTour({
     };
   }, [isOpen, scene?.id, scene?.ensureChat, scene?.ensureHierarchy, scene?.target]);
 
+  // Demo the hierarchy context menu so "Add Observation" can be spotlighted.
+  useEffect(() => {
+    if (!isOpen || !scene?.openContextMenu) return undefined;
+
+    let cancelled = false;
+    const timers = [];
+
+    const openMenu = () => {
+      if (cancelled) return;
+      const item = document.querySelector('[data-testid^="hierarchy-item-"]');
+      if (!item) return;
+
+      if (window.innerWidth < 1024) {
+        item.click();
+      } else {
+        const node = item.closest('[data-testid^="hierarchy-node-"]');
+        if (!node) return;
+        const rect = node.getBoundingClientRect();
+        node.dispatchEvent(
+          new MouseEvent("contextmenu", {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            clientX: rect.left + rect.width / 2,
+            clientY: rect.top + rect.height / 2,
+          })
+        );
+      }
+      window.dispatchEvent(new Event("resize"));
+    };
+
+    timers.push(setTimeout(openMenu, 850));
+    timers.push(setTimeout(openMenu, 1400));
+
+    return () => {
+      cancelled = true;
+      timers.forEach(clearTimeout);
+      document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    };
+  }, [isOpen, scene?.id, scene?.openContextMenu, scene?.ensureHierarchy]);
+
   /* ------------------------------------------------------------------
    * Navigation
    * ------------------------------------------------------------------ */

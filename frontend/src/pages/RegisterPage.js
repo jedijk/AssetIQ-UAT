@@ -409,7 +409,9 @@ const RegisterPage = () => {
               <Label htmlFor="name">{t("auth.name")}</Label>
               <Input
                 id="name"
+                name="name"
                 type="text"
+                autoComplete="name"
                 placeholder="John Doe"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -423,7 +425,9 @@ const RegisterPage = () => {
               <Label htmlFor="email">{t("auth.email")}</Label>
               <Input
                 id="email"
+                name="email"
                 type="email"
+                autoComplete="email"
                 placeholder="you@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -437,7 +441,9 @@ const RegisterPage = () => {
               <Label htmlFor="password">{t("auth.password")}</Label>
               <Input
                 id="password"
+                name="password"
                 type="password"
+                autoComplete="new-password"
                 placeholder="Min. 6 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
