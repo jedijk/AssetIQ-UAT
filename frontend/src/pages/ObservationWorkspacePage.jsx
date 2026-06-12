@@ -368,8 +368,8 @@ const ObservationWorkspacePage = () => {
         <div className="container mx-auto px-3 sm:px-4 max-w-7xl">
           {/* Mobile: title row (with ⋯ menu pinned right) + action bar row stack vertically.
               Desktop: everything inline on a single row. */}
-          <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-3 py-2">
-            <div className="flex items-start sm:items-center gap-2 sm:gap-3 min-w-0">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 lg:gap-3 py-2">
+            <div className="flex items-start sm:items-center gap-2 sm:gap-3 min-w-0 flex-1">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <RiskBadge level={observation?.risk_level} size="sm" />
@@ -387,7 +387,7 @@ const ObservationWorkspacePage = () => {
             </div>
 
             {/* Action bar slot (desktop) — ObservationDetailsSection portals share/edit/delete/⋯ into here */}
-            <div id="workspace-hero-slot" className="hidden lg:block lg:flex-shrink-0 lg:flex-none min-w-0 lg:overflow-visible" />
+            <div id="workspace-hero-slot" className="hidden lg:flex lg:items-center lg:gap-2 lg:flex-shrink-0" />
           </div>
         </div>
       </div>

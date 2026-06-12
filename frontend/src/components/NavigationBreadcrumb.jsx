@@ -32,7 +32,7 @@ const NavigationBreadcrumb = ({ className = '' }) => {
   }
 
   return (
-    <div className={`sticky top-[var(--app-header-offset)] z-50 bg-slate-50 flex items-center gap-2 mb-0.5 sm:mb-4 pointer-events-auto ${className}`}>
+    <div className={`sticky top-[var(--app-header-offset)] z-[35] bg-slate-50 flex items-center gap-2 mb-0.5 sm:mb-4 pointer-events-auto ${className}`}>
       {canGoBack && (
         <button
           type="button"
