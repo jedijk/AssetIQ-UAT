@@ -20,6 +20,7 @@ from services.work_execution_config import (
     should_include_unbridged_work_items,
     work_items_source_mode,
 )
+from services.scheduler_job import get_task_generation_config
 from utils.mongo_regex import case_insensitive_contains
 from services.task_instance_bridge import (
     STATUS_MAP,
@@ -226,6 +227,14 @@ async def _maybe_fetch_unbridged(
 ) -> List[dict]:
     if not await should_include_unbridged_work_items():
         return []
+    # When the weekly Task Generation cron is OFF, no unbridged maintenance
+    # rows should leak into My Tasks either.
+    try:
+        gen_cfg = await get_task_generation_config()
+        if not gen_cfg.get("enabled", True):
+            return []
+    except Exception as exc:
+        logger.warning("task_generation config lookup skipped: %s", exc)
     return await fetch_unbridged_maintenance_work_items(
         user_id,
         filter_name=filter_name,
@@ -654,6 +663,28 @@ async def fetch_work_items(
 
     if status:
         query["status"] = status
+
+    # Gate maintenance-program task_instances behind the Task Generation cron.
+    # When the weekly cron is disabled in Settings → Task Generation, no
+    # maintenance-sourced tasks should appear as "live" on My Tasks. Ad-hoc,
+    # observation-driven, recurring (task_plan) and manual instances are not
+    # affected — only ``source == "maintenance"`` (built by the bridge from
+    # scheduled_tasks) is hidden.
+    try:
+        gen_cfg = await get_task_generation_config()
+        if not gen_cfg.get("enabled", True):
+            existing_source = query.get("source")
+            block = {"$ne": "maintenance"}
+            if existing_source is None:
+                query["source"] = block
+            elif isinstance(existing_source, dict):
+                existing_source["$ne"] = "maintenance"
+            else:
+                # If a caller is already filtering by a specific source,
+                # respect it — they have explicit intent.
+                pass
+    except Exception as exc:
+        logger.warning("task_generation config lookup skipped: %s", exc)
 
     query = merge_tenant_filter(query, user)
 

@@ -231,20 +231,19 @@ async def ensure_task_instance_for_scheduled_task(
     *,
     triggered_by_user_id: Optional[str] = None,
 ) -> Optional[dict]:
-    """Return an existing or newly created task_instance for a scheduled_task id."""
-    existing = await db.task_instances.find_one({"scheduled_task_id": scheduled_task_id})
-    if existing:
-        return existing
+    """Return an existing task_instance for a scheduled_task id, or None.
 
-    st = await db.scheduled_tasks.find_one({"id": scheduled_task_id}, {"_id": 0})
-    if not st or st.get("status") in ("completed", "cancelled"):
-        return None
+    NOTE: This used to silently insert a new task_instance on demand, which
+    bypassed the weekly cron gate (Settings → Task Generation). All
+    maintenance-program task_instances are now created **only** by the
+    weekly cron via ``sync_scheduled_tasks_to_instances``. If the caller
+    needs the instance but the cron has not produced it yet, they receive
+    ``None`` and the route surfaces a 404.
 
-    instance = await build_instance_from_scheduled_task(
-        st,
-        triggered_by_user_id=triggered_by_user_id,
-    )
-    await db.task_instances.insert_one(instance)
+    ``triggered_by_user_id`` is intentionally ignored here — kept in the
+    signature to preserve the call sites that still pass it.
+    """
+    _ = triggered_by_user_id  # noqa: F841 — preserved for caller compatibility
     return await db.task_instances.find_one({"scheduled_task_id": scheduled_task_id})
 
 
