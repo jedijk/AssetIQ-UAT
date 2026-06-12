@@ -7,7 +7,7 @@ import requests
 import json
 
 # Configuration
-BASE_URL = "https://observation-cinema.preview.emergentagent.com/api"
+BASE_URL = "https://action-lockup-bug.preview.emergentagent.com/api"
 TEST_EMAIL = "jedijk@gmail.com"
 TEST_PASSWORD = "Jaap8019@"
 
