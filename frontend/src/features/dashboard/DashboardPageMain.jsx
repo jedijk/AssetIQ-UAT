@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, Suspense, lazy } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { useIsFetching, useQuery, useQueryClient } from "@tanstack/react-query";
 import { statsAPI, actionsAPI, investigationAPI, equipmentHierarchyAPI, threatsAPI, usersAPI, api } from "../../lib/api";
 import { queryKeys } from "../../lib/queryKeys";
@@ -116,6 +116,7 @@ export default function DashboardPageMain({ initialTab }) {
   const { t, language } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { effectiveRole } = useEffectiveRole();
   const { hasPermission } = usePermissions();
@@ -290,7 +291,20 @@ export default function DashboardPageMain({ initialTab }) {
   }, [viewingImage, closeImageLightbox]);
 
   // Navigation state for back button support
-  const navState = { from: "dashboard", fromPage: "Dashboard", breadcrumbOrigin: "/dashboard" };
+  const navState = useMemo(
+    () => ({ from: "dashboard", fromPage: "Dashboard", breadcrumbOrigin: "/dashboard" }),
+    []
+  );
+
+  // Deep link: /dashboard?action=<id> → action detail (shareable / notification links)
+  useEffect(() => {
+    const actionId = searchParams.get("action");
+    if (!actionId) return;
+    navigate(`/actions/${actionId}`, { replace: true, state: navState });
+    const next = new URLSearchParams(searchParams);
+    next.delete("action");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, navigate, navState]);
   
   // Fetch users for owner filter
   const { data: usersData } = useQuery({
@@ -1062,7 +1076,8 @@ export default function DashboardPageMain({ initialTab }) {
           renderItem={(item, idx) => (
             <div 
               key={item.id || `action-${idx}`} 
-              className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 transition-colors"
+              className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors"
+              onClick={(e) => { e.stopPropagation(); navigate(`/actions/${item.id}`, { state: navState }); }}
               data-testid={`action-item-${item.id}`}
             >
               <UserAvatar 

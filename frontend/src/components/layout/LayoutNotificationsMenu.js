@@ -284,7 +284,7 @@ export default function LayoutNotificationsMenu({
                 <DropdownMenuItem
                   key={action.id}
                   className="cursor-pointer flex flex-col items-start gap-1 py-2"
-                  onClick={() => navigate("/actions")}
+                  onClick={() => navigate(`/actions/${action.id}`, { state: { breadcrumbOrigin: "/dashboard" } })}
                 >
                   <div className="flex items-center justify-between w-full">
                     <span className="font-medium text-slate-800 truncate max-w-[200px]">
