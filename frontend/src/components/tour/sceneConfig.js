@@ -90,7 +90,7 @@ export const TOUR_SCENES = [
     pulseTarget: false,
     spotlightZoom: 1,
     transition: "fade",
-    typedText: "Oil leak observed on Pump P-101 near mechanical seal.",
+    typedText: "Oil leak observed near the mechanical seal during operation.",
     badge: "Equipment matched",
     chapter: "AI detection",
   },
@@ -107,7 +107,6 @@ export const TOUR_SCENES = [
     pulseTarget: false,
     spotlightZoom: 1,
     transition: "fade",
-    typedText: "Found oil leak near production area.",
     badge: "Needs clarification",
     chapter: "Clarification",
   },
@@ -173,7 +172,7 @@ export const SCENE_DURATIONS_MS = {
   "context-menu": 8000,        // context menu + cursor + success state
   "quick-add": 6000,
   "ai-detection": 8500,        // typewriter (~2s) + analyzing (1.1s) + read time
-  clarification: 10000,         // typewriter + dialog + search animation + selection
+  clarification: 7500,         // equipment search dialog + selection (no retype animations)
   describe: 8500,               // longer typewriter + AI tag extraction
   submit: 7000,                 // submit pulse + success slide
   "next-steps": 9000,           // 6-step flow stagger + counter animations

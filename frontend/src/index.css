@@ -364,8 +364,10 @@
         margin: 1rem;
     }
     
-    /* Touch-friendly tap targets */
-    button, a, [role="button"] {
+    /* Touch-friendly tap targets (tour progress dots use their own compact hit areas) */
+    button:not([data-tour-progress-dot]),
+    a:not([data-tour-progress-dot]),
+    [role="button"]:not([data-tour-progress-dot]) {
         min-height: 44px;
         min-width: 44px;
     }

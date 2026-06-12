@@ -526,45 +526,33 @@ function MockAIDetection({ typedText }) {
  * Scene 6 — Equipment clarification dialog
  * ========================================================================== */
 
-function MockClarification({ typedText }) {
-  const [typingDone, setTypingDone] = useState(false);
+function MockClarification() {
   const [showDialog, setShowDialog] = useState(false);
   const [selected, setSelected] = useState(null);
 
   useEffect(() => {
-    setTypingDone(false);
     setShowDialog(false);
     setSelected(null);
-  }, [typedText]);
-
-  useEffect(() => {
-    if (!typingDone) return undefined;
-    const t1 = setTimeout(() => setShowDialog(true), 700);
-    const t2 = setTimeout(() => setSelected("P-101"), 3000);
+    const t1 = setTimeout(() => setShowDialog(true), 500);
+    const t2 = setTimeout(() => setSelected("P-101"), 2800);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
     };
-  }, [typingDone]);
+  }, []);
 
   return (
     <PanelShell className="w-full max-w-2xl" data-testid="tour-mock-clarification">
       <FakeWindowChrome title="New observation" />
       <div className="p-4 sm:p-5 space-y-3 sm:space-y-4">
-        <div className="rounded-xl border border-white/15 bg-white/5 p-3 text-slate-100 text-[15px] leading-relaxed min-h-[52px]">
-          <TypewriterText text={typedText} onComplete={() => setTypingDone(true)} />
-        </div>
-
-        {typingDone && !showDialog && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="flex items-center gap-2 text-sm text-amber-200"
-          >
-            <AlertTriangle className="w-4 h-4" />
-            AI confidence is low. Please help locate the equipment.
-          </motion.div>
-        )}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex items-center gap-2 text-sm text-amber-200"
+        >
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          AI could not confidently match equipment — help locate the asset.
+        </motion.div>
 
         <AnimatePresence>
           {showDialog && (
@@ -581,8 +569,11 @@ function MockClarification({ typedText }) {
                 Equipment search
               </div>
               <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200">
-                <Search className="w-4 h-4 text-slate-400" />
-                <TypewriterText text="pump production area" speedMs={42} startDelayMs={400} cursor={false} />
+                <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                <span className="text-slate-300">pump production area</span>
+                <span className="ml-auto text-[10px] uppercase tracking-wide text-blue-300/80">
+                  AI suggested
+                </span>
               </div>
 
               <div className="mt-3 space-y-1.5">
@@ -905,7 +896,7 @@ export default function SceneMocks({ mockKey, typedText }) {
     case "aiDetection":
       return <MockAIDetection typedText={typedText} />;
     case "clarification":
-      return <MockClarification typedText={typedText} />;
+      return <MockClarification />;
     case "describe":
       return <MockDescribe typedText={typedText} />;
     case "submit":
