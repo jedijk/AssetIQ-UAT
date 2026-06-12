@@ -131,7 +131,7 @@ export default function DashboardPageMain({ initialTab }) {
   const canShowOperational = hasPermission("dashboard_operational", "read");
   const canShowProduction = hasPermission("dashboard_production", "read");
   const canShowReliability = hasPermission("reliability_intelligence", "read") && !isMobileViewport;
-  const canShowExecutive = hasPermission("dashboard_executive", "read") && !isMobileViewport;
+  const canShowExecutive = hasPermission("dashboard_executive", "read");
   const canShowBuilder =
     manualBuilderEnabled && !isMobileViewport && hasPermission("dashboard_builder", "read");
   const dashboardTabFlags = {
@@ -500,7 +500,7 @@ export default function DashboardPageMain({ initialTab }) {
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col overflow-x-hidden" data-testid="dashboard-page">
       {/* Fixed Header with Tabs - Condensed */}
-      <div className="flex-shrink-0 px-6 pt-4 pb-2 max-w-7xl mx-auto w-full">
+      <div className="flex-shrink-0 px-4 sm:px-6 pt-4 pb-2 max-w-7xl mx-auto w-full">
         <div className="flex items-center justify-between mb-2">
           <div>
             <h1 className="text-xl font-bold text-slate-900">{t("dashboard.title") || "Dashboard"}</h1>
@@ -561,8 +561,8 @@ export default function DashboardPageMain({ initialTab }) {
                 data-testid="executive-tab"
               >
                 <TrendingUp className="w-4 h-4 flex-shrink-0" />
-                <span className="hidden xs:inline">Executive</span>
-                <span className="xs:hidden">Exec</span>
+                <span className="hidden xs:inline">{t("dashboard.executive")}</span>
+                <span className="xs:hidden">{t("dashboard.executiveShort")}</span>
               </button>
             )}
             {canShowBuilder && (
@@ -709,7 +709,7 @@ export default function DashboardPageMain({ initialTab }) {
       </div>
       
       {/* Scrollable Tab Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pb-6">
         <div className="max-w-7xl mx-auto">
           {/* Operational Dashboard Tab */}
           {activeTab === "operational" && canShowOperational && (

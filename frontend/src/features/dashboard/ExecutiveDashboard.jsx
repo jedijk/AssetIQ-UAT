@@ -5,9 +5,8 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/apiClient";
-import { queryKeys } from "../../lib/queryKeys";
-import { useLanguage } from "../../contexts/LanguageContext";
-import { motion, AnimatePresence } from "framer-motion";
+import useIsMobile from "../../hooks/useIsMobile";
+import { motion } from "framer-motion";
 import {
   BarChart,
   Bar,
@@ -17,7 +16,6 @@ import {
   ResponsiveContainer,
   Cell,
   LabelList,
-  ReferenceLine,
 } from "recharts";
 import {
   TrendingUp,
@@ -30,12 +28,9 @@ import {
   Activity,
   Sparkles,
   ChevronRight,
-  X,
-  ExternalLink,
   Loader2,
   Info,
 } from "lucide-react";
-import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import {
   Dialog,
@@ -92,45 +87,78 @@ const TrendIndicator = ({ trend, changePercent }) => {
 };
 
 // KPI Card component
-const KPICard = ({ title, kpi, icon: Icon, colorClass, onClick }) => {
+const KPICard = ({ title, kpi, icon: Icon, colorClass, onClick, isMobile }) => {
   if (!kpi) return null;
+
+  const iconColorClass =
+    colorClass.includes("green") ? "text-green-600"
+    : colorClass.includes("red") ? "text-red-600"
+    : colorClass.includes("orange") ? "text-orange-600"
+    : colorClass.includes("blue") ? "text-blue-600"
+    : "text-slate-600";
+
+  const cardBody = (
+    <motion.div
+      whileHover={isMobile ? undefined : { scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      className={`relative bg-white rounded-xl border border-slate-200 p-3.5 sm:p-4 transition-all ${colorClass} ${
+        onClick ? "cursor-pointer hover:shadow-lg active:shadow-md" : ""
+      }`}
+      onClick={onClick}
+      onKeyDown={
+        onClick
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onClick(event);
+              }
+            }
+          : undefined
+      }
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+    >
+      <div className="flex items-start justify-between mb-2">
+        <div className={`p-2 rounded-lg ${colorClass.replace("border-l-4", "bg-opacity-10")}`}>
+          <Icon className={`w-5 h-5 ${iconColorClass}`} />
+        </div>
+        <TrendIndicator trend={kpi.trend} changePercent={kpi.change_percent} />
+      </div>
+
+      <div className="text-xl sm:text-2xl font-bold text-slate-900 mb-1">
+        {kpi.formatted_value}
+      </div>
+
+      <div className="text-sm text-slate-600 font-medium">{title}</div>
+
+      {kpi.evidence_count > 0 && (
+        <div className="mt-2 flex items-center gap-1 text-xs text-slate-500">
+          <span>
+            {kpi.total_submitted_count != null
+              ? `${kpi.evidence_count} evidence items`
+              : title === "Exposure Coverage"
+                ? `${kpi.evidence_count} active maintenance program${kpi.evidence_count === 1 ? "" : "s"}`
+                : `${kpi.evidence_count} evidence items`}
+          </span>
+          {onClick && <ChevronRight className="w-3 h-3" />}
+        </div>
+      )}
+
+      {isMobile && kpi.tooltip ? (
+        <p className="mt-2 text-[11px] leading-snug text-slate-500 line-clamp-3">
+          {kpi.tooltip}
+        </p>
+      ) : null}
+    </motion.div>
+  );
+
+  if (isMobile) {
+    return cardBody;
+  }
 
   return (
     <HoverCard>
-      <HoverCardTrigger asChild>
-        <motion.div
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className={`relative bg-white rounded-xl border border-slate-200 p-4 cursor-pointer hover:shadow-lg transition-all ${colorClass}`}
-          onClick={onClick}
-        >
-          <div className="flex items-start justify-between mb-2">
-            <div className={`p-2 rounded-lg ${colorClass.replace("border-l-4", "bg-opacity-10")}`}>
-              <Icon className={`w-5 h-5 ${colorClass.includes("green") ? "text-green-600" : colorClass.includes("red") ? "text-red-600" : colorClass.includes("orange") ? "text-orange-600" : colorClass.includes("blue") ? "text-blue-600" : "text-slate-600"}`} />
-            </div>
-            <TrendIndicator trend={kpi.trend} changePercent={kpi.change_percent} />
-          </div>
-          
-          <div className="text-2xl font-bold text-slate-900 mb-1">
-            {kpi.formatted_value}
-          </div>
-          
-          <div className="text-sm text-slate-600 font-medium">{title}</div>
-          
-          {kpi.evidence_count > 0 && (
-            <div className="mt-2 flex items-center gap-1 text-xs text-slate-500">
-              <span>
-                {kpi.total_submitted_count != null
-                  ? `${kpi.evidence_count} evidence items`
-                  : title === "Exposure Coverage"
-                    ? `${kpi.evidence_count} active maintenance program${kpi.evidence_count === 1 ? "" : "s"}`
-                    : `${kpi.evidence_count} evidence items`}
-              </span>
-              {title !== "Exposure Coverage" && <ChevronRight className="w-3 h-3" />}
-            </div>
-          )}
-        </motion.div>
-      </HoverCardTrigger>
+      <HoverCardTrigger asChild>{cardBody}</HoverCardTrigger>
       <HoverCardContent className="w-80">
         <div className="space-y-2">
           <p className="text-sm text-slate-600">{kpi.tooltip}</p>
@@ -149,8 +177,8 @@ const KPICard = ({ title, kpi, icon: Icon, colorClass, onClick }) => {
           {kpi.total_submitted_count == null && kpi.previous_value !== null && (
             <p className="text-xs text-slate-500">
               Previous period: {kpi.previous_formatted ?? (
-                kpi.formatted_value.includes('%')
-                  ? (typeof kpi.previous_value === 'number' && kpi.previous_value > 1000
+                kpi.formatted_value.includes("%")
+                  ? (typeof kpi.previous_value === "number" && kpi.previous_value > 1000
                     ? kpi.formatted_value.replace(/[\d.,]+/, kpi.previous_value.toLocaleString())
                     : `${kpi.previous_value?.toFixed?.(1) ?? kpi.previous_value}%`)
                   : Number(kpi.previous_value).toLocaleString()
@@ -195,8 +223,41 @@ const WaterfallTooltip = ({ active, payload }) => {
   );
 };
 
-const WaterfallChart = ({ data, currencySymbol }) => {
+const WaterfallMobileList = ({ data }) => {
   if (!data || data.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      {data.map((item) => (
+        <div
+          key={item.name}
+          className="flex items-start justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/60 p-3"
+        >
+          <div className="flex min-w-0 items-start gap-2.5">
+            <div
+              className="mt-1 h-3 w-3 shrink-0 rounded"
+              style={{ backgroundColor: item.color }}
+            />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-slate-900">{item.name}</p>
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                {formatWaterfallCount(item.count, item.count_unit)}
+              </p>
+            </div>
+          </div>
+          <p className="shrink-0 text-sm font-bold text-slate-900">{item.formatted}</p>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const WaterfallChart = ({ data, currencySymbol, isMobile }) => {
+  if (!data || data.length === 0) return null;
+
+  if (isMobile) {
+    return <WaterfallMobileList data={data} />;
+  }
 
   // Transform data for waterfall visualization
   const waterfallData = data.map((item, index) => {
@@ -280,12 +341,12 @@ const WaterfallChart = ({ data, currencySymbol }) => {
 };
 
 // Evidence Panel component
-const EvidencePanel = ({ isOpen, onClose, title, evidence, metricType }) => {
+const EvidencePanel = ({ isOpen, onClose, title, evidence }) => {
   if (!evidence) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-2xl max-h-[85vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-orange-500" />
@@ -303,16 +364,16 @@ const EvidencePanel = ({ isOpen, onClose, title, evidence, metricType }) => {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className="bg-slate-50 rounded-lg p-4 border border-slate-200"
+                className="bg-slate-50 rounded-lg p-3 sm:p-4 border border-slate-200"
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="font-semibold text-slate-900">{item.asset}</div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-slate-900 break-words">{item.asset}</div>
                     {item.tag && (
                       <div className="text-xs text-slate-500 font-mono">{item.tag}</div>
                     )}
                   </div>
-                  <div className="text-right">
+                  <div className="text-left sm:text-right shrink-0">
                     <div className="text-lg font-bold text-slate-900">
                       {item.exposure_formatted}
                     </div>
@@ -356,7 +417,7 @@ const EvidencePanel = ({ isOpen, onClose, title, evidence, metricType }) => {
 
 // Main Executive Dashboard component
 export default function ExecutiveDashboard() {
-  const { t } = useLanguage();
+  const isMobile = useIsMobile();
   const [selectedEvidence, setSelectedEvidence] = useState(null);
   const [periodDays, setPeriodDays] = useState(30);
 
@@ -391,19 +452,19 @@ export default function ExecutiveDashboard() {
   const currencySymbol = exposure_metrics?.currency_symbol || "€";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 pb-2">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">
+          <h2 className="text-lg sm:text-xl font-bold text-slate-900">
             Reliability Value Management
           </h2>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
             Executive overview of production value exposure and reliability controls
           </p>
         </div>
-        <div className="flex flex-col items-start sm:items-end gap-2">
-          <div className="inline-flex h-8 items-center rounded-lg bg-slate-100 p-0.5 gap-0.5" data-testid="executive-report-period">
+        <div className="flex flex-col items-stretch sm:items-end gap-2 w-full sm:w-auto">
+          <div className="inline-flex h-8 items-center rounded-lg bg-slate-100 p-0.5 gap-0.5 self-start sm:self-auto" data-testid="executive-report-period">
             {REPORT_PERIOD_OPTIONS.map((opt) => (
               <button
                 key={opt.days}
@@ -432,18 +493,20 @@ export default function ExecutiveDashboard() {
       </div>
 
       {/* KPI Cards Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         <KPICard
           title="Exposure Coverage"
           kpi={kpi_cards?.exposure_coverage}
           icon={Shield}
           colorClass="border-l-4 border-l-green-500"
+          isMobile={isMobile}
         />
         <KPICard
           title="Active Exposure"
           kpi={kpi_cards?.active_threat_exposure}
           icon={AlertTriangle}
           colorClass="border-l-4 border-l-orange-500"
+          isMobile={isMobile}
           onClick={() => setSelectedEvidence({
             type: "active_threat_exposure",
             title: "Active Exposure Evidence",
@@ -455,6 +518,7 @@ export default function ExecutiveDashboard() {
           kpi={kpi_cards?.critical_active_exposure}
           icon={AlertOctagon}
           colorClass="border-l-4 border-l-red-500"
+          isMobile={isMobile}
           onClick={() => setSelectedEvidence({
             type: "critical_active_exposure",
             title: "High Exposure Evidence",
@@ -466,35 +530,45 @@ export default function ExecutiveDashboard() {
           kpi={kpi_cards?.pm_compliance}
           icon={CheckCircle2}
           colorClass="border-l-4 border-l-blue-500"
+          isMobile={isMobile}
         />
         <KPICard
           title="Digital Execution"
           kpi={kpi_cards?.digital_execution_rate}
           icon={Activity}
           colorClass="border-l-4 border-l-purple-500"
+          isMobile={isMobile}
         />
       </div>
 
       {/* Waterfall Chart */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6">
-        <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+      <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6">
+        <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-2 sm:mb-4 flex items-center gap-2">
           <span>Exposure Waterfall</span>
-          <HoverCard>
-            <HoverCardTrigger>
-              <Info className="w-4 h-4 text-slate-400 cursor-help" />
-            </HoverCardTrigger>
-            <HoverCardContent className="w-80">
-              <p className="text-sm text-slate-600">
-                Shows the flow from total assessed exposure to actively managed and unmanaged exposure.
-                Uncovered exposure is assessed production impact for equipment without a maintenance program.
-              </p>
-            </HoverCardContent>
-          </HoverCard>
+          {!isMobile && (
+            <HoverCard>
+              <HoverCardTrigger>
+                <Info className="w-4 h-4 text-slate-400 cursor-help" />
+              </HoverCardTrigger>
+              <HoverCardContent className="w-80">
+                <p className="text-sm text-slate-600">
+                  Shows the flow from total assessed exposure to actively managed and unmanaged exposure.
+                  Uncovered exposure is assessed production impact for equipment without a maintenance program.
+                </p>
+              </HoverCardContent>
+            </HoverCard>
+          )}
         </h3>
-        <WaterfallChart data={waterfall_data} currencySymbol={currencySymbol} />
+        {isMobile && (
+          <p className="text-xs text-slate-500 mb-3">
+            Flow from total assessed exposure to active and high exposure observations.
+          </p>
+        )}
+        <WaterfallChart data={waterfall_data} currencySymbol={currencySymbol} isMobile={isMobile} />
         
-        {/* Legend */}
-        <div className="flex flex-wrap gap-4 mt-4 justify-center">
+        {/* Legend — desktop chart only */}
+        {!isMobile && (
+        <div className="flex flex-wrap gap-3 sm:gap-4 mt-4 justify-center">
           {waterfall_data?.map((item) => (
             <div key={item.name} className="flex items-center gap-2 text-sm">
               <div
@@ -505,19 +579,20 @@ export default function ExecutiveDashboard() {
             </div>
           ))}
         </div>
+        )}
       </div>
 
       {/* AI Executive Summary */}
-      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100 p-6">
+      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100 p-4 sm:p-6">
         <div className="flex items-start gap-3">
-          <div className="p-2 bg-blue-100 rounded-lg">
+          <div className="p-2 bg-blue-100 rounded-lg shrink-0">
             <Sparkles className="w-5 h-5 text-blue-600" />
           </div>
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900 mb-2">
+          <div className="min-w-0">
+            <h3 className="text-base sm:text-lg font-semibold text-slate-900 mb-2">
               Executive Summary
             </h3>
-            <p className="text-slate-700 leading-relaxed whitespace-pre-line">
+            <p className="text-sm sm:text-base text-slate-700 leading-relaxed whitespace-pre-line">
               {ai_summary}
             </p>
           </div>
@@ -530,7 +605,6 @@ export default function ExecutiveDashboard() {
         onClose={() => setSelectedEvidence(null)}
         title={selectedEvidence?.title}
         evidence={selectedEvidence?.data}
-        metricType={selectedEvidence?.type}
       />
     </div>
   );

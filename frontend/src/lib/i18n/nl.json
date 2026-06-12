@@ -523,6 +523,8 @@
     "reliabilityShort": "RIL",
     "builder": "Dashboard-bouwer",
     "builderShort": "Bouw",
+    "executive": "Executive",
+    "executiveShort": "Exec",
     "refresh": "Vernieuwen",
     "reliabilityPerformance": "Betrouwbaarheidsprestaties",
     "analytics": "Analyse",

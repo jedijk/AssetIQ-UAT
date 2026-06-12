@@ -523,6 +523,8 @@
     "reliabilityShort": "RIL",
     "builder": "Builder",
     "builderShort": "Build",
+    "executive": "Executive",
+    "executiveShort": "Exec",
     "refresh": "Refresh",
     "reliabilityPerformance": "Reliability Performance",
     "analytics": "Analytics",
