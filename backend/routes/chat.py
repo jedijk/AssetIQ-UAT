@@ -320,7 +320,12 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
         threat_doc["attachments"] = [{"type": "image", "data": image_thumbnail,
                                       "created_at": datetime.now(timezone.utc).isoformat()}]
 
-    await db.threats.insert_one(threat_doc)
+    try:
+        result = await db.threats.insert_one(threat_doc)
+        logger.info(f"Created threat {threat_id} with {len(threat_doc.get('attachments', []))} attachments")
+    except Exception as e:
+        logger.error(f"Failed to create threat {threat_id}: {e}")
+        raise
 
     # Skip auto-translation for faster response - can be done manually later if needed
     # asyncio.create_task(
