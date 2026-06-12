@@ -29,26 +29,38 @@ router = APIRouter(prefix="/executive-dashboard", tags=["Executive Dashboard"])
 
 _dashboard_read = require_permission("observations:read")
 HIGH_ACTIVE_RISK_THRESHOLD = 50
+HIGH_EXPOSURE_RISK_LEVELS = {"high", "critical"}
 
-OPEN_OBSERVATION_STATUSES = {
-    "open", "new", "in_progress", "planning", "active", "investigating",
-    "observation", "assessment", "investigation", "action",
-}
-CLOSED_OBSERVATION_STATUSES = {
-    "closed", "resolved", "completed", "done", "dismissed",
-    "learning", "mitigated", "archived", "cancelled",
+# Terminal journey stages excluded from active/high exposure (matches Observations page default filter).
+TERMINAL_OBSERVATION_STATUSES = {
+    "mitigated", "learning", "closed", "resolved", "completed",
+    "done", "dismissed", "archived", "cancelled",
 }
 
 
-def is_open_observation_status(status: Optional[str]) -> bool:
+def is_active_observation_status(status: Optional[str]) -> bool:
+    """Non-terminal observations — aligned with Observations page default status filter."""
     normalized = (status or "").lower().strip()
     if not normalized:
         return True
-    if normalized in CLOSED_OBSERVATION_STATUSES:
-        return False
-    if normalized in OPEN_OBSERVATION_STATUSES:
+    return normalized not in TERMINAL_OBSERVATION_STATUSES
+
+
+def observation_risk_score_value(obs: dict) -> float:
+    raw = obs.get("risk_score")
+    if raw is None or raw == "":
+        return 0.0
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def is_high_exposure_observation(obs: dict) -> bool:
+    """High exposure = active observation with High/Critical risk (score or level)."""
+    if observation_risk_score_value(obs) >= HIGH_ACTIVE_RISK_THRESHOLD:
         return True
-    return True
+    return (obs.get("risk_level") or "").lower().strip() in HIGH_EXPOSURE_RISK_LEVELS
 
 
 async def _fetch_scoped_equipment_nodes(current_user: dict) -> List[dict]:
@@ -353,10 +365,7 @@ async def get_executive_dashboard(
     )
 
     def observation_risk_score(obs: dict) -> float:
-        raw = obs.get("risk_score")
-        if raw is not None and raw != "":
-            return float(raw)
-        return 0.0
+        return observation_risk_score_value(obs)
     # Build equipment lookup
     equipment_map = {eq.get("id"): eq for eq in equipment_nodes if eq.get("id")}
     
@@ -546,7 +555,7 @@ async def get_executive_dashboard(
         )
         
         status = obs.get("status") or ""
-        is_open = is_open_observation_status(status)
+        is_active = is_active_observation_status(status)
         
         description = obs.get("user_context") or obs.get("description") or ""
         observation_data = {
@@ -557,6 +566,7 @@ async def get_executive_dashboard(
             "production_impact": production_impact,
             "severity": obs.get("risk_level"),
             "risk_score": observation_risk_score(obs),
+            "risk_level": obs.get("risk_level"),
             "exposure_value": exposure_value,
             "exposure_formatted": format_currency(exposure_value, currency_symbol),
             "status": status,
@@ -574,7 +584,7 @@ async def get_executive_dashboard(
             "control_status": "Controlled" if has_control else "No Control"
         })
         
-        if is_open and observation_data["risk_score"] >= HIGH_ACTIVE_RISK_THRESHOLD:
+        if is_active and is_high_exposure_observation(obs):
             critical_active_exposure += exposure_value
             if is_previous_period:
                 prev_critical += exposure_value
@@ -655,8 +665,8 @@ async def get_executive_dashboard(
             change_percent=critical_change,
             trend=critical_trend,
             tooltip=(
-                "Production impact from active observations with a risk score of "
-                f"{HIGH_ACTIVE_RISK_THRESHOLD} or above."
+                "Production impact from active observations rated High or Critical "
+                f"(risk score {HIGH_ACTIVE_RISK_THRESHOLD}+)."
             ),
             evidence_count=len(critical_evidence)
         ),
@@ -741,7 +751,7 @@ async def get_executive_dashboard(
 
 {format_currency(covered_by_controls, currency_symbol)} ({coverage_current:.0f}%) of assessed exposure is covered by equipment with a maintenance program or imported PM plan. {format_currency(uncovered_exposure, currency_symbol)} remains uncovered across {uncovered_equipment_count} assessed assets without active controls.
 
-All {total_obs} observations represent {format_currency(active_threat_exposure, currency_symbol)} in total production exposure. {len(critical_evidence)} active observations with a risk score of {HIGH_ACTIVE_RISK_THRESHOLD} or above represent {format_currency(critical_active_exposure, currency_symbol)} and require immediate attention.
+All {total_obs} observations represent {format_currency(active_threat_exposure, currency_symbol)} in total production exposure. {len(critical_evidence)} active High or Critical observations represent {format_currency(critical_active_exposure, currency_symbol)} and require immediate attention.
 
 PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvement"} at {pm_compliance_current:.0f}%. Digital execution recorded {digital_current_period} tasks and forms in the report period ({report_period['label']}) versus {digital_previous_period} in the previous period."""
     
