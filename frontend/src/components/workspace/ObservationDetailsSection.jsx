@@ -21,12 +21,14 @@ import {
   AlertTriangle,
   Activity,
   Calculator,
+  Camera,
   ChevronDown,
   Clock,
   Cog,
   Copy,
   Edit,
   Eye,
+  FileText,
   Leaf,
   Link as LinkIcon,
   Loader2,
@@ -460,6 +462,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
       owner_id: threat.owner_id || "",
       owner_name: threat.owner_name || "",
       discipline: normalizeDiscipline(threat.discipline || "") || "",
+      description: threat.description || "",
       user_context: threat.user_context || "",
       attachments: threat.attachments || [],
     });
@@ -1077,15 +1080,15 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
         </div>
         {isEditing ? (
           <Textarea
-            value={editForm.user_context || ""}
-            onChange={(e) => setEditForm({ ...editForm, user_context: e.target.value })}
+            value={editForm.description || ""}
+            onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
             placeholder={t("observationWorkspace.descriptionPlaceholder")}
             rows={4}
             className="text-sm"
           />
-        ) : threat.user_context ? (
+        ) : threat.description ? (
           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-            <p className="text-slate-700 whitespace-pre-wrap text-sm">{threat.user_context}</p>
+            <p className="text-slate-700 whitespace-pre-wrap text-sm">{threat.description}</p>
           </div>
         ) : (
           <p className="text-slate-400 text-sm italic">{t("observationWorkspace.noDescriptionRecorded")}</p>
@@ -1093,6 +1096,86 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
         {/* Attachments are now shown only as a count badge on the paperclip; clicking
             a file title opens a preview dialog. No mini-thumbnails. */}
       </div>
+
+      {/* User Context — shows what the user originally typed/dictated if different from the description */}
+      {threat.user_context && threat.user_context !== threat.description && (
+        <div className="bg-white rounded-xl border border-slate-200 p-4" data-testid="workspace-user-context">
+          <div className="flex items-center gap-2 mb-2">
+            <FileText className="w-4 h-4 text-blue-600" />
+            <h3 className="font-semibold text-slate-900 text-sm">{t("observationWorkspace.additionalContext") || "Additional Context"}</h3>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-slate-700 whitespace-pre-wrap text-sm">{threat.user_context}</p>
+          </div>
+        </div>
+      )}
+
+      {/* AI Photo Analysis — shows findings from image analysis if available */}
+      {threat.image_analysis && (
+        <div className="bg-white rounded-xl border border-slate-200 p-4" data-testid="workspace-ai-photo-analysis">
+          <div className="flex items-center gap-2 mb-3">
+            <Camera className="w-4 h-4 text-purple-600" />
+            <h3 className="font-semibold text-slate-900 text-sm">{t("observationWorkspace.aiPhotoAnalysis") || "AI Photo Analysis"}</h3>
+            {threat.image_analysis.severity && (
+              <span className={`ml-auto text-xs font-medium px-2 py-0.5 rounded-full ${
+                threat.image_analysis.severity === "critical" ? "bg-red-100 text-red-700" :
+                threat.image_analysis.severity === "high" ? "bg-orange-100 text-orange-700" :
+                threat.image_analysis.severity === "medium" ? "bg-yellow-100 text-yellow-700" :
+                "bg-green-100 text-green-700"
+              }`}>
+                {t(`severity.${threat.image_analysis.severity}`) || threat.image_analysis.severity}
+              </span>
+            )}
+          </div>
+          
+          <div className="space-y-3">
+            {/* Image Description */}
+            {threat.image_analysis.image_description && (
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                <p className="text-slate-700 text-sm">{threat.image_analysis.image_description}</p>
+              </div>
+            )}
+            
+            {/* Visible Damage */}
+            {threat.image_analysis.visible_damage && threat.image_analysis.visible_damage.length > 0 && (
+              <div>
+                <h4 className="text-xs font-medium text-slate-600 mb-1.5">{t("observationWorkspace.visibleDamage") || "Visible Damage"}</h4>
+                <ul className="space-y-1">
+                  {threat.image_analysis.visible_damage.map((damage, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm text-slate-700">
+                      <span className="text-orange-500 mt-0.5">•</span>
+                      <span>{damage}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            {/* Safety Concerns */}
+            {threat.image_analysis.safety_concerns && threat.image_analysis.safety_concerns.length > 0 && (
+              <div>
+                <h4 className="text-xs font-medium text-red-600 mb-1.5">{t("observationWorkspace.safetyConcerns") || "Safety Concerns"}</h4>
+                <ul className="space-y-1">
+                  {threat.image_analysis.safety_concerns.map((concern, idx) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm text-red-700">
+                      <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                      <span>{concern}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          
+          {threat.image_analysis_at && (
+            <div className="mt-3 pt-2 border-t border-slate-100">
+              <span className="text-xs text-slate-400">
+                {t("observationWorkspace.analyzedAt") || "Analyzed"} {formatDateTime(threat.image_analysis_at)}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Attachment preview dialog */}
       {previewAtt && (

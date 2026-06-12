@@ -1020,7 +1020,12 @@
     "clickToFindInHierarchy": "Click to find in hierarchy",
     "riskScoreTooltip": "Risk score (right-click the card below for calculation details)",
     "rpnTooltip": "Risk Priority Number",
-    "attachmentFallback": "Attachment"
+    "attachmentFallback": "Attachment",
+    "additionalContext": "Additional Context",
+    "aiPhotoAnalysis": "AI Photo Analysis",
+    "visibleDamage": "Visible Damage",
+    "safetyConcerns": "Safety Concerns",
+    "analyzedAt": "Analyzed"
   },
   "causal": {
     "title": "Causal Engine",

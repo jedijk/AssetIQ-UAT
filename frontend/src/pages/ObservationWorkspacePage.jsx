@@ -316,6 +316,23 @@ const ObservationWorkspacePage = () => {
     setRiskStepComplete(true);
   };
 
+  // Compute display title: "equipment - failure mode" or "equipment - Problem" if failure mode is unclear
+  // Must be before early returns to satisfy React hooks rules
+  const displayTitle = useMemo(() => {
+    const obs = workspace?.observation;
+    if (!obs) return "";
+    const equipment = obs.asset || obs.equipment_type || "";
+    const failureMode = obs.failure_mode;
+    
+    // If failure mode is set and is not a generic placeholder, use it
+    if (failureMode && failureMode.trim() && 
+        !["unknown", "not specified", "n/a", "na", "none", "-"].includes(failureMode.toLowerCase().trim())) {
+      return equipment ? `${equipment} - ${failureMode}` : failureMode;
+    }
+    // Otherwise use "Problem" as placeholder
+    return equipment ? `${equipment} - Problem` : obs.title || "Problem";
+  }, [workspace?.observation]);
+
   // Loading state
   if (isLoading) {
     return (
@@ -361,7 +378,7 @@ const ObservationWorkspacePage = () => {
                   </span>
                 </div>
                 <h1 className="font-semibold text-sm sm:text-base text-slate-900 truncate leading-tight">
-                  {observation?.title}
+                  {displayTitle}
                 </h1>
               </div>
 
