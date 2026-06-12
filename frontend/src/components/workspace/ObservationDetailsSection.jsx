@@ -11,7 +11,7 @@
  * It fetches its own threat data and renders all editable sections in flow.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -59,9 +59,11 @@ import { queryKeys } from "../../lib/queryKeys";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useUndo } from "../../contexts/UndoContext";
 import {
+  useEquipmentNodeIdMap,
   useEquipmentNodeNameMap,
   useEquipmentTypeNameMap,
   useFailureModeNameMap,
+  useTranslatedFailureModes,
 } from "../../hooks/useTranslatedEntities";
 import { formatDateTime } from "../../lib/dateUtils";
 import { computeCriticalityScore } from "../../lib/criticalityScore";
@@ -116,6 +118,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
   const { t, language } = useLanguage();
   const { disciplines, getLabel, normalize: normalizeDiscipline } = useDisciplines();
   const nodeNameMap = useEquipmentNodeNameMap();
+  const nodeIdMap = useEquipmentNodeIdMap();
   const typeNameMap = useEquipmentTypeNameMap();
   const fmNameMap = useFailureModeNameMap();
 
@@ -180,6 +183,18 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
     staleTime: 5 * 60 * 1000,
   });
   const failureModes = useMemo(() => failureModesData?.failure_modes ?? [], [failureModesData]);
+  const { failureModes: translatedFailureModes } = useTranslatedFailureModes(failureModes);
+
+  const resolveNodeDisplayName = useCallback(
+    (node) => {
+      if (!node) return "";
+      const byId = nodeIdMap[node.id]?.name;
+      if (byId) return byId;
+      const key = String(node.name || "").trim().toLowerCase();
+      return nodeNameMap[key] || node.name || "";
+    },
+    [nodeIdMap, nodeNameMap]
+  );
 
   const { data: usersData } = useQuery({
     queryKey: queryKeys.users.rbac(),
@@ -256,9 +271,9 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(threatId) });
       toast.success(
         t("observations.linkedEquipmentToast", {
-          asset: data.threat.asset,
+          asset: translateEquipmentTypeName(data.threat.asset) || data.threat.asset,
           score: data.score_calculation.final_score,
-          level: data.score_calculation.risk_level,
+          level: translateEnum(data.score_calculation.risk_level),
         })
       );
       setShowLinkEquipmentDialog(false);
@@ -274,9 +289,9 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.observationWorkspace.detail(threatId) });
       toast.success(
         t("observations.linkedFailureModeToast", {
-          failureMode: data.threat.failure_mode,
+          failureMode: translateFailureModeName(data.threat.failure_mode) || data.threat.failure_mode,
           score: data.score_calculation.final_score,
-          level: data.score_calculation.risk_level,
+          level: translateEnum(data.score_calculation.risk_level),
         })
       );
       setShowLinkFailureModeDialog(false);
@@ -353,24 +368,34 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
     [equipmentTypes]
   );
   const failureModeOptions = useMemo(
-    () => failureModes.map((m) => ({ value: m.failure_mode, label: m.failure_mode, description: m.equipment || m.category })),
-    [failureModes]
+    () =>
+      translatedFailureModes.map((m) => ({
+        value: m._originalName || m.failure_mode,
+        label: m.failure_mode,
+        description: translateEquipmentTypeName(m.equipment) || m.equipment || m.category,
+      })),
+    [translatedFailureModes, translateEquipmentTypeName]
   );
 
   const flatEquipmentList = useMemo(() => {
     const result = [];
     const eqTypeNameById = {};
-    for (const et of equipmentTypes) eqTypeNameById[et.id] = et.name;
+    for (const et of equipmentTypes) {
+      eqTypeNameById[et.id] = translateEquipmentTypeName(et.name) || et.name;
+    }
     const flatten = (nodes, parentPath = "") => {
       for (const node of nodes) {
-        const path = parentPath ? `${parentPath} > ${node.name}` : node.name;
+        const displayName = resolveNodeDisplayName(node);
+        const path = parentPath ? `${parentPath} > ${displayName}` : displayName;
+        const rawTypeName = node.equipment_type_id ? eqTypeNameById[node.equipment_type_id] : null;
         result.push({
           id: node.id,
-          name: node.name,
+          name: displayName,
+          originalName: node.name,
           path,
           level: node.level,
-          discipline: node.discipline,
-          equipmentTypeName: node.equipment_type_id ? eqTypeNameById[node.equipment_type_id] : null,
+          discipline: node.discipline ? getLabel(normalizeDiscipline(node.discipline)) : null,
+          equipmentTypeName: rawTypeName,
           hasCriticality: !!node.criticality,
           criticalityLevel: node.criticality?.level,
         });
@@ -379,7 +404,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
     };
     flatten(equipmentNodes);
     return result;
-  }, [equipmentNodes, equipmentTypes]);
+  }, [equipmentNodes, equipmentTypes, resolveNodeDisplayName, translateEquipmentTypeName, getLabel, normalizeDiscipline]);
 
   const filteredEquipmentList = useMemo(() => {
     const q = equipmentSearch.trim().toLowerCase();
@@ -387,6 +412,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
     return flatEquipmentList.filter(
       (eq) =>
         (eq.name || "").toLowerCase().includes(q) ||
+        (eq.originalName || "").toLowerCase().includes(q) ||
         (eq.path || "").toLowerCase().includes(q) ||
         (eq.level || "").toLowerCase().includes(q) ||
         (eq.discipline || "").toLowerCase().includes(q) ||
@@ -396,16 +422,22 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
   }, [flatEquipmentList, equipmentSearch]);
 
   const filteredFailureModes = useMemo(() => {
-    if (!failureModeSearch.trim()) return failureModes;
+    if (!failureModeSearch.trim()) return translatedFailureModes;
     const q = failureModeSearch.toLowerCase();
-    return failureModes.filter(
-      (fm) =>
-        fm.failure_mode.toLowerCase().includes(q) ||
-        fm.category.toLowerCase().includes(q) ||
-        fm.equipment.toLowerCase().includes(q) ||
+    return translatedFailureModes.filter((fm) => {
+      const modeNames = [fm.failure_mode, fm._originalName].filter(Boolean);
+      const equipmentNames = [
+        fm.equipment,
+        translateEquipmentTypeName(fm.equipment),
+      ].filter(Boolean);
+      return (
+        modeNames.some((n) => n.toLowerCase().includes(q)) ||
+        (fm.category || "").toLowerCase().includes(q) ||
+        equipmentNames.some((n) => n.toLowerCase().includes(q)) ||
         (fm.keywords && fm.keywords.some((k) => k.toLowerCase().includes(q)))
-    );
-  }, [failureModes, failureModeSearch]);
+      );
+    });
+  }, [translatedFailureModes, failureModeSearch, translateEquipmentTypeName]);
 
   // Close score popup on outside click
   useEffect(() => {
@@ -649,7 +681,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
                   }}
                   data-testid="menu-share"
                 >
-                  <Share2 className="w-4 h-4 mr-2" /> Share
+                  <Share2 className="w-4 h-4 mr-2" /> {t("observations.shareLink")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="sm:hidden"
@@ -659,7 +691,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
                   }}
                   data-testid="menu-edit"
                 >
-                  <Edit className="w-4 h-4 mr-2" /> Edit
+                  <Edit className="w-4 h-4 mr-2" /> {t("common.edit")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() => {
@@ -668,7 +700,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
                   }}
                   data-testid="menu-link-equipment"
                 >
-                  <LinkIcon className="w-4 h-4 mr-2" /> Link Equipment
+                  <LinkIcon className="w-4 h-4 mr-2" /> {t("observations.linkEquipment")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() => {
@@ -677,7 +709,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
                   }}
                   data-testid="menu-link-failure-mode"
                 >
-                  <AlertTriangle className="w-4 h-4 mr-2" /> Link Failure Mode
+                  <AlertTriangle className="w-4 h-4 mr-2" /> {t("observations.linkFailureMode")}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="sm:hidden text-red-600 focus:text-red-700 focus:bg-red-50"
@@ -687,7 +719,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
                   }}
                   data-testid="menu-delete-observation"
                 >
-                  <Trash2 className="w-4 h-4 mr-2" /> Delete
+                  <Trash2 className="w-4 h-4 mr-2" /> {t("common.delete")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -712,7 +744,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
             shareLink();
           }}
         >
-          <Share2 className="w-4 h-4 mr-2" /> Share
+          <Share2 className="w-4 h-4 mr-2" /> {t("observations.shareLink")}
         </DropdownMenuItem>
         <DropdownMenuItem
           onSelect={() => {
@@ -720,7 +752,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
             startEditing();
           }}
         >
-          <Edit className="w-4 h-4 mr-2" /> Edit
+          <Edit className="w-4 h-4 mr-2" /> {t("common.edit")}
         </DropdownMenuItem>
         <DropdownMenuItem
           onSelect={() => {
@@ -728,7 +760,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
             setShowLinkEquipmentDialog(true);
           }}
         >
-          <LinkIcon className="w-4 h-4 mr-2" /> Link Equipment
+          <LinkIcon className="w-4 h-4 mr-2" /> {t("observations.linkEquipment")}
         </DropdownMenuItem>
         <DropdownMenuItem
           onSelect={() => {
@@ -736,7 +768,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
             setShowLinkFailureModeDialog(true);
           }}
         >
-          <AlertTriangle className="w-4 h-4 mr-2" /> Link Failure Mode
+          <AlertTriangle className="w-4 h-4 mr-2" /> {t("observations.linkFailureMode")}
         </DropdownMenuItem>
         <DropdownMenuItem
           onSelect={() => {
@@ -745,7 +777,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
           }}
           className="text-red-600 focus:text-red-700 focus:bg-red-50"
         >
-          <Trash2 className="w-4 h-4 mr-2" /> Delete
+          <Trash2 className="w-4 h-4 mr-2" /> {t("common.delete")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -778,7 +810,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
             <div className="flex items-center justify-between px-3 py-2 border-b">
               <div className="flex items-center gap-2">
                 <Calculator className="w-4 h-4 text-blue-600" />
-                <h3 className="font-semibold text-sm">Score Calculation</h3>
+                <h3 className="font-semibold text-sm">{t("observations.scoreCalculation")}</h3>
               </div>
               <button onClick={() => setScoreCalcPopup({ show: false, x: 0, y: 0 })} className="p-1 hover:bg-slate-100 rounded">
                 <X className="w-4 h-4 text-slate-400" />
@@ -1259,15 +1291,15 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Observation</AlertDialogTitle>
+            <AlertDialogTitle>{t("observations.deleteObservation")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure? This action cannot be undone.
+              {t("observations.deleteConfirmShort")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={() => deleteMutation.mutate()} className="bg-red-600 hover:bg-red-700" data-testid="confirm-delete-btn">
-              {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
+              {deleteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : t("common.delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1279,17 +1311,17 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Share2 className="w-5 h-5 text-blue-600" />
-              Share Observation
+              {t("observations.shareObservation")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-slate-500">Anyone with the link can view this observation.</p>
+            <p className="text-sm text-slate-500">{t("observations.anyoneWithLinkCanView")}</p>
             <div className="flex items-center gap-2">
               <div className="flex-1 p-3 bg-slate-100 rounded-lg border text-sm font-mono text-slate-600 truncate">
                 {shareableLink}
               </div>
               <Button size="sm" onClick={() => { copyLink(); setShareDialogOpen(false); }}>
-                <Copy className="w-4 h-4 mr-1" /> Copy
+                <Copy className="w-4 h-4 mr-1" /> {t("observations.copy")}
               </Button>
             </div>
           </div>
@@ -1302,21 +1334,23 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <LinkIcon className="w-5 h-5 text-purple-600" />
-              Link to Equipment
+              {t("observations.linkToEquipment")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <p className="text-sm text-slate-600">{t("observations.linkEquipmentDesc")}</p>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Search equipment by tag, name, level…"
+                placeholder={t("observations.searchEquipmentPlaceholder")}
                 value={equipmentSearch}
                 onChange={(e) => setEquipmentSearch(e.target.value)}
                 className="pl-9"
                 autoFocus
+                data-testid="equipment-search-input"
               />
             </div>
-            <div className="max-h-64 overflow-y-auto space-y-1 border rounded-lg p-2">
+            <div className="max-h-64 overflow-y-auto space-y-1 border rounded-lg p-2" data-testid="equipment-list">
               {filteredEquipmentList.map((eq) => (
                 <button
                   key={eq.id}
@@ -1324,25 +1358,55 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
                   className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
                     selectedEquipmentId === eq.id ? "bg-purple-100 border-purple-300 border" : "hover:bg-slate-50 border border-transparent"
                   }`}
+                  data-testid={`equipment-option-${eq.id}`}
                 >
                   <div className="font-medium text-slate-800">{eq.name}</div>
                   <div className="text-xs text-slate-500 truncate">{eq.path}</div>
+                  {(eq.level || eq.equipmentTypeName || eq.discipline || eq.criticalityLevel) && (
+                    <div className="flex flex-wrap items-center gap-1 mt-1.5">
+                      {eq.level && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                          {String(eq.level).replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                        </span>
+                      )}
+                      {eq.equipmentTypeName && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-100">
+                          {eq.equipmentTypeName}
+                        </span>
+                      )}
+                      {eq.discipline && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                          {eq.discipline}
+                        </span>
+                      )}
+                      {eq.criticalityLevel && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                          eq.criticalityLevel === "critical" ? "bg-red-50 text-red-700 border-red-200"
+                          : eq.criticalityLevel === "high" ? "bg-orange-50 text-orange-700 border-orange-200"
+                          : eq.criticalityLevel === "medium" ? "bg-yellow-50 text-yellow-700 border-yellow-200"
+                          : "bg-green-50 text-green-700 border-green-200"
+                        }`}>
+                          {translateEnum(String(eq.criticalityLevel).charAt(0).toUpperCase() + String(eq.criticalityLevel).slice(1))}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </button>
               ))}
               {filteredEquipmentList.length === 0 && (
-                <div className="text-center py-4 text-slate-400 text-sm">No equipment found</div>
+                <div className="text-center py-4 text-slate-400 text-sm">{t("observations.noEquipmentFound")}</div>
               )}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowLinkEquipmentDialog(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowLinkEquipmentDialog(false)}>{t("common.cancel")}</Button>
             <Button
               onClick={() => linkEquipmentMutation.mutate({ equipmentNodeId: selectedEquipmentId })}
               disabled={!selectedEquipmentId || linkEquipmentMutation.isPending}
               className="bg-purple-600 hover:bg-purple-700"
             >
               {linkEquipmentMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <LinkIcon className="w-4 h-4 mr-1" />}
-              Link & Recalculate
+              {t("observations.linkAndRecalculate")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1354,17 +1418,19 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-amber-600" />
-              Link to Failure Mode
+              {t("observations.linkToFailureMode")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <p className="text-sm text-slate-600">{t("observations.linkFailureModeDesc")}</p>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                placeholder="Search failure modes…"
+                placeholder={t("observations.searchFailureModes")}
                 value={failureModeSearch}
                 onChange={(e) => setFailureModeSearch(e.target.value)}
                 className="pl-9"
+                data-testid="failure-mode-search"
               />
             </div>
             <div className="max-h-72 overflow-y-auto space-y-1 border rounded-lg p-2">
@@ -1375,6 +1441,7 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
                   className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
                     selectedFailureModeId === fm.id ? "bg-amber-100 border-amber-300 border" : "hover:bg-slate-50 border border-transparent"
                   }`}
+                  data-testid={`failure-mode-option-${fm.id}`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="font-medium text-slate-800">{fm.failure_mode}</div>
@@ -1383,25 +1450,34 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
                       : fm.rpn >= 200 ? "bg-orange-100 text-orange-700"
                       : fm.rpn >= 100 ? "bg-yellow-100 text-yellow-700"
                       : "bg-green-100 text-green-700"
-                    }`}>RPN: {fm.rpn}</div>
+                    }`}>
+                      {t("observations.rpn")}: {fm.rpn}
+                    </div>
                   </div>
-                  <div className="text-xs text-slate-500 mt-0.5">{fm.category} • {fm.equipment}</div>
+                  <div className="text-xs text-slate-500 mt-0.5">
+                    {fm.category} • {translateEquipmentTypeName(fm.equipment) || fm.equipment}
+                  </div>
+                  <div className="flex gap-3 mt-1 text-[10px] text-slate-400">
+                    <span>S: {fm.severity}</span>
+                    <span>O: {fm.occurrence}</span>
+                    <span>D: {fm.detectability}</span>
+                  </div>
                 </button>
               ))}
               {filteredFailureModes.length === 0 && (
-                <div className="text-center py-4 text-slate-400 text-sm">No failure modes found</div>
+                <div className="text-center py-4 text-slate-400 text-sm">{t("observations.noFailureModesFound")}</div>
               )}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowLinkFailureModeDialog(false); setSelectedFailureModeId(null); setFailureModeSearch(""); }}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setShowLinkFailureModeDialog(false); setSelectedFailureModeId(null); setFailureModeSearch(""); }}>{t("common.cancel")}</Button>
             <Button
               onClick={() => linkFailureModeMutation.mutate({ failureModeId: selectedFailureModeId })}
               disabled={!selectedFailureModeId || linkFailureModeMutation.isPending}
               className="bg-amber-600 hover:bg-amber-700"
             >
               {linkFailureModeMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <LinkIcon className="w-4 h-4 mr-1" />}
-              Link & Recalculate
+              {t("observations.linkAndRecalculate")}
             </Button>
           </DialogFooter>
         </DialogContent>

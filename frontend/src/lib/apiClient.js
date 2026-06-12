@@ -18,6 +18,84 @@ function applyCookieAuthHeaders(config) {
   return config;
 }
 
+function buildSessionCheckHeaders() {
+  const headers = {};
+  if (AUTH_MODE !== "cookie") {
+    const token = localStorage.getItem("token");
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const dbEnv = getDatabaseEnvironment();
+    if (dbEnv) headers["X-Database-Environment"] = dbEnv;
+  } else {
+    const dbEnv = getDatabaseEnvironment();
+    if (dbEnv) headers["X-Database-Environment"] = dbEnv;
+  }
+  return headers;
+}
+
+function isPreLoginAuthUrl(url) {
+  const u = url || "";
+  return (
+    u.includes("/auth/login") ||
+    u.includes("/auth/register") ||
+    u.includes("/auth/forgot-password") ||
+    u.includes("/auth/reset-password") ||
+    u.includes("/auth/verify-reset-token")
+  );
+}
+
+// Separate client so session checks do not recurse through 401 interceptors.
+const sessionCheckClient = axios.create({
+  baseURL: API_URL,
+  timeout: 10000,
+  withCredentials: AUTH_MODE === "cookie",
+});
+
+let sessionVerifyInFlight = null;
+
+async function isSessionActuallyExpired() {
+  if (sessionVerifyInFlight) return sessionVerifyInFlight;
+
+  sessionVerifyInFlight = (async () => {
+    try {
+      await sessionCheckClient.get("/auth/me", {
+        headers: buildSessionCheckHeaders(),
+      });
+      return false;
+    } catch (e) {
+      return e?.response?.status === 401;
+    } finally {
+      sessionVerifyInFlight = null;
+    }
+  })();
+
+  return sessionVerifyInFlight;
+}
+
+function handleUnauthorizedResponse(error) {
+  const url = `${error.config?.baseURL || ""}${error.config?.url || ""}`;
+  if (isPreLoginAuthUrl(url)) return;
+  if (typeof window !== "undefined" && window.location.pathname.includes("/login")) return;
+
+  try {
+    debugLog("api_401", { url });
+  } catch (_e) {}
+
+  isSessionActuallyExpired().then((expired) => {
+    if (!expired) {
+      try {
+        debugLog("api_401_ignored", { url, reason: "session_still_valid" });
+      } catch (_e) {}
+      return;
+    }
+    if (AUTH_MODE !== "cookie") {
+      localStorage.removeItem("token");
+    }
+    try {
+      window.dispatchEvent(new CustomEvent("assetiq:auth-expired"));
+    } catch (_e) {}
+  });
+}
+
 // Global axios defaults for cookie-auth (AuthContext and legacy raw axios calls).
 if (AUTH_MODE === "cookie") {
   axios.defaults.withCredentials = true;
@@ -86,19 +164,7 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      try {
-        debugLog("api_401", {
-          url: `${error.config?.baseURL || ""}${error.config?.url || ""}`,
-        });
-      } catch (_e) {}
-      // In cookie-auth mode, a 401 can simply mean "no session cookie".
-      // Do not clear localStorage token here (it may not exist or may be in transition).
-      if (AUTH_MODE !== "cookie") {
-        localStorage.removeItem("token");
-      }
-      try {
-        window.dispatchEvent(new CustomEvent("assetiq:auth-expired"));
-      } catch (_e) {}
+      handleUnauthorizedResponse(error);
     }
 
     if (error.code === "ECONNABORTED") {
@@ -147,12 +213,7 @@ aiApi.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      if (AUTH_MODE !== "cookie") {
-        localStorage.removeItem("token");
-      }
-      try {
-        window.dispatchEvent(new CustomEvent("assetiq:auth-expired"));
-      } catch (_e) {}
+      handleUnauthorizedResponse(error);
     }
 
     if (error.code === "ECONNABORTED") {

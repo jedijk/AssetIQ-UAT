@@ -35,61 +35,49 @@ logger = logging.getLogger(__name__)
 FAILURE_MODES_BY_ID = {fm["id"]: fm for fm in FAILURE_MODES_LIBRARY if "id" in fm}
 FAILURE_MODES_BY_NAME = {fm["failure_mode"].lower(): fm for fm in FAILURE_MODES_LIBRARY if "failure_mode" in fm}
 
+def _fm_serialized_to_threat_format(db_fm: dict) -> dict:
+    """Map FailureModesService API shape to threat-linking shape."""
+    effects = db_fm.get("potential_effects") or []
+    causes = db_fm.get("potential_causes") or []
+    return {
+        "id": db_fm.get("id"),
+        "failure_mode": db_fm.get("failure_mode", ""),
+        "category": db_fm.get("category", ""),
+        "equipment": db_fm.get("equipment", ""),
+        "severity": db_fm.get("severity", 5),
+        "occurrence": db_fm.get("occurrence", 5),
+        "detectability": db_fm.get("detectability", 5),
+        "rpn": db_fm.get("rpn", 125),
+        "recommended_actions": db_fm.get("recommended_actions", []),
+        "mechanism": db_fm.get("mechanism", ""),
+        "effect": effects[0] if effects else db_fm.get("effect", ""),
+        "cause": causes[0] if causes else db_fm.get("cause", ""),
+    }
+
+
 async def get_failure_mode_by_name_or_id(failure_mode_name: str = None, failure_mode_id: str = None):
     """
     Get failure mode from database first, then fall back to static library.
     Returns failure mode dict or None.
     """
-    fm = None
-    
-    # First check database for user-created failure modes
-    if failure_mode_id:
-        db_fm = await db.failure_modes.find_one({"id": failure_mode_id})
+    if failure_mode_id is not None:
+        db_fm = await failure_modes_service.get_by_id(str(failure_mode_id))
         if db_fm:
-            db_fm.pop("_id", None)
-            # Normalize field names for compatibility
-            fm = {
-                "id": db_fm.get("id"),
-                "failure_mode": db_fm.get("name", ""),
-                "severity": db_fm.get("severity", 5),
-                "occurrence": db_fm.get("occurrence", 5),
-                "detectability": db_fm.get("detectability", 5),
-                "rpn": db_fm.get("rpn", 125),
-                "recommended_actions": db_fm.get("recommended_actions", []),
-                "equipment": db_fm.get("equipment_type", ""),
-                "mechanism": db_fm.get("mechanism", ""),
-                "effect": db_fm.get("effect", ""),
-                "cause": db_fm.get("cause", ""),
-            }
-            return fm
-    
-    if failure_mode_name:
-        from utils.mongo_regex import exact_case_insensitive
+            return _fm_serialized_to_threat_format(db_fm)
+        try:
+            int_id = int(failure_mode_id)
+            if int_id in FAILURE_MODES_BY_ID:
+                return FAILURE_MODES_BY_ID[int_id]
+        except (TypeError, ValueError):
+            pass
 
-        db_fm = await db.failure_modes.find_one({"name": exact_case_insensitive(failure_mode_name)})
+    if failure_mode_name:
+        db_fm = await failure_modes_service.get_by_name(failure_mode_name)
         if db_fm:
-            db_fm.pop("_id", None)
-            fm = {
-                "id": db_fm.get("id"),
-                "failure_mode": db_fm.get("name", ""),
-                "severity": db_fm.get("severity", 5),
-                "occurrence": db_fm.get("occurrence", 5),
-                "detectability": db_fm.get("detectability", 5),
-                "rpn": db_fm.get("rpn", 125),
-                "recommended_actions": db_fm.get("recommended_actions", []),
-                "equipment": db_fm.get("equipment_type", ""),
-                "mechanism": db_fm.get("mechanism", ""),
-                "effect": db_fm.get("effect", ""),
-                "cause": db_fm.get("cause", ""),
-            }
-            return fm
-    
-    # Fall back to static library
-    if failure_mode_id and failure_mode_id in FAILURE_MODES_BY_ID:
-        return FAILURE_MODES_BY_ID[failure_mode_id]
-    if failure_mode_name and failure_mode_name.lower() in FAILURE_MODES_BY_NAME:
-        return FAILURE_MODES_BY_NAME[failure_mode_name.lower()]
-    
+            return _fm_serialized_to_threat_format(db_fm)
+        if failure_mode_name.lower() in FAILURE_MODES_BY_NAME:
+            return FAILURE_MODES_BY_NAME[failure_mode_name.lower()]
+
     return None
 
 # Common failure mode causes for investigation root cause analysis
@@ -883,41 +871,14 @@ async def link_threat_to_failure_mode(
         logger.warning(f"link_threat_to_failure_mode: Threat {threat_id} NOT FOUND in database {current_db}")
         raise HTTPException(status_code=404, detail="Threat not found")
     await _assert_threat_installation_scope(current_user, threat)
-    
-    # Find the failure mode - check database first, then static library
-    matched_fm = None
-    
-    # Check database for user-created failure modes (UUID strings)
-    db_fm = await db.failure_modes.find_one({"id": str(failure_mode_id)})
-    if db_fm:
-        db_fm.pop("_id", None)
-        matched_fm = {
-            "id": db_fm.get("id"),
-            "failure_mode": db_fm.get("name", ""),
-            "category": db_fm.get("category", ""),
-            "equipment": db_fm.get("equipment_type", ""),
-            "severity": db_fm.get("severity", 5),
-            "occurrence": db_fm.get("occurrence", 5),
-            "detectability": db_fm.get("detectability", 5),
-            "rpn": db_fm.get("rpn", 125),
-            "recommended_actions": db_fm.get("recommended_actions", []),
-            "mechanism": db_fm.get("mechanism", ""),
-            "effect": db_fm.get("effect", ""),
-            "cause": db_fm.get("cause", ""),
-        }
-    else:
-        # Fall back to static library (integer ids)
-        try:
-            int_id = int(failure_mode_id)
-        except (TypeError, ValueError):
-            int_id = None
-        if int_id is not None:
-            for fm in FAILURE_MODES_LIBRARY:
-                if fm["id"] == int_id:
-                    matched_fm = fm
-                    break
-    
+
+    matched_fm = await get_failure_mode_by_name_or_id(failure_mode_id=failure_mode_id)
     if not matched_fm:
+        logger.warning(
+            "link_threat_to_failure_mode: Failure mode %s NOT FOUND in database %s",
+            failure_mode_id,
+            current_db,
+        )
         raise HTTPException(status_code=404, detail="Failure mode not found in library")
     
     # Create failure mode data snapshot

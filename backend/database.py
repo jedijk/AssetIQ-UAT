@@ -236,7 +236,7 @@ if not JWT_SECRET:
         "Set JWT_SECRET_KEY (recommended) or set REQUIRE_JWT_SECRET_KEY=true to fail fast."
     )
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_HOURS = 24
+JWT_EXPIRATION_HOURS = int(os.environ.get("JWT_EXPIRATION_HOURS", "24"))
 
 # LLM Config
 
