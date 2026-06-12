@@ -2,6 +2,9 @@
  * Scene configuration for the cinematic "Progress an Observation" tour.
  */
 
+/** Set false to hide the tour from Help and skip mounting the overlay. */
+export const PROGRESS_OBSERVATION_TOUR_ENABLED = false;
+
 export const PROGRESS_TOUR_SCENES = [
   {
     id: "opened",

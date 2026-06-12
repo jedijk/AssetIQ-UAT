@@ -61,6 +61,7 @@ import ImageEditor from "./ImageEditor";
 import EquipmentHierarchy from "./EquipmentHierarchy";
 import ObservationTour from "./ObservationTour";
 import ProgressObservationTour from "./ProgressObservationTour";
+import { PROGRESS_OBSERVATION_TOUR_ENABLED } from "./tour/progressTourSceneConfig";
 import NavigationBreadcrumb from "./NavigationBreadcrumb";
 import { actionsAPI, feedbackAPI } from "../lib/api";
 import { useOfflineSync } from "../hooks/useOfflineSync";
@@ -595,7 +596,9 @@ const Layout = () => {
         t={t}
         resetIntro={resetIntro}
         setObservationTourOpen={setObservationTourOpen}
-        setProgressObservationTourOpen={setProgressObservationTourOpen}
+        setProgressObservationTourOpen={
+          PROGRESS_OBSERVATION_TOUR_ENABLED ? setProgressObservationTourOpen : null
+        }
         user={user}
         avatarUrl={avatarUrl}
         openProfileDialog={openProfileDialog}
@@ -758,10 +761,12 @@ const Layout = () => {
         setHierarchyOpen={setHierarchyOpen}
       />
 
+      {PROGRESS_OBSERVATION_TOUR_ENABLED && (
       <ProgressObservationTour
         isOpen={progressObservationTourOpen}
         onClose={() => setProgressObservationTourOpen(false)}
       />
+      )}
 
       {/* Info Dialog */}
       <Dialog open={infoOpen} onOpenChange={setInfoOpen}>
