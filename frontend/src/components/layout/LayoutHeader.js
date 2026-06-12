@@ -51,8 +51,8 @@ export default function LayoutHeader({
   setDismissedNotifications,
 }) {
   return (
-    <header className="app-header bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 z-[200] relative pointer-events-auto">
-        <div className="header-content max-w-full px-4">
+    <header className="app-header bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 pointer-events-auto">
+        <div className="header-content relative max-w-full px-4">
           {/* Left Section - Logo & Nav */}
           <div className="flex items-center gap-3 lg:gap-6">
             {/* Mobile Menu Toggle - LEFT side on mobile */}
