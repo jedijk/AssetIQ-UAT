@@ -2754,5 +2754,73 @@
     "confidence": "Vertrauen",
     "aiGenerated": "KI-generiert",
     "manuallyEdited": "Manuell bearbeitet"
+  },
+  "observationTour": {
+    "menuLabel": "Erste Beobachtung erstellen",
+    "tourLabel": "Erste Beobachtung erstellen",
+    "exitTour": "Tour beenden",
+    "skipTour": "Tour überspringen",
+    "skip": "Überspringen",
+    "pause": "Pause",
+    "autoPlay": "Automatisch abspielen",
+    "previous": "Zurück",
+    "next": "Weiter",
+    "finish": "Fertig",
+    "keyboardHint": "Mit ← → navigieren · Leertaste zum Abspielen / Pausieren · Esc zum Beenden",
+    "mobileHint": "Nutzen Sie das hervorgehobene Element und tippen Sie dann auf Weiter",
+    "sceneProgress": "Szene {current} / {total}",
+    "progressAriaLabel": "Tour-Fortschritt",
+    "goToScene": "Zu Szene {index}: {chapter}",
+    "chapters": {
+      "observations": "Beobachtungen",
+      "hierarchy": "Hierarchie",
+      "report": "Melden",
+      "describe": "Beschreiben",
+      "submit": "Senden",
+      "done": "Fertig"
+    },
+    "scenes": {
+      "observations": {
+        "title": "Wo Beobachtungen leben",
+        "narration": "Beobachtungen erfassen Equipmentprobleme. AssetIQ bewertet sie und steuert Untersuchungen und Maßnahmen.",
+        "actionHint": "Öffnen Sie Beobachtungen jederzeit über das Menü."
+      },
+      "hierarchy-open": {
+        "title": "Equipment-Hierarchie öffnen",
+        "narration": "Sie können in der Equipment-Struktur starten. Öffnen Sie das Hierarchie-Panel, um Anlagen nach Standort, Bereich und Unit zu durchsuchen.",
+        "actionHint": "Desktop: Panel-Symbol in der Kopfzeile. Mobil: Menü → Equipment-Hierarchie."
+      },
+      "hierarchy-select": {
+        "title": "Equipment auswählen",
+        "narration": "Suchen oder erweitern Sie die Struktur, bis Sie das betroffene Equipment finden. Klicken Sie auf eine Zeile, um die Aktionen zu öffnen.",
+        "actionHint": "Desktop: Rechtsklick auf eine Zeile. Mobil: Tippen Sie auf den Equipment-Namen."
+      },
+      "hierarchy-add": {
+        "title": "Beobachtung aus der Hierarchie hinzufügen",
+        "narration": "Wählen Sie Beobachtung hinzufügen, um den Assistenten mit bereits verknüpftem Equipment zu öffnen.",
+        "actionHint": "Probieren Sie Beobachtung hinzufügen — oder tippen Sie auf Weiter, um die Tour fortzusetzen."
+      },
+      "report": {
+        "title": "Oder die +-Schaltfläche nutzen",
+        "narration": "Sie können auch von überall mit der +-Schaltfläche melden — praktisch, wenn Sie bereits wissen, was Sie beschreiben möchten.",
+        "actionHint": "Klicken Sie jetzt auf die +-Schaltfläche."
+      },
+      "describe": {
+        "title": "Beschreiben Sie, was Sie gesehen haben",
+        "narration": "Geben Sie das Problem in einfacher Sprache ein. Nennen Sie den Equipment-Namen oder Tag, wenn möglich — AssetIQ ordnet Equipment zu und schlägt einen Fehlermodus vor.",
+        "actionHint": "Bearbeiten Sie den Beispieltext oder geben Sie Ihr eigenes Problem ein und fahren Sie fort.",
+        "prefillMessage": "Hohe Vibration an Pumpe P-101 im Betrieb."
+      },
+      "send": {
+        "title": "Meldung absenden",
+        "narration": "Drücken Sie Senden. AssetIQ fasst Ihre Meldung zusammen, ordnet Equipment zu und bittet um Bestätigung, bevor die Beobachtung erstellt wird.",
+        "actionHint": "Klicken Sie auf Senden, wenn Sie bereit sind — oder tippen Sie auf Weiter, um die Tour fortzusetzen."
+      },
+      "complete": {
+        "title": "Sie sind bereit",
+        "narration": "Sie können Beobachtungen aus der Hierarchie oder über die +-Schaltfläche erfassen. Validieren Sie dann den Fehlermodus, erstellen Sie einen Maßnahmenplan und verfolgen Sie die Risikoreduktion.",
+        "actionHint": "Beenden Sie die Tour und melden Sie eine echte Beobachtung."
+      }
+    }
   }
 }

@@ -241,7 +241,7 @@ export default function LayoutHeader({
                   data-testid="observation-tour-menu-item"
                 >
                   <Sparkles className="w-3.5 h-3.5 mr-2 text-blue-500" />
-                  Create Your First Observation
+                  {t("observationTour.menuLabel")}
                 </DropdownMenuItem>
                 )}
                 {!isOperatorActive && setProgressObservationTourOpen && (

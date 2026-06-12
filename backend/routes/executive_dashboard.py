@@ -5,11 +5,12 @@ Provides executives with visibility into production value exposure and reliabili
 NOTE: In AssetIQ, "threats" are called "observations" - this is the primary data source.
 """
 from fastapi import APIRouter, Depends, HTTPException
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Set
 from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel
+import asyncio
 import logging
-from database import db
+from database import db, installation_filter
 from auth import get_current_user, require_permission
 from services.tenant_schema import merge_tenant_filter, tenant_id_from_user, prepend_tenant_match
 from services.cache_service import cache
@@ -28,6 +29,92 @@ router = APIRouter(prefix="/executive-dashboard", tags=["Executive Dashboard"])
 
 _dashboard_read = require_permission("observations:read")
 HIGH_ACTIVE_RISK_THRESHOLD = 50
+
+OPEN_OBSERVATION_STATUSES = {
+    "open", "new", "in_progress", "planning", "active", "investigating",
+    "observation", "assessment", "investigation", "action",
+}
+CLOSED_OBSERVATION_STATUSES = {
+    "closed", "resolved", "completed", "done", "dismissed",
+    "learning", "mitigated", "archived", "cancelled",
+}
+
+
+def is_open_observation_status(status: Optional[str]) -> bool:
+    normalized = (status or "").lower().strip()
+    if not normalized:
+        return True
+    if normalized in CLOSED_OBSERVATION_STATUSES:
+        return False
+    if normalized in OPEN_OBSERVATION_STATUSES:
+        return True
+    return True
+
+
+async def _fetch_scoped_equipment_nodes(current_user: dict) -> List[dict]:
+    installation_ids = await installation_filter.get_user_installation_ids(current_user)
+    if not installation_ids:
+        return []
+    equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
+        installation_ids, current_user["id"]
+    )
+    if not equipment_ids:
+        return []
+    return await db.equipment_nodes.find(
+        merge_tenant_filter({"id": {"$in": list(equipment_ids)}}, current_user),
+        {"_id": 0, "id": 1, "name": 1, "criticality": 1, "equipment_type_id": 1},
+    ).to_list(5000)
+
+
+async def _fetch_scoped_observations(current_user: dict) -> List[dict]:
+    """Observations live in the threats collection, scoped by installation access."""
+    user_id = current_user["id"]
+    installation_ids = await installation_filter.get_user_installation_ids(current_user)
+    if not installation_ids:
+        return []
+
+    equipment_ids, equipment_names = await asyncio.gather(
+        installation_filter.get_all_equipment_ids_for_installations(
+            installation_ids, user_id
+        ),
+        installation_filter.get_equipment_names_for_installations(
+            installation_ids, user_id
+        ),
+    )
+    query = installation_filter.build_threat_filter(
+        user_id, equipment_ids, equipment_names
+    )
+    if query.get("_impossible"):
+        return []
+
+    return await db.threats.find(
+        merge_tenant_filter(query, current_user),
+        {
+            "_id": 0,
+            "id": 1,
+            "linked_equipment_id": 1,
+            "asset": 1,
+            "failure_mode": 1,
+            "failure_mode_id": 1,
+            "description": 1,
+            "user_context": 1,
+            "risk_level": 1,
+            "risk_score": 1,
+            "status": 1,
+            "created_at": 1,
+        },
+    ).to_list(10000)
+
+
+async def _threat_ids_with_linked_actions(current_user: dict) -> Set[str]:
+    rows = await db.central_actions.find(
+        merge_tenant_filter(
+            {"source_type": "threat", "source_id": {"$exists": True, "$ne": None}},
+            current_user,
+        ),
+        {"_id": 0, "source_id": 1},
+    ).to_list(10000)
+    return {row["source_id"] for row in rows if row.get("source_id")}
 
 # Equipment with accepted/imported PM Import tasks (Intelligence Map parity).
 PM_IMPORT_EQUIPMENT_LINKED_TASK_MATCH = {
@@ -258,53 +345,18 @@ async def get_executive_dashboard(
     }
     
     # ============= Fetch Data =============
-    
-    # 1. Get all OBSERVATIONS (these are the threats in AssetIQ)
-    obs_filter = merge_tenant_filter({"created_by": user_id}, current_user)
-    all_observations = await db.observations.find(
-        obs_filter,
-        {
-            "_id": 0, "id": 1, "equipment_id": 1, "equipment_name": 1,
-            "failure_mode_id": 1, "failure_mode_name": 1, "description": 1,
-            "severity": 1, "status": 1, "observation_type": 1, "source": 1,
-            "linked_action_ids": 1, "efm_id": 1, "threat_id": 1, "risk_score": 1,
-            "created_at": 1, "updated_at": 1, "created_by": 1
-        }
-    ).to_list(10000)
 
-    threat_ids_missing_risk = {
-        obs.get("threat_id")
-        for obs in all_observations
-        if obs.get("threat_id") and obs.get("risk_score") is None
-    }
-    threat_risk_by_id: Dict[str, float] = {}
-    if threat_ids_missing_risk:
-        threat_docs = await db.threats.find(
-            merge_tenant_filter({"id": {"$in": list(threat_ids_missing_risk)}}, current_user),
-            {"_id": 0, "id": 1, "risk_score": 1},
-        ).to_list(len(threat_ids_missing_risk))
-        threat_risk_by_id = {
-            doc["id"]: float(doc.get("risk_score") or 0)
-            for doc in threat_docs
-            if doc.get("id")
-        }
+    equipment_nodes, all_observations, threat_ids_with_actions = await asyncio.gather(
+        _fetch_scoped_equipment_nodes(current_user),
+        _fetch_scoped_observations(current_user),
+        _threat_ids_with_linked_actions(current_user),
+    )
 
     def observation_risk_score(obs: dict) -> float:
         raw = obs.get("risk_score")
         if raw is not None and raw != "":
             return float(raw)
-        threat_id = obs.get("threat_id")
-        if threat_id:
-            return threat_risk_by_id.get(threat_id, 0.0)
         return 0.0
-    
-    # 2. Get equipment nodes with criticality data
-    equipment_filter = merge_tenant_filter({"created_by": user_id}, current_user)
-    equipment_nodes = await db.equipment_nodes.find(
-        equipment_filter,
-        {"_id": 0, "id": 1, "name": 1, "criticality": 1, "equipment_type_id": 1}
-    ).to_list(5000)
-    
     # Build equipment lookup
     equipment_map = {eq.get("id"): eq for eq in equipment_nodes if eq.get("id")}
     
@@ -459,73 +511,61 @@ async def get_executive_dashboard(
 
     active_threat_evidence = []
     critical_evidence = []
-    active_threat_equipment_ids = set()
-    critical_active_equipment_ids = set()
     
-    # Open statuses
-    open_statuses = {"open", "new", "in_progress", "planning", "active", "investigating"}
-    closed_statuses = {"closed", "resolved", "completed", "done", "dismissed"}
-    
-    # Process each OBSERVATION for exposure calculation
+    # Process each observation (threat) for exposure calculation
     for obs in all_observations:
-        # Get production impact from equipment criticality or observation severity
-        equipment_id = obs.get("equipment_id")
+        equipment_id = obs.get("linked_equipment_id")
         equipment = equipment_map.get(equipment_id) if equipment_id else None
         
-        # Priority: Equipment criticality > Observation severity
-        production_impact = 3  # Default medium
+        # Priority: Equipment criticality > observation risk level
+        production_impact = 3
         if equipment and equipment.get("criticality"):
             production_impact = production_impact_from_criticality(equipment.get("criticality")) or 3
         else:
-            # Fall back to observation severity
-            production_impact = severity_to_production_impact(obs.get("severity"))
+            production_impact = severity_to_production_impact(obs.get("risk_level"))
         
-        # Calculate monetary exposure (same max-hours logic as observation workspace)
         exposure_value = calculate_production_value(production_impact, hourly_cost)
         
-        # Determine if created in current or previous period
         created_at = obs.get("created_at", "")
+        if isinstance(created_at, datetime):
+            created_at = created_at.isoformat()
         is_previous_period = (
             created_at >= previous_period_start.isoformat() and 
             created_at < current_period_start.isoformat()
         ) if created_at else False
         
-        # Check if has control
         failure_mode_id = obs.get("failure_mode_id")
-        efm_id = obs.get("efm_id")
         equipment_type_id = equipment.get("equipment_type_id") if equipment else None
+        obs_id = obs.get("id")
         
         has_control = (
             equipment_type_id in controlled_equipment_types or
             failure_mode_id in controlled_failure_modes or
-            efm_id in efm_with_strategy or
             f"{equipment_id}_{failure_mode_id}" in efm_with_strategy or
-            bool(obs.get("linked_action_ids"))  # Has linked remediation actions
+            obs_id in threat_ids_with_actions
         )
         
-        # Check if observation is open/active
-        status = (obs.get("status") or "").lower()
-        is_open = status in open_statuses or (status and status not in closed_statuses)
+        status = obs.get("status") or ""
+        is_open = is_open_observation_status(status)
         
+        description = obs.get("user_context") or obs.get("description") or ""
         observation_data = {
-            "asset": obs.get("equipment_name") or "Unassigned",
-            "failure_mode": obs.get("failure_mode_name") or obs.get("description", "")[:50],
-            "description": obs.get("description", "")[:100],
+            "asset": obs.get("asset") or equipment.get("name") if equipment else "Unassigned",
+            "failure_mode": obs.get("failure_mode") or description[:50],
+            "description": description[:100],
             "equipment_type": equipment_type_id,
             "production_impact": production_impact,
-            "severity": obs.get("severity"),
+            "severity": obs.get("risk_level"),
             "risk_score": observation_risk_score(obs),
             "exposure_value": exposure_value,
             "exposure_formatted": format_currency(exposure_value, currency_symbol),
-            "status": obs.get("status"),
-            "source": obs.get("source"),
-            "id": obs.get("id"),
-            "has_actions": bool(obs.get("linked_action_ids"))
+            "status": status,
+            "source": "threat",
+            "id": obs_id,
+            "has_actions": obs_id in threat_ids_with_actions,
         }
 
         active_threat_exposure += exposure_value
-        if equipment_id:
-            active_threat_equipment_ids.add(equipment_id)
         if created_at and created_at < current_period_start.isoformat():
             prev_active_threat += exposure_value
 
@@ -536,8 +576,6 @@ async def get_executive_dashboard(
         
         if is_open and observation_data["risk_score"] >= HIGH_ACTIVE_RISK_THRESHOLD:
             critical_active_exposure += exposure_value
-            if equipment_id:
-                critical_active_equipment_ids.add(equipment_id)
             if is_previous_period:
                 prev_critical += exposure_value
             
@@ -683,8 +721,8 @@ async def get_executive_dashboard(
             "formatted": format_currency(active_threat_exposure, currency_symbol),
             "type": "warning",
             "color": "#f97316",
-            "count": len(active_threat_equipment_ids),
-            "count_unit": "equipment",
+            "count": total_obs,
+            "count_unit": "observations",
         },
         {
             "name": "High Exposure",
@@ -692,8 +730,8 @@ async def get_executive_dashboard(
             "formatted": format_currency(critical_active_exposure, currency_symbol),
             "type": "critical",
             "color": "#ef4444",
-            "count": len(critical_active_equipment_ids),
-            "count_unit": "equipment",
+            "count": len(critical_evidence),
+            "count_unit": "observations",
         }
     ]
     

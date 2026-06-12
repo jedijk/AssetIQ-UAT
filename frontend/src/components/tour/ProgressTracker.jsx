@@ -1,17 +1,19 @@
 import React from "react";
 import { motion } from "framer-motion";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 /**
  * Progress dots + chapter label, Apple-style.
  */
 export default function ProgressTracker({ scenes, currentIndex, onJumpTo }) {
+  const { t } = useLanguage();
   if (!scenes || scenes.length === 0) return null;
   return (
     <div className="tour-progress-tracker flex flex-col items-center gap-0.5 sm:gap-2 select-none">
       <div
         className="tour-progress-dots flex items-center justify-center gap-px sm:gap-1.5 max-w-full px-1 overflow-x-auto flex-nowrap scrollbar-none"
         role="tablist"
-        aria-label="Tour scene progress"
+        aria-label={t("observationTour.progressAriaLabel")}
       >
         {scenes.map((scene, idx) => {
           const isActive = idx === currentIndex;
@@ -22,7 +24,10 @@ export default function ProgressTracker({ scenes, currentIndex, onJumpTo }) {
               type="button"
               data-tour-progress-dot
               onClick={() => onJumpTo && onJumpTo(idx)}
-              aria-label={`Go to scene ${idx + 1}: ${scene.chapter || scene.title}`}
+              aria-label={t("observationTour.goToScene", {
+                index: idx + 1,
+                chapter: scene.chapter || scene.title,
+              })}
               aria-current={isActive ? "step" : undefined}
               role="tab"
               className="tour-progress-dot-btn group relative cursor-pointer flex items-center justify-center shrink-0 sm:p-1"
@@ -44,7 +49,10 @@ export default function ProgressTracker({ scenes, currentIndex, onJumpTo }) {
         })}
       </div>
       <div className="text-[8px] sm:text-[11px] uppercase tracking-[0.12em] sm:tracking-[0.25em] text-white/55 text-center px-2">
-        Scene {currentIndex + 1} / {scenes.length}
+        {t("observationTour.sceneProgress", {
+          current: currentIndex + 1,
+          total: scenes.length,
+        })}
         {scenes[currentIndex]?.chapter ? (
           <span className="ml-1 sm:ml-2 text-white/40">— {scenes[currentIndex].chapter}</span>
         ) : null}

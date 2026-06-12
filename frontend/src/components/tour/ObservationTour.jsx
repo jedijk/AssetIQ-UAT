@@ -14,12 +14,13 @@ import FloatingNarrationCard from "./FloatingNarrationCard";
 import SceneMocks from "./SceneMocks";
 import AutoFitScale from "./AutoFitScale";
 import {
-  TOUR_SCENES,
+  getTourScenes,
   AUTO_PLAY_DURATION_MS,
   SCENE_DURATIONS_MS,
   TOUR_COMPLETION_STORAGE_KEY,
   TOUR_LAST_RUN_STORAGE_KEY,
 } from "./sceneConfig";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 /**
  * Guided "Create Your First Observation" tour — spotlights real UI controls.
@@ -35,10 +36,11 @@ export default function ObservationTour({
   setChatPrefillMessage,
   setHierarchyOpen,
 }) {
+  const { t } = useLanguage();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const autoPlayTimerRef = useRef(null);
-  const scenes = TOUR_SCENES;
+  const scenes = useMemo(() => getTourScenes(t), [t]);
   const scene = scenes[currentIndex];
   const isFirst = currentIndex === 0;
   const isLast = currentIndex === scenes.length - 1;
@@ -353,7 +355,7 @@ export default function ObservationTour({
           type="button"
           onClick={handleSkip}
           className="absolute top-3 right-3 sm:top-4 sm:right-4 z-[2] pointer-events-auto inline-flex items-center justify-center w-10 h-10 sm:w-9 sm:h-9 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white border border-white/15 transition-colors"
-          aria-label="Exit tour"
+          aria-label={t("observationTour.exitTour")}
           data-testid="observation-tour-close-btn"
         >
           <X className="w-4 h-4" />
@@ -423,6 +425,7 @@ export default function ObservationTour({
                   onSkip={handleSkip}
                   onToggleAutoPlay={handleToggleAutoPlay}
                   position={scene.cardPosition}
+                  tourLabel={t("observationTour.tourLabel")}
                 />
               </AnimatePresence>
 

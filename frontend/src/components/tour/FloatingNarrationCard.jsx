@@ -10,6 +10,7 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { Button } from "../ui/button";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 /**
  * Apple-style floating narration card.
@@ -30,10 +31,12 @@ export default function FloatingNarrationCard({
   onSkip,
   onToggleAutoPlay,
   position = "center",
-  tourLabel = "Create Your First Observation",
+  tourLabel,
   actionHint,
   children,
 }) {
+  const { t } = useLanguage();
+  const label = tourLabel || t("observationTour.tourLabel");
   // We intentionally don't fight the SpotlightEngine: this card is anchored
   // bottom-center via parent layout, while the spotlight handles direction
   // cues. We use the `position` prop to subtly bias horizontal alignment.
@@ -70,7 +73,7 @@ export default function FloatingNarrationCard({
           <div className="flex items-center justify-between gap-3 mb-2.5 sm:mb-3">
             <div className="flex items-center gap-2 text-[10px] sm:text-[11px] uppercase tracking-[0.2em] sm:tracking-[0.22em] text-blue-300/90">
               <Sparkles className="w-3.5 h-3.5" />
-              <span className="truncate">{tourLabel}</span>
+              <span className="truncate">{label}</span>
             </div>
             {badge ? (
               <motion.span
@@ -123,8 +126,8 @@ export default function FloatingNarrationCard({
               data-testid="tour-skip-btn"
             >
               <SkipForward className="w-4 h-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Skip tour</span>
-              <span className="sm:hidden ml-1.5">Skip</span>
+              <span className="hidden sm:inline">{t("observationTour.skipTour")}</span>
+              <span className="sm:hidden ml-1.5">{t("observationTour.skip")}</span>
             </Button>
             <Button
               type="button"
@@ -138,12 +141,12 @@ export default function FloatingNarrationCard({
               {isAutoPlaying ? (
                 <>
                   <Pause className="w-4 h-4 sm:mr-1.5" />
-                  <span className="hidden sm:inline">Pause</span>
+                  <span className="hidden sm:inline">{t("observationTour.pause")}</span>
                 </>
               ) : (
                 <>
                   <Play className="w-4 h-4 sm:mr-1.5" />
-                  <span className="hidden sm:inline">Auto-play</span>
+                  <span className="hidden sm:inline">{t("observationTour.autoPlay")}</span>
                 </>
               )}
             </Button>
@@ -160,7 +163,7 @@ export default function FloatingNarrationCard({
               data-testid="tour-prev-btn"
             >
               <ChevronLeft className="w-4 h-4 sm:mr-1" />
-              <span className="hidden sm:inline">Previous</span>
+              <span className="hidden sm:inline">{t("observationTour.previous")}</span>
             </Button>
             <Button
               type="button"
@@ -171,12 +174,12 @@ export default function FloatingNarrationCard({
             >
               {isLast ? (
                 <>
-                  Finish
+                  {t("observationTour.finish")}
                   <CheckCircle className="w-4 h-4 ml-1.5" />
                 </>
               ) : (
                 <>
-                  Next
+                  {t("observationTour.next")}
                   <ChevronRight className="w-4 h-4 ml-1" />
                 </>
               )}
@@ -185,21 +188,13 @@ export default function FloatingNarrationCard({
         </div>
       </div>
 
-      {/* Keyboard hint \u2014 desktop only */}
       <div className="mt-3 hidden sm:block text-center text-[11px] text-white/40 tracking-wide">
-        Use
-        <kbd className="mx-1 px-1.5 py-0.5 rounded bg-white/10 border border-white/15 text-white/70 text-[10px]">\u2190</kbd>
-        <kbd className="mx-0.5 px-1.5 py-0.5 rounded bg-white/10 border border-white/15 text-white/70 text-[10px]">\u2192</kbd>
-        to navigate \u00b7
-        <kbd className="mx-1 px-1.5 py-0.5 rounded bg-white/10 border border-white/15 text-white/70 text-[10px]">Space</kbd>
-        to play / pause \u00b7
-        <kbd className="mx-1 px-1.5 py-0.5 rounded bg-white/10 border border-white/15 text-white/70 text-[10px]">Esc</kbd>
-        to exit
+        {t("observationTour.keyboardHint")}
       </div>
 
-      {/* Swipe hint \u2014 mobile only */}
+      {/* Swipe hint — mobile only */}
       <div className="mt-2 sm:hidden text-center text-[11px] text-white/45 tracking-wide">
-        Use the highlighted control, then tap Next
+        {t("observationTour.mobileHint")}
       </div>
     </motion.div>
   );

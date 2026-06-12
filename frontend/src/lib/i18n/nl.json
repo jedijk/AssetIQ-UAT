@@ -2754,5 +2754,73 @@
     "confidence": "Vertrouwen",
     "aiGenerated": "AI-gegenereerd",
     "manuallyEdited": "Handmatig bewerkt"
+  },
+  "observationTour": {
+    "menuLabel": "Maak je eerste observatie",
+    "tourLabel": "Maak je eerste observatie",
+    "exitTour": "Rondleiding sluiten",
+    "skipTour": "Rondleiding overslaan",
+    "skip": "Overslaan",
+    "pause": "Pauzeren",
+    "autoPlay": "Automatisch afspelen",
+    "previous": "Vorige",
+    "next": "Volgende",
+    "finish": "Afronden",
+    "keyboardHint": "Gebruik ← → om te navigeren · Spatie om af te spelen / te pauzeren · Esc om te sluiten",
+    "mobileHint": "Gebruik het gemarkeerde onderdeel en tik daarna op Volgende",
+    "sceneProgress": "Scène {current} / {total}",
+    "progressAriaLabel": "Voortgang rondleiding",
+    "goToScene": "Ga naar scène {index}: {chapter}",
+    "chapters": {
+      "observations": "Observaties",
+      "hierarchy": "Hiërarchie",
+      "report": "Melden",
+      "describe": "Beschrijven",
+      "submit": "Verzenden",
+      "done": "Klaar"
+    },
+    "scenes": {
+      "observations": {
+        "title": "Waar observaties staan",
+        "narration": "Observaties registreren equipmentproblemen. AssetIQ beoordeelt ze en stuurt onderzoeken en acties aan.",
+        "actionHint": "Open Observaties altijd via het menu."
+      },
+      "hierarchy-open": {
+        "title": "Open de equipmenthiërarchie",
+        "narration": "Je kunt beginnen bij de equipmentboom. Open het hiërarchiepaneel om assets te bekijken per site, area en unit.",
+        "actionHint": "Desktop: gebruik het paneelpictogram in de header. Mobiel: Menu → Equipmenthiërarchie."
+      },
+      "hierarchy-select": {
+        "title": "Selecteer equipment",
+        "narration": "Zoek of vouw de boom uit tot je het betreffende equipment vindt. Klik op een rij om de acties te openen.",
+        "actionHint": "Desktop: klik met rechts op een rij. Mobiel: tik op de equipmentnaam."
+      },
+      "hierarchy-add": {
+        "title": "Observatie toevoegen vanuit hiërarchie",
+        "narration": "Kies Observatie toevoegen om de assistent te openen met dat equipment al gekoppeld.",
+        "actionHint": "Probeer Observatie toevoegen — of tik op Volgende om de rondleiding voort te zetten."
+      },
+      "report": {
+        "title": "Of gebruik de +-knop",
+        "narration": "Je kunt ook overal melden met de +-knop — handig als je al weet wat je wilt beschrijven.",
+        "actionHint": "Probeer nu op de +-knop te klikken."
+      },
+      "describe": {
+        "title": "Beschrijf wat je zag",
+        "narration": "Typ het probleem in gewone taal. Noem de equipmentnaam of tag als je kunt — AssetIQ koppelt equipment en stelt een storingsmodus voor.",
+        "actionHint": "Bewerk de voorbeeldtekst of typ je eigen probleem en ga verder.",
+        "prefillMessage": "Hoge trilling op pomp P-101 tijdens bedrijf."
+      },
+      "send": {
+        "title": "Verstuur de melding",
+        "narration": "Druk op Verzenden. AssetIQ vat je melding samen, koppelt equipment en vraagt om bevestiging voordat de observatie wordt aangemaakt.",
+        "actionHint": "Klik op Verzenden wanneer je klaar bent — of tik op Volgende om de rondleiding voort te zetten."
+      },
+      "complete": {
+        "title": "Je bent klaar",
+        "narration": "Je kunt observaties registreren vanuit de hiërarchie of de +-knop. Valideer daarna de storingsmodus, stel een actieplan op en volg de risicoreductie.",
+        "actionHint": "Rond de rondleiding af en probeer een echte observatie te melden."
+      }
+    }
   }
 }
