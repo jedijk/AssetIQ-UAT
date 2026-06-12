@@ -1104,13 +1104,43 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
                 <span className="truncate">{previewAtt.name || previewAtt.filename || t("observationWorkspace.attachmentFallback")}</span>
               </DialogTitle>
             </DialogHeader>
-            <div className="flex-1 overflow-auto flex items-center justify-center bg-slate-50 rounded-lg">
+            <div className="flex-1 overflow-auto flex flex-col items-center justify-center bg-slate-50 rounded-lg p-4">
               {(() => {
                 const ct = previewAtt.mime || previewAtt.content_type || previewAtt.type || "";
-                const url = previewAtt.data;
+                let url = previewAtt.data;
                 if (!url) return <div className="text-sm text-slate-400 p-8">{t("observationWorkspace.noPreviewAvailable")}</div>;
-                if (ct.startsWith("image/")) {
-                  return <img src={url} alt={previewAtt.name} className="max-w-full max-h-[70vh] object-contain" />;
+                
+                // Check if this is an image - handle both "image/jpeg" format and simple "image" type from chat
+                const isImage = ct.startsWith("image/") || ct === "image";
+                
+                // If it's a base64 string without the data URL prefix, add it
+                if (isImage && url && !url.startsWith("data:") && !url.startsWith("http")) {
+                  url = `data:image/jpeg;base64,${url}`;
+                }
+                
+                // Download handler for base64 data
+                const handleDownload = () => {
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.download = previewAtt.name || previewAtt.filename || (isImage ? 'image.jpg' : 'attachment');
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                };
+                
+                if (isImage) {
+                  return (
+                    <>
+                      <img src={url} alt={previewAtt.name} className="max-w-full max-h-[60vh] object-contain" />
+                      <button
+                        onClick={handleDownload}
+                        className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 flex items-center gap-2"
+                      >
+                        <Eye className="w-4 h-4" />
+                        {t("observationWorkspace.download")}
+                      </button>
+                    </>
+                  );
                 }
                 if (ct.includes("pdf")) {
                   return <iframe src={url} title={previewAtt.name} className="w-full h-[70vh] bg-white" />;
@@ -1125,13 +1155,12 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
                   <div className="text-center p-8 text-sm text-slate-500">
                     <Paperclip className="w-8 h-8 mx-auto mb-2 opacity-50" />
                     <div>{t("observationWorkspace.previewNotAvailable")}</div>
-                    <a
-                      href={url}
-                      download={previewAtt.name}
+                    <button
+                      onClick={handleDownload}
                       className="inline-block mt-3 px-3 py-1.5 bg-blue-600 text-white rounded-md text-xs font-medium hover:bg-blue-700"
                     >
                       {t("observationWorkspace.download")}
-                    </a>
+                    </button>
                   </div>
                 );
               })()}

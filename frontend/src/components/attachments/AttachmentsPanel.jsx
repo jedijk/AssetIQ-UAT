@@ -13,9 +13,23 @@ function getExtFromName(name = "") {
 
 function isLikelyImage(item) {
   const ct = (item?.contentType || item?.mime || item?.type || "").toLowerCase();
-  if (ct.startsWith("image/")) return true;
+  if (ct.startsWith("image/") || ct === "image") return true;
   const ext = (item?.ext || getExtFromName(item?.name || item?.filename || "") || "").toLowerCase();
   return ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(ext);
+}
+
+/**
+ * Convert a base64 string without data URL prefix to a proper data URL
+ */
+function ensureDataUrl(url, isImage = false) {
+  if (!url) return null;
+  // Already a proper URL (http/https or data URL)
+  if (url.startsWith("http") || url.startsWith("data:")) return url;
+  // Raw base64 - add data URL prefix
+  if (isImage) {
+    return `data:image/jpeg;base64,${url}`;
+  }
+  return `data:application/octet-stream;base64,${url}`;
 }
 
 export default function AttachmentsPanel({
@@ -39,9 +53,12 @@ export default function AttachmentsPanel({
     return arr.map((it, idx) => {
       const id = (getKey ? getKey(it) : it?.id) ?? idx;
       const name = (getName ? getName(it) : it?.name || it?.filename) || "Attachment";
-      const url = (getUrl ? getUrl(it) : it?.url || it?.data) || null;
+      const rawUrl = (getUrl ? getUrl(it) : it?.url || it?.data) || null;
       const contentType = (getContentType ? getContentType(it) : it?.content_type || it?.contentType || it?.mime || it?.type) || "";
       const ext = it?.ext || getExtFromName(name);
+      // Check if this item is an image to properly format base64 data URLs
+      const image = isLikelyImage({ contentType, ext, type: it?.type });
+      const url = ensureDataUrl(rawUrl, image);
       return { raw: it, id, name, url, contentType, ext };
     });
   }, [items, getKey, getName, getUrl, getContentType]);
