@@ -35,7 +35,6 @@ import {
   Zap
 } from "lucide-react";
 import { Button } from "./ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { useLanguage } from "../contexts/LanguageContext";
 import { translateEnum } from "../lib/translateEnum";
 
@@ -393,6 +392,9 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => scrollToBottom("instant"), 100);
+    } else {
+      setShowLangPicker(false);
+      setShowAttachMenu(false);
     }
   }, [isOpen]);
 
@@ -1010,82 +1012,91 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
           ) : (
             <>
             {/* Language Selector — always visible so user can pick EN/NL before dictating */}
-            <div className="flex items-center mb-1.5 sm:mb-2 min-h-[28px]">
-              <Popover open={showLangPicker} onOpenChange={setShowLangPicker}>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    className="inline-flex items-center justify-center gap-1.5 h-7 min-w-[5.25rem] px-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 transition-colors"
-                    data-testid="chat-language-selector"
-                    title={t("chat.languageDictationTitle")}
-                    aria-label={t("chat.languageDictationTitle")}
+            <div className="relative mb-1.5 sm:mb-2 h-7">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAttachMenu(false);
+                  setShowLangPicker((open) => !open);
+                }}
+                className="inline-flex items-center justify-center gap-1.5 h-7 w-[5.5rem] px-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 transition-colors"
+                data-testid="chat-language-selector"
+                title={t("chat.languageDictationTitle")}
+                aria-label={t("chat.languageDictationTitle")}
+                aria-expanded={showLangPicker}
+                aria-haspopup="menu"
+              >
+                <Globe className="w-3 h-3 shrink-0" />
+                <span className="w-6 text-center text-[11px] font-bold leading-none tabular-nums">
+                  {(() => {
+                    const active = manualLanguage || detectedLanguage || appLanguage || "en";
+                    return LANGUAGE_OPTIONS.find((l) => l.code === active)?.flag || active.toUpperCase();
+                  })()}
+                </span>
+                <span
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                    !manualLanguage && detectedLanguage ? "bg-blue-400" : "bg-transparent"
+                  }`}
+                  title={!manualLanguage && detectedLanguage ? t("chat.detected") : undefined}
+                  aria-hidden="true"
+                />
+                <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
+              </button>
+              {showLangPicker && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    aria-hidden="true"
+                    onClick={() => setShowLangPicker(false)}
+                  />
+                  <div
+                    role="menu"
+                    className="absolute bottom-full left-0 z-50 mb-2 w-44 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+                    data-testid="chat-language-menu"
                   >
-                    <Globe className="w-3 h-3 shrink-0" />
-                    <span className="w-6 text-center text-[11px] font-bold leading-none">
-                      {(() => {
-                        const active = manualLanguage || detectedLanguage || appLanguage || "en";
-                        return LANGUAGE_OPTIONS.find((l) => l.code === active)?.flag || active.toUpperCase();
-                      })()}
-                    </span>
-                    {!manualLanguage && detectedLanguage ? (
-                      <span
-                        className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0"
-                        title={t("chat.detected")}
-                        aria-hidden="true"
-                      />
-                    ) : (
-                      <span className="w-1.5 h-1.5 shrink-0" aria-hidden="true" />
-                    )}
-                    <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent
-                  align="start"
-                  side="top"
-                  sideOffset={6}
-                  avoidCollisions={false}
-                  className="w-44 p-1"
-                >
-                  {LANGUAGE_OPTIONS.map((lang) => {
-                    const active = manualLanguage || detectedLanguage || appLanguage;
-                    return (
-                      <button
-                        key={lang.code}
-                        type="button"
-                        className={`w-full flex items-center gap-2 px-3 py-2 rounded text-sm hover:bg-slate-100 transition-colors ${
-                          active === lang.code ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-700"
-                        }`}
-                        onClick={() => {
-                          setManualLanguage(lang.code);
-                          setShowLangPicker(false);
-                          if (lang.code === "en" || lang.code === "nl" || lang.code === "de") {
-                            setAppLanguage(lang.code);
-                          }
-                        }}
-                        data-testid={`chat-language-option-${lang.code}`}
-                      >
-                        <span className="text-xs font-bold w-6 shrink-0">{lang.flag}</span>
-                        {lang.label}
-                      </button>
-                    );
-                  })}
-                  <div className="border-t border-slate-100 my-1" />
-                  <button
-                    type="button"
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded text-sm hover:bg-slate-100 transition-colors ${
-                      manualLanguage ? "text-slate-700" : "text-slate-400 cursor-default"
-                    }`}
-                    disabled={!manualLanguage}
-                    onClick={() => {
-                      if (!manualLanguage) return;
-                      setManualLanguage(null);
-                      setShowLangPicker(false);
-                    }}
-                  >
-                    {t("chat.autoDetect")}
-                  </button>
-                </PopoverContent>
-              </Popover>
+                    {LANGUAGE_OPTIONS.map((lang) => {
+                      const active = manualLanguage || detectedLanguage || appLanguage;
+                      return (
+                        <button
+                          key={lang.code}
+                          type="button"
+                          role="menuitem"
+                          className={`w-full flex items-center gap-2 px-3 py-2 rounded text-sm hover:bg-slate-100 transition-colors ${
+                            active === lang.code ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-700"
+                          }`}
+                          onClick={() => {
+                            setManualLanguage(lang.code);
+                            setShowLangPicker(false);
+                            if (lang.code === "en" || lang.code === "nl" || lang.code === "de") {
+                              setAppLanguage(lang.code);
+                            }
+                          }}
+                          data-testid={`chat-language-option-${lang.code}`}
+                        >
+                          <span className="text-xs font-bold w-6 shrink-0">{lang.flag}</span>
+                          {lang.label}
+                        </button>
+                      );
+                    })}
+                    <div className="border-t border-slate-100 my-1" />
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded text-sm hover:bg-slate-100 transition-colors ${
+                        manualLanguage ? "text-slate-700" : "text-slate-400 cursor-default"
+                      }`}
+                      disabled={!manualLanguage}
+                      onClick={() => {
+                        if (!manualLanguage) return;
+                        setManualLanguage(null);
+                        setShowLangPicker(false);
+                      }}
+                    >
+                      {t("chat.autoDetect")}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
             
             {/* Recording indicator */}
@@ -1114,7 +1125,10 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
               {/* Attachment Button with Menu */}
               <div className="relative">
                 <button
-                  onClick={() => setShowAttachMenu(!showAttachMenu)}
+                  onClick={() => {
+                    setShowLangPicker(false);
+                    setShowAttachMenu(!showAttachMenu);
+                  }}
                   className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-200 transition-colors"
                   title={t("chat.attachFileTitle")}
                 >

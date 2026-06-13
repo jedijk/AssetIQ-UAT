@@ -22,13 +22,46 @@ import {
 } from "./sceneConfig";
 import { useLanguage } from "../../contexts/LanguageContext";
 
-function expandCollapsedHierarchyNodes(maxRounds = 12) {
+const TOUR_EQUIPMENT_POLL_MS = 200;
+const TOUR_EQUIPMENT_MAX_ATTEMPTS = 25;
+
+let tourEquipmentItemCache = null;
+
+function clearTourEquipmentCache() {
+  tourEquipmentItemCache = null;
+}
+
+function getHierarchyScope() {
+  return (
+    document.querySelector('[data-testid="mobile-hierarchy-panel"]') ||
+    document.querySelector('[data-testid="hierarchy-sidebar"]') ||
+    document
+  );
+}
+
+function isVisibleElement(el) {
+  if (!el) return false;
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
+function expandOneCollapsedNode(scope) {
+  const nodes = [...scope.querySelectorAll('[data-testid^="hierarchy-node-"]')];
+  for (const nodeRow of nodes) {
+    const expandBtn = nodeRow.querySelector('[data-testid^="hierarchy-expand-"]');
+    if (!expandBtn) continue;
+    const wrapper = nodeRow.parentElement;
+    if (wrapper && wrapper.children.length > 1) continue;
+    expandBtn.click();
+    return true;
+  }
+  return false;
+}
+
+function expandCollapsedHierarchyNodes(maxRounds = 20) {
+  const scope = getHierarchyScope();
   for (let round = 0; round < maxRounds; round += 1) {
-    const collapsed = [...document.querySelectorAll('[data-testid^="hierarchy-expand-"]')].filter(
-      (btn) => btn.querySelector(".lucide-chevron-right")
-    );
-    if (collapsed.length === 0) break;
-    collapsed.slice(0, 4).forEach((btn) => btn.click());
+    if (!expandOneCollapsedNode(scope)) break;
   }
 }
 
@@ -40,16 +73,33 @@ function getHierarchyNodeDepth(itemEl) {
 }
 
 function findTourEquipmentItem() {
-  const items = [...document.querySelectorAll('[data-testid^="hierarchy-item-"]')];
+  if (tourEquipmentItemCache?.isConnected && isVisibleElement(tourEquipmentItemCache)) {
+    return tourEquipmentItemCache;
+  }
+
+  const scope = getHierarchyScope();
+  const items = [...scope.querySelectorAll('[data-testid^="hierarchy-item-"]')].filter(
+    isVisibleElement
+  );
   if (items.length === 0) return null;
 
   const tagged = items.find((el) => el.querySelector(".font-mono"));
-  if (tagged) return tagged;
+  const item =
+    tagged ||
+    items.reduce((best, el) => {
+      if (!best) return el;
+      return getHierarchyNodeDepth(el) > getHierarchyNodeDepth(best) ? el : best;
+    }, null);
 
-  return items.reduce((best, el) => {
-    if (!best) return el;
-    return getHierarchyNodeDepth(el) > getHierarchyNodeDepth(best) ? el : best;
-  }, null);
+  if (item) tourEquipmentItemCache = item;
+  return item;
+}
+
+function getEquipmentSpotlightSelector(item) {
+  if (!item) return null;
+  const nodeRow = item.closest('[data-testid^="hierarchy-node-"]') || item;
+  const testId = nodeRow.getAttribute("data-testid");
+  return testId ? `[data-testid="${testId}"]` : null;
 }
 
 function resolveTourEquipmentTarget() {
@@ -58,8 +108,19 @@ function resolveTourEquipmentTarget() {
   if (!item) return null;
 
   item.scrollIntoView({ block: "center", behavior: "instant" });
-  const testId = item.getAttribute("data-testid");
-  return testId ? `[data-testid="${testId}"]` : null;
+  return getEquipmentSpotlightSelector(item);
+}
+
+async function waitForTourEquipmentTarget() {
+  for (let attempt = 0; attempt < TOUR_EQUIPMENT_MAX_ATTEMPTS; attempt += 1) {
+    expandCollapsedHierarchyNodes(6);
+    const target = resolveTourEquipmentTarget();
+    if (target) return target;
+    await new Promise((resolve) => {
+      setTimeout(resolve, TOUR_EQUIPMENT_POLL_MS);
+    });
+  }
+  return null;
 }
 
 function openHierarchyContextMenuForItem(item) {
@@ -123,11 +184,14 @@ export default function ObservationTour({
     if (isOpen) {
       setCurrentIndex(0);
       setIsAutoPlaying(false);
+      clearTourEquipmentCache();
       try {
         localStorage.setItem(TOUR_LAST_RUN_STORAGE_KEY, new Date().toISOString());
       } catch (e) {
         /* ignore */
       }
+    } else {
+      clearTourEquipmentCache();
     }
   }, [isOpen]);
 
@@ -206,12 +270,16 @@ export default function ObservationTour({
     const t4 = scene?.openMobileMenu ? setTimeout(fire, 400) : null;
     const t5 =
       scene?.ensureHierarchy === "open" ? setTimeout(fire, 400) : null;
+    const t6 = scene?.spotlightEquipmentItem ? setTimeout(fire, 1800) : null;
+    const t7 = scene?.spotlightEquipmentItem ? setTimeout(fire, 2600) : null;
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
       if (t4) clearTimeout(t4);
       if (t5) clearTimeout(t5);
+      if (t6) clearTimeout(t6);
+      if (t7) clearTimeout(t7);
     };
   }, [
     isOpen,
@@ -232,24 +300,18 @@ export default function ObservationTour({
     }
 
     let cancelled = false;
-    const timers = [];
 
-    const reveal = () => {
-      if (cancelled) return;
-      const target = resolveTourEquipmentTarget();
-      if (target) {
-        setDynamicSpotlightTarget(target);
-        window.dispatchEvent(new Event("resize"));
-      }
+    const reveal = async () => {
+      const target = await waitForTourEquipmentTarget();
+      if (cancelled || !target) return;
+      setDynamicSpotlightTarget(target);
+      window.dispatchEvent(new Event("resize"));
     };
 
-    timers.push(setTimeout(reveal, 500));
-    timers.push(setTimeout(reveal, 950));
-    timers.push(setTimeout(reveal, 1500));
+    reveal();
 
     return () => {
       cancelled = true;
-      timers.forEach(clearTimeout);
       setDynamicSpotlightTarget(null);
     };
   }, [isOpen, scene?.id, scene?.spotlightEquipmentItem, scene?.ensureHierarchy]);
@@ -344,6 +406,7 @@ export default function ObservationTour({
       clearTimeout(autoPlayTimerRef.current);
       autoPlayTimerRef.current = null;
     }
+    clearTourEquipmentCache();
     if (typeof setChatOpen === "function") setChatOpen(false);
     if (typeof setHierarchyOpen === "function") setHierarchyOpen(false);
     if (typeof setMobileMenuOpen === "function") setMobileMenuOpen(false);
