@@ -32,6 +32,7 @@ from routes.production.helpers import (
     parse_submitted_at,
     _information_entry_display_time,
     _submission_is_information_form,
+    INFORMATION_DASHBOARD_PINNED_FIELD,
     _production_date_raw_for_big_bag,
     _unwrap_form_value,
     _submission_prefill_by_field_id,
@@ -71,13 +72,22 @@ async def set_production_information_pin(
     if not await _submission_is_information_form(sub):
         raise HTTPException(status_code=400, detail="Only information form submissions can be pinned here")
 
-    fid = sub.get("id") or submission_id
     now = _serialize_datetime(datetime.now(timezone.utc))
-    await db.form_submissions.update_one(
-        {"id": fid},
+    fid = sub.get("id")
+    if fid:
+        match = {"id": fid}
+    elif ObjectId.is_valid(submission_id):
+        match = {"_id": ObjectId(submission_id)}
+    else:
+        match = {"id": submission_id}
+
+    result = await db.form_submissions.update_one(
+        match,
         {"$set": {INFORMATION_DASHBOARD_PINNED_FIELD: pinned, "updated_at": now}},
     )
-    return {"status": "updated", "id": fid, "pinned": pinned}
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Submission update failed")
+    return {"status": "updated", "id": fid or submission_id, "pinned": pinned}
 
 
 @router.patch("/production/submission/{submission_id}")
