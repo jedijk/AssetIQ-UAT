@@ -12,8 +12,25 @@ const SPOTLIGHT_INSET = 12;
  *    This is the right look for "cinematic" scenes that don't anchor to a
  *    real DOM element (e.g. the AI detection / next-steps narrative scenes).
  */
+function rectFromBounds(r, spotlightZoom, vw, vh) {
+  if (!r || r.width === 0 || r.height === 0) return null;
+  const baseW = r.width + SPOTLIGHT_INSET * 2;
+  const baseH = r.height + SPOTLIGHT_INSET * 2;
+  const scaledW = baseW * spotlightZoom;
+  const scaledH = baseH * spotlightZoom;
+  const cx = r.left + r.width / 2;
+  const cy = r.top + r.height / 2;
+  return {
+    top: Math.max(8, cy - scaledH / 2),
+    left: Math.max(8, cx - scaledW / 2),
+    width: Math.min(scaledW, vw - 16),
+    height: Math.min(scaledH, vh - 16),
+  };
+}
+
 export default function SpotlightEngine({
   targetSelector,
+  targetRect = null,
   spotlightZoom = 1,
   pulse = false,
   active = true,
@@ -28,6 +45,11 @@ export default function SpotlightEngine({
     const vh = window.innerHeight;
     setViewport({ w: vw, h: vh });
 
+    if (targetRect) {
+      setRect(rectFromBounds(targetRect, spotlightZoom, vw, vh));
+      return;
+    }
+
     if (!targetSelector) {
       setRect(null);
       return;
@@ -37,24 +59,8 @@ export default function SpotlightEngine({
       setRect(null);
       return;
     }
-    const r = el.getBoundingClientRect();
-    if (r.width === 0 || r.height === 0) {
-      setRect(null);
-      return;
-    }
-    const baseW = r.width + SPOTLIGHT_INSET * 2;
-    const baseH = r.height + SPOTLIGHT_INSET * 2;
-    const scaledW = baseW * spotlightZoom;
-    const scaledH = baseH * spotlightZoom;
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
-    setRect({
-      top: Math.max(8, cy - scaledH / 2),
-      left: Math.max(8, cx - scaledW / 2),
-      width: Math.min(scaledW, vw - 16),
-      height: Math.min(scaledH, vh - 16),
-    });
-  }, [targetSelector, spotlightZoom]);
+    setRect(rectFromBounds(el.getBoundingClientRect(), spotlightZoom, vw, vh));
+  }, [targetSelector, targetRect, spotlightZoom]);
 
   useEffect(() => {
     if (!active) return undefined;

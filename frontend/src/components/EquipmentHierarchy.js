@@ -443,6 +443,7 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
           ref={contextMenuRef}
           className="fixed bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[180px]"
           style={{ left: contextMenu.x, top: contextMenu.y, zIndex: 99999 }}
+          data-testid="hierarchy-context-menu"
         >
           <button
             onClick={handleFilterOn}

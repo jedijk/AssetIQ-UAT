@@ -23,7 +23,7 @@ import {
 import { useLanguage } from "../../contexts/LanguageContext";
 
 const TOUR_EQUIPMENT_POLL_MS = 200;
-const TOUR_EQUIPMENT_MAX_ATTEMPTS = 25;
+const TOUR_EQUIPMENT_MAX_ATTEMPTS = 40;
 
 let tourEquipmentItemCache = null;
 
@@ -31,18 +31,48 @@ function clearTourEquipmentCache() {
   tourEquipmentItemCache = null;
 }
 
-function getHierarchyScope() {
+function delay(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function waitForNextFrame() {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  });
+}
+
+function getHierarchyPanel() {
   return (
     document.querySelector('[data-testid="mobile-hierarchy-panel"]') ||
-    document.querySelector('[data-testid="hierarchy-sidebar"]') ||
-    document
+    document.querySelector('[data-testid="hierarchy-sidebar"]')
   );
+}
+
+function getHierarchyScope() {
+  return getHierarchyPanel() || document;
 }
 
 function isVisibleElement(el) {
   if (!el) return false;
   const rect = el.getBoundingClientRect();
   return rect.width > 0 && rect.height > 0;
+}
+
+function isHierarchyLoading(scope) {
+  return !!scope?.querySelector(".loading-dots");
+}
+
+async function waitForHierarchyReady() {
+  for (let attempt = 0; attempt < TOUR_EQUIPMENT_MAX_ATTEMPTS; attempt += 1) {
+    const panel = getHierarchyPanel();
+    if (panel && isVisibleElement(panel) && !isHierarchyLoading(panel)) {
+      return panel;
+    }
+    await delay(TOUR_EQUIPMENT_POLL_MS);
+  }
+  return getHierarchyPanel();
 }
 
 function expandOneCollapsedNode(scope) {
@@ -58,10 +88,11 @@ function expandOneCollapsedNode(scope) {
   return false;
 }
 
-function expandCollapsedHierarchyNodes(maxRounds = 20) {
+async function expandCollapsedHierarchyNodes(maxRounds = 24) {
   const scope = getHierarchyScope();
   for (let round = 0; round < maxRounds; round += 1) {
     if (!expandOneCollapsedNode(scope)) break;
+    await waitForNextFrame();
   }
 }
 
@@ -95,32 +126,48 @@ function findTourEquipmentItem() {
   return item;
 }
 
-function getEquipmentSpotlightSelector(item) {
-  if (!item) return null;
-  const nodeRow = item.closest('[data-testid^="hierarchy-node-"]') || item;
-  const testId = nodeRow.getAttribute("data-testid");
-  return testId ? `[data-testid="${testId}"]` : null;
+function getEquipmentNodeRow(item) {
+  return item?.closest('[data-testid^="hierarchy-node-"]') || item;
 }
 
-function resolveTourEquipmentTarget() {
-  expandCollapsedHierarchyNodes();
+function measureTourEquipmentRect() {
   const item = findTourEquipmentItem();
   if (!item) return null;
-
-  item.scrollIntoView({ block: "center", behavior: "instant" });
-  return getEquipmentSpotlightSelector(item);
+  const nodeRow = getEquipmentNodeRow(item);
+  nodeRow.scrollIntoView({ block: "center", behavior: "instant" });
+  const rect = nodeRow.getBoundingClientRect();
+  if (!isVisibleElement(nodeRow)) return null;
+  return {
+    top: rect.top,
+    left: rect.left,
+    width: rect.width,
+    height: rect.height,
+  };
 }
 
-async function waitForTourEquipmentTarget() {
+async function waitForTourEquipmentRect() {
+  await waitForHierarchyReady();
+  await delay(300);
+
   for (let attempt = 0; attempt < TOUR_EQUIPMENT_MAX_ATTEMPTS; attempt += 1) {
-    expandCollapsedHierarchyNodes(6);
-    const target = resolveTourEquipmentTarget();
-    if (target) return target;
-    await new Promise((resolve) => {
-      setTimeout(resolve, TOUR_EQUIPMENT_POLL_MS);
-    });
+    await expandCollapsedHierarchyNodes(8);
+    const rect = measureTourEquipmentRect();
+    if (rect) return rect;
+    await delay(TOUR_EQUIPMENT_POLL_MS);
   }
   return null;
+}
+
+function measureTourContextMenuRect() {
+  const menu = document.querySelector('[data-testid="hierarchy-context-menu"]');
+  if (!menu || !isVisibleElement(menu)) return null;
+  const rect = menu.getBoundingClientRect();
+  return {
+    top: rect.top,
+    left: rect.left,
+    width: rect.width,
+    height: rect.height,
+  };
 }
 
 function openHierarchyContextMenuForItem(item) {
@@ -167,6 +214,7 @@ export default function ObservationTour({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const [dynamicSpotlightTarget, setDynamicSpotlightTarget] = useState(null);
+  const [spotlightRect, setSpotlightRect] = useState(null);
   const autoPlayTimerRef = useRef(null);
   const scenes = useMemo(
     () => getTourScenes(t, { simpleMode, mobileMode: isMobileView }),
@@ -296,15 +344,17 @@ export default function ObservationTour({
   useEffect(() => {
     if (!isOpen || !scene?.spotlightEquipmentItem) {
       setDynamicSpotlightTarget(null);
+      setSpotlightRect(null);
       return undefined;
     }
 
     let cancelled = false;
 
     const reveal = async () => {
-      const target = await waitForTourEquipmentTarget();
-      if (cancelled || !target) return;
-      setDynamicSpotlightTarget(target);
+      const rect = await waitForTourEquipmentRect();
+      if (cancelled || !rect) return;
+      setDynamicSpotlightTarget(null);
+      setSpotlightRect(rect);
       window.dispatchEvent(new Event("resize"));
     };
 
@@ -312,81 +362,62 @@ export default function ObservationTour({
 
     return () => {
       cancelled = true;
+      setSpotlightRect(null);
       setDynamicSpotlightTarget(null);
     };
   }, [isOpen, scene?.id, scene?.spotlightEquipmentItem, scene?.ensureHierarchy]);
 
-  // Step 4: spotlight equipment, open its menu, then highlight Add Observation.
+  // Step 4: open the equipment context menu and spotlight it.
   useEffect(() => {
     if (!isOpen || !scene?.openContextMenu) return undefined;
 
     let cancelled = false;
     const timers = [];
 
-    const schedule = (fn, delay) => {
-      timers.push(setTimeout(fn, delay));
+    const schedule = (fn, delayMs) => {
+      timers.push(setTimeout(fn, delayMs));
     };
 
-    const spotlightEquipment = () => {
+    const openMenuAndSpotlight = async () => {
       if (cancelled) return;
-      const target = resolveTourEquipmentTarget();
-      if (target) {
-        setDynamicSpotlightTarget(target);
-        window.dispatchEvent(new Event("resize"));
+      await waitForHierarchyReady();
+      await expandCollapsedHierarchyNodes(8);
+      const item = findTourEquipmentItem();
+      if (!item || cancelled) return;
+
+      openHierarchyContextMenuForItem(item);
+      await delay(200);
+      if (cancelled) return;
+
+      const menuRect = measureTourContextMenuRect();
+      if (menuRect) {
+        setSpotlightRect(menuRect);
+        setDynamicSpotlightTarget(null);
+      } else {
+        setSpotlightRect(null);
+        setDynamicSpotlightTarget('[data-testid="context-menu-add-threat"]');
       }
+      window.dispatchEvent(new Event("resize"));
     };
 
-    const openMenuAndSpotlightAdd = () => {
-      if (cancelled) return;
-      openHierarchyContextMenuForItem(findTourEquipmentItem());
-      schedule(() => {
-        if (cancelled) return;
-        const addBtn = document.querySelector('[data-testid="context-menu-add-threat"]');
-        if (addBtn) {
-          setDynamicSpotlightTarget('[data-testid="context-menu-add-threat"]');
-          window.dispatchEvent(new Event("resize"));
-        }
-      }, 180);
-      schedule(() => {
-        if (cancelled) return;
-        if (document.querySelector('[data-testid="context-menu-add-threat"]')) {
-          setDynamicSpotlightTarget('[data-testid="context-menu-add-threat"]');
-          window.dispatchEvent(new Event("resize"));
-        }
-      }, 450);
-    };
-
-    if (scene.spotlightEquipmentFirst) {
-      schedule(spotlightEquipment, 450);
-      schedule(spotlightEquipment, 900);
-      schedule(openMenuAndSpotlightAdd, 2100);
-      schedule(openMenuAndSpotlightAdd, 2800);
-    } else {
-      schedule(() => {
-        if (cancelled) return;
-        openHierarchyContextMenuForItem(findTourEquipmentItem());
-        window.dispatchEvent(new Event("resize"));
-      }, 850);
-      schedule(() => {
-        if (cancelled) return;
-        openHierarchyContextMenuForItem(findTourEquipmentItem());
-        window.dispatchEvent(new Event("resize"));
-      }, 1400);
-    }
+    schedule(() => {
+      openMenuAndSpotlight();
+    }, 450);
+    schedule(() => {
+      openMenuAndSpotlight();
+    }, 1100);
+    schedule(() => {
+      openMenuAndSpotlight();
+    }, 1900);
 
     return () => {
       cancelled = true;
       timers.forEach(clearTimeout);
+      setSpotlightRect(null);
       setDynamicSpotlightTarget(null);
       document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     };
-  }, [
-    isOpen,
-    scene?.id,
-    scene?.openContextMenu,
-    scene?.spotlightEquipmentFirst,
-    scene?.ensureHierarchy,
-  ]);
+  }, [isOpen, scene?.id, scene?.openContextMenu, scene?.ensureHierarchy]);
 
   /* ------------------------------------------------------------------
    * Navigation
@@ -553,7 +584,7 @@ export default function ObservationTour({
   };
 
   const guidedTour = !scene?.mockVisual;
-  const spotlightTarget = dynamicSpotlightTarget || scene.target;
+  const spotlightTarget = spotlightRect ? null : dynamicSpotlightTarget || scene.target;
 
   const overlay = (
     <AnimatePresence>
@@ -579,6 +610,7 @@ export default function ObservationTour({
         {/* The cinematic spotlight cuts a hole in the dark backdrop for the real DOM target. */}
         <SpotlightEngine
           targetSelector={spotlightTarget}
+          targetRect={spotlightRect}
           spotlightZoom={scene.spotlightZoom || 1}
           pulse={!!scene.pulseTarget}
           active
