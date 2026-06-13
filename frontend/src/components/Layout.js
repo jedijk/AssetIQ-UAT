@@ -765,6 +765,10 @@ const Layout = () => {
         setChatOpen={setChatOpen}
         setChatPrefillMessage={setChatPrefillMessage}
         setHierarchyOpen={setHierarchyOpen}
+        setMobileMenuOpen={setMobileMenuOpen}
+        simpleMode={isOperatorActive}
+        isMobileView={isMobileView}
+        navigate={navigate}
       />
 
       {PROGRESS_OBSERVATION_TOUR_ENABLED && !isMobileView && (

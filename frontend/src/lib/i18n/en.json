@@ -2686,8 +2686,8 @@
       },
       "hierarchy-add": {
         "title": "Add observation from hierarchy",
-        "narration": "Choose Add Observation to open the assistant with that equipment already linked.",
-        "actionHint": "Try Add Observation — or tap Next to continue the tour."
+        "narration": "Open the equipment menu, then choose Add Observation to start the assistant with that equipment already linked.",
+        "actionHint": "Tap or right-click the equipment row, then choose Add Observation — or tap Next to continue."
       },
       "report": {
         "title": "Or use the + button",
@@ -2708,6 +2708,49 @@
       "complete": {
         "title": "You are ready",
         "narration": "You can record observations from the hierarchy or the + button. Then validate the failure mode, build an action plan, and track exposure reduction.",
+        "actionHint": "Finish the tour and try reporting a real observation."
+      }
+    },
+    "simpleScenes": {
+      "observations": {
+        "title": "Your home screen",
+        "narration": "Simple mode keeps the essentials on one screen — equipment, observations, and tasks. This is where you start every shift.",
+        "actionHint": "Tap Next to learn how to report your first observation."
+      },
+      "hierarchy-open": {
+        "title": "Open equipment",
+        "narration": "Start from the equipment you are working on. Tap Equipment to browse the plant hierarchy.",
+        "actionHint": "Tap the Equipment button — or tap Next to continue the tour."
+      },
+      "hierarchy-select": {
+        "title": "Find your equipment",
+        "narration": "Search or expand the tree until you find the affected equipment. Tap a row to see its actions.",
+        "actionHint": "Tap an equipment name to open its menu."
+      },
+      "hierarchy-add": {
+        "title": "Add observation from equipment",
+        "narration": "Tap the equipment row to open its menu, then choose Add Observation to start the assistant with that equipment already linked.",
+        "actionHint": "Tap the equipment row, then choose Add Observation — or tap Next to continue."
+      },
+      "report": {
+        "title": "Or use the + button",
+        "narration": "The blue + button is always available — use it when you already know what to describe.",
+        "actionHint": "Try tapping the + button now."
+      },
+      "describe": {
+        "title": "Describe what you saw",
+        "narration": "Type the issue in plain language. Mention equipment name or tag if you can — AssetIQ will match equipment and suggest a failure mode.",
+        "actionHint": "Edit the example text or type your own issue, then continue.",
+        "prefillMessage": "High vibration on Pump P-101 during operation."
+      },
+      "send": {
+        "title": "Submit the report",
+        "narration": "Press Send. AssetIQ summarises your report, matches equipment, and asks you to confirm before creating the observation.",
+        "actionHint": "Tap Send when you are ready — or tap Next to continue the tour."
+      },
+      "complete": {
+        "title": "You are ready",
+        "narration": "You can report from Equipment or the + button. Open Observations on the home screen to review what you logged.",
         "actionHint": "Finish the tour and try reporting a real observation."
       }
     }

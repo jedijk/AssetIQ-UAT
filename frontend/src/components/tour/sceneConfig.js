@@ -13,6 +13,7 @@ const TOUR_SCENE_DEFS = [
     cardPosition: "center",
     ensureChat: "closed",
     ensureHierarchy: "closed",
+    openMobileMenu: true,
     pulseTarget: false,
     spotlightZoom: 1.15,
     transition: "fade",
@@ -25,6 +26,7 @@ const TOUR_SCENE_DEFS = [
     cardPosition: "right",
     ensureChat: "closed",
     ensureHierarchy: "closed",
+    closeMobileMenu: true,
     pulseTarget: true,
     spotlightZoom: 1.25,
     transition: "pan",
@@ -33,13 +35,13 @@ const TOUR_SCENE_DEFS = [
     id: "hierarchy-select",
     chapterKey: "hierarchy",
     mockVisual: null,
-    target:
-      '[data-testid="hierarchy-sidebar"], [data-testid="mobile-hierarchy-panel"]',
+    target: '[data-testid^="hierarchy-item-"]',
     cardPosition: "right",
     ensureChat: "closed",
     ensureHierarchy: "open",
-    pulseTarget: false,
-    spotlightZoom: 1.05,
+    spotlightEquipmentItem: true,
+    pulseTarget: true,
+    spotlightZoom: 1.18,
     transition: "fade",
   },
   {
@@ -51,6 +53,7 @@ const TOUR_SCENE_DEFS = [
     ensureChat: "closed",
     ensureHierarchy: "open",
     openContextMenu: true,
+    spotlightEquipmentFirst: true,
     pulseTarget: true,
     spotlightZoom: 1.2,
     transition: "spotlight",
@@ -100,16 +103,136 @@ const TOUR_SCENE_DEFS = [
     cardPosition: "center",
     ensureChat: "closed",
     ensureHierarchy: "closed",
+    openMobileMenu: true,
     pulseTarget: false,
     spotlightZoom: 1.1,
     transition: "fade",
   },
 ];
 
-export function getTourScenes(t) {
-  return TOUR_SCENE_DEFS.map((def) => {
-    const { chapterKey, hasPrefill, ...scene } = def;
-    const baseKey = `observationTour.scenes.${def.id}`;
+/** Simple mode (operator landing) — same flow, different entry points and copy. */
+const SIMPLE_TOUR_SCENE_DEFS = [
+  {
+    id: "observations",
+    chapterKey: "observations",
+    mockVisual: null,
+    target: '[data-testid="operator-landing"]',
+    cardPosition: "center",
+    ensureChat: "closed",
+    ensureHierarchy: "closed",
+    ensureDashboard: true,
+    pulseTarget: false,
+    spotlightZoom: 1.08,
+    transition: "fade",
+  },
+  {
+    id: "hierarchy-open",
+    chapterKey: "hierarchy",
+    mockVisual: null,
+    target: '[data-testid="operator-btn-equipment"]',
+    cardPosition: "center",
+    ensureChat: "closed",
+    ensureHierarchy: "closed",
+    ensureDashboard: true,
+    pulseTarget: true,
+    spotlightZoom: 1.2,
+    transition: "pan",
+  },
+  {
+    id: "hierarchy-select",
+    chapterKey: "hierarchy",
+    mockVisual: null,
+    target: '[data-testid^="hierarchy-item-"]',
+    cardPosition: "center",
+    ensureChat: "closed",
+    ensureHierarchy: "open",
+    spotlightEquipmentItem: true,
+    pulseTarget: true,
+    spotlightZoom: 1.18,
+    transition: "fade",
+  },
+  {
+    id: "hierarchy-add",
+    chapterKey: "hierarchy",
+    mockVisual: null,
+    target: '[data-testid="context-menu-add-threat"]',
+    cardPosition: "center",
+    ensureChat: "closed",
+    ensureHierarchy: "open",
+    openContextMenu: true,
+    spotlightEquipmentFirst: true,
+    pulseTarget: true,
+    spotlightZoom: 1.2,
+    transition: "spotlight",
+  },
+  {
+    id: "report",
+    chapterKey: "report",
+    mockVisual: null,
+    target: '[data-testid="fab-report-observation"]',
+    cardPosition: "center",
+    ensureChat: "closed",
+    ensureHierarchy: "closed",
+    pulseTarget: true,
+    spotlightZoom: 1.35,
+    transition: "pan",
+  },
+  {
+    id: "describe",
+    chapterKey: "describe",
+    mockVisual: null,
+    target: '[data-testid="sidebar-chat-message-input"]',
+    cardPosition: "center",
+    ensureChat: "open",
+    ensureHierarchy: "closed",
+    hasPrefill: true,
+    pulseTarget: false,
+    spotlightZoom: 1.08,
+    transition: "fade",
+  },
+  {
+    id: "send",
+    chapterKey: "submit",
+    mockVisual: null,
+    target: '[data-testid="sidebar-send-message-button"]',
+    cardPosition: "center",
+    ensureChat: "open",
+    ensureHierarchy: "closed",
+    pulseTarget: true,
+    spotlightZoom: 1.2,
+    transition: "spotlight",
+  },
+  {
+    id: "complete",
+    chapterKey: "done",
+    mockVisual: null,
+    target:
+      '[data-testid="operator-btn-observations"], [data-testid="operator-landing"]',
+    cardPosition: "center",
+    ensureChat: "closed",
+    ensureHierarchy: "closed",
+    ensureDashboard: true,
+    pulseTarget: false,
+    spotlightZoom: 1.08,
+    transition: "fade",
+  },
+];
+
+export function getTourScenes(t, { simpleMode = false, mobileMode = false } = {}) {
+  const defs = simpleMode ? SIMPLE_TOUR_SCENE_DEFS : TOUR_SCENE_DEFS;
+  const copySection = simpleMode ? "simpleScenes" : "scenes";
+
+  const mobilePatches =
+    mobileMode && !simpleMode
+      ? {
+          observations: { target: '[data-testid="mobile-nav-observations"]' },
+          complete: { target: '[data-testid="mobile-nav-observations"]' },
+        }
+      : {};
+
+  return defs.map((def) => {
+    const { chapterKey, hasPrefill, ...scene } = { ...def, ...(mobilePatches[def.id] || {}) };
+    const baseKey = `observationTour.${copySection}.${def.id}`;
     return {
       ...scene,
       title: t(`${baseKey}.title`),

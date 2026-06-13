@@ -2801,8 +2801,8 @@
       },
       "hierarchy-add": {
         "title": "Beobachtung aus der Hierarchie hinzufügen",
-        "narration": "Wählen Sie Beobachtung hinzufügen, um den Assistenten mit bereits verknüpftem Equipment zu öffnen.",
-        "actionHint": "Probieren Sie Beobachtung hinzufügen — oder tippen Sie auf Weiter, um die Tour fortzusetzen."
+        "narration": "Öffnen Sie das Equipment-Menü und wählen Sie Beobachtung hinzufügen, um den Assistenten mit bereits verknüpftem Equipment zu starten.",
+        "actionHint": "Tippen oder Rechtsklick auf die Equipment-Zeile, dann Beobachtung hinzufügen — oder Weiter tippen."
       },
       "report": {
         "title": "Oder die +-Schaltfläche nutzen",
@@ -2823,6 +2823,49 @@
       "complete": {
         "title": "Sie sind bereit",
         "narration": "Sie können Beobachtungen aus der Hierarchie oder über die +-Schaltfläche erfassen. Validieren Sie dann den Fehlermodus, erstellen Sie einen Maßnahmenplan und verfolgen Sie die Risikoreduktion.",
+        "actionHint": "Beenden Sie die Tour und melden Sie eine echte Beobachtung."
+      }
+    },
+    "simpleScenes": {
+      "observations": {
+        "title": "Ihr Startbildschirm",
+        "narration": "Der einfache Modus bündelt das Wesentliche auf einem Bildschirm — Equipment, Beobachtungen und Aufgaben. Hier beginnen Sie jede Schicht.",
+        "actionHint": "Tippen Sie auf Weiter, um zu lernen, wie Sie Ihre erste Beobachtung melden."
+      },
+      "hierarchy-open": {
+        "title": "Equipment öffnen",
+        "narration": "Beginnen Sie beim Equipment, an dem Sie arbeiten. Tippen Sie auf Equipment, um die Anlagenhierarchie zu durchsuchen.",
+        "actionHint": "Tippen Sie auf die Equipment-Schaltfläche — oder auf Weiter, um die Tour fortzusetzen."
+      },
+      "hierarchy-select": {
+        "title": "Equipment finden",
+        "narration": "Suchen oder erweitern Sie den Baum, bis Sie das betroffene Equipment finden. Tippen Sie auf eine Zeile, um die Aktionen zu öffnen.",
+        "actionHint": "Tippen Sie auf einen Equipment-Namen, um das Menü zu öffnen."
+      },
+      "hierarchy-add": {
+        "title": "Beobachtung über Equipment hinzufügen",
+        "narration": "Tippen Sie auf die Equipment-Zeile, um das Menü zu öffnen, und wählen Sie dann Beobachtung hinzufügen, um den Assistenten mit bereits verknüpftem Equipment zu starten.",
+        "actionHint": "Tippen Sie auf die Equipment-Zeile, dann Beobachtung hinzufügen — oder tippen Sie auf Weiter."
+      },
+      "report": {
+        "title": "Oder die +-Schaltfläche nutzen",
+        "narration": "Die blaue +-Schaltfläche ist immer verfügbar — nutzen Sie sie, wenn Sie bereits wissen, was Sie beschreiben möchten.",
+        "actionHint": "Tippen Sie jetzt auf die +-Schaltfläche."
+      },
+      "describe": {
+        "title": "Beschreiben Sie, was Sie gesehen haben",
+        "narration": "Geben Sie das Problem in einfacher Sprache ein. Nennen Sie den Equipment-Namen oder Tag, wenn möglich — AssetIQ ordnet Equipment zu und schlägt einen Fehlermodus vor.",
+        "actionHint": "Bearbeiten Sie den Beispieltext oder geben Sie Ihr eigenes Problem ein und fahren Sie fort.",
+        "prefillMessage": "Hohe Vibration an Pumpe P-101 im Betrieb."
+      },
+      "send": {
+        "title": "Meldung absenden",
+        "narration": "Drücken Sie Senden. AssetIQ fasst Ihre Meldung zusammen, ordnet Equipment zu und bittet um Bestätigung, bevor die Beobachtung erstellt wird.",
+        "actionHint": "Tippen Sie auf Senden, wenn Sie bereit sind — oder auf Weiter, um die Tour fortzusetzen."
+      },
+      "complete": {
+        "title": "Sie sind bereit",
+        "narration": "Sie können über Equipment oder die +-Schaltfläche melden. Öffnen Sie Beobachtungen auf dem Startbildschirm, um Ihre Einträge zu prüfen.",
         "actionHint": "Beenden Sie die Tour und melden Sie eine echte Beobachtung."
       }
     }

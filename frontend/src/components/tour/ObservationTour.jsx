@@ -22,6 +22,68 @@ import {
 } from "./sceneConfig";
 import { useLanguage } from "../../contexts/LanguageContext";
 
+function expandCollapsedHierarchyNodes(maxRounds = 12) {
+  for (let round = 0; round < maxRounds; round += 1) {
+    const collapsed = [...document.querySelectorAll('[data-testid^="hierarchy-expand-"]')].filter(
+      (btn) => btn.querySelector(".lucide-chevron-right")
+    );
+    if (collapsed.length === 0) break;
+    collapsed.slice(0, 4).forEach((btn) => btn.click());
+  }
+}
+
+function getHierarchyNodeDepth(itemEl) {
+  const node = itemEl?.closest('[data-testid^="hierarchy-node-"]');
+  const pad = node?.style?.paddingLeft || "";
+  const match = pad.match(/(\d+)/);
+  return match ? parseInt(match[1], 10) : 0;
+}
+
+function findTourEquipmentItem() {
+  const items = [...document.querySelectorAll('[data-testid^="hierarchy-item-"]')];
+  if (items.length === 0) return null;
+
+  const tagged = items.find((el) => el.querySelector(".font-mono"));
+  if (tagged) return tagged;
+
+  return items.reduce((best, el) => {
+    if (!best) return el;
+    return getHierarchyNodeDepth(el) > getHierarchyNodeDepth(best) ? el : best;
+  }, null);
+}
+
+function resolveTourEquipmentTarget() {
+  expandCollapsedHierarchyNodes();
+  const item = findTourEquipmentItem();
+  if (!item) return null;
+
+  item.scrollIntoView({ block: "center", behavior: "instant" });
+  const testId = item.getAttribute("data-testid");
+  return testId ? `[data-testid="${testId}"]` : null;
+}
+
+function openHierarchyContextMenuForItem(item) {
+  if (!item) return;
+
+  if (window.innerWidth < 1024) {
+    item.click();
+    return;
+  }
+
+  const node = item.closest('[data-testid^="hierarchy-node-"]');
+  if (!node) return;
+  const rect = node.getBoundingClientRect();
+  node.dispatchEvent(
+    new MouseEvent("contextmenu", {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
+    })
+  );
+}
+
 /**
  * Guided "Create Your First Observation" tour — spotlights real UI controls.
  *
@@ -35,12 +97,20 @@ export default function ObservationTour({
   setChatOpen,
   setChatPrefillMessage,
   setHierarchyOpen,
+  setMobileMenuOpen,
+  simpleMode = false,
+  isMobileView = false,
+  navigate,
 }) {
   const { t } = useLanguage();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+  const [dynamicSpotlightTarget, setDynamicSpotlightTarget] = useState(null);
   const autoPlayTimerRef = useRef(null);
-  const scenes = useMemo(() => getTourScenes(t), [t]);
+  const scenes = useMemo(
+    () => getTourScenes(t, { simpleMode, mobileMode: isMobileView }),
+    [t, simpleMode, isMobileView]
+  );
   const scene = scenes[currentIndex];
   const isFirst = currentIndex === 0;
   const isLast = currentIndex === scenes.length - 1;
@@ -61,12 +131,21 @@ export default function ObservationTour({
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen || !simpleMode || typeof navigate !== "function") return;
+    navigate("/dashboard", { state: null });
+  }, [isOpen, simpleMode, navigate]);
+
   /* ------------------------------------------------------------------
    * Drive real AssetIQ UI when scenes require it
    * ------------------------------------------------------------------ */
 
   useEffect(() => {
     if (!isOpen || !scene) return;
+
+    if (scene.ensureDashboard && typeof navigate === "function") {
+      navigate("/dashboard", { state: null });
+    }
 
     if (scene.ensureChat === "open" && typeof setChatOpen === "function") {
       setChatOpen(true);
@@ -93,12 +172,28 @@ export default function ObservationTour({
         setChatPrefillMessage(null);
       }
     }
+
+    if (
+      !simpleMode &&
+      isMobileView &&
+      typeof setMobileMenuOpen === "function"
+    ) {
+      if (scene.openMobileMenu) {
+        setMobileMenuOpen(true);
+      } else if (scene.closeMobileMenu) {
+        setMobileMenuOpen(false);
+      }
+    }
   }, [
     isOpen,
     scene,
     setChatOpen,
     setHierarchyOpen,
     setChatPrefillMessage,
+    setMobileMenuOpen,
+    simpleMode,
+    isMobileView,
+    navigate,
   ]);
 
   // Re-measure spotlight after chat / hierarchy panels finish opening.
@@ -108,53 +203,128 @@ export default function ObservationTour({
     const t1 = setTimeout(fire, 280);
     const t2 = setTimeout(fire, 650);
     const t3 = setTimeout(fire, 1100);
+    const t4 = scene?.openMobileMenu ? setTimeout(fire, 400) : null;
+    const t5 =
+      scene?.ensureHierarchy === "open" ? setTimeout(fire, 400) : null;
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
+      if (t4) clearTimeout(t4);
+      if (t5) clearTimeout(t5);
     };
-  }, [isOpen, scene?.id, scene?.ensureChat, scene?.ensureHierarchy, scene?.target]);
+  }, [
+    isOpen,
+    scene?.id,
+    scene?.ensureChat,
+    scene?.ensureHierarchy,
+    scene?.target,
+    scene?.openMobileMenu,
+    scene?.spotlightEquipmentItem,
+    scene?.openContextMenu,
+  ]);
 
-  // Demo the hierarchy context menu so "Add Observation" can be spotlighted.
+  // Expand the tree and spotlight a concrete equipment row (step 3).
+  useEffect(() => {
+    if (!isOpen || !scene?.spotlightEquipmentItem) {
+      setDynamicSpotlightTarget(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const timers = [];
+
+    const reveal = () => {
+      if (cancelled) return;
+      const target = resolveTourEquipmentTarget();
+      if (target) {
+        setDynamicSpotlightTarget(target);
+        window.dispatchEvent(new Event("resize"));
+      }
+    };
+
+    timers.push(setTimeout(reveal, 500));
+    timers.push(setTimeout(reveal, 950));
+    timers.push(setTimeout(reveal, 1500));
+
+    return () => {
+      cancelled = true;
+      timers.forEach(clearTimeout);
+      setDynamicSpotlightTarget(null);
+    };
+  }, [isOpen, scene?.id, scene?.spotlightEquipmentItem, scene?.ensureHierarchy]);
+
+  // Step 4: spotlight equipment, open its menu, then highlight Add Observation.
   useEffect(() => {
     if (!isOpen || !scene?.openContextMenu) return undefined;
 
     let cancelled = false;
     const timers = [];
 
-    const openMenu = () => {
-      if (cancelled) return;
-      const item = document.querySelector('[data-testid^="hierarchy-item-"]');
-      if (!item) return;
-
-      if (window.innerWidth < 1024) {
-        item.click();
-      } else {
-        const node = item.closest('[data-testid^="hierarchy-node-"]');
-        if (!node) return;
-        const rect = node.getBoundingClientRect();
-        node.dispatchEvent(
-          new MouseEvent("contextmenu", {
-            bubbles: true,
-            cancelable: true,
-            view: window,
-            clientX: rect.left + rect.width / 2,
-            clientY: rect.top + rect.height / 2,
-          })
-        );
-      }
-      window.dispatchEvent(new Event("resize"));
+    const schedule = (fn, delay) => {
+      timers.push(setTimeout(fn, delay));
     };
 
-    timers.push(setTimeout(openMenu, 850));
-    timers.push(setTimeout(openMenu, 1400));
+    const spotlightEquipment = () => {
+      if (cancelled) return;
+      const target = resolveTourEquipmentTarget();
+      if (target) {
+        setDynamicSpotlightTarget(target);
+        window.dispatchEvent(new Event("resize"));
+      }
+    };
+
+    const openMenuAndSpotlightAdd = () => {
+      if (cancelled) return;
+      openHierarchyContextMenuForItem(findTourEquipmentItem());
+      schedule(() => {
+        if (cancelled) return;
+        const addBtn = document.querySelector('[data-testid="context-menu-add-threat"]');
+        if (addBtn) {
+          setDynamicSpotlightTarget('[data-testid="context-menu-add-threat"]');
+          window.dispatchEvent(new Event("resize"));
+        }
+      }, 180);
+      schedule(() => {
+        if (cancelled) return;
+        if (document.querySelector('[data-testid="context-menu-add-threat"]')) {
+          setDynamicSpotlightTarget('[data-testid="context-menu-add-threat"]');
+          window.dispatchEvent(new Event("resize"));
+        }
+      }, 450);
+    };
+
+    if (scene.spotlightEquipmentFirst) {
+      schedule(spotlightEquipment, 450);
+      schedule(spotlightEquipment, 900);
+      schedule(openMenuAndSpotlightAdd, 2100);
+      schedule(openMenuAndSpotlightAdd, 2800);
+    } else {
+      schedule(() => {
+        if (cancelled) return;
+        openHierarchyContextMenuForItem(findTourEquipmentItem());
+        window.dispatchEvent(new Event("resize"));
+      }, 850);
+      schedule(() => {
+        if (cancelled) return;
+        openHierarchyContextMenuForItem(findTourEquipmentItem());
+        window.dispatchEvent(new Event("resize"));
+      }, 1400);
+    }
 
     return () => {
       cancelled = true;
       timers.forEach(clearTimeout);
+      setDynamicSpotlightTarget(null);
       document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     };
-  }, [isOpen, scene?.id, scene?.openContextMenu, scene?.ensureHierarchy]);
+  }, [
+    isOpen,
+    scene?.id,
+    scene?.openContextMenu,
+    scene?.spotlightEquipmentFirst,
+    scene?.ensureHierarchy,
+  ]);
 
   /* ------------------------------------------------------------------
    * Navigation
@@ -176,9 +346,10 @@ export default function ObservationTour({
     }
     if (typeof setChatOpen === "function") setChatOpen(false);
     if (typeof setHierarchyOpen === "function") setHierarchyOpen(false);
+    if (typeof setMobileMenuOpen === "function") setMobileMenuOpen(false);
     if (typeof setChatPrefillMessage === "function") setChatPrefillMessage(null);
     if (typeof onClose === "function") onClose();
-  }, [onClose, setChatOpen, setChatPrefillMessage, setHierarchyOpen]);
+  }, [onClose, setChatOpen, setChatPrefillMessage, setHierarchyOpen, setMobileMenuOpen]);
 
   const handleNext = useCallback(() => {
     // Any manual advance pauses auto-play so the user can read at their own pace.
@@ -319,6 +490,7 @@ export default function ObservationTour({
   };
 
   const guidedTour = !scene?.mockVisual;
+  const spotlightTarget = dynamicSpotlightTarget || scene.target;
 
   const overlay = (
     <AnimatePresence>
@@ -343,7 +515,7 @@ export default function ObservationTour({
 
         {/* The cinematic spotlight cuts a hole in the dark backdrop for the real DOM target. */}
         <SpotlightEngine
-          targetSelector={scene.target}
+          targetSelector={spotlightTarget}
           spotlightZoom={scene.spotlightZoom || 1}
           pulse={!!scene.pulseTarget}
           active

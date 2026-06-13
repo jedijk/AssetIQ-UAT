@@ -2801,8 +2801,8 @@
       },
       "hierarchy-add": {
         "title": "Observatie toevoegen vanuit hiërarchie",
-        "narration": "Kies Observatie toevoegen om de assistent te openen met dat equipment al gekoppeld.",
-        "actionHint": "Probeer Observatie toevoegen — of tik op Volgende om de rondleiding voort te zetten."
+        "narration": "Open het equipmentmenu en kies Observatie toevoegen om de assistent te starten met dat equipment al gekoppeld.",
+        "actionHint": "Tik of klik met rechts op de equipmentrij, kies daarna Observatie toevoegen — of tik op Volgende."
       },
       "report": {
         "title": "Of gebruik de +-knop",
@@ -2823,6 +2823,49 @@
       "complete": {
         "title": "Je bent klaar",
         "narration": "Je kunt observaties registreren vanuit de hiërarchie of de +-knop. Valideer daarna de storingsmodus, stel een actieplan op en volg de risicoreductie.",
+        "actionHint": "Rond de rondleiding af en probeer een echte observatie te melden."
+      }
+    },
+    "simpleScenes": {
+      "observations": {
+        "title": "Je startscherm",
+        "narration": "Eenvoudige modus houdt het essentiële op één scherm — equipment, observaties en taken. Hier begin je elke dienst.",
+        "actionHint": "Tik op Volgende om te leren hoe je je eerste observatie meldt."
+      },
+      "hierarchy-open": {
+        "title": "Equipment openen",
+        "narration": "Begin bij het equipment waar je aan werkt. Tik op Equipment om de hiërarchie te bekijken.",
+        "actionHint": "Tik op de Equipment-knop — of tik op Volgende om de rondleiding voort te zetten."
+      },
+      "hierarchy-select": {
+        "title": "Vind je equipment",
+        "narration": "Zoek of vouw de boom uit tot je het betreffende equipment vindt. Tik op een rij om de acties te openen.",
+        "actionHint": "Tik op een equipmentnaam om het menu te openen."
+      },
+      "hierarchy-add": {
+        "title": "Observatie toevoegen vanuit equipment",
+        "narration": "Tik op de equipmentrij om het menu te openen, kies daarna Observatie toevoegen om de assistent te starten met dat equipment al gekoppeld.",
+        "actionHint": "Tik op de equipmentrij, kies daarna Observatie toevoegen — of tik op Volgende."
+      },
+      "report": {
+        "title": "Of gebruik de +-knop",
+        "narration": "De blauwe +-knop is altijd beschikbaar — gebruik die als je al weet wat je wilt beschrijven.",
+        "actionHint": "Probeer nu op de +-knop te tikken."
+      },
+      "describe": {
+        "title": "Beschrijf wat je zag",
+        "narration": "Typ het probleem in gewone taal. Noem de equipmentnaam of tag als je kunt — AssetIQ koppelt equipment en stelt een storingsmodus voor.",
+        "actionHint": "Bewerk de voorbeeldtekst of typ je eigen probleem en ga verder.",
+        "prefillMessage": "Hoge trilling op pomp P-101 tijdens bedrijf."
+      },
+      "send": {
+        "title": "Verstuur de melding",
+        "narration": "Druk op Verzenden. AssetIQ vat je melding samen, koppelt equipment en vraagt om bevestiging voordat de observatie wordt aangemaakt.",
+        "actionHint": "Tik op Verzenden wanneer je klaar bent — of tik op Volgende om de rondleiding voort te zetten."
+      },
+      "complete": {
+        "title": "Je bent klaar",
+        "narration": "Je kunt melden via Equipment of de +-knop. Open Observaties op het startscherm om te zien wat je hebt gelogd.",
         "actionHint": "Rond de rondleiding af en probeer een echte observatie te melden."
       }
     }

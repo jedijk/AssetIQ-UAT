@@ -20,15 +20,15 @@ import {
 
 export function buildNavItems(t) {
   return [
-    { path: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
-    { path: "/threats", label: t("nav.observations"), icon: AlertTriangle, feature: "observations" },
-    { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch, desktopOnly: true, feature: "investigations" },
-    { path: "/actions", label: t("nav.actions"), icon: ClipboardList, feature: "actions" },
+    { path: "/dashboard", label: t("nav.dashboard"), icon: LayoutDashboard, navTestId: "dashboard" },
+    { path: "/threats", label: t("nav.observations"), icon: AlertTriangle, feature: "observations", navTestId: "observations" },
+    { path: "/causal-engine", label: t("nav.causalEngine"), icon: GitBranch, desktopOnly: true, feature: "investigations", navTestId: "causal-engine" },
+    { path: "/actions", label: t("nav.actions"), icon: ClipboardList, feature: "actions", navTestId: "actions" },
     // UI route kept for deep links; data via /work-items API (see docs/api/WORK_ITEMS_API.md)
-    { path: "/my-tasks", label: t("nav.myTasks"), icon: ClipboardCheck, feature: "tasks" },
-    { path: "/tasks", label: t("nav.taskScheduler"), icon: Calendar, desktopOnly: true, feature: "tasks" },
-    { path: "/form-submissions", label: t("nav.formSubmissions"), icon: FileText, feature: "forms" },
-    { path: "/library", label: t("nav.library"), icon: BookOpen, desktopOnly: true, feature: "library" },
+    { path: "/my-tasks", label: t("nav.myTasks"), icon: ClipboardCheck, feature: "tasks", navTestId: "my-tasks" },
+    { path: "/tasks", label: t("nav.taskScheduler"), icon: Calendar, desktopOnly: true, feature: "tasks", navTestId: "task-scheduler" },
+    { path: "/form-submissions", label: t("nav.formSubmissions"), icon: FileText, feature: "forms", navTestId: "form-submissions" },
+    { path: "/library", label: t("nav.library"), icon: BookOpen, desktopOnly: true, feature: "library", navTestId: "library" },
   ];
 }
 
