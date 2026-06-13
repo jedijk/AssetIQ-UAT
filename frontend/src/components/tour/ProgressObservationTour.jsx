@@ -27,12 +27,12 @@ const I18N_NS = "progressObservationTour";
  * Guided "Observation Resolution Workflow" tour — spotlights real workspace UI.
  */
 export default function ProgressObservationTour({ isOpen, onClose, navigate }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const [demoThreatId, setDemoThreatId] = useState(null);
   const autoPlayTimerRef = useRef(null);
-  const scenes = useMemo(() => getProgressTourScenes(t), [t]);
+  const scenes = useMemo(() => getProgressTourScenes(t), [t, language]);
   const scene = scenes[currentIndex];
   const isFirst = currentIndex === 0;
   const isLast = currentIndex === scenes.length - 1;
@@ -54,7 +54,7 @@ export default function ProgressObservationTour({ isOpen, onClose, navigate }) {
     let cancelled = false;
     (async () => {
       try {
-        const data = await threatsAPI.getTop(1);
+        const data = await threatsAPI.getTop(1, { language });
         const first = Array.isArray(data) ? data[0] : data?.threats?.[0];
         if (!cancelled && first?.id) setDemoThreatId(first.id);
       } catch (e) {
@@ -97,30 +97,53 @@ export default function ProgressObservationTour({ isOpen, onClose, navigate }) {
     const t2 = setTimeout(fire, 650);
     const t3 = setTimeout(fire, 1100);
     const t4 = setTimeout(fire, 1800);
+    const t5 = scene.openFullAnalysis ? setTimeout(fire, 2800) : null;
+    const t6 = scene.openFullAnalysis ? setTimeout(fire, 3800) : null;
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
       clearTimeout(t4);
+      if (t5) clearTimeout(t5);
+      if (t6) clearTimeout(t6);
     };
-  }, [isOpen, scene?.id, scene?.navigateTo, scene?.openWorkspaceMenu, scene?.openFullAnalysis, scene?.target]);
+  }, [isOpen, scene?.id, scene?.navigateTo, scene?.openWorkspaceMenu, scene?.openWorkspaceEdit, scene?.openFullAnalysis, scene?.target, scene?.dock]);
 
   useEffect(() => {
     if (!isOpen || !scene?.target) return undefined;
 
+    const bottomChromeInset = scene.dock === "top" ? 48 : 340;
+
     const scrollTarget = () => {
       const el = document.querySelector(scene.target);
-      el?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+      if (!el) {
+        window.dispatchEvent(new Event("resize"));
+        return;
+      }
+
+      const dialog = el.closest('[data-testid="full-analysis-dialog"]');
+      if (dialog) {
+        const dialogRect = dialog.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const overflow = elRect.bottom - (window.innerHeight - bottomChromeInset);
+        if (overflow > 0) {
+          dialog.scrollTop += overflow + 16;
+        } else if (elRect.top < (scene.dock === "top" ? 280 : 80)) {
+          dialog.scrollTop += elRect.top - (scene.dock === "top" ? 280 : 80);
+        }
+      } else {
+        el.scrollIntoView?.({
+          block: scene.dock === "top" ? "center" : "nearest",
+          behavior: "smooth",
+        });
+      }
+
       window.dispatchEvent(new Event("resize"));
     };
 
-    const t1 = setTimeout(scrollTarget, 700);
-    const t2 = setTimeout(scrollTarget, 1400);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, [isOpen, scene?.id, scene?.target]);
+    const timers = [700, 1400, 2200, 3200].map((ms) => setTimeout(scrollTarget, ms));
+    return () => timers.forEach(clearTimeout);
+  }, [isOpen, scene?.id, scene?.target, scene?.dock, scene?.openFullAnalysis]);
 
   useEffect(() => {
     if (!isOpen || !scene?.openWorkspaceMenu) return undefined;
@@ -146,6 +169,31 @@ export default function ProgressObservationTour({ isOpen, onClose, navigate }) {
     };
   }, [isOpen, scene?.id, scene?.openWorkspaceMenu]);
 
+  useEffect(() => {
+    if (!isOpen || !scene?.openWorkspaceEdit) return undefined;
+
+    let cancelled = false;
+    const timers = [];
+
+    const enterEdit = () => {
+      if (cancelled) return;
+      const cancelBtn = document.querySelector('[data-testid="cancel-edit-btn"]');
+      const editBtn = document.querySelector('[data-testid="workspace-edit-btn"]');
+      if (!cancelBtn && editBtn) editBtn.click();
+      window.dispatchEvent(new Event("resize"));
+    };
+
+    timers.push(setTimeout(enterEdit, 750));
+    timers.push(setTimeout(enterEdit, 1300));
+
+    return () => {
+      cancelled = true;
+      timers.forEach(clearTimeout);
+      const cancelBtn = document.querySelector('[data-testid="cancel-edit-btn"]');
+      if (cancelBtn) cancelBtn.click();
+    };
+  }, [isOpen, scene?.id, scene?.openWorkspaceEdit]);
+
   const markCompleted = useCallback(() => {
     try {
       localStorage.setItem(PROGRESS_TOUR_COMPLETION_STORAGE_KEY, new Date().toISOString());
@@ -161,6 +209,8 @@ export default function ProgressObservationTour({ isOpen, onClose, navigate }) {
       autoPlayTimerRef.current = null;
     }
     window.dispatchEvent(new Event("progress-tour:close-full-analysis"));
+    const cancelEditBtn = document.querySelector('[data-testid="cancel-edit-btn"]');
+    if (cancelEditBtn) cancelEditBtn.click();
     document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     if (typeof onClose === "function") onClose();
   }, [onClose]);
@@ -279,7 +329,7 @@ export default function ProgressObservationTour({ isOpen, onClose, navigate }) {
 
   if (!isOpen || !scene) return null;
 
-  const variant = transitionVariant[scene.transition] || transitionVariant.fade;
+  const dockTop = scene.dock === "top";
 
   const handleSwipe = (_evt, info) => {
     const offsetX = info?.offset?.x ?? 0;
@@ -290,6 +340,41 @@ export default function ProgressObservationTour({ isOpen, onClose, navigate }) {
       handlePrev();
     }
   };
+
+  const tourChrome = (
+    <div className="max-w-5xl mx-auto flex flex-col items-center gap-3 sm:gap-4">
+      <AnimatePresence mode="wait">
+        <FloatingNarrationCard
+          key={`card-${scene.id}-${language}`}
+          title={scene.title}
+          narration={scene.narration}
+          badge={scene.badge}
+          actionHint={scene.actionHint}
+          sceneIndex={currentIndex}
+          totalScenes={scenes.length}
+          isFirst={isFirst}
+          isLast={isLast}
+          isAutoPlaying={isAutoPlaying}
+          onPrev={handlePrev}
+          onNext={handleNext}
+          onSkip={handleSkip}
+          onToggleAutoPlay={handleToggleAutoPlay}
+          position={scene.cardPosition}
+          tourLabel={t(`${I18N_NS}.tourLabel`)}
+          i18nNamespace={I18N_NS}
+        />
+      </AnimatePresence>
+
+      <div className="pointer-events-auto w-full max-w-md sm:max-w-xl">
+        <ProgressTracker
+          scenes={scenes}
+          currentIndex={currentIndex}
+          onJumpTo={handleJumpTo}
+          i18nNamespace={I18N_NS}
+        />
+      </div>
+    </div>
+  );
 
   const overlay = (
     <AnimatePresence>
@@ -336,42 +421,21 @@ export default function ProgressObservationTour({ isOpen, onClose, navigate }) {
           dragElastic={0.18}
           onDragEnd={handleSwipe}
         >
-          <div className="flex-1 min-h-0" aria-hidden="true" />
-
-          <div className="shrink-0 px-3 sm:px-4 pb-4 sm:pb-8 pointer-events-none">
-            <div className="max-w-5xl mx-auto flex flex-col items-center gap-3 sm:gap-4">
-              <AnimatePresence mode="wait">
-                <FloatingNarrationCard
-                  key={`card-${scene.id}`}
-                  title={scene.title}
-                  narration={scene.narration}
-                  badge={scene.badge}
-                  actionHint={scene.actionHint}
-                  sceneIndex={currentIndex}
-                  totalScenes={scenes.length}
-                  isFirst={isFirst}
-                  isLast={isLast}
-                  isAutoPlaying={isAutoPlaying}
-                  onPrev={handlePrev}
-                  onNext={handleNext}
-                  onSkip={handleSkip}
-                  onToggleAutoPlay={handleToggleAutoPlay}
-                  position={scene.cardPosition}
-                  tourLabel={t(`${I18N_NS}.tourLabel`)}
-                  i18nNamespace={I18N_NS}
-                />
-              </AnimatePresence>
-
-              <div className="pointer-events-auto w-full max-w-md sm:max-w-xl">
-                <ProgressTracker
-                  scenes={scenes}
-                  currentIndex={currentIndex}
-                  onJumpTo={handleJumpTo}
-                  i18nNamespace={I18N_NS}
-                />
-              </div>
+          {dockTop ? (
+            <div className="shrink-0 px-3 sm:px-4 pt-14 sm:pt-16 pb-2 pointer-events-none">
+              {tourChrome}
             </div>
+          ) : (
+            <div className="flex-1 min-h-0" aria-hidden="true" />
+          )}
+
+          {!dockTop && (
+          <div className="shrink-0 px-3 sm:px-4 pb-4 sm:pb-8 pointer-events-none">
+            {tourChrome}
           </div>
+          )}
+
+          {dockTop && <div className="flex-1 min-h-0" aria-hidden="true" />}
         </motion.div>
       </motion.div>
     </AnimatePresence>

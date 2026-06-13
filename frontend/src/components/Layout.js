@@ -565,6 +565,12 @@ const Layout = () => {
 
   const lastAction = getLastAction();
 
+  useEffect(() => {
+    if (isMobileView && progressObservationTourOpen) {
+      setProgressObservationTourOpen(false);
+    }
+  }, [isMobileView, progressObservationTourOpen]);
+
   const navItems = filterNavItems(buildNavItems(t), { isMobileView, canSeeNavItem });
   const settingsMenuItems = filterSettingsMenuItems(buildSettingsMenuItems(t), {
     isMobileView,
@@ -597,7 +603,7 @@ const Layout = () => {
         resetIntro={resetIntro}
         setObservationTourOpen={setObservationTourOpen}
         setProgressObservationTourOpen={
-          PROGRESS_OBSERVATION_TOUR_ENABLED ? setProgressObservationTourOpen : null
+          PROGRESS_OBSERVATION_TOUR_ENABLED && !isMobileView ? setProgressObservationTourOpen : null
         }
         user={user}
         avatarUrl={avatarUrl}
@@ -761,7 +767,7 @@ const Layout = () => {
         setHierarchyOpen={setHierarchyOpen}
       />
 
-      {PROGRESS_OBSERVATION_TOUR_ENABLED && (
+      {PROGRESS_OBSERVATION_TOUR_ENABLED && !isMobileView && (
       <ProgressObservationTour
         isOpen={progressObservationTourOpen}
         onClose={() => setProgressObservationTourOpen(false)}

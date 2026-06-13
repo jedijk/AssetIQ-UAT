@@ -2711,8 +2711,8 @@
     }
   },
   "progressObservationTour": {
-    "menuLabel": "Observation Resolution Workflow",
-    "tourLabel": "Observation Resolution Workflow",
+    "menuLabel": "Progress Observation",
+    "tourLabel": "Progress Observation",
     "exitTour": "Exit tour",
     "skipTour": "Skip tour",
     "skip": "Skip",
@@ -2749,14 +2749,14 @@
         "actionHint": "Review failure mode"
       },
       "link-failure-mode": {
-        "title": "Connect Reliability Knowledge",
-        "narration": "If the failure mode already exists, link it from the library. If it is new, create it and define severity, occurrence, detection, and recommended actions.",
-        "actionHint": "Link or Create Failure Mode"
+        "title": "Change Failure Mode",
+        "narration": "Update the failure mode here in the info grid. Search the library to link an existing mode, or type a new name to create one and define severity, occurrence, and detection.",
+        "actionHint": "Change failure mode"
       },
       "link-equipment": {
         "title": "Connect Equipment Context",
-        "narration": "Link the affected equipment to provide criticality, hierarchy, historical observations, and asset context.",
-        "actionHint": "Select equipment"
+        "narration": "Update the equipment type here in the info grid. This connects the observation to the right asset class, criticality, and hierarchy context.",
+        "actionHint": "Change equipment type"
       },
       "ai-insights": {
         "title": "Review AI Analysis",

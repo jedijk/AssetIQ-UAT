@@ -2826,8 +2826,8 @@
     }
   },
   "progressObservationTour": {
-    "menuLabel": "Beobachtungs-Abwicklungsworkflow",
-    "tourLabel": "Beobachtungs-Abwicklungsworkflow",
+    "menuLabel": "Beobachtung bearbeiten",
+    "tourLabel": "Beobachtung bearbeiten",
     "exitTour": "Tour beenden",
     "skipTour": "Tour überspringen",
     "skip": "Überspringen",
@@ -2864,14 +2864,14 @@
         "actionHint": "Fehlermodus prüfen"
       },
       "link-failure-mode": {
-        "title": "Zuverlässigkeitswissen verknüpfen",
-        "narration": "Wenn der Fehlermodus bereits existiert, verknüpfen Sie ihn aus der Bibliothek. Ist er neu, erstellen Sie ihn und definieren Sie Schweregrad, Auftretenshäufigkeit, Erkennung und empfohlene Maßnahmen.",
-        "actionHint": "Fehlermodus verknüpfen oder erstellen"
+        "title": "Fehlermodus ändern",
+        "narration": "Aktualisieren Sie den Fehlermodus hier im Info-Raster. Durchsuchen Sie die Bibliothek, um einen vorhandenen Modus zu verknüpfen, oder geben Sie einen neuen Namen ein, um Schweregrad, Auftretenshäufigkeit und Erkennung zu definieren.",
+        "actionHint": "Fehlermodus ändern"
       },
       "link-equipment": {
         "title": "Equipment-Kontext verknüpfen",
-        "narration": "Verknüpfen Sie das betroffene Equipment für Kritikalität, Hierarchie, historische Beobachtungen und Asset-Kontext.",
-        "actionHint": "Equipment auswählen"
+        "narration": "Aktualisieren Sie den Equipment-Typ hier im Info-Raster. So verbinden Sie die Beobachtung mit der richtigen Asset-Klasse, Kritikalität und Hierarchie.",
+        "actionHint": "Equipment-Typ ändern"
       },
       "ai-insights": {
         "title": "KI-Analyse prüfen",

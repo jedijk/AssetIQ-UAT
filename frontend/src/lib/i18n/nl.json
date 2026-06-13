@@ -2826,8 +2826,8 @@
     }
   },
   "progressObservationTour": {
-    "menuLabel": "Observatie-afhandelingsworkflow",
-    "tourLabel": "Observatie-afhandelingsworkflow",
+    "menuLabel": "Observatie afhandelen",
+    "tourLabel": "Observatie afhandelen",
     "exitTour": "Rondleiding sluiten",
     "skipTour": "Rondleiding overslaan",
     "skip": "Overslaan",
@@ -2864,14 +2864,14 @@
         "actionHint": "Storingsmodus beoordelen"
       },
       "link-failure-mode": {
-        "title": "Betrouwbaarheidskennis koppelen",
-        "narration": "Als de storingsmodus al bestaat, koppel deze vanuit de bibliotheek. Is het nieuw, maak hem dan aan en definieer ernst, frequentie, detectie en aanbevolen acties.",
-        "actionHint": "Storingsmodus koppelen of aanmaken"
+        "title": "Storingsmodus wijzigen",
+        "narration": "Wijzig de storingsmodus hier in het info-overzicht. Zoek in de bibliotheek om een bestaande modus te koppelen, of typ een nieuwe naam om er een aan te maken met ernst, frequentie en detectie.",
+        "actionHint": "Storingsmodus wijzigen"
       },
       "link-equipment": {
         "title": "Equipmentcontext koppelen",
-        "narration": "Koppel het betrokken equipment voor criticaliteit, hiërarchie, historische observaties en assetcontext.",
-        "actionHint": "Equipment selecteren"
+        "narration": "Wijzig het equipmenttype hier in het info-overzicht. Dit koppelt de observatie aan de juiste assetklasse, criticaliteit en hiërarchiecontext.",
+        "actionHint": "Equipmenttype wijzigen"
       },
       "ai-insights": {
         "title": "AI-analyse bekijken",
