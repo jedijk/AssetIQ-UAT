@@ -554,8 +554,8 @@
     "liteModeError": "Kan voorkeur voor prestatie-modus niet bijwerken."
   },
   "announcements": {
-    "liteModeTitle": "AssetIQ 3.7.4 — Wat is er nieuw",
-    "liteModeBody": "Betrouwbaarheidsintelligentie: AI-samenvattingen, oorzaken en aanbevelingen worden nu in het Nederlands en Duits getoond. Labels voor vertrouwen en aantallen opgelost. Instellingen → Vertalingen: bulk vertaling van bestaande gegevens."
+    "liteModeTitle": "AssetIQ 3.7.5 — Wat is er nieuw",
+    "liteModeBody": "Nieuwe observatieworkspace om issues te bekijken en af te handelen. Vereenvoudigd melden van problemen in eenvoudige modus. Rondleiding Maak je eerste observatie in het Helpmenu. Plus bugfixes en stabiliteitsverbeteringen."
   },
   "enums": {
     "Equipment Damage": "Schade aan apparatuur",

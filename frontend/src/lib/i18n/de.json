@@ -554,8 +554,8 @@
     "liteModeError": "Leistungseinstellung konnte nicht aktualisiert werden."
   },
   "announcements": {
-    "liteModeTitle": "AssetIQ 3.7.4 — Was gibt's Neues",
-    "liteModeBody": "Reliability Intelligence: KI-Zusammenfassungen, Ursachen und Empfehlungen werden jetzt auf Niederländisch und Deutsch angezeigt. Konfidenz- und Ereigniszähler-Labels behoben. Einstellungen → Übersetzungen: Massenübersetzung für Legacy-Daten."
+    "liteModeTitle": "AssetIQ 3.7.5 — Was gibt's Neues",
+    "liteModeBody": "Neuer Beobachtungs-Workspace zum Prüfen und Bearbeiten von Meldungen. Vereinfachte Problemmeldung im einfachen Modus. Tour Erste Beobachtung erstellen im Hilfe-Menü. Plus Fehlerbehebungen und Stabilitätsverbesserungen."
   },
   "enums": {
     "Equipment Damage": "Anlagenschaden",
