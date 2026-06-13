@@ -291,7 +291,7 @@ BASE_ORIGINS = [
     "https://asset-iq-uat.vercel.app",
     "https://assetiq-uat.vercel.app",
     # Preview/Development
-    "https://action-lockup-bug.preview.emergentagent.com",
+    "https://flicker-solver.preview.emergentagent.com",
     "http://localhost:3000",
     "http://localhost:5000",
 ]

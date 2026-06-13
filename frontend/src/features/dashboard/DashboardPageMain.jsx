@@ -119,7 +119,7 @@ export default function DashboardPageMain({ initialTab }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const { effectiveRole } = useEffectiveRole();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
   const isFetchingAny = useIsFetching() > 0;
   // ON by default; disable explicitly with REACT_APP_ENABLE_SMART_DASHBOARD_BUILDER=false
@@ -128,30 +128,61 @@ export default function DashboardPageMain({ initialTab }) {
   // Operator view: shown on mobile when role is operator or owner has toggled it
   const initialIsMobileViewport = window.innerWidth < 768;
   const [isMobileViewport, setIsMobileViewport] = useState(() => initialIsMobileViewport);
-  const canShowOperational = hasPermission("dashboard_operational", "read");
-  const canShowProduction = hasPermission("dashboard_production", "read");
-  const canShowReliability = hasPermission("reliability_intelligence", "read") && !isMobileViewport;
-  const canShowExecutive = hasPermission("dashboard_executive", "read");
-  const canShowBuilder =
-    manualBuilderEnabled && !isMobileViewport && hasPermission("dashboard_builder", "read");
-  const dashboardTabFlags = {
-    canShowOperational,
-    canShowProduction,
-    canShowReliability,
-    canShowExecutive,
-    canShowBuilder,
-  };
-  const [activeTab, setActiveTab] = useState(
-    resolveDashboardTab(initialTab) ||
-      resolveDashboardTab(location.state?.activeTab) ||
-      pickFirstAllowedDashboardTab({
-        preferBuilder: manualBuilderEnabled && !initialIsMobileViewport,
-        ...dashboardTabFlags,
-      })
-  );
+  
+  // Memoize permission flags to prevent cascading re-renders during permission loading
+  const dashboardTabFlags = useMemo(() => {
+    // While permissions are loading, use stable defaults to prevent flickering
+    if (permissionsLoading) {
+      return {
+        canShowOperational: true,
+        canShowProduction: false,
+        canShowReliability: false,
+        canShowExecutive: false,
+        canShowBuilder: false,
+      };
+    }
+    return {
+      canShowOperational: hasPermission("dashboard_operational", "read"),
+      canShowProduction: hasPermission("dashboard_production", "read"),
+      canShowReliability: hasPermission("reliability_intelligence", "read") && !isMobileViewport,
+      canShowExecutive: hasPermission("dashboard_executive", "read"),
+      canShowBuilder: manualBuilderEnabled && !isMobileViewport && hasPermission("dashboard_builder", "read"),
+    };
+  }, [permissionsLoading, hasPermission, isMobileViewport, manualBuilderEnabled]);
+  
+  const { canShowOperational, canShowProduction, canShowReliability, canShowExecutive, canShowBuilder } = dashboardTabFlags;
+
+  // Track if we've initialized the tab from permissions (prevents re-initialization on permission changes)
+  const [tabInitialized, setTabInitialized] = useState(false);
+  
+  const [activeTab, setActiveTab] = useState(() => {
+    // Initial tab from props or location state takes precedence
+    const fromProps = resolveDashboardTab(initialTab);
+    const fromState = resolveDashboardTab(location.state?.activeTab);
+    if (fromProps) return fromProps;
+    if (fromState) return fromState;
+    // Default to operational while permissions are loading
+    return "operational";
+  });
+  
   const [operatorToggle, setOperatorToggle] = useState(
     () => localStorage.getItem("operatorViewEnabled") === "true"
   );
+  
+  // Initialize tab selection after permissions are loaded (runs only once)
+  useEffect(() => {
+    if (permissionsLoading || tabInitialized) return;
+    
+    // Check if current tab is allowed, if not switch to first allowed
+    if (!isDashboardTabAllowed(activeTab, dashboardTabFlags)) {
+      const newTab = pickFirstAllowedDashboardTab({ preferBuilder: canShowBuilder, ...dashboardTabFlags });
+      setActiveTab(newTab);
+    } else if (canShowBuilder && activeTab === "operational" && !initialTab && !location.state?.activeTab) {
+      // If builder is available and we defaulted to operational, switch to builder
+      setActiveTab("builder");
+    }
+    setTabInitialized(true);
+  }, [permissionsLoading, tabInitialized, activeTab, dashboardTabFlags, canShowBuilder, initialTab, location.state?.activeTab]);
   useEffect(() => {
     const onResize = () => setIsMobileViewport(window.innerWidth < 768);
     const onStorage = () => setOperatorToggle(localStorage.getItem("operatorViewEnabled") === "true");
@@ -186,42 +217,12 @@ export default function DashboardPageMain({ initialTab }) {
     queryClient.invalidateQueries({ queryKey: queryKeys.users.rbac() });
   }, [queryClient]);
 
-  // Redirect to operational tab on mobile if viewing hidden tabs (except production which is now mobile-enabled)
-  useEffect(() => {
-    const handleResize = () => {
-      // sm breakpoint is 640px
-      if (window.innerWidth < 640 && activeTab === "builder") {
-        setActiveTab("operational");
-      }
-    };
-    
-    // Check on mount
-    handleResize();
-    
-    // Listen for resize
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [activeTab]);
-
-  // If we enter mobile viewport while on builder, force back to operational.
+  // Consolidated mobile viewport handler - only redirects from builder to operational on mobile
   useEffect(() => {
     if (isMobileViewport && activeTab === "builder") {
       setActiveTab("operational");
     }
-  }, [activeTab, isMobileViewport]);
-
-  useEffect(() => {
-    if (!isDashboardTabAllowed(activeTab, dashboardTabFlags)) {
-      setActiveTab(pickFirstAllowedDashboardTab({ preferBuilder: false, ...dashboardTabFlags }));
-    }
-  }, [
-    activeTab,
-    canShowOperational,
-    canShowProduction,
-    canShowReliability,
-    canShowExecutive,
-    canShowBuilder,
-  ]);
+  }, [isMobileViewport]); // Only trigger on viewport change, not on every activeTab change
 
   useEffect(() => {
     if (DISABLED_DASHBOARD_TABS.has(activeTab)) {
@@ -442,6 +443,32 @@ export default function DashboardPageMain({ initialTab }) {
   // Operator landing early return (after all hooks)
   if (isMobileViewport && isOperatorMode && !initialTab) {
     return <OperatorLandingPage />;
+  }
+
+  // Show minimal loading state while permissions are being fetched to prevent flickering
+  if (permissionsLoading && !tabInitialized) {
+    return (
+      <div className="h-[calc(100vh-64px)] flex flex-col overflow-x-hidden" data-testid="dashboard-page">
+        <div className="flex-shrink-0 px-4 sm:px-6 pt-4 pb-2 max-w-7xl mx-auto w-full">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <h1 className="text-xl font-bold text-slate-900">{t("dashboard.title") || "Dashboard"}</h1>
+              <p className="text-sm text-slate-500">{t("dashboard.subtitle") || "Overview of your risk management status"}</p>
+            </div>
+          </div>
+          <div className="h-10 bg-slate-100 rounded-lg animate-pulse" />
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pb-6">
+          <div className="max-w-7xl mx-auto">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-24 bg-slate-100 rounded-xl animate-pulse" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Clear all filters
@@ -1736,8 +1763,8 @@ export default function DashboardPageMain({ initialTab }) {
               <Button 
                 variant="outline"
                 onClick={() => {
-                  // Export functionality
-                  toast.info("Export feature coming soon");
+                  // Export functionality - feature coming soon
+                  console.log("Export feature coming soon");
                 }}
                 className="px-4"
               >

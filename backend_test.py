@@ -7,7 +7,7 @@ import json
 import time
 
 # Configuration
-BASE_URL = "https://action-lockup-bug.preview.emergentagent.com/api"
+BASE_URL = "https://flicker-solver.preview.emergentagent.com/api"
 TEST_EMAIL = "jedijk@gmail.com"
 TEST_PASSWORD = "Jaap8019@"
 
