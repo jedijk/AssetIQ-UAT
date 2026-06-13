@@ -1010,30 +1010,49 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
           ) : (
             <>
             {/* Language Selector — always visible so user can pick EN/NL before dictating */}
-            <div className="flex items-center mb-1.5 sm:mb-2">
+            <div className="flex items-center mb-1.5 sm:mb-2 min-h-[28px]">
               <Popover open={showLangPicker} onOpenChange={setShowLangPicker}>
                 <PopoverTrigger asChild>
                   <button
-                    className="inline-flex items-center gap-1 sm:gap-1.5 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full bg-slate-100 hover:bg-slate-200 text-[10px] sm:text-xs font-medium text-slate-600 transition-colors"
+                    type="button"
+                    className="inline-flex items-center justify-center gap-1.5 h-7 min-w-[5.25rem] px-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 transition-colors"
                     data-testid="chat-language-selector"
                     title={t("chat.languageDictationTitle")}
+                    aria-label={t("chat.languageDictationTitle")}
                   >
-                    <Globe className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                    {(() => {
-                      const active = manualLanguage || detectedLanguage || appLanguage || "en";
-                      return LANGUAGE_OPTIONS.find(l => l.code === active)?.flag || active.toUpperCase();
-                    })()}
-                    {!manualLanguage && detectedLanguage && <span className="text-slate-400 hidden sm:inline">{t("chat.detected")}</span>}
-                    <ChevronDown className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-slate-400" />
+                    <Globe className="w-3 h-3 shrink-0" />
+                    <span className="w-6 text-center text-[11px] font-bold leading-none">
+                      {(() => {
+                        const active = manualLanguage || detectedLanguage || appLanguage || "en";
+                        return LANGUAGE_OPTIONS.find((l) => l.code === active)?.flag || active.toUpperCase();
+                      })()}
+                    </span>
+                    {!manualLanguage && detectedLanguage ? (
+                      <span
+                        className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0"
+                        title={t("chat.detected")}
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <span className="w-1.5 h-1.5 shrink-0" aria-hidden="true" />
+                    )}
+                    <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="w-40 sm:w-44 p-1" sideOffset={4}>
-                  {LANGUAGE_OPTIONS.map(lang => {
+                <PopoverContent
+                  align="start"
+                  side="top"
+                  sideOffset={6}
+                  avoidCollisions={false}
+                  className="w-44 p-1"
+                >
+                  {LANGUAGE_OPTIONS.map((lang) => {
                     const active = manualLanguage || detectedLanguage || appLanguage;
                     return (
                       <button
                         key={lang.code}
-                        className={`w-full flex items-center gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded text-sm hover:bg-slate-100 transition-colors ${
+                        type="button"
+                        className={`w-full flex items-center gap-2 px-3 py-2 rounded text-sm hover:bg-slate-100 transition-colors ${
                           active === lang.code ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-700"
                         }`}
                         onClick={() => {
@@ -1045,25 +1064,26 @@ const ChatSidebar = ({ isOpen, onClose, prefillEquipment = null, prefillMessage 
                         }}
                         data-testid={`chat-language-option-${lang.code}`}
                       >
-                        <span className="text-xs font-bold w-6">{lang.flag}</span>
+                        <span className="text-xs font-bold w-6 shrink-0">{lang.flag}</span>
                         {lang.label}
                       </button>
                     );
                   })}
-                  {manualLanguage && (
-                    <>
-                      <div className="border-t border-slate-100 my-1" />
-                      <button
-                        className="w-full flex items-center gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded text-sm text-slate-500 hover:bg-slate-100"
-                        onClick={() => {
-                          setManualLanguage(null);
-                          setShowLangPicker(false);
-                        }}
-                      >
-                        {t("chat.autoDetect")}
-                      </button>
-                    </>
-                  )}
+                  <div className="border-t border-slate-100 my-1" />
+                  <button
+                    type="button"
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded text-sm hover:bg-slate-100 transition-colors ${
+                      manualLanguage ? "text-slate-700" : "text-slate-400 cursor-default"
+                    }`}
+                    disabled={!manualLanguage}
+                    onClick={() => {
+                      if (!manualLanguage) return;
+                      setManualLanguage(null);
+                      setShowLangPicker(false);
+                    }}
+                  >
+                    {t("chat.autoDetect")}
+                  </button>
                 </PopoverContent>
               </Popover>
             </div>
