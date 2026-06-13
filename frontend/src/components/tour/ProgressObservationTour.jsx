@@ -115,10 +115,22 @@ export default function ProgressObservationTour({ isOpen, onClose, navigate }) {
     const bottomChromeInset = scene.dock === "top" ? 48 : 340;
 
     const scrollTarget = () => {
+      if (scene.scrollPanel) {
+        document.querySelector(scene.scrollPanel)?.scrollIntoView?.({
+          block: "start",
+          behavior: "smooth",
+        });
+      }
+
       const el = document.querySelector(scene.target);
       if (!el) {
         window.dispatchEvent(new Event("resize"));
         return;
+      }
+
+      const scrollablePanel = el.closest('[data-testid="recommended-actions-panel"]');
+      if (scrollablePanel && scene.id === "generate-recommendations") {
+        scrollablePanel.scrollTop = 0;
       }
 
       const dialog = el.closest('[data-testid="full-analysis-dialog"]');
@@ -133,7 +145,7 @@ export default function ProgressObservationTour({ isOpen, onClose, navigate }) {
         }
       } else {
         el.scrollIntoView?.({
-          block: scene.dock === "top" ? "center" : "nearest",
+          block: scene.id === "generate-recommendations" ? "center" : scene.dock === "top" ? "center" : "nearest",
           behavior: "smooth",
         });
       }
@@ -143,7 +155,7 @@ export default function ProgressObservationTour({ isOpen, onClose, navigate }) {
 
     const timers = [700, 1400, 2200, 3200].map((ms) => setTimeout(scrollTarget, ms));
     return () => timers.forEach(clearTimeout);
-  }, [isOpen, scene?.id, scene?.target, scene?.dock, scene?.openFullAnalysis]);
+  }, [isOpen, scene?.id, scene?.target, scene?.dock, scene?.openFullAnalysis, scene?.scrollPanel]);
 
   useEffect(() => {
     if (!isOpen || !scene?.openWorkspaceMenu) return undefined;
@@ -153,6 +165,8 @@ export default function ProgressObservationTour({ isOpen, onClose, navigate }) {
 
     const openMenu = () => {
       if (cancelled) return;
+      const cancelBtn = document.querySelector('[data-testid="cancel-edit-btn"]');
+      if (cancelBtn) cancelBtn.click();
       const btn = document.querySelector('[data-testid="workspace-more-menu"]');
       if (!btn) return;
       btn.click();

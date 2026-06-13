@@ -119,8 +119,8 @@ export function RecommendedActionsPanel({ recommendations, onAddToPlan, onAddToS
               <p className="text-xs text-slate-500">{t("observationWorkspace.recommendedActionsSubtitle")}</p>
             </div>
           </div>
-          {aiActions.length === 0 && onGenerateAI && (
-            <div className="relative group flex-shrink-0">
+          {onGenerateAI && (
+            <div className="relative group flex-shrink-0" data-testid="recommended-actions-ai-control">
               <button
                 type="button"
                 onClick={onGenerateAI}
@@ -144,7 +144,11 @@ export function RecommendedActionsPanel({ recommendations, onAddToPlan, onAddToS
                 <div className="font-semibold flex items-center gap-1 mb-1">
                   <Sparkles className="w-3 h-3 text-purple-300" /> {t("ai.generateAiq")}
                 </div>
-                <p className="text-slate-300">Generate AI-powered recommended actions for this observation.</p>
+                <p className="text-slate-300">
+                  {aiActions.length > 0
+                    ? t("observationWorkspace.regenerateAiRecommendationsHint")
+                    : t("observationWorkspace.generateAiRecommendationsHint")}
+                </p>
                 <div className="absolute -top-1 right-4 w-2 h-2 bg-slate-900 rotate-45"></div>
               </div>
             </div>

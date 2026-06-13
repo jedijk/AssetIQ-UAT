@@ -934,6 +934,8 @@
     "addToStrategy": "Add To Strategy",
     "noRecommendations": "No recommendations available",
     "noRecommendationsHint": "Link a failure mode to get recommendations",
+    "generateAiRecommendationsHint": "Generate AI-powered recommended actions for this observation.",
+    "regenerateAiRecommendationsHint": "Generate additional AI-powered recommended actions for this observation.",
     "actionPlan": "Action Plan",
     "actionsTracked": "{count} action tracked",
     "actionsTrackedPlural": "{count} actions tracked",
@@ -2749,14 +2751,14 @@
         "actionHint": "Review failure mode"
       },
       "link-failure-mode": {
-        "title": "Change Failure Mode",
-        "narration": "Update the failure mode here in the info grid. Search the library to link an existing mode, or type a new name to create one and define severity, occurrence, and detection.",
-        "actionHint": "Change failure mode"
+        "title": "Connect Reliability Knowledge",
+        "narration": "Open the ⋯ menu in the top-right corner and choose Link Failure Mode. Connect an existing mode from the library, or create a new one with severity, occurrence, and detection.",
+        "actionHint": "Link or create failure mode"
       },
       "link-equipment": {
         "title": "Connect Equipment Context",
-        "narration": "Update the equipment type here in the info grid. This connects the observation to the right asset class, criticality, and hierarchy context.",
-        "actionHint": "Change equipment type"
+        "narration": "Use the same ⋯ menu to link the affected equipment from the hierarchy. This adds criticality, asset context, and historical observations.",
+        "actionHint": "Link equipment"
       },
       "ai-insights": {
         "title": "Review AI Analysis",
@@ -2770,7 +2772,7 @@
       },
       "generate-recommendations": {
         "title": "Need More Actions?",
-        "narration": "If the existing recommendations are insufficient, use AI analysis to generate additional mitigation and prevention actions.",
+        "narration": "Use the sparkles button in the Recommended Actions header to generate additional mitigation and prevention actions with AI.",
         "actionHint": "Generate recommendations"
       },
       "build-action-plan": {

@@ -1031,6 +1031,8 @@
     "addToStrategy": "Toevoegen aan strategie",
     "noRecommendations": "Geen aanbevelingen beschikbaar",
     "noRecommendationsHint": "Koppel een faalmodus om aanbevelingen te krijgen",
+    "generateAiRecommendationsHint": "Genereer AI-aanbevolen acties voor deze observatie.",
+    "regenerateAiRecommendationsHint": "Genereer extra AI-aanbevolen acties voor deze observatie.",
     "actionPlan": "Actieplan",
     "actionsTracked": "{count} actie gevolgd",
     "actionsTrackedPlural": "{count} acties gevolgd",
@@ -2864,14 +2866,14 @@
         "actionHint": "Storingsmodus beoordelen"
       },
       "link-failure-mode": {
-        "title": "Storingsmodus wijzigen",
-        "narration": "Wijzig de storingsmodus hier in het info-overzicht. Zoek in de bibliotheek om een bestaande modus te koppelen, of typ een nieuwe naam om er een aan te maken met ernst, frequentie en detectie.",
-        "actionHint": "Storingsmodus wijzigen"
+        "title": "Betrouwbaarheidskennis koppelen",
+        "narration": "Open het ⋯-menu rechtsboven en kies Storingsmodus koppelen. Koppel een bestaande modus uit de bibliotheek of maak een nieuwe aan met ernst, frequentie en detectie.",
+        "actionHint": "Storingsmodus koppelen of aanmaken"
       },
       "link-equipment": {
         "title": "Equipmentcontext koppelen",
-        "narration": "Wijzig het equipmenttype hier in het info-overzicht. Dit koppelt de observatie aan de juiste assetklasse, criticaliteit en hiërarchiecontext.",
-        "actionHint": "Equipmenttype wijzigen"
+        "narration": "Gebruik hetzelfde ⋯-menu om het betrokken equipment uit de hiërarchie te koppelen. Dit voegt criticaliteit, assetcontext en historische observaties toe.",
+        "actionHint": "Equipment koppelen"
       },
       "ai-insights": {
         "title": "AI-analyse bekijken",
@@ -2885,7 +2887,7 @@
       },
       "generate-recommendations": {
         "title": "Meer acties nodig?",
-        "narration": "Als de bestaande aanbevelingen onvoldoende zijn, gebruik dan AI-analyse om extra mitigatie- en preventieacties te genereren.",
+        "narration": "Gebruik de sparkles-knop in de kop van Aanbevolen acties om extra mitigatie- en preventieacties met AI te genereren.",
         "actionHint": "Aanbevelingen genereren"
       },
       "build-action-plan": {

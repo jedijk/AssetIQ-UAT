@@ -1031,6 +1031,8 @@
     "addToStrategy": "Zur Strategie hinzufügen",
     "noRecommendations": "Keine Empfehlungen verfügbar",
     "noRecommendationsHint": "Verknüpfen Sie einen Fehlermodus, um Empfehlungen zu erhalten",
+    "generateAiRecommendationsHint": "Generieren Sie KI-Empfehlungen für diese Beobachtung.",
+    "regenerateAiRecommendationsHint": "Generieren Sie zusätzliche KI-Empfehlungen für diese Beobachtung.",
     "actionPlan": "Aktionsplan",
     "actionsTracked": "{count} Aktion verfolgt",
     "actionsTrackedPlural": "{count} Aktionen verfolgt",
@@ -2864,14 +2866,14 @@
         "actionHint": "Fehlermodus prüfen"
       },
       "link-failure-mode": {
-        "title": "Fehlermodus ändern",
-        "narration": "Aktualisieren Sie den Fehlermodus hier im Info-Raster. Durchsuchen Sie die Bibliothek, um einen vorhandenen Modus zu verknüpfen, oder geben Sie einen neuen Namen ein, um Schweregrad, Auftretenshäufigkeit und Erkennung zu definieren.",
-        "actionHint": "Fehlermodus ändern"
+        "title": "Zuverlässigkeitswissen verknüpfen",
+        "narration": "Öffnen Sie das ⋯-Menü oben rechts und wählen Sie Fehlermodus verknüpfen. Verknüpfen Sie einen vorhandenen Modus aus der Bibliothek oder erstellen Sie einen neuen mit Schweregrad, Auftretenshäufigkeit und Erkennung.",
+        "actionHint": "Fehlermodus verknüpfen oder erstellen"
       },
       "link-equipment": {
         "title": "Equipment-Kontext verknüpfen",
-        "narration": "Aktualisieren Sie den Equipment-Typ hier im Info-Raster. So verbinden Sie die Beobachtung mit der richtigen Asset-Klasse, Kritikalität und Hierarchie.",
-        "actionHint": "Equipment-Typ ändern"
+        "narration": "Nutzen Sie dasselbe ⋯-Menü, um das betroffene Equipment aus der Hierarchie zu verknüpfen. So erhalten Sie Kritikalität, Asset-Kontext und historische Beobachtungen.",
+        "actionHint": "Equipment verknüpfen"
       },
       "ai-insights": {
         "title": "KI-Analyse prüfen",
@@ -2885,7 +2887,7 @@
       },
       "generate-recommendations": {
         "title": "Weitere Maßnahmen nötig?",
-        "narration": "Wenn die vorhandenen Empfehlungen nicht ausreichen, nutzen Sie die KI-Analyse, um zusätzliche Minderungs- und Präventionsmaßnahmen zu generieren.",
+        "narration": "Nutzen Sie die Sparkles-Schaltfläche in der Kopfzeile Empfohlene Maßnahmen, um zusätzliche Minderungs- und Präventionsmaßnahmen per KI zu generieren.",
         "actionHint": "Empfehlungen generieren"
       },
       "build-action-plan": {
