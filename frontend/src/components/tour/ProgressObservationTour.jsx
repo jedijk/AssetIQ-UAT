@@ -11,41 +11,140 @@ import { X } from "lucide-react";
 import SpotlightEngine from "./SpotlightEngine";
 import ProgressTracker from "./ProgressTracker";
 import FloatingNarrationCard from "./FloatingNarrationCard";
-import ProgressSceneMocks from "./ProgressSceneMocks";
-import AutoFitScale from "./AutoFitScale";
 import {
-  PROGRESS_TOUR_SCENES,
+  getProgressTourScenes,
   PROGRESS_AUTO_PLAY_DURATION_MS,
   PROGRESS_SCENE_DURATIONS_MS,
   PROGRESS_TOUR_COMPLETION_STORAGE_KEY,
   PROGRESS_TOUR_LAST_RUN_STORAGE_KEY,
 } from "./progressTourSceneConfig";
+import { useLanguage } from "../../contexts/LanguageContext";
+import { threatsAPI } from "../../lib/api";
 
-const TOUR_LABEL = "Progress an Observation";
+const I18N_NS = "progressObservationTour";
 
 /**
- * Cinematic "Progress an Observation" reliability journey tour.
+ * Guided "Observation Resolution Workflow" tour — spotlights real workspace UI.
  */
-export default function ProgressObservationTour({ isOpen, onClose }) {
+export default function ProgressObservationTour({ isOpen, onClose, navigate }) {
+  const { t } = useLanguage();
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+  const [demoThreatId, setDemoThreatId] = useState(null);
   const autoPlayTimerRef = useRef(null);
-  const scenes = PROGRESS_TOUR_SCENES;
+  const scenes = useMemo(() => getProgressTourScenes(t), [t]);
   const scene = scenes[currentIndex];
   const isFirst = currentIndex === 0;
   const isLast = currentIndex === scenes.length - 1;
 
   useEffect(() => {
-    if (isOpen) {
-      setCurrentIndex(0);
-      setIsAutoPlaying(true);
-      try {
-        localStorage.setItem(PROGRESS_TOUR_LAST_RUN_STORAGE_KEY, new Date().toISOString());
-      } catch (e) {
-        /* ignore */
-      }
+    if (!isOpen) {
+      setDemoThreatId(null);
+      return undefined;
     }
+
+    setCurrentIndex(0);
+    setIsAutoPlaying(false);
+    try {
+      localStorage.setItem(PROGRESS_TOUR_LAST_RUN_STORAGE_KEY, new Date().toISOString());
+    } catch (e) {
+      /* ignore */
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await threatsAPI.getTop(1);
+        const first = Array.isArray(data) ? data[0] : data?.threats?.[0];
+        if (!cancelled && first?.id) setDemoThreatId(first.id);
+      } catch (e) {
+        /* ignore — tour still works on observations list */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !scene || typeof navigate !== "function") return;
+
+    if (scene.navigateTo === "threats") {
+      navigate("/threats");
+      return;
+    }
+
+    if (scene.navigateTo === "workspace" && demoThreatId) {
+      navigate(`/threats/${demoThreatId}/workspace`);
+    }
+  }, [isOpen, scene?.id, scene?.navigateTo, navigate, demoThreatId]);
+
+  useEffect(() => {
+    if (!isOpen || !scene) return undefined;
+
+    if (scene.openFullAnalysis) {
+      window.dispatchEvent(new Event("progress-tour:open-full-analysis"));
+    } else if (scene.closeFullAnalysis) {
+      window.dispatchEvent(new Event("progress-tour:close-full-analysis"));
+    }
+  }, [isOpen, scene?.id, scene?.openFullAnalysis, scene?.closeFullAnalysis]);
+
+  useEffect(() => {
+    if (!isOpen || !scene) return undefined;
+    const fire = () => window.dispatchEvent(new Event("resize"));
+    const t1 = setTimeout(fire, 280);
+    const t2 = setTimeout(fire, 650);
+    const t3 = setTimeout(fire, 1100);
+    const t4 = setTimeout(fire, 1800);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+    };
+  }, [isOpen, scene?.id, scene?.navigateTo, scene?.openWorkspaceMenu, scene?.openFullAnalysis, scene?.target]);
+
+  useEffect(() => {
+    if (!isOpen || !scene?.target) return undefined;
+
+    const scrollTarget = () => {
+      const el = document.querySelector(scene.target);
+      el?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+      window.dispatchEvent(new Event("resize"));
+    };
+
+    const t1 = setTimeout(scrollTarget, 700);
+    const t2 = setTimeout(scrollTarget, 1400);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [isOpen, scene?.id, scene?.target]);
+
+  useEffect(() => {
+    if (!isOpen || !scene?.openWorkspaceMenu) return undefined;
+
+    let cancelled = false;
+    const timers = [];
+
+    const openMenu = () => {
+      if (cancelled) return;
+      const btn = document.querySelector('[data-testid="workspace-more-menu"]');
+      if (!btn) return;
+      btn.click();
+      window.dispatchEvent(new Event("resize"));
+    };
+
+    timers.push(setTimeout(openMenu, 750));
+    timers.push(setTimeout(openMenu, 1300));
+
+    return () => {
+      cancelled = true;
+      timers.forEach(clearTimeout);
+      document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    };
+  }, [isOpen, scene?.id, scene?.openWorkspaceMenu]);
 
   const markCompleted = useCallback(() => {
     try {
@@ -61,6 +160,8 @@ export default function ProgressObservationTour({ isOpen, onClose }) {
       clearTimeout(autoPlayTimerRef.current);
       autoPlayTimerRef.current = null;
     }
+    window.dispatchEvent(new Event("progress-tour:close-full-analysis"));
+    document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     if (typeof onClose === "function") onClose();
   }, [onClose]);
 
@@ -215,54 +316,27 @@ export default function ProgressObservationTour({ isOpen, onClose }) {
           spotlightZoom={scene.spotlightZoom || 1}
           pulse={!!scene.pulseTarget}
           active
+          backdropOpacity={0.52}
         />
 
         <button
           type="button"
           onClick={handleSkip}
-          className="absolute top-3 right-3 sm:top-4 sm:right-4 z-[2] inline-flex items-center justify-center w-10 h-10 sm:w-9 sm:h-9 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white border border-white/15 transition-colors"
-          aria-label="Exit tour"
+          className="absolute top-3 right-3 sm:top-4 sm:right-4 z-[2] pointer-events-auto inline-flex items-center justify-center w-10 h-10 sm:w-9 sm:h-9 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white border border-white/15 transition-colors"
+          aria-label={t(`${I18N_NS}.exitTour`)}
           data-testid="progress-observation-tour-close-btn"
         >
           <X className="w-4 h-4" />
         </button>
 
         <motion.div
-          className="relative h-full w-full flex flex-col"
+          className="relative h-full w-full flex flex-col pointer-events-none"
           drag="x"
           dragConstraints={{ left: 0, right: 0 }}
           dragElastic={0.18}
           onDragEnd={handleSwipe}
         >
-          <div
-            className={`flex-1 min-h-0 flex items-stretch px-3 sm:px-4 pt-14 sm:pt-10 pb-2 sm:pb-4 overflow-hidden ${
-              scene.cardPosition === "left"
-                ? "justify-center sm:justify-start sm:pl-6 lg:pl-10"
-                : scene.cardPosition === "right"
-                ? "justify-center sm:justify-end sm:pr-6 lg:pr-10"
-                : "justify-center"
-            }`}
-          >
-            <AnimatePresence mode="wait">
-              {scene.mockVisual && (
-                <motion.div
-                  key={`mock-${scene.id}`}
-                  initial={variant.initial}
-                  animate={variant.animate}
-                  exit={variant.exit}
-                  transition={variant.transition}
-                  className="w-full max-w-full flex items-center justify-center pointer-events-auto"
-                  data-testid={`progress-tour-scene-${scene.id}`}
-                >
-                  <AutoFitScale minScale={0.28} maxScale={1}>
-                    <div style={{ width: "min(92vw, 880px)" }}>
-                      <ProgressSceneMocks mockKey={scene.mockVisual} typedText={scene.typedText} />
-                    </div>
-                  </AutoFitScale>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          <div className="flex-1 min-h-0" aria-hidden="true" />
 
           <div className="shrink-0 px-3 sm:px-4 pb-4 sm:pb-8 pointer-events-none">
             <div className="max-w-5xl mx-auto flex flex-col items-center gap-3 sm:gap-4">
@@ -272,6 +346,7 @@ export default function ProgressObservationTour({ isOpen, onClose }) {
                   title={scene.title}
                   narration={scene.narration}
                   badge={scene.badge}
+                  actionHint={scene.actionHint}
                   sceneIndex={currentIndex}
                   totalScenes={scenes.length}
                   isFirst={isFirst}
@@ -282,7 +357,8 @@ export default function ProgressObservationTour({ isOpen, onClose }) {
                   onSkip={handleSkip}
                   onToggleAutoPlay={handleToggleAutoPlay}
                   position={scene.cardPosition}
-                  tourLabel={TOUR_LABEL}
+                  tourLabel={t(`${I18N_NS}.tourLabel`)}
+                  i18nNamespace={I18N_NS}
                 />
               </AnimatePresence>
 
@@ -291,6 +367,7 @@ export default function ProgressObservationTour({ isOpen, onClose }) {
                   scenes={scenes}
                   currentIndex={currentIndex}
                   onJumpTo={handleJumpTo}
+                  i18nNamespace={I18N_NS}
                 />
               </div>
             </div>

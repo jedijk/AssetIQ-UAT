@@ -5,7 +5,7 @@ import { useLanguage } from "../../contexts/LanguageContext";
 /**
  * Progress dots + chapter label, Apple-style.
  */
-export default function ProgressTracker({ scenes, currentIndex, onJumpTo }) {
+export default function ProgressTracker({ scenes, currentIndex, onJumpTo, i18nNamespace = "observationTour" }) {
   const { t } = useLanguage();
   if (!scenes || scenes.length === 0) return null;
   return (
@@ -13,7 +13,7 @@ export default function ProgressTracker({ scenes, currentIndex, onJumpTo }) {
       <div
         className="tour-progress-dots flex items-center justify-center gap-px sm:gap-1.5 max-w-full px-1 overflow-x-auto flex-nowrap scrollbar-none"
         role="tablist"
-        aria-label={t("observationTour.progressAriaLabel")}
+        aria-label={t(`${i18nNamespace}.progressAriaLabel`)}
       >
         {scenes.map((scene, idx) => {
           const isActive = idx === currentIndex;
@@ -24,7 +24,7 @@ export default function ProgressTracker({ scenes, currentIndex, onJumpTo }) {
               type="button"
               data-tour-progress-dot
               onClick={() => onJumpTo && onJumpTo(idx)}
-              aria-label={t("observationTour.goToScene", {
+              aria-label={t(`${i18nNamespace}.goToScene`, {
                 index: idx + 1,
                 chapter: scene.chapter || scene.title,
               })}
@@ -49,7 +49,7 @@ export default function ProgressTracker({ scenes, currentIndex, onJumpTo }) {
         })}
       </div>
       <div className="text-[8px] sm:text-[11px] uppercase tracking-[0.12em] sm:tracking-[0.25em] text-white/55 text-center px-2">
-        {t("observationTour.sceneProgress", {
+        {t(`${i18nNamespace}.sceneProgress`, {
           current: currentIndex + 1,
           total: scenes.length,
         })}

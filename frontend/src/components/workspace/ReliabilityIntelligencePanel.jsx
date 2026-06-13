@@ -8,7 +8,7 @@ export function ReliabilityIntelligencePanel({ intelligence, onViewFullAnalysis,
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto scrollbar-thin">
+    <div className="bg-white rounded-xl border border-slate-200 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto scrollbar-thin" data-testid="workspace-reliability-intelligence">
       {/* Header — sticky on scroll */}
       <div className="lg:sticky lg:top-0 z-10 bg-white px-4 sm:px-6 pt-4 sm:pt-6 pb-3 border-b border-slate-100">
         <div className="flex items-center gap-3">

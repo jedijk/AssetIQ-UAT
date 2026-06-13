@@ -120,7 +120,7 @@ const ProcessJourney = ({ stages }) => {
   };
 
   return (
-    <div className="bg-white rounded-lg border border-slate-200 px-3 py-2 overflow-hidden">
+    <div className="bg-white rounded-lg border border-slate-200 px-3 py-2 overflow-hidden" data-testid="workspace-process-journey">
       {/* Single-row compact layout: title + steps inline (stacks on very small screens) */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
         <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -316,6 +316,23 @@ const ObservationWorkspacePage = () => {
     setRiskStepComplete(true);
   };
 
+  useEffect(() => {
+    const onOpenFullAnalysis = () => {
+      setRiskStepComplete(false);
+      setShowAnalysisDialog(true);
+    };
+    const onCloseFullAnalysis = () => {
+      setShowAnalysisDialog(false);
+      setRiskStepComplete(false);
+    };
+    window.addEventListener("progress-tour:open-full-analysis", onOpenFullAnalysis);
+    window.addEventListener("progress-tour:close-full-analysis", onCloseFullAnalysis);
+    return () => {
+      window.removeEventListener("progress-tour:open-full-analysis", onOpenFullAnalysis);
+      window.removeEventListener("progress-tour:close-full-analysis", onCloseFullAnalysis);
+    };
+  }, []);
+
   // Compute display title: "equipment - failure mode" or "equipment - Problem" if failure mode is unclear
   // Must be before early returns to satisfy React hooks rules
   const displayTitle = useMemo(() => {
@@ -362,7 +379,7 @@ const ObservationWorkspacePage = () => {
   const { observation, exposure, timeline, reliability_intelligence, recommended_actions, action_plan, process_journey } = workspace;
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-12">
+    <div className="min-h-screen bg-slate-50 pb-12" data-testid="observation-workspace-page">
       {/* Hero header — pinned at top below the 48px app header; does not move when scrolling */}
       <div className="sticky-below-app-header bg-white border-b border-slate-200 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 max-w-7xl">

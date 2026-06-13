@@ -876,7 +876,11 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
         data-testid="workspace-info-grid"
       >
         {infoItems.map((item) => (
-          <div key={item.label} className="bg-white rounded-lg border border-slate-200 px-2 sm:px-3 py-1.5 sm:py-2 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 min-h-[36px] sm:min-h-[44px] text-center">
+          <div
+            key={item.label}
+            className="bg-white rounded-lg border border-slate-200 px-2 sm:px-3 py-1.5 sm:py-2 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 min-h-[36px] sm:min-h-[44px] text-center"
+            data-testid={item.field === "failure_mode" ? "workspace-failure-mode-field" : undefined}
+          >
             <div className="flex items-center gap-1 sm:gap-2 min-w-0 justify-center">
               <item.icon className="w-3 h-3 text-slate-400 flex-shrink-0" />
               <span className="text-[10px] uppercase tracking-wide text-slate-500 truncate flex-shrink-0">{item.label}</span>

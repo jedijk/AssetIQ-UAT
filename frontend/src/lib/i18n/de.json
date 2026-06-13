@@ -2824,5 +2824,96 @@
         "actionHint": "Beenden Sie die Tour und melden Sie eine echte Beobachtung."
       }
     }
+  },
+  "progressObservationTour": {
+    "menuLabel": "Beobachtungs-Abwicklungsworkflow",
+    "tourLabel": "Beobachtungs-Abwicklungsworkflow",
+    "exitTour": "Tour beenden",
+    "skipTour": "Tour überspringen",
+    "skip": "Überspringen",
+    "pause": "Pause",
+    "autoPlay": "Automatisch abspielen",
+    "previous": "Zurück",
+    "next": "Weiter",
+    "finish": "Fertig",
+    "keyboardHint": "← → zum Navigieren · Leertaste für Wiedergabe / Pause · Esc zum Beenden",
+    "mobileHint": "Verwenden Sie die hervorgehobene Steuerung und tippen Sie dann auf Weiter",
+    "sceneProgress": "Szene {current} / {total}",
+    "progressAriaLabel": "Tour-Fortschritt",
+    "goToScene": "Gehe zu Szene {index}: {chapter}",
+    "chapters": {
+      "open": "Öffnen",
+      "failureMode": "Fehlermodus",
+      "reliability": "Zuverlässigkeit",
+      "equipment": "Equipment",
+      "insights": "KI-Einblicke",
+      "recommendations": "Empfehlungen",
+      "actionPlan": "Maßnahmenplan",
+      "investigation": "Untersuchung",
+      "done": "Abgeschlossen"
+    },
+    "scenes": {
+      "open-observation": {
+        "title": "Beobachtung öffnen",
+        "narration": "Wählen Sie eine Beobachtung aus, um Details zu prüfen, das Problem zu analysieren und die nächsten Schritte festzulegen.",
+        "actionHint": "Beobachtung öffnen"
+      },
+      "review-failure-mode": {
+        "title": "Fehlermodus prüfen",
+        "narration": "Prüfen Sie, ob der vorgeschlagene Fehlermodus zum beobachteten Problem passt. Dieser Fehlermodus steuert Risikobewertung, Empfehlungen und künftige Analysen.",
+        "actionHint": "Fehlermodus prüfen"
+      },
+      "link-failure-mode": {
+        "title": "Zuverlässigkeitswissen verknüpfen",
+        "narration": "Wenn der Fehlermodus bereits existiert, verknüpfen Sie ihn aus der Bibliothek. Ist er neu, erstellen Sie ihn und definieren Sie Schweregrad, Auftretenshäufigkeit, Erkennung und empfohlene Maßnahmen.",
+        "actionHint": "Fehlermodus verknüpfen oder erstellen"
+      },
+      "link-equipment": {
+        "title": "Equipment-Kontext verknüpfen",
+        "narration": "Verknüpfen Sie das betroffene Equipment für Kritikalität, Hierarchie, historische Beobachtungen und Asset-Kontext.",
+        "actionHint": "Equipment auswählen"
+      },
+      "ai-insights": {
+        "title": "KI-Analyse prüfen",
+        "narration": "Prüfen Sie KI-generierte Einblicke, wahrscheinliche Ursachen und Risikoindikatoren, um das Problem besser zu verstehen.",
+        "actionHint": "Einblicke prüfen"
+      },
+      "recommended-actions": {
+        "title": "Empfehlungen bewerten",
+        "narration": "Prüfen Sie Maßnahmen aus der Fehlermodus-Bibliothek und der KI-Analyse. Entscheiden Sie, welche Maßnahmen umgesetzt werden sollen.",
+        "actionHint": "Empfehlungen prüfen"
+      },
+      "generate-recommendations": {
+        "title": "Weitere Maßnahmen nötig?",
+        "narration": "Wenn die vorhandenen Empfehlungen nicht ausreichen, nutzen Sie die KI-Analyse, um zusätzliche Minderungs- und Präventionsmaßnahmen zu generieren.",
+        "actionHint": "Empfehlungen generieren"
+      },
+      "build-action-plan": {
+        "title": "Maßnahmenplan erstellen",
+        "narration": "Übernehmen Sie empfohlene Maßnahmen in den Maßnahmenplan. Diese werden als nachverfolgte Arbeitspunkte zur Problemlösung geführt.",
+        "actionHint": "Maßnahmen zum Plan hinzufügen"
+      },
+      "refine-actions": {
+        "title": "Maßnahmenplan finalisieren",
+        "narration": "Bearbeiten Sie Maßnahmen, passen Sie Prioritäten an, weisen Sie Disziplinen zu und ergänzen Sie fehlende Aufgaben zur vollständigen Behebung.",
+        "actionHint": "Maßnahmen bearbeiten oder hinzufügen"
+      },
+      "validate-plan": {
+        "title": "Maßnahmen validieren",
+        "narration": "Validieren Sie Maßnahmen vor der Ausführung, damit der vorgeschlagene Plan technisch fundiert und freigegeben ist.",
+        "actionHint": "Plan validieren"
+      },
+      "start-investigation": {
+        "title": "Root-Cause-Analyse nötig?",
+        "narration": "Bei komplexen oder wiederkehrenden Problemen starten Sie eine vollständige Untersuchung. AssetIQ kann KI-gestützte Ursachenanalyse durchführen und eine Untersuchung mit dieser Beobachtung verknüpfen.",
+        "actionHint": "Untersuchung starten"
+      },
+      "complete": {
+        "title": "Beobachtung bereit zur Ausführung",
+        "narration": "Gut gemacht. Die Beobachtung ist mit Zuverlässigkeitswissen verknüpft, mit Equipment verbunden, durch Empfehlungen unterstützt und durch einen umsetzbaren Lösungsplan abgesichert.",
+        "actionHint": "Beenden Sie die Tour und wenden Sie diese Schritte auf eine echte Beobachtung an.",
+        "badge": "Bereit"
+      }
+    }
   }
 }

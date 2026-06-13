@@ -251,7 +251,7 @@ export default function LayoutHeader({
                   data-testid="progress-observation-tour-menu-item"
                 >
                   <Route className="w-3.5 h-3.5 mr-2 text-purple-500" />
-                  Progress an Observation
+                  {t("progressObservationTour.menuLabel")}
                 </DropdownMenuItem>
                 )}
                 <DropdownMenuItem 

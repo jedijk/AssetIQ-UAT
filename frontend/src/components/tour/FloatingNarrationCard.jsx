@@ -33,10 +33,11 @@ export default function FloatingNarrationCard({
   position = "center",
   tourLabel,
   actionHint,
+  i18nNamespace = "observationTour",
   children,
 }) {
   const { t } = useLanguage();
-  const label = tourLabel || t("observationTour.tourLabel");
+  const label = tourLabel || t(`${i18nNamespace}.tourLabel`);
   // We intentionally don't fight the SpotlightEngine: this card is anchored
   // bottom-center via parent layout, while the spotlight handles direction
   // cues. We use the `position` prop to subtly bias horizontal alignment.
@@ -126,8 +127,8 @@ export default function FloatingNarrationCard({
               data-testid="tour-skip-btn"
             >
               <SkipForward className="w-4 h-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">{t("observationTour.skipTour")}</span>
-              <span className="sm:hidden ml-1.5">{t("observationTour.skip")}</span>
+              <span className="hidden sm:inline">{t(`${i18nNamespace}.skipTour`)}</span>
+              <span className="sm:hidden ml-1.5">{t(`${i18nNamespace}.skip`)}</span>
             </Button>
             <Button
               type="button"
@@ -141,12 +142,12 @@ export default function FloatingNarrationCard({
               {isAutoPlaying ? (
                 <>
                   <Pause className="w-4 h-4 sm:mr-1.5" />
-                  <span className="hidden sm:inline">{t("observationTour.pause")}</span>
+                  <span className="hidden sm:inline">{t(`${i18nNamespace}.pause`)}</span>
                 </>
               ) : (
                 <>
                   <Play className="w-4 h-4 sm:mr-1.5" />
-                  <span className="hidden sm:inline">{t("observationTour.autoPlay")}</span>
+                  <span className="hidden sm:inline">{t(`${i18nNamespace}.autoPlay`)}</span>
                 </>
               )}
             </Button>
@@ -163,7 +164,7 @@ export default function FloatingNarrationCard({
               data-testid="tour-prev-btn"
             >
               <ChevronLeft className="w-4 h-4 sm:mr-1" />
-              <span className="hidden sm:inline">{t("observationTour.previous")}</span>
+              <span className="hidden sm:inline">{t(`${i18nNamespace}.previous`)}</span>
             </Button>
             <Button
               type="button"
@@ -174,12 +175,12 @@ export default function FloatingNarrationCard({
             >
               {isLast ? (
                 <>
-                  {t("observationTour.finish")}
+                  {t(`${i18nNamespace}.finish`)}
                   <CheckCircle className="w-4 h-4 ml-1.5" />
                 </>
               ) : (
                 <>
-                  {t("observationTour.next")}
+                  {t(`${i18nNamespace}.next`)}
                   <ChevronRight className="w-4 h-4 ml-1" />
                 </>
               )}
@@ -189,12 +190,12 @@ export default function FloatingNarrationCard({
       </div>
 
       <div className="mt-3 hidden sm:block text-center text-[11px] text-white/40 tracking-wide">
-        {t("observationTour.keyboardHint")}
+        {t(`${i18nNamespace}.keyboardHint`)}
       </div>
 
       {/* Swipe hint — mobile only */}
       <div className="mt-2 sm:hidden text-center text-[11px] text-white/45 tracking-wide">
-        {t("observationTour.mobileHint")}
+        {t(`${i18nNamespace}.mobileHint`)}
       </div>
     </motion.div>
   );

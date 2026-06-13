@@ -70,6 +70,7 @@ function RecommendedActionCard({ action, onAddToPlan, onAddToStrategy, isAdding,
           disabled={isAdding || isInPlan}
           className={`h-7 w-7 p-0 flex-shrink-0 ${isInPlan ? 'bg-green-600' : ''}`}
           title={isInPlan ? t("observationWorkspace.alreadyInPlan") : t("observationWorkspace.addToPlanTitle")}
+          data-testid="recommended-action-add-btn"
         >
           {isAdding ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -105,7 +106,7 @@ export function RecommendedActionsPanel({ recommendations, onAddToPlan, onAddToS
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto scrollbar-thin">
+    <div className="bg-white rounded-xl border border-slate-200 lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto scrollbar-thin" data-testid="recommended-actions-panel">
       {/* Header — sticky on scroll */}
       <div className="lg:sticky lg:top-0 z-10 bg-white px-4 sm:px-6 pt-4 sm:pt-6 pb-3 border-b border-slate-100">
         <div className="flex items-start justify-between gap-3">

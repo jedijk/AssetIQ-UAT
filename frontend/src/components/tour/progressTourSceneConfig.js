@@ -1,230 +1,176 @@
 /**
- * Scene configuration for the cinematic "Progress an Observation" tour.
+ * Guided "Observation Resolution Workflow" tour — spotlights real workspace UI.
+ *
+ * Scene copy is resolved via i18n in getProgressTourScenes(t).
  */
 
 /** Set false to hide the tour from Help and skip mounting the overlay. */
-export const PROGRESS_OBSERVATION_TOUR_ENABLED = false;
+export const PROGRESS_OBSERVATION_TOUR_ENABLED = true;
 
-export const PROGRESS_TOUR_SCENES = [
+const PROGRESS_TOUR_SCENE_DEFS = [
   {
-    id: "opened",
-    title: "Start with the Observation",
-    narration:
-      "Every reliability improvement starts with an observation. AssetIQ uses the reported problem to identify potential failure modes, investigations and corrective actions.",
-    mockVisual: "progressOpened",
-    target: null,
+    id: "open-observation",
+    chapterKey: "open",
+    navigateTo: "threats",
+    target: '[data-testid^="threat-item-"]',
     cardPosition: "center",
+    pulseTarget: true,
+    spotlightZoom: 1.1,
     transition: "fade",
-    chapter: "Observation opened",
-    typedText: "High vibration detected on Pump P-101 during operation.",
   },
   {
-    id: "suggested-fm",
-    title: "Review the Suggested Failure Mode",
-    narration:
-      "AssetIQ analyses the observation and equipment context to identify the most likely failure mode.",
-    mockVisual: "progressSuggestedFm",
-    target: null,
-    cardPosition: "left",
-    transition: "zoom",
-    chapter: "Suggested failure mode",
-    badge: "AI suggested",
+    id: "review-failure-mode",
+    chapterKey: "failureMode",
+    navigateTo: "workspace",
+    target: '[data-testid="workspace-failure-mode-field"]',
+    cardPosition: "right",
+    pulseTarget: false,
+    spotlightZoom: 1.08,
+    transition: "fade",
   },
   {
-    id: "confirm-fm",
-    title: "Apply Engineering Judgement",
-    narration:
-      "Review whether the suggested failure mode accurately explains the reported problem. Confirm when correct, or search the library to select a better match.",
-    mockVisual: "progressConfirmFm",
-    target: null,
+    id: "link-failure-mode",
+    chapterKey: "reliability",
+    navigateTo: "workspace",
+    openWorkspaceMenu: true,
+    target: '[data-testid="menu-link-failure-mode"]',
     cardPosition: "left",
+    pulseTarget: true,
+    spotlightZoom: 1.15,
     transition: "spotlight",
-    chapter: "Confirm failure mode",
   },
   {
-    id: "investigation-decision",
-    title: "Do We Understand the Cause?",
-    narration:
-      "Some observations can move directly to action planning. Others require investigation before corrective actions can be selected.",
-    mockVisual: "progressInvestigationDecision",
-    target: null,
-    cardPosition: "center",
-    transition: "fade",
-    chapter: "Investigation decision",
-  },
-  {
-    id: "ai-analysis",
-    title: "Analyse the Observation",
-    narration:
-      "AssetIQ AI evaluates the observation, equipment context, reliability knowledge and historical information to identify possible causes and investigative paths.",
-    mockVisual: "progressAiAnalysis",
-    target: null,
+    id: "link-equipment",
+    chapterKey: "equipment",
+    navigateTo: "workspace",
+    openWorkspaceMenu: true,
+    target: '[data-testid="menu-link-equipment"]',
     cardPosition: "left",
-    transition: "zoom",
-    chapter: "AI analysis",
-    badge: "AI processing",
+    pulseTarget: true,
+    spotlightZoom: 1.15,
+    transition: "spotlight",
   },
   {
-    id: "create-investigation",
-    title: "Create an Investigation",
-    narration:
-      "Convert the AI analysis into a structured investigation and begin collecting evidence.",
-    mockVisual: "progressCreateInvestigation",
-    target: null,
+    id: "ai-insights",
+    chapterKey: "insights",
+    navigateTo: "workspace",
+    openFullAnalysis: true,
+    target: '[data-testid="ai-insights-panel"], [data-testid="workspace-reliability-intelligence"]',
     cardPosition: "left",
+    pulseTarget: false,
+    spotlightZoom: 1.05,
     transition: "fade",
-    chapter: "Create investigation",
-  },
-  {
-    id: "investigation-plan",
-    title: "Follow the Investigation Plan",
-    narration:
-      "AssetIQ proposes investigation activities and evidence requirements.",
-    mockVisual: "progressInvestigationPlan",
-    target: null,
-    cardPosition: "left",
-    transition: "pan",
-    chapter: "Investigation plan",
-    badge: "AI generated",
-  },
-  {
-    id: "investigation-results",
-    title: "Confirm the Cause",
-    narration:
-      "Once evidence has been collected, validate the most likely failure mode and continue to action planning.",
-    mockVisual: "progressInvestigationResults",
-    target: null,
-    cardPosition: "center",
-    transition: "fade",
-    chapter: "Investigation results",
-    badge: "Investigation complete",
   },
   {
     id: "recommended-actions",
-    title: "Review Recommended Actions",
-    narration:
-      "AssetIQ recommends actions associated with the selected failure mode and reliability strategy.",
-    mockVisual: "progressRecommendedActions",
-    target: null,
+    chapterKey: "recommendations",
+    navigateTo: "workspace",
+    closeFullAnalysis: true,
+    target: '[data-testid="recommended-actions-panel"]',
     cardPosition: "left",
+    pulseTarget: false,
+    spotlightZoom: 1.06,
     transition: "pan",
-    chapter: "Recommended actions",
   },
   {
-    id: "ai-recommendations",
-    title: "Need More Actions?",
-    narration:
-      "If additional mitigations are required, AssetIQ AI can propose further recommendations.",
-    mockVisual: "progressAiRecommendations",
-    target: null,
+    id: "generate-recommendations",
+    chapterKey: "recommendations",
+    navigateTo: "workspace",
+    target: '[data-testid="run-ai-recommendations-btn"]',
     cardPosition: "left",
-    transition: "zoom",
-    chapter: "AI recommendations",
-    badge: "AI generated",
-  },
-  {
-    id: "action-plan",
-    title: "Build the Response Plan",
-    narration:
-      "Select the actions required to reduce risk and resolve the issue.",
-    mockVisual: "progressActionPlan",
-    target: null,
-    cardPosition: "left",
-    transition: "fade",
-    chapter: "Action plan",
-  },
-  {
-    id: "add-to-plan",
-    title: "Add Recommended Actions",
-    narration:
-      "Recommended actions can be added directly into the action plan.",
-    mockVisual: "progressAddToPlan",
-    target: null,
-    cardPosition: "left",
+    pulseTarget: true,
+    spotlightZoom: 1.2,
     transition: "spotlight",
-    chapter: "Add to plan",
   },
   {
-    id: "edit-actions",
-    title: "Tailor Actions to Your Site",
-    narration:
-      "Recommended actions are a starting point. Adjust them to fit local operating requirements.",
-    mockVisual: "progressEditActions",
-    target: null,
+    id: "build-action-plan",
+    chapterKey: "actionPlan",
+    navigateTo: "workspace",
+    target: '[data-testid="recommended-action-add-btn"]',
     cardPosition: "left",
-    transition: "fade",
-    chapter: "Edit actions",
+    pulseTarget: true,
+    spotlightZoom: 1.2,
+    transition: "spotlight",
   },
   {
-    id: "manual-action",
-    title: "Add Missing Actions",
-    narration:
-      "Create additional actions whenever work is required that was not suggested by AssetIQ.",
-    mockVisual: "progressManualAction",
-    target: null,
+    id: "refine-actions",
+    chapterKey: "actionPlan",
+    navigateTo: "workspace",
+    target: '[data-testid="action-plan-panel"]',
     cardPosition: "left",
+    pulseTarget: false,
+    spotlightZoom: 1.06,
     transition: "fade",
-    chapter: "Manual actions",
   },
   {
-    id: "review-plan",
-    title: "Validate the Plan",
-    narration:
-      "Review all selected, AI-generated and manually created actions before finalizing.",
-    mockVisual: "progressReviewPlan",
-    target: null,
-    cardPosition: "center",
-    transition: "zoom",
-    chapter: "Review plan",
+    id: "validate-plan",
+    chapterKey: "actionPlan",
+    navigateTo: "workspace",
+    target: '[data-testid^="action-plan-edit-"], [data-testid="action-plan-add-btn"]',
+    cardPosition: "left",
+    pulseTarget: true,
+    spotlightZoom: 1.12,
+    transition: "pan",
   },
   {
-    id: "finalize",
-    title: "Observation Successfully Progressed",
-    narration:
-      "The observation now has a validated failure mode and a complete action plan ready for execution.",
-    mockVisual: "progressFinalize",
-    target: null,
+    id: "start-investigation",
+    chapterKey: "investigation",
+    navigateTo: "workspace",
+    openFullAnalysis: true,
+    target: '[data-testid="start-investigation-btn"], [data-testid="generate-causes-btn"]',
+    cardPosition: "left",
+    pulseTarget: true,
+    spotlightZoom: 1.15,
+    transition: "spotlight",
+  },
+  {
+    id: "complete",
+    chapterKey: "done",
+    navigateTo: "workspace",
+    closeFullAnalysis: true,
+    target: '[data-testid="workspace-process-journey"], [data-testid="observation-workspace-page"]',
     cardPosition: "center",
+    pulseTarget: false,
+    spotlightZoom: 1.08,
     transition: "fade",
-    chapter: "Finalize",
-    badge: "Observation progressed",
-  },
-  {
-    id: "business-impact",
-    title: "From Observation to Exposure Reduction",
-    narration:
-      "AssetIQ transforms observations into structured reliability improvements that reduce operational exposure.",
-    mockVisual: "progressBusinessImpact",
-    target: null,
-    cardPosition: "center",
-    transition: "zoom",
-    chapter: "Business impact",
   },
 ];
 
-export const PROGRESS_AUTO_PLAY_DURATION_MS = 6500;
+export function getProgressTourScenes(t) {
+  return PROGRESS_TOUR_SCENE_DEFS.map((def) => {
+    const { chapterKey, ...scene } = def;
+    const baseKey = `progressObservationTour.scenes.${def.id}`;
+    const badgeKey = `${baseKey}.badge`;
+    const badge = def.id === "complete" ? t(badgeKey) : undefined;
+    return {
+      ...scene,
+      title: t(`${baseKey}.title`),
+      narration: t(`${baseKey}.narration`),
+      actionHint: t(`${baseKey}.actionHint`),
+      chapter: t(`progressObservationTour.chapters.${chapterKey}`),
+      ...(badge && badge !== badgeKey ? { badge } : {}),
+    };
+  });
+}
+
+export const PROGRESS_AUTO_PLAY_DURATION_MS = 7000;
 
 export const PROGRESS_SCENE_DURATIONS_MS = {
-  opened: 7000,
-  "suggested-fm": 7500,
-  "confirm-fm": 9500,
-  "investigation-decision": 8000,
-  "ai-analysis": 10000,
-  "create-investigation": 8500,
-  "investigation-plan": 8500,
-  "investigation-results": 9000,
-  "recommended-actions": 7500,
-  "ai-recommendations": 9000,
-  "action-plan": 8000,
-  "add-to-plan": 8000,
-  "edit-actions": 7500,
-  "manual-action": 7500,
-  "review-plan": 8500,
-  finalize: 9000,
-  "business-impact": 11000,
+  "open-observation": 9000,
+  "review-failure-mode": 9000,
+  "link-failure-mode": 10000,
+  "link-equipment": 10000,
+  "ai-insights": 11000,
+  "recommended-actions": 9000,
+  "generate-recommendations": 9000,
+  "build-action-plan": 10000,
+  "refine-actions": 10000,
+  "validate-plan": 10000,
+  "start-investigation": 11000,
+  complete: 9000,
 };
 
 export const PROGRESS_TOUR_COMPLETION_STORAGE_KEY =
-  "assetiq.progress_observation_tour_v1.completed";
+  "assetiq.progress_observation_tour_v2.completed";
 export const PROGRESS_TOUR_LAST_RUN_STORAGE_KEY =
-  "assetiq.progress_observation_tour_v1.last_run";
+  "assetiq.progress_observation_tour_v2.last_run";

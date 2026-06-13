@@ -765,6 +765,7 @@ const Layout = () => {
       <ProgressObservationTour
         isOpen={progressObservationTourOpen}
         onClose={() => setProgressObservationTourOpen(false)}
+        navigate={navigate}
       />
       )}
 

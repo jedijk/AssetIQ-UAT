@@ -2709,5 +2709,96 @@
         "actionHint": "Finish the tour and try reporting a real observation."
       }
     }
+  },
+  "progressObservationTour": {
+    "menuLabel": "Observation Resolution Workflow",
+    "tourLabel": "Observation Resolution Workflow",
+    "exitTour": "Exit tour",
+    "skipTour": "Skip tour",
+    "skip": "Skip",
+    "pause": "Pause",
+    "autoPlay": "Auto-play",
+    "previous": "Previous",
+    "next": "Next",
+    "finish": "Finish",
+    "keyboardHint": "Use ← → to navigate · Space to play / pause · Esc to exit",
+    "mobileHint": "Use the highlighted control, then tap Next",
+    "sceneProgress": "Scene {current} / {total}",
+    "progressAriaLabel": "Tour scene progress",
+    "goToScene": "Go to scene {index}: {chapter}",
+    "chapters": {
+      "open": "Open",
+      "failureMode": "Failure Mode",
+      "reliability": "Reliability",
+      "equipment": "Equipment",
+      "insights": "AI Insights",
+      "recommendations": "Recommendations",
+      "actionPlan": "Action Plan",
+      "investigation": "Investigation",
+      "done": "Complete"
+    },
+    "scenes": {
+      "open-observation": {
+        "title": "Open an Observation",
+        "narration": "Select an observation to review its details, analyze the issue, and determine the next actions.",
+        "actionHint": "Open Observation"
+      },
+      "review-failure-mode": {
+        "title": "Review Failure Mode",
+        "narration": "Verify that the suggested failure mode matches the observed problem. This failure mode drives risk scoring, recommendations, and future analysis.",
+        "actionHint": "Review failure mode"
+      },
+      "link-failure-mode": {
+        "title": "Connect Reliability Knowledge",
+        "narration": "If the failure mode already exists, link it from the library. If it is new, create it and define severity, occurrence, detection, and recommended actions.",
+        "actionHint": "Link or Create Failure Mode"
+      },
+      "link-equipment": {
+        "title": "Connect Equipment Context",
+        "narration": "Link the affected equipment to provide criticality, hierarchy, historical observations, and asset context.",
+        "actionHint": "Select equipment"
+      },
+      "ai-insights": {
+        "title": "Review AI Analysis",
+        "narration": "Review AI-generated insights, likely causes, and risk indicators to better understand the issue.",
+        "actionHint": "Review insights"
+      },
+      "recommended-actions": {
+        "title": "Evaluate Recommendations",
+        "narration": "Review actions suggested by the failure mode library and AI analysis. Determine which actions should be implemented.",
+        "actionHint": "Review recommendations"
+      },
+      "generate-recommendations": {
+        "title": "Need More Actions?",
+        "narration": "If the existing recommendations are insufficient, use AI analysis to generate additional mitigation and prevention actions.",
+        "actionHint": "Generate recommendations"
+      },
+      "build-action-plan": {
+        "title": "Create Action Plan",
+        "narration": "Promote recommended actions into the Action Plan. These actions become tracked work items used to resolve the issue.",
+        "actionHint": "Add actions to plan"
+      },
+      "refine-actions": {
+        "title": "Finalize Action Plan",
+        "narration": "Edit actions, adjust priorities, assign disciplines, and add any missing tasks required to fully address the issue.",
+        "actionHint": "Edit or add actions"
+      },
+      "validate-plan": {
+        "title": "Validate Actions",
+        "narration": "Validate actions before execution to ensure the proposed plan is technically sound and approved.",
+        "actionHint": "Validate plan"
+      },
+      "start-investigation": {
+        "title": "Need Root Cause Analysis?",
+        "narration": "For complex or recurring issues, launch a full investigation. AssetIQ can perform AI-assisted causal analysis and create an investigation linked to this observation.",
+        "actionHint": "Start investigation"
+      },
+      "complete": {
+        "title": "Observation Ready for Execution",
+        "narration": "Great work. The observation is now linked to reliability knowledge, connected to equipment, supported by recommendations, and backed by an actionable resolution plan.",
+        "actionHint": "Finish the tour and apply these steps to a real observation.",
+        "badge": "Ready"
+      }
+    }
   }
 }

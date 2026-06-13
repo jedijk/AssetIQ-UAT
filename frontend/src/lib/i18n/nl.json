@@ -2824,5 +2824,96 @@
         "actionHint": "Rond de rondleiding af en probeer een echte observatie te melden."
       }
     }
+  },
+  "progressObservationTour": {
+    "menuLabel": "Observatie-afhandelingsworkflow",
+    "tourLabel": "Observatie-afhandelingsworkflow",
+    "exitTour": "Rondleiding sluiten",
+    "skipTour": "Rondleiding overslaan",
+    "skip": "Overslaan",
+    "pause": "Pauzeren",
+    "autoPlay": "Automatisch afspelen",
+    "previous": "Vorige",
+    "next": "Volgende",
+    "finish": "Afronden",
+    "keyboardHint": "Gebruik ← → om te navigeren · Spatie om af te spelen / te pauzeren · Esc om te sluiten",
+    "mobileHint": "Gebruik de gemarkeerde bediening en tik daarna op Volgende",
+    "sceneProgress": "Scène {current} / {total}",
+    "progressAriaLabel": "Voortgang rondleiding",
+    "goToScene": "Ga naar scène {index}: {chapter}",
+    "chapters": {
+      "open": "Openen",
+      "failureMode": "Storingsmodus",
+      "reliability": "Betrouwbaarheid",
+      "equipment": "Equipment",
+      "insights": "AI-inzichten",
+      "recommendations": "Aanbevelingen",
+      "actionPlan": "Actieplan",
+      "investigation": "Onderzoek",
+      "done": "Voltooid"
+    },
+    "scenes": {
+      "open-observation": {
+        "title": "Open een observatie",
+        "narration": "Selecteer een observatie om details te bekijken, het probleem te analyseren en de volgende stappen te bepalen.",
+        "actionHint": "Observatie openen"
+      },
+      "review-failure-mode": {
+        "title": "Storingsmodus beoordelen",
+        "narration": "Controleer of de voorgestelde storingsmodus overeenkomt met het waargenomen probleem. Deze storingsmodus stuurt risicoscores, aanbevelingen en toekomstige analyses.",
+        "actionHint": "Storingsmodus beoordelen"
+      },
+      "link-failure-mode": {
+        "title": "Betrouwbaarheidskennis koppelen",
+        "narration": "Als de storingsmodus al bestaat, koppel deze vanuit de bibliotheek. Is het nieuw, maak hem dan aan en definieer ernst, frequentie, detectie en aanbevolen acties.",
+        "actionHint": "Storingsmodus koppelen of aanmaken"
+      },
+      "link-equipment": {
+        "title": "Equipmentcontext koppelen",
+        "narration": "Koppel het betrokken equipment voor criticaliteit, hiërarchie, historische observaties en assetcontext.",
+        "actionHint": "Equipment selecteren"
+      },
+      "ai-insights": {
+        "title": "AI-analyse bekijken",
+        "narration": "Bekijk AI-gegenereerde inzichten, waarschijnlijke oorzaken en risico-indicatoren om het probleem beter te begrijpen.",
+        "actionHint": "Inzichten bekijken"
+      },
+      "recommended-actions": {
+        "title": "Aanbevelingen evalueren",
+        "narration": "Bekijk acties voorgesteld door de storingsmodusbibliotheek en AI-analyse. Bepaal welke acties moeten worden uitgevoerd.",
+        "actionHint": "Aanbevelingen bekijken"
+      },
+      "generate-recommendations": {
+        "title": "Meer acties nodig?",
+        "narration": "Als de bestaande aanbevelingen onvoldoende zijn, gebruik dan AI-analyse om extra mitigatie- en preventieacties te genereren.",
+        "actionHint": "Aanbevelingen genereren"
+      },
+      "build-action-plan": {
+        "title": "Actieplan maken",
+        "narration": "Promoveer aanbevolen acties naar het actieplan. Deze acties worden bijgehouden als werkitems om het probleem op te lossen.",
+        "actionHint": "Acties toevoegen aan plan"
+      },
+      "refine-actions": {
+        "title": "Actieplan afronden",
+        "narration": "Bewerk acties, pas prioriteiten aan, wijs disciplines toe en voeg ontbrekende taken toe om het probleem volledig aan te pakken.",
+        "actionHint": "Acties bewerken of toevoegen"
+      },
+      "validate-plan": {
+        "title": "Acties valideren",
+        "narration": "Valideer acties vóór uitvoering om te zorgen dat het voorgestelde plan technisch klopt en is goedgekeurd.",
+        "actionHint": "Plan valideren"
+      },
+      "start-investigation": {
+        "title": "Rootcause-analyse nodig?",
+        "narration": "Voor complexe of terugkerende problemen start u een volledig onderzoek. AssetIQ kan AI-ondersteunde oorzaakanalyse uitvoeren en een onderzoek koppelen aan deze observatie.",
+        "actionHint": "Onderzoek starten"
+      },
+      "complete": {
+        "title": "Observatie klaar voor uitvoering",
+        "narration": "Goed gedaan. De observatie is gekoppeld aan betrouwbaarheidskennis, verbonden met equipment, ondersteund door aanbevelingen en voorzien van een uitvoerbaar oplossingsplan.",
+        "actionHint": "Rond de rondleiding af en pas deze stappen toe op een echte observatie.",
+        "badge": "Gereed"
+      }
+    }
   }
 }
