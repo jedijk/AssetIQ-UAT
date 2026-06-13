@@ -104,6 +104,7 @@ async def _fetch_scoped_observations(current_user: dict) -> List[dict]:
         {
             "_id": 0,
             "id": 1,
+            "title": 1,
             "linked_equipment_id": 1,
             "asset": 1,
             "failure_mode": 1,
@@ -488,6 +489,11 @@ async def get_executive_dashboard(
         previous_period_program_equipment_ids,
         hourly_cost,
     )
+    prev_uncovered, _ = calculate_uncovered_assessed_exposure(
+        equipment_nodes,
+        previous_period_program_equipment_ids,
+        hourly_cost,
+    )
 
     active_threat_exposure = 0.0
     critical_active_exposure = 0.0
@@ -511,6 +517,7 @@ async def get_executive_dashboard(
             "failure_mode": "No Maintenance Program",
             "description": "Assessed equipment without an active maintenance program",
             "equipment_type": equipment.get("equipment_type_id"),
+            "criticality": equipment.get("criticality"),
             "production_impact": production_impact,
             "exposure_value": exposure_value,
             "exposure_formatted": format_currency(exposure_value, currency_symbol),
@@ -558,10 +565,17 @@ async def get_executive_dashboard(
         is_active = is_active_observation_status(status)
         
         description = obs.get("user_context") or obs.get("description") or ""
+        title = (
+            obs.get("title")
+            or obs.get("failure_mode")
+            or (description[:80] if description else "Untitled Observation")
+        )
         observation_data = {
+            "title": title,
             "asset": obs.get("asset") or equipment.get("name") if equipment else "Unassigned",
             "failure_mode": obs.get("failure_mode") or description[:50],
             "description": description[:100],
+            "created_at": created_at,
             "equipment_type": equipment_type_id,
             "production_impact": production_impact,
             "severity": obs.get("risk_level"),
@@ -629,6 +643,9 @@ async def get_executive_dashboard(
     
     # 5. High exposure trend
     critical_change, critical_trend = calculate_trend(critical_active_exposure, prev_critical, higher_is_better=False)
+
+    # 6. Uncovered exposure trend
+    uncovered_change, uncovered_trend = calculate_trend(uncovered_exposure, prev_uncovered, higher_is_better=False)
     
     # ============= Build KPI Cards =============
     
@@ -648,6 +665,19 @@ async def get_executive_dashboard(
                 f"({coverage_current:.0f}% of total assessed exposure)."
             ),
             evidence_count=active_maintenance_program_count,
+        ),
+        "uncovered_exposure": KPICard(
+            value=uncovered_exposure,
+            formatted_value=format_currency(uncovered_exposure, currency_symbol),
+            previous_value=prev_uncovered,
+            previous_formatted=format_currency(prev_uncovered, currency_symbol),
+            change_percent=uncovered_change,
+            trend=uncovered_trend,
+            tooltip=(
+                "Assessed production impact for equipment without an active maintenance program "
+                f"or imported PM plan ({uncovered_equipment_count} assets)."
+            ),
+            evidence_count=uncovered_equipment_count,
         ),
         "active_threat_exposure": KPICard(
             value=active_threat_exposure,
