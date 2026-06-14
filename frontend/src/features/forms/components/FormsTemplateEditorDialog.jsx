@@ -32,6 +32,7 @@ export function FormsTemplateEditorDialog({
   onAddField,
   onEditField,
   onRemoveField,
+  onCancel,
 }) {
   const queryClient = useQueryClient();
   return (
@@ -585,7 +586,7 @@ export function FormsTemplateEditorDialog({
           <DialogFooter>
             <Button variant="outline" onClick={() => {
               onOpenChange(false);
-              resetNewTemplate();
+              onCancel?.();
             }}>
               Cancel
             </Button>
