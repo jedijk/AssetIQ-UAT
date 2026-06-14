@@ -26,6 +26,7 @@ from ai_helpers import (
     translate_to_english_for_record,
     generate_observation_description,
 )
+from services.tenant_schema import merge_tenant_filter, with_tenant_id
 from chat_handler_v2 import process_chat_message, ChatState, _chat_ui
 from services.equipment_search_service import search_equipment_hierarchy
 from failure_modes import FAILURE_MODES_LIBRARY
@@ -177,6 +178,13 @@ async def _reset_conv(user_id: str):
 # ---------------------------------------------------------------------------
 # Store assistant message helper
 # ---------------------------------------------------------------------------
+async def _tenant_ctx_for_user(user_id: str) -> Optional[dict]:
+    return await db.users.find_one(
+        {"id": user_id},
+        {"_id": 0, "company_id": 1, "organization_id": 1},
+    )
+
+
 async def _store_assistant_msg(user_id: str, content: str, **extra) -> dict:
     msg = {
         "id": str(uuid.uuid4()),
@@ -186,6 +194,7 @@ async def _store_assistant_msg(user_id: str, content: str, **extra) -> dict:
         "created_at": datetime.now(timezone.utc).isoformat(),
         **extra,
     }
+    with_tenant_id(msg, await _tenant_ctx_for_user(user_id))
     await db.chat_messages.insert_one(msg)
     return msg
 
@@ -717,6 +726,7 @@ async def _core_chat_process(user_id: str, content: str, session_id: str,
         "image_data": image_thumbnail,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+    with_tenant_id(user_msg, await _tenant_ctx_for_user(user_id))
     await db.chat_messages.insert_one(user_msg)
 
     # 2. Read conversation state (single source of truth)
@@ -1314,7 +1324,8 @@ async def send_chat_message(
 @router.get("/chat/history")
 async def get_chat_history(limit: int = 50, current_user: dict = Depends(_tasks_read)):
     messages = await db.chat_messages.find(
-        {"user_id": current_user["id"]}, {"_id": 0}
+        merge_tenant_filter({"user_id": current_user["id"]}, current_user),
+        {"_id": 0},
     ).sort("created_at", -1).limit(limit).to_list(limit)
     return list(reversed(messages))
 
@@ -1322,7 +1333,9 @@ async def get_chat_history(limit: int = 50, current_user: dict = Depends(_tasks_
 @router.delete("/chat/clear")
 async def clear_chat_history(current_user: dict = Depends(require_permission("tasks:read"))):
     user_id = current_user["id"]
-    result = await db.chat_messages.delete_many({"user_id": user_id})
+    result = await db.chat_messages.delete_many(
+        merge_tenant_filter({"user_id": user_id}, current_user)
+    )
     await db.chat_conversations.delete_many({"user_id": user_id})
     return {"success": True, "deleted_messages": result.deleted_count, "message": "Chat history cleared"}
 

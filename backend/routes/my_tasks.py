@@ -28,6 +28,14 @@ _tasks_read = require_permission("tasks:read")
 _tasks_write = require_permission("tasks:write")
 
 
+@router.get("/my-tasks/kpis")
+async def get_my_tasks_kpis(current_user: dict = Depends(_tasks_read)):
+    """Materialized work execution KPIs for the current user."""
+    from services.work_execution_kpi_materializer import get_or_compute_work_execution_kpis
+
+    return await get_or_compute_work_execution_kpis(current_user)
+
+
 def _assigned_user_id_str(task: dict) -> Optional[str]:
     raw = task.get("assigned_user_id")
     if raw is None:

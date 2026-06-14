@@ -12,6 +12,8 @@ from services.tenant_schema import (
     WAVE1_COLLECTIONS,
     WAVE2_COLLECTIONS,
     WAVE3_COLLECTIONS,
+    WAVE4_COLLECTIONS,
+    WAVE5_COLLECTIONS,
 )
 
 
@@ -61,6 +63,38 @@ async def phase2_exit_ready(db) -> Tuple[bool, List[str]]:
     if not wave2_ok:
         gaps.append("Wave 2 collections missing tenant_id — run backfill_tenant_id.py --wave2")
     return wave1_ok and wave2_ok, gaps
+
+
+async def wave4_exit_ready(db) -> Tuple[bool, List[str]]:
+    """Wave 4 exit gate: telemetry and template collections backfilled."""
+    wave4_ok, _ = await wave_coverage(db, WAVE4_COLLECTIONS)
+    gaps: List[str] = []
+    if not wave4_ok:
+        gaps.append("Wave 4 collections missing tenant_id — run backfill_tenant_id.py --wave4")
+    return wave4_ok, gaps
+
+
+async def wave5_exit_ready(db) -> Tuple[bool, List[str]]:
+    """Wave 5 exit gate: preferences, graph impacts, granulometry backfilled."""
+    wave5_ok, _ = await wave_coverage(db, WAVE5_COLLECTIONS)
+    gaps: List[str] = []
+    if not wave5_ok:
+        gaps.append("Wave 5 collections missing tenant_id — run backfill_tenant_id.py --wave5")
+    return wave5_ok, gaps
+
+
+async def strict_mode_ready(db) -> Tuple[bool, List[str]]:
+    """Full strict-mode readiness across waves 1–5."""
+    w12_ok, w12_gaps = await phase2_exit_ready(db)
+    w3_ok, _ = await wave_coverage(db, WAVE3_COLLECTIONS)
+    w4_ok, w4_gaps = await wave4_exit_ready(db)
+    w5_ok, w5_gaps = await wave5_exit_ready(db)
+    gaps = list(w12_gaps)
+    if not w3_ok:
+        gaps.append("Wave 3 collections missing tenant_id — run backfill_tenant_id.py --wave3")
+    gaps.extend(w4_gaps)
+    gaps.extend(w5_gaps)
+    return w12_ok and w3_ok and w4_ok and w5_ok, gaps
 
 
 def format_coverage_lines(rows: List[Dict[str, Any]]) -> str:

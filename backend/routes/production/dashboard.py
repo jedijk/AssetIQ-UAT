@@ -75,6 +75,22 @@ async def get_production_dashboard(
     Get aggregated production dashboard data.
     Supports single-day (date) or range (from_date + to_date).
     """
+    from services.production_dashboard_materializer import (
+        dashboard_cache_key,
+        get_cached_production_dashboard,
+        store_production_dashboard_snapshot,
+    )
+
+    cache_key = dashboard_cache_key(
+        date=date,
+        from_date=from_date,
+        to_date=to_date,
+        shift=shift,
+    )
+    cached = await get_cached_production_dashboard(current_user, cache_key)
+    if cached:
+        return cached
+
     now = datetime.now(timezone.utc)
     shift_keys = _normalize_shift_keys(shift)
     shift_param = ",".join(shift_keys)
@@ -1114,7 +1130,7 @@ async def get_production_dashboard(
             range_end.isoformat(),
         )
 
-    return {
+    payload = {
         "date": target_date.strftime("%Y-%m-%d"),
         "from_date": range_start.strftime("%Y-%m-%d"),
         "to_date": range_end.strftime("%Y-%m-%d"),
@@ -1156,6 +1172,8 @@ async def get_production_dashboard(
         "insights": insights,
         "submissions_count": len(submissions),
     }
+    await store_production_dashboard_snapshot(current_user, cache_key, payload)
+    return payload
 
 
 @router.get("/production/events")

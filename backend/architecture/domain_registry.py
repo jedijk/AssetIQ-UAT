@@ -218,6 +218,7 @@ DOMAINS: Dict[str, DomainDefinition] = {
             "executive_kpi_snapshots",
             "executive_dashboard_snapshots",
             "work_execution_kpi_snapshots",
+            "ril_dashboard_snapshots",
             "asset_health_documents",
             "reliability_snapshots",
         ),

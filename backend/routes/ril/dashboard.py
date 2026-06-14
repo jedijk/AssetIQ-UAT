@@ -76,15 +76,13 @@ async def get_executive_dashboard(
     - Cases by Status
     - Trend indicators
     """
-    from database import db
-    from services.executive_kpi_materializer import get_or_compute_executive_kpis
+    from services.ril_dashboard_materializer import get_or_compute_ril_dashboard
     from services.reliability_graph_query import count_active_reliability_edges
 
     owner_id = current_user.get("owner_id") or current_user.get("id")
-    service = get_ril_service()
-    
-    stats = await service.get_dashboard_stats(owner_id)
-    reliability_kpis = await get_or_compute_executive_kpis(current_user, owner_id)
+    cached = await get_or_compute_ril_dashboard(current_user, owner_id)
+    stats = cached["stats"]
+    reliability_kpis = cached["reliability_kpis"]
     
     # Calculate reliability score
     # Based on ratio of resolved cases, low alert volume, few predictions at risk

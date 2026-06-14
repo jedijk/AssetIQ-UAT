@@ -8,6 +8,11 @@ from bson import ObjectId
 from bson.errors import InvalidId
 
 from database import db
+from repositories.cascade_helpers import (
+    delete_actions_for_threat,
+    delete_investigations_for_threat,
+    session_kw,
+)
 from services.db_transactions import run_transactional
 from services.tenant_schema import merge_tenant_filter
 
@@ -36,10 +41,6 @@ async def find_observation_by_id(
     return None
 
 
-def _session_kw(session) -> Dict[str, Any]:
-    return {"session": session} if session is not None else {}
-
-
 async def delete_observation_cascade(
     *,
     obs_id: str,
@@ -62,77 +63,23 @@ async def delete_observation_cascade(
 
     async def _cascade(session) -> Dict[str, Any]:
         nonlocal deleted_actions_count, deleted_investigations_count
-        skw = _session_kw(session)
 
         if delete_actions:
-            action_filter = merge_tenant_filter(
-                {
-                    "source_type": "threat",
-                    "source_id": observation_id,
-                },
-                user,
-            )
-            result = await db.central_actions.delete_many(action_filter, **skw)
-            deleted_actions_count += result.deleted_count
-            logger.info(
-                "Deleted %s central actions linked to observation %s",
-                result.deleted_count,
-                observation_id,
+            deleted_actions_count += await delete_actions_for_threat(
+                observation_id, user=user, session=session
             )
 
         if delete_investigations:
-            inv_filter = merge_tenant_filter({"threat_id": observation_id}, user)
-            linked_investigations = await db.investigations.find(
-                inv_filter,
-                {"id": 1},
-            ).to_list(100)
-
-            for inv in linked_investigations:
-                inv_id = inv.get("id")
-                inv_scope = {"investigation_id": inv_id}
-                await db.timeline_events.delete_many(
-                    merge_tenant_filter(inv_scope, user),
-                    **skw,
-                )
-                await db.failure_identifications.delete_many(
-                    merge_tenant_filter(inv_scope, user),
-                    **skw,
-                )
-                await db.cause_nodes.delete_many(
-                    merge_tenant_filter(inv_scope, user),
-                    **skw,
-                )
-                await db.action_items.delete_many(
-                    merge_tenant_filter(inv_scope, user),
-                    **skw,
-                )
-                await db.evidence_items.delete_many(
-                    merge_tenant_filter(inv_scope, user),
-                    **skw,
-                )
-
-                if delete_actions:
-                    result = await db.central_actions.delete_many(
-                        merge_tenant_filter(
-                            {
-                                "source_type": "investigation",
-                                "source_id": inv_id,
-                            },
-                            user,
-                        ),
-                        **skw,
-                    )
-                    deleted_actions_count += result.deleted_count
-
-            result = await db.investigations.delete_many(inv_filter, **skw)
-            deleted_investigations_count = result.deleted_count
-            logger.info(
-                "Deleted %s investigations linked to observation %s",
-                deleted_investigations_count,
+            inv_count, extra_actions = await delete_investigations_for_threat(
                 observation_id,
+                user=user,
+                session=session,
+                delete_actions=delete_actions,
             )
+            deleted_investigations_count = inv_count
+            deleted_actions_count += extra_actions
 
-        result = await db.observations.delete_one(obs_delete_filter, **skw)
+        result = await db.observations.delete_one(obs_delete_filter, **session_kw(session))
         if result.deleted_count == 0:
             raise ValueError("delete_failed")
 

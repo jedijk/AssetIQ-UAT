@@ -462,34 +462,32 @@ async def delete_investigation(
     current_user: dict = Depends(_investigations_delete)
 ):
     """Delete an investigation and all related data. Optionally delete linked Central Actions."""
-    inv = await db.investigations.find_one(
-        _inv_query(current_user, inv_id=inv_id)
-    )
-    if not inv:
-        raise HTTPException(status_code=404, detail="Investigation not found")
-    
-    deleted_actions_count = 0
-    
-    # Optionally delete additional linked Central Actions
-    if delete_central_actions:
-        result = await db.central_actions.delete_many({
-            "source_type": "investigation",
-            "source_id": inv_id
-        })
-        deleted_actions_count = result.deleted_count
-        logger.info(f"Deleted {deleted_actions_count} central actions linked to investigation {inv_id}")
-    
-    # Delete all related internal data (action_items are investigation-specific, not Central Actions)
-    await db.timeline_events.delete_many({"investigation_id": inv_id})
-    await db.failure_identifications.delete_many({"investigation_id": inv_id})
-    await db.cause_nodes.delete_many({"investigation_id": inv_id})
-    await db.action_items.delete_many({"investigation_id": inv_id})
-    await db.evidence_items.delete_many({"investigation_id": inv_id})
-    await db.investigations.delete_one({"id": inv_id})
-    
+    from repositories.investigation_repository import delete_investigation_cascade
+
+    try:
+        result = await delete_investigation_cascade(
+            inv_id=inv_id,
+            delete_central_actions=delete_central_actions,
+            user=current_user,
+        )
+    except ValueError as exc:
+        code = str(exc)
+        if code == "not_found":
+            raise HTTPException(status_code=404, detail="Investigation not found") from exc
+        if code == "forbidden":
+            raise HTTPException(status_code=403, detail="Not allowed to delete this investigation") from exc
+        raise
+
+    if result.get("deleted_central_actions"):
+        logger.info(
+            "Deleted %s central actions linked to investigation %s",
+            result["deleted_central_actions"],
+            inv_id,
+        )
+
     return {
         "message": "Investigation deleted",
-        "deleted_central_actions": deleted_actions_count
+        "deleted_central_actions": result.get("deleted_central_actions", 0),
     }
 
 

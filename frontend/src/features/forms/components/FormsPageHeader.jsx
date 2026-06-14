@@ -1,8 +1,24 @@
-import React from "react";
+import {
+  FileText,
+  Plus,
+  Layers,
+  AlertTriangle,
+  AlertCircle,
+} from "lucide-react";
+import { Button } from "../../../components/ui/button";
+import { Card, CardContent } from "../../../components/ui/card";
 
-export function FormsPageHeader(props) {
+export function FormsPageHeader({
+  embedded,
+  t,
+  stats,
+  onCreateTemplate,
+}) {
   return (
     <>
+      {!embedded && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+          <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
               <FileText className="h-5 w-5 text-white" />
             </div>
@@ -11,11 +27,8 @@ export function FormsPageHeader(props) {
               <p className="text-sm text-slate-500">Create and manage data collection forms</p>
             </div>
           </div>
-          <Button 
-            onClick={() => {
-              resetNewTemplate();
-              setShowCreateDialog(true);
-            }}
+          <Button
+            onClick={onCreateTemplate}
             className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
             data-testid="create-form-btn"
           >
@@ -24,15 +37,11 @@ export function FormsPageHeader(props) {
         </div>
       )}
 
-      {/* Embedded Header with Create Button */}
       {embedded && (
         <div className="flex items-center justify-between mb-4">
           <p className="text-sm text-slate-500">Create and manage data collection forms for your tasks</p>
-          <Button 
-            onClick={() => {
-              resetNewTemplate();
-              setShowCreateDialog(true);
-            }}
+          <Button
+            onClick={onCreateTemplate}
             size="sm"
             className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
             data-testid="create-form-btn"
@@ -42,13 +51,12 @@ export function FormsPageHeader(props) {
         </div>
       )}
 
-      {/* Stats Cards */}
-      <div className={`grid ${embedded ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-4'} gap-3 ${embedded ? 'mb-4' : 'mb-6'}`}>
+      <div className={`grid ${embedded ? "grid-cols-1" : "grid-cols-2 lg:grid-cols-4"} gap-3 ${embedded ? "mb-4" : "mb-6"}`}>
         <Card>
           <CardContent className="p-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-slate-500">Templates</p>
+                <p className="text-xs text-slate-500">{t("forms.templates")}</p>
                 <p className="text-xl font-bold text-slate-900">{stats.totalTemplates}</p>
               </div>
               <div className="h-8 w-8 rounded-lg bg-indigo-100 flex items-center justify-center">
@@ -63,7 +71,7 @@ export function FormsPageHeader(props) {
               <CardContent className="p-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-slate-500">Submissions</p>
+                    <p className="text-xs text-slate-500">{t("forms.submissions")}</p>
                     <p className="text-xl font-bold text-slate-900">{stats.totalSubmissions}</p>
                   </div>
                   <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
@@ -76,7 +84,7 @@ export function FormsPageHeader(props) {
               <CardContent className="p-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-slate-500">Warnings</p>
+                    <p className="text-xs text-slate-500">{t("forms.warnings")}</p>
                     <p className="text-xl font-bold text-amber-600">{stats.warningCount}</p>
                   </div>
                   <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center">
@@ -89,7 +97,7 @@ export function FormsPageHeader(props) {
               <CardContent className="p-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-slate-500">Critical</p>
+                    <p className="text-xs text-slate-500">{t("forms.critical")}</p>
                     <p className="text-xl font-bold text-red-600">{stats.criticalCount}</p>
                   </div>
                   <div className="h-8 w-8 rounded-lg bg-red-100 flex items-center justify-center">
@@ -101,11 +109,6 @@ export function FormsPageHeader(props) {
           </>
         )}
       </div>
-
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <TabsList>
     </>
   );
 }
