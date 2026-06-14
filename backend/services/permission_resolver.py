@@ -59,11 +59,14 @@ async def _load_ui_permissions() -> Dict:
     if cached and now < cached[0]:
         return cached[1]
 
-    from routes.permissions import DEFAULT_PERMISSIONS, _backfill_permissions
+    from services.permissions_defaults import (
+        DEFAULT_PERMISSIONS,
+        backfill_permissions,
+    )
 
     stored = await db.permissions.find_one({"type": "role_permissions"})
     if stored:
-        permissions = _backfill_permissions(stored.get("permissions", DEFAULT_PERMISSIONS))
+        permissions = backfill_permissions(stored.get("permissions", DEFAULT_PERMISSIONS))
     else:
         permissions = DEFAULT_PERMISSIONS.copy()
 
@@ -105,7 +108,7 @@ async def check_api_permission(role: str, permission: str) -> bool:
     role_perms = ui_perms.get(resolved_role)
     if role_perms is None and resolved_role not in ROLES:
         # Custom roles: fall back to viewer defaults when missing from matrix.
-        from routes.permissions import DEFAULT_PERMISSIONS
+        from services.permissions_defaults import DEFAULT_PERMISSIONS
 
         role_perms = ui_perms.get(resolved_role) or DEFAULT_PERMISSIONS.get("viewer", {})
 

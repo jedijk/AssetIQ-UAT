@@ -1747,88 +1747,9 @@ async def run_aggregation(
 async def _run_aggregation():
     """Background: aggregate production_logs into asset_history (hourly buckets)."""
     try:
-        pipeline = [
-            {"$addFields": {
-                "ts_parsed": {
-                    "$cond": {
-                        "if": {"$eq": [{"$type": "$timestamp"}, "string"]},
-                        "then": {"$dateFromString": {"dateString": "$timestamp", "onError": None}},
-                        "else": "$timestamp"
-                    }
-                }
-            }},
-            {"$match": {"ts_parsed": {"$ne": None}}},
-            {"$group": {
-                "_id": {
-                    "asset_id": "$asset_id",
-                    "hour": {"$dateToString": {"format": "%Y-%m-%dT%H:00:00", "date": "$ts_parsed"}},
-                },
-                "records": {"$sum": 1},
-                "events": {"$push": "$event_type"},
-                "statuses": {"$push": "$status"},
-                "all_metrics": {"$push": "$metrics"},
-            }},
-            {"$sort": {"_id.hour": 1}},
-        ]
+        from services.production_logs_aggregation import aggregate_production_logs_to_asset_history
 
-        results = await db.production_logs.aggregate(pipeline).to_list(100000)
-
-        if not results:
-            logger.info("[Aggregation] No valid records to aggregate")
-            return
-
-        # Clear old aggregations
-        await db.asset_history.delete_many({})
-
-        docs = []
-        for r in results:
-            asset_id = r["_id"]["asset_id"]
-            hour = r["_id"]["hour"]
-
-            # Aggregate metrics
-            metric_agg = {}
-            for m in r["all_metrics"]:
-                if not m:
-                    continue
-                for k, v in m.items():
-                    if isinstance(v, (int, float)):
-                        if k not in metric_agg:
-                            metric_agg[k] = {"values": []}
-                        metric_agg[k]["values"].append(v)
-
-            metrics_summary = {}
-            for k, data in metric_agg.items():
-                vals = data["values"]
-                if vals:
-                    metrics_summary[k] = {
-                        "avg": round(sum(vals) / len(vals), 2),
-                        "min": round(min(vals), 2),
-                        "max": round(max(vals), 2),
-                        "count": len(vals),
-                    }
-
-            # Count events
-            event_counts = {}
-            for e in r["events"]:
-                event_counts[e] = event_counts.get(e, 0) + 1
-
-            docs.append({
-                "id": str(uuid.uuid4()),
-                "asset_id": asset_id,
-                "hour": hour,
-                "records": r["records"],
-                "metrics": metrics_summary,
-                "events": event_counts,
-                "downtime_count": event_counts.get("downtime", 0),
-                "alarm_count": event_counts.get("alarm", 0),
-                "waste_count": event_counts.get("waste", 0),
-                "aggregated_at": datetime.now(timezone.utc).isoformat(),
-            })
-
-        if docs:
-            await db.asset_history.insert_many(docs)
-            logger.info(f"[Aggregation] Created {len(docs)} hourly buckets")
-
+        await aggregate_production_logs_to_asset_history()
     except Exception as e:
         logger.error(f"[Aggregation] Failed: {e}")
 

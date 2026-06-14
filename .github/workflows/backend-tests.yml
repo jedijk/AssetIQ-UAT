@@ -45,31 +45,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements-dev.txt
 
-      - name: Run unit tests
+      - name: Run full backend test suite
         env:
           MONGO_URL: mongodb://localhost:27017/test
+          DB_NAME: test
         run: |
-          cd backend && python -m pytest \
-            tests/test_background_jobs.py \
-            tests/test_maintenance_readiness.py \
-            tests/test_maintenance_readiness_service.py \
-            tests/test_verify_uat_gates.py \
-            tests/test_pm_import_job_handler.py \
-            tests/test_reliability_graph_pm_import.py \
-            tests/test_reliability_graph_audit.py \
-            tests/test_reliability_graph_scheduled_task.py \
-            tests/test_worker_config.py \
-            tests/test_ai_cost_guard.py \
-            tests/test_auth_matrix.py \
-            tests/test_mongo_regex.py \
-            tests/test_reliability_graph_query.py \
-            tests/test_ai_fm_suggestions_auth.py \
-            tests/test_work_item_query.py \
-            tests/test_tenant_schema.py \
-            tests/test_asset_health_materializer.py \
-            tests/test_copilot_eval_set.py \
-            tests/test_chat_handler_unknown.py \
-            -q
+          cd backend && python -m pytest tests/ -q --ignore=tests/test_big_bag_dashboard_filter.py --cov=services --cov=repositories --cov-report=term-missing:skip-covered --cov-fail-under=0
 
       - name: Run UAT readiness gates
         env:
@@ -77,3 +58,8 @@ jobs:
           DB_NAME: test
         run: |
           cd backend && python scripts/verify_uat_gates.py
+
+      - name: Test summary
+        if: always()
+        run: |
+          echo "Backend tests executed from backend/tests/ (full suite)"

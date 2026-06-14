@@ -18,8 +18,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any, Tuple
 
 from database import db
-from routes.maintenance_scheduler._shared import normalize_program_criticality
-from services.scheduler_helpers import build_task_to_failure_modes, is_strategy_task_active
+from services.scheduler_helpers import normalize_program_criticality, build_task_to_failure_modes, is_strategy_task_active
 from services.scheduler_config import should_sync_legacy_maintenance_programs
 from services.criticality_score import compute_criticality_score, resolve_equipment_criticality_score
 from models.maintenance_program import (
@@ -869,7 +868,7 @@ class MaintenanceProgramService:
             if not should_sync_legacy_maintenance_programs():
                 synced_programs += len(active_v2_ids)
                 if schedule:
-                    from routes.maintenance_scheduler.scheduler import (
+                    from services.maintenance_scheduling import (
                         schedule_programs_for_equipment,
                     )
 
@@ -972,7 +971,7 @@ class MaintenanceProgramService:
                 synced_programs += 1
 
                 if schedule:
-                    from routes.maintenance_scheduler.scheduler import schedule_program
+                    from services.maintenance_scheduling import schedule_program
 
                     created = await schedule_program(program_doc, horizon_days)
                     scheduled_tasks += len(created)

@@ -25,10 +25,10 @@ async def handle_apply_strategy(job: dict) -> dict:
         if user:
             current_user = user
 
-    from routes.maintenance_scheduler.programs import _apply_strategy_to_equipment_impl
+    from services.apply_strategy_service import apply_strategy_to_equipment
 
     request = ApplyStrategyRequest(equipment_ids=list(equipment_ids), run_async=False)
-    result = await _apply_strategy_to_equipment_impl(
+    result = await apply_strategy_to_equipment(
         equipment_type_id,
         request,
         current_user,
