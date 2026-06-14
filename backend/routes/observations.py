@@ -72,7 +72,8 @@ async def get_observations(
         to_date=to_dt,
         search=search,
         skip=skip,
-        limit=limit
+        limit=limit,
+        user=current_user,
     )
 
 @router.get("/observations/combined")
@@ -87,7 +88,8 @@ async def get_combined_observations(
         user_id=current_user["id"],
         include_converted=include_threats,
         skip=skip,
-        limit=limit
+        limit=limit,
+        user=current_user,
     )
 
 @router.get("/observations/unlinked")
@@ -98,7 +100,8 @@ async def get_unlinked_observations(
     """Get observations without failure mode links (need AI suggestions)."""
     return await observation_service.get_unlinked_observations(
         user_id=current_user["id"],
-        limit=limit
+        limit=limit,
+        user=current_user,
     )
 
 @router.get("/observations/trends")
@@ -110,7 +113,8 @@ async def get_observation_trends(
     """Get observation trends over time."""
     return await observation_service.get_observation_trends(
         equipment_id=equipment_id,
-        days=days
+        days=days,
+        user=current_user,
     )
 
 @router.get("/observations/{obs_id}")
@@ -119,7 +123,7 @@ async def get_observation(
     current_user: dict = Depends(get_current_user)
 ):
     """Get a specific observation."""
-    obs = await observation_service.get_observation_by_id(obs_id)
+    obs = await observation_service.get_observation_by_id(obs_id, user=current_user)
     if not obs:
         raise HTTPException(status_code=404, detail="Observation not found")
     return obs
@@ -134,7 +138,8 @@ async def create_observation(
     result = await observation_service.create_observation(
         data.model_dump(),
         created_by=current_user["id"],
-        source="manual"
+        source="manual",
+        user=current_user,
     )
     # Trigger auto-translation in background
     if result and result.get("id"):
@@ -164,6 +169,7 @@ async def update_observation(
     result = await observation_service.update_observation(
         obs_id,
         update_payload,
+        user=current_user,
     )
     if not result:
         raise HTTPException(status_code=404, detail="Observation not found")
@@ -190,7 +196,9 @@ async def close_observation(
     current_user: dict = Depends(_observations_write)
 ):
     """Close an observation."""
-    result = await observation_service.close_observation(obs_id, resolution_notes)
+    result = await observation_service.close_observation(
+        obs_id, resolution_notes, user=current_user
+    )
     if not result:
         raise HTTPException(status_code=404, detail="Observation not found")
     return result
@@ -214,6 +222,7 @@ async def delete_observation(
             obs_id=obs_id,
             delete_actions=delete_actions,
             delete_investigations=delete_investigations,
+            user=current_user,
         )
     except ValueError as exc:
         if str(exc) == "not_found":
@@ -260,7 +269,8 @@ async def link_failure_mode_to_observation(
     result = await observation_service.link_failure_mode_to_observation(
         obs_id=obs_id,
         failure_mode_id=failure_mode_id,
-        efm_id=efm_id
+        efm_id=efm_id,
+        user=current_user,
     )
     if not result:
         raise HTTPException(status_code=404, detail="Observation or failure mode not found")
@@ -274,7 +284,9 @@ async def convert_threat_to_observation(
     current_user: dict = Depends(get_current_user)
 ):
     """Convert an existing threat to the new observation format."""
-    result = await observation_service.convert_threat_to_observation(threat_id)
+    result = await observation_service.convert_threat_to_observation(
+        threat_id, user=current_user
+    )
     if not result:
         raise HTTPException(status_code=404, detail="Threat not found")
     return result

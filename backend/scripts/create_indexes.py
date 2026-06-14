@@ -53,6 +53,9 @@ INDEX_DEFINITIONS = {
     # Observations - linked to equipment and threats
     "observations": [
         {"keys": [("id", 1)], "unique": True},
+        {"keys": [("tenant_id", 1)]},
+        {"keys": [("tenant_id", 1), ("equipment_id", 1), ("created_at", -1)]},
+        {"keys": [("tenant_id", 1), ("status", 1), ("created_at", -1)]},
         {"keys": [("equipment_id", 1)]},
         {"keys": [("threat_id", 1)]},
         {"keys": [("status", 1)]},
@@ -408,6 +411,14 @@ INDEX_DEFINITIONS = {
         {"keys": [("equipment_id", 1), ("snapshot_at", -1)]},
         {"keys": [("tenant_id", 1), ("equipment_id", 1), ("snapshot_at", -1)]},
         {"keys": [("snapshot_at", -1)]},
+    ],
+    "executive_kpi_snapshots": [
+        {"keys": [("tenant_id", 1), ("user_id", 1)], "unique": True},
+        {"keys": [("expires_at", 1)], "expireAfterSeconds": 0},
+    ],
+    "executive_dashboard_snapshots": [
+        {"keys": [("tenant_id", 1), ("user_id", 1), ("period_days", 1)], "unique": True},
+        {"keys": [("expires_at", 1)], "expireAfterSeconds": 0},
     ],
     "audit_log": [
         {"keys": [("ts", -1)]},

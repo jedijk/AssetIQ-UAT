@@ -351,6 +351,15 @@ async def get_executive_dashboard(
     - Drill-down evidence data
     - AI executive summary
     """
+    from services.executive_dashboard_materializer import (
+        get_cached_dashboard,
+        store_dashboard_snapshot,
+    )
+
+    cached = await get_cached_dashboard(current_user, period_days)
+    if cached:
+        return ExecutiveDashboardResponse(**cached)
+
     user_id = current_user["id"]
     
     # Get user's production loss configuration
@@ -920,7 +929,7 @@ PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvemen
         "resolved_exposure": sorted(resolved_exposure_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:25],
     }
     
-    return ExecutiveDashboardResponse(
+    response = ExecutiveDashboardResponse(
         exposure_metrics=ExposureMetrics(
             total_lifecycle_exposure=total_lifecycle_exposure,
             covered_by_controls=covered_by_controls,
@@ -938,6 +947,15 @@ PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvemen
         last_updated=now.isoformat(),
         report_period=report_period,
     )
+    try:
+        await store_dashboard_snapshot(
+            current_user,
+            period_days,
+            response.model_dump(),
+        )
+    except Exception as exc:
+        logger.warning("Failed to store executive dashboard snapshot: %s", exc)
+    return response
 
 
 @router.get("/evidence/{metric_type}")

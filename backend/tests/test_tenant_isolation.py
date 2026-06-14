@@ -75,6 +75,7 @@ CRITICAL_DOMAINS = (
     "task_instances",
     "investigations",
     "equipment_nodes",
+    "observations",
 )
 
 

@@ -22,6 +22,7 @@ WAVE1_COLLECTIONS = frozenset({
     "equipment_nodes",
     "threats",
     "users",
+    "observations",
 })
 
 # Wave 2 — work execution and maintenance program collections.

@@ -51,13 +51,16 @@ async def wave_coverage(db, collections: frozenset) -> Tuple[bool, List[Dict[str
 
 async def phase2_exit_ready(db) -> Tuple[bool, List[str]]:
     """
-    Phase 2 exit gate: Wave 2 fully backfilled (prerequisite for TENANT_STRICT_MODE).
+    Phase 2 exit gate: Wave 1 + Wave 2 fully backfilled (prerequisite for TENANT_STRICT_MODE).
     """
+    wave1_ok, _ = await wave_coverage(db, WAVE1_COLLECTIONS)
     wave2_ok, _ = await wave_coverage(db, WAVE2_COLLECTIONS)
     gaps: List[str] = []
+    if not wave1_ok:
+        gaps.append("Wave 1 collections missing tenant_id — run backfill_tenant_id.py --wave1")
     if not wave2_ok:
         gaps.append("Wave 2 collections missing tenant_id — run backfill_tenant_id.py --wave2")
-    return wave2_ok, gaps
+    return wave1_ok and wave2_ok, gaps
 
 
 def format_coverage_lines(rows: List[Dict[str, Any]]) -> str:

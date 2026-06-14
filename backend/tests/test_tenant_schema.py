@@ -38,7 +38,9 @@ def test_pilot_collections_include_projections():
 
 
 def test_wave1_collections():
-    assert WAVE1_COLLECTIONS == frozenset({"equipment_nodes", "threats", "users"})
+    assert WAVE1_COLLECTIONS == frozenset({
+        "equipment_nodes", "threats", "users", "observations",
+    })
 
 
 def test_wave2_collections():
