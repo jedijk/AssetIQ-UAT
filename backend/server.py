@@ -386,6 +386,14 @@ app.add_middleware(TimeoutMiddleware, timeout=25.0, long_timeout=300.0)
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
 try:
+    from services.observability_metrics import RequestMetricsMiddleware
+
+    app.add_middleware(RequestMetricsMiddleware, slow_ms=float(os.environ.get("SLOW_API_MS", "2000")))
+    logger.info("Request metrics middleware enabled")
+except Exception as e:
+    logger.warning("Request metrics middleware not available: %s", e)
+
+try:
     from middleware.structured_logging import StructuredLoggingMiddleware
     from middleware.security import SecurityHeadersMiddleware, RequestSizeLimitMiddleware
 

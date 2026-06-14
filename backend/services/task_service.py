@@ -991,16 +991,15 @@ class TaskService:
         try:
             await self.db.threats.insert_one(observation_doc)
             logger.info(f"Created observation from task: {observation_doc['id']}")
-            from services.reliability_graph import _run_graph_sync, sync_threat_edges
+            from services.reliability_graph import dispatch_graph_sync
 
             equipment_id = task_instance.get("equipment_id")
-            await _run_graph_sync(
-                sync_threat_edges(
-                    threat_id=observation_doc["id"],
-                    equipment_id=equipment_id,
-                    tenant_id=None,
-                ),
+            await dispatch_graph_sync(
+                "sync_threat_edges",
                 "task_observation_threat",
+                threat_id=observation_doc["id"],
+                equipment_id=equipment_id,
+                tenant_id=None,
             )
             return observation_doc["id"]
         except Exception as e:

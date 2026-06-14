@@ -88,16 +88,15 @@ async def create_chat_central_action(
     await db.central_actions.insert_one(action_doc)
     action_doc.pop("_id", None)
 
-    from services.reliability_graph import _run_graph_sync, sync_action_edges
+    from services.reliability_graph import dispatch_graph_sync
 
-    await _run_graph_sync(
-        sync_action_edges(
-            action_id=action_id,
-            source_type="threat",
-            source_id=threat_id,
-            equipment_id=linked_equipment_id,
-        ),
+    await dispatch_graph_sync(
+        "sync_action_edges",
         "chat_action_create",
+        action_id=action_id,
+        source_type="threat",
+        source_id=threat_id,
+        equipment_id=linked_equipment_id,
     )
 
     return action_doc

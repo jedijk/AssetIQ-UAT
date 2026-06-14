@@ -99,7 +99,7 @@ async def _seed_failure_modes(db) -> None:
 
 
 async def _seed_disciplines() -> None:
-    from routes.disciplines import seed_disciplines_if_empty
+    from services.discipline_seed import seed_disciplines_if_empty
 
     inserted = await seed_disciplines_if_empty()
     return f"{inserted} inserted" if inserted else "already populated"

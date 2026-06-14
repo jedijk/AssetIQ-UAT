@@ -536,16 +536,15 @@ async def create_central_action(
         inv = await db.investigations.find_one({"id": data.source_id}, {"asset_id": 1})
         linked_equipment_id = (inv or {}).get("asset_id")
 
-    from services.reliability_graph import _run_graph_sync, sync_action_edges
+    from services.reliability_graph import dispatch_graph_sync
 
-    await _run_graph_sync(
-        sync_action_edges(
-            action_id=action_id,
-            source_type=data.source_type,
-            source_id=data.source_id,
-            equipment_id=linked_equipment_id,
-        ),
+    await dispatch_graph_sync(
+        "sync_action_edges",
         "action_create",
+        action_id=action_id,
+        source_type=data.source_type,
+        source_id=data.source_id,
+        equipment_id=linked_equipment_id,
     )
     schedule_tracked_job(
         background_tasks,
@@ -676,7 +675,7 @@ async def update_central_action(
                 }
     
     if status_changed_to_completed:
-        from services.reliability_graph import _run_graph_sync, sync_outcome_edges
+        from services.reliability_graph import dispatch_graph_sync
         import uuid as _uuid
 
         eq_id = updated.get("linked_equipment_id")
@@ -687,15 +686,14 @@ async def update_central_action(
             )
             eq_id = (threat or {}).get("linked_equipment_id")
         if eq_id:
-            await _run_graph_sync(
-                sync_outcome_edges(
-                    action_id=updated.get("id") or action_id,
-                    outcome_id=str(_uuid.uuid4()),
-                    equipment_id=eq_id,
-                    verification_status="verified",
-                    effectiveness=updated.get("completion_notes"),
-                ),
+            await dispatch_graph_sync(
+                "sync_outcome_edges",
                 "action_close_outcome",
+                action_id=updated.get("id") or action_id,
+                outcome_id=str(_uuid.uuid4()),
+                equipment_id=eq_id,
+                verification_status="verified",
+                effectiveness=updated.get("completion_notes"),
             )
 
     if any(k in update_data for k in ("title", "description")):

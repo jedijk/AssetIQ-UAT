@@ -420,6 +420,17 @@ INDEX_DEFINITIONS = {
         {"keys": [("tenant_id", 1), ("user_id", 1), ("period_days", 1)], "unique": True},
         {"keys": [("expires_at", 1)], "expireAfterSeconds": 0},
     ],
+    "work_execution_kpi_snapshots": [
+        {"keys": [("tenant_id", 1), ("user_id", 1)], "unique": True},
+        {"keys": [("expires_at", 1)], "expireAfterSeconds": 0},
+    ],
+    "domain_event_outbox": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("status", 1), ("created_at", 1)]},
+        {"keys": [("event_type", 1), ("status", 1)]},
+        {"keys": [("tenant_id", 1), ("status", 1), ("created_at", 1)]},
+        {"keys": [("aggregate_type", 1), ("aggregate_id", 1)]},
+    ],
     "audit_log": [
         {"keys": [("ts", -1)]},
         {"keys": [("actor.id", 1), ("ts", -1)]},

@@ -144,7 +144,7 @@ async def apply_strategy_to_equipment(
         time.perf_counter() - t0,
     )
 
-    from routes.maintenance_strategy_v2.strategy_helpers import clear_strategy_needs_apply
+    from services.strategy_apply_state import clear_strategy_needs_apply
 
     await clear_strategy_needs_apply(
         equipment_type_id,
