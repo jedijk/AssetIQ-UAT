@@ -102,9 +102,30 @@ async def handle_reliability_snapshots_daily_refresh(job: dict) -> dict:
     return result
 
 
+async def handle_executive_kpi_refresh(job: dict) -> dict:
+    """Refresh materialized executive reliability KPI snapshots for a user."""
+    payload = job.get("payload") or {}
+    user = payload.get("user")
+    if not user:
+        return {"status": "skipped", "reason": "payload.user required"}
+
+    from services.executive_kpi_materializer import refresh_executive_kpis
+
+    owner_id = payload.get("owner_id") or user.get("owner_id") or user.get("id")
+    result = await refresh_executive_kpis(user, owner_id)
+    logger.info(
+        "executive_kpi_refresh tenant=%s user=%s generated_at=%s",
+        user.get("company_id") or user.get("organization_id"),
+        user.get("id"),
+        result.get("generated_at"),
+    )
+    return {"status": "ok", "generated_at": result.get("generated_at")}
+
+
 JOB_HANDLERS: Dict[str, Callable[..., Any]] = {
     "apply_strategy": handle_apply_strategy,
     "pm_import_ai_review": handle_pm_import_ai_review,
     "asset_health_daily_refresh": handle_asset_health_daily_refresh,
     "reliability_snapshots_daily_refresh": handle_reliability_snapshots_daily_refresh,
+    "executive_kpi_refresh": handle_executive_kpi_refresh,
 }
