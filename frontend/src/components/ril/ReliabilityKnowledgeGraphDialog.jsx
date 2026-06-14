@@ -77,7 +77,7 @@ function NodeRelationBreakdown({ node }) {
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs max-h-[min(220px,32vh)] overflow-y-auto overscroll-contain pr-1">
       <div>
         <p className="font-semibold text-slate-700 mb-1">
           Outgoing ({node.edge_count_outgoing ?? 0})
@@ -148,7 +148,7 @@ const ReliabilityOntologyGraph = ({
 
   return (
     <div
-      className="rounded-lg border border-slate-200 bg-slate-50/80 overflow-auto max-h-[min(380px,50vh)] touch-pan-x touch-pan-y"
+      className="rounded-lg border border-slate-200 bg-slate-50/80 overflow-auto max-h-[min(420px,55vh)] touch-pan-x touch-pan-y"
       data-testid="reliability-knowledge-graph-scroll"
     >
       <svg
@@ -393,7 +393,7 @@ export default function ReliabilityKnowledgeGraphDialog({
                 />
 
                 <div
-                  className="min-h-[148px] rounded-lg border border-slate-200 bg-slate-50/60 p-3"
+                  className="min-h-[148px] max-h-[min(280px,38vh)] overflow-y-auto overscroll-contain rounded-lg border border-slate-200 bg-slate-50/60 p-3"
                   data-testid="reliability-knowledge-graph-node-detail"
                 >
                   {selectedNode ? (

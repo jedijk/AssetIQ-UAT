@@ -355,6 +355,134 @@ async def backfill_task_instances(db, config: BackfillConfig) -> PhaseStats:
     return stats
 
 
+async def backfill_pm_import_tasks(
+    db,
+    config: BackfillConfig,
+    equipment_cache: Dict[str, Dict[str, Optional[str]]],
+) -> PhaseStats:
+    """Backfill pm_import_task → program_task and applied_to edges from programs and sessions."""
+    from services.reliability_graph import (
+        sync_edge_for_pm_import_task,
+        sync_pm_import_program_task_links,
+    )
+    from services.pm_import_constants import is_pm_import_review_accepted
+
+    stats = PhaseStats()
+    seen_links: Set[Tuple[str, str]] = set()
+
+    query = _equipment_filter(config)
+    cursor = db.maintenance_programs_v2.find(query, {"_id": 0}).batch_size(config.batch_size)
+    if config.limit:
+        cursor = cursor.limit(config.limit)
+
+    async for program in cursor:
+        equipment_id = program.get("equipment_id")
+        if not equipment_id:
+            continue
+        eq_info = equipment_cache.get(equipment_id, {})
+        equipment_type_id = eq_info.get("equipment_type_id")
+        tenant_id = _tenant_id(program) or eq_info.get("tenant_id")
+
+        for task in program.get("tasks") or []:
+            task_id = task.get("id")
+            trace = task.get("traceability") or {}
+            pm_ref = trace.get("pm_import_task_id")
+            if not task_id or not pm_ref:
+                continue
+            link_key = (str(pm_ref), str(task_id))
+            if link_key in seen_links:
+                continue
+            seen_links.add(link_key)
+
+            fm_id = trace.get("failure_mode_id")
+            label = "sync_pm_import_program_task_links"
+
+            async def _sync(
+                pm_id=pm_ref,
+                prog_id=task_id,
+                fm=fm_id,
+                eq_id=equipment_id,
+                et_id=equipment_type_id,
+                tid=tenant_id,
+            ) -> None:
+                await sync_pm_import_program_task_links(
+                    pm_import_task_id=str(pm_id),
+                    program_task_id=str(prog_id),
+                    failure_mode_id=fm,
+                    equipment_id=eq_id,
+                    equipment_type_id=et_id,
+                    tenant_id=tid,
+                    apply_mode="backfill_program",
+                )
+
+            await _run_sync(
+                config=config,
+                stats=stats,
+                entity_id=f"{pm_ref}->{task_id}",
+                label=label,
+                coro_factory=_sync,
+            )
+
+    session_cursor = db.pm_import_sessions.find({}, {"_id": 0}).batch_size(config.batch_size)
+    if config.limit:
+        session_cursor = session_cursor.limit(config.limit)
+
+    async for session in session_cursor:
+        session_id = session.get("session_id") or session.get("id")
+        if not session_id:
+            continue
+        tenant_id = _tenant_id(session)
+
+        for pm_task in session.get("tasks") or []:
+            if not is_pm_import_review_accepted(pm_task):
+                continue
+            task_id = pm_task.get("task_id") or pm_task.get("id")
+            if not task_id:
+                continue
+            pm_ref = f"{session_id}:{task_id}"
+            fm_id = (
+                pm_task.get("target_failure_mode_id")
+                or pm_task.get("matched_failure_mode_id")
+                or pm_task.get("failure_mode_id")
+            )
+            if not fm_id:
+                continue
+
+            equip_match = pm_task.get("equipment_match") or {}
+            equipment_id = equip_match.get("equipment_id") or pm_task.get("equipment_id")
+            if config.equipment_id and equipment_id != config.equipment_id:
+                continue
+
+            eq_info = equipment_cache.get(equipment_id or "", {})
+            label = "sync_edge_for_pm_import_task"
+
+            async def _sync_applied(
+                ref=pm_ref,
+                fm=str(fm_id),
+                eq_id=equipment_id,
+                et_id=equip_match.get("equipment_type_id"),
+                tid=tenant_id,
+            ) -> None:
+                await sync_edge_for_pm_import_task(
+                    task_id=ref,
+                    failure_mode_id=fm,
+                    equipment_id=eq_id,
+                    equipment_type_id=et_id,
+                    apply_mode="backfill_session",
+                    tenant_id=tid,
+                )
+
+            await _run_sync(
+                config=config,
+                stats=stats,
+                entity_id=pm_ref,
+                label=label,
+                coro_factory=_sync_applied,
+            )
+
+    return stats
+
+
 async def backfill_observations(db, config: BackfillConfig) -> PhaseStats:
     from services.reliability_graph import sync_observation_edges
 
@@ -661,6 +789,11 @@ async def run_backfill(db, config: BackfillConfig) -> Dict[str, PhaseStats]:
 
         summaries["task_instances"] = await backfill_task_instances(db, config)
         _print_phase_summary("task_instances", summaries["task_instances"])
+
+        summaries["pm_import_tasks"] = await backfill_pm_import_tasks(
+            db, config, equipment_cache
+        )
+        _print_phase_summary("pm_import_tasks", summaries["pm_import_tasks"])
 
     if should_run_phase(config, "reactive"):
         print("Phase: reactive")

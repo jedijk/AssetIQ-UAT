@@ -306,6 +306,18 @@ async def sync_edges_for_apply_strategy(
                 )
                 created += 1
 
+            pm_import_ref = trace.get("pm_import_task_id")
+            if pm_import_ref:
+                created += await sync_pm_import_program_task_links(
+                    pm_import_task_id=str(pm_import_ref),
+                    program_task_id=task_id,
+                    failure_mode_id=fm_id,
+                    equipment_id=equipment_id,
+                    equipment_type_id=equipment_type_id,
+                    tenant_id=tenant_id,
+                    apply_mode="apply_strategy",
+                )
+
         retired += await retire_stale_program_task_edges(
             equipment_id=equipment_id,
             active_task_ids=active_task_ids,
@@ -336,6 +348,43 @@ async def sync_edge_for_pm_import_task(
         tenant_id=tenant_id,
         metadata={"apply_mode": apply_mode},
     )
+
+
+async def sync_pm_import_program_task_links(
+    *,
+    pm_import_task_id: str,
+    program_task_id: str,
+    failure_mode_id: Optional[str] = None,
+    equipment_id: Optional[str] = None,
+    equipment_type_id: Optional[str] = None,
+    tenant_id: Optional[str] = None,
+    apply_mode: str = "program_sync",
+) -> int:
+    """Link a PM import staging task to its program task (and failure mode when known)."""
+    upserted = 0
+    await upsert_edge(
+        source_type="pm_import_task",
+        source_id=pm_import_task_id,
+        relation="imported_as",
+        target_type="program_task",
+        target_id=program_task_id,
+        equipment_id=equipment_id,
+        equipment_type_id=equipment_type_id,
+        tenant_id=tenant_id,
+        metadata={"apply_mode": apply_mode},
+    )
+    upserted += 1
+    if failure_mode_id:
+        await sync_edge_for_pm_import_task(
+            task_id=pm_import_task_id,
+            failure_mode_id=failure_mode_id,
+            equipment_id=equipment_id,
+            equipment_type_id=equipment_type_id,
+            apply_mode=apply_mode,
+            tenant_id=tenant_id,
+        )
+        upserted += 1
+    return upserted
 
 
 async def sync_edges_for_scheduled_task(
@@ -386,6 +435,18 @@ async def sync_edges_for_scheduled_task(
             metadata=base_meta,
         )
         upserted += 1
+
+    pm_import_id = scheduled_task.get("pm_import_task_id")
+    if pm_import_id and program_task_id:
+        upserted += await sync_pm_import_program_task_links(
+            pm_import_task_id=str(pm_import_id),
+            program_task_id=program_task_id,
+            failure_mode_id=failure_mode_id,
+            equipment_id=equipment_id,
+            equipment_type_id=equipment_type_id,
+            tenant_id=tenant_id,
+            apply_mode="scheduled_sync",
+        )
 
     if equipment_id:
         await upsert_edge(
