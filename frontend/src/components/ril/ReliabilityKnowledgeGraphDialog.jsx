@@ -142,17 +142,13 @@ const ReliabilityOntologyGraph = ({
 
   const activeArcs = highlightedArc
     ? visibleArcs.filter((arc) => arc.id === highlightedArc)
-    : highlightedNode
-      ? visibleArcs.filter(
-          (arc) => arc.source === highlightedNode || arc.target === highlightedNode
-        )
-      : visibleArcs;
+    : visibleArcs;
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50/80 overflow-x-auto">
+    <div className="rounded-lg border border-slate-200 bg-slate-50/80 overflow-x-auto overflow-y-hidden">
       <svg
         viewBox="0 0 1100 340"
-        className="w-full min-w-[720px] h-[340px]"
+        className="w-full min-w-[720px] h-[340px] block"
         data-testid="reliability-knowledge-graph-svg"
       >
         <rect x="20" y="20" width="560" height="300" rx="12" fill="#EFF6FF" fillOpacity="0.55" />
@@ -173,6 +169,8 @@ const ReliabilityOntologyGraph = ({
             const touchesNode =
               highlightedNode &&
               (arc.source === highlightedNode || arc.target === highlightedNode);
+            const isDimmed =
+              highlightedNode && !touchesNode && !highlightedArc;
             return (
               <path
                 key={arc.id}
@@ -185,8 +183,16 @@ const ReliabilityOntologyGraph = ({
                       ? "#64748B"
                       : "#CBD5E1"
                 }
-                strokeWidth={isHighlighted || touchesNode ? 2.5 : hasData ? 1.5 : 1}
-                strokeOpacity={isHighlighted || touchesNode ? 0.95 : hasData ? 0.55 : 0.35}
+                strokeWidth={isHighlighted || touchesNode ? 2 : hasData ? 1.5 : 1}
+                strokeOpacity={
+                  isDimmed
+                    ? 0.12
+                    : isHighlighted || touchesNode
+                      ? 0.95
+                      : hasData
+                        ? 0.55
+                        : 0.35
+                }
                 markerEnd="url(#arrowhead)"
               />
             );
@@ -214,16 +220,28 @@ const ReliabilityOntologyGraph = ({
                 key={node.id}
                 transform={`translate(${node.x}, ${node.y})`}
                 onMouseEnter={() => onNodeHover?.(node.id)}
-                onMouseLeave={() => onNodeHover?.(null)}
                 style={{ cursor: "pointer" }}
               >
+                {isActive && (
+                  <rect
+                    x="-1"
+                    y="-1"
+                    width={NODE_WIDTH + 2}
+                    height={NODE_HEIGHT + 2}
+                    rx="9"
+                    fill="none"
+                    stroke="#2563EB"
+                    strokeWidth="1.5"
+                    pointerEvents="none"
+                  />
+                )}
                 <rect
                   width={NODE_WIDTH}
                   height={NODE_HEIGHT}
                   rx="8"
                   fill={isActive ? "#EFF6FF" : "#ffffff"}
-                  stroke={isActive ? "#2563EB" : node.color || "#94A3B8"}
-                  strokeWidth={isActive ? 2 : 1.5}
+                  stroke={node.color || "#94A3B8"}
+                  strokeWidth="1.5"
                 />
                 <circle cx="10" cy="15" r="4" fill={node.color || "#94A3B8"} />
                 <text x="20" y="16" className="fill-slate-800 text-[10px] font-medium">
@@ -351,29 +369,36 @@ export default function ReliabilityKnowledgeGraphDialog({
           </div>
         ) : (
           <div className="space-y-4 min-h-0 flex-1 flex flex-col">
-            <ReliabilityOntologyGraph
-              nodeTypes={nodeTypes}
-              relationArcs={relationArcs}
-              highlightedArc={highlightedArc}
-              highlightedNode={highlightedNode}
-              onNodeHover={setHighlightedNode}
-            />
+            <div
+              className="space-y-3"
+              onMouseLeave={() => setHighlightedNode(null)}
+            >
+              <ReliabilityOntologyGraph
+                nodeTypes={nodeTypes}
+                relationArcs={relationArcs}
+                highlightedArc={highlightedArc}
+                highlightedNode={highlightedNode}
+                onNodeHover={setHighlightedNode}
+              />
 
-            {selectedNode ? (
               <div
-                className="rounded-lg border border-blue-200 bg-blue-50/50 p-3"
+                className="min-h-[148px] rounded-lg border border-slate-200 bg-slate-50/60 p-3"
                 data-testid="reliability-knowledge-graph-node-detail"
               >
-                <p className="text-sm font-semibold text-slate-900 mb-2">
-                  {selectedNode.label}
-                </p>
-                <NodeRelationBreakdown node={selectedNode} />
+                {selectedNode ? (
+                  <>
+                    <p className="text-sm font-semibold text-slate-900 mb-2">
+                      {selectedNode.label}
+                    </p>
+                    <NodeRelationBreakdown node={selectedNode} />
+                  </>
+                ) : (
+                  <p className="text-xs text-slate-500">
+                    Hover a node to see per-relation incoming and outgoing counts.
+                  </p>
+                )}
               </div>
-            ) : (
-              <p className="text-xs text-slate-500">
-                Hover a node to see per-relation incoming and outgoing counts.
-              </p>
-            )}
+            </div>
 
             <ScrollArea className="max-h-52 rounded-lg border border-slate-200">
               <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
