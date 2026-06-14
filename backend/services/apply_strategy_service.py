@@ -151,14 +151,28 @@ async def apply_strategy_to_equipment(
         applied_version=strategy_version,
     )
 
-    from services.reliability_graph import sync_edges_for_apply_strategy
-
-    graph_sync = await sync_edges_for_apply_strategy(
-        equipment_type_id=equipment_type_id,
-        equipment_ids=equipment_ids,
-        strategy_version=strategy_version,
-        tenant_id=tenant_id_from_user(current_user),
+    from services.reliability_graph import (
+        dispatch_graph_sync,
+        graph_sync_async_enabled,
+        sync_edges_for_apply_strategy,
     )
+
+    tid = tenant_id_from_user(current_user)
+    graph_kwargs = {
+        "equipment_type_id": equipment_type_id,
+        "equipment_ids": equipment_ids,
+        "strategy_version": strategy_version,
+        "tenant_id": tid,
+    }
+    if graph_sync_async_enabled():
+        await dispatch_graph_sync(
+            "sync_edges_for_apply_strategy",
+            f"apply_strategy_{equipment_type_id}",
+            **graph_kwargs,
+        )
+        graph_sync = {"edges_upserted": 0, "edges_retired": 0}
+    else:
+        graph_sync = await sync_edges_for_apply_strategy(**graph_kwargs)
 
     # Legacy flat-row count is 0 when SYNC_LEGACY_MAINTENANCE_PROGRAMS is off; surface v2 creates.
     effective_programs_created = programs_created_count or v2_programs_created

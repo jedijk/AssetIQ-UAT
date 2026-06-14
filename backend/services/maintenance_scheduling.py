@@ -114,6 +114,7 @@ async def schedule_program(program: dict, horizon_days: int = DEFAULT_HORIZON_DA
                 "scheduled_task_created",
                 scheduled_task=task_doc,
                 event="created",
+                tenant_id=task_doc.get("tenant_id"),
             )
 
     if last_created_iso:
