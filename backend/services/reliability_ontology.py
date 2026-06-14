@@ -48,6 +48,7 @@ RELATIONS: List[Dict[str, Any]] = [
     {"id": "indicates_failure_mode", "label": "indicates failure mode", "source": "observation", "target": "failure_mode", "domain": "reactive"},
     {"id": "escalated_to", "label": "escalated to", "source": "observation", "target": "threat", "domain": "reactive"},
     {"id": "linked_to_threat", "label": "linked to threat", "source": "observation", "target": "threat", "domain": "reactive"},
+    {"id": "linked_to_equipment", "label": "linked to equipment", "source": "threat", "target": "equipment", "domain": "reactive"},
     {"id": "triggered_investigation", "label": "triggered investigation", "source": "threat", "target": "investigation", "domain": "reactive"},
     {"id": "identified_cause", "label": "identified cause", "source": "investigation", "target": "cause", "domain": "reactive"},
     {"id": "generated_action", "label": "generated action", "source": "investigation", "target": "action", "domain": "reactive"},
@@ -57,12 +58,56 @@ RELATIONS: List[Dict[str, Any]] = [
     {"id": "affects_equipment", "label": "affects equipment", "source": "reliability_impact", "target": "equipment", "domain": "reactive"},
 ]
 
+RELATION_LABELS: Dict[str, str] = {rel["id"]: rel["label"] for rel in RELATIONS}
+
+
+def _enrich_node_types(
+    *,
+    outgoing_by_node: Dict[str, Dict[str, int]],
+    incoming_by_node: Dict[str, Dict[str, int]],
+) -> List[Dict[str, Any]]:
+    enriched: List[Dict[str, Any]] = []
+    for node in NODE_TYPES:
+        node_id = node["id"]
+        outgoing = outgoing_by_node.get(node_id, {})
+        incoming = incoming_by_node.get(node_id, {})
+        enriched.append(
+            {
+                **node,
+                "edge_count_outgoing": sum(outgoing.values()),
+                "edge_count_incoming": sum(incoming.values()),
+                "outgoing_by_relation": outgoing,
+                "incoming_by_relation": incoming,
+            }
+        )
+    return enriched
+
+
+def _enrich_relation_arcs(relation_arcs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    enriched: List[Dict[str, Any]] = []
+    for arc in relation_arcs:
+        relation_id = arc.get("relation") or ""
+        enriched.append(
+            {
+                **arc,
+                "label": RELATION_LABELS.get(relation_id, relation_id.replace("_", " ")),
+            }
+        )
+    return enriched
+
 
 async def get_reliability_ontology_payload(user=None) -> Dict[str, Any]:
     """Return ontology schema plus live edge counts for visualization."""
-    from services.reliability_graph_query import count_edges_by_relation
+    from services.reliability_graph_query import get_graph_topology_stats
 
-    edges_by_relation = await count_edges_by_relation(user, active_only=True)
+    topology = await get_graph_topology_stats(user, active_only=True)
+    edges_by_relation = topology["edges_by_relation"]
+    relation_arcs = _enrich_relation_arcs(topology["relation_arcs"])
+    node_types = _enrich_node_types(
+        outgoing_by_node=topology["outgoing_by_node"],
+        incoming_by_node=topology["incoming_by_node"],
+    )
+
     known_relation_ids = {rel["id"] for rel in RELATIONS}
     relations = [
         {**rel, "edge_count": edges_by_relation.get(rel["id"], 0)}
@@ -78,8 +123,9 @@ async def get_reliability_ontology_payload(user=None) -> Dict[str, Any]:
     )
     total_edges = sum(edges_by_relation.values())
     return {
-        "node_types": NODE_TYPES,
+        "node_types": node_types,
         "relations": relations,
+        "relation_arcs": relation_arcs,
         "other_relations": other_relations,
         "edges_by_relation": edges_by_relation,
         "reliability_edges_total": total_edges,

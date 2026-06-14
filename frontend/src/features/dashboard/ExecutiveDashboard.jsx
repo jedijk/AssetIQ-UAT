@@ -26,7 +26,7 @@ import {
   Shield,
   ShieldOff,
   AlertTriangle,
-  AlertOctagon,
+  ShieldCheck,
   CheckCircle2,
   ClipboardCheck,
   Activity,
@@ -148,6 +148,8 @@ const KPICard = ({ title, kpi, icon: Icon, colorClass, onClick, isMobile }) => {
                   ? `${kpi.evidence_count} equipment item${kpi.evidence_count === 1 ? "" : "s"}`
                   : title === "Assessment Coverage"
                     ? `${kpi.evidence_count} unassessed item${kpi.evidence_count === 1 ? "" : "s"}`
+                    : title === "Active Exposure" || title === "Controlled Exposure"
+                      ? `${kpi.evidence_count} observation${kpi.evidence_count === 1 ? "" : "s"}`
                   : `${kpi.evidence_count} evidence items`}
           </span>
           {onClick && <ChevronRight className="w-3 h-3" />}
@@ -712,19 +714,19 @@ export default function ExecutiveDashboard() {
           isMobile={isMobile}
           onClick={() => setSelectedEvidence({
             type: "active_threat_exposure",
-            title: "Active Exposure Evidence",
+            title: "Uncontrolled Active Exposure",
             data: evidence_drill_down?.active_threat_exposure || []
           })}
         />
         <KPICard
-          title="High Exposure"
+          title="Controlled Exposure"
           kpi={kpi_cards?.critical_active_exposure}
-          icon={AlertOctagon}
-          colorClass="border-l-4 border-l-red-500"
+          icon={ShieldCheck}
+          colorClass="border-l-4 border-l-green-500"
           isMobile={isMobile}
           onClick={() => setSelectedEvidence({
             type: "critical_active_exposure",
-            title: "High Exposure Evidence",
+            title: "Controlled Exposure Evidence",
             data: evidence_drill_down?.critical_active_exposure || []
           })}
         />
@@ -755,8 +757,8 @@ export default function ExecutiveDashboard() {
               </HoverCardTrigger>
               <HoverCardContent className="w-80">
                 <p className="text-sm text-slate-600">
-                  Shows the flow from total assessed exposure to actively managed and unmanaged exposure.
-                  Uncovered exposure is assessed production impact for equipment without a maintenance program.
+                  Shows the flow from total assessed exposure to uncontrolled and controlled active observation exposure.
+                  Uncontrolled exposure is active production impact for observations without a maintenance strategy, program, or action plan.
                 </p>
               </HoverCardContent>
             </HoverCard>
@@ -764,7 +766,7 @@ export default function ExecutiveDashboard() {
         </h3>
         {isMobile && (
           <p className="text-xs text-slate-500 mb-3">
-            Flow from total assessed exposure to active and high exposure observations.
+            Flow from total assessed exposure to uncontrolled and controlled active observation exposure.
           </p>
         )}
         <WaterfallChart data={waterfall_data} currencySymbol={currencySymbol} isMobile={isMobile} />

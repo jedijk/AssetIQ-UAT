@@ -677,7 +677,7 @@ async def sync_threat_edges(
         await upsert_edge(
             source_type="threat",
             source_id=threat_id,
-            relation="observed_on",
+            relation="linked_to_equipment",
             target_type="equipment",
             target_id=equipment_id,
             equipment_id=equipment_id,
