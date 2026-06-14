@@ -9,15 +9,15 @@ import {
   ArrowUpDown,
   BarChart3,
 } from "lucide-react";
-import BackButton from "../../components/BackButton";
-import { Input } from "../../components/ui/input";
+import BackButton from "../../../components/BackButton";
+import { Input } from "../../../components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../components/ui/select";
+} from "../../../components/ui/select";
 import { PRIORITY_OPTIONS, STATUS_OPTIONS } from "../actionsPageConstants";
 
 export function ActionsPageToolbar({
