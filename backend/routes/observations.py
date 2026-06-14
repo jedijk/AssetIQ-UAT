@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
-from database import db, observation_service
+from database import observation_service
 from auth import get_current_user, require_permission
 from services.background_jobs import schedule_tracked_job
 from utils.auto_translate import translate_observation

@@ -1,1 +1,1 @@
-"""AssetIQ architecture definitions — domain boundaries and dependency rules."""
+"""Architecture convergence definitions and CI allowlists."""

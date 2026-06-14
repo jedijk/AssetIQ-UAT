@@ -27,19 +27,7 @@ import DOMPurify from "dompurify";
 import { getBackendUrl } from '../lib/apiConfig';
 import { isIOSLikeDevice } from '../lib/deviceUtils';
 const API_BASE_URL = getBackendUrl();
-const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
-
-function getAuthFetchInit(extra = {}) {
-  const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
-  return {
-    ...extra,
-    credentials: AUTH_MODE === "cookie" ? "include" : "omit",
-    headers: {
-      ...(extra.headers || {}),
-      ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  };
-}
+import { fetchDocumentArrayBuffer, fetchDocumentBlob } from '../lib/documentFetch';
 
 /**
  * Native PDF viewer.
@@ -348,15 +336,7 @@ export const DocumentViewer = ({
     setError(null);
     
     try {
-      const response = await fetch(url, getAuthFetchInit());
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("[DocumentViewer] DOCX fetch failed:", response.status, errorText);
-        throw new Error(errorText || `Failed to fetch document (${response.status})`);
-      }
-      
-      const arrayBuffer = await response.arrayBuffer();
+      const arrayBuffer = await fetchDocumentArrayBuffer(url);
       const result = await mammoth.convertToHtml({ arrayBuffer });
       setDocxHtml(result.value);
     } catch (err) {
@@ -375,14 +355,7 @@ export const DocumentViewer = ({
     setError(null);
     
     try {
-      const response = await fetch(url, getAuthFetchInit());
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || `Failed to fetch spreadsheet (${response.status})`);
-      }
-      
-      const arrayBuffer = await response.arrayBuffer();
+      const arrayBuffer = await fetchDocumentArrayBuffer(url);
       const workbook = XLSX.read(arrayBuffer, { type: "array" });
       
       // Parse all sheets
@@ -437,14 +410,7 @@ export const DocumentViewer = ({
       // Load PDF/Image as blob for authenticated access
       setLoading(true);
       
-      fetch(url, getAuthFetchInit())
-        .then(async response => {
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(errorText || `Failed to fetch file (${response.status})`);
-          }
-          return response.blob();
-        })
+      fetchDocumentBlob(url)
         .then(blob => {
           const objectUrl = URL.createObjectURL(blob);
           blobUrlRef.current = objectUrl;
@@ -664,9 +630,7 @@ export const DocumentViewer = ({
                     window.document.body.removeChild(a);
                     return;
                   }
-                  const response = await fetch(url, getAuthFetchInit());
-                  if (!response.ok) throw new Error("Download failed");
-                  const blob = await response.blob();
+                  const blob = await fetchDocumentBlob(url);
                   const downloadUrl = URL.createObjectURL(blob);
                   const a = window.document.createElement("a");
                   a.href = downloadUrl;
@@ -865,9 +829,7 @@ export const DocumentViewer = ({
                   className="bg-indigo-600 hover:bg-indigo-700"
                   onClick={async () => {
                     try {
-                      const response = await fetch(url, getAuthFetchInit());
-                      if (!response.ok) throw new Error("Download failed");
-                      const blob = await response.blob();
+                      const blob = await fetchDocumentBlob(url);
                       const downloadUrl = URL.createObjectURL(blob);
                       const a = document.createElement("a");
                       a.href = downloadUrl;

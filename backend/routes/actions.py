@@ -1,20 +1,15 @@
 """
-Actions routes.
+Actions routes — orchestration only (Wave 4 convergence).
 """
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
-from datetime import datetime, timezone
-import uuid
-import logging
-from database import db, installation_filter
+from typing import Optional
+
+from fastapi import APIRouter, Depends, BackgroundTasks
+from pydantic import BaseModel
+
 from auth import require_permission
-from services.cache_service import cache
-from services.tenant_schema import merge_tenant_filter, with_tenant_id
 from services.background_jobs import schedule_tracked_job
-from services.action_number_service import allocate_central_action_number
+from services import action_service
 from utils.auto_translate import translate_action
-logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Actions"])
 
@@ -23,231 +18,56 @@ _actions_write = require_permission("actions:write")
 _actions_delete = require_permission("actions:delete")
 
 
-async def _find_central_action(action_id: str, user: dict, *, include_mongo_id: bool = False):
-    """Load an action scoped to the user's tenant."""
-    from bson import ObjectId
-
-    projection = None if include_mongo_id else {"_id": 0}
-    query = merge_tenant_filter({"id": action_id}, user)
-    action = await db.central_actions.find_one(query, projection)
-    if not action:
-        try:
-            query = merge_tenant_filter({"_id": ObjectId(action_id)}, user)
-            action = await db.central_actions.find_one(query, projection)
-        except Exception:
-            pass
-    return action
-
-
-async def _assert_action_installation_scope(user: dict, action: dict) -> None:
-    """Ensure the user may mutate an action within their installation assignments."""
-    eq_id = action.get("linked_equipment_id")
-    if eq_id:
-        await installation_filter.assert_user_can_access_equipment(user, eq_id)
-        return
-    threat_id = action.get("threat_id") or (
-        action.get("source_id") if action.get("source_type") == "threat" else None
-    )
-    if threat_id:
-        threat = await db.threats.find_one({"id": threat_id})
-        if threat:
-            eq_id = threat.get("linked_equipment_id")
-            if eq_id:
-                await installation_filter.assert_user_can_access_equipment(user, eq_id)
-                return
-            if installation_filter.is_owner(user):
-                return
-            if threat.get("created_by") == user.get("id"):
-                return
-            raise HTTPException(status_code=403, detail="Action not in your assigned installations")
-    if installation_filter.is_owner(user):
-        return
-    if action.get("created_by") == user.get("id"):
-        return
-    raise HTTPException(status_code=403, detail="Action not in your assigned installations")
-
-
-def _normalize_action_source_type(action: dict) -> Optional[str]:
-    """Map legacy ``source`` values to ``source_type``."""
-    source_type = action.get("source_type")
-    if source_type:
-        return source_type
-    legacy = action.get("source")
-    if legacy in ("observation", "threat", "recommendation"):
-        return "threat"
-    if legacy == "investigation":
-        return "investigation"
-    return None
-
-
-async def _enrich_actions_source_names(actions: List[dict]) -> List[dict]:
-    """Backfill source_name / source_type for legacy or incomplete action documents."""
-    if not actions:
-        return actions
-
-    threat_ids: set = set()
-    inv_ids: set = set()
-    pending: List[dict] = []
-
-    for action in actions:
-        if action.get("source_name"):
-            continue
-        pending.append(action)
-        source_type = _normalize_action_source_type(action)
-        source_id = (
-            action.get("source_id")
-            or action.get("observation_id")
-            or action.get("threat_id")
-        )
-        if source_type == "threat" and source_id:
-            threat_ids.add(source_id)
-        elif source_type == "investigation" and source_id:
-            inv_ids.add(source_id)
-        elif action.get("threat_id"):
-            threat_ids.add(action["threat_id"])
-
-    threat_map: Dict[str, dict] = {}
-    if threat_ids:
-        threats = await db.threats.find(
-            {"id": {"$in": list(threat_ids)}},
-            {"_id": 0, "id": 1, "title": 1, "asset": 1},
-        ).to_list(500)
-        threat_map = {t["id"]: t for t in threats}
-
-    inv_map: Dict[str, dict] = {}
-    if inv_ids:
-        investigations = await db.investigations.find(
-            {"id": {"$in": list(inv_ids)}},
-            {"_id": 0, "id": 1, "title": 1, "case_number": 1},
-        ).to_list(500)
-        inv_map = {i["id"]: i for i in investigations}
-
-    for action in pending:
-        source_type = _normalize_action_source_type(action)
-        if source_type and not action.get("source_type"):
-            action["source_type"] = source_type
-
-        source_id = (
-            action.get("source_id")
-            or action.get("observation_id")
-            or action.get("threat_id")
-        )
-        resolved_name = None
-        if source_type == "threat":
-            threat = threat_map.get(source_id) or threat_map.get(action.get("threat_id"))
-            if threat:
-                resolved_name = threat.get("title") or threat.get("asset")
-        elif source_type == "investigation":
-            investigation = inv_map.get(source_id)
-            if investigation:
-                resolved_name = investigation.get("title") or investigation.get("case_number")
-
-        if not resolved_name:
-            resolved_name = action.get("equipment_name") or action.get("threat_asset")
-
-        if resolved_name:
-            action["source_name"] = resolved_name
-
-    return actions
-
-
-# Helper function to enrich items with creator info (with caching)
-async def enrich_with_creator_info(items: list) -> list:
-    """Add creator name and initials to items based on created_by field.
-    Uses caching to reduce database queries."""
-    if not items:
-        return items
-    
-    # Collect unique creator IDs
-    creator_ids = list(set(item.get("created_by") for item in items if item.get("created_by")))
-    if not creator_ids:
-        return items
-    
-    # Check cache first
-    cached_creators = cache.get_users_batch(creator_ids)
-    uncached_ids = [uid for uid in creator_ids if uid not in cached_creators]
-    
-    # Only fetch uncached users from database
-    if uncached_ids:
-        creators = await db.users.find(
-            {"id": {"$in": uncached_ids}},
-            {"_id": 0, "id": 1, "name": 1, "email": 1, "photo_url": 1, "avatar_path": 1, "avatar_data": 1, "position": 1, "role": 1}
-        ).to_list(100)
-        
-        # Cache the fetched users
-        fetched_map = {c["id"]: c for c in creators}
-        cache.set_users_batch(fetched_map)
-        
-        # Merge with cached
-        cached_creators.update(fetched_map)
-    
-    creator_map = cached_creators
-    
-    # Enrich items
-    for item in items:
-        creator_id = item.get("created_by")
-        if creator_id and creator_id in creator_map:
-            creator = creator_map[creator_id]
-            item["creator_name"] = creator.get("name") or creator.get("email", "").split("@")[0]
-            item["creator_position"] = creator.get("position") or creator.get("role") or "Team Member"
-            # Check photo_url, avatar_path, or avatar_data (MongoDB fallback)
-            if creator.get("photo_url"):
-                item["creator_photo"] = creator.get("photo_url")
-            elif creator.get("avatar_path") or creator.get("avatar_data"):
-                # Generate API URL for avatar (works for both storage methods)
-                item["creator_photo"] = f"/api/users/{creator_id}/avatar"
-            else:
-                item["creator_photo"] = None
-            # Generate initials
-            name = item["creator_name"]
-            if name:
-                parts = name.split()
-                item["creator_initials"] = "".join(p[0].upper() for p in parts[:2])
-            else:
-                item["creator_initials"] = "?"
-        else:
-            item["creator_name"] = None
-            item["creator_position"] = None
-            item["creator_photo"] = None
-            item["creator_initials"] = "?"
-    
-    return items
-
-# ============= CENTRALIZED ACTIONS MANAGEMENT =============
-
 class CentralActionCreate(BaseModel):
-    """Model for creating a centralized action."""
     title: str
     description: str
-    source_type: str  # 'threat' or 'investigation'
+    source_type: str
     source_id: str
-    source_name: str  # threat title or investigation title for reference
+    source_name: str
     priority: str = "medium"
     assignee: Optional[str] = None
-    action_type: Optional[str] = None  # CM, PM, PDM
+    action_type: Optional[str] = None
     discipline: Optional[str] = None
     due_date: Optional[str] = None
     comments: Optional[str] = None
-    # RPN and risk from original observation (optional - will be auto-fetched if not provided)
     rpn: Optional[int] = None
     risk_score: Optional[int] = None
     risk_level: Optional[str] = None
-    # Original threat ID if creating from investigation
     threat_id: Optional[str] = None
 
 
 class CentralActionUpdate(BaseModel):
-    """Model for updating a centralized action."""
     title: Optional[str] = None
     description: Optional[str] = None
     priority: Optional[str] = None
     assignee: Optional[str] = None
-    action_type: Optional[str] = None  # CM, PM, PDM
+    action_type: Optional[str] = None
     discipline: Optional[str] = None
     due_date: Optional[str] = None
     status: Optional[str] = None
     completion_notes: Optional[str] = None
     comments: Optional[str] = None
+
+
+class ActionValidateRequest(BaseModel):
+    validated_by_name: str
+    validated_by_position: str
+    validated_by_id: Optional[str] = None
+
+
+def _schedule_translation(background_tasks: BackgroundTasks, action_id: str, doc: dict, user_id: str) -> None:
+    schedule_tracked_job(
+        background_tasks,
+        "translate_action",
+        translate_action,
+        action_id,
+        {
+            "title": doc.get("title", ""),
+            "description": doc.get("description", "") or "",
+        },
+        user_id,
+        user_id=user_id,
+    )
 
 
 @router.get("/actions")
@@ -256,345 +76,36 @@ async def get_all_actions(
     priority: Optional[str] = None,
     assignee: Optional[str] = None,
     source_type: Optional[str] = None,
-    current_user: dict = Depends(_actions_read)
+    current_user: dict = Depends(_actions_read),
 ):
-    """Get all centralized actions with optional filters, filtered by user's assigned installations."""
-    # Get user's installation filter data
-    installation_ids = await installation_filter.get_user_installation_ids(current_user)
-    
-    # If no installations assigned, return empty result
-    if not installation_ids:
-        return {
-            "actions": [],
-            "stats": {
-                "total": 0,
-                "open": 0,
-                "in_progress": 0,
-                "completed": 0,
-                "overdue": 0
-            }
-        }
-    
-    equipment_ids = await installation_filter.get_all_equipment_ids_for_installations(
-        installation_ids, current_user["id"]
+    return await action_service.list_all_actions(
+        current_user,
+        status=status,
+        priority=priority,
+        assignee=assignee,
+        source_type=source_type,
     )
-    equipment_names = await installation_filter.get_equipment_names_for_installations(
-        installation_ids, current_user["id"]
-    )
-    
-    # Get threat IDs that belong to user's installations
-    threat_ids = await installation_filter.get_filtered_threat_ids(
-        current_user["id"], equipment_ids, equipment_names
-    )
-    
-    # Get investigation IDs that belong to user's installations
-    investigation_ids = await installation_filter.get_filtered_investigation_ids(
-        current_user["id"], equipment_ids, equipment_names
-    )
-    
-    # Build base query with installation filtering
-    query = installation_filter.build_action_filter(
-        current_user["id"], equipment_ids, equipment_names, threat_ids, investigation_ids
-    )
-    
-    if query.get("_impossible"):
-        return {
-            "actions": [],
-            "stats": {"total": 0, "open": 0, "in_progress": 0, "completed": 0, "overdue": 0}
-        }
-    
-    # Add additional filters
-    if status and status != "all":
-        query["status"] = status
-    if priority and priority != "all":
-        query["priority"] = priority
-    if assignee:
-        from utils.mongo_regex import case_insensitive_contains
-
-        assignee_match = case_insensitive_contains(assignee)
-        if assignee_match:
-            query["assignee"] = assignee_match
-    if source_type and source_type != "all":
-        query["source_type"] = source_type
-
-    query = merge_tenant_filter(query, current_user)
-    
-    actions = await db.central_actions.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
-    
-    # Enrich with creator info (uses caching)
-    actions = await enrich_with_creator_info(actions)
-    actions = await _enrich_actions_source_names(actions)
-    
-    # Batch fetch threat data for actions that need enrichment
-    threat_ids_to_fetch = []
-    for action in actions:
-        threat_id = action.get("threat_id") or (action.get("source_id") if action.get("source_type") == "threat" else None)
-        if threat_id:
-            threat_ids_to_fetch.append(threat_id)
-    
-    # Fetch all threats in one query
-    threat_data_map = {}
-    if threat_ids_to_fetch:
-        threats = await db.threats.find(
-            {"id": {"$in": list(set(threat_ids_to_fetch))}},
-            {"_id": 0, "id": 1, "fmea_rpn": 1, "risk_score": 1, "risk_level": 1, "asset": 1, "linked_equipment_id": 1}
-        ).to_list(500)
-        threat_data_map = {t["id"]: t for t in threats}
-    
-    # Enrich actions with threat data
-    enriched_actions = []
-    for action in actions:
-        enriched_action = dict(action)
-        
-        # Get threat data for asset/equipment info
-        threat_id = action.get("threat_id") or (action.get("source_id") if action.get("source_type") == "threat" else None)
-        threat = threat_data_map.get(threat_id) if threat_id else None
-        
-        # Prefer live threat data (always fresh), fall back to stored action values
-        if threat:
-            enriched_action["threat_rpn"] = threat.get("fmea_rpn") or action.get("rpn")
-            enriched_action["threat_risk_score"] = threat.get("risk_score") or action.get("risk_score")
-            enriched_action["threat_risk_level"] = threat.get("risk_level") or action.get("risk_level")
-        elif action.get("rpn") is not None:
-            enriched_action["threat_rpn"] = action.get("rpn")
-            enriched_action["threat_risk_score"] = action.get("risk_score")
-            enriched_action["threat_risk_level"] = action.get("risk_level")
-        else:
-            enriched_action["threat_rpn"] = None
-            enriched_action["threat_risk_score"] = None
-            enriched_action["threat_risk_level"] = None
-        
-        # Always add asset and equipment info from threat
-        if threat:
-            enriched_action["threat_asset"] = threat.get("asset")
-            enriched_action["linked_equipment_id"] = threat.get("linked_equipment_id")
-        
-        enriched_actions.append(enriched_action)
-    
-    # Get stats using aggregation pipeline (single query instead of 5)
-    base_stats_query = installation_filter.build_action_filter(
-        current_user["id"], equipment_ids, equipment_names, threat_ids
-    )
-    
-    if base_stats_query.get("_impossible"):
-        stats = {"total": 0, "open": 0, "in_progress": 0, "completed": 0, "overdue": 0}
-    else:
-        base_stats_query = merge_tenant_filter(base_stats_query, current_user)
-        now_iso = datetime.now(timezone.utc).isoformat()
-        pipeline = [
-            {"$match": base_stats_query},
-            {"$facet": {
-                "total": [{"$count": "count"}],
-                "open": [{"$match": {"status": "open"}}, {"$count": "count"}],
-                "in_progress": [{"$match": {"status": "in_progress"}}, {"$count": "count"}],
-                "completed": [{"$match": {"status": "completed"}}, {"$count": "count"}],
-                "overdue": [
-                    {"$match": {
-                        "status": {"$in": ["open", "in_progress"]},
-                        "due_date": {"$lt": now_iso, "$ne": None}
-                    }},
-                    {"$count": "count"}
-                ]
-            }}
-        ]
-        
-        result = await db.central_actions.aggregate(pipeline).to_list(1)
-        if result:
-            facets = result[0]
-            stats = {
-                "total": facets["total"][0]["count"] if facets["total"] else 0,
-                "open": facets["open"][0]["count"] if facets["open"] else 0,
-                "in_progress": facets["in_progress"][0]["count"] if facets["in_progress"] else 0,
-                "completed": facets["completed"][0]["count"] if facets["completed"] else 0,
-                "overdue": facets["overdue"][0]["count"] if facets["overdue"] else 0
-            }
-        else:
-            stats = {"total": 0, "open": 0, "in_progress": 0, "completed": 0, "overdue": 0}
-    
-    # Enrich actions with equipment tags
-    equipment_ids = list(set(a.get("linked_equipment_id") for a in enriched_actions if a.get("linked_equipment_id")))
-    if equipment_ids:
-        equipment_nodes = await db.equipment_nodes.find(
-            {"id": {"$in": equipment_ids}},
-            {"_id": 0, "id": 1, "tag": 1}
-        ).to_list(500)
-        equipment_tags = {eq["id"]: eq.get("tag") for eq in equipment_nodes}
-        for action in enriched_actions:
-            eq_id = action.get("linked_equipment_id")
-            if eq_id:
-                action["equipment_tag"] = equipment_tags.get(eq_id)
-    
-    return {
-        "actions": enriched_actions,
-        "stats": stats
-    }
 
 
 @router.get("/actions/overdue")
-async def get_overdue_actions(
-    current_user: dict = Depends(_actions_read)
-):
-    """Get all overdue actions for notifications."""
-    now = datetime.now(timezone.utc).isoformat()
-    
-    overdue_actions = await db.central_actions.find(
-        merge_tenant_filter({
-            "created_by": current_user["id"],
-            "status": {"$in": ["open", "in_progress"]},
-            "due_date": {"$lt": now, "$nin": [None, ""]},
-        }, current_user),
-        {"_id": 0},
-    ).sort("due_date", 1).to_list(50)
-    
-    return {
-        "overdue_actions": overdue_actions,
-        "count": len(overdue_actions)
-    }
+async def get_overdue_actions(current_user: dict = Depends(_actions_read)):
+    return await action_service.list_overdue_actions(current_user)
 
 
 @router.post("/actions")
 async def create_central_action(
     data: CentralActionCreate,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(_actions_write)
+    current_user: dict = Depends(_actions_write),
 ):
-    """Create a new centralized action (promote from threat or investigation)."""
-    if data.source_type == "threat":
-        threat = await db.threats.find_one({"id": data.source_id})
-        if threat:
-            eq_id = threat.get("linked_equipment_id")
-            if eq_id:
-                await installation_filter.assert_user_can_access_equipment(current_user, eq_id)
-    action_id = str(uuid.uuid4())
-    action_number = await allocate_central_action_number()
-    
-    # Initialize RPN and risk values from input or defaults
-    rpn = data.rpn
-    risk_score = data.risk_score
-    risk_level = data.risk_level
-    threat_id = data.threat_id
-    
-    # If creating from an investigation, try to get RPN/risk from the original threat
-    if data.source_type == "investigation" and rpn is None:
-        # First, get the investigation to find the linked threat
-        investigation = await db.investigations.find_one({"id": data.source_id})
-        if investigation:
-            # The investigation should have a threat_id linking to the original observation
-            linked_threat_id = investigation.get("threat_id") or threat_id
-            if linked_threat_id:
-                threat = await db.threats.find_one({"id": linked_threat_id})
-                if threat:
-                    rpn = threat.get("fmea_rpn") or threat.get("rpn")
-                    risk_score = threat.get("risk_score")
-                    risk_level = threat.get("risk_level")
-                    threat_id = linked_threat_id
-    
-    # If creating directly from a threat, get RPN/risk from the threat
-    elif data.source_type == "threat" and rpn is None:
-        threat = await db.threats.find_one({"id": data.source_id})
-        if threat:
-            rpn = threat.get("fmea_rpn") or threat.get("rpn")
-            risk_score = threat.get("risk_score")
-            risk_level = threat.get("risk_level")
-            threat_id = data.source_id
-    
-    action_doc = {
-        "id": action_id,
-        "action_number": action_number,
-        "title": data.title,
-        "description": data.description,
-        "source_type": data.source_type,
-        "source_id": data.source_id,
-        "source_name": data.source_name,
-        "threat_id": threat_id,  # Store reference to original threat
-        "priority": data.priority,
-        "assignee": data.assignee,
-        "action_type": data.action_type,
-        "discipline": data.discipline,
-        "due_date": data.due_date,
-        "status": "open",
-        "comments": data.comments or "",
-        "completion_notes": None,
-        # Store RPN and risk from original observation
-        "rpn": rpn,
-        "risk_score": risk_score,
-        "risk_level": risk_level,
-        "created_by": current_user["id"],
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat()
-    }
-    action_doc = with_tenant_id(action_doc, current_user)
-    
-    await db.central_actions.insert_one(action_doc)
-    action_doc.pop("_id", None)
-
-    linked_equipment_id = None
-    if data.source_type == "threat":
-        threat = await db.threats.find_one({"id": data.source_id}, {"linked_equipment_id": 1})
-        linked_equipment_id = (threat or {}).get("linked_equipment_id")
-    elif data.source_type == "investigation":
-        inv = await db.investigations.find_one({"id": data.source_id}, {"asset_id": 1})
-        linked_equipment_id = (inv or {}).get("asset_id")
-
-    from services.reliability_graph import dispatch_graph_sync
-
-    await dispatch_graph_sync(
-        "sync_action_edges",
-        "action_create",
-        action_id=action_id,
-        source_type=data.source_type,
-        source_id=data.source_id,
-        equipment_id=linked_equipment_id,
-    )
-    schedule_tracked_job(
-        background_tasks,
-        "translate_action",
-        translate_action,
-        action_id,
-        {
-            "title": action_doc.get("title", ""),
-            "description": action_doc.get("description", "") or "",
-        },
-        current_user["id"],
-        user_id=current_user["id"],
-    )
+    action_doc = await action_service.create_action(current_user, data.dict())
+    _schedule_translation(background_tasks, action_doc["id"], action_doc, current_user["id"])
     return action_doc
 
 
 @router.get("/actions/{action_id}")
-async def get_central_action(
-    action_id: str,
-    current_user: dict = Depends(_actions_read)
-):
-    """Get a specific centralized action."""
-    action = await _find_central_action(action_id, current_user)
-    
-    if not action:
-        raise HTTPException(status_code=404, detail="Action not found")
-
-    enriched = await _enrich_actions_source_names([action])
-    action = enriched[0]
-    
-    # Enrich with equipment tag from linked threat
-    threat_id = action.get("threat_id") or (action.get("source_id") if action.get("source_type") == "threat" else None)
-    if threat_id:
-        threat = await db.threats.find_one(
-            {"id": threat_id},
-            {"_id": 0, "asset": 1, "linked_equipment_id": 1}
-        )
-        if threat:
-            action["threat_asset"] = threat.get("asset")
-            eq_id = threat.get("linked_equipment_id")
-            if eq_id:
-                action["linked_equipment_id"] = eq_id
-                equipment = await db.equipment_nodes.find_one(
-                    {"id": eq_id},
-                    {"_id": 0, "tag": 1}
-                )
-                if equipment:
-                    action["equipment_tag"] = equipment.get("tag")
-    
-    return action
+async def get_central_action(action_id: str, current_user: dict = Depends(_actions_read)):
+    return await action_service.get_action_detail(action_id, current_user)
 
 
 @router.patch("/actions/{action_id}")
@@ -602,299 +113,48 @@ async def update_central_action(
     action_id: str,
     data: CentralActionUpdate,
     background_tasks: BackgroundTasks,
-    current_user: dict = Depends(_actions_write)
+    current_user: dict = Depends(_actions_write),
 ):
-    """Update a centralized action. Owner and Admin can update any action."""
-    action = await _find_central_action(action_id, current_user, include_mongo_id=True)
-    
-    if not action:
-        raise HTTPException(status_code=404, detail="Action not found")
-    await _assert_action_installation_scope(current_user, action)
-    
-    update_data = {k: v for k, v in data.dict().items() if v is not None}
-    update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
-    
-    # Check if status is being changed to completed
-    status_changed_to_completed = (
-        data.status == "completed" and 
-        action.get("status") != "completed"
-    )
-    
-    # Update using _id from the found document
-    await db.central_actions.update_one(
-        {"_id": action["_id"]},
-        {"$set": update_data}
-    )
-    
-    updated = await db.central_actions.find_one({"_id": action["_id"]}, {"_id": 0})
-    
-    # Check if all actions for the source are now completed
-    completion_notification = None
-    if status_changed_to_completed and action.get("source_type") and action.get("source_id"):
-        source_type = action["source_type"]
-        source_id = action["source_id"]
-        
-        # Count remaining open actions for this source (not filtered by created_by - actions are shared)
-        remaining_open = await db.central_actions.count_documents({
-            "source_type": source_type,
-            "source_id": source_id,
-            "status": {"$ne": "completed"}
-        })
-        
-        if remaining_open == 0:
-            # All actions completed - prepare notification
-            total_actions = await db.central_actions.count_documents({
-                "source_type": source_type,
-                "source_id": source_id
-            })
-            
-            # Get source details
-            source_name = None
-            source_status = None
-            if source_type == "threat":
-                threat = await db.threats.find_one({"id": source_id}, {"_id": 0, "title": 1, "status": 1})
-                if threat:
-                    source_name = threat.get("title", "Observation")
-                    source_status = threat.get("status")
-            elif source_type == "investigation":
-                inv = await db.investigations.find_one({"id": source_id}, {"_id": 0, "title": 1, "status": 1})
-                if inv:
-                    source_name = inv.get("title", "Investigation")
-                    source_status = inv.get("status")
-            
-            # Only suggest closure if source is not already closed
-            if source_status not in ["closed", "completed"]:
-                completion_notification = {
-                    "type": "all_actions_completed",
-                    "source_type": source_type,
-                    "source_id": source_id,
-                    "source_name": source_name,
-                    "total_actions": total_actions,
-                    "message": f"All {total_actions} action(s) for '{source_name}' are now complete! Consider closing this {source_type.replace('threat', 'observation')}.",
-                    "suggest_closure": True
-                }
-    
-    if status_changed_to_completed:
-        from services.reliability_graph import dispatch_graph_sync
-        import uuid as _uuid
-
-        eq_id = updated.get("linked_equipment_id")
-        if not eq_id and updated.get("threat_id"):
-            threat = await db.threats.find_one(
-                {"id": updated["threat_id"]},
-                {"linked_equipment_id": 1},
-            )
-            eq_id = (threat or {}).get("linked_equipment_id")
-        if eq_id:
-            await dispatch_graph_sync(
-                "sync_outcome_edges",
-                "action_close_outcome",
-                action_id=updated.get("id") or action_id,
-                outcome_id=str(_uuid.uuid4()),
-                equipment_id=eq_id,
-                verification_status="verified",
-                effectiveness=updated.get("completion_notes"),
-            )
-
-    if any(k in update_data for k in ("title", "description")):
-        schedule_tracked_job(
-            background_tasks,
-            "translate_action",
-            translate_action,
-            action_id,
-            {
-                "title": updated.get("title", ""),
-                "description": updated.get("description", "") or "",
-            },
-            current_user["id"],
-            user_id=current_user["id"],
-        )
-
-    response = dict(updated)
-    if completion_notification:
-        response["completion_notification"] = completion_notification
-    
+    response = await action_service.update_action(action_id, current_user, data.dict())
+    if any(k in data.dict(exclude_unset=True) for k in ("title", "description")):
+        _schedule_translation(background_tasks, action_id, response, current_user["id"])
     return response
 
 
 @router.delete("/actions/{action_id}")
 async def delete_central_action_route(
     action_id: str,
-    current_user: dict = Depends(_actions_delete)
+    current_user: dict = Depends(_actions_delete),
 ):
-    """Delete a centralized action. Owner and Admin can delete any action."""
-    from repositories.action_repository import delete_central_action
-
-    action = await _find_central_action(action_id, current_user, include_mongo_id=True)
-    if not action:
-        raise HTTPException(status_code=404, detail="Action not found")
-    await _assert_action_installation_scope(current_user, action)
-
-    try:
-        await delete_central_action(action_id=action_id, user=current_user)
-    except ValueError as exc:
-        code = str(exc)
-        if code == "not_found":
-            raise HTTPException(status_code=404, detail="Action not found") from exc
-        if code == "forbidden":
-            raise HTTPException(
-                status_code=404,
-                detail="Action not found or you don't have permission to delete it",
-            ) from exc
-        raise
-
+    await action_service.delete_action(action_id, current_user)
     return {"message": "Action deleted"}
-
-
-# ============= ACTION VALIDATION =============
-
-class ActionValidateRequest(BaseModel):
-    """Model for validating an action."""
-    validated_by_name: str
-    validated_by_position: str
-    validated_by_id: Optional[str] = None
 
 
 @router.post("/actions/{action_id}/validate")
 async def validate_action(
     action_id: str,
     data: ActionValidateRequest,
-    current_user: dict = Depends(_actions_write)
+    current_user: dict = Depends(_actions_write),
 ):
-    """Validate an action (mark as reviewed/approved by a person)."""
-    action = await _find_central_action(action_id, current_user, include_mongo_id=True)
-    
-    if not action:
-        raise HTTPException(status_code=404, detail="Action not found")
-    await _assert_action_installation_scope(current_user, action)
-    
-    update_data = {
-        "is_validated": True,
-        "validated_by_name": data.validated_by_name,
-        "validated_by_position": data.validated_by_position,
-        "validated_by_id": data.validated_by_id or current_user["id"],
-        "validated_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat()
-    }
-    
-    await db.central_actions.update_one(
-        {"_id": action["_id"]},
-        {"$set": update_data}
+    return await action_service.set_action_validation(
+        action_id,
+        current_user,
+        validated=True,
+        validated_by_name=data.validated_by_name,
+        validated_by_position=data.validated_by_position,
+        validated_by_id=data.validated_by_id,
     )
-    
-    updated = await _find_central_action(action_id, current_user)
-    return updated
 
 
 @router.post("/actions/{action_id}/unvalidate")
-async def unvalidate_action(
-    action_id: str,
-    current_user: dict = Depends(_actions_write)
-):
-    """Remove validation from an action."""
-    action = await _find_central_action(action_id, current_user, include_mongo_id=True)
-    if not action:
-        raise HTTPException(status_code=404, detail="Action not found")
-    await _assert_action_installation_scope(current_user, action)
-    
-    update_data = {
-        "is_validated": False,
-        "validated_by_name": None,
-        "validated_by_position": None,
-        "validated_by_id": None,
-        "validated_at": None,
-        "updated_at": datetime.now(timezone.utc).isoformat()
-    }
-    
-    await db.central_actions.update_one(
-        {"_id": action["_id"]},
-        {"$set": update_data}
-    )
-    
-    updated = await _find_central_action(action_id, current_user)
-    return updated
+async def unvalidate_action(action_id: str, current_user: dict = Depends(_actions_write)):
+    return await action_service.set_action_validation(action_id, current_user, validated=False)
 
-
-# ============= ACTION COMPLETION CHECK =============
 
 @router.get("/actions/source/{source_type}/{source_id}/completion-status")
 async def get_source_action_completion_status(
     source_type: str,
     source_id: str,
-    current_user: dict = Depends(_actions_read)
+    current_user: dict = Depends(_actions_read),
 ):
-    """
-    Check if all actions for a given source (threat/investigation) are completed.
-    Returns completion status and suggests closure if all actions are done.
-    """
-    if source_type not in ["threat", "investigation"]:
-        raise HTTPException(status_code=400, detail="Invalid source_type. Must be 'threat' or 'investigation'")
-    
-    # Get all actions for this source
-    all_actions = await db.central_actions.find(
-        merge_tenant_filter(
-            {"source_type": source_type, "source_id": source_id, "created_by": current_user["id"]},
-            current_user,
-        ),
-        {"_id": 0, "id": 1, "status": 1, "title": 1, "is_validated": 1},
-    ).to_list(100)
-    
-    if not all_actions:
-        return {
-            "source_type": source_type,
-            "source_id": source_id,
-            "total_actions": 0,
-            "completed_actions": 0,
-            "all_completed": False,
-            "all_validated": False,
-            "suggest_closure": False,
-            "pending_actions": [],
-            "message": "No actions found for this source"
-        }
-    
-    completed_actions = [a for a in all_actions if a.get("status") == "completed"]
-    validated_actions = [a for a in all_actions if a.get("is_validated")]
-    pending_actions = [a for a in all_actions if a.get("status") != "completed"]
-    
-    total = len(all_actions)
-    completed = len(completed_actions)
-    validated = len(validated_actions)
-    all_completed = completed == total
-    all_validated = validated == total
-    
-    # Suggest closure only if ALL actions are completed
-    suggest_closure = all_completed and total > 0
-    
-    # Get source name for notification
-    source_name = None
-    if source_type == "threat":
-        threat = await db.threats.find_one({"id": source_id}, {"_id": 0, "title": 1, "status": 1})
-        if threat:
-            source_name = threat.get("title", "Observation")
-            # Don't suggest closure if already closed
-            if threat.get("status") == "closed":
-                suggest_closure = False
-    elif source_type == "investigation":
-        investigation = await db.investigations.find_one({"id": source_id}, {"_id": 0, "title": 1, "status": 1})
-        if investigation:
-            source_name = investigation.get("title", "Investigation")
-            if investigation.get("status") == "completed":
-                suggest_closure = False
-    
-    return {
-        "source_type": source_type,
-        "source_id": source_id,
-        "source_name": source_name,
-        "total_actions": total,
-        "completed_actions": completed,
-        "validated_actions": validated,
-        "completion_percentage": round((completed / total) * 100) if total > 0 else 0,
-        "all_completed": all_completed,
-        "all_validated": all_validated,
-        "suggest_closure": suggest_closure,
-        "pending_actions": [{"id": a["id"], "title": a.get("title", "Untitled")} for a in pending_actions],
-        "message": f"All {total} action(s) completed! Consider closing this {source_type.replace('threat', 'observation')}." if suggest_closure else None
-    }
-
-
-
+    return await action_service.get_source_completion_status(source_type, source_id, current_user)
