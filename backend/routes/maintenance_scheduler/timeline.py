@@ -21,7 +21,7 @@ async def get_timeline(
     current_user: dict = Depends(require_permission("scheduler:read")),
 ):
     """Get timeline view of scheduled tasks grouped by equipment."""
-    await ensure_imported_pm_tasks_scheduled(equipment_type_id)
+    await ensure_imported_pm_tasks_scheduled(equipment_type_id, read_only=True)
 
     if not start_date:
         start_date = datetime.utcnow().date().isoformat()

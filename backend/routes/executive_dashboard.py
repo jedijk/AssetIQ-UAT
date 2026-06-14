@@ -662,7 +662,8 @@ async def get_executive_dashboard(
             tooltip=(
                 f"Total assessed production exposure covered by {active_maintenance_program_count} "
                 f"equipment with an active maintenance program or imported PM plan "
-                f"({coverage_current:.0f}% of total assessed exposure)."
+                f"({coverage_current:.0f}% of total assessed exposure). "
+                "Coverage indicates that a program exists, not the quality or effectiveness of that coverage."
             ),
             evidence_count=active_maintenance_program_count,
         ),

@@ -38,7 +38,7 @@ async def get_scheduled_tasks(
     current_user: dict = Depends(_scheduler_read),
 ):
     """Get scheduled tasks with filtering."""
-    await ensure_imported_pm_tasks_scheduled(equipment_type_id)
+    await ensure_imported_pm_tasks_scheduled(equipment_type_id, read_only=True)
 
     query = {}
 
@@ -82,7 +82,7 @@ async def get_daily_planner(
     current_user: dict = Depends(_scheduler_read),
 ):
     """Get tasks for daily planner view."""
-    await ensure_imported_pm_tasks_scheduled()
+    await ensure_imported_pm_tasks_scheduled(read_only=True)
 
     if not date:
         date = datetime.utcnow().date().isoformat()
@@ -128,7 +128,7 @@ async def get_weekly_planner(
     current_user: dict = Depends(_scheduler_read),
 ):
     """Get tasks for weekly planner view."""
-    await ensure_imported_pm_tasks_scheduled()
+    await ensure_imported_pm_tasks_scheduled(read_only=True)
 
     if not start_date:
         today_date = datetime.utcnow().date()

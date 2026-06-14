@@ -437,7 +437,12 @@ const ObservationEvidenceList = ({ evidence, onNavigate }) => (
 
 const formatCriticalityLabel = (criticality) => {
   if (!criticality) return null;
-  const normalized = String(criticality).replace(/_/g, " ");
+  let raw = criticality;
+  if (typeof criticality === "object") {
+    raw = criticality.level || criticality.profile_id || criticality.name || null;
+  }
+  if (raw == null || raw === "") return null;
+  const normalized = String(raw).replace(/_/g, " ");
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 };
 
