@@ -168,9 +168,7 @@ async def get_kpi_summary(
     else:
         start_dt = now - timedelta(days=30)
     
-    match_stage = {
-        "timestamp": {"$gte": start_dt, "$lte": now}
-    }
+    match_stage = user_stats_service.build_event_match_stage(start_dt, now)
     
     kpis = await user_stats_service._get_kpi_metrics(match_stage)
     
@@ -200,9 +198,7 @@ async def get_module_usage(
     now = datetime.now(timezone.utc)
     start_dt = now - timedelta(days=int(period) if period.isdigit() else 30)
     
-    match_stage = {
-        "timestamp": {"$gte": start_dt, "$lte": now}
-    }
+    match_stage = user_stats_service.build_event_match_stage(start_dt, now)
     
     return await user_stats_service._get_module_usage(match_stage)
 
@@ -224,12 +220,9 @@ async def get_user_activity(
     now = datetime.now(timezone.utc)
     start_dt = now - timedelta(days=int(period) if period.isdigit() else 30)
     
-    match_stage = {
-        "timestamp": {"$gte": start_dt, "$lte": now}
-    }
-    
-    if role_filter:
-        match_stage["user_role"] = role_filter
+    match_stage = user_stats_service.build_event_match_stage(
+        start_dt, now, user_role_filter=role_filter
+    )
     
     users = await user_stats_service._get_user_activity(match_stage)
     
@@ -264,9 +257,7 @@ async def get_action_usage(
     now = datetime.now(timezone.utc)
     start_dt = now - timedelta(days=int(period) if period.isdigit() else 30)
     
-    match_stage = {
-        "timestamp": {"$gte": start_dt, "$lte": now}
-    }
+    match_stage = user_stats_service.build_event_match_stage(start_dt, now)
     
     return await user_stats_service._get_action_usage(match_stage)
 
@@ -286,9 +277,7 @@ async def get_device_usage(
     now = datetime.now(timezone.utc)
     start_dt = now - timedelta(days=int(period) if period.isdigit() else 30)
     
-    match_stage = {
-        "timestamp": {"$gte": start_dt, "$lte": now}
-    }
+    match_stage = user_stats_service.build_event_match_stage(start_dt, now)
     
     return await user_stats_service._get_device_usage(match_stage)
 
@@ -308,9 +297,7 @@ async def get_usage_trends(
     now = datetime.now(timezone.utc)
     start_dt = now - timedelta(days=int(period) if period.isdigit() else 30)
     
-    match_stage = {
-        "timestamp": {"$gte": start_dt, "$lte": now}
-    }
+    match_stage = user_stats_service.build_event_match_stage(start_dt, now)
     
     return await user_stats_service._get_daily_trends(match_stage, start_dt, now)
 
