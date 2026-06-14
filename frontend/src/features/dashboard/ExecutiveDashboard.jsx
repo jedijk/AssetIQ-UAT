@@ -28,6 +28,7 @@ import {
   AlertTriangle,
   AlertOctagon,
   CheckCircle2,
+  ClipboardCheck,
   Activity,
   Sparkles,
   ChevronRight,
@@ -99,6 +100,7 @@ const KPICard = ({ title, kpi, icon: Icon, colorClass, onClick, isMobile }) => {
     : colorClass.includes("orange") ? "text-orange-600"
     : colorClass.includes("amber") ? "text-amber-600"
     : colorClass.includes("blue") ? "text-blue-600"
+    : colorClass.includes("teal") ? "text-teal-600"
     : "text-slate-600";
 
   const cardBody = (
@@ -144,6 +146,8 @@ const KPICard = ({ title, kpi, icon: Icon, colorClass, onClick, isMobile }) => {
                 ? `${kpi.evidence_count} active maintenance program${kpi.evidence_count === 1 ? "" : "s"}`
                 : title === "Uncovered Exposure"
                   ? `${kpi.evidence_count} equipment item${kpi.evidence_count === 1 ? "" : "s"}`
+                  : title === "Assessment Coverage"
+                    ? `${kpi.evidence_count} unassessed item${kpi.evidence_count === 1 ? "" : "s"}`
                   : `${kpi.evidence_count} evidence items`}
           </span>
           {onClick && <ChevronRight className="w-3 h-3" />}
@@ -353,6 +357,7 @@ const OBSERVATION_EVIDENCE_TYPES = new Set([
 
 const EQUIPMENT_EVIDENCE_TYPES = new Set([
   "uncovered_exposure",
+  "unassessed_assessments",
 ]);
 
 const formatEvidenceDate = (dateStr) => {
@@ -446,16 +451,22 @@ const formatCriticalityLabel = (criticality) => {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 };
 
-const EquipmentEvidenceList = ({ evidence, onNavigate }) => (
+const buildEquipmentAssessUrl = (equipmentId) =>
+  `/equipment-manager?edit=${equipmentId}&section=criticality`;
+
+const EquipmentEvidenceList = ({ evidence, onNavigate, assessMode = false }) => (
   <div className="mt-2 divide-y divide-slate-200 rounded-lg border border-slate-200 overflow-hidden">
     <div className="hidden sm:grid sm:grid-cols-[minmax(0,1fr)_7rem_6rem] gap-3 bg-slate-100 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
       <span>Equipment</span>
       <span>Status</span>
-      <span className="text-right">Impact</span>
+      <span className="text-right">{assessMode ? "Action" : "Impact"}</span>
     </div>
     {evidence.map((item, index) => {
       const label = item.asset || "Unnamed equipment";
       const criticalityLabel = formatCriticalityLabel(item.criticality);
+      const hoverClass = assessMode
+        ? "hover:bg-teal-50/70 active:bg-teal-50"
+        : "hover:bg-amber-50/70 active:bg-amber-50";
 
       return (
         <motion.button
@@ -466,14 +477,19 @@ const EquipmentEvidenceList = ({ evidence, onNavigate }) => (
           transition={{ delay: index * 0.03 }}
           onClick={() => item.id && onNavigate(item.id)}
           disabled={!item.id}
-          className="w-full text-left bg-white hover:bg-amber-50/70 active:bg-amber-50 transition-colors px-4 py-3 disabled:cursor-default disabled:hover:bg-white"
+          className={`w-full text-left bg-white transition-colors px-4 py-3 disabled:cursor-default disabled:hover:bg-white ${hoverClass}`}
           data-testid={item.id ? `evidence-equipment-${item.id}` : undefined}
         >
           <div className="flex items-start gap-3 sm:grid sm:grid-cols-[minmax(0,1fr)_7rem_6rem] sm:items-center sm:gap-3">
             <div className="min-w-0 flex-1">
               <div className="font-medium text-slate-900 break-words line-clamp-2">{label}</div>
-              {criticalityLabel && (
+              {item.level_label ? (
+                <div className="text-xs text-slate-500 mt-0.5">{item.level_label}</div>
+              ) : criticalityLabel ? (
                 <div className="text-xs text-slate-500 mt-0.5">{criticalityLabel} criticality</div>
+              ) : null}
+              {item.tag && (
+                <div className="text-xs text-slate-400 mt-0.5">{item.tag}</div>
               )}
             </div>
             <div className="shrink-0">
@@ -481,18 +497,40 @@ const EquipmentEvidenceList = ({ evidence, onNavigate }) => (
                 {item.control_status || "Uncovered"}
               </Badge>
             </div>
-            <div className="hidden sm:flex items-center justify-end gap-1 text-sm font-semibold text-slate-900 tabular-nums">
-              <span>{item.exposure_formatted}</span>
-              {item.id && <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />}
+            <div className="hidden sm:flex items-center justify-end gap-1 text-sm font-semibold tabular-nums">
+              {assessMode ? (
+                item.id && (
+                  <span className="inline-flex items-center gap-1 text-teal-700">
+                    Assess
+                    <ChevronRight className="w-4 h-4 shrink-0" />
+                  </span>
+                )
+              ) : (
+                <>
+                  <span className="text-slate-900">{item.exposure_formatted}</span>
+                  {item.id && <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />}
+                </>
+              )}
             </div>
           </div>
           <div className="mt-2 flex items-center justify-between sm:hidden">
-            <span className="text-sm font-semibold text-slate-900 tabular-nums">{item.exposure_formatted}</span>
-            {item.id && (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700">
-                Open
-                <ChevronRight className="w-3.5 h-3.5" />
-              </span>
+            {assessMode ? (
+              item.id && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-teal-700">
+                  Assess
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </span>
+              )
+            ) : (
+              <>
+                <span className="text-sm font-semibold text-slate-900 tabular-nums">{item.exposure_formatted}</span>
+                {item.id && (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700">
+                    Open
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </span>
+                )}
+              </>
             )}
           </div>
         </motion.button>
@@ -517,7 +555,11 @@ const EvidencePanel = ({ isOpen, onClose, title, evidence, evidenceType }) => {
 
   const handleEquipmentNavigate = (equipmentId) => {
     onClose();
-    navigate(`/equipment-manager?edit=${equipmentId}`);
+    navigate(
+      evidenceType === "unassessed_assessments"
+        ? buildEquipmentAssessUrl(equipmentId)
+        : `/equipment-manager?edit=${equipmentId}`
+    );
   };
 
   return (
@@ -535,7 +577,11 @@ const EvidencePanel = ({ isOpen, onClose, title, evidence, evidenceType }) => {
         ) : isObservationEvidence ? (
           <ObservationEvidenceList evidence={evidence} onNavigate={handleObservationNavigate} />
         ) : isEquipmentEvidence ? (
-          <EquipmentEvidenceList evidence={evidence} onNavigate={handleEquipmentNavigate} />
+          <EquipmentEvidenceList
+            evidence={evidence}
+            onNavigate={handleEquipmentNavigate}
+            assessMode={evidenceType === "unassessed_assessments"}
+          />
         ) : (
           <p className="text-center text-slate-500 py-8">No evidence items found</p>
         )}
@@ -622,7 +668,7 @@ export default function ExecutiveDashboard() {
       </div>
 
       {/* KPI Cards Row */}
-      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-3 sm:gap-4">
         <KPICard
           title="Exposure Coverage"
           kpi={kpi_cards?.exposure_coverage}
@@ -641,6 +687,22 @@ export default function ExecutiveDashboard() {
             title: "Uncovered Exposure Evidence",
             data: evidence_drill_down?.uncovered_exposure || []
           })}
+        />
+        <KPICard
+          title="Assessment Coverage"
+          kpi={kpi_cards?.assessment_coverage}
+          icon={ClipboardCheck}
+          colorClass="border-l-4 border-l-teal-500"
+          isMobile={isMobile}
+          onClick={
+            (kpi_cards?.assessment_coverage?.evidence_count ?? 0) > 0
+              ? () => setSelectedEvidence({
+                  type: "unassessed_assessments",
+                  title: "Unassessed Equipment",
+                  data: evidence_drill_down?.unassessed_assessments || [],
+                })
+              : undefined
+          }
         />
         <KPICard
           title="Active Exposure"

@@ -74,7 +74,15 @@ async def _fetch_scoped_equipment_nodes(current_user: dict) -> List[dict]:
         return []
     return await db.equipment_nodes.find(
         merge_tenant_filter({"id": {"$in": list(equipment_ids)}}, current_user),
-        {"_id": 0, "id": 1, "name": 1, "criticality": 1, "equipment_type_id": 1},
+        {
+            "_id": 0,
+            "id": 1,
+            "name": 1,
+            "tag": 1,
+            "level": 1,
+            "criticality": 1,
+            "equipment_type_id": 1,
+        },
     ).to_list(5000)
 
 
@@ -138,6 +146,25 @@ PM_IMPORT_EQUIPMENT_LINKED_TASK_MATCH = {
         {"tasks_extracted.review_status": {"$in": ["accepted", "edited", "implemented"]}},
     ],
 }
+
+
+ASSESSMENT_COVERAGE_LEVELS = frozenset({"subunit", "maintainable_item"})
+
+
+def _equipment_level_key(level: Optional[str]) -> str:
+    return (level or "").lower().strip()
+
+
+def _is_equipment_production_assessed(equipment: dict) -> bool:
+    return production_impact_from_criticality(equipment.get("criticality")) > 0
+
+
+def _assessment_level_display(level: str) -> str:
+    labels = {
+        "subunit": "Sub unit",
+        "maintainable_item": "Maintainable item",
+    }
+    return labels.get(level, level.replace("_", " ").title())
 
 
 async def _equipment_ids_with_active_pm_import(
@@ -525,6 +552,39 @@ async def get_executive_dashboard(
             "id": equipment_id,
         })
 
+    assessment_scope_equipment = [
+        eq
+        for eq in equipment_nodes
+        if _equipment_level_key(eq.get("level")) in ASSESSMENT_COVERAGE_LEVELS
+    ]
+    assessed_in_scope_count = sum(
+        1 for eq in assessment_scope_equipment if _is_equipment_production_assessed(eq)
+    )
+    assessment_scope_total = len(assessment_scope_equipment)
+    assessment_coverage_pct = (
+        (assessed_in_scope_count / assessment_scope_total * 100)
+        if assessment_scope_total > 0
+        else 0.0
+    )
+    unassessed_assessment_evidence: List[dict] = []
+    for equipment in assessment_scope_equipment:
+        if _is_equipment_production_assessed(equipment):
+            continue
+        equipment_id = equipment.get("id")
+        level_key = _equipment_level_key(equipment.get("level"))
+        unassessed_assessment_evidence.append(
+            {
+                "asset": equipment.get("name") or equipment_id,
+                "tag": equipment.get("tag"),
+                "level": level_key,
+                "level_label": _assessment_level_display(level_key),
+                "control_status": "Not assessed",
+                "exposure_formatted": "—",
+                "id": equipment_id,
+            }
+        )
+    unassessed_assessment_count = len(unassessed_assessment_evidence)
+
     active_threat_evidence = []
     critical_evidence = []
     
@@ -680,6 +740,18 @@ async def get_executive_dashboard(
             ),
             evidence_count=uncovered_equipment_count,
         ),
+        "assessment_coverage": KPICard(
+            value=round(assessment_coverage_pct, 1),
+            formatted_value=f"{assessment_coverage_pct:.0f}%",
+            previous_value=None,
+            change_percent=None,
+            trend="stable",
+            tooltip=(
+                "Share of sub units and maintainable items with a production criticality assessment "
+                f"({assessed_in_scope_count} of {assessment_scope_total} assessed)."
+            ),
+            evidence_count=unassessed_assessment_count,
+        ),
         "active_threat_exposure": KPICard(
             value=active_threat_exposure,
             formatted_value=format_currency(active_threat_exposure, currency_symbol),
@@ -790,6 +862,10 @@ PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvemen
     
     evidence_drill_down = {
         "uncovered_exposure": sorted(uncovered_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:25],
+        "unassessed_assessments": sorted(
+            unassessed_assessment_evidence,
+            key=lambda x: (x.get("level", ""), (x.get("asset") or "").lower()),
+        ),
         "active_threat_exposure": sorted(active_threat_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:25],
         "critical_active_exposure": sorted(critical_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:25]
     }
@@ -822,7 +898,7 @@ async def get_evidence_detail(
 ) -> Dict[str, Any]:
     """
     Get detailed evidence for a specific metric.
-    metric_type: uncovered_exposure, active_threat_exposure, critical_active_exposure
+    metric_type: uncovered_exposure, unassessed_assessments, active_threat_exposure, critical_active_exposure
     """
     dashboard = await get_executive_dashboard(current_user=current_user)
     

@@ -391,7 +391,7 @@ function EquipmentFiles({ equipmentId }) {
 }
 
 
-export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCriticality, onDelete, allNodes }) {
+export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCriticality, onDelete, allNodes, focusSection, onFocusSectionHandled }) {
   const { t } = useLanguage();
   const nodeTransMap = useEquipmentNodeIdMap();
   const nodeTrans = (node && nodeTransMap[node.id]) || {};
@@ -405,6 +405,8 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
   const [localProcessStep, setLocalProcessStep] = useState(node?.process_step || "");
   const processStepTimeoutRef = useRef(null);
   const editNameRef = useRef(null);
+  const criticalitySectionRef = useRef(null);
+  const [highlightCriticality, setHighlightCriticality] = useState(false);
   const [showAllTypes, setShowAllTypes] = useState(false);
   const [typeSearchOpen, setTypeSearchOpen] = useState(false);
   const [typeSearchQuery, setTypeSearchQuery] = useState("");
@@ -457,6 +459,19 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
   useEffect(() => {
     setLocalProcessStep(node?.process_step || "");
   }, [node?.id, node?.process_step]);
+
+  useEffect(() => {
+    if (focusSection !== "criticality" || !node) return undefined;
+
+    const scrollTimer = window.setTimeout(() => {
+      criticalitySectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlightCriticality(true);
+      onFocusSectionHandled?.();
+      window.setTimeout(() => setHighlightCriticality(false), 2000);
+    }, 150);
+
+    return () => window.clearTimeout(scrollTimer);
+  }, [focusSection, node?.id, onFocusSectionHandled]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -872,7 +887,11 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
             </div>
           )}
           
-          <div>
+          <div
+            ref={criticalitySectionRef}
+            id="equipment-criticality-section"
+            className={`rounded-lg transition-shadow ${highlightCriticality ? "ring-2 ring-teal-400 ring-offset-2" : ""}`}
+          >
             <Label className="text-xs text-slate-500 mb-2">{t("equipment.criticality")}</Label>
             <div className="space-y-3 bg-slate-50 p-3 rounded-lg">
               <CriticalityDimension
