@@ -75,4 +75,9 @@ export const actionsAPI = {
     const response = await api.post(`/actions/${actionId}/unvalidate`);
     return response.data;
   },
+
+  getOutcome: async (actionId: string) => {
+    const response = await api.get(`/actions/${actionId}/outcome`);
+    return response.data;
+  },
 };

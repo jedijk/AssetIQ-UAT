@@ -146,11 +146,34 @@ export const rilDashboardAPI = {
 
   getExecutive: async () => rilGet("/dashboard/executive"),
 
+  getSupervisor: async () => rilGet("/dashboard/supervisor"),
+
   getIntelligence: async () => rilGet("/dashboard/intelligence"),
 
   getDataQuality: async () => rilGet("/dashboard/data-quality"),
 
   getReliabilityGraphOntology: async () => rilGet("/dashboard/reliability-graph/ontology"),
+
+  getEquipmentReliabilityChain: async (equipmentId, params = {}) => {
+    const response = await api.get(`${RIL_PREFIX}/dashboard/equipment/${equipmentId}/reliability-chain`, { params });
+    return response.data;
+  },
+
+  getEquipmentReliabilityProfile: async (equipmentId, params = {}) => {
+    const response = await api.get(
+      `${RIL_PREFIX}/dashboard/equipment/${equipmentId}/reliability-profile`,
+      { params }
+    );
+    return response.data;
+  },
+
+  getNodeReliabilityTrace: async (nodeType, nodeId, params = {}) => {
+    const response = await api.get(
+      `${RIL_PREFIX}/dashboard/nodes/${encodeURIComponent(nodeType)}/${encodeURIComponent(nodeId)}/reliability-trace`,
+      { params }
+    );
+    return response.data;
+  },
 };
 
 // Export all APIs as a single object

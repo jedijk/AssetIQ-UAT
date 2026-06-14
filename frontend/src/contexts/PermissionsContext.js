@@ -20,7 +20,7 @@ const FEATURE_PATHS = {
   investigations: ["/investigations", "/causal-engine", "/decision-engine"],
   actions: ["/actions"],
   tasks: ["/my-tasks"],
-  dashboard_operational: ["/dashboard"],
+  dashboard_operational: ["/dashboard", "/supervisor"],
   dashboard_production: ["/production"],
   // "scheduler" is the planner / scheduling UI (route is `/tasks`)
   scheduler: ["/tasks"],

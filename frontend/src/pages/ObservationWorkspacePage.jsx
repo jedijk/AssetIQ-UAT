@@ -84,6 +84,7 @@ import RiskBadge from "../components/RiskBadge";
 import ObservationDetailsSection from "../components/workspace/ObservationDetailsSection";
 import { ALARPCard, ExposureCard, RiskSummaryCard } from "../components/workspace/ExposureCards";
 import { EquipmentReliabilityTimeline } from "../components/workspace/EquipmentReliabilityTimeline";
+import { ReliabilityEvidencePanel } from "../components/reliability/ReliabilityEvidencePanel";
 import { ReliabilityIntelligencePanel } from "../components/workspace/ReliabilityIntelligencePanel";
 import { RecommendedActionsPanel } from "../components/workspace/RecommendedActionsPanel";
 import ActionPlanPanel from "../components/workspace/ActionPlanPanel";
@@ -524,6 +525,13 @@ const ObservationWorkspacePage = () => {
         <EquipmentReliabilityTimeline 
           events={timeline?.events} 
           aiEvidence={timeline?.ai_evidence}
+        />
+
+        <ReliabilityEvidencePanel
+          equipmentId={observation?.linked_equipment_id}
+          anchorNodeType="threat"
+          anchorNodeId={id}
+          title="Reliability Graph Evidence"
         />
 
         {/* Row 3: Main Work Area - 3 Columns on desktop, stacked on mobile */}

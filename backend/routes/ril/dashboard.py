@@ -29,6 +29,14 @@ async def get_executive_dashboard(current_user: dict = Depends(_ril_read)):
     return payload
 
 
+@router.get("/supervisor", response_model=dict)
+async def get_supervisor_dashboard(current_user: dict = Depends(_ril_read)):
+    """Supervisor Command Center — operational queue composed from existing services."""
+    from services.supervisor_dashboard_service import get_supervisor_dashboard as build_supervisor
+
+    return await build_supervisor(current_user)
+
+
 @router.get("/intelligence", response_model=dict)
 async def get_intelligence_dashboard(current_user: dict = Depends(_ril_read)):
     """Get intelligence dashboard data."""
@@ -63,6 +71,25 @@ async def get_equipment_reliability_edges(
     return {"equipment_id": equipment_id, "edges": edges, "total": len(edges)}
 
 
+@router.get("/equipment/{equipment_id}/reliability-profile")
+async def get_equipment_reliability_profile(
+    equipment_id: str,
+    refresh: bool = False,
+    current_user: dict = Depends(_ril_read),
+):
+    """Composed asset reliability profile — single source of truth for one equipment item."""
+    from services.equipment_reliability_profile_service import build_equipment_reliability_profile
+    from services.ril_service_factory import ril_owner_id
+
+    profile = await build_equipment_reliability_profile(
+        equipment_id,
+        ril_owner_id(current_user),
+        user=current_user,
+        refresh_context=refresh,
+    )
+    return {"success": True, "profile": profile}
+
+
 @router.get("/equipment/{equipment_id}/reliability-chain")
 async def get_equipment_reliability_chain(
     equipment_id: str,
@@ -81,6 +108,62 @@ async def get_equipment_reliability_chain(
     return {
         "equipment_id": equipment_id,
         "chain": chain,
+        "risk_explanation": risk,
+    }
+
+
+@router.get("/nodes/{node_type}/{node_id}/reliability-trace")
+async def get_node_reliability_trace(
+    node_type: str,
+    node_id: str,
+    depth: int = 8,
+    current_user: dict = Depends(_ril_read),
+):
+    """Upstream/downstream graph evidence for a single node (evidence panels)."""
+    from services.reliability_graph_query import GraphTraversalService
+
+    traversal = GraphTraversalService()
+    upstream = await traversal.get_upstream(
+        node_type, node_id, depth=depth, user=current_user
+    )
+    downstream = await traversal.get_downstream(
+        node_type, node_id, depth=depth, user=current_user
+    )
+    edges = upstream.get("edges", []) + downstream.get("edges", [])
+    seen: set[str] = set()
+    merged: list = []
+    for edge in edges:
+        eid = edge.get("id")
+        if eid and eid in seen:
+            continue
+        if eid:
+            seen.add(eid)
+        merged.append(edge)
+
+    equipment_id = None
+    for edge in merged:
+        for key, ntype in (
+            (edge.get("source_id"), edge.get("source_type")),
+            (edge.get("target_id"), edge.get("target_type")),
+        ):
+            if ntype == "equipment" and key:
+                equipment_id = key
+                break
+        if equipment_id:
+            break
+
+    risk = None
+    if equipment_id:
+        risk = await traversal.explain_risk(equipment_id, user=current_user)
+
+    return {
+        "node_type": node_type,
+        "node_id": node_id,
+        "equipment_id": equipment_id,
+        "upstream": upstream,
+        "downstream": downstream,
+        "edges": merged,
+        "edge_count": len(merged),
         "risk_explanation": risk,
     }
 

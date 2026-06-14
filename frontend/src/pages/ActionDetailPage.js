@@ -52,6 +52,8 @@ import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 import { DocumentViewer } from "../components/DocumentViewer";
 import AttachmentsPanel from "../components/attachments/AttachmentsPanel";
+import { ReliabilityEvidencePanel } from "../components/reliability/ReliabilityEvidencePanel";
+import { ActionOutcomeWidget } from "../components/actions/ActionOutcomeWidget";
 import { getBackendUrl } from "../lib/apiConfig";
 import { useIsMobile } from "../hooks/useIsMobile";
 import { useDisciplines } from "../hooks/useDisciplines";
@@ -383,6 +385,13 @@ export default function ActionDetailPage() {
             
             {/* LEFT COLUMN - Main content (spans 7 cols on desktop) */}
             <div className="lg:col-span-7 space-y-3">
+              <ReliabilityEvidencePanel
+                equipmentId={action.linked_equipment_id}
+                anchorNodeType="action"
+                anchorNodeId={actionId}
+                title="Reliability Graph Evidence"
+              />
+              <ActionOutcomeWidget actionId={actionId} actionStatus={action.status} />
               {/* Source & Scores + Status Row - Compact header */}
               <div className="bg-white rounded-lg border border-slate-200 p-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">

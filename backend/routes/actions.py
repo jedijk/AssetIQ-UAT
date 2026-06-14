@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from auth import require_permission
 from services.background_jobs import schedule_tracked_job
 from services import action_service
+from services.action_outcome_service import get_action_outcome
 from utils.auto_translate import translate_action
 
 router = APIRouter(tags=["Actions"])
@@ -106,6 +107,11 @@ async def create_central_action(
 @router.get("/actions/{action_id}")
 async def get_central_action(action_id: str, current_user: dict = Depends(_actions_read)):
     return await action_service.get_action_detail(action_id, current_user)
+
+
+@router.get("/actions/{action_id}/outcome")
+async def get_central_action_outcome(action_id: str, current_user: dict = Depends(_actions_read)):
+    return await get_action_outcome(action_id, current_user)
 
 
 @router.patch("/actions/{action_id}")
