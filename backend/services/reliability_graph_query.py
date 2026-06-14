@@ -44,18 +44,135 @@ async def get_equipment_reliability_context(
     }
 
 
-async def count_edges_by_relation(
-    user: Optional[dict] = None,
-    *,
-    active_only: bool = True,
-) -> Dict[str, int]:
-    """Aggregate edge counts by relation type (tenant-scoped intelligence map KPIs)."""
+def _build_active_edge_match(user: Optional[dict] = None, *, active_only: bool = True) -> Dict[str, Any]:
     match: Dict[str, Any] = {}
     if active_only:
         match["status"] = {"$ne": EDGE_STATUS_RETIRED}
     tenant_part = tenant_read_filter(user)
     if tenant_part:
         match = {"$and": [match, tenant_part]} if match else tenant_part
+    return match
+
+
+async def get_graph_topology_stats(
+    user: Optional[dict] = None,
+    *,
+    active_only: bool = True,
+) -> Dict[str, Any]:
+    """
+    Live topology from reliability_edges: relation totals, per-arc counts,
+    and per node-type incoming/outgoing counts by relation.
+    """
+    match = _build_active_edge_match(user, active_only=active_only)
+    pipeline: List[Dict[str, Any]] = []
+    if match:
+        pipeline.append({"$match": match})
+    pipeline.append(
+        {
+            "$facet": {
+                "by_relation": [
+                    {"$group": {"_id": "$relation", "count": {"$sum": 1}}},
+                ],
+                "by_arc": [
+                    {
+                        "$group": {
+                            "_id": {
+                                "relation": "$relation",
+                                "source": "$source_type",
+                                "target": "$target_type",
+                            },
+                            "count": {"$sum": 1},
+                        }
+                    },
+                    {"$sort": {"count": -1, "_id.relation": 1}},
+                ],
+                "outgoing_by_node": [
+                    {
+                        "$group": {
+                            "_id": {
+                                "node_type": "$source_type",
+                                "relation": "$relation",
+                            },
+                            "count": {"$sum": 1},
+                        }
+                    },
+                ],
+                "incoming_by_node": [
+                    {
+                        "$group": {
+                            "_id": {
+                                "node_type": "$target_type",
+                                "relation": "$relation",
+                            },
+                            "count": {"$sum": 1},
+                        }
+                    },
+                ],
+            }
+        }
+    )
+
+    cursor = db[COLLECTION].aggregate(pipeline)
+    rows = await cursor.to_list(1)
+    facet = rows[0] if rows else {}
+
+    edges_by_relation = {
+        row["_id"]: row["count"]
+        for row in facet.get("by_relation", [])
+        if row.get("_id")
+    }
+
+    relation_arcs: List[Dict[str, Any]] = []
+    for row in facet.get("by_arc", []):
+        arc = row.get("_id") or {}
+        relation = arc.get("relation")
+        source = arc.get("source")
+        target = arc.get("target")
+        if not relation or not source or not target:
+            continue
+        relation_arcs.append(
+            {
+                "id": f"{relation}:{source}:{target}",
+                "relation": relation,
+                "source": source,
+                "target": target,
+                "edge_count": row.get("count", 0),
+            }
+        )
+
+    outgoing_by_node: Dict[str, Dict[str, int]] = {}
+    for row in facet.get("outgoing_by_node", []):
+        key = row.get("_id") or {}
+        node_type = key.get("node_type")
+        relation = key.get("relation")
+        if not node_type or not relation:
+            continue
+        outgoing_by_node.setdefault(node_type, {})[relation] = row.get("count", 0)
+
+    incoming_by_node: Dict[str, Dict[str, int]] = {}
+    for row in facet.get("incoming_by_node", []):
+        key = row.get("_id") or {}
+        node_type = key.get("node_type")
+        relation = key.get("relation")
+        if not node_type or not relation:
+            continue
+        incoming_by_node.setdefault(node_type, {})[relation] = row.get("count", 0)
+
+    return {
+        "edges_by_relation": edges_by_relation,
+        "relation_arcs": relation_arcs,
+        "outgoing_by_node": outgoing_by_node,
+        "incoming_by_node": incoming_by_node,
+    }
+
+
+async def count_edges_by_relation(
+    user: Optional[dict] = None,
+    *,
+    active_only: bool = True,
+) -> Dict[str, int]:
+    """Aggregate edge counts by relation type (tenant-scoped intelligence map KPIs)."""
+    match = _build_active_edge_match(user, active_only=active_only)
 
     pipeline: List[Dict[str, Any]] = []
     if match:

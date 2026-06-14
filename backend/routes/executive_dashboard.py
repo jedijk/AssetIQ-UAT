@@ -523,11 +523,11 @@ async def get_executive_dashboard(
     )
 
     active_threat_exposure = 0.0
-    critical_active_exposure = 0.0
+    controlled_active_exposure = 0.0
 
     # Previous period metrics for trend
     prev_active_threat = 0.0
-    prev_critical = 0.0
+    prev_controlled_active = 0.0
     
     # Evidence drill-down data
     uncovered_evidence = []
@@ -586,7 +586,7 @@ async def get_executive_dashboard(
     unassessed_assessment_count = len(unassessed_assessment_evidence)
 
     active_threat_evidence = []
-    critical_evidence = []
+    controlled_active_evidence = []
     
     # Process each observation (threat) for exposure calculation
     for obs in all_observations:
@@ -605,10 +605,6 @@ async def get_executive_dashboard(
         created_at = obs.get("created_at", "")
         if isinstance(created_at, datetime):
             created_at = created_at.isoformat()
-        is_previous_period = (
-            created_at >= previous_period_start.isoformat() and 
-            created_at < current_period_start.isoformat()
-        ) if created_at else False
         
         failure_mode_id = obs.get("failure_mode_id")
         equipment_type_id = equipment.get("equipment_type_id") if equipment else None
@@ -623,6 +619,8 @@ async def get_executive_dashboard(
         
         status = obs.get("status") or ""
         is_active = is_active_observation_status(status)
+        if not is_active:
+            continue
         
         description = obs.get("user_context") or obs.get("description") or ""
         title = (
@@ -649,24 +647,25 @@ async def get_executive_dashboard(
             "has_actions": obs_id in threat_ids_with_actions,
         }
 
-        active_threat_exposure += exposure_value
-        if created_at and created_at < current_period_start.isoformat():
-            prev_active_threat += exposure_value
+        is_before_current_period = (
+            created_at and created_at < current_period_start.isoformat()
+        )
 
-        active_threat_evidence.append({
-            **observation_data,
-            "control_status": "Controlled" if has_control else "No Control"
-        })
-        
-        if is_active and is_high_exposure_observation(obs):
-            critical_active_exposure += exposure_value
-            if is_previous_period:
-                prev_critical += exposure_value
-            
-            critical_evidence.append({
+        if not has_control:
+            active_threat_exposure += exposure_value
+            if is_before_current_period:
+                prev_active_threat += exposure_value
+            active_threat_evidence.append({
                 **observation_data,
-                "control_status": f"Risk score {int(observation_data['risk_score'])}",
-                "priority": "Critical" if observation_data["risk_score"] >= 75 else "High"
+                "control_status": "No Control",
+            })
+        else:
+            controlled_active_exposure += exposure_value
+            if is_before_current_period:
+                prev_controlled_active += exposure_value
+            controlled_active_evidence.append({
+                **observation_data,
+                "control_status": "Controlled",
             })
     
     # ============= Calculate KPIs =============
@@ -698,11 +697,13 @@ async def get_executive_dashboard(
         float(digital_current_period), float(digital_previous_period), higher_is_better=True
     )
     
-    # 4. Active Threat Exposure trend
+    # 4. Uncontrolled active exposure trend (lower is better)
     active_change, active_trend = calculate_trend(active_threat_exposure, prev_active_threat, higher_is_better=False)
     
-    # 5. High exposure trend
-    critical_change, critical_trend = calculate_trend(critical_active_exposure, prev_critical, higher_is_better=False)
+    # 5. Controlled active exposure trend (higher is better)
+    controlled_change, controlled_trend = calculate_trend(
+        controlled_active_exposure, prev_controlled_active, higher_is_better=True
+    )
 
     # 6. Uncovered exposure trend
     uncovered_change, uncovered_trend = calculate_trend(uncovered_exposure, prev_uncovered, higher_is_better=False)
@@ -758,20 +759,23 @@ async def get_executive_dashboard(
             previous_value=prev_active_threat,
             change_percent=active_change,
             trend=active_trend,
-            tooltip="Total production impact across all observations.",
-            evidence_count=total_obs
+            tooltip=(
+                "Production impact from active observations without a maintenance strategy, "
+                f"program, or linked action plan ({len(active_threat_evidence)} observations)."
+            ),
+            evidence_count=len(active_threat_evidence),
         ),
         "critical_active_exposure": KPICard(
-            value=critical_active_exposure,
-            formatted_value=format_currency(critical_active_exposure, currency_symbol),
-            previous_value=prev_critical,
-            change_percent=critical_change,
-            trend=critical_trend,
+            value=controlled_active_exposure,
+            formatted_value=format_currency(controlled_active_exposure, currency_symbol),
+            previous_value=prev_controlled_active,
+            change_percent=controlled_change,
+            trend=controlled_trend,
             tooltip=(
-                "Production impact from active observations rated High or Critical "
-                f"(risk score {HIGH_ACTIVE_RISK_THRESHOLD}+)."
+                "Production impact from active observations covered by a maintenance strategy, "
+                f"program, or linked action plan ({len(controlled_active_evidence)} observations)."
             ),
-            evidence_count=len(critical_evidence)
+            evidence_count=len(controlled_active_evidence),
         ),
         "pm_compliance": KPICard(
             value=round(pm_compliance_current, 1),
@@ -829,21 +833,21 @@ async def get_executive_dashboard(
             "count_unit": "equipment",
         },
         {
-            "name": "Active Exposure",
+            "name": "Uncontrolled Active Exposure",
             "value": active_threat_exposure,
             "formatted": format_currency(active_threat_exposure, currency_symbol),
             "type": "warning",
             "color": "#f97316",
-            "count": total_obs,
+            "count": len(active_threat_evidence),
             "count_unit": "observations",
         },
         {
-            "name": "High Exposure",
-            "value": critical_active_exposure,
-            "formatted": format_currency(critical_active_exposure, currency_symbol),
-            "type": "critical",
-            "color": "#ef4444",
-            "count": len(critical_evidence),
+            "name": "Controlled Exposure",
+            "value": controlled_active_exposure,
+            "formatted": format_currency(controlled_active_exposure, currency_symbol),
+            "type": "positive",
+            "color": "#22c55e",
+            "count": len(controlled_active_evidence),
             "count_unit": "observations",
         }
     ]
@@ -854,7 +858,7 @@ async def get_executive_dashboard(
 
 {format_currency(covered_by_controls, currency_symbol)} ({coverage_current:.0f}%) of assessed exposure is covered by equipment with a maintenance program or imported PM plan. {format_currency(uncovered_exposure, currency_symbol)} remains uncovered across {uncovered_equipment_count} assessed assets without active controls.
 
-All {total_obs} observations represent {format_currency(active_threat_exposure, currency_symbol)} in total production exposure. {len(critical_evidence)} active High or Critical observations represent {format_currency(critical_active_exposure, currency_symbol)} and require immediate attention.
+Active observations without controls represent {format_currency(active_threat_exposure, currency_symbol)} in uncontrolled production exposure ({len(active_threat_evidence)} observations). {format_currency(controlled_active_exposure, currency_symbol)} of active exposure is controlled across {len(controlled_active_evidence)} observations with a strategy, program, or action plan.
 
 PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvement"} at {pm_compliance_current:.0f}%. Digital execution recorded {digital_current_period} tasks and forms in the report period ({report_period['label']}) versus {digital_previous_period} in the previous period."""
     
@@ -867,7 +871,7 @@ PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvemen
             key=lambda x: (x.get("level", ""), (x.get("asset") or "").lower()),
         ),
         "active_threat_exposure": sorted(active_threat_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:25],
-        "critical_active_exposure": sorted(critical_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:25]
+        "critical_active_exposure": sorted(controlled_active_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:25]
     }
     
     return ExecutiveDashboardResponse(
@@ -876,7 +880,7 @@ PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvemen
             covered_by_controls=covered_by_controls,
             uncovered_exposure=uncovered_exposure,
             active_threat_exposure=active_threat_exposure,
-            critical_active_exposure=critical_active_exposure,
+            critical_active_exposure=controlled_active_exposure,
             currency=currency,
             currency_symbol=currency_symbol
         ),
