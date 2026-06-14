@@ -99,6 +99,53 @@ async def test_sync_apply_strategy_contains_task_and_has_failure_mode():
 
 
 @pytest.mark.asyncio
+async def test_sync_apply_strategy_links_pm_import_tasks():
+    mock_db = MagicMock()
+    strategy = {
+        "failure_mode_strategies": [{"failure_mode_id": "fm-1"}],
+    }
+    program = {
+        "id": "prog-1",
+        "equipment_id": "eq-1",
+        "tasks": [
+            {
+                "id": "task-1",
+                "traceability": {
+                    "failure_mode_id": "fm-1",
+                    "pm_import_task_id": "sess-1:row-1",
+                },
+            }
+        ],
+    }
+    mock_db.equipment_type_strategies.find_one = AsyncMock(return_value=strategy)
+    mock_cursor = MagicMock()
+    mock_cursor.to_list = AsyncMock(return_value=[program])
+    mock_db.maintenance_programs_v2.find = MagicMock(return_value=mock_cursor)
+
+    mock_upsert = AsyncMock()
+    mock_retire = AsyncMock(return_value=0)
+    mock_pm_links = AsyncMock(return_value=2)
+
+    with patch("services.reliability_graph.db", mock_db), patch(
+        "services.reliability_graph.upsert_edge", mock_upsert
+    ), patch(
+        "services.reliability_graph.retire_stale_program_task_edges", mock_retire
+    ), patch(
+        "services.reliability_graph.sync_pm_import_program_task_links", mock_pm_links
+    ):
+        await sync_edges_for_apply_strategy(
+            equipment_type_id="et-1",
+            equipment_ids=["eq-1"],
+            strategy_version="2.0",
+            tenant_id="co-1",
+        )
+
+    mock_pm_links.assert_awaited_once()
+    assert mock_pm_links.await_args.kwargs["pm_import_task_id"] == "sess-1:row-1"
+    assert mock_pm_links.await_args.kwargs["program_task_id"] == "task-1"
+
+
+@pytest.mark.asyncio
 async def test_sync_observation_edges_all_relations():
     mock_upsert = AsyncMock()
     with patch("services.reliability_graph.upsert_edge", mock_upsert):

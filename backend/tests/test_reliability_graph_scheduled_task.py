@@ -106,3 +106,27 @@ async def test_sync_edges_for_scheduled_task_created_event():
     assert "derived_from" in relations
     assert "scheduled_for" in relations
     assert "completed_on" not in relations
+
+
+@pytest.mark.asyncio
+async def test_sync_edges_for_scheduled_task_links_pm_import_task():
+    mock_upsert = AsyncMock()
+    mock_pm_links = AsyncMock(return_value=2)
+    task = {
+        "id": "st-4",
+        "equipment_id": "eq-4",
+        "maintenance_program_id": "pt-4",
+        "v2_task_id": "pt-4",
+        "pm_import_task_id": "sess-9:task-9",
+        "failure_mode_id": "fm-9",
+        "task_name": "Imported lube",
+    }
+    with patch("services.reliability_graph.upsert_edge", mock_upsert), patch(
+        "services.reliability_graph.sync_pm_import_program_task_links", mock_pm_links
+    ):
+        result = await sync_edges_for_scheduled_task(task, event="created")
+
+    assert result["edges_upserted"] == 5
+    mock_pm_links.assert_awaited_once()
+    assert mock_pm_links.await_args.kwargs["pm_import_task_id"] == "sess-9:task-9"
+    assert mock_pm_links.await_args.kwargs["program_task_id"] == "pt-4"

@@ -2,7 +2,10 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from services.reliability_graph import sync_edge_for_pm_import_task
+from services.reliability_graph import (
+    sync_edge_for_pm_import_task,
+    sync_pm_import_program_task_links,
+)
 
 
 @pytest.mark.asyncio
@@ -50,6 +53,25 @@ async def test_sync_edge_for_pm_import_task_passes_optional_fields():
         tenant_id=None,
         metadata={"apply_mode": "merged"},
     )
+
+
+@pytest.mark.asyncio
+async def test_sync_pm_import_program_task_links_creates_imported_as_and_applied_to():
+    mock_upsert = AsyncMock()
+    with patch("services.reliability_graph.upsert_edge", mock_upsert), patch(
+        "services.reliability_graph.sync_edge_for_pm_import_task", AsyncMock()
+    ) as mock_applied:
+        count = await sync_pm_import_program_task_links(
+            pm_import_task_id="sess-1:task-1",
+            program_task_id="pt-1",
+            failure_mode_id="fm-1",
+            equipment_id="eq-1",
+        )
+
+    assert count == 2
+    mock_upsert.assert_awaited_once()
+    assert mock_upsert.await_args.kwargs["relation"] == "imported_as"
+    mock_applied.assert_awaited_once()
 
 
 @pytest.mark.asyncio

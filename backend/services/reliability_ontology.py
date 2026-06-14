@@ -35,6 +35,7 @@ RELATIONS: List[Dict[str, Any]] = [
     {"id": "derived_from_template", "label": "derived from template", "source": "program_task", "target": "strategy_task_template", "domain": "maintenance"},
     {"id": "mitigates_failure_mode", "label": "mitigates", "source": "program_task", "target": "failure_mode", "domain": "maintenance"},
     {"id": "applied_to", "label": "applied to", "source": "pm_import_task", "target": "failure_mode", "domain": "maintenance"},
+    {"id": "imported_as", "label": "imported as", "source": "pm_import_task", "target": "program_task", "domain": "maintenance"},
     {"id": "derived_from", "label": "derived from", "source": "scheduled_task", "target": "program_task", "domain": "maintenance"},
     {"id": "scheduled_for", "label": "scheduled for", "source": "scheduled_task", "target": "equipment", "domain": "maintenance"},
     {"id": "instantiated_as", "label": "instantiated as", "source": "scheduled_task", "target": "task_instance", "domain": "maintenance"},
