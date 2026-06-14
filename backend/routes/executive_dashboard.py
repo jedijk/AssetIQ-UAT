@@ -46,6 +46,11 @@ def is_active_observation_status(status: Optional[str]) -> bool:
     return normalized not in TERMINAL_OBSERVATION_STATUSES
 
 
+def is_mitigated_observation_status(status: Optional[str]) -> bool:
+    """Observations that completed the mitigated journey stage."""
+    return (status or "").lower().strip() == "mitigated"
+
+
 def observation_risk_score_value(obs: dict) -> float:
     raw = obs.get("risk_score")
     if raw is None or raw == "":
@@ -197,6 +202,7 @@ class ExposureMetrics(BaseModel):
     uncovered_exposure: float
     active_threat_exposure: float
     critical_active_exposure: float
+    resolved_exposure: float = 0.0
     currency: str = "EUR"
     currency_symbol: str = "€"
 
@@ -524,10 +530,12 @@ async def get_executive_dashboard(
 
     active_threat_exposure = 0.0
     controlled_active_exposure = 0.0
+    resolved_exposure = 0.0
 
     # Previous period metrics for trend
     prev_active_threat = 0.0
     prev_controlled_active = 0.0
+    prev_resolved_exposure = 0.0
     
     # Evidence drill-down data
     uncovered_evidence = []
@@ -587,6 +595,7 @@ async def get_executive_dashboard(
 
     active_threat_evidence = []
     controlled_active_evidence = []
+    resolved_exposure_evidence = []
     
     # Process each observation (threat) for exposure calculation
     for obs in all_observations:
@@ -618,10 +627,10 @@ async def get_executive_dashboard(
         )
         
         status = obs.get("status") or ""
-        is_active = is_active_observation_status(status)
-        if not is_active:
-            continue
-        
+        is_before_current_period = (
+            created_at and created_at < current_period_start.isoformat()
+        )
+
         description = obs.get("user_context") or obs.get("description") or ""
         title = (
             obs.get("title")
@@ -647,9 +656,19 @@ async def get_executive_dashboard(
             "has_actions": obs_id in threat_ids_with_actions,
         }
 
-        is_before_current_period = (
-            created_at and created_at < current_period_start.isoformat()
-        )
+        if is_mitigated_observation_status(status):
+            resolved_exposure += exposure_value
+            if is_before_current_period:
+                prev_resolved_exposure += exposure_value
+            resolved_exposure_evidence.append({
+                **observation_data,
+                "control_status": "Mitigated",
+            })
+            continue
+
+        is_active = is_active_observation_status(status)
+        if not is_active:
+            continue
 
         if not has_control:
             active_threat_exposure += exposure_value
@@ -705,7 +724,12 @@ async def get_executive_dashboard(
         controlled_active_exposure, prev_controlled_active, higher_is_better=True
     )
 
-    # 6. Uncovered exposure trend
+    # 6. Resolved exposure trend (higher is better)
+    resolved_change, resolved_trend = calculate_trend(
+        resolved_exposure, prev_resolved_exposure, higher_is_better=True
+    )
+
+    # 7. Uncovered exposure trend
     uncovered_change, uncovered_trend = calculate_trend(uncovered_exposure, prev_uncovered, higher_is_better=False)
     
     # ============= Build KPI Cards =============
@@ -776,6 +800,18 @@ async def get_executive_dashboard(
                 f"program, or linked action plan ({len(controlled_active_evidence)} observations)."
             ),
             evidence_count=len(controlled_active_evidence),
+        ),
+        "resolved_exposure": KPICard(
+            value=resolved_exposure,
+            formatted_value=format_currency(resolved_exposure, currency_symbol),
+            previous_value=prev_resolved_exposure,
+            change_percent=resolved_change,
+            trend=resolved_trend,
+            tooltip=(
+                "Production impact from observations marked Mitigated "
+                f"({len(resolved_exposure_evidence)} observations)."
+            ),
+            evidence_count=len(resolved_exposure_evidence),
         ),
         "pm_compliance": KPICard(
             value=round(pm_compliance_current, 1),
@@ -849,6 +885,15 @@ async def get_executive_dashboard(
             "color": "#22c55e",
             "count": len(controlled_active_evidence),
             "count_unit": "observations",
+        },
+        {
+            "name": "Resolved Exposure",
+            "value": resolved_exposure,
+            "formatted": format_currency(resolved_exposure, currency_symbol),
+            "type": "positive",
+            "color": "#6366f1",
+            "count": len(resolved_exposure_evidence),
+            "count_unit": "observations",
         }
     ]
     
@@ -858,7 +903,7 @@ async def get_executive_dashboard(
 
 {format_currency(covered_by_controls, currency_symbol)} ({coverage_current:.0f}%) of assessed exposure is covered by equipment with a maintenance program or imported PM plan. {format_currency(uncovered_exposure, currency_symbol)} remains uncovered across {uncovered_equipment_count} assessed assets without active controls.
 
-Active observations without controls represent {format_currency(active_threat_exposure, currency_symbol)} in uncontrolled production exposure ({len(active_threat_evidence)} observations). {format_currency(controlled_active_exposure, currency_symbol)} of active exposure is controlled across {len(controlled_active_evidence)} observations with a strategy, program, or action plan.
+Active observations without controls represent {format_currency(active_threat_exposure, currency_symbol)} in uncontrolled production exposure ({len(active_threat_evidence)} observations). {format_currency(controlled_active_exposure, currency_symbol)} of active exposure is controlled across {len(controlled_active_evidence)} observations with a strategy, program, or action plan. {format_currency(resolved_exposure, currency_symbol)} of production exposure has been resolved across {len(resolved_exposure_evidence)} mitigated observations.
 
 PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvement"} at {pm_compliance_current:.0f}%. Digital execution recorded {digital_current_period} tasks and forms in the report period ({report_period['label']}) versus {digital_previous_period} in the previous period."""
     
@@ -871,7 +916,8 @@ PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvemen
             key=lambda x: (x.get("level", ""), (x.get("asset") or "").lower()),
         ),
         "active_threat_exposure": sorted(active_threat_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:25],
-        "critical_active_exposure": sorted(controlled_active_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:25]
+        "critical_active_exposure": sorted(controlled_active_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:25],
+        "resolved_exposure": sorted(resolved_exposure_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:25],
     }
     
     return ExecutiveDashboardResponse(
@@ -881,6 +927,7 @@ PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvemen
             uncovered_exposure=uncovered_exposure,
             active_threat_exposure=active_threat_exposure,
             critical_active_exposure=controlled_active_exposure,
+            resolved_exposure=resolved_exposure,
             currency=currency,
             currency_symbol=currency_symbol
         ),
@@ -902,7 +949,7 @@ async def get_evidence_detail(
 ) -> Dict[str, Any]:
     """
     Get detailed evidence for a specific metric.
-    metric_type: uncovered_exposure, unassessed_assessments, active_threat_exposure, critical_active_exposure
+    metric_type: uncovered_exposure, unassessed_assessments, active_threat_exposure, critical_active_exposure, resolved_exposure
     """
     dashboard = await get_executive_dashboard(current_user=current_user)
     
