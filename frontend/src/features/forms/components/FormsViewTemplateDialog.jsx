@@ -1,5 +1,20 @@
 import {
-  FileText, Layers, Signature, Monitor, Smartphone, Loader2, Search, ExternalLink,
+  AlertCircle,
+  Building2,
+  Calendar,
+  ChevronDown,
+  Eye,
+  ExternalLink,
+  FileText,
+  Layers,
+  Loader2,
+  Monitor,
+  Printer,
+  Search,
+  Signature,
+  Smartphone,
+  Sparkles,
+  Upload,
 } from "lucide-react";
 import PhotoDataCaptureField from "../../../components/forms/PhotoDataCaptureField";
 import { formAPI, FieldPreview } from "../../../components/forms";

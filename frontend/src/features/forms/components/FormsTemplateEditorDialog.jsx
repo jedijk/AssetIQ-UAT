@@ -1,7 +1,16 @@
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  FileText, Plus, GripVertical, X, RefreshCw, Upload, Trash2, Edit,
+  AlertCircle,
+  Edit,
+  FileText,
+  GripVertical,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Trash2,
+  Upload,
+  X,
 } from "lucide-react";
 import LabelPrintConfigPanel from "../../../components/forms/LabelPrintConfigPanel";
 import { EXTRACTION_TEMPLATES } from "../../../components/forms/extractionTemplates";
