@@ -86,11 +86,12 @@ _DUTCH_MONTHS = {
 
 
 def _expand_two_digit_year(y: int, month: int, day: int, ref: date) -> int:
-    """Pick 19xx/20xx/21xx so the calendar date is closest to the capture/reference day."""
+    """Pick full year so the calendar date is closest to the capture/reference day."""
     if y >= 100:
         return y
-    base = (ref.year // 100) * 100
-    candidates = [base + y, base - 100 + y, base + 100 + y]
+    decade = (ref.year // 10) * 10
+    candidate = decade + (y % 10)
+    candidates = [candidate - 10, candidate, candidate + 10]
 
     def distance(yr: int) -> int:
         try:
