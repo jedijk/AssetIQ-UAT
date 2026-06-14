@@ -325,6 +325,161 @@ def test_wave18_equipment_import_service_exists():
     assert callable(equipment_import_service.import_excel_file)
 
 
+def test_wave19_ril_routes_are_green():
+    from architecture.convergence_registry import GREEN_ROUTES
+
+    for rel in (
+        "routes/ril/observations.py",
+        "routes/ril/readings.py",
+        "routes/ril/alerts.py",
+        "routes/ril/correlations.py",
+        "routes/ril/predictions.py",
+        "routes/ril/cases.py",
+        "routes/ril/copilot.py",
+    ):
+        assert rel in GREEN_ROUTES
+        text = (BACKEND_ROOT / rel).read_text(encoding="utf-8")
+        assert "from database import db" not in text
+
+
+def test_wave19_ril_service_factory_exists():
+    from services.ril_service_factory import get_ril_service, ril_owner_id
+
+    assert callable(get_ril_service)
+    assert callable(ril_owner_id)
+
+
+def test_wave20_config_routes_are_green():
+    from architecture.convergence_registry import GREEN_ROUTES
+
+    for rel in ("routes/disciplines.py", "routes/risk_settings.py"):
+        assert rel in GREEN_ROUTES
+        text = (BACKEND_ROOT / rel).read_text(encoding="utf-8")
+        assert "from database import db" not in text
+
+
+def test_wave20_services_exist():
+    from services import disciplines_service, risk_settings_service
+
+    assert callable(disciplines_service.normalize_discipline)
+    assert callable(risk_settings_service.reset_risk_settings)
+
+
+def test_wave21_strategy_helper_routes_are_green():
+    from architecture.convergence_registry import GREEN_ROUTES
+
+    for rel in (
+        "routes/maintenance_strategy_v2/strategy_helpers.py",
+        "routes/maintenance_strategy_v2/propagation.py",
+    ):
+        assert rel in GREEN_ROUTES
+        text = (BACKEND_ROOT / rel).read_text(encoding="utf-8")
+        assert "from database import db" not in text
+
+
+def test_wave21_services_exist():
+    from services import maintenance_strategy_helpers, maintenance_strategy_propagation
+
+    assert callable(maintenance_strategy_helpers.log_strategy_audit)
+    assert callable(maintenance_strategy_propagation._sync_metadata_to_open_scheduled_tasks)
+
+
+def test_wave22_maintenance_strategy_routes_are_green():
+    from architecture.convergence_registry import GREEN_ROUTES
+
+    rel = "routes/maintenance_strategy_v2/routes.py"
+    assert rel in GREEN_ROUTES
+    text = (BACKEND_ROOT / rel).read_text(encoding="utf-8")
+    assert "from database import db" not in text
+
+
+def test_wave22_service_exists():
+    from services import maintenance_strategy_v2_service as svc
+
+    assert callable(svc.create_equipment_type_strategy)
+    assert callable(svc.delete_task_template)
+
+
+def test_wave23_failure_modes_routes_are_green():
+    from architecture.convergence_registry import GREEN_ROUTES
+
+    rel = "routes/failure_modes_routes.py"
+    assert rel in GREEN_ROUTES
+    text = (BACKEND_ROOT / rel).read_text(encoding="utf-8")
+    assert "from database import db" not in text
+
+
+def test_wave23_service_exists():
+    from services import failure_modes_routes_service as svc
+
+    assert callable(svc.get_failure_mode_by_id)
+    assert callable(svc.scan_similar_failure_modes)
+
+
+def test_wave24_chat_routes_are_green():
+    from architecture.convergence_registry import GREEN_ROUTES
+
+    rel = "routes/chat.py"
+    assert rel in GREEN_ROUTES
+    text = (BACKEND_ROOT / rel).read_text(encoding="utf-8")
+    assert "from database import db" not in text
+
+
+def test_wave24_service_exists():
+    from services import chat_routes_service as svc
+
+    assert callable(svc.cancel_chat_flow)
+    assert callable(svc.transcribe_voice)
+
+
+def test_wave25_maintenance_program_routes_are_green():
+    from architecture.convergence_registry import GREEN_ROUTES
+
+    rel = "routes/maintenance_program.py"
+    assert rel in GREEN_ROUTES
+    text = (BACKEND_ROOT / rel).read_text(encoding="utf-8")
+    assert "from database import db" not in text
+
+
+def test_wave25_service_exists():
+    from services import maintenance_program_routes_service as svc
+
+    assert callable(svc.regenerate_program)
+    assert callable(svc.approve_program)
+
+
+def test_wave26_intelligence_map_routes_are_green():
+    from architecture.convergence_registry import GREEN_ROUTES
+
+    rel = "routes/intelligence_map.py"
+    assert rel in GREEN_ROUTES
+    text = (BACKEND_ROOT / rel).read_text(encoding="utf-8")
+    assert "from database import db" not in text
+
+
+def test_wave26_service_exists():
+    from services import intelligence_map_routes_service as svc
+
+    assert callable(svc._count_imported_pm_import_tasks)
+    assert callable(svc._scope_query)
+
+
+def test_wave27_efms_routes_are_green():
+    from architecture.convergence_registry import GREEN_ROUTES
+
+    rel = "routes/efms.py"
+    assert rel in GREEN_ROUTES
+    text = (BACKEND_ROOT / rel).read_text(encoding="utf-8")
+    assert "from database import db" not in text
+
+
+def test_wave27_service_exists():
+    from services import efms_routes_service as svc
+
+    assert callable(svc.generate_efms_for_equipment)
+    assert callable(svc.get_high_risk_efms)
+
+
 def test_route_db_imports_are_allowlisted():
     """No new route may import db without explicit allowlist entry."""
     from architecture.convergence_registry import ROUTE_DB_IMPORT_ALLOWLIST

@@ -1,115 +1,68 @@
-"""
-RIL Alerts API
-Intelligent Alert Triage - Automatically classify and prioritize incoming alerts.
-"""
+"""RIL Alerts API."""
+from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional
-from datetime import datetime
-from auth import get_current_user
+
+from models.ril import CreateAlertRequest, AlertPriority
 from routes.ril._auth import _ril_read, _ril_write
-from services.ril_service import RILService
-from models.ril import (
-    CreateAlertRequest, AlertPriority
-)
+from services.ril_service_factory import get_ril_service, ril_owner_id
 
 router = APIRouter(prefix="/alerts", tags=["RIL Alerts"])
-
-
-def get_ril_service():
-    """Get RIL service instance"""
-    from database import db
-    return RILService(db)
 
 
 @router.post("", response_model=dict)
 async def create_alert(
     request: CreateAlertRequest,
-    current_user: dict = Depends(_ril_write)
+    current_user: dict = Depends(_ril_write),
 ):
-    """
-    Create and auto-triage an alert.
-    
-    The alert will be automatically classified with:
-    - Priority (P1 Critical, P2 High, P3 Medium, P4 Low)
-    - Response time recommendation
-    - Recommended owner
-    - Suggested actions
-    
-    Triage evaluation criteria:
-    - Asset criticality
-    - Failure mode severity
-    - Source confidence
-    - Historical behavior
-    - Operational impact
-    """
     service = get_ril_service()
-    owner_id = current_user.get("owner_id") or current_user.get("id")
-    
-    alert = await service.create_alert(owner_id, request)
-    
+    alert = await service.create_alert(ril_owner_id(current_user), request)
     return {
         "success": True,
         "alert": alert.dict(),
-        "triage": alert.triage_result.dict() if alert.triage_result else None
+        "triage": alert.triage_result.dict() if alert.triage_result else None,
     }
 
 
 @router.get("", response_model=dict)
 async def list_alerts(
-    equipment_id: Optional[str] = Query(None, description="Filter by equipment ID"),
-    priority: Optional[AlertPriority] = Query(None, description="Filter by priority"),
-    status: Optional[str] = Query(None, description="Filter by status (new, acknowledged, assigned, resolved, dismissed)"),
-    from_date: Optional[datetime] = Query(None, description="Start date filter"),
-    to_date: Optional[datetime] = Query(None, description="End date filter"),
+    equipment_id: Optional[str] = Query(None),
+    priority: Optional[AlertPriority] = Query(None),
+    status: Optional[str] = Query(None),
+    from_date: Optional[datetime] = Query(None),
+    to_date: Optional[datetime] = Query(None),
     limit: int = Query(100, ge=1, le=500),
     skip: int = Query(0, ge=0),
-    current_user: dict = Depends(_ril_read)
+    current_user: dict = Depends(_ril_read),
 ):
-    """
-    List alerts with optional filtering.
-    Returns triaged alerts sorted by time (newest first).
-    """
     service = get_ril_service()
-    owner_id = current_user.get("owner_id") or current_user.get("id")
-    
     alerts, total = await service.get_alerts(
-        owner_id,
+        ril_owner_id(current_user),
         equipment_id=equipment_id,
         priority=priority,
         status=status,
         from_date=from_date,
         to_date=to_date,
         limit=limit,
-        skip=skip
+        skip=skip,
     )
-    
     return {
         "alerts": [a.dict() for a in alerts],
         "total": total,
         "limit": limit,
-        "skip": skip
+        "skip": skip,
     }
 
 
 @router.get("/{alert_id}", response_model=dict)
 async def get_alert(
     alert_id: str,
-    current_user: dict = Depends(_ril_read)
+    current_user: dict = Depends(_ril_read),
 ):
-    """Get a single alert by ID"""
-    from database import db
-    owner_id = current_user.get("owner_id") or current_user.get("id")
-    
-    doc = await db.ril_alerts.find_one({
-        "owner_id": owner_id,
-        "id": alert_id
-    })
-    
+    doc = await get_ril_service().get_alert_doc(ril_owner_id(current_user), alert_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Alert not found")
-    
-    doc.pop('_id', None)  # Remove MongoDB ObjectId
     return {"alert": doc}
 
 
@@ -118,37 +71,14 @@ async def update_alert(
     alert_id: str,
     status: Optional[str] = None,
     assigned_to: Optional[str] = None,
-    current_user: dict = Depends(_ril_write)
+    current_user: dict = Depends(_ril_write),
 ):
-    """Update alert status or assignment"""
-    from database import db
-    owner_id = current_user.get("owner_id") or current_user.get("id")
-    
-    updates = {"updated_at": datetime.utcnow()}
-    
-    if status:
-        updates["status"] = status
-        if status == "acknowledged":
-            updates["acknowledged_at"] = datetime.utcnow()
-        elif status == "resolved":
-            updates["resolved_at"] = datetime.utcnow()
-    
-    if assigned_to:
-        updates["assigned_to"] = assigned_to
-    
-    result = await db.ril_alerts.update_one(
-        {"owner_id": owner_id, "id": alert_id},
-        {"$set": updates}
+    updated = await get_ril_service().update_alert_status(
+        ril_owner_id(current_user),
+        alert_id,
+        status=status,
+        assigned_to=assigned_to,
     )
-    
-    if result.matched_count == 0:
+    if not updated:
         raise HTTPException(status_code=404, detail="Alert not found")
-    
-    updated = await db.ril_alerts.find_one({"id": alert_id})
-    if updated:
-        updated.pop('_id', None)  # Remove MongoDB ObjectId
-    
-    return {
-        "success": True,
-        "alert": updated
-    }
+    return {"success": True, "alert": updated}

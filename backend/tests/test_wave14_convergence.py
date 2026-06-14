@@ -42,7 +42,7 @@ def test_maintenance_scheduler_service_has_read_endpoints():
 
 
 def test_chat_threat_graph_dispatch_includes_tenant():
-    text = (BACKEND_ROOT / "routes" / "chat.py").read_text(encoding="utf-8")
+    text = (BACKEND_ROOT / "services" / "chat_routes_service.py").read_text(encoding="utf-8")
     start = text.index("async def _create_observation")
     end = text.index("# Auto-create actions")
     block = text[start:end]
