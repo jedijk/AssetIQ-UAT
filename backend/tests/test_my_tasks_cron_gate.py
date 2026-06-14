@@ -20,7 +20,7 @@ import requests
 
 BASE_URL = os.environ.get(
     "REACT_APP_BACKEND_URL",
-    "https://flicker-solver.preview.emergentagent.com",
+    "https://reliability-graph-1.preview.emergentagent.com",
 ).rstrip("/")
 API = f"{BASE_URL}/api"
 

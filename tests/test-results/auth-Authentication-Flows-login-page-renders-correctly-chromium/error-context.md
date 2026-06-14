@@ -34,7 +34,7 @@ Call log:
 ```ts
   1  | import { test, expect } from '@playwright/test';
   2  | 
-  3  | const PAGE_URL = process.env.REACT_APP_BACKEND_URL || 'https://flicker-solver.preview.emergentagent.com';
+  3  | const PAGE_URL = process.env.REACT_APP_BACKEND_URL || 'https://reliability-graph-1.preview.emergentagent.com';
   4  | 
   5  | test.describe('Authentication Flows', () => {
   6  |   test.beforeEach(async ({ page }) => {
