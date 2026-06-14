@@ -60,6 +60,12 @@ async def publish_event(
     else:
         with_tenant_id(doc, user)
 
+    if not doc.get("tenant_id"):
+        logger.warning(
+            "outbox event published without tenant_id",
+            extra={"event_type": event_type, "aggregate_id": aggregate_id},
+        )
+
     await db[COLLECTION].insert_one(doc)
     logger.info(
         "event published",
@@ -74,11 +80,19 @@ async def publish_event(
 
 async def claim_next_event(
     event_types: Optional[List[str]] = None,
+    *,
+    tenant_id: Optional[str] = None,
 ) -> Optional[dict]:
     """Atomically claim the oldest pending outbox event."""
     filt: Dict[str, Any] = {"status": OutboxStatus.PENDING.value}
     if event_types:
         filt["event_type"] = {"$in": event_types}
+
+    from services.worker_config import worker_tenant_id
+
+    tid = tenant_id or worker_tenant_id()
+    if tid:
+        filt["tenant_id"] = tid
 
     now = datetime.now(timezone.utc).isoformat()
     return await db[COLLECTION].find_one_and_update(

@@ -61,6 +61,7 @@ def _graph_event_type(sync_name: str) -> str:
             "sync_outcome_edges": DomainEventType.GRAPH_SYNC_OUTCOME.value,
             "sync_edges_for_scheduled_task": DomainEventType.GRAPH_SYNC_SCHEDULED_TASK.value,
             "sync_task_instance_completion_edges": DomainEventType.GRAPH_SYNC_TASK_COMPLETION.value,
+            "sync_edges_for_apply_strategy": DomainEventType.GRAPH_SYNC_APPLY_STRATEGY.value,
         }
         _GRAPH_SYNC_EVENT_TYPES.update(mapping)
     return _GRAPH_SYNC_EVENT_TYPES.get(sync_name, f"graph.{sync_name}")
@@ -81,6 +82,7 @@ async def dispatch_graph_sync(sync_name: str, label: str, **kwargs: Any) -> None
             or kwargs.get("investigation_id")
             or kwargs.get("action_id")
             or kwargs.get("task_instance_id")
+            or kwargs.get("equipment_type_id")
             or (kwargs.get("scheduled_task") or {}).get("id")
             or label
         )
@@ -1049,4 +1051,5 @@ GRAPH_SYNC_HANDLERS: Dict[str, Callable[..., Any]] = {
     "sync_outcome_edges": sync_outcome_edges,
     "sync_edges_for_scheduled_task": sync_edges_for_scheduled_task,
     "sync_task_instance_completion_edges": sync_task_instance_completion_edges,
+    "sync_edges_for_apply_strategy": sync_edges_for_apply_strategy,
 }

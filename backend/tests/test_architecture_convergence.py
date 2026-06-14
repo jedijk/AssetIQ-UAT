@@ -126,6 +126,205 @@ def test_wave7_service_modules_exist():
     assert callable(production_dashboard_service.get_or_compute_production_dashboard)
 
 
+def test_wave8_priority_routes_are_green():
+    from architecture.convergence_registry import GREEN_ROUTES
+
+    for rel in (
+        "routes/my_tasks.py",
+        "routes/production/dashboard.py",
+        "routes/ril/dashboard.py",
+    ):
+        assert rel in GREEN_ROUTES
+        path = BACKEND_ROOT / rel
+        text = path.read_text(encoding="utf-8")
+        assert "from database import" not in text
+        assert len(text.splitlines()) < 300, f"{rel} should be orchestration-only"
+
+
+def test_wave8_service_modules_exist():
+    from services import my_tasks_service, production_dashboard_ops, ril_dashboard_service
+
+    assert callable(my_tasks_service.get_task_detail)
+    assert callable(my_tasks_service.execute_adhoc_plan)
+    assert callable(production_dashboard_ops.list_production_events)
+    assert callable(ril_dashboard_service.get_executive_dashboard)
+    assert callable(ril_dashboard_service.get_dashboard_stats)
+
+
+def test_wave9_observation_workspace_and_forms_routes_are_green():
+    from architecture.convergence_registry import GREEN_ROUTES
+
+    for rel in ("routes/observation_workspace.py", "routes/forms.py"):
+        assert rel in GREEN_ROUTES
+        path = BACKEND_ROOT / rel
+        text = path.read_text(encoding="utf-8")
+        assert "from database import db" not in text
+
+
+def test_wave9_service_modules_exist():
+    from services import observation_workspace_service
+    from services.form_service import FormService
+
+    assert callable(observation_workspace_service.get_workspace)
+    assert callable(observation_workspace_service.add_action_to_plan)
+    assert callable(FormService.list_submissions_lightweight)
+
+
+def test_wave10_production_and_equipment_routes_are_green():
+    from architecture.convergence_registry import GREEN_ROUTES
+
+    for rel in (
+        "routes/production_logs.py",
+        "routes/production/submissions.py",
+        "routes/equipment/equipment_nodes.py",
+    ):
+        assert rel in GREEN_ROUTES
+        path = BACKEND_ROOT / rel
+        text = path.read_text(encoding="utf-8")
+        assert "from database import db" not in text
+        assert len(text.splitlines()) < 300, f"{rel} should be orchestration-only"
+
+
+def test_wave10_service_modules_exist():
+    from services import equipment_nodes_service, production_logs_service, production_submissions_service
+
+    assert callable(production_logs_service.ingest_logs)
+    assert callable(production_submissions_service.update_production_submission)
+    assert callable(equipment_nodes_service.get_equipment_nodes)
+
+
+def test_wave11_insights_and_ai_routes_are_green():
+    from architecture.convergence_registry import GREEN_ROUTES
+
+    for rel in ("routes/insights.py", "routes/ai_routes.py"):
+        assert rel in GREEN_ROUTES
+        path = BACKEND_ROOT / rel
+        text = path.read_text(encoding="utf-8")
+        assert "from database import db" not in text
+        if rel == "routes/ai_routes.py":
+            assert len(text.splitlines()) < 180, "ai_routes.py should be orchestration-only"
+
+
+def test_wave11_service_modules_exist():
+    from services import ai_risk_queries, insights_service
+
+    assert callable(insights_service.get_insights_summary)
+    assert callable(ai_risk_queries.find_threat)
+    assert callable(ai_risk_queries.upsert_ai_doc)
+
+
+def test_wave12_ai_and_scheduler_modules_exist():
+    from services import ai_extract_queries, ai_fm_queries
+
+    assert callable(ai_extract_queries.find_form_template)
+    assert callable(ai_extract_queries.insert_corrections)
+    assert callable(ai_fm_queries.find_cache_doc)
+    assert callable(ai_fm_queries.upsert_cache_doc)
+
+
+def test_wave13_ai_risk_service_exists():
+    from services import ai_risk_service
+
+    assert callable(ai_risk_service.analyze_threat_risk)
+    assert callable(ai_risk_service.get_ai_top_risks)
+
+
+def test_wave14_scheduler_service_exists():
+    from services import maintenance_scheduler_service, maintenance_scheduler_scope
+
+    assert callable(maintenance_scheduler_service.get_dashboard_kpis)
+    assert callable(maintenance_scheduler_scope.scope_scheduled_tasks_query)
+
+
+def test_wave14_scheduler_read_routes_are_green():
+    from architecture.convergence_registry import GREEN_ROUTES
+
+    for rel in (
+        "routes/maintenance_scheduler/dashboard.py",
+        "routes/maintenance_scheduler/timeline.py",
+    ):
+        assert rel in GREEN_ROUTES
+        text = (BACKEND_ROOT / rel).read_text(encoding="utf-8")
+        assert "from database import db" not in text
+
+
+def test_wave15_scheduler_routes_are_green():
+    from architecture.convergence_registry import GREEN_ROUTES
+
+    for rel in (
+        "routes/maintenance_scheduler/tasks.py",
+        "routes/maintenance_scheduler/technicians.py",
+        "routes/maintenance_scheduler/programs.py",
+        "routes/maintenance_scheduler/ai_planner.py",
+    ):
+        assert rel in GREEN_ROUTES
+        text = (BACKEND_ROOT / rel).read_text(encoding="utf-8")
+        assert "from database import db" not in text
+
+
+def test_wave15_scheduler_services_exist():
+    from services import maintenance_scheduler_service, maintenance_scheduler_ai_service
+
+    assert callable(maintenance_scheduler_service.complete_scheduled_task)
+    assert callable(maintenance_scheduler_ai_service.ai_plan_tasks)
+
+
+def test_wave16_equipment_routes_are_green():
+    from architecture.convergence_registry import GREEN_ROUTES
+
+    for rel in (
+        "routes/equipment/equipment_history.py",
+        "routes/equipment/equipment_types.py",
+        "routes/equipment/equipment_utils.py",
+        "routes/equipment/equipment_files.py",
+    ):
+        assert rel in GREEN_ROUTES
+        text = (BACKEND_ROOT / rel).read_text(encoding="utf-8")
+        assert "from database import db" not in text
+
+
+def test_wave16_equipment_services_exist():
+    from services import equipment_files_service, equipment_history_service
+
+    assert callable(equipment_history_service.get_equipment_history)
+    assert callable(equipment_files_service.list_equipment_files)
+
+
+def test_wave17_equipment_routes_are_green():
+    from architecture.convergence_registry import GREEN_ROUTES
+
+    for rel in (
+        "routes/equipment/equipment_criticality.py",
+        "routes/equipment/equipment_operations.py",
+    ):
+        assert rel in GREEN_ROUTES
+        text = (BACKEND_ROOT / rel).read_text(encoding="utf-8")
+        assert "from database import db" not in text
+
+
+def test_wave17_equipment_services_exist():
+    from services import equipment_criticality_service, equipment_operations_service
+
+    assert callable(equipment_criticality_service.assign_criticality)
+    assert callable(equipment_operations_service.reorder_equipment_node)
+
+
+def test_wave18_equipment_import_is_green():
+    from architecture.convergence_registry import GREEN_ROUTES
+
+    rel = "routes/equipment/equipment_import.py"
+    assert rel in GREEN_ROUTES
+    text = (BACKEND_ROOT / rel).read_text(encoding="utf-8")
+    assert "from database import db" not in text
+
+
+def test_wave18_equipment_import_service_exists():
+    from services import equipment_import_service
+
+    assert callable(equipment_import_service.parse_equipment_list)
+    assert callable(equipment_import_service.import_excel_file)
+
+
 def test_route_db_imports_are_allowlisted():
     """No new route may import db without explicit allowlist entry."""
     from architecture.convergence_registry import ROUTE_DB_IMPORT_ALLOWLIST

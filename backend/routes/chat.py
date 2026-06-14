@@ -329,6 +329,8 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
         threat_doc["attachments"] = [{"type": "image", "data": image_thumbnail,
                                       "created_at": datetime.now(timezone.utc).isoformat()}]
 
+    with_tenant_id(threat_doc, await _tenant_ctx_for_user(user_id))
+
     try:
         result = await db.threats.insert_one(threat_doc)
         logger.info(f"Created threat {threat_id} with {len(threat_doc.get('attachments', []))} attachments")
@@ -357,6 +359,7 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
             threat_id=threat_id,
             equipment_id=obs_data.get("equipment_id"),
             failure_mode_id=obs_data.get("failure_mode_id"),
+            tenant_id=threat_doc.get("tenant_id"),
         )
     )
 

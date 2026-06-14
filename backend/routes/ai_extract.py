@@ -15,7 +15,7 @@ from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 from auth import get_current_user
-from database import db
+from services.ai_extract_queries import find_form_template, get_correction_hints, insert_corrections
 from services.ai_gateway import chat_with_images, user_context
 from services.storage_service import put_object_async
 
@@ -57,40 +57,13 @@ class ExtractionResponse(BaseModel):
     photo_path: Optional[str] = None
 
 
-async def _get_learned_hints(form_template_id: Optional[str]) -> List[str]:
+async def _get_learned_hints(user: dict, form_template_id: Optional[str]) -> List[str]:
     """Fetch past corrections to enhance the prompt."""
     if not form_template_id:
         return []
 
     try:
-        # Aggregate corrections: group by field key, find most common correction patterns
-        pipeline = [
-            {"$match": {"form_template_id": form_template_id}},
-            {"$sort": {"created_at": -1}},
-            {"$limit": 50},  # Last 50 corrections
-            {"$group": {
-                "_id": "$field_key",
-                "corrections": {"$push": {
-                    "ai_value": "$ai_value",
-                    "corrected_value": "$corrected_value",
-                }},
-                "count": {"$sum": 1},
-            }},
-            {"$match": {"count": {"$gte": 2}}},  # Only fields corrected 2+ times
-        ]
-        results = await db.ai_extraction_corrections.aggregate(pipeline).to_list(20)
-
-        hints = []
-        for r in results:
-            key = r["_id"]
-            # Find the most recent correction pattern
-            latest = r["corrections"][0]
-            hints.append(
-                f'Note for "{key}": Users have corrected this field {r["count"]} times. '
-                f'AI often reads "{latest["ai_value"]}" but correct value tends to be "{latest["corrected_value"]}". '
-                f'Please be extra careful with this field.'
-            )
-        return hints
+        return await get_correction_hints(user, form_template_id)
     except Exception as e:
         logger.warning(f"[AI Extract] Failed to fetch correction hints: {e}")
         return []
@@ -355,9 +328,7 @@ async def extract_from_image(
     saved_fields_by_key: Dict[str, Any] = {}
     if form_template_id:
         try:
-            form_template_doc = await db.form_templates.find_one(
-                {"id": form_template_id}, {"_id": 0, "fields": 1, "photo_extraction_config": 1}
-            )
+            form_template_doc = await find_form_template(current_user, form_template_id)
         except Exception as e:
             logger.warning(f"[AI Extract] Could not fetch form template {form_template_id}: {e}")
 
@@ -399,7 +370,7 @@ async def extract_from_image(
         photo_path = None
 
     # Fetch learned hints from past corrections
-    hints = await _get_learned_hints(form_template_id)
+    hints = await _get_learned_hints(current_user, form_template_id)
     if hints:
         logger.info(f"[AI Extract] Applying {len(hints)} learned correction hints")
 
@@ -541,7 +512,8 @@ async def store_corrections(
         })
 
     if docs:
-        await db.ai_extraction_corrections.insert_many(docs)
-        logger.info(f"[AI Extract] Stored {len(docs)} corrections for form {data.form_template_id}")
+        stored = await insert_corrections(current_user, docs)
+        logger.info(f"[AI Extract] Stored {stored} corrections for form {data.form_template_id}")
+        return {"stored": stored}
 
-    return {"stored": len(docs)}
+    return {"stored": 0}

@@ -18,6 +18,7 @@ class DomainEventType(str, Enum):
     GRAPH_SYNC_OUTCOME = "graph.sync_outcome_edges"
     GRAPH_SYNC_SCHEDULED_TASK = "graph.sync_edges_for_scheduled_task"
     GRAPH_SYNC_TASK_COMPLETION = "graph.sync_task_instance_completion_edges"
+    GRAPH_SYNC_APPLY_STRATEGY = "graph.sync_edges_for_apply_strategy"
 
     # Domain lifecycle (outbox-ready; handlers added incrementally)
     THREAT_CREATED = "threat.created"
@@ -42,6 +43,7 @@ GRAPH_EVENT_TYPES = frozenset({
     DomainEventType.GRAPH_SYNC_OUTCOME,
     DomainEventType.GRAPH_SYNC_SCHEDULED_TASK,
     DomainEventType.GRAPH_SYNC_TASK_COMPLETION,
+    DomainEventType.GRAPH_SYNC_APPLY_STRATEGY,
 })
 
 PROJECTION_EVENT_TYPES = frozenset({

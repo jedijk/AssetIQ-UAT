@@ -5,18 +5,17 @@ Equipment Maintenance Programs:
 - Programs summary per equipment type
 """
 import logging
-from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from typing import Optional
 
-from database import db
-
 logger = logging.getLogger(__name__)
-from auth import get_current_user, require_permission
+
+from auth import require_permission
 from models.maintenance_scheduler import ApplyStrategyRequest
 from services.apply_strategy_service import apply_strategy_to_equipment as _apply_strategy_to_equipment_impl
 from services.background_jobs import background_job_service, JobStatus, tenant_id_from_user
 from services.worker_config import use_external_background_worker
+from services import maintenance_scheduler_service as svc
 
 router = APIRouter()
 
@@ -138,41 +137,4 @@ async def get_programs_summary(
     current_user: dict = Depends(require_permission("scheduler:read")),
 ):
     """Get summary of maintenance programs for an equipment type (v2)."""
-    programs = await db.maintenance_programs_v2.find(
-        {"equipment_type_id": equipment_type_id, "status": {"$in": ["active", "draft"]}},
-        {"_id": 0, "equipment_id": 1, "equipment_name": 1, "equipment_tag": 1, "tasks": 1},
-    ).to_list(500)
-
-    equipment_summary = []
-    total_tasks = 0
-    for prog in programs:
-        active_tasks = [
-            t for t in (prog.get("tasks") or [])
-            if t.get("is_active", True)
-        ]
-        total_tasks += len(active_tasks)
-        equipment_summary.append({
-            "_id": prog.get("equipment_id"),
-            "equipment_name": prog.get("equipment_name"),
-            "equipment_tag": prog.get("equipment_tag"),
-            "task_count": len(active_tasks),
-        })
-
-    today = datetime.utcnow().date().isoformat()
-    overdue_count = await db.scheduled_tasks.count_documents({
-        "equipment_type_id": equipment_type_id,
-        "status": {"$nin": ["completed", "cancelled"]},
-        "due_date": {"$lt": today},
-    })
-
-    return {
-        "equipment_type_id": equipment_type_id,
-        "equipment_count": len(equipment_summary),
-        "total_program_tasks": total_tasks,
-        # Backward-compatible fields for Maintenance Schedule UI (pre-v2 response shape).
-        "total_programs": total_tasks,
-        "overdue_count": overdue_count,
-        "equipment": equipment_summary,
-        "equipment_summary": equipment_summary,
-        "source": "maintenance_programs_v2",
-    }
+    return await svc.get_programs_summary(current_user, equipment_type_id)
