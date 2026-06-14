@@ -339,17 +339,15 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
     #     )
     # )
 
-    from services.reliability_graph import _run_graph_sync, sync_threat_edges
+    from services.reliability_graph import dispatch_graph_sync
 
-    # Run graph sync in background (non-blocking)
     asyncio.create_task(
-        _run_graph_sync(
-            sync_threat_edges(
-                threat_id=threat_id,
-                equipment_id=obs_data.get("equipment_id"),
-                failure_mode_id=obs_data.get("failure_mode_id"),
-            ),
+        dispatch_graph_sync(
+            "sync_threat_edges",
             "chat_threat_create",
+            threat_id=threat_id,
+            equipment_id=obs_data.get("equipment_id"),
+            failure_mode_id=obs_data.get("failure_mode_id"),
         )
     )
 

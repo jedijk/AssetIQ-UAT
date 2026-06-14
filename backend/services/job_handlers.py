@@ -122,10 +122,21 @@ async def handle_executive_kpi_refresh(job: dict) -> dict:
     return {"status": "ok", "generated_at": result.get("generated_at")}
 
 
+async def handle_process_domain_event_outbox(job: dict) -> dict:
+    """Drain domain event outbox batch (projection worker job type)."""
+    from workers.event_outbox_processor import process_outbox_batch
+
+    payload = job.get("payload") or {}
+    batch_size = int(payload.get("batch_size", 10))
+    processed = await process_outbox_batch(batch_size)
+    return {"status": "ok", "processed": processed}
+
+
 JOB_HANDLERS: Dict[str, Callable[..., Any]] = {
     "apply_strategy": handle_apply_strategy,
     "pm_import_ai_review": handle_pm_import_ai_review,
     "asset_health_daily_refresh": handle_asset_health_daily_refresh,
     "reliability_snapshots_daily_refresh": handle_reliability_snapshots_daily_refresh,
     "executive_kpi_refresh": handle_executive_kpi_refresh,
+    "process_domain_event_outbox": handle_process_domain_event_outbox,
 }

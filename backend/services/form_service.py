@@ -654,8 +654,7 @@ class FormService:
 
         try:
             from services.reliability_graph import (
-                _run_graph_sync,
-                sync_task_instance_completion_edges,
+                dispatch_graph_sync,
             )
             from services.threat_score_service import recalculate_threat_scores_for_asset
 
@@ -683,17 +682,16 @@ class FormService:
                     equipment_id = equipment_id or inst.get("equipment_id")
                     tenant_id = tenant_id or inst.get("tenant_id")
 
-                await _run_graph_sync(
-                    sync_task_instance_completion_edges(
-                        task_instance_id=str(task_instance_id),
-                        equipment_id=equipment_id,
-                        failure_mode_id=failure_mode_id,
-                        scheduled_task_id=scheduled_task_id,
-                        completed_at=completed_at,
-                        tenant_id=tenant_id,
-                        findings_text=notes or submission.get("form_template_name"),
-                    ),
+                await dispatch_graph_sync(
+                    "sync_task_instance_completion_edges",
                     "form_submission",
+                    task_instance_id=str(task_instance_id),
+                    equipment_id=equipment_id,
+                    failure_mode_id=failure_mode_id,
+                    scheduled_task_id=scheduled_task_id,
+                    completed_at=completed_at,
+                    tenant_id=tenant_id,
+                    findings_text=notes or submission.get("form_template_name"),
                 )
 
             if equipment_id:

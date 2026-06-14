@@ -420,8 +420,11 @@ async def get_application_metrics(
         company_id = current_user.get("company_id") or current_user.get("organization_id") or "default"
         ai_daily = ai_cost_guard.get_daily_summary(company_id)
         from services.background_jobs import background_job_service
+        from services.event_outbox import get_outbox_health
+        from services.observability_metrics import snapshot as observability_snapshot
 
         queue_health = await background_job_service.get_queue_health()
+        outbox_health = await get_outbox_health()
         from services.scheduler_config import (
             should_read_legacy_maintenance_programs,
             should_sync_legacy_maintenance_programs,
@@ -432,10 +435,16 @@ async def get_application_metrics(
             "redis": redis_status(),
             "slow_query_threshold_ms": SLOW_QUERY_MS,
             "slow_api_threshold_ms": int(__import__("os").environ.get("SLOW_API_MS", "1000")),
+            "platform_metrics": observability_snapshot(),
+            "event_outbox": outbox_health,
             "background_worker": {
                 "script": "backend/scripts/run_background_worker.py",
                 "handlers": ["apply_strategy", "pm_import_ai_review"],
                 "external_mode_env": "USE_EXTERNAL_BACKGROUND_WORKER",
+            },
+            "projection_worker": {
+                "script": "backend/scripts/run_projection_worker.py",
+                "graph_sync_async_env": "GRAPH_SYNC_ASYNC",
             },
             "maintenance_domain": {
                 "read_legacy_maintenance_programs": should_read_legacy_maintenance_programs(),

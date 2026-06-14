@@ -102,16 +102,15 @@ class ObservationService:
         doc["_id"] = result.inserted_id
 
         obs_id = str(result.inserted_id)
-        from services.reliability_graph import _run_graph_sync, sync_observation_edges
+        from services.reliability_graph import dispatch_graph_sync
 
-        await _run_graph_sync(
-            sync_observation_edges(
-                observation_id=obs_id,
-                equipment_id=data.get("equipment_id"),
-                failure_mode_id=data.get("failure_mode_id"),
-                threat_id=data.get("threat_id"),
-            ),
+        await dispatch_graph_sync(
+            "sync_observation_edges",
             "observation_create",
+            observation_id=obs_id,
+            equipment_id=data.get("equipment_id"),
+            failure_mode_id=data.get("failure_mode_id"),
+            threat_id=data.get("threat_id"),
         )
         
         # Update EFM observation count if linked
@@ -235,16 +234,15 @@ class ObservationService:
         
         if result:
             serialized = self._serialize_observation(result)
-            from services.reliability_graph import _run_graph_sync, sync_observation_edges
+            from services.reliability_graph import dispatch_graph_sync
 
-            await _run_graph_sync(
-                sync_observation_edges(
-                    observation_id=serialized["id"],
-                    equipment_id=result.get("equipment_id"),
-                    failure_mode_id=result.get("failure_mode_id"),
-                    threat_id=result.get("threat_id"),
-                ),
+            await dispatch_graph_sync(
+                "sync_observation_edges",
                 "observation_update",
+                observation_id=serialized["id"],
+                equipment_id=result.get("equipment_id"),
+                failure_mode_id=result.get("failure_mode_id"),
+                threat_id=result.get("threat_id"),
             )
             return serialized
         return None
@@ -363,16 +361,15 @@ class ObservationService:
         
         if result:
             serialized = self._serialize_observation(result)
-            from services.reliability_graph import _run_graph_sync, sync_observation_edges
+            from services.reliability_graph import dispatch_graph_sync
 
-            await _run_graph_sync(
-                sync_observation_edges(
-                    observation_id=serialized["id"],
-                    equipment_id=result.get("equipment_id"),
-                    failure_mode_id=result.get("failure_mode_id"),
-                    threat_id=result.get("threat_id"),
-                ),
+            await dispatch_graph_sync(
+                "sync_observation_edges",
                 "observation_update",
+                observation_id=serialized["id"],
+                equipment_id=result.get("equipment_id"),
+                failure_mode_id=result.get("failure_mode_id"),
+                threat_id=result.get("threat_id"),
             )
             return serialized
         return None
@@ -433,25 +430,23 @@ class ObservationService:
         )
 
         obs_id = str(result.inserted_id)
-        from services.reliability_graph import _run_graph_sync, sync_observation_edges, sync_threat_edges
+        from services.reliability_graph import dispatch_graph_sync
 
-        await _run_graph_sync(
-            sync_observation_edges(
-                observation_id=obs_id,
-                equipment_id=obs_doc.get("equipment_id"),
-                failure_mode_id=obs_doc.get("failure_mode_id"),
-                threat_id=threat_id,
-                escalate=True,
-            ),
+        await dispatch_graph_sync(
+            "sync_observation_edges",
             "threat_convert_observation",
+            observation_id=obs_id,
+            equipment_id=obs_doc.get("equipment_id"),
+            failure_mode_id=obs_doc.get("failure_mode_id"),
+            threat_id=threat_id,
+            escalate=True,
         )
-        await _run_graph_sync(
-            sync_threat_edges(
-                threat_id=threat_id,
-                equipment_id=obs_doc.get("equipment_id"),
-                observation_id=obs_id,
-            ),
+        await dispatch_graph_sync(
+            "sync_threat_edges",
             "threat_convert_threat",
+            threat_id=threat_id,
+            equipment_id=obs_doc.get("equipment_id"),
+            observation_id=obs_id,
         )
         
         return self._serialize_observation(obs_doc)

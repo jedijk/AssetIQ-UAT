@@ -23,16 +23,9 @@ logger = logging.getLogger(__name__)
 
 
 async def mark_strategy_needs_apply(equipment_type_id: str) -> None:
-    """Persist flag that schedule/programs are out of sync with strategy edits."""
-    await db.equipment_type_strategies.update_one(
-        {"equipment_type_id": equipment_type_id},
-        {
-            "$set": {
-                "strategy_needs_apply": True,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-        },
-    )
+    from services.strategy_apply_state import mark_strategy_needs_apply as _mark
+
+    await _mark(equipment_type_id)
 
 
 async def clear_strategy_needs_apply(
@@ -40,18 +33,9 @@ async def clear_strategy_needs_apply(
     *,
     applied_version: Optional[str] = None,
 ) -> None:
-    """Clear apply flag after successful Apply Strategy."""
-    fields: Dict[str, Any] = {
-        "strategy_needs_apply": False,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "last_strategy_applied_at": datetime.now(timezone.utc).isoformat(),
-    }
-    if applied_version:
-        fields["last_applied_strategy_version"] = applied_version
-    await db.equipment_type_strategies.update_one(
-        {"equipment_type_id": equipment_type_id},
-        {"$set": fields},
-    )
+    from services.strategy_apply_state import clear_strategy_needs_apply as _clear
+
+    await _clear(equipment_type_id, applied_version=applied_version)
 
 
 async def enrich_strategy_needs_apply(
