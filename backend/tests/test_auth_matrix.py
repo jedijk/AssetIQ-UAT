@@ -34,7 +34,7 @@ def test_all_roles_defined_or_aliased():
 
 
 def test_permissions_route_aliases_match_rbac():
-    source = (Path(__file__).resolve().parents[1] / "routes" / "permissions.py").read_text()
+    source = (Path(__file__).resolve().parents[1] / "services" / "permissions_defaults.py").read_text()
     assert 'DEFAULT_PERMISSIONS["manager"] = DEFAULT_PERMISSIONS["admin"]' in source
     assert 'DEFAULT_PERMISSIONS["operator"] = DEFAULT_PERMISSIONS["operations"]' in source
 

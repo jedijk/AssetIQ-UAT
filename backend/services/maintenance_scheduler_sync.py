@@ -889,7 +889,7 @@ async def refresh_equipment_schedule(
     call afterwards. They can also pass a pre-loaded `strategy` doc to avoid
     re-fetching equipment_type_strategies on every call.
     """
-    from routes.maintenance_scheduler.scheduler import schedule_programs_for_equipment
+    from services.maintenance_scheduling import schedule_programs_for_equipment
     from services.maintenance_program_service import MaintenanceProgramService
     from services.scheduler_program_source import load_schedulable_programs
 
@@ -942,7 +942,7 @@ async def refresh_equipment_type_schedules(
     user_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Refresh schedules for all equipment of a type that already has programs."""
-    from routes.maintenance_strategy_v2.propagation import _resync_programs_with_strategy
+    from services.strategy_propagation import resync_programs_with_strategy
 
     equipment_ids = await _equipment_ids_with_schedules(equipment_type_id)
     totals = {
@@ -966,7 +966,7 @@ async def refresh_equipment_type_schedules(
         totals["pm_import_programs_synced"] += result.get("pm_import_programs_synced", 0)
         totals["scheduled_tasks_created"] += result.get("scheduled_tasks_created", 0)
 
-    resync = await _resync_programs_with_strategy(equipment_type_id)
+    resync = await resync_programs_with_strategy(equipment_type_id)
     totals.update(
         {
             "programs_activated": resync.get("programs_activated", 0),

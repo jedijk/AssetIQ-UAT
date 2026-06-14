@@ -8,7 +8,12 @@ from pydantic import BaseModel
 
 from models.maintenance_scheduler import TaskPriority
 from database import db
-from services.scheduler_helpers import frequency_to_days, normalize_program_criticality
+from services.scheduler_helpers import (
+    frequency_to_days,
+    normalize_program_criticality,
+    get_planning_horizon,
+    calculate_priority,
+)
 
 _PM_SYNC_LOCK = asyncio.Lock()
 _PM_SYNC_LAST_AT: Dict[str, float] = {}
@@ -28,36 +33,7 @@ class ApplyAIPlanRequest(BaseModel):
 
 # ---------- Helpers ----------
 
-_PLANNING_HORIZON = {
-    "high": 7,
-    "medium": 14,
-    "low": 30,
-}
-
-
-def get_planning_horizon(criticality: str) -> int:
-    """Get planning horizon days based on criticality."""
-    return _PLANNING_HORIZON.get(criticality, 14)
-
-
-def calculate_priority(criticality: str, days_until_due: int, is_overdue: bool) -> TaskPriority:
-    """Calculate task priority based on criticality and due date."""
-    if is_overdue:
-        if criticality == "high":
-            return TaskPriority.CRITICAL
-        return TaskPriority.HIGH
-
-    if criticality == "high":
-        if days_until_due <= 3:
-            return TaskPriority.CRITICAL
-        return TaskPriority.HIGH
-    if criticality == "medium":
-        if days_until_due <= 3:
-            return TaskPriority.HIGH
-        return TaskPriority.MEDIUM
-    if days_until_due <= 3:
-        return TaskPriority.MEDIUM
-    return TaskPriority.LOW
+# Re-exported from services.scheduler_helpers for route-layer backward compatibility.
 
 
 async def ensure_imported_pm_tasks_scheduled(

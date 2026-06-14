@@ -432,6 +432,20 @@ INDEX_DEFINITIONS = {
         {"keys": [("equipment_id", 1), ("created_at", -1)]},
         {"keys": [("status", 1)]},
     ],
+    "production_logs": [
+        {"keys": [("asset_id", 1), ("timestamp", -1)]},
+        {"keys": [("timestamp", -1)]},
+        {"keys": [("event_type", 1), ("timestamp", -1)]},
+        {"keys": [("status", 1), ("timestamp", -1)]},
+    ],
+    "log_ingestion_jobs": [
+        {"keys": [("status", 1), ("created_at", -1)]},
+        {"keys": [("created_at", -1)]},
+    ],
+    "asset_history": [
+        {"keys": [("asset_id", 1), ("hour", 1)]},
+        {"keys": [("hour", -1)]},
+    ],
 }
 
 
