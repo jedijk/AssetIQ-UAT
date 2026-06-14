@@ -40,6 +40,8 @@ const NODE_LAYOUT = {
 
 const NODE_WIDTH = 118;
 const NODE_HEIGHT = 46;
+const GRAPH_WIDTH = 1100;
+const GRAPH_HEIGHT = 340;
 
 function formatNodeLabel(label) {
   return label.length > 14 ? `${label.slice(0, 13)}…` : label;
@@ -145,10 +147,15 @@ const ReliabilityOntologyGraph = ({
     : visibleArcs;
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50/80 overflow-x-auto overflow-y-hidden">
+    <div
+      className="rounded-lg border border-slate-200 bg-slate-50/80 overflow-auto max-h-[min(380px,50vh)] touch-pan-x touch-pan-y"
+      data-testid="reliability-knowledge-graph-scroll"
+    >
       <svg
-        viewBox="0 0 1100 340"
-        className="w-full min-w-[720px] h-[340px] block"
+        viewBox={`0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}`}
+        width={GRAPH_WIDTH}
+        height={GRAPH_HEIGHT}
+        className="block shrink-0"
         data-testid="reliability-knowledge-graph-svg"
       >
         <rect x="20" y="20" width="560" height="300" rx="12" fill="#EFF6FF" fillOpacity="0.55" />
@@ -368,86 +375,91 @@ export default function ReliabilityKnowledgeGraphDialog({
             Unable to load knowledge graph data.
           </div>
         ) : (
-          <div className="space-y-4 min-h-0 flex-1 flex flex-col">
-            <div
-              className="space-y-3"
-              onMouseLeave={() => setHighlightedNode(null)}
-            >
-              <ReliabilityOntologyGraph
-                nodeTypes={nodeTypes}
-                relationArcs={relationArcs}
-                highlightedArc={highlightedArc}
-                highlightedNode={highlightedNode}
-                onNodeHover={setHighlightedNode}
-              />
-
+          <ScrollArea className="flex-1 min-h-0 h-0">
+            <div className="space-y-4 pr-3 pb-1">
               <div
-                className="min-h-[148px] rounded-lg border border-slate-200 bg-slate-50/60 p-3"
-                data-testid="reliability-knowledge-graph-node-detail"
+                className="space-y-3"
+                onMouseLeave={() => setHighlightedNode(null)}
               >
-                {selectedNode ? (
-                  <>
-                    <p className="text-sm font-semibold text-slate-900 mb-2">
-                      {selectedNode.label}
+                <p className="text-[11px] text-slate-400 sm:hidden">
+                  Scroll the graph horizontally to explore all nodes.
+                </p>
+                <ReliabilityOntologyGraph
+                  nodeTypes={nodeTypes}
+                  relationArcs={relationArcs}
+                  highlightedArc={highlightedArc}
+                  highlightedNode={highlightedNode}
+                  onNodeHover={setHighlightedNode}
+                />
+
+                <div
+                  className="min-h-[148px] rounded-lg border border-slate-200 bg-slate-50/60 p-3"
+                  data-testid="reliability-knowledge-graph-node-detail"
+                >
+                  {selectedNode ? (
+                    <>
+                      <p className="text-sm font-semibold text-slate-900 mb-2">
+                        {selectedNode.label}
+                      </p>
+                      <NodeRelationBreakdown node={selectedNode} />
+                    </>
+                  ) : (
+                    <p className="text-xs text-slate-500">
+                      Hover a node to see per-relation incoming and outgoing counts.
                     </p>
-                    <NodeRelationBreakdown node={selectedNode} />
-                  </>
-                ) : (
-                  <p className="text-xs text-slate-500">
-                    Hover a node to see per-relation incoming and outgoing counts.
-                  </p>
-                )}
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 p-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {sortedArcs.map((arc) => (
+                    <button
+                      key={arc.id}
+                      type="button"
+                      onMouseEnter={() => {
+                        setHighlightedArc(arc.id);
+                        setHighlightedNode(null);
+                      }}
+                      onMouseLeave={() => setHighlightedArc(null)}
+                      onFocus={() => {
+                        setHighlightedArc(arc.id);
+                        setHighlightedNode(null);
+                      }}
+                      onBlur={() => setHighlightedArc(null)}
+                      className={`flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors ${
+                        highlightedArc === arc.id
+                          ? "border-blue-300 bg-blue-50"
+                          : "border-slate-200 bg-white hover:bg-slate-50"
+                      }`}
+                      data-testid={`reliability-relation-${arc.id}`}
+                    >
+                      <span className="text-slate-700 truncate">
+                        {formatTypeLabel(arc.source)} → {arc.label || formatTypeLabel(arc.relation)} → {formatTypeLabel(arc.target)}
+                      </span>
+                      <Badge variant="secondary" className="shrink-0">
+                        {(arc.edge_count ?? 0).toLocaleString()}
+                      </Badge>
+                    </button>
+                  ))}
+                  {otherRelationRows.map((rel) => (
+                    <div
+                      key={rel.id}
+                      className="flex items-center justify-between gap-2 rounded-md border border-dashed border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs"
+                      data-testid={`reliability-relation-other-${rel.id}`}
+                    >
+                      <span className="text-slate-600 truncate">
+                        Other · {rel.id.replace(/_/g, " ")}
+                      </span>
+                      <Badge variant="outline" className="shrink-0">
+                        {(rel.edge_count ?? 0).toLocaleString()}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-
-            <ScrollArea className="max-h-52 rounded-lg border border-slate-200">
-              <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {sortedArcs.map((arc) => (
-                  <button
-                    key={arc.id}
-                    type="button"
-                    onMouseEnter={() => {
-                      setHighlightedArc(arc.id);
-                      setHighlightedNode(null);
-                    }}
-                    onMouseLeave={() => setHighlightedArc(null)}
-                    onFocus={() => {
-                      setHighlightedArc(arc.id);
-                      setHighlightedNode(null);
-                    }}
-                    onBlur={() => setHighlightedArc(null)}
-                    className={`flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-left text-xs transition-colors ${
-                      highlightedArc === arc.id
-                        ? "border-blue-300 bg-blue-50"
-                        : "border-slate-200 bg-white hover:bg-slate-50"
-                    }`}
-                    data-testid={`reliability-relation-${arc.id}`}
-                  >
-                    <span className="text-slate-700 truncate">
-                      {formatTypeLabel(arc.source)} → {arc.label || formatTypeLabel(arc.relation)} → {formatTypeLabel(arc.target)}
-                    </span>
-                    <Badge variant="secondary" className="shrink-0">
-                      {(arc.edge_count ?? 0).toLocaleString()}
-                    </Badge>
-                  </button>
-                ))}
-                {otherRelationRows.map((rel) => (
-                  <div
-                    key={rel.id}
-                    className="flex items-center justify-between gap-2 rounded-md border border-dashed border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs"
-                    data-testid={`reliability-relation-other-${rel.id}`}
-                  >
-                    <span className="text-slate-600 truncate">
-                      Other · {rel.id.replace(/_/g, " ")}
-                    </span>
-                    <Badge variant="outline" className="shrink-0">
-                      {(rel.edge_count ?? 0).toLocaleString()}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </div>
+          </ScrollArea>
         )}
       </DialogContent>
     </Dialog>
