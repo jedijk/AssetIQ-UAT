@@ -480,6 +480,22 @@ def test_wave27_service_exists():
     assert callable(svc.get_high_risk_efms)
 
 
+def test_wave28_maintenance_routes_are_green():
+    from architecture.convergence_registry import GREEN_ROUTES
+
+    rel = "routes/maintenance.py"
+    assert rel in GREEN_ROUTES
+    text = (BACKEND_ROOT / rel).read_text(encoding="utf-8")
+    assert "from database import db" not in text
+
+
+def test_wave28_service_exists():
+    from services import maintenance_routes_service as svc
+
+    assert callable(svc.download_documentation)
+    assert callable(svc.increment_strategy_version)
+
+
 def test_route_db_imports_are_allowlisted():
     """No new route may import db without explicit allowlist entry."""
     from architecture.convergence_registry import ROUTE_DB_IMPORT_ALLOWLIST

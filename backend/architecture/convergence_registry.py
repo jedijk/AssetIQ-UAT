@@ -67,6 +67,7 @@ GREEN_ROUTES: FrozenSet[str] = frozenset({
     "routes/maintenance_program.py",
     "routes/intelligence_map.py",
     "routes/efms.py",
+    "routes/maintenance.py",
 })
 
 # Routes mid-migration (service layer present; db import or logic remains).
@@ -86,7 +87,6 @@ ROUTE_DB_IMPORT_ALLOWLIST: FrozenSet[str] = frozenset({
     "routes/gdpr.py",
     "routes/granulometry.py",
     "routes/labels.py",
-    "routes/maintenance.py",
     "routes/permissions.py",
     "routes/pm_import.py",
     "routes/process_import.py",
