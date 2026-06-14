@@ -197,7 +197,9 @@ const UserStatisticsPage = () => {
   }
 
   const moduleUsage = overview?.module_usage || [];
-  const userActivity = overview?.user_activity || [];
+  const userActivity = (overview?.user_activity || []).filter(
+    (user) => (user.role || "").toLowerCase() !== "owner"
+  );
   const actionUsage = overview?.action_usage || [];
   const dailyActiveUsers = trends?.daily_active_users || overview?.daily_active_users || [];
   const dailyViews = trends?.daily_views || overview?.daily_views || [];
