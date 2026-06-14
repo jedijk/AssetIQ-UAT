@@ -11,9 +11,11 @@ logger = logging.getLogger("assetiq.workers.events")
 
 def build_event_handlers() -> Dict[str, Callable[..., Any]]:
     from workers.graph_projection_handler import graph_event_handlers
+    from workers.projection_handler import projection_event_handlers
 
     handlers = {}
     handlers.update(graph_event_handlers())
+    handlers.update(projection_event_handlers())
     return handlers
 
 

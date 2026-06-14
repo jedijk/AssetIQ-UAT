@@ -69,7 +69,7 @@ async def delete_threat_cascade(
             deleted_investigations_count = inv_count
             deleted_actions_count += extra_actions
 
-        result = await db.threats.delete_one(threat_delete_filter, **skw)
+        result = await repo.collection.delete_one(threat_delete_filter, **skw)
         if result.deleted_count == 0:
             raise ValueError("forbidden")
 

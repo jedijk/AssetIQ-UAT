@@ -31,9 +31,9 @@ _tasks_write = require_permission("tasks:write")
 @router.get("/my-tasks/kpis")
 async def get_my_tasks_kpis(current_user: dict = Depends(_tasks_read)):
     """Materialized work execution KPIs for the current user."""
-    from services.work_execution_kpi_materializer import get_or_compute_work_execution_kpis
+    from services import my_tasks_service
 
-    return await get_or_compute_work_execution_kpis(current_user)
+    return await my_tasks_service.get_my_tasks_kpis(current_user)
 
 
 def _assigned_user_id_str(task: dict) -> Optional[str]:
@@ -130,21 +130,16 @@ async def get_my_tasks(
 ):
     """Get unified work items for the current user (delegates to work_item_query). Deprecated: use GET /work-items/."""
     _apply_my_tasks_deprecation_headers(response)
-    user_id = current_user["id"]
-    tasks = await fetch_work_items(
-        user_id,
+    from services import my_tasks_service
+
+    return await my_tasks_service.list_my_tasks(
+        current_user,
         filter_name=filter,
         date=date,
         equipment_id=equipment_id,
         status=status,
         discipline=discipline,
-        user=current_user,
     )
-    return {
-        "tasks": tasks,
-        "count": len(tasks),
-        "filter": filter,
-    }
 
 
 async def _load_task_instance_detail(task: dict, user_id: str) -> dict:

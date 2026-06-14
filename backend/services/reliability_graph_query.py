@@ -425,9 +425,11 @@ async def sync_observation_edge(
     threat_id: Optional[str] = None,
     tenant_id: Optional[str] = None,
 ) -> None:
-    from services.reliability_graph import sync_observation_edges
+    from services.reliability_graph import dispatch_graph_sync
 
-    await sync_observation_edges(
+    await dispatch_graph_sync(
+        "sync_observation_edges",
+        "observation_edge",
         observation_id=observation_id,
         equipment_id=equipment_id,
         failure_mode_id=failure_mode_id,
