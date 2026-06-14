@@ -40,6 +40,7 @@ async def run_safe_startup(db, app) -> None:
         return
 
     logger.info("MongoDB connected successfully")
+    app.state.ready = True
 
     await _run_step("Cutover config", _cutover_check)
     await _run_step("UAT owner bootstrap", lambda: _uat_owner(client, AVAILABLE_DATABASES))
@@ -60,7 +61,6 @@ async def run_safe_startup(db, app) -> None:
         )
 
     asyncio.create_task(_cleanup_pending_registrations_task(db))
-    app.state.ready = True
 
 
 async def _cutover_check() -> None:

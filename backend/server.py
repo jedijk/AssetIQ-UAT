@@ -107,12 +107,13 @@ async def api_health_check():
     
     routes_ok = route_load_error is None
     ready = bool(getattr(app.state, "ready", False))
-    critical_ok = db_status == "connected" and routes_ok and ready
+    # `ready` tracks background warmup only; routes + live DB ping mean we can serve traffic.
+    critical_ok = db_status == "connected" and routes_ok
     redis_degraded = redis_status == "unavailable"
-    overall_ok = critical_ok and not redis_degraded
+    overall_ok = critical_ok and ready and not redis_degraded
 
     payload = {
-        "status": "ok" if overall_ok else "degraded",
+        "status": "ok" if overall_ok else ("starting" if critical_ok and not ready else "degraded"),
         "database": db_status,
         "database_latency_ms": db_latency,
         "uptime_seconds": uptime,
