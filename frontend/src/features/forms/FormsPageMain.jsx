@@ -87,6 +87,14 @@ import {
   FormStats,
   DocumentManager,
 } from "../../components/forms";
+import { FormsPageHeader } from "./components/FormsPageHeader";
+import { FormsTabsToolbar } from "./components/FormsTabsToolbar";
+import { FormsTemplatesTabPanel } from "./components/FormsTemplatesTabPanel";
+import { FormsSubmissionsTabPanel } from "./components/FormsSubmissionsTabPanel";
+import { FormsTemplateEditorDialog } from "./components/FormsTemplateEditorDialog";
+import { FormsFieldEditorDialog } from "./components/FormsFieldEditorDialog";
+import { FormsDeleteConfirmDialog } from "./components/FormsDeleteConfirmDialog";
+import { FormsViewTemplateDialog } from "./components/FormsViewTemplateDialog";
 
 
 export default function FormsPage({ embedded = false }) {
@@ -371,254 +379,53 @@ export default function FormsPage({ embedded = false }) {
     return <DesktopOnlyMessage title="Form Designer" icon={FileText} />;
   }
 
+  const openCreateTemplate = () => {
+    resetNewTemplate();
+    setShowCreateDialog(true);
+  };
+
   return (
     <div className={`${embedded ? 'p-4' : 'p-6'} max-w-7xl mx-auto`} data-testid="forms-page">
-      {/* Header - Hidden when embedded */}
-      {!embedded && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-              <FileText className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">Form Designer</h1>
-              <p className="text-sm text-slate-500">Create and manage data collection forms</p>
-            </div>
-          </div>
-          <Button 
-            onClick={() => {
-              resetNewTemplate();
-              setShowCreateDialog(true);
-            }}
-            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
-            data-testid="create-form-btn"
-          >
-            <Plus className="w-4 h-4 mr-2" /> New Form Template
-          </Button>
-        </div>
-      )}
+      <FormsPageHeader
+        embedded={embedded}
+        t={t}
+        stats={stats}
+        onCreateTemplate={openCreateTemplate}
+      />
 
-      {/* Embedded Header with Create Button */}
-      {embedded && (
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-sm text-slate-500">Create and manage data collection forms for your tasks</p>
-          <Button 
-            onClick={() => {
-              resetNewTemplate();
-              setShowCreateDialog(true);
-            }}
-            size="sm"
-            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
-            data-testid="create-form-btn"
-          >
-            <Plus className="w-4 h-4 mr-1" /> New Form
-          </Button>
-        </div>
-      )}
-
-      {/* Stats Cards */}
-      <div className={`grid ${embedded ? 'grid-cols-1' : 'grid-cols-2 lg:grid-cols-4'} gap-3 ${embedded ? 'mb-4' : 'mb-6'}`}>
-        <Card>
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-500">{t("forms.templates")}</p>
-                <p className="text-xl font-bold text-slate-900">{stats.totalTemplates}</p>
-              </div>
-              <div className="h-8 w-8 rounded-lg bg-indigo-100 flex items-center justify-center">
-                <Layers className="h-4 w-4 text-indigo-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        {!embedded && (
-          <>
-            <Card>
-              <CardContent className="p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-slate-500">{t("forms.submissions")}</p>
-                    <p className="text-xl font-bold text-slate-900">{stats.totalSubmissions}</p>
-                  </div>
-                  <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                    <FileText className="h-4 w-4 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-slate-500">{t("forms.warnings")}</p>
-                    <p className="text-xl font-bold text-amber-600">{stats.warningCount}</p>
-                  </div>
-                  <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center">
-                    <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-slate-500">{t("forms.critical")}</p>
-                    <p className="text-xl font-bold text-red-600">{stats.criticalCount}</p>
-                  </div>
-                  <div className="h-8 w-8 rounded-lg bg-red-100 flex items-center justify-center">
-                    <AlertCircle className="h-4 w-4 text-red-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </>
-        )}
-      </div>
-
-      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <TabsList>
-            <TabsTrigger value="templates" data-testid="templates-tab">
-              <Layers className="w-4 h-4 mr-2" /> Templates
-            </TabsTrigger>
-            {!embedded && (
-              <TabsTrigger value="submissions" data-testid="submissions-tab">
-                <FileText className="w-4 h-4 mr-2" /> Submissions
-              </TabsTrigger>
-            )}
-          </TabsList>
-          
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input
-                placeholder={t("forms.searchTemplates")}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-                data-testid="search-input"
-              />
-            </div>
-            <Select value={disciplineFilter} onValueChange={setDisciplineFilter}>
-              <SelectTrigger className="w-[160px]" title={t("forms.filterByDiscipline")}>
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder={t("forms.discipline")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("forms.allDisciplines")}</SelectItem>
-                {DISCIPLINES.map((d) => (
-                  <SelectItem key={d.value} value={d.value}>
-                    {t(`disciplines.${d.label}`) || d.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        <FormsTabsToolbar
+          embedded={embedded}
+          t={t}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          disciplineFilter={disciplineFilter}
+          setDisciplineFilter={setDisciplineFilter}
+        />
 
-        {/* Templates Tab */}
-        <TabsContent value="templates" className="mt-4">
-          {loadingTemplates ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin h-8 w-8 border-4 border-indigo-500 border-t-transparent rounded-full" />
-            </div>
-          ) : templatesError ? (
-            <Card className="py-12 border-red-200 bg-red-50">
-              <CardContent className="text-center">
-                <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-red-700 mb-2">Failed to load form templates</h3>
-                <p className="text-sm text-red-500 mb-4">
-                  {templatesErrorDetail?.message || "Please check your connection and try again"}
-                </p>
-                <Button 
-                  variant="outline"
-                  onClick={() => queryClient.invalidateQueries({ queryKey: ["form-templates"] })}
-                  data-testid="retry-templates-btn"
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" /> Retry
-                </Button>
-              </CardContent>
-            </Card>
-          ) : templates.length === 0 ? (
-            <Card className="py-12">
-              <CardContent className="text-center">
-                <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-700 mb-2">No form templates yet</h3>
-                <p className="text-sm text-slate-500 mb-4">Create your first form template to start collecting data</p>
-                <Button onClick={() => {
-                  resetNewTemplate();
-                  setShowCreateDialog(true);
-                }}>
-                  <Plus className="w-4 h-4 mr-2" /> Create Template
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-2">
-              {templates.map((template) => (
-                <TemplateRow
-                  key={template.id}
-                  template={template}
-                  onView={setSelectedTemplate}
-                  onEdit={(t) => {
-                    setNewTemplate(t);
-                    setShowCreateDialog(true);
-                  }}
-                  onDelete={(t) => setShowDeleteConfirm(t)}
-                />
-              ))}
-            </div>
-          )}
-        </TabsContent>
+        <FormsTemplatesTabPanel
+          loadingTemplates={loadingTemplates}
+          templatesError={templatesError}
+          templatesErrorDetail={templatesErrorDetail}
+          queryClient={queryClient}
+          templates={templates}
+          onCreateTemplate={openCreateTemplate}
+          onViewTemplate={setSelectedTemplate}
+          onEditTemplate={(tpl) => {
+            setNewTemplate(tpl);
+            setShowCreateDialog(true);
+          }}
+          onDeleteTemplate={(tpl) => setShowDeleteConfirm(tpl)}
+        />
 
-        {/* Submissions Tab - Only shown when not embedded */}
         {!embedded && (
-          <TabsContent value="submissions" className="mt-4">
-            {loadingSubmissions ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="animate-spin h-8 w-8 border-4 border-indigo-500 border-t-transparent rounded-full" />
-              </div>
-            ) : submissionsError ? (
-              <Card className="py-12 border-red-200 bg-red-50">
-                <CardContent className="text-center">
-                  <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-red-700 mb-2">Failed to load submissions</h3>
-                  <p className="text-sm text-red-500 mb-4">Please check your connection and try again</p>
-                  <Button 
-                    variant="outline"
-                    onClick={() => queryClient.invalidateQueries({ queryKey: ["form-submissions"] })}
-                  >
-                    <RefreshCw className="w-4 h-4 mr-2" /> Retry
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : submissions.length === 0 ? (
-              <Card className="py-12">
-                <CardContent className="text-center">
-                  <FileText className="h-12 w-12 text-slate-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-slate-700 mb-2">No submissions yet</h3>
-                  <p className="text-sm text-slate-500">Submissions will appear here when forms are filled</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                {submissions.map((submission) => {
-                  const tpl = templates.find(
-                    (t) => t.id === (submission.template_id || submission.form_template_id)
-                  );
-                  return (
-                    <SubmissionRow
-                      key={submission.id}
-                      submission={submission}
-                      labelConfig={tpl?.label_print_config || null}
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </TabsContent>
+          <FormsSubmissionsTabPanel
+            loadingSubmissions={loadingSubmissions}
+            submissionsError={submissionsError}
+            queryClient={queryClient}
+            submissions={submissions}
+            templates={templates}
+          />
         )}
       </Tabs>
 

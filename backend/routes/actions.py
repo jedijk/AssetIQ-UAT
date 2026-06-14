@@ -718,27 +718,31 @@ async def update_central_action(
 
 
 @router.delete("/actions/{action_id}")
-async def delete_central_action(
+async def delete_central_action_route(
     action_id: str,
     current_user: dict = Depends(_actions_delete)
 ):
     """Delete a centralized action. Owner and Admin can delete any action."""
+    from repositories.action_repository import delete_central_action
+
     action = await _find_central_action(action_id, current_user, include_mongo_id=True)
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
     await _assert_action_installation_scope(current_user, action)
 
-    # Owner and Admin can delete any action
-    if current_user.get("role") in ["owner", "admin"]:
-        result = await db.central_actions.delete_one({"_id": action["_id"]})
-    else:
-        # Others can only delete their own
-        result = await db.central_actions.delete_one(
-            {"id": action_id, "created_by": current_user["id"]}
-        )
-    
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Action not found or you don't have permission to delete it")
+    try:
+        await delete_central_action(action_id=action_id, user=current_user)
+    except ValueError as exc:
+        code = str(exc)
+        if code == "not_found":
+            raise HTTPException(status_code=404, detail="Action not found") from exc
+        if code == "forbidden":
+            raise HTTPException(
+                status_code=404,
+                detail="Action not found or you don't have permission to delete it",
+            ) from exc
+        raise
+
     return {"message": "Action deleted"}
 
 

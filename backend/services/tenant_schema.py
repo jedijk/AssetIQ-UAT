@@ -49,8 +49,32 @@ WAVE3_COLLECTIONS = frozenset({
     "pm_import_sessions",
 })
 
+# Wave 4 — platform telemetry, chat, templates, production logs.
+WAVE4_COLLECTIONS = frozenset({
+    "chat_messages",
+    "user_events",
+    "task_templates",
+    "task_plans",
+    "equipment_failure_modes",
+    "disciplines",
+    "production_logs",
+    "log_ingestion_jobs",
+})
+
+# Wave 5 — preferences, graph impacts, granulometry, production read models.
+WAVE5_COLLECTIONS = frozenset({
+    "user_preferences",
+    "reliability_impacts",
+    "granulometry_records",
+})
+
 WAVE_COLLECTIONS = (
-    PILOT_COLLECTIONS | WAVE1_COLLECTIONS | WAVE2_COLLECTIONS | WAVE3_COLLECTIONS
+    PILOT_COLLECTIONS
+    | WAVE1_COLLECTIONS
+    | WAVE2_COLLECTIONS
+    | WAVE3_COLLECTIONS
+    | WAVE4_COLLECTIONS
+    | WAVE5_COLLECTIONS
 )
 
 DEFAULT_TENANT_FIELD = "tenant_id"

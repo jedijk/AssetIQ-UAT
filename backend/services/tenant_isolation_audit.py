@@ -12,26 +12,13 @@ from services.tenant_schema import (
     WAVE1_COLLECTIONS,
     WAVE2_COLLECTIONS,
     WAVE3_COLLECTIONS,
+    WAVE4_COLLECTIONS,
+    WAVE5_COLLECTIONS,
     WAVE_COLLECTIONS,
 )
 
-# Collections known to exist but not yet in wave rollout (installation-scoped or pending).
-INSTALLATION_SCOPED_COLLECTIONS = frozenset({
-    "production_logs",
-    "log_ingestion_jobs",
-    "granulometry_records",
-})
-
 # Collections without tenant wave assignment (review backlog).
-UNSCOPED_BACKLOG = frozenset({
-    "chat_messages",
-    "user_events",
-    "user_preferences",
-    "task_templates",
-    "task_plans",
-    "equipment_failure_modes",
-    "reliability_impacts",
-})
+UNSCOPED_BACKLOG = frozenset()
 
 
 def wave_for_collection(name: str) -> Optional[str]:
@@ -43,8 +30,10 @@ def wave_for_collection(name: str) -> Optional[str]:
         return "wave2"
     if name in WAVE3_COLLECTIONS:
         return "wave3"
-    if name in INSTALLATION_SCOPED_COLLECTIONS:
-        return "installation_scoped"
+    if name in WAVE4_COLLECTIONS:
+        return "wave4"
+    if name in WAVE5_COLLECTIONS:
+        return "wave5"
     if name in UNSCOPED_BACKLOG:
         return "backlog"
     return None
@@ -52,19 +41,19 @@ def wave_for_collection(name: str) -> Optional[str]:
 
 def collection_audit_entry(name: str) -> Dict[str, Any]:
     wave = wave_for_collection(name)
-    tenant_scoped = wave in ("pilot", "wave1", "wave2", "wave3")
+    tenant_scoped = wave in ("pilot", "wave1", "wave2", "wave3", "wave4", "wave5")
     return {
         "collection": name,
         "wave": wave or "unknown",
         "tenant_scoped": tenant_scoped,
         "index_expected": tenant_scoped,
         "strict_mode_compatible": tenant_scoped,
-        "installation_scoped": wave == "installation_scoped",
+        "installation_scoped": name in ("production_logs", "log_ingestion_jobs", "granulometry_records"),
     }
 
 
 def all_audited_collections(extra: Optional[Set[str]] = None) -> List[str]:
-    names = set(WAVE_COLLECTIONS) | INSTALLATION_SCOPED_COLLECTIONS | UNSCOPED_BACKLOG
+    names = set(WAVE_COLLECTIONS) | UNSCOPED_BACKLOG
     if extra:
         names |= extra
     return sorted(names)

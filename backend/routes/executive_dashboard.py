@@ -368,7 +368,9 @@ async def get_executive_dashboard(
     currency_symbol = "€"
     
     try:
-        user_prefs = await db.user_preferences.find_one({"user_id": user_id})
+        user_prefs = await db.user_preferences.find_one(
+            merge_tenant_filter({"user_id": user_id}, current_user)
+        )
         if user_prefs and user_prefs.get("production_loss_config"):
             config = user_prefs["production_loss_config"]
             hourly_cost = config.get("hourly_cost", 500.0)

@@ -684,69 +684,38 @@ async def delete_threat(
     current_user: dict = Depends(_threats_delete)
 ):
     """Delete a threat/observation. Optionally delete linked Actions and Investigations."""
+    from repositories.threat_repository import delete_threat_cascade
+
     threat = await db.threats.find_one({"id": threat_id})
     if not threat:
         raise HTTPException(status_code=404, detail="Threat not found")
     await _assert_threat_installation_scope(current_user, threat)
 
-    deleted_actions_count = 0
-    deleted_investigations_count = 0
-    
-    # Optionally delete linked Central Actions
-    if delete_actions:
-        result = await db.central_actions.delete_many({
-            "source_type": "threat",
-            "source_id": threat_id
-        })
-        deleted_actions_count = result.deleted_count
-        logger.info(f"Deleted {deleted_actions_count} central actions linked to threat {threat_id}")
-    
-    # Optionally delete linked Investigations
-    if delete_investigations:
-        # Find all investigations linked to this threat
-        linked_investigations = await db.investigations.find({"threat_id": threat_id}).to_list(100)
-        
-        for inv in linked_investigations:
-            inv_id = inv.get("id")
-            # Delete investigation's internal data
-            await db.timeline_events.delete_many({"investigation_id": inv_id})
-            await db.failure_identifications.delete_many({"investigation_id": inv_id})
-            await db.cause_nodes.delete_many({"investigation_id": inv_id})
-            await db.action_items.delete_many({"investigation_id": inv_id})
-            await db.evidence_items.delete_many({"investigation_id": inv_id})
-            
-            # Also delete Central Actions linked to this investigation if delete_actions is true
-            if delete_actions:
-                result = await db.central_actions.delete_many({
-                    "source_type": "investigation",
-                    "source_id": inv_id
-                })
-                deleted_actions_count += result.deleted_count
-        
-        # Delete the investigations themselves
-        result = await db.investigations.delete_many({"threat_id": threat_id})
-        deleted_investigations_count = result.deleted_count
-        logger.info(f"Deleted {deleted_investigations_count} investigations linked to threat {threat_id}")
-    
-    # Owner and admin can delete any threat
-    if current_user.get("role") in ["owner", "admin"]:
-        result = await db.threats.delete_one({"id": threat_id})
-    else:
-        # Others can only delete their own
-        result = await db.threats.delete_one({"id": threat_id, "created_by": current_user["id"]})
-    
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Threat not found or you don't have permission to delete it")
-    
+    try:
+        result = await delete_threat_cascade(
+            threat_id=threat_id,
+            delete_actions=delete_actions,
+            delete_investigations=delete_investigations,
+            user=current_user,
+        )
+    except ValueError as exc:
+        code = str(exc)
+        if code == "not_found":
+            raise HTTPException(status_code=404, detail="Threat not found")
+        if code == "forbidden":
+            raise HTTPException(
+                status_code=404,
+                detail="Threat not found or you don't have permission to delete it",
+            )
+        raise HTTPException(status_code=500, detail="Failed to delete threat")
+
     await update_all_ranks(current_user["id"])
-    
-    # Invalidate stats cache
     cache.invalidate_stats(f"stats:{current_user['id']}")
-    
+
     return {
         "message": "Threat deleted",
-        "deleted_actions": deleted_actions_count,
-        "deleted_investigations": deleted_investigations_count
+        "deleted_actions": result["deleted_actions"],
+        "deleted_investigations": result["deleted_investigations"],
     }
 
 

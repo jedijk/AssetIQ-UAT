@@ -1,15 +1,37 @@
-import React from "react";
+import {
+  FileText, Layers, Signature, Monitor, Smartphone, Loader2, Search, ExternalLink,
+} from "lucide-react";
+import PhotoDataCaptureField from "../../../components/forms/PhotoDataCaptureField";
+import { formAPI, FieldPreview } from "../../../components/forms";
+import { Button } from "../../../components/ui/button";
+import { Badge } from "../../../components/ui/badge";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "../../../components/ui/dialog";
 
-export function FormsViewTemplateDialog(props) {
+export function FormsViewTemplateDialog({
+  selectedTemplate,
+  onClose,
+  viewingDocument,
+  previewMode,
+  setPreviewMode,
+  viewTab,
+  setViewTab,
+  docSearchQuery,
+  setDocSearchQuery,
+  docSearchResult,
+  setDocSearchResult,
+  isSearchingDocs,
+  setIsSearchingDocs,
+  setViewingDocument,
+  t,
+}) {
+  if (!selectedTemplate) return null;
   return (
-    <>
-        if (!open) {
-          setSelectedTemplate(null); 
-          setPreviewMode("desktop"); 
-          setViewTab("fields");
-          setDocSearchQuery("");
-          setDocSearchResult(null);
-        }
+      <Dialog open={!!selectedTemplate} onOpenChange={(open) => { 
+        // Don't close if document viewer is open
+        if (!open && viewingDocument) return;
+        if (!open) onClose();
       }}>
         <DialogContent className="max-w-4xl w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -560,33 +582,12 @@ export function FormsViewTemplateDialog(props) {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => { 
-              setSelectedTemplate(null); 
-              setPreviewMode("desktop"); 
-              setViewTab("fields");
-              setDocSearchQuery("");
-              setDocSearchResult(null);
-            }}>
+            <Button variant="outline" onClick={onClose}>
               Close
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Document Viewer - rendered as portal to be above all dialogs */}
-      {viewingDocument && createPortal(
-        <DocumentViewer
-          document={viewingDocument}
-          onClose={() => setViewingDocument(null)}
-          onBack={() => setViewingDocument(null)}
-          showBackButton={true}
-        />,
-        document.body
-      )}
-    </div>
-  );
-};
-
-    </>
   );
 }

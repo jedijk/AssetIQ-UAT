@@ -1,8 +1,43 @@
-import React from "react";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  FileText, Plus, GripVertical, X, RefreshCw, Upload, Trash2, Edit,
+} from "lucide-react";
+import LabelPrintConfigPanel from "../../../components/forms/LabelPrintConfigPanel";
+import { EXTRACTION_TEMPLATES } from "../../../components/forms/extractionTemplates";
+import { DISCIPLINES } from "../../../constants/disciplines";
+import {
+  formAPI, FIELD_TYPES, FieldPreview, DocumentManager,
+} from "../../../components/forms";
+import { Button } from "../../../components/ui/button";
+import { Input } from "../../../components/ui/input";
+import { Textarea } from "../../../components/ui/textarea";
+import { Label } from "../../../components/ui/label";
+import { Switch } from "../../../components/ui/switch";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "../../../components/ui/select";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "../../../components/ui/dialog";
 
-export function FormsTemplateEditorDialog(props) {
+export function FormsTemplateEditorDialog({
+  open,
+  onOpenChange,
+  newTemplate,
+  setNewTemplate,
+  t,
+  onSave,
+  isSaving,
+  onAddField,
+  onEditField,
+  onRemoveField,
+}) {
+  const queryClient = useQueryClient();
   return (
-    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
             <DialogTitle>
               {newTemplate.id ? t("common.edit") + " " + t("forms.templates") : t("forms.title")}
             </DialogTitle>
@@ -312,10 +347,7 @@ export function FormsTemplateEditorDialog(props) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    resetNewField();
-                    setShowFieldDialog(true);
-                  }}
+                  onClick={onAddField}
                   data-testid="add-field-btn"
                 >
                   <Plus className="w-4 h-4 mr-1" /> Add Field
@@ -333,12 +365,8 @@ export function FormsTemplateEditorDialog(props) {
                     <FieldPreview
                       key={field.id}
                       field={field}
-                      onEdit={(f) => {
-                        setEditingField(f);
-                        setNewField(f);
-                        setShowFieldDialog(true);
-                      }}
-                      onDelete={() => handleRemoveField(field.id)}
+                      onEdit={onEditField}
+                      onDelete={() => onRemoveField(field.id)}
                     />
                   ))}
                 </div>
@@ -556,25 +584,21 @@ export function FormsTemplateEditorDialog(props) {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => {
-              setShowCreateDialog(false);
+              onOpenChange(false);
               resetNewTemplate();
             }}>
               Cancel
             </Button>
             <Button
-              onClick={handleCreateTemplate}
-              disabled={createTemplateMutation.isPending}
+              onClick={onSave}
+              disabled={isSaving}
               data-testid="save-template-btn"
             >
-              {createTemplateMutation.isPending ? t("taskScheduler.saving") : t("taskScheduler.saveChanges")}
+              {isSaving ? t("taskScheduler.saving") : t("taskScheduler.saveChanges")}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Add/Edit Field Dialog */}
-      <Dialog open={showFieldDialog} onOpenChange={setShowFieldDialog}>
-        <DialogContent className="max-w-md">
-    </>
   );
 }

@@ -1,8 +1,36 @@
-import React from "react";
+import { Loader2, X } from "lucide-react";
+import { FIELD_TYPES } from "../../../components/forms";
+import { Button } from "../../../components/ui/button";
+import { Input } from "../../../components/ui/input";
+import { Textarea } from "../../../components/ui/textarea";
+import { Label } from "../../../components/ui/label";
+import { Switch } from "../../../components/ui/switch";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "../../../components/ui/select";
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from "../../../components/ui/dialog";
 
-export function FormsFieldEditorDialog(props) {
+export function FormsFieldEditorDialog({
+  open,
+  onOpenChange,
+  editingField,
+  newField,
+  setNewField,
+  t,
+  onSave,
+  onReset,
+  equipmentSearchQuery,
+  setEquipmentSearchQuery,
+  equipmentSearchResults,
+  searchingEquipment,
+  onSearchEquipment,
+}) {
   return (
-    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
             <DialogTitle>{editingField ? t("common.edit") : t("common.add")} {t("forms.label")}</DialogTitle>
           </DialogHeader>
 
@@ -297,7 +325,7 @@ export function FormsFieldEditorDialog(props) {
                         value={equipmentSearchQuery}
                         onChange={(e) => {
                           setEquipmentSearchQuery(e.target.value);
-                          searchEquipmentForField(e.target.value);
+                          onSearchEquipment(e.target.value);
                         }}
                         placeholder="Type to search equipment..."
                         className="pl-8 h-9 text-sm"
@@ -395,7 +423,7 @@ export function FormsFieldEditorDialog(props) {
                       value={equipmentSearchQuery}
                       onChange={(e) => {
                         setEquipmentSearchQuery(e.target.value);
-                        searchEquipmentForField(e.target.value);
+                        onSearchEquipment(e.target.value);
                       }}
                       placeholder="Search equipment to link..."
                       className="pl-9"
@@ -446,22 +474,17 @@ export function FormsFieldEditorDialog(props) {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => {
-              setShowFieldDialog(false);
-              setEditingField(null);
-              resetNewField();
+              onOpenChange(false);
+              onReset();
             }}>
               Cancel
             </Button>
-            <Button onClick={handleAddField} data-testid="save-field-btn">
+            <Button onClick={onSave} data-testid="save-field-btn">
               {editingField ? "Update Field" : "Add Field"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={!!showDeleteConfirm} onOpenChange={() => setShowDeleteConfirm(null)}>
-        <DialogContent className="max-w-md">
-    </>
   );
 }
