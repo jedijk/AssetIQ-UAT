@@ -27,6 +27,7 @@ import {
   ShieldOff,
   AlertTriangle,
   ShieldCheck,
+  CircleCheck,
   CheckCircle2,
   ClipboardCheck,
   Activity,
@@ -101,6 +102,7 @@ const KPICard = ({ title, kpi, icon: Icon, colorClass, onClick, isMobile }) => {
     : colorClass.includes("amber") ? "text-amber-600"
     : colorClass.includes("blue") ? "text-blue-600"
     : colorClass.includes("teal") ? "text-teal-600"
+    : colorClass.includes("indigo") ? "text-indigo-600"
     : "text-slate-600";
 
   const cardBody = (
@@ -148,7 +150,7 @@ const KPICard = ({ title, kpi, icon: Icon, colorClass, onClick, isMobile }) => {
                   ? `${kpi.evidence_count} equipment item${kpi.evidence_count === 1 ? "" : "s"}`
                   : title === "Assessment Coverage"
                     ? `${kpi.evidence_count} unassessed item${kpi.evidence_count === 1 ? "" : "s"}`
-                    : title === "Active Exposure" || title === "Controlled Exposure"
+                    : title === "Active Exposure" || title === "Controlled Exposure" || title === "Resolved Exposure"
                       ? `${kpi.evidence_count} observation${kpi.evidence_count === 1 ? "" : "s"}`
                   : `${kpi.evidence_count} evidence items`}
           </span>
@@ -355,6 +357,7 @@ const WaterfallChart = ({ data, currencySymbol, isMobile }) => {
 const OBSERVATION_EVIDENCE_TYPES = new Set([
   "active_threat_exposure",
   "critical_active_exposure",
+  "resolved_exposure",
 ]);
 
 const EQUIPMENT_EVIDENCE_TYPES = new Set([
@@ -670,7 +673,7 @@ export default function ExecutiveDashboard() {
       </div>
 
       {/* KPI Cards Row */}
-      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-8 gap-3 sm:gap-4">
         <KPICard
           title="Exposure Coverage"
           kpi={kpi_cards?.exposure_coverage}
@@ -731,6 +734,18 @@ export default function ExecutiveDashboard() {
           })}
         />
         <KPICard
+          title="Resolved Exposure"
+          kpi={kpi_cards?.resolved_exposure}
+          icon={CircleCheck}
+          colorClass="border-l-4 border-l-indigo-500"
+          isMobile={isMobile}
+          onClick={() => setSelectedEvidence({
+            type: "resolved_exposure",
+            title: "Resolved Exposure Evidence",
+            data: evidence_drill_down?.resolved_exposure || []
+          })}
+        />
+        <KPICard
           title="PM Compliance"
           kpi={kpi_cards?.pm_compliance}
           icon={CheckCircle2}
@@ -757,8 +772,8 @@ export default function ExecutiveDashboard() {
               </HoverCardTrigger>
               <HoverCardContent className="w-80">
                 <p className="text-sm text-slate-600">
-                  Shows the flow from total assessed exposure to uncontrolled and controlled active observation exposure.
-                  Uncontrolled exposure is active production impact for observations without a maintenance strategy, program, or action plan.
+                  Shows the flow from total assessed exposure to uncontrolled, controlled, and resolved observation exposure.
+                  Resolved exposure is production impact from observations marked Mitigated.
                 </p>
               </HoverCardContent>
             </HoverCard>
@@ -766,7 +781,7 @@ export default function ExecutiveDashboard() {
         </h3>
         {isMobile && (
           <p className="text-xs text-slate-500 mb-3">
-            Flow from total assessed exposure to uncontrolled and controlled active observation exposure.
+            Flow from total assessed exposure to uncontrolled, controlled, and resolved observation exposure.
           </p>
         )}
         <WaterfallChart data={waterfall_data} currencySymbol={currencySymbol} isMobile={isMobile} />
