@@ -35,6 +35,7 @@ import {
   ChevronRight,
   Loader2,
   Info,
+  Target,
 } from "lucide-react";
 import { Badge } from "../../components/ui/badge";
 import {
@@ -604,6 +605,67 @@ const EvidencePanel = ({ isOpen, onClose, title, evidence, evidenceType }) => {
   );
 };
 
+// Outcome intelligence summary card (Phase 5)
+const OutcomeSummaryCard = ({ summary, currencySymbol }) => {
+  if (!summary || summary.assessed_actions_count === 0 && summary.completed_actions_count === 0) {
+    return null;
+  }
+
+  const formatExposure = (value) => {
+    if (value == null) return "—";
+    if (value >= 1_000_000) return `${currencySymbol}${(value / 1_000_000).toFixed(1)}M`;
+    if (value >= 1_000) return `${currencySymbol}${(value / 1_000).toFixed(0)}K`;
+    return `${currencySymbol}${value.toLocaleString()}`;
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6" data-testid="outcome-summary-card">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h3 className="text-base sm:text-lg font-semibold text-slate-900 flex items-center gap-2">
+            <Target className="w-5 h-5 text-emerald-600" />
+            Outcome Intelligence
+          </h3>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Closed-loop reliability from completed actions (last {summary.window_days || 90} days)
+          </p>
+        </div>
+        {summary.strategy_coverage_effectiveness_score != null && (
+          <Badge variant="outline" className="text-xs shrink-0">
+            Effectiveness {summary.strategy_coverage_effectiveness_score}%
+          </Badge>
+        )}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+        <div className="rounded-lg bg-slate-50 p-3">
+          <p className="text-xs text-slate-500">Actions completed</p>
+          <p className="text-lg font-semibold text-slate-900">{summary.completed_actions_count ?? 0}</p>
+        </div>
+        <div className="rounded-lg bg-slate-50 p-3">
+          <p className="text-xs text-slate-500">Avg risk reduction</p>
+          <p className="text-lg font-semibold text-emerald-700">
+            {summary.avg_risk_reduction_pct != null ? `${summary.avg_risk_reduction_pct}%` : "—"}
+          </p>
+        </div>
+        <div className="rounded-lg bg-slate-50 p-3">
+          <p className="text-xs text-slate-500">Exposure reduced</p>
+          <p className="text-lg font-semibold text-slate-900">
+            {formatExposure(summary.total_exposure_reduction)}
+          </p>
+        </div>
+        <div className="rounded-lg bg-slate-50 p-3">
+          <p className="text-xs text-slate-500">Repeat failures</p>
+          <p className="text-lg font-semibold text-slate-900">{summary.repeat_failure_count ?? 0}</p>
+        </div>
+        <div className="rounded-lg bg-slate-50 p-3 col-span-2 sm:col-span-1">
+          <p className="text-xs text-slate-500">Assessed outcomes</p>
+          <p className="text-lg font-semibold text-slate-900">{summary.assessed_actions_count ?? 0}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Main Executive Dashboard component
 export default function ExecutiveDashboard() {
   const isMobile = useIsMobile();
@@ -637,7 +699,7 @@ export default function ExecutiveDashboard() {
 
   if (!data) return null;
 
-  const { exposure_metrics, kpi_cards, waterfall_data, ai_summary, evidence_drill_down, report_period } = data;
+  const { exposure_metrics, kpi_cards, waterfall_data, ai_summary, evidence_drill_down, report_period, outcome_summary } = data;
   const currencySymbol = exposure_metrics?.currency_symbol || "€";
 
   return (
@@ -778,6 +840,8 @@ export default function ExecutiveDashboard() {
           isMobile={isMobile}
         />
       </div>
+
+      <OutcomeSummaryCard summary={outcome_summary} currencySymbol={currencySymbol} />
 
       {/* Waterfall Chart */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 sm:p-6">

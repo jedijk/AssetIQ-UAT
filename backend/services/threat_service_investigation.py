@@ -10,6 +10,7 @@ from fastapi import HTTPException
 from database import db
 from failure_modes import FAILURE_MODES_LIBRARY
 from investigation_models import InvestigationStatus
+from services.tenant_schema import merge_tenant_filter, with_tenant_id
 
 # Heuristic root-cause suggestions when auto-building causal diagrams from threats.
 FAILURE_MODE_CAUSES: Dict[str, List[str]] = {
@@ -24,22 +25,29 @@ FAILURE_MODE_CAUSES: Dict[str, List[str]] = {
     "cavitation": ["Insufficient NPSH", "Blocked suction line", "Air entrainment", "Operating off BEP"],
 }
 
+
+async def _find_threat_for_user(user: dict, threat_id: str) -> Optional[dict]:
+    return await db.threats.find_one(
+        merge_tenant_filter({"id": threat_id}, user),
+        {"_id": 0},
+    )
+
+
 async def create_investigation_from_threat(user: dict, threat_id: str):
     """Create a new investigation from an existing threat with auto-generated timeline and causal diagram."""
     from services import investigation_service as inv_svc
     from services.threat_service import assert_threat_installation_scope
 
-    # Shared entity - no created_by filter for read access
-    threat = await db.threats.find_one(
-        {"id": threat_id},
-        {"_id": 0}
-    )
+    threat = await _find_threat_for_user(user, threat_id)
     if not threat:
         raise HTTPException(status_code=404, detail="Threat not found")
     await assert_threat_installation_scope(user, threat)
     
     # Check if investigation already exists for this threat
-    existing = await db.investigations.find_one({"threat_id": threat_id}, {"_id": 0})
+    existing = await db.investigations.find_one(
+        merge_tenant_filter({"threat_id": threat_id}, user),
+        {"_id": 0},
+    )
     if existing:
         return {"investigation": existing, "message": "Investigation already exists for this threat"}
     
@@ -64,6 +72,7 @@ async def create_investigation_from_threat(user: dict, threat_id: str):
         "created_at": now,
         "updated_at": now
     }
+    with_tenant_id(inv_doc, user)
     
     await db.investigations.insert_one(inv_doc)
     inv_doc.pop("_id", None)
@@ -134,6 +143,8 @@ async def create_investigation_from_threat(user: dict, threat_id: str):
     
     # Insert all timeline events
     if timeline_events:
+        for event in timeline_events:
+            with_tenant_id(event, user)
         await db.timeline_events.insert_many(timeline_events)
     
     # ========== AUTO-CREATE FAILURE IDENTIFICATION ==========
@@ -147,12 +158,17 @@ async def create_investigation_from_threat(user: dict, threat_id: str):
         fm_pattern = case_insensitive_contains(failure_mode_text)
         
         # Check database for user-created failure modes
-        db_fm = await db.failure_modes.find_one({
-            "$or": [
-                {"name": fm_pattern},
-                {"keywords": fm_pattern},
-            ]
-        }) if fm_pattern else None
+        db_fm = await db.failure_modes.find_one(
+            merge_tenant_filter(
+                {
+                    "$or": [
+                        {"name": fm_pattern},
+                        {"keywords": fm_pattern},
+                    ]
+                },
+                user,
+            )
+        ) if fm_pattern else None
         if db_fm:
             db_fm.pop("_id", None)
             matching_fm = {
@@ -190,6 +206,7 @@ async def create_investigation_from_threat(user: dict, threat_id: str):
             "failure_mode_id": matching_fm["id"] if matching_fm else None,
             "created_at": now
         }
+        with_tenant_id(failure_doc, user)
         await db.failure_identifications.insert_one(failure_doc)
     
     # ========== AUTO-CREATE DRAFT CAUSAL DIAGRAM ==========
@@ -259,6 +276,8 @@ async def create_investigation_from_threat(user: dict, threat_id: str):
     
     # Insert all cause nodes
     if cause_nodes:
+        for node in cause_nodes:
+            with_tenant_id(node, user)
         await db.cause_nodes.insert_many(cause_nodes)
     
     # ========== AUTO-CREATE RECOMMENDED ACTIONS ==========
@@ -312,6 +331,8 @@ async def create_investigation_from_threat(user: dict, threat_id: str):
         })
     
     if action_items:
+        for item in action_items:
+            with_tenant_id(item, user)
         await db.action_items.insert_many(action_items)
     
     return {
@@ -334,17 +355,14 @@ async def get_threat_timeline(user: dict, threat_id: str):
     Get timeline of all activity related to a specific observation/threat.
     Includes: other observations on same equipment, actions, and tasks.
     """
-    # Shared entity - no created_by filter for read access
-    threat = await db.threats.find_one(
-        {"id": threat_id},
-        {"_id": 0}
-    )
+    threat = await _find_threat_for_user(user, threat_id)
     if not threat:
         raise HTTPException(status_code=404, detail="Observation not found")
     
     timeline_items = []
     equipment_id = threat.get("linked_equipment_id")
     asset_name = threat.get("asset", "")
+    past_observations: List[dict] = []
     
     # Get the current observation as the first timeline item
     timeline_items.append({
@@ -372,11 +390,14 @@ async def get_threat_timeline(user: dict, threat_id: str):
         
         # Shared entities - no created_by filter
         past_observations = await db.threats.find(
-            {
-                "id": {"$ne": threat_id},  # Exclude current observation
-                "$or": obs_query_conditions
-            },
-            {"_id": 0}
+            merge_tenant_filter(
+                {
+                    "id": {"$ne": threat_id},
+                    "$or": obs_query_conditions,
+                },
+                user,
+            ),
+            {"_id": 0},
         ).sort("created_at", -1).to_list(50)
         
         for obs in past_observations:
@@ -420,11 +441,16 @@ async def get_threat_timeline(user: dict, threat_id: str):
         equipment_action_conditions.append({"equipment_name": asset_name})
     
     # Combine: directly linked actions OR sibling observation actions OR equipment-linked actions
-    action_query = {"$or": direct_action_conditions + equipment_action_conditions} if equipment_action_conditions else {"$or": direct_action_conditions}
+    action_query = merge_tenant_filter(
+        {"$or": direct_action_conditions + equipment_action_conditions}
+        if equipment_action_conditions
+        else {"$or": direct_action_conditions},
+        user,
+    )
     
     actions = await db.central_actions.find(
         action_query,
-        {"_id": 0}
+        {"_id": 0},
     ).to_list(100)
     
     for action in actions:
@@ -457,8 +483,8 @@ async def get_threat_timeline(user: dict, threat_id: str):
         investigation_conditions.append({"asset_name": asset_name})
     
     investigations = await db.investigations.find(
-        {"$or": investigation_conditions},
-        {"_id": 0}
+        merge_tenant_filter({"$or": investigation_conditions}, user),
+        {"_id": 0},
     ).to_list(50)
     
     # Deduplicate investigations by id (same investigation may match multiple conditions)

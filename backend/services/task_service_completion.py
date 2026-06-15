@@ -134,24 +134,15 @@ async def create_observation_from_task(
     }, tenant_user)
 
     try:
-        await db.threats.insert_one(observation_doc)
-        logger.info("Created observation from task: %s", observation_doc["id"])
+        from services.work_signal_lifecycle import create_work_signal
 
-        from services.threat_observation_bridge import sync_threat_mirror
-
-        await sync_threat_mirror(observation_doc, user=tenant_user)
-
-        from services.reliability_graph import dispatch_graph_sync
-
-        equipment_id = task_instance.get("equipment_id")
-        await dispatch_graph_sync(
-            "sync_threat_edges",
-            "task_observation_threat",
-            threat_id=observation_doc["id"],
-            equipment_id=equipment_id,
-            tenant_id=observation_doc.get("tenant_id"),
+        created = await create_work_signal(
+            observation_doc,
+            user=tenant_user,
+            source="task_execution",
+            graph_label="task_observation_create",
         )
-        return observation_doc["id"]
+        return created["id"]
     except Exception as e:
         logger.error("Failed to create observation from task: %s", e)
         return None

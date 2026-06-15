@@ -45,6 +45,27 @@ async def _mirror_threat_observation(user: dict, threat: dict) -> None:
         logger.warning("Threat observation mirror failed: %s", exc)
 
 
+async def _sync_threat_graph(user: dict, threat: dict, *, label: str) -> None:
+    """Best-effort graph sync for UI threat CRUD paths."""
+    threat_id = threat.get("id")
+    if not threat_id:
+        return
+    try:
+        from services.reliability_graph import dispatch_graph_sync
+        from services.tenant_schema import tenant_id_from_user
+
+        await dispatch_graph_sync(
+            "sync_threat_edges",
+            label,
+            threat_id=threat_id,
+            equipment_id=threat.get("linked_equipment_id"),
+            failure_mode_id=threat.get("failure_mode_id"),
+            tenant_id=tenant_id_from_user(user) or threat.get("tenant_id"),
+        )
+    except Exception as exc:
+        logger.warning("Threat graph sync failed (%s): %s", label, exc)
+
+
 async def _find_threat_scoped(user: dict, threat_id: str, *, projection: Optional[dict] = None) -> Optional[dict]:
     filt = merge_tenant_filter({"id": threat_id}, user)
     return await db.threats.find_one(filt, projection or {"_id": 0})
@@ -339,6 +360,7 @@ async def get_threat_detail(user: dict, threat_id: str, *, language: Optional[st
             # Propagate updated risk to linked actions and investigations
             await propagate_risk_to_linked_entities([threat_id], [threat], user=user)
             await _mirror_threat_observation(user, threat)
+            await _sync_threat_graph(user, threat, label="threat_auto_sync")
         
         # Ensure risk_score is int
         if isinstance(threat.get("risk_score"), float):
@@ -444,6 +466,7 @@ async def update_threat(user: dict, threat_id: str, update_data: dict) -> dict:
     if isinstance(updated.get("risk_score"), float):
         updated["risk_score"] = int(updated["risk_score"])
     await _mirror_threat_observation(user, updated)
+    await _sync_threat_graph(user, updated, label="threat_update")
     return updated
 
 async def delete_threat(
@@ -710,6 +733,7 @@ async def link_threat_to_equipment(user: dict, threat_id: str, equipment_node_id
     
     updated_threat = await _find_threat_scoped(user, threat_id)
     await _mirror_threat_observation(user, updated_threat)
+    await _sync_threat_graph(user, updated_threat, label="threat_link_equipment")
     
     return {
         "message": f"Threat linked to {node['name']}",
@@ -816,6 +840,7 @@ async def link_threat_to_failure_mode(user: dict, threat_id: str, failure_mode_i
     
     updated_threat = await _find_threat_scoped(user, threat_id)
     await _mirror_threat_observation(user, updated_threat)
+    await _sync_threat_graph(user, updated_threat, label="threat_link_failure_mode")
     
     return {
         "message": f"Threat linked to failure mode: {matched_fm['failure_mode']}",
@@ -907,6 +932,7 @@ Output only the improved description text, no labels or formatting.""",
         updated = await _find_threat_scoped(user, threat_id)
         if updated:
             await _mirror_threat_observation(user, updated)
+            await _sync_threat_graph(user, updated, label="threat_improve_description")
 
         
         return {

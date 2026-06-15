@@ -61,9 +61,17 @@ async def delete_production_event(user: dict, event_id: str):
 
 async def generate_ai_insights(user: dict, data: dict):
     """Generate AI-powered daily insights by analyzing the current production data."""
+    from services.ai_citation import attach_citations_to_response, format_citations_for_prompt
+    from services.ai_evidence_pack import build_evidence_pack
     from services.ai_gateway import chat as ai_gateway_chat, user_context
 
     uid, cid = user_context(user)
+
+    evidence_pack = await build_evidence_pack(
+        user=user,
+        intent="production_insights",
+        include_fleet=True,
+    )
 
     date = data.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     production_log = data.get("production_log", [])
@@ -104,6 +112,13 @@ Rules:
 
 Format:
 [{{"title": "...", "description": "...", "severity": "critical|warning|success|info", "time": "HH:MM"}}]"""
+
+    evidence_block = evidence_pack.get("prompt_summary") or ""
+    citation_block = format_citations_for_prompt(evidence_pack.get("citations") or [])
+    if evidence_block:
+        prompt += f"\n\nFleet reliability context (cite as [cite:<id>] when relevant):\n{evidence_block}"
+    if citation_block:
+        prompt += f"\n{citation_block}"
 
     try:
         messages = [
@@ -156,7 +171,11 @@ Format:
             event.pop("_id", None)
             saved.append(event)
 
-        return {"status": "ok", "insights": saved, "count": len(saved)}
+        return attach_citations_to_response(
+            {"status": "ok", "insights": saved, "count": len(saved)},
+            evidence_pack.get("citations") or [],
+            evidence=evidence_pack,
+        )
 
     except Exception as e:
         logger.error(f"AI insights generation failed: {e}")

@@ -227,6 +227,7 @@ class ExecutiveDashboardResponse(BaseModel):
     evidence_drill_down: Dict[str, List[Dict[str, Any]]]
     last_updated: str
     report_period: Dict[str, Any]
+    outcome_summary: Optional[Dict[str, Any]] = None
 
 
 def severity_to_production_impact(severity: str) -> int:
@@ -943,6 +944,14 @@ PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvemen
         "critical_active_exposure": sorted(controlled_active_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:25],
         "resolved_exposure": sorted(resolved_exposure_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:25],
     }
+
+    outcome_summary: Optional[Dict[str, Any]] = None
+    try:
+        from services.outcome_intelligence_service import compute_fleet_outcome_summary
+
+        outcome_summary = await compute_fleet_outcome_summary(current_user)
+    except Exception as exc:
+        logger.warning("Failed to compute fleet outcome summary: %s", exc)
     
     response = ExecutiveDashboardResponse(
         exposure_metrics=ExposureMetrics(
@@ -961,6 +970,7 @@ PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvemen
         evidence_drill_down=evidence_drill_down,
         last_updated=now.isoformat(),
         report_period=report_period,
+        outcome_summary=outcome_summary,
     )
     try:
         await store_dashboard_snapshot(

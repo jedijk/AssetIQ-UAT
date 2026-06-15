@@ -847,6 +847,7 @@ async def application_audit_log(request: Request, call_next):
         entry = {
             "ts": datetime.now(timezone.utc),
             "actor": actor,
+            "tenant_id": getattr(request.state, "tenant_id", None),
             "http": {
                 "method": method,
                 "path": path,

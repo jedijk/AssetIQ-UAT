@@ -411,18 +411,25 @@ async def build_equipment_reliability_profile(
     failure_mode_stats = _failure_mode_stats(open_threats, ctx.get("failure_modes") or [])
     strategy_coverage = _strategy_coverage(ctx.get("failure_modes") or [], program_tasks, graph_edges)
 
-    latest = (twin or {}).get("latest") or {}
-    health_score = latest.get("health_score") or health_snapshot.get("reliability_score")
-    open_threat_count = len(open_threats) or ctx.get("open_threat_count") or 0
-    top_risk = (open_threats[0].get("risk_level") if open_threats else None) or "Low"
-
-    ai_summary = format_context_for_prompt(ctx)
-
     from services.equipment_reliability_state_service import build_equipment_reliability_state
 
     reliability_state = await build_equipment_reliability_state(
         equipment_id, user_id, user=user
     )
+
+    health_score = (
+        (reliability_state.get("health") or {}).get("score")
+        or reliability_state.get("health_score")
+    )
+    open_observation_count = reliability_state.get("open_observation_count", 0)
+    risk_level = reliability_state.get("risk_level") or "Low"
+    overdue_pm_count = (
+        (reliability_state.get("maintenance") or {}).get("overdue_count")
+        or reliability_state.get("overdue_pm_count")
+        or 0
+    )
+
+    ai_summary = format_context_for_prompt(ctx)
 
     return {
         "found": True,
@@ -435,16 +442,18 @@ async def build_equipment_reliability_profile(
             "criticality": _criticality_label(criticality),
             "criticality_detail": criticality,
             "health_score": health_score,
-            "risk_level": top_risk,
+            "risk_level": risk_level,
             "risk_score": open_threats[0].get("risk_score") if open_threats else None,
-            "status": "At Risk" if open_threat_count > 0 or (health_score or 100) < 70 else "Stable",
-            "open_threat_count": open_threat_count,
-            "open_observation_count": reliability_state.get("open_observation_count", open_threat_count),
+            "status": "At Risk" if open_observation_count > 0 or (health_score or 100) < 70 else "Stable",
+            "open_threat_count": open_observation_count,
+            "open_observation_count": open_observation_count,
             "open_investigation_count": investigations.get("open_count", 0),
             "open_action_count": actions.get("open_count", 0),
-            "overdue_pm": health_snapshot.get("overdue_pm"),
-            "program_task_count": ctx.get("program_task_count", 0),
-            "strategy_version": ctx.get("strategy_version"),
+            "overdue_pm": {"total": overdue_pm_count},
+            "program_task_count": reliability_state.get("program_task_count", 0),
+            "strategy_version": reliability_state.get("strategy_version"),
+            "exposure_score": (reliability_state.get("exposure") or {}).get("score"),
+            "canonical_source": reliability_state.get("canonical_source"),
         },
         "trend": trend,
         "open_threats": open_threats,

@@ -62,7 +62,8 @@ def _graph_event_type(sync_name: str) -> str:
             "sync_edges_for_scheduled_task": DomainEventType.GRAPH_SYNC_SCHEDULED_TASK.value,
             "sync_task_instance_completion_edges": DomainEventType.GRAPH_SYNC_TASK_COMPLETION.value,
             "sync_edges_for_apply_strategy": DomainEventType.GRAPH_SYNC_APPLY_STRATEGY.value,
-            "sync_edge_for_pm_import_task": "graph.sync_edge_for_pm_import_task",
+            "sync_prediction_edges": DomainEventType.GRAPH_SYNC_PREDICTION.value,
+            "sync_edge_for_pm_import_task": DomainEventType.GRAPH_SYNC_PM_IMPORT.value,
         }
         _GRAPH_SYNC_EVENT_TYPES.update(mapping)
     return _GRAPH_SYNC_EVENT_TYPES.get(sync_name, f"graph.{sync_name}")

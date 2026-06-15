@@ -952,6 +952,9 @@ async def download_file(user: dict, path: str) -> Tuple[bytes, str, str]:
 
 async def ai_problem_check(user: dict, inv_id: str, description: str) -> dict:
     """Analyze investigation description for defensive reasoning patterns."""
+    from services.ai_citation import attach_citations_to_response, format_citations_for_prompt
+    from services.ai_evidence_pack import build_evidence_pack
+
     inv = await db.investigations.find_one(investigation_query(user, inv_id=inv_id))
     if not inv:
         raise HTTPException(status_code=404, detail="Investigation not found")
@@ -960,15 +963,30 @@ async def ai_problem_check(user: dict, inv_id: str, description: str) -> dict:
     if not description:
         raise HTTPException(status_code=400, detail="Description cannot be empty")
 
+    equipment_id = inv.get("asset_id")
+    evidence_pack = None
+    if equipment_id:
+        try:
+            evidence_pack = await build_evidence_pack(
+                user=user,
+                equipment_id=equipment_id,
+                intent="investigation",
+            )
+        except Exception as exc:
+            logger.warning("investigation evidence pack failed: %s", exc)
+
     try:
         uid, cid = user_context(user)
+        user_content = f"Analyze this problem statement for defensive reasoning:\n\n{description}"
+        if evidence_pack and evidence_pack.get("prompt_summary"):
+            user_content += (
+                f"\n\nLinked equipment evidence:\n{evidence_pack['prompt_summary']}\n"
+                f"{format_citations_for_prompt(evidence_pack.get('citations') or [])}"
+            )
         content = await ai_gateway_chat(
             [
                 {"role": "system", "content": DEFENSIVE_REASONING_CHECK_PROMPT},
-                {
-                    "role": "user",
-                    "content": f"Analyze this problem statement for defensive reasoning:\n\n{description}",
-                },
+                {"role": "user", "content": user_content},
             ],
             user_id=uid,
             company_id=cid,
@@ -984,13 +1002,18 @@ async def ai_problem_check(user: dict, inv_id: str, description: str) -> dict:
                 content = content[4:]
         content = content.strip().rstrip("```")
         result = json.loads(content)
-        return {
+        payload = {
             "analysis": result.get("analysis", {}),
             "has_issues": result.get("has_issues", False),
             "refined_description": result.get("refined_description", description),
             "guidance": result.get("guidance", []),
             "changes_made": result.get("changes_made", []),
         }
+        return attach_citations_to_response(
+            payload,
+            (evidence_pack or {}).get("citations") or [],
+            evidence=evidence_pack,
+        )
     except json.JSONDecodeError as exc:
         logger.error("Failed to parse AI response: %s", exc)
         raise HTTPException(status_code=500, detail="Failed to parse AI response") from exc

@@ -249,12 +249,14 @@ async def get_supervisor_dashboard(user: dict) -> Dict[str, Any]:
     blocked_cutoff = now - timedelta(days=BLOCKED_INVESTIGATION_DAYS)
 
     from services.executive_reliability_kpis import compute_executive_reliability_kpis
+    from services.equipment_reliability_state_service import (
+        batch_equipment_reliability_states,
+        compute_fleet_reliability_summary,
+    )
     from services.maintenance_scheduler_service import get_daily_planner, get_dashboard_kpis
     from services.threat_service import list_threats
 
-    from services.threat_observation_bridge import count_unified_open_signals
-
-    unified_open_signals = await count_unified_open_signals(user=user)
+    fleet_summary = await compute_fleet_reliability_summary(user=user)
     reliability_kpis = await compute_executive_reliability_kpis(user=user)
     scheduler_kpis = await get_dashboard_kpis(user)
     daily_planner = await get_daily_planner(user)
@@ -318,6 +320,11 @@ async def get_supervisor_dashboard(user: dict) -> Dict[str, Any]:
         if eid
     })
     crit_map = await _equipment_criticality_map(equipment_ids, user)
+    state_by_equipment = await batch_equipment_reliability_states(
+        equipment_ids,
+        user.get("id"),
+        user=user,
+    )
 
     overdue_pm = [
         _serialize_pm_item(t, criticality=crit_map.get(t.get("equipment_id") or "", 0))
@@ -352,18 +359,25 @@ async def get_supervisor_dashboard(user: dict) -> Dict[str, Any]:
         reverse=True,
     )[:QUEUE_LIMIT]
 
+    for item in prioritized_queue:
+        eid = item.get("equipment_id") or item.get("linked_equipment_id")
+        if eid and eid in state_by_equipment:
+            item["reliability_state"] = state_by_equipment[eid]
+
     return {
         "generated_at": now.isoformat(),
         "summary": {
-            "overdue_pm_count": reliability_kpis.get("overdue_pm", {}).get("total")
+            "overdue_pm_count": fleet_summary.get("overdue_pm", {}).get("total")
             or len(overdue_pm),
-            "open_threats_count": reliability_kpis.get("open_threats") or len(open_threats),
-            "unified_open_signals_count": unified_open_signals,
+            "open_threats_count": fleet_summary.get("open_observation_count")
+            or len(open_threats),
+            "unified_open_signals_count": fleet_summary.get("unified_open_signals"),
             "escalating_risks_count": len(escalating_risks),
             "blocked_investigations_count": len(blocked_inv_items),
             "open_actions_count": len(open_actions),
             "crew_members": len(crew_workload),
             "scheduler_overdue": (scheduler_kpis.get("backlog") or {}).get("overdue_tasks"),
+            "canonical_source": fleet_summary.get("canonical_source"),
         },
         "overdue_pm": {"count": len(overdue_pm), "items": overdue_pm},
         "open_threats": {"count": len(open_threats), "items": open_threats},
@@ -376,9 +390,8 @@ async def get_supervisor_dashboard(user: dict) -> Dict[str, Any]:
         "crew_workload": {"count": len(crew_workload), "items": crew_workload},
         "prioritized_queue": {"count": len(prioritized_queue), "items": prioritized_queue},
         "reliability_kpis": {
-            "open_threats": reliability_kpis.get("open_threats"),
-            "high_risk_threats": reliability_kpis.get("high_risk_threats"),
-            "overdue_pm": reliability_kpis.get("overdue_pm"),
+            **fleet_summary,
             "graph_kpis": reliability_kpis.get("graph_kpis"),
+            "mtbf_proxy": reliability_kpis.get("mtbf_proxy"),
         },
     }

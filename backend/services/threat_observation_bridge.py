@@ -122,6 +122,56 @@ async def count_unified_open_signals(*, user: Optional[dict] = None) -> int:
     return threat_count + obs_count
 
 
+async def count_unified_open_signals_for_equipment(
+    equipment_id: str,
+    *,
+    equipment_name: Optional[str] = None,
+    user: Optional[dict] = None,
+) -> int:
+    """Count distinct open work signals for one asset (threats + observations, deduped)."""
+    open_statuses = ["Open", "open", "In Progress", "in_progress", "active"]
+    equipment_or: List[Dict[str, Any]] = [
+        {"linked_equipment_id": equipment_id},
+        {"equipment_id": equipment_id},
+    ]
+    if equipment_name:
+        from utils.mongo_regex import exact_case_insensitive
+
+        equipment_or.append({"asset": exact_case_insensitive(equipment_name)})
+        equipment_or.append({"equipment_name": exact_case_insensitive(equipment_name)})
+
+    mirrored = await db.observations.distinct(
+        "legacy_threat_id",
+        merge_tenant_filter(
+            {
+                "legacy_threat_id": {"$exists": True, "$ne": None},
+                "$or": equipment_or,
+            },
+            user,
+        ),
+    )
+    threat_query: Dict[str, Any] = merge_tenant_filter(
+        {
+            "status": {"$in": open_statuses},
+            "$or": equipment_or,
+        },
+        user,
+    )
+    if mirrored:
+        threat_query["id"] = {"$nin": [m for m in mirrored if m]}
+    threat_count = await db.threats.count_documents(threat_query)
+    obs_count = await db.observations.count_documents(
+        merge_tenant_filter(
+            {
+                "status": {"$in": list(OPEN_STATUSES)},
+                "$or": equipment_or,
+            },
+            user,
+        ),
+    )
+    return threat_count + obs_count
+
+
 async def list_unified_signals(
     *,
     user: Optional[dict] = None,
@@ -156,9 +206,11 @@ async def list_unified_signals(
     ).sort("created_at", -1).to_list(limit)
 
     mirrored_threat_ids = {o.get("legacy_threat_id") for o in observations if o.get("legacy_threat_id")}
+    observation_ids = {o.get("id") for o in observations if o.get("id")}
     items: List[Dict[str, Any]] = []
     for t in threats:
-        if t.get("id") in mirrored_threat_ids:
+        tid = t.get("id")
+        if tid in mirrored_threat_ids or tid in observation_ids:
             continue
         items.append({**normalize_work_signal(t, source="observation"), "legacy_threat_id": t.get("id")})
     for o in observations:

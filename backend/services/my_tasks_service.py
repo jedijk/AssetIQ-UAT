@@ -341,11 +341,15 @@ async def complete_action(user: dict, action_id: str, data: Optional[dict] = Non
             "created_by_action": True,
         }, user)
         
-        await db.threats.insert_one(observation_doc)
-        logger.info(f"Created observation from action: {observation_doc['id']}")
-        from services.threat_observation_bridge import sync_threat_mirror
+        from services.work_signal_lifecycle import create_work_signal
 
-        await sync_threat_mirror(observation_doc, user=user)
+        await create_work_signal(
+            observation_doc,
+            user=user,
+            source="action_execution",
+            graph_label="action_observation_create",
+        )
+        logger.info(f"Created observation from action: {observation_doc['id']}")
     
     # Check if all actions for the source are now completed
     from services.observation_mitigation import build_action_plan_completion_notification

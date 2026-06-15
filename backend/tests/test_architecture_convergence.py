@@ -688,3 +688,52 @@ def test_copilot_tool_registry_includes_reliability_tools():
 
     assert "get_reliability_chain" in COPILOT_TOOL_REGISTRY
     assert "get_open_signals" in COPILOT_TOOL_REGISTRY
+
+
+def test_threat_insert_one_only_in_allowlist():
+    """Phase 3 — direct threats.insert_one must stay in THREAT_INSERT_ALLOWLIST."""
+    from services.work_signal_lifecycle import THREAT_INSERT_ALLOWLIST
+
+    pattern = re.compile(r"\bdb\.threats\.insert_one\b")
+    violations: list[str] = []
+    for path in SERVICES_DIR.rglob("*.py"):
+        if path.name == "__init__.py":
+            continue
+        rel = path.relative_to(BACKEND_ROOT).as_posix()
+        text = path.read_text(encoding="utf-8")
+        if pattern.search(text) and rel not in THREAT_INSERT_ALLOWLIST:
+            violations.append(rel)
+
+    assert not violations, (
+        "db.threats.insert_one outside THREAT_INSERT_ALLOWLIST — use create_work_signal: "
+        + ", ".join(sorted(violations))
+    )
+
+
+def test_phase4_ai_convergence_modules_exist():
+    from services.ai_citation import attach_citations_to_response, format_citations_for_prompt
+    from services.ai_evidence_pack import build_evidence_pack
+    from services.ai_orchestrator import run_grounded_recommendation
+
+    assert callable(build_evidence_pack)
+    assert callable(format_citations_for_prompt)
+    assert callable(attach_citations_to_response)
+    assert callable(run_grounded_recommendation)
+
+
+def test_openai_imports_are_allowlisted():
+    """Phase 4 — direct OpenAI imports must stay in allowlist or grandfathered baseline."""
+    import importlib.util
+
+    script = BACKEND_ROOT / "scripts" / "ai_entry_point_report.py"
+    spec = importlib.util.spec_from_file_location("ai_entry_point_report", script)
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(mod)
+
+    report = mod.build_report()
+    assert not report["violations"], (
+        "New direct OpenAI imports outside allowlist: " + ", ".join(report["violations"])
+    )
+    # Grandfathered legacy bypasses — fail if count grows
+    assert len(report["baseline_bypasses"]) <= len(mod.OPENAI_IMPORT_BASELINE)

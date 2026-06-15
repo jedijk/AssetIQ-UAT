@@ -19,11 +19,14 @@ class DomainEventType(str, Enum):
     GRAPH_SYNC_SCHEDULED_TASK = "graph.sync_edges_for_scheduled_task"
     GRAPH_SYNC_TASK_COMPLETION = "graph.sync_task_instance_completion_edges"
     GRAPH_SYNC_APPLY_STRATEGY = "graph.sync_edges_for_apply_strategy"
+    GRAPH_SYNC_PREDICTION = "graph.sync_prediction_edges"
+    GRAPH_SYNC_PM_IMPORT = "graph.sync_edge_for_pm_import_task"
 
     # Domain lifecycle (outbox-ready; handlers added incrementally)
     THREAT_CREATED = "threat.created"
     OBSERVATION_CREATED = "observation.created"
     ACTION_COMPLETED = "action.completed"
+    ACTION_OUTCOME_ASSESSED = "action.outcome_assessed"
     TASK_COMPLETED = "task.completed"
     INVESTIGATION_CLOSED = "investigation.closed"
     STRATEGY_APPLIED = "strategy.applied"
@@ -44,6 +47,8 @@ GRAPH_EVENT_TYPES = frozenset({
     DomainEventType.GRAPH_SYNC_SCHEDULED_TASK,
     DomainEventType.GRAPH_SYNC_TASK_COMPLETION,
     DomainEventType.GRAPH_SYNC_APPLY_STRATEGY,
+    DomainEventType.GRAPH_SYNC_PREDICTION,
+    DomainEventType.GRAPH_SYNC_PM_IMPORT,
 })
 
 PROJECTION_EVENT_TYPES = frozenset({

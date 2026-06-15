@@ -56,6 +56,25 @@ async def get_data_quality_dashboard(current_user: dict = Depends(_ril_read)):
     return await ril_dashboard_service.get_data_quality_dashboard(current_user, owner_id)
 
 
+@router.get("/outcome-summary", response_model=dict)
+async def get_fleet_outcome_summary(current_user: dict = Depends(_ril_read)):
+    """Fleet closed-loop outcome intelligence (last 90 days)."""
+    from services.outcome_intelligence_service import compute_fleet_outcome_summary
+
+    return await compute_fleet_outcome_summary(current_user)
+
+
+@router.get("/strategies/{equipment_type_id}/outcome", response_model=dict)
+async def get_strategy_outcome_summary(
+    equipment_type_id: str,
+    current_user: dict = Depends(_ril_read),
+):
+    """Strategy effectiveness from completed action outcomes on covered equipment."""
+    from services.strategy_outcome_service import compute_strategy_outcome
+
+    return await compute_strategy_outcome(equipment_type_id, current_user)
+
+
 @router.get("/equipment/{equipment_id}/reliability-edges")
 async def get_equipment_reliability_edges(
     equipment_id: str,

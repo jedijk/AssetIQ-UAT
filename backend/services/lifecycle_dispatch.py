@@ -47,6 +47,29 @@ async def publish_action_completed(
     )
 
 
+async def publish_action_outcome_assessed(
+    action_id: str,
+    *,
+    outcome_status: str,
+    risk_reduction_pct: float,
+    exposure_reduction: float,
+    equipment_id: Optional[str] = None,
+    user: Optional[dict] = None,
+) -> str:
+    return await publish_lifecycle_event(
+        DomainEventType.ACTION_OUTCOME_ASSESSED,
+        aggregate_type="central_action",
+        aggregate_id=action_id,
+        payload={
+            "outcome_status": outcome_status,
+            "risk_reduction_pct": risk_reduction_pct,
+            "exposure_reduction": exposure_reduction,
+            "equipment_id": equipment_id,
+        },
+        user=user,
+    )
+
+
 async def publish_threat_created(threat_id: str, *, user: Optional[dict] = None) -> str:
     return await publish_lifecycle_event(
         DomainEventType.THREAT_CREATED,

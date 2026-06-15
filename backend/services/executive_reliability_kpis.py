@@ -30,55 +30,26 @@ async def compute_executive_reliability_kpis(
     user: Optional[dict] = None,
 ) -> Dict[str, Any]:
     """Compute installation-wide executive KPIs."""
-    now = datetime.now(timezone.utc)
-    today_iso = now.date().isoformat()
+    from services.equipment_reliability_state_service import compute_fleet_reliability_summary
 
+    now = datetime.now(timezone.utc)
+    window_start = now - timedelta(days=90)
+
+    fleet = await compute_fleet_reliability_summary(user=user)
     scope = await _equipment_scope_filter(user)
     if user and scope.get("_impossible"):
         return {
-            "open_threats": 0,
-            "high_risk_threats": 0,
-            "overdue_pm": {"scheduled_tasks": 0, "task_instances": 0, "total": 0},
+            **fleet,
             "mtbf_proxy": {
                 "fleet_mean_days": None,
                 "sample_equipment_count": 0,
                 "window_days": 90,
                 "worst_performers": [],
             },
+            "graph_kpis": {},
             "generated_at": now.isoformat(),
         }
 
-    threat_scope = merge_tenant_filter(
-        {**scope, "status": {"$in": ["Open", "open", "In Progress", "in_progress"]}},
-        user,
-    )
-    open_threats = await db.threats.count_documents(threat_scope)
-
-    high_risk_threats = await db.threats.count_documents(merge_tenant_filter({
-        **scope,
-        "status": {"$in": ["Open", "open", "In Progress", "in_progress"]},
-        "risk_level": {"$in": ["High", "high", "Critical", "critical"]},
-    }, user))
-
-    pm_scope: Dict[str, Any] = {}
-    if scope.get("linked_equipment_id"):
-        pm_scope["equipment_id"] = scope["linked_equipment_id"]
-    overdue_pm_scheduled = await db.scheduled_tasks.count_documents(merge_tenant_filter({
-        **pm_scope,
-        "status": {"$nin": ["completed", "cancelled"]},
-        "due_date": {"$lt": today_iso},
-    }, user))
-
-    overdue_pm_instances = await db.task_instances.count_documents(merge_tenant_filter({
-        **pm_scope,
-        "status": {"$in": ["pending", "overdue", "scheduled"]},
-        "due_date": {"$lt": now},
-    }, user))
-
-    open_work_total = overdue_pm_scheduled + overdue_pm_instances
-
-    # MTBF proxy: mean days between resolved threats per equipment (90d window)
-    window_start = now - timedelta(days=90)
     equipment_ids = scope.get("linked_equipment_id", {}).get("$in") if scope else None
     mtbf_by_equipment = await _mtbf_proxy_days(
         window_start, equipment_ids=equipment_ids, user=user
@@ -107,13 +78,7 @@ async def compute_executive_reliability_kpis(
     )
 
     return {
-        "open_threats": open_threats,
-        "high_risk_threats": high_risk_threats,
-        "overdue_pm": {
-            "scheduled_tasks": overdue_pm_scheduled,
-            "task_instances": overdue_pm_instances,
-            "total": open_work_total,
-        },
+        **fleet,
         "mtbf_proxy": {
             "fleet_mean_days": mtbf_from_graph or fleet_mtbf_days,
             "sample_equipment_count": len(mtbf_by_equipment),

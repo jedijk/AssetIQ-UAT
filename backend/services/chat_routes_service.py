@@ -322,22 +322,27 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
         threat_doc["attachments"] = [{"type": "image", "data": image_thumbnail,
                                       "created_at": datetime.now(timezone.utc).isoformat()}]
 
-    with_tenant_id(threat_doc, await _tenant_ctx_for_user(user_id))
-
     try:
-        result = await db.threats.insert_one(threat_doc)
-        logger.info(f"Created threat {threat_id} with {len(threat_doc.get('attachments', []))} attachments")
+        from services.work_signal_lifecycle import create_work_signal
+
+        tenant_user = await _tenant_ctx_for_user(user_id)
+        created = await create_work_signal(
+            threat_doc,
+            user=tenant_user,
+            source="chat",
+            graph_label="chat_threat_create",
+        )
+        threat_id = created["id"]
+        logger.info(
+            "Created work signal %s with %s attachments",
+            threat_id,
+            len(threat_doc.get("attachments", [])),
+        )
     except Exception as e:
-        logger.error(f"Failed to create threat {threat_id}: {e}")
+        logger.error(f"Failed to create work signal {threat_id}: {e}")
         raise
 
-    from services.threat_observation_bridge import mirror_threat_to_observation
-
-    tenant_user = await _tenant_ctx_for_user(user_id)
-    try:
-        await mirror_threat_to_observation(threat_doc, user=tenant_user)
-    except Exception as bridge_exc:
-        logger.warning("Threat→observation mirror failed for %s: %s", threat_id, bridge_exc)
+    threat_doc["id"] = threat_id
 
     # Skip auto-translation for faster response - can be done manually later if needed
     # asyncio.create_task(
@@ -350,19 +355,6 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
     #         user_id,
     #     )
     # )
-
-    from services.reliability_graph import dispatch_graph_sync
-
-    asyncio.create_task(
-        dispatch_graph_sync(
-            "sync_threat_edges",
-            "chat_threat_create",
-            threat_id=threat_id,
-            equipment_id=obs_data.get("equipment_id"),
-            failure_mode_id=obs_data.get("failure_mode_id"),
-            tenant_id=threat_doc.get("tenant_id"),
-        )
-    )
 
     # Auto-create actions
     auto_created = []

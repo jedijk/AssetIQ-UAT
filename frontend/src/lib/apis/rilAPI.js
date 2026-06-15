@@ -152,6 +152,11 @@ export const rilDashboardAPI = {
 
   getDataQuality: async () => rilGet("/dashboard/data-quality"),
 
+  getOutcomeSummary: async () => rilGet("/dashboard/outcome-summary"),
+
+  getStrategyOutcome: async (equipmentTypeId) =>
+    rilGet(`/dashboard/strategies/${encodeURIComponent(equipmentTypeId)}/outcome`),
+
   getReliabilityGraphOntology: async () => rilGet("/dashboard/reliability-graph/ontology"),
 
   getEquipmentReliabilityChain: async (equipmentId, params = {}) => {

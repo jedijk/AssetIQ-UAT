@@ -1,11 +1,12 @@
 """
-Action outcome intelligence — composition service (Phase 3).
+Action outcome intelligence — composition service (Phase 3/5).
 
 Compares before/after equipment threat, exposure, and risk metrics for closed actions.
 Reuses production exposure helpers, threat history, and stored outcomes/reliability_impacts.
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -14,32 +15,21 @@ from fastapi import HTTPException
 from database import db
 from repositories.threat_repository import ThreatRepository
 from services.action_service import assert_action_installation_scope, find_central_action
+from services.outcome_metrics import (
+    COMPLETED_STATUSES,
+    OUTCOME_WINDOWS,
+    PRIMARY_WINDOW_DAYS,
+    closure_date,
+    compute_outcome_status,
+    exposure_label,
+    parse_dt,
+)
 from services.production_exposure import equipment_assessed_exposure_value
 from services.tenant_schema import merge_tenant_filter
 
+logger = logging.getLogger(__name__)
+
 _threat_repo = ThreatRepository(db)
-
-OUTCOME_WINDOWS: Tuple[int, ...] = (30, 60, 90)
-PRIMARY_WINDOW_DAYS = 90
-COMPLETED_STATUSES = frozenset({"completed", "closed"})
-
-
-def _parse_dt(value: Any) -> Optional[datetime]:
-    if value is None:
-        return None
-    if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
-    if isinstance(value, str):
-        try:
-            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-            return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
-        except ValueError:
-            return None
-    return None
-
-
-def _closure_date(action: dict) -> Optional[datetime]:
-    return _parse_dt(action.get("completed_at")) or _parse_dt(action.get("updated_at"))
 
 
 async def _resolve_equipment_id(action: dict, user: dict) -> Optional[str]:
@@ -145,52 +135,35 @@ async def _period_metrics(
     }
 
 
-def _compute_outcome_status(
-    before: Dict[str, Any],
-    after: Dict[str, Any],
-    repeat_count: int,
-) -> Tuple[str, float, float]:
-    before_risk = before["risk_score_total"]
-    after_risk = after["risk_score_total"]
-    before_threats = before["threat_count"]
-    after_threats = after["threat_count"]
+async def _publish_outcome_assessed_event(
+    action_id: str,
+    *,
+    outcome_status: str,
+    risk_reduction_pct: float,
+    exposure_reduction: float,
+    equipment_id: Optional[str],
+    user: dict,
+) -> None:
+    if outcome_status not in {"successful", "unsuccessful"}:
+        return
+    try:
+        from services.lifecycle_dispatch import publish_action_outcome_assessed
 
-    if before_risk > 0:
-        risk_reduction_pct = ((before_risk - after_risk) / before_risk) * 100
-    elif before_threats > 0:
-        risk_reduction_pct = ((before_threats - after_threats) / before_threats) * 100
-    elif after_threats == 0:
-        risk_reduction_pct = 0.0
-    else:
-        risk_reduction_pct = -100.0
-
-    exposure_reduction = before["exposure_proxy"] - after["exposure_proxy"]
-
-    if risk_reduction_pct >= 10 and repeat_count == 0 and after_threats <= before_threats:
-        status = "successful"
-    elif risk_reduction_pct <= -5 or repeat_count >= 2 or after_threats > before_threats:
-        status = "unsuccessful"
-    else:
-        status = "neutral"
-
-    return status, risk_reduction_pct, exposure_reduction
+        await publish_action_outcome_assessed(
+            action_id,
+            outcome_status=outcome_status,
+            risk_reduction_pct=risk_reduction_pct,
+            exposure_reduction=exposure_reduction,
+            equipment_id=equipment_id,
+            user=user,
+        )
+    except Exception as exc:
+        logger.warning("Failed to publish ACTION_OUTCOME_ASSESSED for %s: %s", action_id, exc)
 
 
-def _exposure_label(currency: str) -> str:
-    symbols = {"EUR": "€", "USD": "$", "GBP": "£"}
-    symbol = symbols.get(currency)
-    if symbol:
-        return f"Exposure reduction ({symbol}, proxy)"
-    return f"Exposure reduction ({currency}, proxy)"
-
-
-async def get_action_outcome(action_id: str, user: dict) -> Dict[str, Any]:
-    """Assess whether a closed action improved equipment reliability outcomes."""
-    action = await find_central_action(action_id, user)
-    if not action:
-        raise HTTPException(status_code=404, detail="Action not found")
-    await assert_action_installation_scope(user, action)
-
+async def assess_closed_action_outcome(action: dict, user: dict) -> Dict[str, Any]:
+    """Assess outcome for a pre-loaded closed action (fleet/strategy aggregation)."""
+    action_id = action.get("id") or action.get("action_id")
     action_status = (action.get("status") or "").lower()
     if action_status not in COMPLETED_STATUSES:
         return {
@@ -200,7 +173,7 @@ async def get_action_outcome(action_id: str, user: dict) -> Dict[str, Any]:
             "message": "Outcome assessment is available after the action is completed.",
         }
 
-    closure = _closure_date(action)
+    closure = closure_date(action)
     if not closure:
         return {
             "action_id": action_id,
@@ -238,18 +211,6 @@ async def get_action_outcome(action_id: str, user: dict) -> Dict[str, Any]:
             failure_mode = source_threat.get("failure_mode")
             failure_mode_id = source_threat.get("failure_mode_id")
 
-    stored_outcome = await db.outcomes.find_one(
-        merge_tenant_filter({"action_id": action_id}, user),
-        {"_id": 0},
-        sort=[("created_at", -1)],
-    )
-    stored_impacts: List[dict] = []
-    if stored_outcome and stored_outcome.get("id"):
-        stored_impacts = await db.reliability_impacts.find(
-            merge_tenant_filter({"outcome_id": stored_outcome["id"]}, user),
-            {"_id": 0},
-        ).to_list(20)
-
     now = datetime.now(timezone.utc)
     windows: Dict[str, Dict[str, Any]] = {}
     for days in OUTCOME_WINDOWS:
@@ -277,7 +238,7 @@ async def get_action_outcome(action_id: str, user: dict) -> Dict[str, Any]:
             count_repeats=True,
         )
         repeat_count = after["repeat_failure_count"]
-        outcome_status, risk_reduction_pct, exposure_reduction = _compute_outcome_status(
+        outcome_status, risk_reduction_pct, exposure_reduction = compute_outcome_status(
             before, after, repeat_count
         )
         windows[str(days)] = {
@@ -292,19 +253,90 @@ async def get_action_outcome(action_id: str, user: dict) -> Dict[str, Any]:
         }
 
     primary = windows[str(PRIMARY_WINDOW_DAYS)]
-    return {
+    result = {
         "action_id": action_id,
         "status": "assessed",
         "equipment_id": equipment_id,
         "equipment_name": (equipment or {}).get("name") or (equipment or {}).get("tag"),
         "closure_date": closure.isoformat(),
         "currency": currency,
-        "exposure_label": _exposure_label(currency),
+        "exposure_label": exposure_label(currency),
         "risk_reduction_pct": primary["risk_reduction_pct"],
         "exposure_reduction": primary["exposure_reduction"],
         "repeat_failure_count": primary["repeat_failure_count"],
         "outcome_status": primary["outcome_status"],
         "windows": windows,
+    }
+
+    if action_id:
+        await _publish_outcome_assessed_event(
+            action_id,
+            outcome_status=primary["outcome_status"],
+            risk_reduction_pct=primary["risk_reduction_pct"],
+            exposure_reduction=primary["exposure_reduction"],
+            equipment_id=equipment_id,
+            user=user,
+        )
+
+    return result
+
+
+async def get_action_outcome(action_id: str, user: dict) -> Dict[str, Any]:
+    """Assess whether a closed action improved equipment reliability outcomes."""
+    action = await find_central_action(action_id, user)
+    if not action:
+        raise HTTPException(status_code=404, detail="Action not found")
+    await assert_action_installation_scope(user, action)
+
+    action_status = (action.get("status") or "").lower()
+    if action_status not in COMPLETED_STATUSES:
+        return {
+            "action_id": action_id,
+            "status": "pending",
+            "action_status": action.get("status"),
+            "message": "Outcome assessment is available after the action is completed.",
+        }
+
+    closure = closure_date(action)
+    if not closure:
+        return {
+            "action_id": action_id,
+            "status": "pending",
+            "action_status": action.get("status"),
+            "message": "Completion date unavailable; outcome cannot be assessed yet.",
+        }
+
+    equipment_id = await _resolve_equipment_id(action, user)
+    if not equipment_id:
+        return {
+            "action_id": action_id,
+            "status": "insufficient_data",
+            "message": "No linked equipment found for this action.",
+        }
+
+    stored_outcome = await db.outcomes.find_one(
+        merge_tenant_filter({"action_id": action_id}, user),
+        {"_id": 0},
+        sort=[("created_at", -1)],
+    )
+    stored_impacts: List[dict] = []
+    if stored_outcome and stored_outcome.get("id"):
+        stored_impacts = await db.reliability_impacts.find(
+            merge_tenant_filter({"outcome_id": stored_outcome["id"]}, user),
+            {"_id": 0},
+        ).to_list(20)
+
+    assessed = await assess_closed_action_outcome(action, user)
+    if assessed.get("status") != "assessed":
+        return assessed
+
+    return {
+        **assessed,
         "stored_outcome": stored_outcome,
         "stored_reliability_impacts": stored_impacts,
     }
+
+
+# Backward-compatible re-exports for tests
+_compute_outcome_status = compute_outcome_status
+_parse_dt = parse_dt

@@ -10,10 +10,8 @@ USER = {"company_id": "co-1", "id": "user-1"}
 
 
 @pytest.mark.asyncio
-async def test_create_observation_from_task_mirrors_threat():
+async def test_create_observation_from_task_uses_create_work_signal():
     mock_db = MagicMock()
-    mock_db.threats = MagicMock()
-    mock_db.threats.insert_one = AsyncMock()
 
     task_instance = {
         "_id": "ti-1",
@@ -29,16 +27,22 @@ async def test_create_observation_from_task_mirrors_threat():
     }
     now = datetime.now(timezone.utc)
 
-    with patch("services.threat_observation_bridge.sync_threat_mirror", new_callable=AsyncMock) as mirror, patch(
-        "services.reliability_graph.dispatch_graph_sync", new_callable=AsyncMock
+    create_signal = AsyncMock(return_value={"id": "sig-task-1"})
+
+    with patch(
+        "services.work_signal_lifecycle.create_work_signal",
+        create_signal,
     ):
         obs_id = await create_observation_from_task(
             mock_db, task_instance, completion_data, now, user=USER
         )
 
-    assert obs_id
-    mock_db.threats.insert_one.assert_called_once()
-    inserted = mock_db.threats.insert_one.call_args[0][0]
-    assert inserted["tenant_id"] == "co-1"
-    mirror.assert_awaited_once()
-    assert mirror.call_args[0][0]["id"] == obs_id
+    assert obs_id == "sig-task-1"
+    create_signal.assert_awaited_once()
+    call_kwargs = create_signal.call_args.kwargs
+    assert call_kwargs["user"] == USER
+    assert call_kwargs["source"] == "task_execution"
+    assert call_kwargs["graph_label"] == "task_observation_create"
+    signal_doc = create_signal.call_args.args[0]
+    assert signal_doc["tenant_id"] == "co-1"
+    assert "Oil leak" in signal_doc["description"]

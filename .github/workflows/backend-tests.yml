@@ -56,6 +56,10 @@ jobs:
           python scripts/ci_bootstrap_test_users.py
           python scripts/ci_integration_bootstrap.py
 
+      - name: Graph coverage report
+        run: |
+          cd backend && python scripts/graph_coverage_report.py
+
       - name: Start API server for integration tests
         env:
           MONGO_URL: mongodb://localhost:27017/test

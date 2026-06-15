@@ -82,39 +82,42 @@ class ReliabilityCopilotService:
                 if signals:
                     data["open_signals"] = signals
 
-        # Enrich with reliability graph + FM + open work when equipment is known
-        equipment = data.get("equipment")
-        eq_id = equipment_id or (equipment.get("id") if isinstance(equipment, dict) else None)
+        # Phase 4 — shared evidence pack for grounded AI context
+        evidence_pack = None
         risk_paths: List[Dict[str, Any]] = []
-        if eq_id:
-            try:
-                from services.reliability_context_service import (
-                    ReliabilityContextService,
-                    format_context_for_prompt,
-                )
-                from services.reliability_graph_query import GraphTraversalService
+        eq_id = equipment_id or (data.get("equipment") or {}).get("id")
+        try:
+            from services.ai_evidence_pack import build_evidence_pack
 
-                ctx_svc = ReliabilityContextService(self.db)
-                uid = (current_user or {}).get("id") or owner_id
-                reliability_ctx = await ctx_svc.get_context(eq_id, uid, user=current_user)
-                data["reliability_context"] = reliability_ctx
-                data["reliability_context_summary"] = format_context_for_prompt(reliability_ctx)
-
-                if intent in ("changes_summary", "risk_analysis", "predictions"):
-                    twin = reliability_ctx.get("twin_snapshot")
-                    if twin:
-                        data["twin_snapshot"] = twin
-
-                risk = await GraphTraversalService(self.db).explain_risk(eq_id, user=current_user)
-                risk_paths = risk.get("path_entries") or []
-                data["risk_path_entries"] = risk_paths
-            except Exception as exc:
-                logger.warning("ReliabilityContextService enrichment failed: %s", exc)
+            evidence_pack = await build_evidence_pack(
+                user=current_user,
+                equipment_id=eq_id,
+                intent=intent,
+                include_fleet=intent in ("general_summary", "attention_required", "cases_summary"),
+                database=self.db,
+            )
+            data["evidence_pack"] = evidence_pack
+            data["reliability_context_summary"] = evidence_pack.get("prompt_summary")
+            risk_paths = evidence_pack.get("graph_edges") or []
+            data["risk_path_entries"] = [
+                {
+                    "edge_id": e.get("edge_id"),
+                    "relation": e.get("relation"),
+                    "source": e.get("source"),
+                    "target": e.get("target"),
+                }
+                for e in risk_paths
+            ]
+            if evidence_pack.get("open_signals"):
+                data["open_signals"] = evidence_pack["open_signals"]
+        except Exception as exc:
+            logger.warning("Evidence pack assembly failed: %s", exc)
         
         # Generate AI response
         response = await self._generate_response(
             owner_id, query, intent, data, context, current_user=current_user,
             risk_path_entries=risk_paths,
+            evidence_pack=evidence_pack,
         )
         
         return response
@@ -459,6 +462,8 @@ class ReliabilityCopilotService:
 
             return {
                 "state": state,
+                "open_observation_count": state.get("open_observation_count"),
+                "exposure_score": (state.get("exposure") or {}).get("score"),
                 "open_work_signals": [project_list_item(doc) for doc in threat_docs],
             }
         except Exception as exc:
@@ -474,13 +479,18 @@ class ReliabilityCopilotService:
         context: Dict[str, Any],
         current_user: Optional[dict] = None,
         risk_path_entries: Optional[List[Dict[str, Any]]] = None,
+        evidence_pack: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Generate AI response based on gathered data"""
+        from services.ai_citation import attach_citations_to_response, format_citations_for_prompt
         from services.ai_gateway import chat as ai_gateway_chat, user_context
 
         uid, cid = user_context(current_user)
         if uid == "anonymous":
             uid = str(owner_id)
+
+        citations = (evidence_pack or {}).get("citations") or []
+        citation_block = format_citations_for_prompt(citations)
 
         # Build system prompt
         system_prompt = """You are the Reliability Copilot, an AI assistant for industrial reliability engineers.
@@ -489,25 +499,26 @@ You help analyze equipment health, identify risks, explain failure patterns, and
 Your responses should be:
 - Concise and actionable
 - Focused on reliability and maintenance
-- Based on the provided data
+- Based on the provided data and evidence pack
 - Include specific numbers and equipment references when available
 
-When reliability graph path edge IDs are provided, cite them inline using [edge:<edge_id>] for traceability.
+When graph edge IDs are provided, cite them inline using [cite:<edge_id>] for traceability.
 
 Format your response with:
 1. A direct answer to the question
 2. Key supporting data points (include twin week-over-week deltas when present)
 3. Recommended actions (if applicable)
-4. A "Sources" section listing cited graph edge IDs when paths were used
+4. A "Sources" section listing cited IDs when evidence was used
 
 Use markdown formatting for clarity."""
 
         # Build user prompt with data context
         data_summary = self._summarize_data_for_prompt(data, intent)
+        evidence_summary = (evidence_pack or {}).get("prompt_summary") or ""
         path_lines = ""
         entries = risk_path_entries or data.get("risk_path_entries") or []
-        if entries:
-            path_lines = "\nGraph path edge IDs (cite as [edge:<id>]):\n"
+        if entries and not evidence_summary:
+            path_lines = "\nGraph path edge IDs (cite as [cite:<id>]):\n"
             for entry in entries[:12]:
                 path_lines += (
                     f"- {entry.get('edge_id')}: {entry.get('source')} "
@@ -520,8 +531,12 @@ Intent Classification: {intent}
 
 Available Data:
 {data_summary}
-{path_lines}
-Please provide a helpful response to the query based on the available data."""
+"""
+        if evidence_summary:
+            user_prompt += f"\nEvidence Pack:\n{evidence_summary}\n"
+        if citation_block:
+            user_prompt += f"\n{citation_block}\n"
+        user_prompt += f"{path_lines}\nPlease provide a helpful response to the query based on the available data."
 
         try:
             answer = await ai_gateway_chat(
@@ -546,7 +561,7 @@ Please provide a helpful response to the query based on the available data."""
         # Determine visualization type
         viz_type = self._get_visualization_type(intent)
         
-        return {
+        response = {
             "answer": answer,
             "data": data,
             "intent": intent,
@@ -564,6 +579,11 @@ Please provide a helpful response to the query based on the available data."""
             ],
             "processed_at": datetime.utcnow().isoformat()
         }
+        return attach_citations_to_response(
+            response,
+            citations,
+            evidence=evidence_pack,
+        )
     
     def _summarize_data_for_prompt(self, data: Dict[str, Any], intent: str) -> str:
         """Create a concise summary of data for the AI prompt"""
