@@ -185,6 +185,20 @@ class TestPreview:
         assert r.status_code == 200
         assert r.content[:4] == b"%PDF"
 
+    def test_preview_form_field_binding_uses_sample_values(self, client):
+        r = client.post(f"{BASE_URL}/api/labels/preview", json={
+            "template": {
+                "name": "form_bind",
+                "preset": "blank",
+                "field_bindings": [
+                    {"source": "form_field", "form_field_id": "extruder_temp", "label": "Temperature"}
+                ],
+            }
+        })
+        assert r.status_code == 200
+        assert r.content[:4] == b"%PDF"
+        assert len(r.content) > 1200
+
 
 # ---------- Print & Jobs ----------
 class TestPrintAndJobs:

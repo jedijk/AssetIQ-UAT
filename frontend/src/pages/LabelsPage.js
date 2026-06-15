@@ -771,7 +771,7 @@ function TemplateEditor({ open, onClose, template, onSaved, presets, assetFields
                 </div>
               ) : (
                 <div className="text-xs text-slate-400 text-center px-4">
-                  Click “Generate” to render a PDF preview using sample data
+                  Click “Generate” to render a PDF preview using sample asset and form field data
                 </div>
               )}
             </div>

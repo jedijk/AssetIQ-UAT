@@ -343,6 +343,69 @@ SAMPLE_DATA = {
 }
 
 
+def _preview_sample_for_field(field: dict) -> str:
+    """Synthetic value for designer preview when no submission is available."""
+    fid = field.get("id") or "field"
+    label = (field.get("label") or fid).strip()
+    ftype = str(field.get("type") or "").lower()
+    if ftype in ("number", "integer", "decimal", "range"):
+        return "42"
+    if ftype in ("boolean", "checkbox"):
+        return "Yes"
+    if ftype in ("date", "datetime"):
+        return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if ftype == "time":
+        return datetime.now(timezone.utc).strftime("%H:%M")
+    options = field.get("options")
+    if ftype in ("select", "radio") and isinstance(options, list) and options:
+        first = options[0]
+        if isinstance(first, dict):
+            return str(first.get("label") or first.get("value") or "Option A")
+        return str(first)
+    return f"Sample {label}"
+
+
+async def _build_preview_sample_data(tpl: dict) -> dict:
+    """Build preview data with sample asset + form field values for bound fields."""
+    data = dict(_inject_print_datetime(SAMPLE_DATA))
+    tpl = _normalize_template_doc(tpl)
+
+    linked_ids = tpl.get("source_form_template_ids") or []
+    if linked_ids:
+        templates = await db.form_templates.find(
+            {"id": {"$in": linked_ids}},
+            {"_id": 0, "fields": 1},
+        ).to_list(length=50)
+        for ft in templates:
+            for field in ft.get("fields") or []:
+                fid = field.get("id")
+                if not fid:
+                    continue
+                key = f"form.{fid}"
+                if not str(data.get(key) or "").strip():
+                    sample = _preview_sample_for_field(field)
+                    data[key] = sample
+                    data.setdefault(str(fid), sample)
+
+    for raw in tpl.get("field_bindings") or []:
+        if not isinstance(raw, dict):
+            continue
+        source = raw.get("source")
+        if source == "form_field":
+            fid = raw.get("form_field_id") or ""
+            if not fid:
+                continue
+            key = f"form.{fid}"
+            if not str(data.get(key) or "").strip():
+                label = raw.get("label") or str(fid).replace("_", " ").strip() or fid
+                data[key] = f"Sample {label}"
+                data.setdefault(str(fid), data[key])
+        elif source and source != "custom" and not str(data.get(source) or "").strip():
+            data[source] = str(SAMPLE_DATA.get(source) or f"Sample {source}")
+
+    return data
+
+
 def _inject_print_datetime(data: dict) -> dict:
     """Add print_date / print_time based on current UTC time if missing."""
     now = datetime.now(timezone.utc)
@@ -815,6 +878,7 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
     elif preset == "blank":
         # Minimal layout: logo at configured position, QR bottom-right (if enabled), bindings flow as lines
         text_area_w = w - 2 * pad
+        text_x = x0 + pad
         
         if show_qr and qr_reader:
             qr_size = min(w, h) * 0.35
@@ -825,6 +889,7 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
 
         # Draw logo at configured position if enabled
         text_start_y = y0 + h - pad - body_font
+        logo_total_w = 0
         if logo_enabled:
             lx, ly = _calculate_logo_position(logo_position, x0, y0, w, h, pad, logo_size_mm)
             logo_total_w = _draw_logo_with_text(c, lx, ly, logo_size_mm, logo_grayscale)
@@ -832,15 +897,17 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
             # so text doesn't overlap the logo area.
             if "right" in logo_position:
                 text_area_w = max(10 * mm, text_area_w - logo_total_w - 2 * mm)
-            # Only push the text down when the logo is at TOP-LEFT (it would overlap the text column).
+            # Top-left logo: start text below the logo block
             if "top" in logo_position and "left" in logo_position:
-                text_start_y = y0 + h - pad - logo_size_mm * mm - 3
+                text_start_y = y0 + h - pad - logo_size_mm * mm - 4
+            elif "top" in logo_position:
+                text_start_y = y0 + h - pad - logo_size_mm * mm - 4
 
         # Flow bindings line-by-line starting below logo
         c.setFont("Helvetica", body_font)
         y_cursor = text_start_y
         for b in bindings:
-            if y_cursor < y0 + pad:
+            if y_cursor < y0 + pad + body_font:
                 break
             label, val = _resolve_field_value(b, data)
             if not val and b.source != "custom":
@@ -848,7 +915,7 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
             line = f"{label}: {val}" if label and val else (val or label or "")
             # naive character-based truncation to fit text_area_w
             max_chars = max(8, int(text_area_w / mm * 1.9))
-            c.drawString(x0 + pad, y_cursor, line[:max_chars])
+            c.drawString(text_x, y_cursor, line[:max_chars])
             y_cursor -= body_font + 2
 
     else:  # standard
@@ -1370,11 +1437,13 @@ async def preview_label(
     if body.asset_id:
         data = await _load_asset(body.asset_id)
         if not data:
-            data = SAMPLE_DATA.copy()
+            data = await _build_preview_sample_data(tpl)
+        else:
+            data = {**(await _build_preview_sample_data(tpl)), **data}
     elif body.sample_data:
-        data = {**SAMPLE_DATA, **body.sample_data}
+        data = {**(await _build_preview_sample_data(tpl)), **body.sample_data}
     else:
-        data = SAMPLE_DATA.copy()
+        data = await _build_preview_sample_data(tpl)
 
     # Merge form submission values (if provided) so bindings can reference them
     if body.submission_id:
@@ -1383,7 +1452,7 @@ async def preview_label(
         if not body.asset_id and sub_data.get("_linked_equipment_id"):
             asset_d = await _load_asset(sub_data["_linked_equipment_id"])
             if asset_d:
-                data = {**SAMPLE_DATA, **asset_d}
+                data = {**data, **asset_d}
         data.update(sub_data)
 
     pdf_bytes = _render_pdf(tpl, [data], copies=1)
