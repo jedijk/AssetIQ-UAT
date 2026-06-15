@@ -10,7 +10,7 @@ import { Button } from "../ui/button";
 import { ThresholdBadge } from "./FieldPreview";
 import { formatDateTime } from "../../lib/dateUtils";
 import { formAPI } from "./formAPI";
-import { openPrintWindow, printLabel } from "../../lib/printLabel";
+import { printLabel } from "../../lib/printLabel";
 import { useLanguage } from "../../contexts/LanguageContext";
 
 export const SubmissionRow = ({ submission, labelConfig: labelConfigProp }) => {
@@ -49,17 +49,11 @@ export const SubmissionRow = ({ submission, labelConfig: labelConfigProp }) => {
         toast.error(t("reports.noLabelTemplate"));
         return;
       }
-      // Open synchronously right before print so the tab stays alive (no long await gap).
-      let preOpened = null;
-      try {
-        preOpened = openPrintWindow();
-      } catch (_e) { /* ignore */ }
       const res = await printLabel({
         template_id: templateId,
         submission_id: submission.id,
         copies: 1,
       }, {
-        win: preOpened,
         filename: `${submission.template_name || "label"}.pdf`,
       });
       if (res.method === "window" || res.method === "share" || res.method === "overlay") {
@@ -72,7 +66,6 @@ export const SubmissionRow = ({ submission, labelConfig: labelConfigProp }) => {
         toast.success(t("reports.printOpened"));
       }
     } catch (err) {
-      if (preOpened && !preOpened.closed) preOpened.close();
       toast.error(err.response?.data?.detail || t("reports.printFailed"));
     } finally {
       setPrinting(false);

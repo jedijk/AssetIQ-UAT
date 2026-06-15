@@ -95,7 +95,7 @@ import { useProductionDashboardQuery } from "../../../hooks/production/useProduc
 import { useProductionDateRange } from "../hooks/useProductionDateRange";
 import { productionKeys } from "../queryKeys";
 import { useCapabilities } from "../../../core/performance";
-import { openPrintWindow } from "../../../lib/printLabel";
+import { printLabel } from "../../../lib/printLabel";
 import { formAPI } from "../../../components/forms/formAPI";
 
 // MachineAnalysisPanel removed per request (AI Machine Settings Analysis)
@@ -364,7 +364,6 @@ export default function ProductionDashboardPage() {
       toast.error("No submission linked to this row.");
       return;
     }
-    let preOpened = null;
     setPrintingLogSubmissionId(submissionId);
     try {
       const tpl = isViscOnly ? formTemplates?.viscosity : formTemplates?.extruder;
@@ -384,12 +383,6 @@ export default function ProductionDashboardPage() {
         toast.error("This form has no label template configured. Enable it in the form designer.");
         return;
       }
-      try {
-        preOpened = openPrintWindow();
-      } catch (_err) {
-        /* ignore */
-      }
-      const { printLabel } = await import("../../../lib/printLabel");
       const res = await printLabel(
         {
           template_id: templateId,
@@ -397,7 +390,6 @@ export default function ProductionDashboardPage() {
           copies: 1,
         },
         {
-          win: preOpened,
           filename: `label-${String(submissionId).slice(0, 8)}.pdf`,
         }
       );
@@ -411,7 +403,6 @@ export default function ProductionDashboardPage() {
         toast.success("Print dialog opened");
       }
     } catch (err) {
-      if (preOpened && !preOpened.closed) preOpened.close();
       toast.error(err?.response?.data?.detail || err?.message || "Print failed");
     } finally {
       setPrintingLogSubmissionId(null);

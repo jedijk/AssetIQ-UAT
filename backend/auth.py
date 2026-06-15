@@ -175,3 +175,23 @@ def require_permission(permission: str):
 
     return _dependency
 
+
+def require_any_permission(*permissions: str):
+    """FastAPI dependency: allow if the user has any of the listed permissions."""
+
+    async def _dependency(current_user: dict = Depends(get_current_user)) -> dict:
+        from services.permission_resolver import check_api_permission
+
+        role = current_user.get("role", "viewer")
+        if role == "owner":
+            return current_user
+        for permission in permissions:
+            if await check_api_permission(role, permission):
+                return current_user
+        raise HTTPException(
+            status_code=403,
+            detail=f"Permission denied: requires one of {', '.join(permissions)}",
+        )
+
+    return _dependency
+

@@ -85,7 +85,7 @@ import { DISCIPLINES, getDisciplineColor } from "../constants/disciplines";
 import { DocumentViewer } from "../components/DocumentViewer";
 import { formatDateTime as formatDateTimeUtil } from "../lib/dateUtils";
 import { formAPI } from "../components/forms/formAPI";
-import { openPrintWindow, printLabel } from "../lib/printLabel";
+import { printLabel } from "../lib/printLabel";
 
 const API_BASE_URL = getBackendUrl();
 const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer";
@@ -579,14 +579,6 @@ export default function FormSubmissionsPage() {
       toast.error(t("reports.noLabelTemplate"));
       return;
     }
-    // Open a window synchronously inside the click handler so iOS Safari
-    // doesn't block it; we'll fill it once the fetch returns.
-    let preOpened = null;
-    try {
-      // Open for desktop too: avoids Chrome blocking prints triggered after async fetch.
-      preOpened = openPrintWindow();
-    } catch (_e) { /* ignore */ }
-
     setPrintingId(submission.id);
     try {
       const res = await printLabel(
@@ -596,7 +588,7 @@ export default function FormSubmissionsPage() {
           copies: 1,
         },
         {
-          win: preOpened,
+          win: null,
           filename: `${submission.form_template_name || "label"}.pdf`,
         }
       );
@@ -610,7 +602,6 @@ export default function FormSubmissionsPage() {
         toast.success(t("reports.printOpened"));
       }
     } catch (err) {
-      if (preOpened && !preOpened.closed) preOpened.close();
       toast.error(err?.response?.data?.detail || t("reports.printFailed"));
     } finally {
       setPrintingId(null);

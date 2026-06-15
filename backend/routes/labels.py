@@ -21,12 +21,14 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 from database import db
-from auth import require_permission
+from auth import require_permission, require_any_permission
 
 router = APIRouter(prefix="/labels", tags=["Labels"])
 
 _settings_read = require_permission("settings:read")
 _settings_write = require_permission("settings:write")
+# Operators print labels from form submissions (forms:read) without settings access.
+_label_print = require_any_permission("settings:write", "settings:read", "forms:read")
 
 
 # ==================== MODELS ====================
@@ -124,13 +126,12 @@ def _normalize_field_bindings(bindings) -> list[dict]:
 def _normalize_template_doc(doc: dict) -> dict:
     """Normalize a template dict so renderers see consistent types."""
     allowed_orientations = ["portrait", "landscape"]
-    allowed_font_sizes = ["small", "medium", "large"]
     out = dict(doc or {})
     out["width_mm"] = _coerce_float(out.get("width_mm", 50.0), default=50.0)
     out["height_mm"] = _coerce_float(out.get("height_mm", 30.0), default=30.0)
     out["orientation"] = _coerce_choice(out.get("orientation", "landscape"), allowed_orientations, "landscape")
     out["preset"] = _coerce_choice(out.get("preset", "standard"), ALLOWED_PRESETS, "standard")
-    out["font_size"] = _coerce_choice(out.get("font_size", "medium"), allowed_font_sizes, "medium")
+    out["font_size"] = _coerce_font_size_pt(out.get("font_size", 6.5))
     out["show_qr"] = _coerce_bool(out.get("show_qr", True), default=True)
     out["logo_config"] = _normalize_logo_config(out.get("logo_config"))
     out["qr_config"] = _normalize_qr_config(out.get("qr_config"))
@@ -176,7 +177,7 @@ class LabelTemplateCreate(BaseModel):
     qr_config: QRConfig = Field(default_factory=QRConfig)
     logo_config: LogoConfig = Field(default_factory=LogoConfig)
     show_qr: bool = True  # Toggle to show/hide QR code
-    font_size: Literal["small", "medium", "large"] = "medium"  # Font size preset for field text
+    font_size: float = Field(default=6.5, ge=5.0, le=16.0)  # Body text size in points
     default_equipment_type_id: Optional[str] = None
     source_form_template_ids: List[str] = Field(default_factory=list)
     printer_type: Optional[str] = None
@@ -194,7 +195,7 @@ class LabelTemplateUpdate(BaseModel):
     qr_config: Optional[QRConfig] = None
     logo_config: Optional[LogoConfig] = None
     show_qr: Optional[bool] = None  # Toggle to show/hide QR code
-    font_size: Optional[Literal["small", "medium", "large"]] = None  # Font size preset
+    font_size: Optional[float] = Field(default=None, ge=5.0, le=16.0)
     default_equipment_type_id: Optional[str] = None
     source_form_template_ids: Optional[List[str]] = None
     printer_type: Optional[str] = None
@@ -659,17 +660,35 @@ def _calculate_logo_position(position: str, x0: float, y0: float, w: float, h: f
         return (x0 + pad, y0 + h - pad - logo_h)
 
 
-# Font size presets (in points)
-FONT_SIZE_PRESETS = {
-    "small": {"title": 7, "body": 5.5, "caption": 5},
-    "medium": {"title": 9, "body": 6.5, "caption": 6},
-    "large": {"title": 16.5, "body": 12, "caption": 10.5},
-}
+# Font size: body text in points (5–16). Title/caption scale proportionally.
+FONT_SIZE_PT_MIN = 5.0
+FONT_SIZE_PT_MAX = 16.0
+LEGACY_FONT_SIZE_PT = {"small": 5.5, "medium": 6.5, "large": 12.0}
 
 
-def _get_font_sizes(font_size_preset: str) -> dict:
-    """Get font sizes based on preset (small/medium/large)."""
-    return FONT_SIZE_PRESETS.get(font_size_preset, FONT_SIZE_PRESETS["medium"])
+def _coerce_font_size_pt(raw, default: float = 6.5) -> float:
+    """Normalize font_size to a body point size, migrating legacy presets."""
+    if raw is None:
+        return default
+    if isinstance(raw, (int, float)):
+        return max(FONT_SIZE_PT_MIN, min(FONT_SIZE_PT_MAX, float(raw)))
+    if isinstance(raw, str):
+        key = raw.strip().lower()
+        if key in LEGACY_FONT_SIZE_PT:
+            return LEGACY_FONT_SIZE_PT[key]
+        try:
+            return max(FONT_SIZE_PT_MIN, min(FONT_SIZE_PT_MAX, float(raw)))
+        except ValueError:
+            pass
+    return default
+
+
+def _get_font_sizes(font_size_pt) -> dict:
+    """Derive title/body/caption sizes from the body point size."""
+    body = _coerce_font_size_pt(font_size_pt)
+    title = min(FONT_SIZE_PT_MAX, round(body * 1.38, 1))
+    caption = max(FONT_SIZE_PT_MIN, round(body * 0.92, 1))
+    return {"title": title, "body": body, "caption": caption}
 
 
 def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0), margin_offset_mm: float = 0.0):
@@ -700,7 +719,7 @@ def _render_single_label(c: canvas.Canvas, tpl: dict, data: dict, origin=(0, 0),
     show_qr = _coerce_bool(tpl.get("show_qr", True), default=True)
     
     # Font size preset
-    font_sizes = _get_font_sizes(tpl.get("font_size", "medium"))
+    font_sizes = _get_font_sizes(tpl.get("font_size", 6.5))
     title_font = font_sizes["title"]
     body_font = font_sizes["body"]
     caption_font = font_sizes["caption"]
@@ -1018,7 +1037,7 @@ def _render_label_html(tpl: dict, datasets: List[dict], copies: int = 1, auto_pr
     show_qr = _coerce_bool(tpl.get("show_qr", True), default=True)
     
     # Font size preset
-    font_sizes = _get_font_sizes(tpl.get("font_size", "medium"))
+    font_sizes = _get_font_sizes(tpl.get("font_size", 6.5))
     title_font = font_sizes["title"]
     body_font = font_sizes["body"]
     caption_font = font_sizes["caption"]
@@ -1466,7 +1485,7 @@ async def preview_label(
 @router.post("/print")
 async def print_labels(
     body: PrintRequest,
-    current_user: dict = Depends(require_permission("settings:write")),
+    current_user: dict = Depends(_label_print),
 ):
     """Render a print-ready PDF for one or many assets and record the job."""
     import logging
@@ -1598,7 +1617,7 @@ class RenderHtmlRequest(BaseModel):
 @router.post("/render-html")
 async def render_label_html(
     body: RenderHtmlRequest,
-    current_user: dict = Depends(_settings_read),
+    current_user: dict = Depends(_label_print),
 ):
     """Return the label as a standalone print-ready HTML page.
 

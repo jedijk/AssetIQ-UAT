@@ -131,7 +131,7 @@ import { isTouchMobileDevice } from "../../lib/deviceUtils";
 
 // API functions for My Tasks
 import { myTasksAPI } from "../../lib/api";
-import { openPrintWindow } from "../../lib/printLabel";
+import { printLabel } from "../../lib/printLabel";
 
 // Main My Tasks Page Component
 export default function MyTasksPage() {
@@ -499,11 +499,10 @@ export default function MyTasksPage() {
             } else {
               // Mobile: sticky toast with Print action — tap fires window.open
               toast.success(labelCfg.button_label || "Print Label", {
-                description: "Tap Print to open the print sheet",
+                description: "Tap Print to open the label preview",
                 action: {
                   label: "Print",
                   onClick: () => {
-                    const win = openPrintWindow();
                     (async () => {
                       try {
                         const { printLabel } = await import("../../lib/printLabel");
@@ -512,9 +511,8 @@ export default function MyTasksPage() {
                           template_id: templateId,
                           submission_id: submissionId,
                           copies: 1,
-                        }, { win });
+                        });
                       } catch (_e) {
-                        if (win && !win.closed) win.close();
                         toast.error("Label print failed");
                       }
                     })();
@@ -525,11 +523,10 @@ export default function MyTasksPage() {
             }
           } else if (trigger === "manual") {
             toast.success(labelCfg.button_label || "Print Label", {
-              description: "Tap Print to open the print sheet",
+              description: "Tap Print to open the label preview",
               action: {
                 label: "Print",
                 onClick: () => {
-                  const win = openPrintWindow();
                   (async () => {
                     try {
                       const { printLabel } = await import("../../lib/printLabel");
@@ -538,9 +535,8 @@ export default function MyTasksPage() {
                         template_id: templateId,
                         submission_id: submissionId,
                         copies: 1,
-                      }, { win });
+                      });
                     } catch (_e) {
-                      if (win && !win.closed) win.close();
                       toast.error("Label print failed");
                     }
                   })();

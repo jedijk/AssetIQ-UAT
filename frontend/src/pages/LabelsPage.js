@@ -49,9 +49,28 @@ import {
   TooltipTrigger,
 } from "../components/ui/tooltip";
 import { labelsAPI } from "../lib/api";
-import { openPrintWindow, isMobileDevice } from "../lib/printLabel";
+import { printLabel } from "../lib/printLabel";
 import { formAPI } from "../components/forms/formAPI";
 import { useLanguage } from "../contexts/LanguageContext";
+import { Slider } from "../components/ui/slider";
+
+const FONT_SIZE_PT_MIN = 5;
+const FONT_SIZE_PT_MAX = 16;
+const DEFAULT_FONT_SIZE_PT = 6.5;
+const LEGACY_FONT_SIZE_PT = { small: 5.5, medium: 6.5, large: 12 };
+
+function normalizeFontSizePt(value) {
+  if (value === null || value === undefined) return DEFAULT_FONT_SIZE_PT;
+  if (typeof value === "number" && !Number.isNaN(value)) {
+    return Math.min(FONT_SIZE_PT_MAX, Math.max(FONT_SIZE_PT_MIN, value));
+  }
+  const legacy = LEGACY_FONT_SIZE_PT[String(value).toLowerCase()];
+  if (legacy !== undefined) return legacy;
+  const parsed = parseFloat(value);
+  return Number.isNaN(parsed)
+    ? DEFAULT_FONT_SIZE_PT
+    : Math.min(FONT_SIZE_PT_MAX, Math.max(FONT_SIZE_PT_MIN, parsed));
+}
 
 // ==================== HELPERS ====================
 
@@ -85,7 +104,7 @@ const emptyTemplate = {
     position: "top-left",
   },
   show_qr: true,
-  font_size: "medium",
+  font_size: DEFAULT_FONT_SIZE_PT,
   source_form_template_ids: [],
   status: "draft",
 };
@@ -117,7 +136,7 @@ function TemplateEditor({ open, onClose, template, onSaved, presets, assetFields
       logo_config: { ...emptyTemplate.logo_config, ...(template.logo_config || {}) },
       // Ensure new fields have defaults
       show_qr: template.show_qr !== undefined ? template.show_qr : true,
-      font_size: template.font_size || "medium",
+      font_size: normalizeFontSizePt(template.font_size),
     };
   }, [template]);
   
@@ -697,25 +716,25 @@ function TemplateEditor({ open, onClose, template, onSaved, presets, assetFields
               </p>
             </div>
 
-            {/* Font Size Preset */}
+            {/* Font size (body text, points) */}
             <div className="space-y-2 border-t pt-3">
-              <Label>Font Size</Label>
-              <div className="flex gap-2">
-                {["small", "medium", "large"].map((size) => (
-                  <button
-                    key={size}
-                    type="button"
-                    onClick={() => setForm({ ...form, font_size: size })}
-                    className={`flex-1 py-1.5 px-2 text-xs rounded-md border transition-colors ${
-                      (form.font_size || "medium") === size
-                        ? "bg-indigo-600 text-white border-indigo-600"
-                        : "bg-white text-slate-600 border-slate-200 hover:border-indigo-300"
-                    }`}
-                    data-testid={`font-size-${size}`}
-                  >
-                    {size.charAt(0).toUpperCase() + size.slice(1)}
-                  </button>
-                ))}
+              <div className="flex items-center justify-between gap-2">
+                <Label>Font Size</Label>
+                <span className="text-xs text-slate-500 tabular-nums" data-testid="font-size-value">
+                  {normalizeFontSizePt(form.font_size).toFixed(1)} pt
+                </span>
+              </div>
+              <Slider
+                min={FONT_SIZE_PT_MIN}
+                max={FONT_SIZE_PT_MAX}
+                step={0.5}
+                value={[normalizeFontSizePt(form.font_size)]}
+                onValueChange={([value]) => setForm({ ...form, font_size: value })}
+                data-testid="font-size-slider"
+              />
+              <div className="flex justify-between text-[10px] text-slate-400">
+                <span>{FONT_SIZE_PT_MIN} pt</span>
+                <span>{FONT_SIZE_PT_MAX} pt</span>
               </div>
               <p className="text-[10px] text-slate-400 leading-tight">
                 Adjusts text size for field bindings on the label.
@@ -815,14 +834,6 @@ function PrintDialog({ open, template, onClose }) {
       asset_ids: assetIds,
       copies: Math.max(1, Number(copies) || 1),
     };
-    let preOpened = null;
-    if (!download && isMobileDevice()) {
-      try {
-        preOpened = openPrintWindow();
-      } catch (_e) {
-        /* ignore */
-      }
-    }
     setPrinting(true);
     try {
       if (download) {
@@ -837,7 +848,6 @@ function PrintDialog({ open, template, onClose }) {
       }
       const { printLabel } = await import("../lib/printLabel");
       const res = await printLabel(printPayload, {
-        win: preOpened,
         filename: `${template.name || "labels"}.pdf`,
       });
       qc.invalidateQueries({ queryKey: ["label-jobs"] });
@@ -851,7 +861,6 @@ function PrintDialog({ open, template, onClose }) {
         toast.success("Print dialog opened");
       }
     } catch (e) {
-      if (preOpened && !preOpened.closed) preOpened.close();
       toast.error(e.response?.data?.detail || "Print failed");
     } finally {
       setPrinting(false);
