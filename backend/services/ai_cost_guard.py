@@ -48,6 +48,25 @@ class AICostGuard:
         self._daily_requests: Dict[str, int] = defaultdict(int)
         self._daily_spend_usd: Dict[str, float] = defaultdict(float)
         self._daily_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        self._redis_fallback_logged = False
+
+    def _log_redis_fallback_once(self) -> None:
+        if self._redis_fallback_logged:
+            return
+        self._redis_fallback_logged = True
+        from services.redis_store import redis_status
+
+        status = redis_status()
+        if status.get("enabled"):
+            return
+        if status.get("configured"):
+            logger.warning(
+                "REDIS_URL configured but unreachable — AI rate limits using in-memory fallback"
+            )
+        else:
+            logger.info(
+                "REDIS_URL not set — AI rate limits using in-memory store (single-instance dev mode)"
+            )
 
     def _roll_day_if_needed(self) -> None:
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -76,6 +95,7 @@ class AICostGuard:
                 )
             return
 
+        self._log_redis_fallback_once()
         now = time.time()
         with self._lock:
             self._prune_minute(key, now)

@@ -167,6 +167,13 @@ export const rilDashboardAPI = {
     return response.data;
   },
 
+  getEquipmentReliabilityState: async (equipmentId) => {
+    const response = await api.get(
+      `${RIL_PREFIX}/dashboard/equipment/${equipmentId}/reliability-state`
+    );
+    return response.data;
+  },
+
   getNodeReliabilityTrace: async (nodeType, nodeId, params = {}) => {
     const response = await api.get(
       `${RIL_PREFIX}/dashboard/nodes/${encodeURIComponent(nodeType)}/${encodeURIComponent(nodeId)}/reliability-trace`,

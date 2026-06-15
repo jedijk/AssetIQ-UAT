@@ -62,6 +62,7 @@ def _graph_event_type(sync_name: str) -> str:
             "sync_edges_for_scheduled_task": DomainEventType.GRAPH_SYNC_SCHEDULED_TASK.value,
             "sync_task_instance_completion_edges": DomainEventType.GRAPH_SYNC_TASK_COMPLETION.value,
             "sync_edges_for_apply_strategy": DomainEventType.GRAPH_SYNC_APPLY_STRATEGY.value,
+            "sync_edge_for_pm_import_task": "graph.sync_edge_for_pm_import_task",
         }
         _GRAPH_SYNC_EVENT_TYPES.update(mapping)
     return _GRAPH_SYNC_EVENT_TYPES.get(sync_name, f"graph.{sync_name}")
@@ -1041,15 +1042,48 @@ async def get_edges_for_node(
     return await db[COLLECTION].find(query, {"_id": 0}).sort("updated_at", -1).to_list(limit)
 
 
+async def sync_prediction_edges(
+    *,
+    equipment_id: str,
+    graph_edge_hint: Optional[Dict[str, Any]] = None,
+    tenant_id: Optional[str] = None,
+    owner_id: Optional[str] = None,
+    prediction_version: Optional[int] = None,
+) -> None:
+    """Materialize equipment → prediction edge when graph_edge_hint is present (v1.2)."""
+    if not equipment_id or not graph_edge_hint:
+        return
+    edge_count = int(graph_edge_hint.get("active_edge_count") or 0)
+    if edge_count <= 0:
+        return
+    target_id = f"{equipment_id}:v{prediction_version or 'latest'}"
+    await upsert_edge(
+        source_type="equipment",
+        source_id=equipment_id,
+        relation="has_prediction",
+        target_type="prediction",
+        target_id=target_id,
+        equipment_id=equipment_id,
+        tenant_id=tenant_id,
+        metadata={
+            "active_edge_count": edge_count,
+            "owner_id": owner_id,
+            "model_version": "1.2",
+        },
+    )
+
+
 # Registry for dispatch_graph_sync — populated after handler definitions.
 GRAPH_SYNC_HANDLERS: Dict[str, Callable[..., Any]] = {
     "sync_observation_edges": sync_observation_edges,
     "sync_threat_edges": sync_threat_edges,
     "sync_investigation_edges": sync_investigation_edges,
+    "sync_prediction_edges": sync_prediction_edges,
     "sync_cause_edge": sync_cause_edge,
     "sync_action_edges": sync_action_edges,
     "sync_outcome_edges": sync_outcome_edges,
     "sync_edges_for_scheduled_task": sync_edges_for_scheduled_task,
     "sync_task_instance_completion_edges": sync_task_instance_completion_edges,
     "sync_edges_for_apply_strategy": sync_edges_for_apply_strategy,
+    "sync_edge_for_pm_import_task": sync_edge_for_pm_import_task,
 }

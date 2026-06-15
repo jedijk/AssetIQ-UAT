@@ -94,14 +94,26 @@ async def api_health_check():
         db_status = f"error: {str(e)[:100]}"
     
     redis_status = None
+    outbox_pending = None
     try:
         from services.cutover_config import redis_required
         from services.redis_store import redis_status as get_redis_status
         if redis_required():
             status = get_redis_status()
             redis_status = "connected" if status.get("enabled") else "unavailable"
+        else:
+            status = get_redis_status()
+            if status.get("configured"):
+                redis_status = "connected" if status.get("enabled") else "unavailable"
     except Exception as e:
         redis_status = f"error: {str(e)[:100]}"
+
+    try:
+        from services.event_outbox import get_outbox_health
+        outbox_health = await get_outbox_health()
+        outbox_pending = (outbox_health.get("by_status") or {}).get("pending", 0)
+    except Exception:
+        outbox_pending = None
     
     uptime = round(time.time() - app.state.start_time, 2)
     
@@ -110,7 +122,9 @@ async def api_health_check():
     # `ready` tracks background warmup only; routes + live DB ping mean we can serve traffic.
     critical_ok = db_status == "connected" and routes_ok
     redis_degraded = redis_status == "unavailable"
-    overall_ok = critical_ok and ready and not redis_degraded
+    outbox_threshold = int(os.environ.get("OUTBOX_PENDING_DEGRADED_THRESHOLD", "500"))
+    outbox_degraded = outbox_pending is not None and outbox_pending > outbox_threshold
+    overall_ok = critical_ok and ready and not redis_degraded and not outbox_degraded
 
     payload = {
         "status": "ok" if overall_ok else ("starting" if critical_ok and not ready else "degraded"),
@@ -123,6 +137,10 @@ async def api_health_check():
     }
     if redis_status is not None:
         payload["redis"] = redis_status
+    if outbox_pending is not None:
+        payload["outbox_pending"] = outbox_pending
+        payload["outbox_degraded"] = outbox_degraded
+    payload["mongo"] = "ok" if db_status == "connected" else db_status
     if route_load_error is not None:
         payload["route_load_error"] = route_load_error.get("error")
         payload["route_load_error_type"] = route_load_error.get("type")

@@ -6,6 +6,8 @@ import pytest
 import requests
 from conftest import BASE_URL, TEST_THREAT_ID
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture(autouse=True)
 def _require_test_threat(request, authenticated_client, test_threat_id):

@@ -35,6 +35,20 @@ logger = logging.getLogger(__name__)
 _threat_repo = ThreatRepository(db)
 _equipment_repo = EquipmentRepository(db)
 
+
+async def _mirror_threat_observation(user: dict, threat: dict) -> None:
+    """Best-effort dual-write threat updates to observations collection."""
+    try:
+        from services.threat_observation_bridge import sync_threat_mirror
+        await sync_threat_mirror(threat, user=user)
+    except Exception as exc:
+        logger.warning("Threat observation mirror failed: %s", exc)
+
+
+async def _find_threat_scoped(user: dict, threat_id: str, *, projection: Optional[dict] = None) -> Optional[dict]:
+    filt = merge_tenant_filter({"id": threat_id}, user)
+    return await db.threats.find_one(filt, projection or {"_id": 0})
+
 FAILURE_MODES_BY_ID = {fm["id"]: fm for fm in FAILURE_MODES_LIBRARY if "id" in fm}
 FAILURE_MODES_BY_NAME = {fm["failure_mode"].lower(): fm for fm in FAILURE_MODES_LIBRARY if "failure_mode" in fm}
 
@@ -304,7 +318,10 @@ async def get_threat_detail(user: dict, threat_id: str, *, language: Optional[st
             if equipment_node:
                 update_data["linked_equipment_id"] = equipment_node["id"]
             
-            await db.threats.update_one({"id": threat_id}, {"$set": update_data})
+            await db.threats.update_one(
+            merge_tenant_filter({"id": threat_id}, user),
+            {"$set": update_data},
+        )
             
             # Return updated values
             threat["risk_score"] = new_risk_score
@@ -320,7 +337,8 @@ async def get_threat_detail(user: dict, threat_id: str, *, language: Optional[st
             logger.info(f"Auto-synced threat {threat_id}: risk={new_risk_score}, crit={new_criticality_score}, fmea={fmea_score}")
             
             # Propagate updated risk to linked actions and investigations
-            await propagate_risk_to_linked_entities([threat_id], [threat])
+            await propagate_risk_to_linked_entities([threat_id], [threat], user=user)
+            await _mirror_threat_observation(user, threat)
         
         # Ensure risk_score is int
         if isinstance(threat.get("risk_score"), float):
@@ -364,8 +382,7 @@ async def get_threat_detail(user: dict, threat_id: str, *, language: Optional[st
         raise HTTPException(status_code=500, detail="Error fetching threat data")
 
 async def update_threat(user: dict, threat_id: str, update_data: dict) -> dict:
-    # Remove created_by filter - threats are shared tenant entities
-    threat = await db.threats.find_one({"id": threat_id})
+    threat = await _find_threat_scoped(user, threat_id)
     if not threat:
         raise HTTPException(status_code=404, detail="Threat not found")
     await assert_threat_installation_scope(user, threat)
@@ -403,24 +420,30 @@ async def update_threat(user: dict, threat_id: str, update_data: dict) -> dict:
     if update_data:
         update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
         with_tenant_id(update_data, user)
-        await db.threats.update_one({"id": threat_id}, {"$set": update_data})
+        await db.threats.update_one(
+            merge_tenant_filter({"id": threat_id}, user),
+            {"$set": update_data},
+        )
         
         # Recalculate ranks if status changed
         if "status" in update_data:
-            await update_all_ranks(user["id"])
+            await update_all_ranks(user["id"], user=user)
         
         # Propagate risk changes to linked actions and investigations
         if any(f in update_data for f in ["risk_score", "risk_level", "fmea_rpn"]):
-            updated_threat = await db.threats.find_one({"id": threat_id}, {"_id": 0})
-            await propagate_risk_to_linked_entities([threat_id], [updated_threat])
+            updated_threat = await _find_threat_scoped(user, threat_id)
+            await propagate_risk_to_linked_entities([threat_id], [updated_threat], user=user)
         
         # Invalidate stats cache
         cache.invalidate_stats(f"stats:{user['id']}")
     
-    updated = await db.threats.find_one({"id": threat_id}, {"_id": 0})
+    updated = await _find_threat_scoped(user, threat_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Threat not found")
     # Ensure risk_score is int
     if isinstance(updated.get("risk_score"), float):
         updated["risk_score"] = int(updated["risk_score"])
+    await _mirror_threat_observation(user, updated)
     return updated
 
 async def delete_threat(
@@ -431,7 +454,7 @@ async def delete_threat(
     delete_investigations: bool = False,
 ):
     """Delete a threat/observation. Optionally delete linked Actions and Investigations."""
-    threat = await db.threats.find_one({"id": threat_id})
+    threat = await _find_threat_scoped(user, threat_id)
     if not threat:
         raise HTTPException(status_code=404, detail="Threat not found")
     await assert_threat_installation_scope(user, threat)
@@ -454,7 +477,7 @@ async def delete_threat(
             )
         raise HTTPException(status_code=500, detail="Failed to delete threat")
 
-    await update_all_ranks(user["id"])
+    await update_all_ranks(user["id"], user=user)
     cache.invalidate_stats(f"stats:{user['id']}")
 
     return {
@@ -585,11 +608,11 @@ async def recalculate_all_threat_scores(user: dict):
     logger.info(f"Updated {updated_count} threats, linked {linked_count} to equipment")
     
     # Update all ranks
-    await update_all_ranks(user["id"])
+    await update_all_ranks(user["id"], user=user)
     
     # Propagate updated risk scores to linked actions and investigations
     threat_ids = [t["id"] for t in threats]
-    actions_updated, inv_updated = await propagate_risk_to_linked_entities(threat_ids)
+    actions_updated, inv_updated = await propagate_risk_to_linked_entities(threat_ids, user=user)
     
     return {
         "message": f"Successfully recalculated {updated_count} threat scores",
@@ -604,14 +627,16 @@ async def link_threat_to_equipment(user: dict, threat_id: str, equipment_node_id
     This updates the threat's asset field and recalculates the risk score.
     """
     # Get the threat (shared entity - no created_by filter)
-    threat = await db.threats.find_one({"id": threat_id})
+    threat = await _find_threat_scoped(user, threat_id)
     if not threat:
         raise HTTPException(status_code=404, detail="Threat not found")
     await assert_threat_installation_scope(user, threat)
     await installation_filter.assert_user_can_access_equipment(user, equipment_node_id)
     
-    # Get the equipment node (shared entity - no created_by filter)
-    node = await db.equipment_nodes.find_one({"id": equipment_node_id})
+    # Get the equipment node (tenant-scoped)
+    node = await db.equipment_nodes.find_one(
+        merge_tenant_filter({"id": equipment_node_id}, user),
+    )
     if not node:
         raise HTTPException(status_code=404, detail="Equipment node not found")
     
@@ -675,12 +700,16 @@ async def link_threat_to_equipment(user: dict, threat_id: str, equipment_node_id
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
     
-    await db.threats.update_one({"id": threat_id}, {"$set": update_data})
+    await db.threats.update_one(
+        merge_tenant_filter({"id": threat_id}, user),
+        {"$set": update_data},
+    )
     
     # Update ranks
-    await update_all_ranks(user["id"])
+    await update_all_ranks(user["id"], user=user)
     
-    updated_threat = await db.threats.find_one({"id": threat_id}, {"_id": 0})
+    updated_threat = await _find_threat_scoped(user, threat_id)
+    await _mirror_threat_observation(user, updated_threat)
     
     return {
         "message": f"Threat linked to {node['name']}",
@@ -703,7 +732,7 @@ async def link_threat_to_failure_mode(user: dict, threat_id: str, failure_mode_i
     logger.info(f"link_threat_to_failure_mode: Looking for threat {threat_id} in database {current_db}")
     
     # Get the threat (shared entity - no created_by filter)
-    threat = await db.threats.find_one({"id": threat_id})
+    threat = await _find_threat_scoped(user, threat_id)
     if not threat:
         logger.warning(f"link_threat_to_failure_mode: Threat {threat_id} NOT FOUND in database {current_db}")
         raise HTTPException(status_code=404, detail="Threat not found")
@@ -777,12 +806,16 @@ async def link_threat_to_failure_mode(user: dict, threat_id: str, failure_mode_i
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
     
-    await db.threats.update_one({"id": threat_id}, {"$set": update_data})
+    await db.threats.update_one(
+        merge_tenant_filter({"id": threat_id}, user),
+        {"$set": update_data},
+    )
     
     # Update ranks
-    await update_all_ranks(user["id"])
+    await update_all_ranks(user["id"], user=user)
     
-    updated_threat = await db.threats.find_one({"id": threat_id}, {"_id": 0})
+    updated_threat = await _find_threat_scoped(user, threat_id)
+    await _mirror_threat_observation(user, updated_threat)
     
     return {
         "message": f"Threat linked to failure mode: {matched_fm['failure_mode']}",
@@ -1294,7 +1327,7 @@ async def improve_threat_description(
     """
     from services.ai_gateway import chat as ai_gateway_chat
     
-    threat = await db.threats.find_one({"id": threat_id})
+    threat = await _find_threat_scoped(user, threat_id)
     if not threat:
         raise HTTPException(status_code=404, detail="Observation not found")
     
@@ -1346,13 +1379,16 @@ Output only the improved description text, no labels or formatting.""",
         
         # Update the threat with improved description
         await db.threats.update_one(
-            {"id": threat_id},
+            merge_tenant_filter({"id": threat_id}, user),
             {"$set": {
                 "user_context": improved,
                 "description": improved,
                 "ai_improved_at": datetime.now(timezone.utc).isoformat(),
-            }}
+            }},
         )
+        updated = await _find_threat_scoped(user, threat_id)
+        if updated:
+            await _mirror_threat_observation(user, updated)
 
         
         return {

@@ -12,6 +12,8 @@ import time
 
 from conftest import TEST_OWNER_EMAIL, TEST_OWNER_PASSWORD
 
+pytestmark = pytest.mark.integration
+
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 
 # Test credentials

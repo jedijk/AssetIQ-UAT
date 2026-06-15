@@ -18,6 +18,8 @@ if not BASE_URL:
 
 from conftest import TEST_OWNER_EMAIL, TEST_OWNER_PASSWORD
 
+pytestmark = pytest.mark.integration
+
 pytestmark = pytest.mark.skipif(not BASE_URL, reason="Backend URL not configured")
 
 OWNER_EMAIL = TEST_OWNER_EMAIL

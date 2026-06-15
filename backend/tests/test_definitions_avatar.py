@@ -11,6 +11,8 @@ import os
 import io
 from pathlib import Path
 
+pytestmark = pytest.mark.integration
+
 # Load frontend .env to get REACT_APP_BACKEND_URL
 _frontend_env = Path(__file__).parent.parent.parent / 'frontend' / '.env'
 if _frontend_env.exists():
@@ -19,7 +21,12 @@ if _frontend_env.exists():
             key, val = line.split('=', 1)
             os.environ.setdefault(key.strip(), val.strip())
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://reliability-graph-1.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
+
+
+def _require_api():
+    if not BASE_URL:
+        pytest.skip("REACT_APP_BACKEND_URL not set — skipping HTTP integration tests")
 
 
 class TestDefinitionsAPI:

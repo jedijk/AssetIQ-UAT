@@ -5,6 +5,8 @@ from fastapi import HTTPException
 from services.ai_cost_guard import AIUsageRecord, ai_cost_guard, guard_ai_request
 from services import redis_store
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture(autouse=True)
 def reset_guard(monkeypatch):

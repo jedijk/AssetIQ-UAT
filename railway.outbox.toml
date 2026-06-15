@@ -1,0 +1,13 @@
+# Railway sidecar for the domain event outbox worker.
+# Create a separate Railway service pointing at this repo with:
+#   Root Directory: backend
+#   Config file: railway.outbox.toml
+# Set OUTBOX_WORKER_EXTERNAL=true on the API service.
+
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "python -m workers.outbox_worker"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

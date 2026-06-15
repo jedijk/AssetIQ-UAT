@@ -1,4 +1,4 @@
-"""Reliability graph sync helpers for PM Import (extracted from PMImportService)."""
+"""Reliability graph sync for PM Import — routes through dispatch_graph_sync."""
 from __future__ import annotations
 
 import logging
@@ -15,15 +15,18 @@ async def sync_pm_import_graph_edge(
 ) -> None:
     """Record PM Import → failure mode linkage in the reliability graph."""
     try:
-        from services.reliability_graph import sync_edge_for_pm_import_task
+        from services.reliability_graph import dispatch_graph_sync
 
         equip_match = task.get("equipment_match") or {}
-        await sync_edge_for_pm_import_task(
+        await dispatch_graph_sync(
+            "sync_edge_for_pm_import_task",
+            f"pm_import:{task_id}",
             task_id=task_id,
             failure_mode_id=failure_mode_id,
             equipment_id=equip_match.get("equipment_id") or task.get("equipment_id"),
             equipment_type_id=equip_match.get("equipment_type_id"),
             apply_mode=apply_mode,
+            tenant_id=task.get("tenant_id"),
         )
     except Exception as exc:
         logger.warning("pm import graph edge sync failed: %s", exc)

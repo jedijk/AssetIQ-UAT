@@ -6,6 +6,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends
 
 from routes.ril._auth import _ril_read
+from utils.api_response import ReliabilityProfileResponse, ReliabilityStateResponse
 
 router = APIRouter(prefix="/dashboard", tags=["RIL Dashboard"])
 
@@ -71,7 +72,7 @@ async def get_equipment_reliability_edges(
     return {"equipment_id": equipment_id, "edges": edges, "total": len(edges)}
 
 
-@router.get("/equipment/{equipment_id}/reliability-profile")
+@router.get("/equipment/{equipment_id}/reliability-profile", response_model=ReliabilityProfileResponse)
 async def get_equipment_reliability_profile(
     equipment_id: str,
     refresh: bool = False,
@@ -87,7 +88,24 @@ async def get_equipment_reliability_profile(
         user=current_user,
         refresh_context=refresh,
     )
-    return {"success": True, "profile": profile}
+    return ReliabilityProfileResponse(success=True, profile=profile)
+
+
+@router.get("/equipment/{equipment_id}/reliability-state", response_model=ReliabilityStateResponse)
+async def get_equipment_reliability_state(
+    equipment_id: str,
+    current_user: dict = Depends(_ril_read),
+):
+    """Compact reliability state snapshot — open work, PM overdue, graph fingerprint."""
+    from services.equipment_reliability_state_service import build_equipment_reliability_state
+    from services.ril_service_factory import ril_owner_id
+
+    state = await build_equipment_reliability_state(
+        equipment_id,
+        ril_owner_id(current_user),
+        user=current_user,
+    )
+    return ReliabilityStateResponse(success=True, state=state)
 
 
 @router.get("/equipment/{equipment_id}/reliability-chain")

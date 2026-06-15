@@ -31,6 +31,13 @@ TEST_OWNER_PASSWORD = os.environ.get('TEST_OWNER_PASSWORD', 'admin123')
 # Test data IDs (if needed)
 TEST_THREAT_ID = os.environ.get('TEST_THREAT_ID', '43455566-4f46-4c54-8130-fdd7a7d009a1')
 
+# CI integration env (see scripts/ci_integration_bootstrap.py):
+#   MONGO_URL=mongodb://localhost:27017/test
+#   DB_NAME=test
+#   REACT_APP_BACKEND_URL=http://127.0.0.1:8765
+#   ENVIRONMENT=test
+#   RATE_LIMIT_ENABLED=false
+
 
 def _login_url() -> Optional[str]:
     if not BASE_URL:

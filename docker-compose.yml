@@ -25,6 +25,7 @@ services:
       MONGO_URL: mongodb://mongo:27017
       ENVIRONMENT: development
       USE_EXTERNAL_BACKGROUND_WORKER: "true"
+      OUTBOX_WORKER_EXTERNAL: "true"
       JWT_SECRET: local-dev-secret-change-in-production
     depends_on:
       mongo:
@@ -46,6 +47,24 @@ services:
         condition: service_healthy
       backend:
         condition: service_started
+    profiles:
+      - worker
+
+  outbox-worker:
+    image: python:3.11-slim
+    working_dir: /app/backend
+    volumes:
+      - ./backend:/app/backend
+    command: >
+      sh -c "pip install -q -r requirements.txt &&
+             python -m workers.outbox_worker"
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      ENVIRONMENT: development
+      OUTBOX_WORKER_EXTERNAL: "true"
+    depends_on:
+      mongo:
+        condition: service_healthy
     profiles:
       - worker
 

@@ -674,7 +674,8 @@ async def update_failure_mode(
                     old_name,
                     result["severity"],
                     result["occurrence"],
-                    result["detectability"]
+                    result["detectability"],
+                    user=current_user,
                 )
                 logger.info(f"Updated {updated_threats} threat scores after FMEA change")
                 result["threats_updated"] = updated_threats

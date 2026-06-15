@@ -455,7 +455,7 @@ Respond in JSON format:
         if not tasks:
             return tasks
         
-        from services.openai_service import chat_completion
+        from services.ai_gateway import chat as ai_gateway_chat
         
         # Batch into groups of 10 to stay within token limits
         BATCH = 10
@@ -492,11 +492,13 @@ Respond in JSON format:
             )
             
             try:
-                raw = await chat_completion(
+                raw = await ai_gateway_chat(
                     messages=[
                         {"role": "system", "content": sys_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
+                    user_id="pm-import",
+                    endpoint="pm_import.task_analysis.enrich",
                     model="gpt-4o",
                     temperature=0.1,
                     response_format={"type": "json_object"},

@@ -8,6 +8,8 @@ import os
 
 from conftest import BASE_URL
 
+pytestmark = pytest.mark.integration
+
 
 def _login_headers():
     if not BASE_URL:

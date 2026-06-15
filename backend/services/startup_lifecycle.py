@@ -62,6 +62,30 @@ async def run_safe_startup(db, app) -> None:
 
     asyncio.create_task(_cleanup_pending_registrations_task(db))
 
+    if not _outbox_worker_external():
+        asyncio.create_task(_in_process_outbox_worker())
+    else:
+        logger.info("In-process outbox worker disabled (OUTBOX_WORKER_EXTERNAL=true)")
+
+
+def _outbox_worker_external() -> bool:
+    return os.environ.get("OUTBOX_WORKER_EXTERNAL", "").lower() in ("1", "true", "yes")
+
+
+async def _in_process_outbox_worker() -> None:
+    """Lightweight outbox drain loop for single-replica dev; use workers.outbox_worker in prod."""
+    from workers.outbox_worker import BATCH_SIZE, POLL_INTERVAL_SEC, run_outbox_loop
+
+    await asyncio.sleep(3)  # let API finish warming up
+    logger.info("Starting in-process outbox worker (batch=%s)", BATCH_SIZE)
+    try:
+        await run_outbox_loop(once=False)
+    except asyncio.CancelledError:
+        logger.info("In-process outbox worker cancelled")
+        raise
+    except Exception as exc:
+        logger.warning("In-process outbox worker stopped: %s", exc)
+
 
 async def _cutover_check() -> None:
     from services.cutover_config import cutover_gaps, cutover_snapshot
@@ -86,10 +110,13 @@ async def _mongo_storage(db) -> None:
 
 
 async def _create_indexes() -> None:
+    from database import db
     from scripts.create_indexes import create_indexes
+    from services.tenant_schema import ensure_tenant_indexes
 
     created, skipped = await create_indexes()
-    return f"{created} created, {skipped} skipped"
+    tenant_created = ensure_tenant_indexes(db)
+    return f"{created} created, {skipped} skipped, {tenant_created} tenant indexes"
 
 
 async def _seed_failure_modes(db) -> None:

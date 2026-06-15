@@ -19,6 +19,7 @@ from services.production_exposure import (
     production_exposure_monetary_value,
     production_impact_from_criticality,
 )
+from services.work_signal_projection import project_list_item
 
 logger = logging.getLogger(__name__)
 
@@ -675,6 +676,7 @@ async def build_executive_dashboard(
             "source": "threat",
             "id": obs_id,
             "has_actions": obs_id in threat_ids_with_actions,
+            "work_signal": project_list_item(obs),
         }
 
         if is_mitigated_observation_status(status):

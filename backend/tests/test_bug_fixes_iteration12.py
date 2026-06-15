@@ -13,7 +13,14 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://reliability-graph-1.preview.emergentagent.com')
+pytestmark = pytest.mark.integration
+
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
+
+
+def _require_api():
+    if not BASE_URL:
+        pytest.skip("REACT_APP_BACKEND_URL not set — skipping HTTP integration tests")
 
 
 class TestPasswordResetAPI:
@@ -22,6 +29,7 @@ class TestPasswordResetAPI:
     @pytest.fixture
     def auth_token(self):
         """Get authentication token for owner account"""
+        _require_api()
         response = requests.post(f"{BASE_URL}/api/auth/login", json={
             "email": "jedijk@gmail.com",
             "password": "admin123"

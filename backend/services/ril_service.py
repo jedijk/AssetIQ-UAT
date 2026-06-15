@@ -836,7 +836,7 @@ class RILService:
         return await self.get_reliability_case(owner_id, case_id)
     
     # ============= Predictions =============
-    
+
     async def get_predictions(
         self,
         owner_id: str,
@@ -844,117 +844,32 @@ class RILService:
         limit: int = 50,
         skip: int = 0
     ) -> Tuple[List[Prediction], int]:
-        """Get predictive insights"""
-        query = {"owner_id": owner_id}
-        if equipment_id:
-            query["equipment_id"] = equipment_id
-        
-        total = await self.db[self._collections['predictions']].count_documents(query)
-        cursor = self.db[self._collections['predictions']].find(query).sort(
-            "calculated_at", -1
-        ).skip(skip).limit(limit)
-        
-        predictions = []
-        async for doc in cursor:
-            predictions.append(Prediction(**doc))
-        
-        return predictions, total
-    
+        from services.ril_predictions import get_predictions as _get_predictions
+
+        return await _get_predictions(
+            self.db,
+            owner_id=owner_id,
+            equipment_id=equipment_id,
+            limit=limit,
+            skip=skip,
+            collection=self._collections["predictions"],
+        )
+
     async def generate_prediction(
         self,
         owner_id: str,
         equipment_id: str
     ) -> Optional[Prediction]:
-        """
-        Generate a prediction for equipment based on available data.
-        This is a simplified rule-based prediction engine.
-        In production, this would use ML models.
-        """
-        # Get equipment details
-        equipment = await self.db.equipment_nodes.find_one({"id": equipment_id})
-        if not equipment:
-            return None
-        
-        # Count observations for this equipment (last 90 days)
-        ninety_days_ago = datetime.utcnow() - timedelta(days=90)
-        
-        observation_count = await self.db[self._collections['observations']].count_documents({
-            "owner_id": owner_id,
-            "equipment_id": equipment_id,
-            "observed_at": {"$gte": ninety_days_ago}
-        })
-        
-        # Count alerts
-        alert_count = await self.db[self._collections['alerts']].count_documents({
-            "owner_id": owner_id,
-            "equipment_id": equipment_id,
-            "alert_time": {"$gte": ninety_days_ago}
-        })
-        
-        # Get failure modes for this equipment type
-        failure_predictions = []
-        equipment_type_id = equipment.get("equipment_type_id")
-        
-        if equipment_type_id:
-            async for fm in self.db.failure_modes.find({"equipment_type_ids": equipment_type_id}):
-                # Simplified probability calculation
-                base_probability = 0.1
-                
-                # Increase probability based on observations
-                probability = base_probability + (observation_count * 0.02) + (alert_count * 0.05)
-                probability = min(probability, 0.95)
-                
-                # Determine confidence
-                if observation_count + alert_count > 10:
-                    confidence = PredictionConfidence.HIGH
-                elif observation_count + alert_count > 5:
-                    confidence = PredictionConfidence.MEDIUM
-                else:
-                    confidence = PredictionConfidence.LOW
-                
-                # Calculate RUL (Remaining Useful Life)
-                rul_days = int(90 * (1 - probability)) if probability > 0.3 else None
-                
-                failure_predictions.append(FailurePrediction(
-                    failure_mode=fm.get("failure_mode"),
-                    failure_mode_id=fm.get("id"),
-                    probability=probability,
-                    confidence=confidence,
-                    remaining_useful_life_days=rul_days,
-                    estimated_failure_date=datetime.utcnow() + timedelta(days=rul_days) if rul_days else None,
-                    recommended_actions=fm.get("recommended_actions", [])[:3],
-                    input_factors={
-                        "observations_90d": observation_count,
-                        "alerts_90d": alert_count
-                    }
-                ))
-        
-        # Calculate overall health score
-        if failure_predictions:
-            max_prob = max(fp.probability for fp in failure_predictions)
-            health_score = 100 * (1 - max_prob)
-        else:
-            health_score = 85  # Default healthy
-        
-        prediction = Prediction(
+        from services.ril_predictions import generate_equipment_prediction
+
+        return await generate_equipment_prediction(
+            self.db,
             owner_id=owner_id,
             equipment_id=equipment_id,
-            equipment_tag=equipment.get("tag") or equipment.get("name"),
-            equipment_name=equipment.get("name"),
-            equipment_type_id=equipment_type_id,
-            predictions=failure_predictions[:10],  # Top 10
-            overall_health_score=health_score,
-            observation_count=observation_count,
-            reading_count=0,  # Would come from readings collection
-            maintenance_history_count=0,  # Would come from maintenance history
-            days_of_data=90,
-            valid_until=datetime.utcnow() + timedelta(days=7)
+            observations_collection=self._collections["observations"],
+            alerts_collection=self._collections["alerts"],
+            predictions_collection=self._collections["predictions"],
         )
-        
-        # Save prediction
-        await self.db[self._collections['predictions']].insert_one(prediction.dict())
-        
-        return prediction
     
     # ============= Strategy Recommendations =============
     

@@ -464,6 +464,7 @@ def serialize_task(task: dict) -> dict:
         "maintenance_program_id": task.get("maintenance_program_id"),
         "v2_task_id": task.get("v2_task_id"),
         "is_unbridged_maintenance": False,
+        "work_signal": task.get("work_signal"),
     }
 
 

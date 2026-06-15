@@ -18,6 +18,18 @@ from models.ril import CopilotQueryRequest
 
 logger = logging.getLogger(__name__)
 
+# Formal copilot tool registry — extend by adding entries and handler methods.
+COPILOT_TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
+    "get_reliability_chain": {
+        "description": "Graph-backed reliability chain for one equipment asset",
+        "handler": "_tool_get_reliability_chain",
+    },
+    "get_open_signals": {
+        "description": "Open observations, PM overdue, and graph fingerprint for equipment",
+        "handler": "_tool_get_open_signals",
+    },
+}
+
 
 class ReliabilityCopilotService:
     """
@@ -53,6 +65,22 @@ class ReliabilityCopilotService:
         
         # Gather relevant data based on intent
         data = await self._gather_data(owner_id, intent, query, equipment_id)
+
+        # Copilot tools for equipment-scoped queries
+        eq_id = equipment_id or (data.get("equipment") or {}).get("id")
+        if eq_id:
+            if intent in ("risk_analysis", "equipment_details", "changes_summary", "general_summary"):
+                chain = await self._invoke_copilot_tool(
+                    "get_reliability_chain", eq_id, current_user=current_user
+                )
+                if chain:
+                    data["reliability_chain"] = chain
+            if intent in ("risk_analysis", "attention_required", "equipment_details"):
+                signals = await self._invoke_copilot_tool(
+                    "get_open_signals", eq_id, current_user=current_user
+                )
+                if signals:
+                    data["open_signals"] = signals
 
         # Enrich with reliability graph + FM + open work when equipment is known
         equipment = data.get("equipment")
@@ -344,6 +372,98 @@ class ReliabilityCopilotService:
                     return equipment.get("id")
         
         return None
+    
+    async def _invoke_copilot_tool(
+        self,
+        tool_name: str,
+        equipment_id: str,
+        *,
+        current_user: Optional[dict] = None,
+        **kwargs: Any,
+    ) -> Optional[Any]:
+        """Dispatch a registered copilot tool by name."""
+        entry = COPILOT_TOOL_REGISTRY.get(tool_name)
+        if not entry:
+            logger.warning("Unknown copilot tool: %s", tool_name)
+            return None
+        handler = getattr(self, entry["handler"], None)
+        if not handler:
+            return None
+        return await handler(equipment_id, current_user=current_user, **kwargs)
+
+    async def _tool_get_reliability_chain(
+        self,
+        equipment_id: str,
+        *,
+        current_user: Optional[dict] = None,
+        depth: int = 5,
+        limit: int = 120,
+    ) -> Optional[Dict[str, Any]]:
+        """Copilot tool — fetch graph-backed reliability chain for one asset."""
+        try:
+            from services.reliability_graph_query import GraphTraversalService
+
+            svc = GraphTraversalService(self.db)
+            chain = await svc.get_chain(
+                equipment_id,
+                depth=depth,
+                user=current_user,
+                edge_limit=limit,
+            )
+            return chain
+        except Exception as exc:
+            logger.warning("get_reliability_chain tool failed: %s", exc)
+            return None
+
+    async def _tool_get_open_signals(
+        self,
+        equipment_id: str,
+        *,
+        current_user: Optional[dict] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Copilot tool — open work signals and compact reliability state."""
+        try:
+            from services.equipment_reliability_state_service import build_equipment_reliability_state
+            from services.ril_service_factory import ril_owner_id
+            from services.tenant_schema import merge_tenant_filter
+            from services.work_signal_projection import project_list_item
+
+            owner_id = ril_owner_id(current_user) if current_user else equipment_id
+            state = await build_equipment_reliability_state(
+                equipment_id, owner_id, user=current_user
+            )
+            open_query = merge_tenant_filter(
+                {
+                    "status": {"$nin": ["Closed", "closed", "Mitigated", "mitigated"]},
+                    "$or": [
+                        {"linked_equipment_id": equipment_id},
+                        {"equipment_id": equipment_id},
+                    ],
+                },
+                current_user,
+            )
+            threat_docs = await self.db.threats.find(
+                open_query,
+                {
+                    "_id": 0,
+                    "id": 1,
+                    "title": 1,
+                    "status": 1,
+                    "risk_score": 1,
+                    "risk_level": 1,
+                    "linked_equipment_id": 1,
+                    "asset": 1,
+                    "created_at": 1,
+                },
+            ).sort("risk_score", -1).limit(10).to_list(10)
+
+            return {
+                "state": state,
+                "open_work_signals": [project_list_item(doc) for doc in threat_docs],
+            }
+        except Exception as exc:
+            logger.warning("get_open_signals tool failed: %s", exc)
+            return None
     
     async def _generate_response(
         self,

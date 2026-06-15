@@ -36,18 +36,28 @@ INDEX_DEFINITIONS = {
         {"keys": [("parent_id", 1), ("order", 1)]},
     ],
     
-    # Threats - frequently filtered by equipment, status, risk
+    # Threats / observations (legacy collection name) — tenant-scoped list & detail queries
     "threats": [
         {"keys": [("id", 1)], "unique": True},
+        {"keys": [("tenant_id", 1)]},
+        {"keys": [("tenant_id", 1), ("linked_equipment_id", 1), ("created_at", -1)]},
+        {"keys": [("tenant_id", 1), ("status", 1), ("created_at", -1)]},
+        {"keys": [("tenant_id", 1), ("created_by", 1), ("status", 1), ("risk_score", -1)]},
+        {"keys": [("linked_equipment_id", 1)]},
         {"keys": [("equipment_id", 1)]},
         {"keys": [("status", 1)]},
         {"keys": [("risk_priority", -1)]},
+        {"keys": [("risk_score", -1)]},
         {"keys": [("created_at", -1)]},
+        {"keys": [("created_by", 1)]},
         {"keys": [("failure_mode_id", 1)]},
         {"keys": [("installation_name", 1)]},
+        {"keys": [("asset", 1)]},
         # Compound indexes for common queries
         {"keys": [("equipment_id", 1), ("status", 1)]},
+        {"keys": [("linked_equipment_id", 1), ("status", 1)]},
         {"keys": [("installation_name", 1), ("created_at", -1)]},
+        {"keys": [("created_by", 1), ("status", 1), ("risk_score", -1)]},
     ],
     
     # Observations - linked to equipment and threats
@@ -66,17 +76,27 @@ INDEX_DEFINITIONS = {
     # Central Actions - common list views
     "central_actions": [
         {"keys": [("id", 1)], "unique": True},
+        {"keys": [("tenant_id", 1)]},
         {"keys": [("action_number", 1)], "unique": True, "sparse": True},
         {"keys": [("status", 1)]},
         {"keys": [("priority", 1)]},
         {"keys": [("due_date", 1)]},
         {"keys": [("assigned_to", 1)]},
+        {"keys": [("assignee", 1)]},
         {"keys": [("equipment_id", 1)]},
+        {"keys": [("linked_equipment_id", 1)]},
         {"keys": [("threat_id", 1)]},
+        {"keys": [("source_type", 1)]},
+        {"keys": [("source_id", 1)]},
         {"keys": [("installation_name", 1)]},
         {"keys": [("created_at", -1)]},
+        {"keys": [("created_by", 1)]},
         # Compound for dashboard queries
         {"keys": [("status", 1), ("due_date", 1)]},
+        {"keys": [("assignee", 1), ("status", 1)]},
+        {"keys": [("source_type", 1), ("source_id", 1)]},
+        {"keys": [("tenant_id", 1), ("source_type", 1), ("source_id", 1)]},
+        {"keys": [("tenant_id", 1), ("linked_equipment_id", 1), ("status", 1)]},
         {"keys": [("installation_name", 1), ("status", 1)]},
     ],
     

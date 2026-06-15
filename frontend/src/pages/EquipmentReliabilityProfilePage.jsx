@@ -97,8 +97,22 @@ export default function EquipmentReliabilityProfilePage() {
     staleTime: 60_000,
   });
 
+  const {
+    data: stateResponse,
+    isLoading: stateLoading,
+    error: stateError,
+  } = useQuery({
+    queryKey: ["reliability-state", equipmentId],
+    queryFn: () => rilDashboardAPI.getEquipmentReliabilityState(equipmentId),
+    enabled: Boolean(equipmentId),
+    staleTime: 30_000,
+  });
+
   const profile = profileResponse?.profile;
+  const liveState = stateResponse?.state;
   const summary = profile?.summary;
+  const openObservationCount =
+    liveState?.open_observation_count ?? summary?.open_observation_count ?? summary?.open_threat_count;
   const equipmentName = summary?.name || equipment?.name || equipment?.tag || equipmentId;
   const isLoading = equipmentLoading || profileLoading;
 
@@ -184,11 +198,69 @@ export default function EquipmentReliabilityProfilePage() {
                 <div>
                   <p className="text-xs text-slate-500 uppercase tracking-wide">Open items</p>
                   <p className="text-sm text-slate-700 mt-0.5">
-                    {summary.open_threat_count} threats · {summary.open_investigation_count} inv ·{" "}
-                    {summary.open_action_count} actions
+                    {openObservationCount ?? "—"} observations ·{" "}
+                    {summary.open_investigation_count} inv · {summary.open_action_count} actions
                   </p>
                 </div>
               </div>
+            </SectionCard>
+
+            {/* Live reliability state */}
+            <SectionCard title="Live Reliability State" icon={Activity}>
+              {stateLoading ? (
+                <div className="flex items-center gap-2 text-sm text-slate-500 py-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Refreshing state…
+                </div>
+              ) : stateError ? (
+                <EmptyNote>
+                  Could not load live state{stateError?.message ? `: ${stateError.message}` : "."}
+                </EmptyNote>
+              ) : !liveState?.found ? (
+                <EmptyNote>Live state unavailable.</EmptyNote>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase tracking-wide">Health</p>
+                    <p className="font-semibold text-slate-900 mt-0.5">
+                      {liveState.health_score != null ? `${liveState.health_score}/100` : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase tracking-wide">Risk</p>
+                    <p className="font-semibold text-slate-900 mt-0.5">{liveState.risk_level || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase tracking-wide">Open observations</p>
+                    <p className="font-semibold text-slate-900 mt-0.5">
+                      {openObservationCount ?? "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 uppercase tracking-wide">Overdue PM</p>
+                    <p className="font-semibold text-slate-900 mt-0.5">
+                      {liveState.overdue_pm_count ?? "—"}
+                    </p>
+                  </div>
+                  <div className="col-span-2 sm:col-span-4 flex flex-wrap gap-2 pt-1">
+                    {liveState.signals?.open_observations && (
+                      <Badge variant="outline" className="text-amber-800 border-amber-200 bg-amber-50">
+                        Open observations
+                      </Badge>
+                    )}
+                    {liveState.signals?.overdue_pm && (
+                      <Badge variant="outline" className="text-red-800 border-red-200 bg-red-50">
+                        Overdue PM
+                      </Badge>
+                    )}
+                    {liveState.graph_fingerprint && (
+                      <span className="text-xs text-slate-400 self-center">
+                        Graph fingerprint {liveState.graph_fingerprint}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </SectionCard>
 
             {/* Reliability Trend */}

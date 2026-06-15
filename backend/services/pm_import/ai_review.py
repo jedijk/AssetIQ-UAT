@@ -438,10 +438,8 @@ class PMImportMixin:
         similar_failure_modes: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """Use AI to generate a recommendation for the task."""
-        from services.openai_service import chat_completion
-        import os
-        import json
-        
+        from services.ai_gateway import chat as ai_gateway_chat
+
         task_description = task.get("task_description") or task.get("original_task") or ""
         discipline = normalize_pm_import_discipline(task.get("discipline"))
         frequency = task.get("frequency") or ""
@@ -532,6 +530,9 @@ Respond with a JSON object:
 }}"""
 
         try:
+            import os
+            import json
+
             api_key = os.environ.get("EMERGENT_LLM_KEY") or os.environ.get("OPENAI_API_KEY")
             if not api_key:
                 # Return default recommendation without AI
@@ -541,15 +542,16 @@ Respond with a JSON object:
                 "You are an expert in industrial equipment maintenance and failure mode analysis. "
                 "Respond only with valid JSON."
             )
-            response = await chat_completion(
+            response = await ai_gateway_chat(
                 messages=[
                     {"role": "system", "content": system_message},
                     {"role": "user", "content": prompt},
                 ],
+                user_id="pm-import",
+                endpoint="pm_import.ai_review.recommendation",
                 model="gpt-4o-mini",
                 temperature=0.2,
                 response_format={"type": "json_object"},
-                api_key=api_key,
             )
             
             # Parse JSON response

@@ -12,8 +12,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from openai import OpenAI
-
 logger = logging.getLogger(__name__)
 
 # System prompt for damage detection analysis

@@ -110,6 +110,7 @@ async def assign_criticality(
             user["id"],
             criticality_data,
             node_id,
+            user=user,
         )
         logger.info(
             "Updated %s threat scores after criticality change for %s",

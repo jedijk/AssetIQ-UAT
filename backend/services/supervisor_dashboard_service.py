@@ -252,6 +252,9 @@ async def get_supervisor_dashboard(user: dict) -> Dict[str, Any]:
     from services.maintenance_scheduler_service import get_daily_planner, get_dashboard_kpis
     from services.threat_service import list_threats
 
+    from services.threat_observation_bridge import count_unified_open_signals
+
+    unified_open_signals = await count_unified_open_signals(user=user)
     reliability_kpis = await compute_executive_reliability_kpis(user=user)
     scheduler_kpis = await get_dashboard_kpis(user)
     daily_planner = await get_daily_planner(user)
@@ -355,6 +358,7 @@ async def get_supervisor_dashboard(user: dict) -> Dict[str, Any]:
             "overdue_pm_count": reliability_kpis.get("overdue_pm", {}).get("total")
             or len(overdue_pm),
             "open_threats_count": reliability_kpis.get("open_threats") or len(open_threats),
+            "unified_open_signals_count": unified_open_signals,
             "escalating_risks_count": len(escalating_risks),
             "blocked_investigations_count": len(blocked_inv_items),
             "open_actions_count": len(open_actions),

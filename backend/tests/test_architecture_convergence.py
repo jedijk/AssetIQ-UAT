@@ -622,3 +622,67 @@ def test_frontend_raw_fetch_allowlist():
         f"Too many frontend raw fetch usages ({len(violations)}): "
         + ", ".join(sorted(violations)[:10])
     )
+
+
+SERVICES_DIR = BACKEND_ROOT / "services"
+SERVICE_LOC_LIMIT = 800
+# Grandfathered god-modules pending modularization — fail if count grows or new offenders appear.
+SERVICE_LOC_ALLOWLIST = {
+    "ai_risk_service.py": 833,
+    "chat_routes_service.py": 1421,
+    "decision_engine.py": 822,
+    "equipment_import_service.py": 1034,
+    "executive_dashboard_service.py": 997,
+    "failure_modes/actions_sync.py": 888,
+    "failure_modes_routes_service.py": 1004,
+    "form_service.py": 1680,
+    "intelligence_map_routes_service.py": 855,
+    "investigation_service.py": 999,
+    "maintenance_program_routes_service.py": 819,
+    "maintenance_program_service.py": 1750,
+    "maintenance_scheduler_sync.py": 977,
+    "maintenance_strategy_v2_service.py": 1538,
+    "observation_workspace_service.py": 1100,
+    "pm_import/ai_review.py": 939,
+    "process_import_service.py": 1088,
+    "production_dashboard_service.py": 1179,
+    "production_logs_service.py": 1350,
+    "production_logs_parsing.py": 600,
+    "maintenance_program_ai_recommendations.py": 230,
+    "ril_predictions.py": 180,
+    "reliability_graph.py": 1090,
+    "ril_service.py": 1200,
+    "task_service.py": 1565,
+    "threat_service.py": 1380,
+    "work_item_query.py": 1019,
+}
+
+
+def test_service_modules_respect_loc_limit_or_allowlist():
+    """Services over 800 LOC must be explicitly allowlisted (no silent growth)."""
+    violations: list[str] = []
+    for path in SERVICES_DIR.rglob("*.py"):
+        if path.name == "__init__.py":
+            continue
+        rel = path.relative_to(SERVICES_DIR).as_posix()
+        line_count = len(path.read_text(encoding="utf-8").splitlines())
+        allowed = SERVICE_LOC_ALLOWLIST.get(rel) or SERVICE_LOC_ALLOWLIST.get(path.name)
+        if line_count > SERVICE_LOC_LIMIT and allowed is None:
+            violations.append(f"{rel}: {line_count} LOC (limit {SERVICE_LOC_LIMIT})")
+        elif allowed is not None and line_count > allowed + 50:
+            violations.append(f"{rel}: {line_count} LOC exceeds allowlist cap {allowed}")
+    assert not violations, "Oversized service modules: " + "; ".join(sorted(violations)[:12])
+
+
+def test_pm_import_graph_sync_registered_in_dispatch_handlers():
+    from services.reliability_graph import GRAPH_SYNC_HANDLERS
+
+    assert "sync_edge_for_pm_import_task" in GRAPH_SYNC_HANDLERS
+    assert "sync_prediction_edges" in GRAPH_SYNC_HANDLERS
+
+
+def test_copilot_tool_registry_includes_reliability_tools():
+    from services.ril_copilot_service import COPILOT_TOOL_REGISTRY
+
+    assert "get_reliability_chain" in COPILOT_TOOL_REGISTRY
+    assert "get_open_signals" in COPILOT_TOOL_REGISTRY

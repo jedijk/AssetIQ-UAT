@@ -20,6 +20,7 @@ from services.tenant_schema import merge_tenant_filter, with_tenant_id
 from repositories.observation_document_repository import ObservationRepository
 from repositories.threat_repository import ThreatRepository
 from repositories.equipment_repository import EquipmentRepository
+from services.work_signal_projection import project_list_item
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +202,7 @@ class ObservationService:
         observations = [self._serialize_observation(doc) for doc in docs]
         total = await self._obs_repo.count(query, user=user)
 
-        return {"total": total, "observations": observations}
+        return {"total": total, "observations": observations, "work_signals": [project_list_item(doc) for doc in docs]}
     
     async def get_observation_by_id(
         self,

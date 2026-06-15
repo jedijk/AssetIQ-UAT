@@ -2,6 +2,7 @@
 Single entry point for AI chat completions — cost guard and usage logging.
 
 Routes and services should prefer this module over direct OpenAI client usage.
+Allowed direct OpenAI wrappers: openai_service (transport), image_analysis_service (vision via chat_with_images).
 """
 from __future__ import annotations
 

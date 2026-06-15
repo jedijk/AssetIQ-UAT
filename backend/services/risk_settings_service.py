@@ -132,7 +132,7 @@ async def update_risk_settings(
 
     recalc_result = None
     if recalculate:
-        recalc_result = await recalculate_all_for_installation(installation_id)
+        recalc_result = await recalculate_all_for_installation(installation_id, user=user)
 
     new_settings = await get_risk_settings_for_installation(installation_id)
     return {
@@ -149,7 +149,7 @@ async def trigger_recalculation(user: dict, installation_id: str) -> dict:
         raise HTTPException(status_code=403, detail="Only owners and admins can trigger recalculation")
 
     installation = await _get_installation(user, installation_id)
-    result = await recalculate_all_for_installation(installation_id)
+    result = await recalculate_all_for_installation(installation_id, user=user)
     return {"message": "Recalculation completed", "installation_name": installation["name"], **result}
 
 
@@ -164,7 +164,7 @@ async def reset_risk_settings(
     result = await db.risk_settings.delete_one({"installation_id": installation_id})
     recalc_result = None
     if recalculate and result.deleted_count > 0:
-        recalc_result = await recalculate_all_for_installation(installation_id)
+        recalc_result = await recalculate_all_for_installation(installation_id, user=user)
 
     return {
         "message": "Risk settings reset to defaults",

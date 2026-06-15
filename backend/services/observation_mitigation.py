@@ -90,7 +90,7 @@ async def maybe_auto_mitigate_observation(
             from services.cache_service import cache
             from services.threat_score_service import update_all_ranks
 
-            await update_all_ranks(user_id)
+            await update_all_ranks(user_id, user={"id": user_id} if user_id else None)
             cache.invalidate_stats(f"stats:{user_id}")
         except Exception as exc:
             logger.warning("Rank/stats refresh after auto-mitigate failed: %s", exc)

@@ -15,16 +15,30 @@ import time
 
 from database import db
 from services.action_number_service import allocate_central_action_number
+from services.tenant_schema import merge_tenant_filter, with_tenant_id
 from utils.auto_translate import translate_action
 from utils.workspace_localization import localize_workspace_payload
-from services.production_exposure import PRODUCTION_DOWNTIME_RANGES, production_exposure_monetary_value
+from services.work_signal_projection import project_detail
+from services.observation_workspace_exposure import (
+    calculate_alarp_progress,
+    calculate_environmental_exposure,
+    calculate_production_exposure,
+    calculate_reputation_exposure,
+    calculate_safety_exposure,
+    get_criticality_definitions_for_equipment,
+    get_production_loss_config as _get_production_loss_config,
+    resolve_installation_id as _resolve_installation_id,
+)
 
 logger = logging.getLogger(__name__)
-# In-memory cache for per-user production loss config (avoids extra DB round-trip per load).
-_prod_loss_config_cache: Dict[str, tuple] = {}
-_PROD_LOSS_CACHE_TTL_SEC = 300
-
 _OBSERVATION_PAYLOAD_EXCLUDE = frozenset({"_id", "recommended_actions"})
+
+
+async def _find_observation(observation_id: str, user: Optional[dict]) -> Optional[dict]:
+    return await db.threats.find_one(
+        merge_tenant_filter({"id": observation_id}, user),
+        {"_id": 0},
+    )
 
 
 def _build_observation_payload(observation: dict, equipment_node: Optional[dict] = None) -> dict:
@@ -35,44 +49,6 @@ def _build_observation_payload(observation: dict, equipment_node: Optional[dict]
         if tag:
             payload["equipment_tag"] = tag
     return payload
-
-
-async def _resolve_installation_id(equipment_node: Optional[dict]) -> Optional[str]:
-    """Find installation id without walking more than necessary."""
-    if not equipment_node:
-        return None
-    if equipment_node.get("level") == "installation":
-        return equipment_node.get("id")
-    if equipment_node.get("installation_id"):
-        return equipment_node.get("installation_id")
-
-    parent_id = equipment_node.get("parent_id")
-    for _ in range(15):
-        if not parent_id:
-            break
-        node = await db.equipment_nodes.find_one(
-            {"id": parent_id},
-            {"_id": 0, "id": 1, "level": 1, "parent_id": 1, "installation_id": 1},
-        )
-        if not node:
-            break
-        if node.get("level") == "installation":
-            return node.get("id")
-        if node.get("installation_id"):
-            return node.get("installation_id")
-        parent_id = node.get("parent_id")
-    return None
-
-
-async def _get_production_loss_config(user_id: str) -> dict:
-    now = time.monotonic()
-    cached = _prod_loss_config_cache.get(user_id)
-    if cached and cached[1] > now:
-        return cached[0]
-    doc = await db.production_loss_config.find_one({"created_by": user_id}, {"_id": 0}) or {}
-    _prod_loss_config_cache[user_id] = (doc, now + _PROD_LOSS_CACHE_TTL_SEC)
-    return doc
-
 
 
 # ============================================================================
@@ -92,7 +68,7 @@ class TimelineEvent(BaseModel):
     """A single event in the equipment reliability timeline"""
     id: str
     date: str
-    event_type: str  # observation, failure, work_order, inspection, repair, strategy_change, investigation
+    event_type: str
     title: str
     reference_id: Optional[str] = None
     status: Optional[str] = None
@@ -111,9 +87,9 @@ class ReliabilityIntelligence(BaseModel):
 class RecommendedAction(BaseModel):
     """A recommended action from library or AI"""
     id: str
-    action_type: str  # PM, CM, PDM, OP
+    action_type: str
     title: str
-    source: str  # failure_mode_library, ai_generated
+    source: str
     expected_impact: Optional[str] = None
     confidence: Optional[float] = None
     why_recommended: Optional[str] = None
@@ -125,7 +101,7 @@ class ActionPlanItem(BaseModel):
     id: str
     action_number: str
     title: str
-    status: str  # open, planned, in_progress, completed, validated
+    status: str
     priority: str
     owner: Optional[str] = None
     due_date: Optional[str] = None
@@ -134,266 +110,18 @@ class ActionPlanItem(BaseModel):
 class ProcessStage(BaseModel):
     """A stage in the process journey"""
     stage: str
-    status: str  # completed, in_progress, not_started
+    status: str
     date: Optional[str] = None
     owner: Optional[str] = None
-
-
-# ============================================================================
-# HELPER FUNCTIONS
-# ============================================================================
-
-async def calculate_production_exposure(observation: dict, criticality: dict, user_id: str) -> dict:
-    """Calculate production exposure based on criticality, observation data, and user's production loss config"""
-    production_impact = (criticality or {}).get("production_impact") or 0
-    if not production_impact:  # None or 0 → not rated on the 1-5 scale
-        return {"not_assessed": True, "production_impact_score": None, "formatted_value": "Not Assessed"}
-    
-    # Fetch user's production loss configuration
-    prod_loss_config = await _get_production_loss_config(user_id)
-    
-    # Use config values or defaults
-    hourly_cost = (prod_loss_config or {}).get("hourly_cost", 500.0)
-    currency = (prod_loss_config or {}).get("currency", "EUR")
-    
-    # Currency symbols
-    currency_symbols = {
-        "EUR": "€",
-        "USD": "$",
-        "GBP": "£",
-        "CHF": "CHF ",
-        "NOK": "kr ",
-        "SEK": "kr ",
-        "DKK": "kr "
-    }
-    currency_symbol = currency_symbols.get(currency, currency + " ")
-
-    min_hours, max_hours = PRODUCTION_DOWNTIME_RANGES.get(production_impact, (8, 24))
-
-    # Maximum exposure value:
-    #   - Closed range (max_hours set): max_hours × hourly_cost  → "Up to €X"
-    #   - Open-ended (max_hours = None): min_hours × hourly_cost → "More than €X"
-    open_ended = max_hours is None
-    max_exposure_value = production_exposure_monetary_value(production_impact, hourly_cost)
-    
-    # Build the human-readable downtime label
-    if open_ended:
-        downtime_label = f"> {min_hours}"
-    elif min_hours == 0 and max_hours == 0:
-        downtime_label = "0"
-    elif min_hours == 0:
-        downtime_label = f"< {max_hours}"
-    else:
-        downtime_label = f"{min_hours} - {max_hours}"
-    
-    formatted_value = (
-        f"More than {currency_symbol}{max_exposure_value:,.0f}"
-        if open_ended
-        else f"Up to {currency_symbol}{max_exposure_value:,.0f}"
-    )
-    
-    return {
-        "value": max_exposure_value,
-        "formatted_value": formatted_value,
-        "min_downtime_hours": min_hours,
-        "max_downtime_hours": max_hours,
-        "downtime_range": downtime_label,
-        "open_ended": open_ended,
-        "hourly_cost": hourly_cost,
-        "currency": currency,
-        "production_impact_score": production_impact
-    }
-
-
-def calculate_safety_exposure(observation: dict, criticality: dict) -> dict:
-    """Calculate safety exposure based on criticality"""
-    safety_impact = (criticality or {}).get("safety_impact") or 0
-    if not safety_impact:
-        return {"not_assessed": True, "safety_impact_score": None, "severity": "Not Assessed"}
-    
-    # Map safety impact to personnel exposure
-    personnel_mapping = {
-        1: 0,
-        2: 1,
-        3: 2,
-        4: 5,
-        5: 10
-    }
-    
-    severity_mapping = {
-        1: "Negligible",
-        2: "Low",
-        3: "Medium",
-        4: "High",
-        5: "Critical"
-    }
-    
-    return {
-        "personnel_exposed": personnel_mapping.get(safety_impact, 0),
-        "severity": severity_mapping.get(safety_impact, "Low"),
-        "safety_impact_score": safety_impact
-    }
-
-
-def calculate_environmental_exposure(observation: dict, criticality: dict) -> dict:
-    """Calculate environmental exposure"""
-    env_impact = (criticality or {}).get("environmental_impact") or 0
-    if not env_impact:
-        return {"not_assessed": True, "environmental_impact_score": None, "impact_rating": "Not Assessed"}
-    
-    impact_mapping = {
-        1: "Negligible",
-        2: "Low",
-        3: "Medium",
-        4: "High",
-        5: "Critical"
-    }
-    
-    return {
-        "impact_rating": impact_mapping.get(env_impact, "Low"),
-        "environmental_impact_score": env_impact
-    }
-
-
-def calculate_reputation_exposure(observation: dict, criticality: dict) -> dict:
-    """Calculate reputation exposure based on criticality.reputation_impact (1-5)."""
-    rep_impact = (criticality or {}).get("reputation_impact") or 0
-    if not rep_impact:
-        return {"not_assessed": True, "reputation_impact_score": None, "impact_rating": "Not Assessed"}
-    impact_mapping = {
-        1: "Negligible",
-        2: "Low",
-        3: "Medium",
-        4: "High",
-        5: "Critical",
-    }
-    return {
-        "impact_rating": impact_mapping.get(rep_impact, "Low"),
-        "reputation_impact_score": rep_impact,
-    }
-
-
-async def get_criticality_definitions_for_equipment(equipment_node: dict, user_id: str) -> List[dict]:
-    """
-    Resolve the criticality definitions that apply to an equipment node.
-
-    Walks the equipment hierarchy up to the installation (level == 'installation')
-    and returns the user's custom criticality definitions saved for that installation
-    if any exist. Falls back to the built-in DEFAULT_CRITICALITY otherwise.
-    """
-    from services.criticality_defaults import DEFAULT_CRITICALITY
-
-    if not equipment_node:
-        return DEFAULT_CRITICALITY
-
-    installation_id = await _resolve_installation_id(equipment_node)
-    if not installation_id:
-        return DEFAULT_CRITICALITY
-
-    custom = await db.definitions.find_one(
-        {"equipment_id": installation_id, "created_by": user_id},
-        {"_id": 0, "criticality": 1},
-    )
-    if not custom:
-        custom = await db.definitions.find_one(
-            {"equipment_id": installation_id},
-            {"_id": 0, "criticality": 1},
-        )
-
-    if custom and custom.get("criticality"):
-        return custom["criticality"]
-    return DEFAULT_CRITICALITY
-
-
-async def calculate_alarp_progress(observation: dict, actions: list, investigation: dict = None) -> dict:
-    """
-    Stage-based mitigation progress aligned with the Process Journey:
-        Observation reached               → 10%
-        Assessment (FM + Eq + risk)       → +10%
-        Planning (≥1 action on plan)      → +10%
-        Investigation                     → 0% (optional, no contribution)
-        Action — per completed action     → +40% × (completed / total)
-        Mitigated (all actions complete)  → 90%
-        Learning implemented              → 100%
-    """
-    progress = 10  # Observation stage reached (the observation exists)
-
-    observation = observation or {}
-
-    # Assessment (+10) — requires failure mode + equipment + risk score
-    has_fm = bool(observation.get("failure_mode") or observation.get("failure_mode_id"))
-    has_eq = bool(observation.get("linked_equipment_id"))
-    has_risk = (observation.get("risk_score") or 0) > 0
-    assessment_done = has_fm and has_eq and has_risk
-    if assessment_done:
-        progress += 10
-
-    # Planning (+10) — at least one action exists on the plan
-    total_actions = len(actions) if actions else 0
-    planning_done = total_actions > 0
-    if planning_done:
-        progress += 10
-
-    # Investigation contributes 0% intentionally (optional stage).
-
-    # Action contribution: up to 40% pro-rated by completion ratio.
-    completed_count = sum(
-        1 for a in (actions or []) if a.get("status") in ("completed", "validated")
-    )
-    action_pct = 0
-    if total_actions > 0:
-        if completed_count == total_actions:
-            # Mitigated stage reached — promote to 90% regardless of running total.
-            progress = 90
-        else:
-            action_pct = round(40 * completed_count / total_actions)
-            progress += action_pct
-
-    # Learning implemented → 100%
-    learning_done = any(
-        (a.get("action_type") or "").lower() in ("learning", "learn")
-        and a.get("status") in ("completed", "validated")
-        for a in (actions or [])
-    )
-    if learning_done:
-        progress = 100
-
-    progress = min(progress, 100)
-
-    # Status label reflects the furthest journey stage reached rather than an
-    # arbitrary percentage bucket — easier for the user to read at a glance.
-    if learning_done:
-        status = "Learning Complete"
-    elif total_actions > 0 and completed_count == total_actions:
-        status = "Mitigated"
-    elif total_actions > 0 and completed_count > 0:
-        status = "In Action"
-    elif planning_done:
-        status = "In Planning"
-    elif assessment_done:
-        status = "In Assessment"
-    else:
-        status = "Observation"
-
-    return {
-        "percentage": progress,
-        "status": status,
-        "components": {
-            "observation": 10,
-            "assessment": 10 if assessment_done else 0,
-            "planning": 10 if planning_done else 0,
-            "investigation": 0,
-            "actions": action_pct,
-            "learning": 100 if learning_done else 0,
-        },
-    }
 
 
 async def get_equipment_timeline_events(
     equipment_id: str = None,
     asset_name: str = None,
     current_observation_id: str = None,
-    limit: int = 20
+    limit: int = 20,
+    *,
+    user: Optional[dict] = None,
 ) -> List[dict]:
     """
     Get historical events for equipment:
@@ -417,7 +145,7 @@ async def get_equipment_timeline_events(
     
     # 1. Get observations (including failures - closed observations)
     observations = await db.threats.find(
-        {"$or": eq_conditions},
+        merge_tenant_filter({"$or": eq_conditions}, user),
         {"_id": 0, "id": 1, "title": 1, "created_at": 1, "status": 1, 
          "risk_level": 1, "failure_mode": 1, "threat_number": 1}
     ).sort("created_at", -1).limit(limit).to_list(limit)
@@ -457,7 +185,7 @@ async def get_equipment_timeline_events(
     
     if action_conditions:
         actions_task = db.central_actions.find(
-            {"$or": action_conditions},
+            merge_tenant_filter({"$or": action_conditions}, user),
             {"_id": 0, "id": 1, "title": 1, "created_at": 1, "status": 1,
              "action_number": 1, "action_type": 1}
         ).sort("created_at", -1).limit(limit).to_list(limit)
@@ -474,7 +202,7 @@ async def get_equipment_timeline_events(
 
     if inv_conditions:
         investigations_task = db.investigations.find(
-            {"$or": inv_conditions},
+            merge_tenant_filter({"$or": inv_conditions}, user),
             {"_id": 0, "id": 1, "title": 1, "created_at": 1, "status": 1, "case_number": 1}
         ).sort("created_at", -1).limit(10).to_list(10)
     else:
@@ -764,7 +492,7 @@ async def _load_failure_mode_data(observation: dict) -> Optional[dict]:
     return None
 
 
-async def _load_equipment_node(observation: dict) -> Optional[dict]:
+async def _load_equipment_node(observation: dict, user: Optional[dict] = None) -> Optional[dict]:
     lookup_filters = []
     if observation.get("linked_equipment_id"):
         lookup_filters.append({"id": observation["linked_equipment_id"]})
@@ -775,10 +503,13 @@ async def _load_equipment_node(observation: dict) -> Optional[dict]:
         lookup_filters.append({"name": observation["asset"]})
     if not lookup_filters:
         return None
-    return await db.equipment_nodes.find_one({"$or": lookup_filters}, {"_id": 0})
+    return await db.equipment_nodes.find_one(
+        merge_tenant_filter({"$or": lookup_filters}, user),
+        {"_id": 0},
+    )
 
 
-async def get_action_plan(observation_id: str, investigation: dict = None) -> List[dict]:
+async def get_action_plan(observation_id: str, investigation: dict = None, *, user: Optional[dict] = None) -> List[dict]:
     """
     Get actions linked to this observation (existing actions system).
     
@@ -787,21 +518,27 @@ async def get_action_plan(observation_id: str, investigation: dict = None) -> Li
     central_actions.
     """
     actions = await db.central_actions.find(
-        {
-            "$or": [
-                {"source_id": observation_id},
-                {"observation_id": observation_id},
-                {"threat_id": observation_id}
-            ]
-        },
-        {"_id": 0}
+        merge_tenant_filter(
+            {
+                "$or": [
+                    {"source_id": observation_id},
+                    {"observation_id": observation_id},
+                    {"threat_id": observation_id},
+                ]
+            },
+            user,
+        ),
+        {"_id": 0},
     ).sort("created_at", -1).to_list(50)
     
     action_plan = []
     
     # Surface the linked investigation (if any) as a synthetic IV entry
     if investigation is None:
-        investigation = await db.investigations.find_one({"threat_id": observation_id}, {"_id": 0})
+        investigation = await db.investigations.find_one(
+            merge_tenant_filter({"threat_id": observation_id}, user),
+            {"_id": 0},
+        )
     if investigation:
         inv_status = (investigation.get("status") or "draft").lower()
         # Map investigation status → action plan status
@@ -977,18 +714,18 @@ async def get_workspace(user: dict, observation_id: str, language: Optional[str]
     Returns all data needed for the Reliability Intelligence Workspace.
     """
     # Get the observation
-    observation = await db.threats.find_one(
-        {"id": observation_id},
-        {"_id": 0}
-    )
+    observation = await _find_observation(observation_id, user)
     
     if not observation:
         raise HTTPException(status_code=404, detail="Observation not found")
 
     equipment_node, failure_mode_data, investigation = await asyncio.gather(
-        _load_equipment_node(observation),
+        _load_equipment_node(observation, user),
         _load_failure_mode_data(observation),
-        db.investigations.find_one({"threat_id": observation_id}, {"_id": 0}),
+        db.investigations.find_one(
+            merge_tenant_filter({"threat_id": observation_id}, user),
+            {"_id": 0},
+        ),
     )
 
     criticality = None
@@ -998,7 +735,7 @@ async def get_workspace(user: dict, observation_id: str, language: Optional[str]
         criticality = observation.get("equipment_criticality_data")
 
     # Run independent queries in parallel for better performance
-    action_plan_task = asyncio.create_task(get_action_plan(observation_id, investigation))
+    action_plan_task = asyncio.create_task(get_action_plan(observation_id, investigation, user=user))
     criticality_definitions_task = asyncio.create_task(
         get_criticality_definitions_for_equipment(equipment_node, user["id"])
     )
@@ -1009,7 +746,8 @@ async def get_workspace(user: dict, observation_id: str, language: Optional[str]
         get_equipment_timeline_events(
             equipment_id=observation.get("linked_equipment_id"),
             asset_name=observation.get("asset"),
-            current_observation_id=observation_id
+            current_observation_id=observation_id,
+            user=user,
         )
     )
     reliability_intelligence_task = asyncio.create_task(
@@ -1128,6 +866,7 @@ async def get_workspace(user: dict, observation_id: str, language: Optional[str]
     payload = {
         "observation_id": observation_id,
         "observation": _build_observation_payload(observation, equipment_node),
+        "work_signal": project_detail(observation),
         "equipment": {
             "id": equipment_node.get("id") if equipment_node else None,
             "name": equipment_node.get("name") if equipment_node else observation.get("asset"),
@@ -1188,7 +927,7 @@ async def add_action_to_plan(user: dict, observation_id: str, action_data: dict)
     This creates an action in the central actions system linked to this observation.
     """
     # Verify observation exists
-    observation = await db.threats.find_one({"id": observation_id}, {"_id": 0})
+    observation = await _find_observation(observation_id, user)
     if not observation:
         raise HTTPException(status_code=404, detail="Observation not found")
     
@@ -1199,7 +938,7 @@ async def add_action_to_plan(user: dict, observation_id: str, action_data: dict)
     now = datetime.now(timezone.utc).isoformat()
     observation_title = observation.get("title") or observation.get("asset") or "Observation"
     
-    new_action = {
+    new_action = with_tenant_id({
         "id": action_id,
         "action_number": action_number,
         "title": action_data.get("title", ""),
@@ -1221,7 +960,7 @@ async def add_action_to_plan(user: dict, observation_id: str, action_data: dict)
         "updated_at": now,
         "created_by": user.get("id"),
         "created_by_name": user.get("name")
-    }
+    }, user)
     
     await db.central_actions.insert_one(new_action)
 
@@ -1249,7 +988,7 @@ async def add_recommendation_to_plan(user: dict, observation_id: str, recommenda
     Converts a recommendation into an actual action.
     """
     # Verify observation exists
-    observation = await db.threats.find_one({"id": observation_id}, {"_id": 0})
+    observation = await _find_observation(observation_id, user)
     if not observation:
         raise HTTPException(status_code=404, detail="Observation not found")
     
@@ -1269,7 +1008,7 @@ async def add_recommendation_to_plan(user: dict, observation_id: str, recommenda
     rec_source = recommendation.get("source", "recommendation")
     source_type = "ai_recommendation" if rec_source == "ai_generated" else "threat"
     
-    new_action = {
+    new_action = with_tenant_id({
         "id": action_id,
         "action_number": action_number,
         "title": recommendation.get("title", ""),
@@ -1293,7 +1032,7 @@ async def add_recommendation_to_plan(user: dict, observation_id: str, recommenda
         "updated_at": now,
         "created_by": user.get("id"),
         "created_by_name": user.get("name")
-    }
+    }, user)
     
     await db.central_actions.insert_one(new_action)
 
@@ -1319,7 +1058,7 @@ async def get_timeline_enhanced(user: dict, observation_id: str, limit: int = 20
     """
     Get enhanced equipment timeline for the observation.
     """
-    observation = await db.threats.find_one({"id": observation_id}, {"_id": 0})
+    observation = await _find_observation(observation_id, user)
     if not observation:
         raise HTTPException(status_code=404, detail="Observation not found")
     
@@ -1327,7 +1066,8 @@ async def get_timeline_enhanced(user: dict, observation_id: str, limit: int = 20
         equipment_id=observation.get("linked_equipment_id"),
         asset_name=observation.get("asset"),
         current_observation_id=observation_id,
-        limit=limit
+        limit=limit,
+        user=user,
     )
     
     return {

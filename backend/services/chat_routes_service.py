@@ -262,7 +262,8 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
 
     risk_settings = await get_risk_settings_for_installation(installation_id)
     final_risk_score, risk_level = calculate_risk_score(criticality_score, fmea_score, risk_settings)
-    rank, total = await calculate_rank(final_risk_score, user_id)
+    tenant_user = await _tenant_ctx_for_user(user_id)
+    rank, total = await calculate_rank(final_risk_score, user_id, user=tenant_user)
 
     observation_title = _chat_observation_title(
         equipment_name,
@@ -329,6 +330,14 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
     except Exception as e:
         logger.error(f"Failed to create threat {threat_id}: {e}")
         raise
+
+    from services.threat_observation_bridge import mirror_threat_to_observation
+
+    tenant_user = await _tenant_ctx_for_user(user_id)
+    try:
+        await mirror_threat_to_observation(threat_doc, user=tenant_user)
+    except Exception as bridge_exc:
+        logger.warning("Threat→observation mirror failed for %s: %s", threat_id, bridge_exc)
 
     # Skip auto-translation for faster response - can be done manually later if needed
     # asyncio.create_task(
@@ -404,7 +413,7 @@ async def _create_observation(user_id: str, obs_data: dict, session_id: str,
         )
 
     # Run rank update in background (non-blocking)
-    asyncio.create_task(update_all_ranks(user_id))
+    asyncio.create_task(update_all_ranks(user_id, user=tenant_user))
 
     updated = await db.threats.find_one({"id": threat_id}, {"_id": 0})
     if isinstance(updated.get("risk_score"), float):

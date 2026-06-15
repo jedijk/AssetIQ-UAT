@@ -418,6 +418,12 @@ async def build_equipment_reliability_profile(
 
     ai_summary = format_context_for_prompt(ctx)
 
+    from services.equipment_reliability_state_service import build_equipment_reliability_state
+
+    reliability_state = await build_equipment_reliability_state(
+        equipment_id, user_id, user=user
+    )
+
     return {
         "found": True,
         "equipment_id": equipment_id,
@@ -433,6 +439,7 @@ async def build_equipment_reliability_profile(
             "risk_score": open_threats[0].get("risk_score") if open_threats else None,
             "status": "At Risk" if open_threat_count > 0 or (health_score or 100) < 70 else "Stable",
             "open_threat_count": open_threat_count,
+            "open_observation_count": reliability_state.get("open_observation_count", open_threat_count),
             "open_investigation_count": investigations.get("open_count", 0),
             "open_action_count": actions.get("open_count", 0),
             "overdue_pm": health_snapshot.get("overdue_pm"),
@@ -452,5 +459,6 @@ async def build_equipment_reliability_profile(
         "health_snapshot": health_snapshot,
         "twin_snapshot": twin,
         "ai_reliability_summary": ai_summary,
+        "reliability_state": reliability_state,
         "context": ctx,
     }

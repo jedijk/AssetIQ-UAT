@@ -4,6 +4,8 @@ import os
 import uuid
 from pathlib import Path
 
+pytestmark = pytest.mark.integration
+
 # Load frontend .env to get REACT_APP_BACKEND_URL
 _frontend_env = Path(__file__).parent.parent.parent / 'frontend' / '.env'
 if _frontend_env.exists():

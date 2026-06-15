@@ -144,12 +144,16 @@ export function buildTraceStages({
 
 export function summarizeRiskExplanation(risk = {}) {
   if (!risk || !Object.keys(risk).length) return null;
-  const threats = risk.open_threats || [];
+  const observations = risk.open_observations || risk.open_threats || [];
+  const openCount = risk.open_observation_count ?? risk.open_threat_count ?? observations.length;
   return {
-    openThreatCount: risk.open_threat_count ?? threats.length,
-    graphLinkedThreatCount: risk.graph_linked_threat_count ?? 0,
+    openThreatCount: openCount,
+    openObservationCount: openCount,
+    graphLinkedThreatCount: risk.graph_linked_observation_count ?? risk.graph_linked_threat_count ?? 0,
+    graphLinkedObservationCount: risk.graph_linked_observation_count ?? risk.graph_linked_threat_count ?? 0,
     overduePm: risk.overdue_pm_scheduled ?? 0,
-    topThreats: threats.slice(0, 5),
+    topThreats: observations.slice(0, 5),
+    topObservations: observations.slice(0, 5),
     pathEntries: risk.path_entries || [],
     paths: risk.risk_paths || [],
   };
@@ -157,9 +161,10 @@ export function summarizeRiskExplanation(risk = {}) {
 
 export function buildLabelHintsFromRisk(risk = {}) {
   const hints = {};
-  for (const threat of risk.open_threats || []) {
-    if (threat?.id && threat?.title) {
-      hints[`threat:${threat.id}`] = threat.title;
+  for (const obs of risk.open_observations || risk.open_threats || []) {
+    if (obs?.id && obs?.title) {
+      hints[`observation:${obs.id}`] = obs.title;
+      hints[`threat:${obs.id}`] = obs.title;
     }
   }
   return hints;

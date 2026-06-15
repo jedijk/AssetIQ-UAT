@@ -13,6 +13,7 @@ from fastapi import HTTPException
 
 from database import db
 from services.task_instance_bridge import resolve_task_instance
+from services.tenant_schema import merge_tenant_filter
 from services.work_execution_kpi_materializer import get_or_compute_work_execution_kpis
 from services.work_item_query import (
     fetch_work_items,
@@ -21,6 +22,7 @@ from services.work_item_query import (
     serialize_task,
     _user_can_see_item,
 )
+from services.work_signal_projection import project_detail
 
 logger = logging.getLogger(__name__)
 
@@ -126,14 +128,38 @@ async def _process_attachments(raw_attachments: List[dict]) -> List[dict]:
     return processed
 
 
-async def _load_task_instance_detail(task: dict, user_id: str) -> dict:
+async def _resolve_observation_id_for_task(task: dict) -> Optional[str]:
+    """Resolve linked observation/threat id from a task instance document."""
+    for key in ("observation_id", "threat_id", "source_observation_id"):
+        if task.get(key):
+            return str(task[key])
+    if task.get("created_from_observation") and task.get("source_id"):
+        return str(task["source_id"])
+    return None
+
+
+async def _attach_work_signal(task: dict, user: Optional[dict]) -> None:
+    """Add unified work_signal when task links to an observation/threat."""
+    obs_id = await _resolve_observation_id_for_task(task)
+    if not obs_id:
+        return
+    obs = await db.threats.find_one(
+        merge_tenant_filter({"id": obs_id}, user),
+        {"_id": 0},
+    )
+    if obs:
+        task["work_signal"] = project_detail(obs)
+
+
+async def _load_task_instance_detail(task: dict, user_id: str, user: Optional[dict] = None) -> dict:
     """Enrich a task_instances document for My Tasks detail/start responses."""
     _ensure_user_can_execute_task(task, user_id)
 
     if task.get("equipment_id"):
-        equipment = await db.equipment.find_one({"_id": task["equipment_id"]})
+        eq_query = merge_tenant_filter({"id": task["equipment_id"]}, user)
+        equipment = await db.equipment_nodes.find_one(eq_query)
         if not equipment:
-            equipment = await db.equipment_nodes.find_one({"id": task["equipment_id"]})
+            equipment = await db.equipment.find_one({"_id": task["equipment_id"]})
         if equipment:
             task["equipment_name"] = equipment.get("name", "Unknown")
             task["equipment_tag"] = equipment.get("tag", "")
@@ -188,7 +214,8 @@ async def get_task_detail(user: dict, task_id: str):
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    task = await _load_task_instance_detail(task, user_id)
+    task = await _load_task_instance_detail(task, user_id, user=user)
+    await _attach_work_signal(task, user)
     return serialize_task(task)
 
 
@@ -220,7 +247,7 @@ async def start_task(user: dict, task_id: str):
     )
 
     updated_task = await db.task_instances.find_one({"_id": task["_id"]})
-    updated_task = await _load_task_instance_detail(updated_task, user_id)
+    updated_task = await _load_task_instance_detail(updated_task, user_id, user=user)
     return serialize_task(updated_task)
 
 

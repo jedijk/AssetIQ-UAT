@@ -107,6 +107,15 @@ async def test_build_profile_summary_fields():
         "services.equipment_reliability_profile_service._build_reliability_trend",
         AsyncMock(return_value={"current": {"health_score": 75}, "windows": {}, "series": []}),
     ), patch(
+        "services.equipment_reliability_state_service.build_equipment_reliability_state",
+        AsyncMock(return_value={
+            "found": True,
+            "open_observation_count": 1,
+            "overdue_pm_count": 0,
+            "health_score": 75,
+            "risk_level": "High",
+        }),
+    ), patch(
         "services.equipment_reliability_profile_service.db",
     ) as mock_db:
         mock_ctx_cls.return_value.get_context = AsyncMock(return_value=ctx)
@@ -120,3 +129,4 @@ async def test_build_profile_summary_fields():
     assert result["summary"]["health_score"] == 75
     assert result["ai_reliability_summary"]
     assert len(result["open_threats"]) == 1
+    assert result["reliability_state"]["open_observation_count"] == 1

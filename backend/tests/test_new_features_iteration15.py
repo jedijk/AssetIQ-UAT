@@ -11,6 +11,8 @@ import requests
 import os
 import base64
 
+pytestmark = pytest.mark.integration
+
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 # Test credentials from environment or test_credentials.md

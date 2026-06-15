@@ -6,6 +6,8 @@ import pytest
 import requests
 from conftest import BASE_URL, TEST_ADMIN_EMAIL
 
+pytestmark = pytest.mark.integration
+
 
 class TestAuthRoutes:
     """Test authentication routes after refactoring"""

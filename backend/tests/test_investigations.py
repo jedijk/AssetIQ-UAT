@@ -8,6 +8,8 @@ import os
 import uuid
 from datetime import datetime
 
+pytestmark = pytest.mark.integration
+
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 class TestInvestigationsCRUD:

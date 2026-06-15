@@ -52,6 +52,7 @@ jobs:
           ENVIRONMENT: test
         run: |
           cd backend && python scripts/ci_bootstrap_test_users.py
+          cd backend && python scripts/ci_integration_bootstrap.py
 
       - name: Start API server for integration tests
         env:

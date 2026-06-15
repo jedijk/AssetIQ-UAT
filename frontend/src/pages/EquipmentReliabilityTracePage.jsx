@@ -33,6 +33,17 @@ export default function EquipmentReliabilityTracePage() {
     staleTime: 60_000,
   });
 
+  const { data: stateResponse } = useQuery({
+    queryKey: ["equipment-reliability-state", equipmentId],
+    queryFn: () => rilDashboardAPI.getEquipmentReliabilityState(equipmentId),
+    enabled: Boolean(equipmentId),
+    staleTime: 60_000,
+  });
+
+  const liveState = stateResponse?.state;
+  const openSignalCount =
+    liveState?.open_observation_count ?? liveState?.open_threat_count;
+
   const equipmentName = equipment?.name || equipment?.tag || equipmentId;
 
   return (
@@ -68,6 +79,14 @@ export default function EquipmentReliabilityTracePage() {
       </div>
 
       <div className="container mx-auto max-w-5xl px-4 py-6">
+        {openSignalCount != null && (
+          <p className="text-sm text-slate-600 mb-4">
+            Open reliability signals: <span className="font-semibold text-slate-900">{openSignalCount}</span>
+            {liveState?.status ? (
+              <span className="text-slate-500"> · {liveState.status}</span>
+            ) : null}
+          </p>
+        )}
         {traceLoading || equipmentLoading ? (
           <div className="flex items-center justify-center py-16 text-slate-500">
             <Loader2 className="w-6 h-6 animate-spin mr-2" />
