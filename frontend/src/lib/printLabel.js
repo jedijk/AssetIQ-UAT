@@ -162,52 +162,72 @@ function showMobilePrintOverlay(html) {
 function navigatePrintWindowToUrl(win, url) {
   if (!win || win.closed) return false;
   try {
-    const doc = win.document;
-    doc.open();
-    doc.write(
-      "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Label</title></head>" +
-        "<body><script>window.location.replace(" +
-        JSON.stringify(url) +
-        ");</script></body></html>"
-    );
-    doc.close();
+    win.location.href = url;
     return true;
   } catch (_e) {
     /* ignore */
   }
   try {
-    win.postMessage({ type: "assetiq-label-pdf", url }, window.location.origin);
-    // PDF blob URLs from the parent often fail on Android — do not treat as success.
-    return false;
-  } catch (_e2) {
-    /* ignore */
-  }
-  try {
-    win.location.href = url;
+    const doc = win.document;
+    doc.open();
+    doc.write(
+      "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Label</title></head>" +
+        "<body style=\"margin:0\">" +
+        "<embed type=\"application/pdf\" src=\"" +
+        url.replace(/"/g, "&quot;") +
+        "\" width=\"100%\" height=\"100%\" style=\"position:fixed;inset:0\" />" +
+        "</body></html>"
+    );
+    doc.close();
     return true;
-  } catch (_e3) {
+  } catch (_e2) {
     /* ignore */
   }
   return false;
 }
 
 
-function schedulePrint(win) {
+/** Print after the target window has had time to load PDF content. */
+function schedulePrintWhenReady(win, delayMs = 2000) {
   if (!win || win.closed) return;
-  const tryPrint = () => {
+  setTimeout(() => {
     try {
       win.focus();
       win.print();
     } catch (_e) {
       /* ignore */
     }
-  };
+  }, delayMs);
+}
+
+
+function openPdfInPrintWindow(win, blob) {
+  if (!win || win.closed) return false;
+  const url = URL.createObjectURL(blob);
+  const cleanup = () => setTimeout(() => URL.revokeObjectURL(url), 60000);
+  if (navigatePrintWindowToUrl(win, url)) {
+    schedulePrintWhenReady(win);
+    cleanup();
+    return true;
+  }
+  URL.revokeObjectURL(url);
+  return false;
+}
+
+
+async function deliverHtmlAndPrint(win, html) {
+  if (!win || win.closed) return false;
+  const delivered = await deliverHtmlToPrintWindow(win, html);
+  if (!delivered) return false;
+  // Do not rely on inline load handlers — they may not run after opener document.write.
+  await new Promise((resolve) => setTimeout(resolve, 900));
   try {
-    win.addEventListener("load", tryPrint, { once: true });
+    win.focus();
+    win.print();
   } catch (_e) {
     /* ignore */
   }
-  setTimeout(tryPrint, 600);
+  return true;
 }
 
 
@@ -287,24 +307,18 @@ function printPdfViaIframe(blob) {
 
 
 async function printMobileViaPdfFallback(payload, preOpened, filename) {
-  let url = null;
   try {
     const blob = await labelsAPI.printBlob(payload);
-    url = URL.createObjectURL(blob);
 
-    if (preOpened && !preOpened.closed && navigatePrintWindowToUrl(preOpened, url)) {
-      schedulePrint(preOpened);
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    if (preOpened && !preOpened.closed && openPdfInPrintWindow(preOpened, blob)) {
       return { method: "window", ok: true, mobile: true };
     }
 
     if (await sharePdfBlob(blob, filename)) {
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
       return { method: "share", ok: true, mobile: true };
     }
 
     downloadBlob(blob, filename);
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
     if (preOpened && !preOpened.closed) {
       try {
         preOpened.close();
@@ -314,7 +328,6 @@ async function printMobileViaPdfFallback(payload, preOpened, filename) {
     }
     return { method: "download", ok: true, mobile: true };
   } catch (_err) {
-    if (url) URL.revokeObjectURL(url);
     if (preOpened && !preOpened.closed) {
       try {
         preOpened.close();
@@ -334,11 +347,11 @@ async function printMobileLabel(payload, preOpened, filename) {
       asset_ids: payload.asset_ids || [],
       submission_id: payload.submission_id,
       copies: payload.copies || 1,
-      auto_print: true,
+      auto_print: false,
     });
 
     if (preOpened && !preOpened.closed) {
-      const delivered = await deliverHtmlToPrintWindow(preOpened, html);
+      const delivered = await deliverHtmlAndPrint(preOpened, html);
       if (delivered) {
         return { method: "window", ok: true, mobile: true };
       }
@@ -360,7 +373,7 @@ async function printMobileLabel(payload, preOpened, filename) {
         } catch (_e) {
           /* ignore */
         }
-        const delivered = await deliverHtmlToPrintWindow(w, html);
+        const delivered = await deliverHtmlAndPrint(w, html);
         if (delivered) {
           return { method: "window", ok: true, mobile: true };
         }
@@ -403,14 +416,8 @@ export async function printLabel(payload, opts = {}) {
 
   try {
     const blob = await labelsAPI.printBlob(payload);
-    if (preOpened && !preOpened.closed) {
-      const url = URL.createObjectURL(blob);
-      if (navigatePrintWindowToUrl(preOpened, url)) {
-        schedulePrint(preOpened);
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-        return { method: "window", ok: true, mobile: false };
-      }
-      URL.revokeObjectURL(url);
+    if (preOpened && !preOpened.closed && openPdfInPrintWindow(preOpened, blob)) {
+      return { method: "window", ok: true, mobile: false };
     }
     const ok = await printPdfViaIframe(blob);
     if (!ok) {
