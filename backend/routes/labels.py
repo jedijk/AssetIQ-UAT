@@ -600,7 +600,7 @@ def _calculate_logo_position(position: str, x0: float, y0: float, w: float, h: f
 FONT_SIZE_PRESETS = {
     "small": {"title": 7, "body": 5.5, "caption": 5},
     "medium": {"title": 9, "body": 6.5, "caption": 6},
-    "large": {"title": 11, "body": 8, "caption": 7},
+    "large": {"title": 16.5, "body": 12, "caption": 10.5},
 }
 
 
