@@ -37,8 +37,8 @@ async def get_evidence_detail(
 ) -> Dict[str, Any]:
     """
     Paginated evidence for a dashboard metric.
-    metric_type: uncovered_exposure, unassessed_assessments, active_threat_exposure,
-    critical_active_exposure, resolved_exposure
+    metric_type: covered_exposure, uncovered_exposure, unassessed_assessments,
+    active_threat_exposure, critical_active_exposure, resolved_exposure
     """
     dashboard = await get_or_compute_executive_dashboard(current_user=current_user)
 

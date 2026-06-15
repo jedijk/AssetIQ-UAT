@@ -28,7 +28,7 @@ if not mongo_url:
 DEFAULT_DB_NAME = os.environ.get('DB_NAME', 'assetiq')
 AVAILABLE_DATABASES = {
     "production": {
-        "name": "assetiq",
+        "name": DEFAULT_DB_NAME,
         "label": "Production",
         "description": "Live production database"
     },

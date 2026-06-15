@@ -2,6 +2,7 @@
 Shared pytest fixtures and test configuration.
 All test credentials are loaded from environment variables.
 """
+import asyncio
 import pytest
 import requests
 import os
@@ -57,6 +58,20 @@ def _fetch_auth_token(api_client, credentials: dict, label: str) -> str:
 # =============================================
 # SHARED FIXTURES
 # =============================================
+
+@pytest.fixture(autouse=True)
+def _bind_session_event_loop():
+    """Re-bind the active pytest-asyncio loop after sync tests call asyncio.run()."""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    yield
+
 
 @pytest.fixture(scope="session")
 def base_url():

@@ -77,6 +77,9 @@ async def main() -> int:
         return 1
     for spec in CI_USERS:
         await _upsert_user(spec)
+    emails = [spec["email"].lower() for spec in CI_USERS]
+    result = await db.login_attempts.delete_many({"email": {"$in": emails}})
+    print(f"cleared {result.deleted_count} login_attempts record(s) for CI users")
     return 0
 
 

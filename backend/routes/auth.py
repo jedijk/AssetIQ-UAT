@@ -48,6 +48,13 @@ REQUIRE_PASSWORD_COMPLEXITY = os.environ.get("REQUIRE_PASSWORD_COMPLEXITY", "tru
 # Spam protection configuration
 RECAPTCHA_ENABLED = os.environ.get("RECAPTCHA_ENABLED", "false").lower() == "true"
 
+# Account lockout — disabled in CI/test and when explicitly opted out
+def _account_lockout_disabled() -> bool:
+    return (
+        os.environ.get("ENVIRONMENT", "").lower() == "test"
+        or os.environ.get("DISABLE_ACCOUNT_LOCKOUT", "").lower() == "true"
+    )
+
 # Email configuration
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 SENDER_EMAIL = os.environ.get("SENDER_EMAIL", "onboarding@resend.dev")
@@ -92,6 +99,9 @@ async def check_account_lockout(email: str) -> tuple[bool, int, int]:
     Check if account is locked due to failed login attempts.
     Returns (is_locked, remaining_minutes, retry_after_seconds)
     """
+    if _account_lockout_disabled():
+        return False, 0, 0
+
     lockout = await db.login_attempts.find_one({"email": email.lower()})
     
     if not lockout:
@@ -135,6 +145,9 @@ async def record_login_attempt(email: str, success: bool, ip_address: str = None
             "ip_address": ip_address,
             "timestamp": now.isoformat(),
         })
+        return
+
+    if _account_lockout_disabled():
         return
     
     # Get or create login attempt record
@@ -816,11 +829,11 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest):
     user = await db.users.find_one({"email": exact_case_insensitive(body.email)}, {"_id": 0})
     
     if not user:
-        # User not found - return feedback
+        # Always return success to prevent email enumeration
         return {
-            "status": "not_found",
+            "status": "success",
             "user_found": False,
-            "message": "No account found with this email address."
+            "message": "If an account exists with this email, a password reset link has been sent.",
         }
     
     # User exists - generate reset token

@@ -547,6 +547,40 @@ async def build_executive_dashboard(
             "id": equipment_id,
         })
 
+    program_covered_equipment_ids = {
+        prog.get("equipment_id")
+        for prog in maintenance_programs
+        if prog.get("equipment_id") and _program_is_active(prog)
+    }
+    covered_evidence = []
+    for equipment in equipment_nodes:
+        equipment_id = equipment.get("id")
+        if not equipment_id or equipment_id not in covered_equipment_ids:
+            continue
+        exposure_value = equipment_assessed_exposure_value(equipment, hourly_cost)
+        if exposure_value <= 0:
+            continue
+        production_impact = production_impact_from_criticality(equipment.get("criticality")) or 0
+        if equipment_id in program_covered_equipment_ids:
+            control_status = "Maintenance Program"
+        elif equipment_id in pm_import_equipment_ids:
+            control_status = "Imported PM Plan"
+        else:
+            control_status = "Covered"
+        covered_evidence.append({
+            "asset": equipment.get("name") or equipment_id,
+            "tag": equipment.get("tag"),
+            "failure_mode": control_status,
+            "description": "Assessed equipment with an active maintenance program or imported PM plan",
+            "equipment_type": equipment.get("equipment_type_id"),
+            "criticality": equipment.get("criticality"),
+            "production_impact": production_impact,
+            "exposure_value": exposure_value,
+            "exposure_formatted": format_currency(exposure_value, currency_symbol),
+            "control_status": control_status,
+            "id": equipment_id,
+        })
+
     assessment_scope_equipment = [
         eq
         for eq in equipment_nodes
@@ -897,6 +931,7 @@ PM compliance {"is strong" if pm_compliance_current >= 85 else "needs improvemen
     # ============= Evidence Drill-Down =============
     
     evidence_drill_down = {
+        "covered_exposure": sorted(covered_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:25],
         "uncovered_exposure": sorted(uncovered_evidence, key=lambda x: x.get("exposure_value", 0), reverse=True)[:25],
         "unassessed_assessments": sorted(
             unassessed_assessment_evidence,

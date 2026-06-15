@@ -1,14 +1,26 @@
 """Tests for OpenAI service usage tracking."""
+import importlib
 import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-import services.ai_cost_guard  # noqa: F401 — ensure patch target is loaded
-
 sys.modules.setdefault("openai", MagicMock(OpenAI=MagicMock()))
 
 from services.openai_service import UsageContext, _record_chat_usage, chat_completion
+
+
+def _ai_cost_guard_module():
+    """Return the real ai_cost_guard module (may be stubbed by other tests)."""
+    import importlib
+    import sys
+
+    name = "services.ai_cost_guard"
+    mod = sys.modules.get(name)
+    if mod is None or not hasattr(mod, "record_ai_tokens"):
+        sys.modules.pop(name, None)
+        mod = importlib.import_module(name)
+    return mod
 
 
 @pytest.mark.asyncio
@@ -40,7 +52,8 @@ async def test_chat_completion_records_usage():
 
 
 def test_record_chat_usage_skips_when_openai_returns_no_usage():
-    with patch("services.ai_cost_guard.record_ai_tokens") as record_mock:
+    ai_cost_guard = _ai_cost_guard_module()
+    with patch.object(ai_cost_guard, "record_ai_tokens") as record_mock:
         _record_chat_usage(
             MagicMock(usage=None),
             model="gpt-4o",
@@ -59,7 +72,8 @@ def test_record_chat_usage_persists_token_counts():
         endpoint="openai_service.chat_completion",
     )
 
-    with patch("services.ai_cost_guard.record_ai_tokens") as record_mock:
+    ai_cost_guard = _ai_cost_guard_module()
+    with patch.object(ai_cost_guard, "record_ai_tokens") as record_mock:
         _record_chat_usage(response, model="gpt-4o", usage=context)
 
     record_mock.assert_called_once_with(

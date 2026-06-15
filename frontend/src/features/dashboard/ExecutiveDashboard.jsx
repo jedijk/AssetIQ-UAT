@@ -361,6 +361,7 @@ const OBSERVATION_EVIDENCE_TYPES = new Set([
 ]);
 
 const EQUIPMENT_EVIDENCE_TYPES = new Set([
+  "covered_exposure",
   "uncovered_exposure",
   "unassessed_assessments",
 ]);
@@ -459,7 +460,7 @@ const formatCriticalityLabel = (criticality) => {
 const buildEquipmentAssessUrl = (equipmentId) =>
   `/equipment-manager?edit=${equipmentId}&section=criticality`;
 
-const EquipmentEvidenceList = ({ evidence, onNavigate, assessMode = false }) => (
+const EquipmentEvidenceList = ({ evidence, onNavigate, assessMode = false, coveredMode = false }) => (
   <div className="mt-2 divide-y divide-slate-200 rounded-lg border border-slate-200 overflow-hidden">
     <div className="hidden sm:grid sm:grid-cols-[minmax(0,1fr)_7rem_6rem] gap-3 bg-slate-100 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
       <span>Equipment</span>
@@ -471,7 +472,14 @@ const EquipmentEvidenceList = ({ evidence, onNavigate, assessMode = false }) => 
       const criticalityLabel = formatCriticalityLabel(item.criticality);
       const hoverClass = assessMode
         ? "hover:bg-teal-50/70 active:bg-teal-50"
-        : "hover:bg-amber-50/70 active:bg-amber-50";
+        : coveredMode
+          ? "hover:bg-green-50/70 active:bg-green-50"
+          : "hover:bg-amber-50/70 active:bg-amber-50";
+      const actionClass = assessMode
+        ? "text-teal-700"
+        : coveredMode
+          ? "text-green-700"
+          : "text-amber-700";
 
       return (
         <motion.button
@@ -530,7 +538,7 @@ const EquipmentEvidenceList = ({ evidence, onNavigate, assessMode = false }) => 
               <>
                 <span className="text-sm font-semibold text-slate-900 tabular-nums">{item.exposure_formatted}</span>
                 {item.id && (
-                  <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700">
+                  <span className={`inline-flex items-center gap-1 text-xs font-medium ${actionClass}`}>
                     Open
                     <ChevronRight className="w-3.5 h-3.5" />
                   </span>
@@ -586,6 +594,7 @@ const EvidencePanel = ({ isOpen, onClose, title, evidence, evidenceType }) => {
             evidence={evidence}
             onNavigate={handleEquipmentNavigate}
             assessMode={evidenceType === "unassessed_assessments"}
+            coveredMode={evidenceType === "covered_exposure"}
           />
         ) : (
           <p className="text-center text-slate-500 py-8">No evidence items found</p>
@@ -680,6 +689,15 @@ export default function ExecutiveDashboard() {
           icon={Shield}
           colorClass="border-l-4 border-l-green-500"
           isMobile={isMobile}
+          onClick={
+            (kpi_cards?.exposure_coverage?.evidence_count ?? 0) > 0
+              ? () => setSelectedEvidence({
+                  type: "covered_exposure",
+                  title: "Covered Exposure Evidence",
+                  data: evidence_drill_down?.covered_exposure || [],
+                })
+              : undefined
+          }
         />
         <KPICard
           title="Uncovered Exposure"

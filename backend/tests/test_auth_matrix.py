@@ -502,13 +502,18 @@ ALLOWED_MUTATION_PATH_SNIPPETS = (
 
 
 def _mutation_block_has_rbac(block: str, file_text: str) -> bool:
-    if "require_permission" in block or "require_roles" in block:
+    if (
+        "require_permission" in block
+        or "require_roles" in block
+        or "require_any_permission" in block
+    ):
         return True
     for match in re.finditer(r"Depends\(([_a-zA-Z0-9]+)\)", block):
         dep = match.group(1)
         if (
             f"{dep} = require_permission" in file_text
             or f"{dep} = require_roles" in file_text
+            or f"{dep} = require_any_permission" in file_text
         ):
             return True
     return False
