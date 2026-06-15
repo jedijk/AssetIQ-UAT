@@ -107,10 +107,18 @@ class TestEquipmentFilesAPI:
         )
         assert response.status_code == 404, "Should return 404 for non-existent file"
     
-    def test_view_file_public_endpoint(self):
-        """Test GET /api/equipment-files/{id}/view is public (no auth required)"""
+    def test_view_file_requires_auth(self):
+        """Test GET /api/equipment-files/{id}/view requires authentication"""
         response = requests.get(f"{BASE_URL}/api/equipment-files/{FILE_ID}/view")
-        assert response.status_code == 200, f"View endpoint should be public: {response.text}"
+        assert response.status_code == 401, "Should require authentication"
+
+    def test_view_file_success(self, auth_headers):
+        """Test GET /api/equipment-files/{id}/view with auth"""
+        response = requests.get(
+            f"{BASE_URL}/api/equipment-files/{FILE_ID}/view",
+            headers=auth_headers,
+        )
+        assert response.status_code == 200, f"View endpoint failed: {response.text}"
         
         # Verify content type
         content_type = response.headers.get("Content-Type", "")

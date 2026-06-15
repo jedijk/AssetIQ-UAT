@@ -36,7 +36,7 @@ async def get_threat_summary_stats(current_user: dict) -> Dict[str, Any]:
     tenant_key = tenant_id_from_user(current_user) or "legacy"
     cache_key = f"stats:{tenant_key}:{user_id}"
 
-    cached = cache.get_stats(cache_key)
+    cached = cache.get_stat_entry(cache_key)
     if cached:
         return cached
 

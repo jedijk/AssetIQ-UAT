@@ -4,6 +4,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import services.ai_cost_guard  # noqa: F401 — ensure patch target is loaded
+
 sys.modules.setdefault("openai", MagicMock(OpenAI=MagicMock()))
 
 from services.openai_service import UsageContext, _record_chat_usage, chat_completion

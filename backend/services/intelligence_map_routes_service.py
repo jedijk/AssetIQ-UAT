@@ -205,7 +205,7 @@ async def get_intelligence_map_stats(
     cache_key = f"intelligence_map:{tenant_key}:{user_id}:{plant_id}:{system_id}:{equipment_type_id}:{equipment_id}:{show_linked_only}"
     
     # Check cache first (short TTL since this data can change)
-    cached = cache.get_stats(cache_key)
+    cached = cache.get_stat_entry(cache_key)
     if cached:
         return cached
     

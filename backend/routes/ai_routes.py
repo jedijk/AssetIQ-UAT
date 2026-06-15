@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from middleware.rate_limit import RATE_LIMIT_ENABLED
 
 from ai_risk_models import (
     AnalyzeRiskRequest,
@@ -15,7 +16,7 @@ from auth import get_current_user
 from services import ai_risk_service as svc
 
 router = APIRouter(tags=["AI Risk Engine"])
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=get_remote_address, enabled=RATE_LIMIT_ENABLED)
 
 AI_RATE_LIMIT = "20/minute"
 AI_HEAVY_RATE_LIMIT = "10/minute"

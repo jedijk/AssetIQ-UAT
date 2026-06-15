@@ -29,11 +29,10 @@ async def test_delete_threat_cascade_runs_transaction():
         instance.delete_filter = MagicMock(return_value={"id": "t-1"})
 
         with patch("repositories.threat_repository.run_transactional", side_effect=fake_transactional):
-            with patch("repositories.threat_repository.db") as mock_db:
-                mock_db.threats.delete_one = AsyncMock(return_value=MagicMock(deleted_count=1))
-                from repositories.threat_repository import delete_threat_cascade
+            instance.collection.delete_one = AsyncMock(return_value=MagicMock(deleted_count=1))
+            from repositories.threat_repository import delete_threat_cascade
 
-                result = await delete_threat_cascade(threat_id="t-1", user=USER)
+            result = await delete_threat_cascade(threat_id="t-1", user=USER)
 
     assert result["threat_id"] == "t-1"
-    mock_db.threats.delete_one.assert_called_once()
+    instance.collection.delete_one.assert_called_once()

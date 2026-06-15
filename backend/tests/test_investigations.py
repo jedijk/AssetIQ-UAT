@@ -22,7 +22,7 @@ class TestInvestigationsCRUD:
     
     def teardown_method(self):
         """Cleanup created investigations"""
-        for inv_id in self.created_inv_ids:
+        for inv_id in getattr(self, "created_inv_ids", []):
             try:
                 self.client.delete(f"{BASE_URL}/api/investigations/{inv_id}", headers=self.headers)
             except:

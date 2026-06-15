@@ -10,7 +10,7 @@ BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 class TestAuthRegistration:
     def test_register_new_user(self, api_client):
-        """Register a new user successfully"""
+        """Register a new user successfully (pending approval, no token)"""
         unique_email = f"test_reg_{uuid.uuid4().hex[:8]}@example.com"
         response = api_client.post(f"{BASE_URL}/api/auth/register", json={
             "email": unique_email,
@@ -19,11 +19,11 @@ class TestAuthRegistration:
         })
         assert response.status_code == 200
         data = response.json()
-        assert "token" in data
+        assert data.get("status") == "pending_approval"
+        assert "token" not in data
         assert "user" in data
         assert data["user"]["email"] == unique_email
         assert data["user"]["name"] == "TEST_RegisterUser"
-        assert "id" in data["user"]
 
     def test_register_duplicate_email(self, api_client):
         """Cannot register with existing email"""

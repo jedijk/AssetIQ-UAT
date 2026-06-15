@@ -58,6 +58,9 @@ jobs:
           MONGO_URL: mongodb://localhost:27017/test
           DB_NAME: test
           ENVIRONMENT: test
+          RATE_LIMIT_ENABLED: "false"
+          VAPID_PUBLIC_KEY: test-public-key
+          VAPID_PRIVATE_KEY: test-private-key
         run: |
           cd backend
           nohup python -m uvicorn server:app --host 127.0.0.1 --port 8765 > /tmp/uvicorn-ci.log 2>&1 &
@@ -78,6 +81,9 @@ jobs:
           MONGO_URL: mongodb://localhost:27017/test
           DB_NAME: test
           ENVIRONMENT: test
+          RATE_LIMIT_ENABLED: "false"
+          VAPID_PUBLIC_KEY: test-public-key
+          VAPID_PRIVATE_KEY: test-private-key
           REACT_APP_BACKEND_URL: http://127.0.0.1:8765
         run: |
           cd backend && python -m pytest tests/ -q --ignore=tests/test_big_bag_dashboard_filter.py --cov=services --cov=repositories --cov-report=term-missing:skip-covered --cov-fail-under=0

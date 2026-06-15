@@ -9,6 +9,11 @@ from services.rbac_service import RBACService
 class _FakeDb:
     users = None
 
+    def __getitem__(self, name):
+        if name == "users":
+            return self.users
+        raise KeyError(name)
+
 
 def test_normalize_db_env_key_aliases():
     assert normalize_db_env_key("Production") == "production"
