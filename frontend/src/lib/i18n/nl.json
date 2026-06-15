@@ -231,6 +231,10 @@
         "name": "Operationeel dashboard",
         "description": "Dashboard-tab voor operationeel risico-overzicht"
       },
+      "supervisor_command_center": {
+        "name": "Supervisor Command Center",
+        "description": "Dagelijkse startscherm voor ploegen met geprioriteerde operationele wachtrij en doorkliklinks"
+      },
       "dashboard_production": {
         "name": "Productiedashboard",
         "description": "Dashboard-tab voor productie-indicatoren en monitoring"

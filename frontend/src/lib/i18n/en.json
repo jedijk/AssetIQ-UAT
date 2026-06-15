@@ -231,6 +231,10 @@
         "name": "Ops Dashboard",
         "description": "Operational risk overview dashboard tab"
       },
+      "supervisor_command_center": {
+        "name": "Supervisor Command Center",
+        "description": "Daily shift-start screen with prioritized operational queue and drill-down links"
+      },
       "dashboard_production": {
         "name": "Production Dashboard",
         "description": "Production metrics and monitoring dashboard tab"

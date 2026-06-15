@@ -95,6 +95,8 @@ def _backfill_permissions(stored_perms: Dict) -> Dict:
                 "write": bool(merged["tasks"].get("write")) and tasks_read,
                 "delete": False,
             }
+        if "supervisor_command_center" not in merged and "dashboard_operational" in merged:
+            merged["supervisor_command_center"] = dict(merged["dashboard_operational"])
         defaults_for_role = DEFAULT_PERMISSIONS.get(role_name) or DEFAULT_PERMISSIONS["viewer"]
         for feature_key in FEATURES.keys():
             if feature_key not in merged:

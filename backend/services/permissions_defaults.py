@@ -15,6 +15,7 @@ DEFAULT_PERMISSIONS = {
         "library_ai_tools": {"read": True, "write": True, "delete": True},
         "reliability_intelligence": {"read": True, "write": True, "delete": True},
         "dashboard_operational": {"read": True, "write": True, "delete": True},
+        "supervisor_command_center": {"read": True, "write": True, "delete": True},
         "dashboard_production": {"read": True, "write": True, "delete": True},
         "dashboard_executive": {"read": True, "write": True, "delete": True},
         "dashboard_builder": {"read": True, "write": True, "delete": True},
@@ -36,6 +37,7 @@ DEFAULT_PERMISSIONS = {
         "library_ai_tools": {"read": True, "write": True, "delete": False},
         "reliability_intelligence": {"read": True, "write": True, "delete": False},
         "dashboard_operational": {"read": True, "write": False, "delete": False},
+        "supervisor_command_center": {"read": True, "write": False, "delete": False},
         "dashboard_production": {"read": True, "write": False, "delete": False},
         "dashboard_executive": {"read": False, "write": False, "delete": False},
         "dashboard_builder": {"read": False, "write": False, "delete": False},
@@ -57,6 +59,7 @@ DEFAULT_PERMISSIONS = {
         "library_ai_tools": {"read": False, "write": False, "delete": False},
         "reliability_intelligence": {"read": True, "write": True, "delete": False},
         "dashboard_operational": {"read": True, "write": False, "delete": False},
+        "supervisor_command_center": {"read": True, "write": False, "delete": False},
         "dashboard_production": {"read": True, "write": False, "delete": False},
         "dashboard_executive": {"read": False, "write": False, "delete": False},
         "dashboard_builder": {"read": False, "write": False, "delete": False},
@@ -78,6 +81,7 @@ DEFAULT_PERMISSIONS = {
         "library_ai_tools": {"read": False, "write": False, "delete": False},
         "reliability_intelligence": {"read": True, "write": False, "delete": False},
         "dashboard_operational": {"read": True, "write": False, "delete": False},
+        "supervisor_command_center": {"read": True, "write": False, "delete": False},
         "dashboard_production": {"read": True, "write": False, "delete": False},
         "dashboard_executive": {"read": False, "write": False, "delete": False},
         "dashboard_builder": {"read": False, "write": False, "delete": False},
@@ -99,6 +103,7 @@ DEFAULT_PERMISSIONS = {
         "library_ai_tools": {"read": False, "write": False, "delete": False},
         "reliability_intelligence": {"read": True, "write": False, "delete": False},
         "dashboard_operational": {"read": True, "write": False, "delete": False},
+        "supervisor_command_center": {"read": True, "write": False, "delete": False},
         "dashboard_production": {"read": True, "write": False, "delete": False},
         "dashboard_executive": {"read": False, "write": False, "delete": False},
         "dashboard_builder": {"read": False, "write": False, "delete": False},
@@ -120,6 +125,7 @@ DEFAULT_PERMISSIONS = {
         "library_ai_tools": {"read": False, "write": False, "delete": False},
         "reliability_intelligence": {"read": True, "write": False, "delete": False},
         "dashboard_operational": {"read": True, "write": False, "delete": False},
+        "supervisor_command_center": {"read": True, "write": False, "delete": False},
         "dashboard_production": {"read": True, "write": False, "delete": False},
         "dashboard_executive": {"read": False, "write": False, "delete": False},
         "dashboard_builder": {"read": False, "write": False, "delete": False},
@@ -156,6 +162,10 @@ FEATURES = {
     "dashboard_operational": {
         "name": "Ops Dashboard",
         "description": "Operational risk overview dashboard tab"
+    },
+    "supervisor_command_center": {
+        "name": "Supervisor Command Center",
+        "description": "Daily shift-start screen with prioritized operational queue and drill-down links"
     },
     "dashboard_production": {
         "name": "Production Dashboard",
@@ -233,6 +243,8 @@ def backfill_permissions(stored_perms: Dict) -> Dict:
                 "write": bool(merged["tasks"].get("write")) and tasks_read,
                 "delete": False,
             }
+        if "supervisor_command_center" not in merged and "dashboard_operational" in merged:
+            merged["supervisor_command_center"] = dict(merged["dashboard_operational"])
         defaults_for_role = DEFAULT_PERMISSIONS.get(role_name) or DEFAULT_PERMISSIONS["viewer"]
         for feature_key in FEATURES.keys():
             if feature_key not in merged:

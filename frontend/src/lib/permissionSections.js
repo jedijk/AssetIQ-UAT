@@ -6,6 +6,7 @@ export const PERMISSION_SECTIONS = [
     labelKey: "permissions.sections.dashboards",
     features: [
       "dashboard_operational",
+      "supervisor_command_center",
       "dashboard_production",
       "dashboard_executive",
       "dashboard_builder",
