@@ -773,6 +773,7 @@
     "rpn": "RPN",
     "actions": "Actions",
     "submissionDate": "Submitted",
+    "submittedBy": "Submitted by",
     "riskScore": "Risk Score",
     "riskLevel": "Risk Level",
     "rank": "Rank",

@@ -14,6 +14,7 @@ import {
   TrendingUp,
   Eye,
   RefreshCw,
+  User,
 } from "lucide-react";
 
 const OBSERVATIONS_REFETCH_MS = 30_000;
@@ -207,6 +208,12 @@ const MobileObservations = () => {
                         <Clock size={12} />
                         {formatDate(obs.created_at)}
                       </span>
+                      {(obs.owner_name || obs.creator_name) && (
+                        <span className="meta-item">
+                          <User size={12} />
+                          {obs.owner_name || obs.creator_name}
+                        </span>
+                      )}
                     </div>
 
                     {obs.failure_mode && (

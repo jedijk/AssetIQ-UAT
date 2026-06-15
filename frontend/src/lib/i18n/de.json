@@ -870,6 +870,7 @@
     "rpn": "RPN",
     "actions": "Aktionen",
     "submissionDate": "Eingereicht",
+    "submittedBy": "Eingereicht von",
     "riskScore": "Risikobewertung",
     "riskLevel": "Risikostufe",
     "rank": "Rang",

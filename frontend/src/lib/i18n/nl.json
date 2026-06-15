@@ -870,6 +870,7 @@
     "rpn": "RPN",
     "actions": "Acties",
     "submissionDate": "Ingediend",
+    "submittedBy": "Ingediend door",
     "riskScore": "Risicoscore",
     "riskLevel": "Risiconiveau",
     "rank": "Rang",

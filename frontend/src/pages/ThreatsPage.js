@@ -49,6 +49,7 @@ import {
   RefreshCw,
   ClipboardCheck,
 } from "lucide-react";
+import { UserAvatar } from "../features/dashboard/dashboardWidgets";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import {
@@ -165,6 +166,30 @@ const getEquipmentIcon = (equipmentType, asset) => {
   // Default icon
   return Settings;
 };
+
+function getSubmitterName(threat) {
+  return threat?.owner_name || threat?.creator_name || null;
+}
+
+function ThreatSubmitter({ threat }) {
+  const name = getSubmitterName(threat);
+  if (!name) return null;
+
+  return (
+    <span
+      className="flex items-center gap-1.5 text-xs text-slate-400 min-w-0"
+      data-testid={`threat-submitter-${threat.id}`}
+    >
+      <UserAvatar
+        name={name}
+        photo={threat.creator_photo}
+        initials={threat.creator_initials}
+        size="xs"
+      />
+      <span className="truncate max-w-[10rem]">{name}</span>
+    </span>
+  );
+}
 
 const ThreatsPage = () => {
   const navigate = useNavigate();
@@ -948,6 +973,7 @@ const ThreatsPage = () => {
                             <span className="sm:hidden">{formatRegistrationDate(threat.created_at)}</span>
                           </span>
                         )}
+                        <ThreatSubmitter threat={threat} />
                       </div>
                     </div>
 
@@ -1059,6 +1085,7 @@ const ThreatsPage = () => {
                       <span className="sm:hidden">{formatRegistrationDate(threat.created_at)}</span>
                     </span>
                   )}
+                  <ThreatSubmitter threat={threat} />
                 </div>
               </div>
 
