@@ -62,7 +62,7 @@ export const SubmissionRow = ({ submission, labelConfig: labelConfigProp }) => {
         win: preOpened,
         filename: `${submission.template_name || "label"}.pdf`,
       });
-      if (res.method === "window" || res.method === "share") {
+      if (res.method === "window" || res.method === "share" || res.method === "overlay") {
         toast.success(t("reports.printDialogOpened"));
       } else if (res.mobile) {
         toast.info(t("reports.labelDownloaded"));

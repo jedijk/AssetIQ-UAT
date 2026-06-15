@@ -806,40 +806,49 @@ function PrintDialog({ open, template, onClose }) {
 
   const onPrint = async (download = false) => {
     if (!template) return;
-    // Pre-open window synchronously within the click handler for iOS.
+    const assetIds = assetIdsText
+      .split(/[\s,;\n]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const printPayload = {
+      template_id: template.id,
+      asset_ids: assetIds,
+      copies: Math.max(1, Number(copies) || 1),
+    };
     let preOpened = null;
     if (!download && isMobileDevice()) {
-      preOpened = openPrintWindow();
+      try {
+        preOpened = openPrintWindow();
+      } catch (_e) {
+        /* ignore */
+      }
     }
     setPrinting(true);
     try {
-      const blob = await labelsAPI.printBlob({
-        template_id: template.id,
-        asset_ids: assetIdsText
-          .split(/[\s,;\n]+/)
-          .map((s) => s.trim())
-          .filter(Boolean),
-        copies: Math.max(1, Number(copies) || 1),
-        margin_offset_mm: Number(margin) || 0,
-      });
-      qc.invalidateQueries({ queryKey: ["label-jobs"] });
       if (download) {
+        const blob = await labelsAPI.printBlob({
+          ...printPayload,
+          margin_offset_mm: Number(margin) || 0,
+        });
+        qc.invalidateQueries({ queryKey: ["label-jobs"] });
         downloadBlob(blob, `${template.name || "labels"}.pdf`);
         toast.success("PDF downloaded");
+        return;
+      }
+      const { printLabel } = await import("../lib/printLabel");
+      const res = await printLabel(printPayload, {
+        win: preOpened,
+        filename: `${template.name || "labels"}.pdf`,
+      });
+      qc.invalidateQueries({ queryKey: ["label-jobs"] });
+      if (res.method === "window" || res.method === "share" || res.method === "overlay") {
+        toast.success("Print dialog opened");
+      } else if (res.mobile) {
+        toast.info("PDF downloaded — use Share → Print");
+      } else if (res.method === "download") {
+        toast.info("Print blocked — PDF downloaded instead.");
       } else {
-        const { printLabel } = await import("../lib/printLabel");
-        const res = await printLabel({
-          template_id: template.id,
-          asset_ids: assetIdsText
-            .split(/[\s,;\n]+/)
-            .map((s) => s.trim())
-            .filter(Boolean),
-          copies: Math.max(1, Number(copies) || 1),
-        }, { win: preOpened, filename: `${template.name || "labels"}.pdf` });
-        if (res.method === "window") toast.success("Print dialog opened");
-        else if (res.mobile) toast.info("PDF downloaded — use Share → Print");
-        else if (res.method === "download") toast.info("Print blocked — PDF downloaded instead.");
-        else toast.success("Print dialog opened");
+        toast.success("Print dialog opened");
       }
     } catch (e) {
       if (preOpened && !preOpened.closed) preOpened.close();

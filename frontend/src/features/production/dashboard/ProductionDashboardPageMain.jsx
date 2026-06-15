@@ -401,7 +401,7 @@ export default function ProductionDashboardPage() {
           filename: `label-${String(submissionId).slice(0, 8)}.pdf`,
         }
       );
-      if (res.method === "window" || res.method === "share") {
+      if (res.method === "window" || res.method === "share" || res.method === "overlay") {
         toast.success("Label print dialog opened");
       } else if (res.mobile) {
         toast.info("Label downloaded — use Share → Print");
