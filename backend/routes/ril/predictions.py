@@ -17,7 +17,7 @@ async def list_predictions(
     skip: int = Query(0, ge=0),
     current_user: dict = Depends(_ril_read),
 ):
-    service = get_ril_service()
+    service = get_ril_service(current_user)
     predictions, total = await service.get_predictions(
         ril_owner_id(current_user),
         equipment_id=equipment_id,
@@ -39,7 +39,7 @@ async def generate_prediction(
     equipment_id: str,
     current_user: dict = Depends(_ril_write),
 ):
-    prediction = await get_ril_service().generate_prediction(
+    prediction = await get_ril_service(current_user).generate_prediction(
         ril_owner_id(current_user),
         equipment_id,
     )
@@ -53,7 +53,7 @@ async def get_equipment_prediction(
     equipment_id: str,
     current_user: dict = Depends(_ril_read),
 ):
-    prediction, cached = await get_ril_service().get_equipment_prediction_cached(
+    prediction, cached = await get_ril_service(current_user).get_equipment_prediction_cached(
         ril_owner_id(current_user),
         equipment_id,
     )
@@ -68,7 +68,7 @@ async def get_equipment_at_risk(
     limit: int = Query(20, ge=1, le=100),
     current_user: dict = Depends(_ril_read),
 ):
-    at_risk = await get_ril_service().get_equipment_at_risk(
+    at_risk = await get_ril_service(current_user).get_equipment_at_risk(
         ril_owner_id(current_user),
         health_threshold=health_threshold,
         limit=limit,

@@ -391,7 +391,12 @@ async def get_reliability_intelligence(observation: dict, failure_mode_data: dic
     }
 
 
-async def get_recommended_actions(observation: dict, failure_mode_data: dict = None) -> List[dict]:
+async def get_recommended_actions(
+    observation: dict,
+    failure_mode_data: dict = None,
+    *,
+    user: Optional[dict] = None,
+) -> List[dict]:
     """
     Get recommended actions from two sources:
     1. Failure Mode Library - existing actions linked to the failure mode (strategy)
@@ -438,7 +443,10 @@ async def get_recommended_actions(observation: dict, failure_mode_data: dict = N
     threat_id = observation.get("id")
     if threat_id:
         try:
-            insights = await db.ai_risk_insights.find_one({"threat_id": threat_id}, {"_id": 0})
+            insights = await db.ai_risk_insights.find_one(
+                merge_tenant_filter({"threat_id": threat_id}, user),
+                {"_id": 0},
+            )
         except Exception:
             insights = None
         ai_recs = (insights or {}).get("recommendations", []) or []
@@ -473,21 +481,24 @@ async def get_recommended_actions(observation: dict, failure_mode_data: dict = N
     return recommendations
 
 
-async def _load_failure_mode_data(observation: dict) -> Optional[dict]:
+async def _load_failure_mode_data(observation: dict, user: Optional[dict] = None) -> Optional[dict]:
     """Load failure mode by id or name with at most two sequential lookups."""
     failure_mode_id = observation.get("failure_mode_id")
     failure_mode_name = observation.get("failure_mode")
     if failure_mode_id:
         failure_mode_data = await db.failure_modes.find_one(
-            {"id": failure_mode_id},
-            {"_id": 0}
+            merge_tenant_filter({"id": failure_mode_id}, user),
+            {"_id": 0},
         )
         if failure_mode_data:
             return failure_mode_data
     if failure_mode_name:
         return await db.failure_modes.find_one(
-            {"failure_mode": {"$regex": f"^{re.escape(failure_mode_name)}$", "$options": "i"}},
-            {"_id": 0}
+            merge_tenant_filter(
+                {"failure_mode": {"$regex": f"^{re.escape(failure_mode_name)}$", "$options": "i"}},
+                user,
+            ),
+            {"_id": 0},
         )
     return None
 
@@ -721,7 +732,7 @@ async def get_workspace(user: dict, observation_id: str, language: Optional[str]
 
     equipment_node, failure_mode_data, investigation = await asyncio.gather(
         _load_equipment_node(observation, user),
-        _load_failure_mode_data(observation),
+        _load_failure_mode_data(observation, user),
         db.investigations.find_one(
             merge_tenant_filter({"threat_id": observation_id}, user),
             {"_id": 0},
@@ -754,7 +765,7 @@ async def get_workspace(user: dict, observation_id: str, language: Optional[str]
         get_reliability_intelligence(observation, failure_mode_data)
     )
     recommended_actions_task = asyncio.create_task(
-        get_recommended_actions(observation, failure_mode_data)
+        get_recommended_actions(observation, failure_mode_data, user=user)
     )
     
     # Await all parallel tasks

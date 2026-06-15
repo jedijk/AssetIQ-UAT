@@ -18,6 +18,7 @@ import LandscapeBlocker from "./components/LandscapeBlocker";
 import NotificationPrompt from "./components/NotificationPrompt";
 import { useEffect } from "react";
 import { getBackendUrl } from "./lib/apiConfig";
+import { api } from "./lib/apiClient";
 import { debugLog } from "./lib/debug";
 import "./App.css";
 import { AppShell } from "./components/AppShell";
@@ -182,17 +183,10 @@ const useVersionCheck = () => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       try {
         if (!backendUrl) return;
-        const response = await fetch(`${backendUrl}/api/health`, {
-          cache: "no-store",
+        const response = await api.get("/health", {
           headers: { "Cache-Control": "no-cache" },
         });
-        let data = null;
-        try {
-          data = await response.json();
-        } catch {
-          return;
-        }
-        if (!data) return;
+        const data = response.data;
         const backendVersion = data?.version;
 
         if (backendVersion && isRemoteNewer(backendVersion, APP_VERSION)) {

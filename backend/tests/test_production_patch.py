@@ -8,6 +8,8 @@ import pytest
 
 from database import db
 
+pytestmark = pytest.mark.usefixtures("require_mongo")
+
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_patch_production_submission_all_scenarios():

@@ -10,8 +10,9 @@ pytest.importorskip("email_validator")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from datetime import datetime, timezone
 
-from routes.production import (
+from routes.production.helpers import (
     _calendar_day_in_envelope,
+    _envelope_windows,
     _naive_shift_windows,
     _parse_sample_datetime,
     _in_any_time_window,
@@ -31,8 +32,6 @@ def test_big_bag_early_utc_submission_included_by_calendar_day():
     windows = _shift_windows_for_day(["morning"], target)
     cal_start, cal_end = windows[0][0], windows[0][1]
     # Extend envelope like dashboard does for single-day mode
-    from routes.production import _envelope_windows
-
     cal_env_start, cal_env_end = _envelope_windows(windows)
 
     submitted_utc = datetime(2026, 5, 18, 4, 0, tzinfo=timezone.utc)

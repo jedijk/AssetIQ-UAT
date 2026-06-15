@@ -156,9 +156,8 @@ const Layout = () => {
 
     const checkVersion = async () => {
       try {
-        const response = await fetch(`${getBackendUrl()}/api/health`);
-        if (!response.ok) return;
-        const data = await response.json();
+        const response = await api.get("/health");
+        const data = response.data;
         
         if (data.version === APP_VERSION) {
           localStorage.setItem(STORAGE_KEY, "true");
@@ -284,8 +283,6 @@ const Layout = () => {
       if (!user?.id) return;
       
       try {
-        const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
-        const token = AUTH_MODE === "bearer" ? localStorage.getItem("token") : null;
         const backendUrl = getBackendUrl();
         
         // Only fetch if we have a valid backend URL configured
@@ -294,19 +291,12 @@ const Layout = () => {
           return;
         }
 
-        const avatarUrl = AUTH_MODE === "cookie"
-          ? `${backendUrl}/api/users/${user.id}/avatar`
-          : `${backendUrl}/api/users/${user.id}/avatar?token=${token}`;
-
-        const response = await fetch(avatarUrl, {
-          credentials: AUTH_MODE === "cookie" ? "include" : "omit",
-          headers: {
-            ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
-          },
+        const response = await api.get(`/users/${user.id}/avatar`, {
+          responseType: "blob",
         });
-        
-        if (response.ok) {
-          const blob = await response.blob();
+
+        if (response.status === 200) {
+          const blob = response.data;
           const nextUrl = URL.createObjectURL(blob);
           // Revoke previous object URL to prevent memory growth.
           if (avatarObjectUrlRef.current) {
@@ -430,22 +420,13 @@ const Layout = () => {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      const backendUrl = getBackendUrl();
-      const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer";
-      const token = localStorage.getItem("token");
-      const avatarFetchUrl = AUTH_MODE === "cookie"
-        ? `${backendUrl}/api/users/${user.id}/avatar?t=${Date.now()}`
-        : `${backendUrl}/api/users/${user.id}/avatar?token=${token}&t=${Date.now()}`;
-
-      const avatarResponse = await fetch(avatarFetchUrl, {
-        credentials: AUTH_MODE === "cookie" ? "include" : "omit",
-        headers: {
-          ...(AUTH_MODE === "bearer" && token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+      const avatarResponse = await api.get(`/users/${user.id}/avatar`, {
+        params: { t: Date.now() },
+        responseType: "blob",
       });
       
-      if (avatarResponse.ok) {
-        const blob = await avatarResponse.blob();
+      if (avatarResponse.status === 200) {
+        const blob = avatarResponse.data;
         if (avatarUrl) URL.revokeObjectURL(avatarUrl);
         setAvatarUrl(URL.createObjectURL(blob));
       }

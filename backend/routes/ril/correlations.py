@@ -15,7 +15,7 @@ async def find_correlations(
     time_window_hours: int = Query(24, ge=1, le=168),
     current_user: dict = Depends(_ril_write),
 ):
-    service = get_ril_service()
+    service = get_ril_service(current_user)
     correlations = await service.find_correlations(
         ril_owner_id(current_user),
         equipment_id=equipment_id,
@@ -37,7 +37,7 @@ async def list_correlations(
     skip: int = Query(0, ge=0),
     current_user: dict = Depends(_ril_read),
 ):
-    service = get_ril_service()
+    service = get_ril_service(current_user)
     correlations, total = await service.get_correlations(
         ril_owner_id(current_user),
         equipment_id=equipment_id,
@@ -57,7 +57,7 @@ async def get_correlation(
     correlation_id: str,
     current_user: dict = Depends(_ril_read),
 ):
-    detail = await get_ril_service().get_correlation_detail(
+    detail = await get_ril_service(current_user).get_correlation_detail(
         ril_owner_id(current_user),
         correlation_id,
     )

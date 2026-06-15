@@ -20,7 +20,7 @@ async def create_case(
     request: CreateReliabilityCaseRequest,
     current_user: dict = Depends(_ril_write),
 ):
-    case = await get_ril_service().create_reliability_case(
+    case = await get_ril_service(current_user).create_reliability_case(
         ril_owner_id(current_user),
         request,
     )
@@ -36,7 +36,7 @@ async def list_cases(
     skip: int = Query(0, ge=0),
     current_user: dict = Depends(_ril_read),
 ):
-    cases, total = await get_ril_service().get_reliability_cases(
+    cases, total = await get_ril_service(current_user).get_reliability_cases(
         ril_owner_id(current_user),
         equipment_id=equipment_id,
         status=status,
@@ -57,7 +57,7 @@ async def get_case(
     case_id: str,
     current_user: dict = Depends(_ril_read),
 ):
-    detail = await get_ril_service().get_case_detail(ril_owner_id(current_user), case_id)
+    detail = await get_ril_service(current_user).get_case_detail(ril_owner_id(current_user), case_id)
     if not detail:
         raise HTTPException(status_code=404, detail="Reliability case not found")
     return detail
@@ -69,7 +69,7 @@ async def update_case(
     request: UpdateReliabilityCaseRequest,
     current_user: dict = Depends(_ril_write),
 ):
-    case = await get_ril_service().update_reliability_case(
+    case = await get_ril_service(current_user).update_reliability_case(
         ril_owner_id(current_user),
         case_id,
         request,
@@ -86,7 +86,7 @@ async def link_observation_to_case(
     observation_id: str,
     current_user: dict = Depends(_ril_write),
 ):
-    ok = await get_ril_service().link_observation_to_case(
+    ok = await get_ril_service(current_user).link_observation_to_case(
         ril_owner_id(current_user),
         case_id,
         observation_id,
@@ -102,7 +102,7 @@ async def link_alert_to_case(
     alert_id: str,
     current_user: dict = Depends(_ril_write),
 ):
-    ok = await get_ril_service().link_alert_to_case(
+    ok = await get_ril_service(current_user).link_alert_to_case(
         ril_owner_id(current_user),
         case_id,
         alert_id,
@@ -118,7 +118,7 @@ async def link_investigation_to_case(
     investigation_id: str,
     current_user: dict = Depends(_ril_write),
 ):
-    ok = await get_ril_service().link_investigation_to_case(
+    ok = await get_ril_service(current_user).link_investigation_to_case(
         ril_owner_id(current_user),
         case_id,
         investigation_id,

@@ -16,7 +16,7 @@ async def create_alert(
     request: CreateAlertRequest,
     current_user: dict = Depends(_ril_write),
 ):
-    service = get_ril_service()
+    service = get_ril_service(current_user)
     alert = await service.create_alert(ril_owner_id(current_user), request)
     return {
         "success": True,
@@ -36,7 +36,7 @@ async def list_alerts(
     skip: int = Query(0, ge=0),
     current_user: dict = Depends(_ril_read),
 ):
-    service = get_ril_service()
+    service = get_ril_service(current_user)
     alerts, total = await service.get_alerts(
         ril_owner_id(current_user),
         equipment_id=equipment_id,
@@ -60,7 +60,7 @@ async def get_alert(
     alert_id: str,
     current_user: dict = Depends(_ril_read),
 ):
-    doc = await get_ril_service().get_alert_doc(ril_owner_id(current_user), alert_id)
+    doc = await get_ril_service(current_user).get_alert_doc(ril_owner_id(current_user), alert_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Alert not found")
     return {"alert": doc}
@@ -73,7 +73,7 @@ async def update_alert(
     assigned_to: Optional[str] = None,
     current_user: dict = Depends(_ril_write),
 ):
-    updated = await get_ril_service().update_alert_status(
+    updated = await get_ril_service(current_user).update_alert_status(
         ril_owner_id(current_user),
         alert_id,
         status=status,

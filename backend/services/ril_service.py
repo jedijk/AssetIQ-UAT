@@ -33,8 +33,9 @@ class RILService:
     Main service class for Reliability Intelligence Layer
     """
     
-    def __init__(self, db):
+    def __init__(self, db, tenant_user: Optional[dict] = None):
         self.db = db
+        self._tenant_user = tenant_user
         self._collections = {
             'observations': 'ril_observations',
             'readings': 'ril_readings',
@@ -45,6 +46,20 @@ class RILService:
             'cases': 'ril_cases',
             'case_counter': 'ril_case_counter'
         }
+    
+    async def _find_equipment_node(self, equipment_id: str) -> Optional[dict]:
+        from services.tenant_schema import merge_tenant_filter
+
+        return await self.db.equipment_nodes.find_one(
+            merge_tenant_filter({"id": equipment_id}, self._tenant_user)
+        )
+
+    async def _find_failure_mode(self, failure_mode_id: str) -> Optional[dict]:
+        from services.tenant_schema import merge_tenant_filter
+
+        return await self.db.failure_modes.find_one(
+            merge_tenant_filter({"id": failure_mode_id}, self._tenant_user)
+        )
     
     # ============= Observation Intelligence =============
     
@@ -61,7 +76,7 @@ class RILService:
         equipment_name = None
         equipment_tag = None
         if request.equipment_id:
-            equipment = await self.db.equipment_nodes.find_one({"id": request.equipment_id})
+            equipment = await self._find_equipment_node(request.equipment_id)
             if equipment:
                 equipment_name = equipment.get("name")
                 equipment_tag = equipment.get("tag") or equipment.get("name")
@@ -69,7 +84,7 @@ class RILService:
         # Get failure mode name if ID provided
         failure_mode_name = None
         if request.failure_mode_id:
-            fm = await self.db.failure_modes.find_one({"id": request.failure_mode_id})
+            fm = await self._find_failure_mode(request.failure_mode_id)
             if fm:
                 failure_mode_name = fm.get("failure_mode")
         
@@ -165,7 +180,7 @@ class RILService:
         # Multiply by equipment criticality if available
         criticality_multiplier = 1.0
         if equipment_id:
-            equipment = await self.db.equipment_nodes.find_one({"id": equipment_id})
+            equipment = await self._find_equipment_node(equipment_id)
             if equipment and equipment.get("criticality"):
                 crit = equipment["criticality"]
                 # Calculate from impact scores
@@ -313,7 +328,7 @@ class RILService:
         # Resolve equipment details
         equipment_name = None
         if request.equipment_id:
-            equipment = await self.db.equipment_nodes.find_one({"id": request.equipment_id})
+            equipment = await self._find_equipment_node(request.equipment_id)
             if equipment:
                 equipment_name = equipment.get("name")
         
@@ -354,7 +369,7 @@ class RILService:
         # 1. Check asset criticality
         criticality_score = 2  # Default medium
         if alert.equipment_id:
-            equipment = await self.db.equipment_nodes.find_one({"id": alert.equipment_id})
+            equipment = await self._find_equipment_node(alert.equipment_id)
             if equipment and equipment.get("criticality"):
                 crit = equipment["criticality"]
                 safety = crit.get("safety_impact", 1)
@@ -625,7 +640,7 @@ class RILService:
         equipment_type_id = None
         
         if request.equipment_id:
-            equipment = await self.db.equipment_nodes.find_one({"id": request.equipment_id})
+            equipment = await self._find_equipment_node(request.equipment_id)
             if equipment:
                 equipment_name = equipment.get("name")
                 equipment_tag = equipment.get("tag") or equipment.get("name")
@@ -685,7 +700,7 @@ class RILService:
         reputation = 1
         
         if case.equipment_id:
-            equipment = await self.db.equipment_nodes.find_one({"id": case.equipment_id})
+            equipment = await self._find_equipment_node(case.equipment_id)
             if equipment and equipment.get("criticality"):
                 crit = equipment["criticality"]
                 safety = crit.get("safety_impact", 1)
@@ -1143,7 +1158,7 @@ class RILService:
 
         equipment = None
         if case.equipment_id:
-            equipment = await self.db.equipment_nodes.find_one({"id": case.equipment_id})
+            equipment = await self._find_equipment_node(case.equipment_id)
             if equipment:
                 equipment.pop("_id", None)
 

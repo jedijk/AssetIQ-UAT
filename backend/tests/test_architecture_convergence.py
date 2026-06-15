@@ -652,8 +652,10 @@ SERVICE_LOC_ALLOWLIST = {
     "ril_predictions.py": 180,
     "reliability_graph.py": 1090,
     "ril_service.py": 1200,
-    "task_service.py": 1565,
-    "threat_service.py": 1380,
+    "task_service.py": 1310,
+    "task_service_completion.py": 320,
+    "threat_service.py": 950,
+    "threat_service_investigation.py": 520,
     "work_item_query.py": 1019,
 }
 

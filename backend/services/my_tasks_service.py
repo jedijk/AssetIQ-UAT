@@ -13,7 +13,7 @@ from fastapi import HTTPException
 
 from database import db
 from services.task_instance_bridge import resolve_task_instance
-from services.tenant_schema import merge_tenant_filter
+from services.tenant_schema import merge_tenant_filter, with_tenant_id
 from services.work_execution_kpi_materializer import get_or_compute_work_execution_kpis
 from services.work_item_query import (
     fetch_work_items,
@@ -159,7 +159,13 @@ async def _load_task_instance_detail(task: dict, user_id: str, user: Optional[di
         eq_query = merge_tenant_filter({"id": task["equipment_id"]}, user)
         equipment = await db.equipment_nodes.find_one(eq_query)
         if not equipment:
-            equipment = await db.equipment.find_one({"_id": task["equipment_id"]})
+            equipment = await db.equipment.find_one(
+                merge_tenant_filter({"_id": task["equipment_id"]}, user)
+            )
+        if not equipment:
+            equipment = await db.equipment.find_one(
+                merge_tenant_filter({"id": task["equipment_id"]}, user)
+            )
         if equipment:
             task["equipment_name"] = equipment.get("name", "Unknown")
             task["equipment_tag"] = equipment.get("tag", "")
@@ -171,15 +177,19 @@ async def _load_task_instance_detail(task: dict, user_id: str, user: Optional[di
                 plan_oid = ObjectId(plan_oid)
         except Exception:
             plan_oid = task["task_plan_id"]
-        plan = await db.task_plans.find_one({"_id": plan_oid})
+        plan = await db.task_plans.find_one(merge_tenant_filter({"_id": plan_oid}, user))
         if not plan and isinstance(task.get("task_plan_id"), str):
-            plan = await db.maintenance_programs_v2.find_one({"id": task["task_plan_id"]})
+            plan = await db.maintenance_programs_v2.find_one(
+                merge_tenant_filter({"id": task["task_plan_id"]}, user)
+            )
         if plan:
             task["is_recurring"] = True
             task["frequency_display"] = f"Every {plan.get('interval_value', 0)} {plan.get('interval_unit', 'days')}"
 
             if plan.get("task_template_id"):
-                template = await db.task_templates.find_one({"_id": plan["task_template_id"]})
+                template = await db.task_templates.find_one(
+                    merge_tenant_filter({"_id": plan["task_template_id"]}, user)
+                )
                 if template:
                     task["template"] = {
                         "name": template.get("name"),
@@ -193,7 +203,9 @@ async def _load_task_instance_detail(task: dict, user_id: str, user: Optional[di
 
             form_template_id = plan.get("form_template_id")
             if form_template_id:
-                form_template = await db.form_templates.find_one({"_id": ObjectId(form_template_id)})
+                form_template = await db.form_templates.find_one(
+                    merge_tenant_filter({"_id": ObjectId(form_template_id)}, user)
+                )
                 if form_template:
                     task["form_fields"] = form_template.get("fields", [])
 
@@ -235,7 +247,7 @@ async def start_task(user: dict, task_id: str):
         user_id_value = user_id
 
     await db.task_instances.update_one(
-        {"_id": task["_id"]},
+        merge_tenant_filter({"_id": task["_id"]}, user),
         {
             "$set": {
                 "status": "in_progress",
@@ -246,7 +258,7 @@ async def start_task(user: dict, task_id: str):
         },
     )
 
-    updated_task = await db.task_instances.find_one({"_id": task["_id"]})
+    updated_task = await db.task_instances.find_one(merge_tenant_filter({"_id": task["_id"]}, user))
     updated_task = await _load_task_instance_detail(updated_task, user_id, user=user)
     return serialize_task(updated_task)
 
@@ -256,7 +268,9 @@ async def complete_action(user: dict, action_id: str, data: Optional[dict] = Non
     user_id = user["id"]
     
     # Find the action
-    action = await db.central_actions.find_one({"id": action_id, "created_by": user_id})
+    action = await db.central_actions.find_one(
+        merge_tenant_filter({"id": action_id, "created_by": user_id}, user)
+    )
     
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
@@ -287,7 +301,7 @@ async def complete_action(user: dict, action_id: str, data: Optional[dict] = Non
             update_data["attachments"] = processed_attachments
     
     await db.central_actions.update_one(
-        {"id": action_id},
+        merge_tenant_filter({"id": action_id}, user),
         {"$set": update_data}
     )
     
@@ -304,7 +318,7 @@ async def complete_action(user: dict, action_id: str, data: Optional[dict] = Non
         }
         risk_data = severity_map.get(severity, severity_map["medium"])
         
-        observation_doc = {
+        observation_doc = with_tenant_id({
             "id": str(uuid.uuid4()),
             "title": f"Issue: {issue_text[:100]}",
             "description": f"Issue discovered during action execution.\n\nAction: {action.get('title', 'Unknown')}\n\nDetails: {issue_text}",
@@ -325,10 +339,13 @@ async def complete_action(user: dict, action_id: str, data: Optional[dict] = Non
             "created_at": now,
             "updated_at": now,
             "created_by_action": True,
-        }
+        }, user)
         
         await db.threats.insert_one(observation_doc)
         logger.info(f"Created observation from action: {observation_doc['id']}")
+        from services.threat_observation_bridge import sync_threat_mirror
+
+        await sync_threat_mirror(observation_doc, user=user)
     
     # Check if all actions for the source are now completed
     from services.observation_mitigation import build_action_plan_completion_notification
@@ -350,7 +367,9 @@ async def start_action(user: dict, action_id: str):
     user_id = user["id"]
     
     # Find the action
-    action = await db.central_actions.find_one({"id": action_id, "created_by": user_id})
+    action = await db.central_actions.find_one(
+        merge_tenant_filter({"id": action_id, "created_by": user_id}, user)
+    )
     
     if not action:
         raise HTTPException(status_code=404, detail="Action not found")
@@ -358,7 +377,7 @@ async def start_action(user: dict, action_id: str):
     # Update action status
     now = datetime.now(timezone.utc)
     await db.central_actions.update_one(
-        {"id": action_id},
+        merge_tenant_filter({"id": action_id}, user),
         {
             "$set": {
                 "status": "in_progress",
@@ -369,7 +388,10 @@ async def start_action(user: dict, action_id: str):
     )
     
     # Return updated action
-    updated_action = await db.central_actions.find_one({"id": action_id}, {"_id": 0})
+    updated_action = await db.central_actions.find_one(
+        merge_tenant_filter({"id": action_id}, user),
+        {"_id": 0},
+    )
     return serialize_action_as_task(updated_action)
 
 
@@ -377,10 +399,13 @@ async def get_adhoc_plans(user: dict):
     """Get all active ad-hoc plans that can be executed on-demand."""
     
     # Find all active plans that are ad-hoc
-    query = {
-        "is_active": True,
-        "is_adhoc": True
-    }
+    query = merge_tenant_filter(
+        {
+            "is_active": True,
+            "is_adhoc": True,
+        },
+        user,
+    )
     
     # Collect all plans first to batch lookups
     raw_plans = await db.task_plans.find(query).sort("created_at", -1).to_list(length=100)
@@ -414,28 +439,37 @@ async def get_adhoc_plans(user: dict):
     # Batch fetch task templates (try by _id ObjectId)
     template_map = {}
     if template_ids_oid:
-        templates_cursor = db.task_templates.find({"_id": {"$in": list(template_ids_oid)}})
+        templates_cursor = db.task_templates.find(
+            merge_tenant_filter({"_id": {"$in": list(template_ids_oid)}}, user)
+        )
         async for tmpl in templates_cursor:
             template_map[str(tmpl["_id"])] = tmpl
     
     # Also try by string 'id' field for any missing templates
     missing_ids = template_ids_str - set(template_map.keys())
     if missing_ids:
-        templates_cursor = db.task_templates.find({"id": {"$in": list(missing_ids)}})
+        templates_cursor = db.task_templates.find(
+            merge_tenant_filter({"id": {"$in": list(missing_ids)}}, user)
+        )
         async for tmpl in templates_cursor:
             template_map[tmpl.get("id")] = tmpl
     
     # Batch fetch equipment
     equipment_map = {}
     if equipment_ids:
-        equipment_cursor = db.equipment.find({"id": {"$in": list(equipment_ids)}}, {"id": 1, "name": 1})
+        equipment_cursor = db.equipment.find(
+            merge_tenant_filter({"id": {"$in": list(equipment_ids)}}, user),
+            {"id": 1, "name": 1},
+        )
         async for eq in equipment_cursor:
             equipment_map[eq["id"]] = eq.get("name", "Unknown Equipment")
     
     # Batch fetch form templates
     form_template_map = {}
     if form_template_ids:
-        form_cursor = db.form_templates.find({"id": {"$in": list(form_template_ids)}})
+        form_cursor = db.form_templates.find(
+            merge_tenant_filter({"id": {"$in": list(form_template_ids)}}, user)
+        )
         async for ft in form_cursor:
             form_template_map[ft.get("id")] = ft
     
@@ -443,8 +477,11 @@ async def get_adhoc_plans(user: dict):
     in_progress_map = {}
     if plan_str_ids:
         ip_cursor = db.task_instances.find(
-            {"task_plan_id": {"$in": plan_str_ids}, "status": "in_progress"},
-            {"_id": 1, "task_plan_id": 1}
+            merge_tenant_filter(
+                {"task_plan_id": {"$in": plan_str_ids}, "status": "in_progress"},
+                user,
+            ),
+            {"_id": 1, "task_plan_id": 1},
         )
         async for ip_task in ip_cursor:
             in_progress_map[ip_task["task_plan_id"]] = str(ip_task["_id"])
@@ -507,10 +544,12 @@ async def execute_adhoc_plan(user: dict, plan_id: str):
     """Create a task instance from an ad-hoc plan for immediate execution."""
     
     # Find the plan - try by string id first, then ObjectId
-    plan = await db.task_plans.find_one({"id": plan_id})
+    plan = await db.task_plans.find_one(merge_tenant_filter({"id": plan_id}, user))
     if not plan:
         try:
-            plan = await db.task_plans.find_one({"_id": ObjectId(plan_id)})
+            plan = await db.task_plans.find_one(
+                merge_tenant_filter({"_id": ObjectId(plan_id)}, user)
+            )
         except Exception:
             raise HTTPException(status_code=400, detail="Invalid plan ID")
     
@@ -525,15 +564,22 @@ async def execute_adhoc_plan(user: dict, plan_id: str):
     
     # Check if there's already an in-progress task for this plan
     plan_str_id = plan.get("id") or str(plan["_id"])
-    existing_task = await db.task_instances.find_one({
-        "task_plan_id": plan_str_id,
-        "status": "in_progress"
-    })
+    existing_task = await db.task_instances.find_one(
+        merge_tenant_filter(
+            {
+                "task_plan_id": plan_str_id,
+                "status": "in_progress",
+            },
+            user,
+        )
+    )
     
     if existing_task:
         # Enrich with photo_extraction_config from form template if missing
         if not existing_task.get("photo_extraction_config") and plan.get("form_template_id"):
-            ft = await db.form_templates.find_one({"_id": ObjectId(plan["form_template_id"])}) if ObjectId.is_valid(str(plan["form_template_id"])) else None
+            ft = await db.form_templates.find_one(
+                merge_tenant_filter({"_id": ObjectId(plan["form_template_id"])}, user)
+            ) if ObjectId.is_valid(str(plan["form_template_id"])) else None
             if ft:
                 existing_task["photo_extraction_config"] = ft.get("photo_extraction_config")
         return serialize_task(existing_task)
@@ -542,10 +588,14 @@ async def execute_adhoc_plan(user: dict, plan_id: str):
     template = None
     template_id = plan.get("task_template_id")
     if template_id:
-        template = await db.task_templates.find_one({"id": template_id})
+        template = await db.task_templates.find_one(
+            merge_tenant_filter({"id": template_id}, user)
+        )
         if not template:
             try:
-                template = await db.task_templates.find_one({"_id": ObjectId(template_id)})
+                template = await db.task_templates.find_one(
+                    merge_tenant_filter({"_id": ObjectId(template_id)}, user)
+                )
             except Exception:
                 pass
     
@@ -555,11 +605,15 @@ async def execute_adhoc_plan(user: dict, plan_id: str):
     form_template = None
     if plan.get("form_template_id"):
         # Try finding by 'id' field first (string ID)
-        form_template = await db.form_templates.find_one({"id": plan["form_template_id"]})
+        form_template = await db.form_templates.find_one(
+            merge_tenant_filter({"id": plan["form_template_id"]}, user)
+        )
         # If not found, try by ObjectId
         if not form_template:
             try:
-                form_template = await db.form_templates.find_one({"_id": ObjectId(plan["form_template_id"])})
+                form_template = await db.form_templates.find_one(
+                    merge_tenant_filter({"_id": ObjectId(plan["form_template_id"])}, user)
+                )
             except Exception:
                 pass
         if form_template:
@@ -569,7 +623,8 @@ async def execute_adhoc_plan(user: dict, plan_id: str):
     # Create a new task instance
     now = datetime.now(timezone.utc)
     
-    task_instance = {
+    task_instance = with_tenant_id(
+        {
         "id": str(uuid.uuid4()),  # Add explicit id field
         "task_plan_id": plan.get("id") or str(plan["_id"]),
         "task_template_id": plan.get("task_template_id"),
@@ -599,7 +654,9 @@ async def execute_adhoc_plan(user: dict, plan_id: str):
         "created_by": user.get("user_id"),
         "created_at": now,
         "updated_at": now,
-    }
+        },
+        user,
+    )
     
     result = await db.task_instances.insert_one(task_instance)
     task_instance["_id"] = result.inserted_id
@@ -607,7 +664,7 @@ async def execute_adhoc_plan(user: dict, plan_id: str):
     # Update plan's last_executed_at and execution_count - use the correct query field
     plan_query = {"id": plan_id} if plan.get("id") == plan_id else {"_id": plan["_id"]}
     await db.task_plans.update_one(
-        plan_query,
+        merge_tenant_filter(plan_query, user),
         {
             "$set": {"last_executed_at": now, "updated_at": now},
             "$inc": {"execution_count": 1}

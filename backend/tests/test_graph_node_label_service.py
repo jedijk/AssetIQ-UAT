@@ -5,20 +5,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from services.graph_node_label_service import enrich_edges_with_labels, resolve_node_labels
 
 
+def _mock_find(docs=None):
+    cursor = MagicMock()
+    cursor.to_list = AsyncMock(return_value=docs or [])
+    return MagicMock(return_value=cursor)
+
+
 @pytest.mark.asyncio
 async def test_resolve_threat_and_equipment_labels():
     mock_db = MagicMock()
-    mock_db.equipment_nodes.find = MagicMock(
-        return_value=AsyncMock(
-            to_list=AsyncMock(return_value=[{"id": "eq-1", "name": "Extruder"}])
-        )
-    )
-    mock_db.threats.find = MagicMock(
-        return_value=AsyncMock(
-            to_list=AsyncMock(
-                return_value=[{"id": "th-1", "title": "Bearing noise on P-101"}]
-            )
-        )
+    mock_db.equipment_nodes.find = _mock_find([{"id": "eq-1", "name": "Extruder"}])
+    mock_db.threats.find = _mock_find(
+        [{"id": "th-1", "title": "Bearing noise on P-101"}]
     )
 
     edges = [
@@ -121,19 +119,17 @@ async def test_resolve_observation_by_object_id_uses_description():
 
     obs_oid = ObjectId("507f1f77bcf86cd799439012")
     mock_db = MagicMock()
-    mock_db.observations.find = MagicMock(
-        return_value=AsyncMock(
-            to_list=AsyncMock(
-                return_value=[
-                    {
-                        "_id": obs_oid,
-                        "description": "Pomp word er warm en loopt zwaar.",
-                        "equipment_name": "Oil Pump Filter",
-                    }
-                ]
-            )
-        )
+    mock_db.observations.find = _mock_find(
+        [
+            {
+                "_id": obs_oid,
+                "description": "Pomp word er warm en loopt zwaar.",
+                "equipment_name": "Oil Pump Filter",
+            }
+        ]
     )
+    mock_db.equipment_nodes.find = _mock_find([])
+    mock_db.threats.find = _mock_find([])
 
     edges = [
         {
@@ -154,19 +150,16 @@ async def test_resolve_observation_by_object_id_uses_description():
 @pytest.mark.asyncio
 async def test_resolve_action_falls_back_to_description():
     mock_db = MagicMock()
-    mock_db.central_actions.find = MagicMock(
-        return_value=AsyncMock(
-            to_list=AsyncMock(
-                return_value=[
-                    {
-                        "id": "act-1",
-                        "action_number": "ACT-0011",
-                        "description": "Monitor motor current during peak load",
-                    }
-                ]
-            )
-        )
+    mock_db.central_actions.find = _mock_find(
+        [
+            {
+                "id": "act-1",
+                "action_number": "ACT-0011",
+                "description": "Monitor motor current during peak load",
+            }
+        ]
     )
+    mock_db.investigations.find = _mock_find([])
 
     edges = [
         {

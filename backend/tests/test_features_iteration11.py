@@ -6,6 +6,14 @@ import pytest
 from datetime import datetime
 from conftest import BASE_URL, TEST_ADMIN_EMAIL, TEST_OWNER_EMAIL
 
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not BASE_URL,
+        reason="REACT_APP_BACKEND_URL not set — skipping HTTP integration tests",
+    ),
+]
+
 
 class TestAuthentication:
     """Test authentication endpoints"""

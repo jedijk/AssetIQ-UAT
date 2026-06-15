@@ -113,6 +113,7 @@ WAVE_COLLECTIONS = (
 DEFAULT_TENANT_FIELD = "tenant_id"
 
 # When true, reads use strict {tenant_id: tid} instead of migration-safe $or.
+# Staging / UAT: set TENANT_STRICT_MODE=true after Wave 2 backfill (see scripts/strict_mode_cutover_check.py).
 TENANT_STRICT_MODE = os.environ.get("TENANT_STRICT_MODE", "false").lower() == "true"
 
 

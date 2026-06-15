@@ -16,7 +16,7 @@ async def ingest_reading(
     request: CreateReadingRequest,
     current_user: dict = Depends(_ril_write),
 ):
-    service = get_ril_service()
+    service = get_ril_service(current_user)
     reading = await service.ingest_reading(ril_owner_id(current_user), request)
     return {
         "success": True,
@@ -30,7 +30,7 @@ async def ingest_readings_bulk(
     request: BulkReadingsRequest,
     current_user: dict = Depends(_ril_write),
 ):
-    service = get_ril_service()
+    service = get_ril_service(current_user)
     result = await service.ingest_readings_bulk(
         ril_owner_id(current_user),
         request.readings,
@@ -50,7 +50,7 @@ async def list_readings(
     skip: int = Query(0, ge=0),
     current_user: dict = Depends(_ril_read),
 ):
-    readings, total = await get_ril_service().list_readings(
+    readings, total = await get_ril_service(current_user).list_readings(
         ril_owner_id(current_user),
         equipment_id=equipment_id,
         source_system=source_system,

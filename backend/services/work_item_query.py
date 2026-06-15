@@ -16,6 +16,7 @@ from bson import ObjectId
 from database import db
 from services.db_monitoring import timed_find
 from services.tenant_schema import merge_tenant_filter
+from services.work_signal_projection import project_list_item
 from services.work_execution_config import (
     should_include_unbridged_work_items,
     work_items_source_mode,
@@ -37,6 +38,16 @@ MAX_UNBRIDGED_ITEMS = 50
 # Fleet-scale caps for merged work-item lists.
 MAX_TASK_INSTANCES = 100
 MAX_ACTION_ITEMS = 100
+
+
+def _resolve_linked_signal_id(task: dict) -> Optional[str]:
+    """Resolve linked observation/threat id from a task instance document."""
+    for key in ("observation_id", "threat_id", "source_observation_id"):
+        if task.get(key):
+            return str(task[key])
+    if task.get("created_from_observation") and task.get("source_id"):
+        return str(task["source_id"])
+    return None
 
 
 def _parse_due_date(value: Optional[str]) -> Optional[datetime]:
@@ -748,7 +759,10 @@ async def fetch_work_items(
         plan_map_local: Dict[str, dict] = {}
         if not plan_ids_oid:
             return plan_map_local
-        cursor = await timed_find(db.task_plans, {"_id": {"$in": list(plan_ids_oid)}})
+        cursor = await timed_find(
+            db.task_plans,
+            merge_tenant_filter({"_id": {"$in": list(plan_ids_oid)}}, user),
+        )
         for plan in await cursor.to_list(len(plan_ids_oid)):
             plan_map_local[str(plan["_id"])] = plan
         return plan_map_local
@@ -815,9 +829,26 @@ async def fetch_work_items(
             except Exception:
                 pass
         if form_ids_oid:
-            form_cursor = await timed_find(db.form_templates, {"_id": {"$in": form_ids_oid}})
+            form_cursor = await timed_find(
+                db.form_templates,
+                merge_tenant_filter({"_id": {"$in": form_ids_oid}}, user),
+            )
             for ft in await form_cursor.to_list(len(form_ids_oid)):
                 form_template_map[str(ft["_id"])] = ft
+
+    linked_signal_ids = {
+        sid for task in raw_tasks if (sid := _resolve_linked_signal_id(task))
+    }
+    task_signal_map: Dict[str, dict] = {}
+    if linked_signal_ids:
+        sig_cursor = await timed_find(
+            db.threats,
+            merge_tenant_filter({"id": {"$in": list(linked_signal_ids)}}, user),
+            {"_id": 0},
+        )
+        for threat in await sig_cursor.to_list(len(linked_signal_ids)):
+            if threat.get("id"):
+                task_signal_map[threat["id"]] = threat
 
     items: List[dict] = []
     for task in raw_tasks:
@@ -899,6 +930,11 @@ async def fetch_work_items(
             task["source"] = "manual"
 
         task["source_type"] = "task"
+
+        signal_id = _resolve_linked_signal_id(task)
+        if signal_id and signal_id in task_signal_map:
+            task["work_signal"] = project_list_item(task_signal_map[signal_id])
+
         items.append(serialize_task(task))
 
     if maintenance_task is not None:
@@ -957,7 +993,7 @@ async def fetch_work_items(
         if investigation_source_ids:
             inv_cursor = await timed_find(
                 db.investigations,
-                {"id": {"$in": list(investigation_source_ids)}},
+                merge_tenant_filter({"id": {"$in": list(investigation_source_ids)}}, user),
                 {"_id": 0, "id": 1, "threat_id": 1},
             )
             for inv in await inv_cursor.to_list(len(investigation_source_ids)):

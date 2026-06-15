@@ -1,26 +1,15 @@
 """Tests for P1 Translation Management Dashboard + Dictionary Validation features."""
 import os
-from pathlib import Path
 
 import pytest
 import requests
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/") or os.environ.get(
-    "PUBLIC_BACKEND_URL", ""
-).rstrip("/")
-if not BASE_URL:
-    _env_path = Path(__file__).resolve().parents[2] / "frontend" / ".env"
-    if _env_path.is_file():
-        for line in _env_path.read_text().splitlines():
-            if line.startswith("REACT_APP_BACKEND_URL="):
-                BASE_URL = line.split("=", 1)[1].strip().strip('"').rstrip("/")
-                break
+from conftest import BASE_URL, TEST_OWNER_EMAIL, TEST_OWNER_PASSWORD
 
-from conftest import TEST_OWNER_EMAIL, TEST_OWNER_PASSWORD
-
-pytestmark = pytest.mark.integration
-
-pytestmark = pytest.mark.skipif(not BASE_URL, reason="Backend URL not configured")
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(not BASE_URL, reason="REACT_APP_BACKEND_URL not set — skipping HTTP integration tests"),
+]
 
 OWNER_EMAIL = TEST_OWNER_EMAIL
 OWNER_PASSWORD = TEST_OWNER_PASSWORD

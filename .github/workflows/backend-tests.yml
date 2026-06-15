@@ -87,7 +87,15 @@ jobs:
           VAPID_PRIVATE_KEY: test-private-key
           REACT_APP_BACKEND_URL: http://127.0.0.1:8765
         run: |
-          cd backend && python -m pytest tests/ -q --ignore=tests/test_big_bag_dashboard_filter.py --cov=services --cov=repositories --cov-report=term-missing:skip-covered --cov-fail-under=0
+          cd backend && python -m pytest tests/ -q --cov=services --cov=repositories --cov-report=term-missing:skip-covered --cov-fail-under=0
+
+      - name: Strict mode cutover check (informational)
+        continue-on-error: true
+        env:
+          MONGO_URL: mongodb://localhost:27017/test
+          DB_NAME: test
+        run: |
+          cd backend && python scripts/strict_mode_cutover_check.py
 
       - name: Stop API server
         if: always()

@@ -86,9 +86,12 @@ async def test_audit_scheduled_task_completed_all_edges():
 @pytest.mark.asyncio
 async def test_task_service_complete_syncs_scheduled_task_edges():
     """complete_task delegates graph sync after completion."""
-    from services.task_service import TaskService
+    from pathlib import Path
 
-    source = (pytest.importorskip("pathlib").Path(__file__).resolve().parents[1] / "services" / "task_service.py").read_text()
-    assert "_sync_reliability_graph_on_complete" in source
-    assert "dispatch_graph_sync" in source
-    assert "sync_edges_for_scheduled_task" in source
+    services = Path(__file__).resolve().parents[1] / "services"
+    completion_source = (services / "task_service_completion.py").read_text()
+    task_source = (services / "task_service.py").read_text()
+    assert "sync_reliability_graph_on_complete" in completion_source
+    assert "sync_reliability_graph_on_complete" in task_source
+    assert "dispatch_graph_sync" in completion_source
+    assert "sync_edges_for_scheduled_task" in completion_source

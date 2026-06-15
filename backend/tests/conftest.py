@@ -97,6 +97,22 @@ def base_url():
     return BASE_URL
 
 
+@pytest.fixture(scope="session")
+def require_mongo():
+    """Skip DB integration tests when MongoDB is unreachable."""
+    import os
+
+    from pymongo import MongoClient
+
+    url = os.environ.get("MONGO_URL", "mongodb://localhost:27017/test")
+    try:
+        client = MongoClient(url, serverSelectionTimeoutMS=2000)
+        client.admin.command("ping")
+    except Exception as exc:
+        pytest.skip(f"MongoDB not available at {url}: {exc}")
+    return url
+
+
 @pytest.fixture
 def api_client():
     """Create an unauthenticated API session."""

@@ -7,6 +7,8 @@ import pytest
 from database import db
 from services.form_service import FormService
 
+pytestmark = pytest.mark.usefixtures("require_mongo")
+
 
 def _visc_doc(visc_id: str, when: datetime):
     return {

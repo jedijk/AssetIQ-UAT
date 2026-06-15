@@ -16,7 +16,7 @@ async def create_observation(
     request: CreateObservationRequest,
     current_user: dict = Depends(_ril_write),
 ):
-    service = get_ril_service()
+    service = get_ril_service(current_user)
     observation = await service.create_observation(ril_owner_id(current_user), request)
     return {"success": True, "observation": observation.dict()}
 
@@ -32,7 +32,7 @@ async def list_observations(
     skip: int = Query(0, ge=0),
     current_user: dict = Depends(_ril_read),
 ):
-    service = get_ril_service()
+    service = get_ril_service(current_user)
     owner_id = ril_owner_id(current_user)
     observations, total = await service.get_observations(
         owner_id,
@@ -57,7 +57,7 @@ async def get_observation(
     observation_id: str,
     current_user: dict = Depends(_ril_read),
 ):
-    doc = await get_ril_service().get_observation_doc(
+    doc = await get_ril_service(current_user).get_observation_doc(
         ril_owner_id(current_user),
         observation_id,
     )

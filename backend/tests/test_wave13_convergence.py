@@ -21,10 +21,11 @@ def test_ai_risk_service_holds_endpoint_logic():
 
 
 def test_task_service_uses_dispatch_graph_sync():
-    text = (BACKEND_ROOT / "services" / "task_service.py").read_text(encoding="utf-8")
-    start = text.index("async def _sync_reliability_graph_on_complete")
-    end = text.index("async def _create_observation_from_task")
-    block = text[start:end]
-    assert "dispatch_graph_sync" in block
-    assert "sync_edges_for_scheduled_task(" not in block
-    assert "sync_task_instance_completion_edges(" not in block
+    completion = (BACKEND_ROOT / "services" / "task_service_completion.py").read_text(encoding="utf-8")
+    assert "async def sync_reliability_graph_on_complete" in completion
+    assert "dispatch_graph_sync" in completion
+    assert "sync_edges_for_scheduled_task(" not in completion.split("dispatch_graph_sync")[0]
+    assert "sync_task_instance_completion_edges(" not in completion.split("dispatch_graph_sync")[0]
+
+    task_svc = (BACKEND_ROOT / "services" / "task_service.py").read_text(encoding="utf-8")
+    assert "sync_reliability_graph_on_complete" in task_svc

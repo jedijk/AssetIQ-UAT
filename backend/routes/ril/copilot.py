@@ -13,7 +13,7 @@ async def query_copilot(
     request: CopilotQueryRequest,
     current_user: dict = Depends(_ril_write),
 ):
-    _, copilot_service = get_copilot_services()
+    _, copilot_service = get_copilot_services(current_user)
     return await copilot_service.process_query(
         ril_owner_id(current_user),
         request,
@@ -42,7 +42,7 @@ async def get_equipment_reliability_context(
 async def get_query_suggestions(
     current_user: dict = Depends(_ril_read),
 ):
-    ril_service, _ = get_copilot_services()
+    ril_service, _ = get_copilot_services(current_user)
     owner_id = ril_owner_id(current_user)
     stats = await ril_service.get_dashboard_stats(owner_id)
 
