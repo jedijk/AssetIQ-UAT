@@ -50,15 +50,18 @@ jobs:
           MONGO_URL: mongodb://localhost:27017/test
           DB_NAME: test
           ENVIRONMENT: test
+          JWT_SECRET_KEY: ci-test-jwt-secret-not-for-production
         run: |
-          cd backend && python scripts/ci_bootstrap_test_users.py
-          cd backend && python scripts/ci_integration_bootstrap.py
+          cd backend
+          python scripts/ci_bootstrap_test_users.py
+          python scripts/ci_integration_bootstrap.py
 
       - name: Start API server for integration tests
         env:
           MONGO_URL: mongodb://localhost:27017/test
           DB_NAME: test
           ENVIRONMENT: test
+          JWT_SECRET_KEY: ci-test-jwt-secret-not-for-production
           RATE_LIMIT_ENABLED: "false"
           VAPID_PUBLIC_KEY: test-public-key
           VAPID_PRIVATE_KEY: test-private-key
@@ -82,6 +85,7 @@ jobs:
           MONGO_URL: mongodb://localhost:27017/test
           DB_NAME: test
           ENVIRONMENT: test
+          JWT_SECRET_KEY: ci-test-jwt-secret-not-for-production
           RATE_LIMIT_ENABLED: "false"
           VAPID_PUBLIC_KEY: test-public-key
           VAPID_PRIVATE_KEY: test-private-key
