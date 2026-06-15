@@ -365,11 +365,6 @@ export default function ProductionDashboardPage() {
       return;
     }
     let preOpened = null;
-    try {
-      preOpened = openPrintWindow();
-    } catch (_err) {
-      /* ignore */
-    }
     setPrintingLogSubmissionId(submissionId);
     try {
       const tpl = isViscOnly ? formTemplates?.viscosity : formTemplates?.extruder;
@@ -387,8 +382,12 @@ export default function ProductionDashboardPage() {
       const templateId = cfg?.label_template_id;
       if (!cfg?.enabled || !templateId) {
         toast.error("This form has no label template configured. Enable it in the form designer.");
-        if (preOpened && !preOpened.closed) preOpened.close();
         return;
+      }
+      try {
+        preOpened = openPrintWindow();
+      } catch (_err) {
+        /* ignore */
       }
       const { printLabel } = await import("../../../lib/printLabel");
       const res = await printLabel(
@@ -402,10 +401,15 @@ export default function ProductionDashboardPage() {
           filename: `label-${String(submissionId).slice(0, 8)}.pdf`,
         }
       );
-      if (res.method === "window") toast.success("Label print dialog opened");
-      else if (res.mobile) toast.info("Label downloaded — use Share → Print");
-      else if (res.method === "download") toast.info("Print blocked — label downloaded.");
-      else toast.success("Print dialog opened");
+      if (res.method === "window" || res.method === "share") {
+        toast.success("Label print dialog opened");
+      } else if (res.mobile) {
+        toast.info("Label downloaded — use Share → Print");
+      } else if (res.method === "download") {
+        toast.info("Print blocked — label downloaded.");
+      } else {
+        toast.success("Print dialog opened");
+      }
     } catch (err) {
       if (preOpened && !preOpened.closed) preOpened.close();
       toast.error(err?.response?.data?.detail || err?.message || "Print failed");

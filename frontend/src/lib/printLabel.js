@@ -37,35 +37,107 @@ export const isMobileDevice = () => {
  */
 export function openPrintWindow() {
   try {
-    const w = window.open("", "_blank", "noopener=no");
+    // Do not pass noopener — modern browsers block opener.location after async
+    // unless we navigate via the child's own document or postMessage.
+    const w = window.open("about:blank", "_blank");
     if (!w) return null;
-    // Show a "Preparing…" placeholder while we fetch the HTML
+    // Show a "Preparing…" placeholder and listen for PDF URL via postMessage.
     try {
-      w.document.open();
-      w.document.close();
-      // Avoid document.write: render a minimal placeholder via DOM APIs.
       const doc = w.document;
-      doc.title = "Preparing label…";
-      const metaCharset = doc.createElement("meta");
-      metaCharset.setAttribute("charset", "utf-8");
-      const metaViewport = doc.createElement("meta");
-      metaViewport.setAttribute("name", "viewport");
-      metaViewport.setAttribute("content", "width=device-width,initial-scale=1");
-      doc.head.appendChild(metaCharset);
-      doc.head.appendChild(metaViewport);
-
-      const style = doc.createElement("style");
-      style.textContent =
-        "body{font-family:-apple-system,system-ui,Helvetica,Arial,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#64748b}";
-      doc.head.appendChild(style);
-
-      const body = doc.body || doc.createElement("body");
-      body.textContent = "Preparing label…";
-      if (!doc.body) doc.documentElement.appendChild(body);
+      doc.open();
+      doc.write(
+        "<!DOCTYPE html><html><head>" +
+          '<meta charset="utf-8">' +
+          '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+          "<title>Preparing label…</title>" +
+          "<style>body{font-family:-apple-system,system-ui,Helvetica,Arial,sans-serif;" +
+          "display:flex;align-items:center;justify-content:center;height:100vh;margin:0;color:#64748b}</style>" +
+          "</head><body>Preparing label…" +
+          "<script>" +
+          'window.addEventListener("message",function(e){' +
+          'if(!e.data||e.data.type!=="assetiq-label-pdf"||!e.data.url)return;' +
+          'try{window.location.replace(e.data.url);}catch(_e){try{window.location.href=e.data.url;}catch(_e2){}}' +
+          "});" +
+          "</script></body></html>"
+      );
+      doc.close();
     } catch (_e) { /* ignore */ }
     return w;
   } catch (_err) {
     return null;
+  }
+}
+
+
+/**
+ * Navigate a pre-opened print window to a blob URL after an async fetch.
+ * Direct opener.location assignment fails on many browsers (implicit noopener);
+ * redirecting from the child's document or via postMessage is reliable.
+ */
+function navigatePrintWindowToUrl(win, url) {
+  if (!win || win.closed) return false;
+  try {
+    const doc = win.document;
+    doc.open();
+    doc.write(
+      "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Label</title></head>" +
+        "<body><script>window.location.replace(" +
+        JSON.stringify(url) +
+        ");</script></body></html>"
+    );
+    doc.close();
+    return true;
+  } catch (_e) {
+    /* ignore */
+  }
+  try {
+    win.postMessage({ type: "assetiq-label-pdf", url }, window.location.origin);
+    return true;
+  } catch (_e2) {
+    /* ignore */
+  }
+  try {
+    win.location.href = url;
+    return true;
+  } catch (_e3) {
+    /* ignore */
+  }
+  return false;
+}
+
+
+function schedulePrint(win) {
+  if (!win || win.closed) return;
+  const tryPrint = () => {
+    try {
+      win.focus();
+      win.print();
+    } catch (_e) {
+      /* ignore — mobile PDF viewers often block programmatic print */
+    }
+  };
+  try {
+    win.addEventListener("load", tryPrint, { once: true });
+  } catch (_e) {
+    /* ignore */
+  }
+  setTimeout(tryPrint, 600);
+}
+
+
+async function sharePdfBlob(blob, filename) {
+  if (typeof navigator.share !== "function" || typeof File === "undefined") {
+    return false;
+  }
+  const file = new File([blob], filename, { type: "application/pdf" });
+  if (navigator.canShare && !navigator.canShare({ files: [file] })) {
+    return false;
+  }
+  try {
+    await navigator.share({ files: [file], title: filename });
+    return true;
+  } catch (_e) {
+    return false;
   }
 }
 
@@ -128,34 +200,41 @@ function printPdfViaIframe(blob) {
 }
 
 
+async function openPdfInNewTab(url) {
+  try {
+    const w = window.open(url, "_blank");
+    if (w) return w;
+  } catch (_e) {
+    /* ignore */
+  }
+  return null;
+}
+
+
 async function printMobileViaPdf(payload, preOpened, filename) {
+  let url = null;
   try {
     const blob = await labelsAPI.printBlob(payload);
-    const url = URL.createObjectURL(blob);
-    if (preOpened && !preOpened.closed) {
-      try {
-        // Navigate the already-opened window to the PDF blob URL.
-        // User can Print/Share from the native PDF viewer.
-        preOpened.location.href = url;
-        // Best-effort: some browsers will allow print after load.
-        preOpened.addEventListener(
-          "load",
-          () => {
-            try {
-              preOpened.focus();
-              preOpened.print();
-            } catch (_e) {
-              /* ignore */
-            }
-          },
-          { once: true }
-        );
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-        return { method: "window", ok: true, mobile: true };
-      } catch (_navErr) {
-        /* fall through to download */
-      }
+    url = URL.createObjectURL(blob);
+
+    if (preOpened && !preOpened.closed && navigatePrintWindowToUrl(preOpened, url)) {
+      schedulePrint(preOpened);
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      return { method: "window", ok: true, mobile: true };
     }
+
+    const tab = await openPdfInNewTab(url);
+    if (tab) {
+      schedulePrint(tab);
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      return { method: "window", ok: true, mobile: true };
+    }
+
+    if (await sharePdfBlob(blob, filename)) {
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      return { method: "share", ok: true, mobile: true };
+    }
+
     downloadBlob(blob, filename);
     setTimeout(() => URL.revokeObjectURL(url), 60000);
     if (preOpened && !preOpened.closed) {
@@ -167,6 +246,7 @@ async function printMobileViaPdf(payload, preOpened, filename) {
     }
     return { method: "download", ok: true, mobile: true };
   } catch (_err) {
+    if (url) URL.revokeObjectURL(url);
     if (preOpened && !preOpened.closed) {
       try {
         preOpened.close();
@@ -187,7 +267,7 @@ async function printMobileViaPdf(payload, preOpened, filename) {
  *   - win: a Window handle returned from openPrintWindow() (REQUIRED on mobile
  *     for reliable printing; optional on desktop)
  *   - filename: suggested file name if we fall back to download
- * @returns {Promise<{ method: "window"|"iframe"|"download", ok: boolean, mobile: boolean }>}
+ * @returns {Promise<{ method: "window"|"iframe"|"download"|"share", ok: boolean, mobile: boolean }>}
  */
 export async function printLabel(payload, opts = {}) {
   const mobile = isMobileDevice();
@@ -205,22 +285,13 @@ export async function printLabel(payload, opts = {}) {
     // This keeps the action user-gesture associated (popup opened on click),
     // and avoids Chrome blocking iframe.print() after an async fetch.
     if (preOpened && !preOpened.closed) {
-      try {
-        const url = URL.createObjectURL(blob);
-        preOpened.location.href = url;
-        preOpened.addEventListener(
-          "load",
-          () => {
-            try {
-              preOpened.focus();
-              preOpened.print();
-            } catch (_e) {}
-          },
-          { once: true }
-        );
+      const url = URL.createObjectURL(blob);
+      if (navigatePrintWindowToUrl(preOpened, url)) {
+        schedulePrint(preOpened);
         setTimeout(() => URL.revokeObjectURL(url), 60000);
         return { method: "window", ok: true, mobile: false };
-      } catch (_e) { /* fall through to iframe */ }
+      }
+      URL.revokeObjectURL(url);
     }
     const ok = await printPdfViaIframe(blob);
     if (!ok) {

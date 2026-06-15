@@ -85,7 +85,7 @@ import { DISCIPLINES, getDisciplineColor } from "../constants/disciplines";
 import { DocumentViewer } from "../components/DocumentViewer";
 import { formatDateTime as formatDateTimeUtil } from "../lib/dateUtils";
 import { formAPI } from "../components/forms/formAPI";
-import { openPrintWindow, isMobileDevice } from "../lib/printLabel";
+import { openPrintWindow, printLabel } from "../lib/printLabel";
 
 const API_BASE_URL = getBackendUrl();
 const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer";
@@ -589,12 +589,6 @@ export default function FormSubmissionsPage() {
 
     setPrintingId(submission.id);
     try {
-      const { printLabel } = await import("../lib/printLabel");
-      try {
-        // Helpful for iOS debugging: confirm which template is actually being used.
-        // eslint-disable-next-line no-console
-        console.log("[labels] reprint", { submissionId: submission.id, templateId });
-      } catch (_e) {}
       const res = await printLabel(
         {
           template_id: templateId,
@@ -606,10 +600,15 @@ export default function FormSubmissionsPage() {
           filename: `${submission.form_template_name || "label"}.pdf`,
         }
       );
-      if (res.method === "window") toast.success(t("reports.printDialogOpened"));
-      else if (res.mobile) toast.info(t("reports.labelDownloaded"));
-      else if (res.method === "download") toast.info(t("reports.printBlocked"));
-      else toast.success(t("reports.printOpened"));
+      if (res.method === "window" || res.method === "share") {
+        toast.success(t("reports.printDialogOpened"));
+      } else if (res.mobile) {
+        toast.info(t("reports.labelDownloaded"));
+      } else if (res.method === "download") {
+        toast.info(t("reports.printBlocked"));
+      } else {
+        toast.success(t("reports.printOpened"));
+      }
     } catch (err) {
       if (preOpened && !preOpened.closed) preOpened.close();
       toast.error(err?.response?.data?.detail || t("reports.printFailed"));

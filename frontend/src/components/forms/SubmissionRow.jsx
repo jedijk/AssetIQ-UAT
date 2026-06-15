@@ -10,7 +10,7 @@ import { Button } from "../ui/button";
 import { ThresholdBadge } from "./FieldPreview";
 import { formatDateTime } from "../../lib/dateUtils";
 import { formAPI } from "./formAPI";
-import { openPrintWindow, isMobileDevice } from "../../lib/printLabel";
+import { openPrintWindow, printLabel } from "../../lib/printLabel";
 import { useLanguage } from "../../contexts/LanguageContext";
 
 export const SubmissionRow = ({ submission, labelConfig: labelConfigProp }) => {
@@ -41,24 +41,19 @@ export const SubmissionRow = ({ submission, labelConfig: labelConfigProp }) => {
 
   const handlePrint = async (e) => {
     e.stopPropagation();
-    // IMPORTANT: open the new window SYNCHRONOUSLY within the click event so
-    // iOS Safari doesn't block it. We fill it with HTML once the fetch returns.
-    let preOpened = null;
-    try {
-      // Open for desktop too: avoids Chrome blocking prints triggered after async fetch.
-      preOpened = openPrintWindow();
-    } catch (_e) { /* ignore */ }
-
     setPrinting(true);
     try {
       const cfg = await ensureConfig();
       const templateId = submission?.label_template_id || cfg?.label_template_id;
       if (!cfg?.enabled || !templateId) {
         toast.error(t("reports.noLabelTemplate"));
-        if (preOpened && !preOpened.closed) preOpened.close();
         return;
       }
-      const { printLabel } = await import("../../lib/printLabel");
+      // Open synchronously right before print so the tab stays alive (no long await gap).
+      let preOpened = null;
+      try {
+        preOpened = openPrintWindow();
+      } catch (_e) { /* ignore */ }
       const res = await printLabel({
         template_id: templateId,
         submission_id: submission.id,
@@ -67,10 +62,15 @@ export const SubmissionRow = ({ submission, labelConfig: labelConfigProp }) => {
         win: preOpened,
         filename: `${submission.template_name || "label"}.pdf`,
       });
-      if (res.method === "window") toast.success(t("reports.printDialogOpened"));
-      else if (res.mobile) toast.info(t("reports.labelDownloaded"));
-      else if (res.method === "download") toast.info(t("reports.printBlocked"));
-      else toast.success(t("reports.printOpened"));
+      if (res.method === "window" || res.method === "share") {
+        toast.success(t("reports.printDialogOpened"));
+      } else if (res.mobile) {
+        toast.info(t("reports.labelDownloaded"));
+      } else if (res.method === "download") {
+        toast.info(t("reports.printBlocked"));
+      } else {
+        toast.success(t("reports.printOpened"));
+      }
     } catch (err) {
       if (preOpened && !preOpened.closed) preOpened.close();
       toast.error(err.response?.data?.detail || t("reports.printFailed"));
