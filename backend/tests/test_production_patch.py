@@ -12,7 +12,7 @@ from database import db
 pytestmark = [
     pytest.mark.usefixtures("require_mongo"),
     pytest.mark.skipif(
-        os.environ.get("REACT_APP_BACKEND_URL"),
+        bool(os.environ.get("REACT_APP_BACKEND_URL")),
         reason="Skip motor event-loop tests in HTTP integration CI mode",
     ),
 ]

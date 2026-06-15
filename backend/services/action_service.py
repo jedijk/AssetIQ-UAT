@@ -381,6 +381,22 @@ async def create_action(current_user: dict, data: Dict[str, Any]) -> dict:
             risk_level = threat.get("risk_level")
             threat_id = data["source_id"]
 
+    linked_equipment_id = None
+    if data.get("source_type") == "threat" and threat_id:
+        threat = await _threat_repo.find_one(
+            {"id": threat_id},
+            user=current_user,
+            projection={"linked_equipment_id": 1},
+        )
+        linked_equipment_id = (threat or {}).get("linked_equipment_id")
+    elif data.get("source_type") == "investigation":
+        inv = await inv_repo.find_one(
+            {"id": data["source_id"]},
+            user=current_user,
+            projection={"asset_id": 1},
+        )
+        linked_equipment_id = (inv or {}).get("asset_id")
+
     now = datetime.now(timezone.utc).isoformat()
     action_doc = {
         "id": action_id,
@@ -391,6 +407,7 @@ async def create_action(current_user: dict, data: Dict[str, Any]) -> dict:
         "source_id": data["source_id"],
         "source_name": data["source_name"],
         "threat_id": threat_id,
+        "linked_equipment_id": linked_equipment_id,
         "priority": data.get("priority", "medium"),
         "assignee": data.get("assignee"),
         "action_type": data.get("action_type"),
@@ -409,22 +426,6 @@ async def create_action(current_user: dict, data: Dict[str, Any]) -> dict:
 
     await _action_repo.insert_document(action_doc, user=current_user)
     action_doc.pop("_id", None)
-
-    linked_equipment_id = None
-    if data.get("source_type") == "threat":
-        threat = await _threat_repo.find_one(
-            {"id": data["source_id"]},
-            user=current_user,
-            projection={"linked_equipment_id": 1},
-        )
-        linked_equipment_id = (threat or {}).get("linked_equipment_id")
-    elif data.get("source_type") == "investigation":
-        inv = await inv_repo.find_one(
-            {"id": data["source_id"]},
-            user=current_user,
-            projection={"asset_id": 1},
-        )
-        linked_equipment_id = (inv or {}).get("asset_id")
 
     from services.reliability_graph import dispatch_graph_sync
 

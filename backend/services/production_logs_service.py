@@ -611,13 +611,18 @@ async def delete_job(user: dict,
         raise HTTPException(status_code=404, detail="Job not found")
 
     # Delete ingested records
-    result = await db.production_logs.delete_many({"source.job_id": job_id})
-    logger.info(f"[LogIngest] Deleted {result.deleted_count} records for job {job_id}")
+    logs_result = await db.production_logs.delete_many({"source.job_id": job_id})
+    logger.info(f"[LogIngest] Deleted {logs_result.deleted_count} records for job {job_id}")
 
     # Delete job
-    await db.log_ingestion_jobs.delete_one({"id": job_id})
+    job_result = await db.log_ingestion_jobs.delete_one({"id": job_id})
+    if job_result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Job not found")
 
-    return {"deleted_records": result.deleted_count, "message": "Job and data deleted"}
+    return {
+        "deleted_records": logs_result.deleted_count,
+        "message": "Job and data deleted",
+    }
 
 
 # ======================== Template Management ========================

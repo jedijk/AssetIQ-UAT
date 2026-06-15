@@ -22,6 +22,34 @@ CI_EQUIPMENT_ID = "ci-equipment-001"
 CI_THREAT_ID = "ci-threat-001"
 CI_AI_THREAT_ID = "43455566-4f46-4c54-8130-fdd7a7d009a1"
 CI_ACTION_ID = "ci-action-001"
+CI_TENANT_ID = "default"
+
+
+def _threat_doc(threat_id: str, title: str, now: str) -> dict:
+    """Fields required by ThreatResponse and installation-scoped list queries."""
+    return {
+        "id": threat_id,
+        "title": title,
+        "status": "Open",
+        "linked_equipment_id": CI_EQUIPMENT_ID,
+        "asset": "CI Test Pump",
+        "equipment_type": "Pump",
+        "failure_mode": "General Degradation",
+        "impact": "Medium",
+        "frequency": "Occasional",
+        "likelihood": "Possible",
+        "detectability": "Moderate",
+        "risk_score": 55,
+        "risk_level": "Medium",
+        "rank": 1,
+        "total_threats": 1,
+        "occurrence_count": 1,
+        "recommended_actions": [],
+        "created_by": "ci-bootstrap",
+        "tenant_id": CI_TENANT_ID,
+        "created_at": now,
+        "updated_at": now,
+    }
 
 
 async def _upsert_user_fields() -> None:
@@ -34,7 +62,7 @@ async def _upsert_user_fields() -> None:
                 "$set": {
                     "assigned_installations": [CI_INSTALLATION_NAME],
                     "department": "Engineering",
-                    "company_id": "default",
+                    "company_id": CI_TENANT_ID,
                     "updated_at": now,
                 }
             },
@@ -52,6 +80,7 @@ async def seed_ci_fixtures() -> dict:
                 "id": CI_INSTALLATION_ID,
                 "name": CI_INSTALLATION_NAME,
                 "level": "installation",
+                "tenant_id": CI_TENANT_ID,
                 "updated_at": now,
             },
             "$setOnInsert": {"created_at": now},
@@ -68,6 +97,7 @@ async def seed_ci_fixtures() -> dict:
                 "tag": "P-CI-001",
                 "level": "equipment",
                 "parent_id": CI_INSTALLATION_ID,
+                "tenant_id": CI_TENANT_ID,
                 "updated_at": now,
             },
             "$setOnInsert": {"created_at": now},
@@ -82,17 +112,7 @@ async def seed_ci_fixtures() -> dict:
         await db.threats.update_one(
             {"id": threat_id},
             {
-                "$set": {
-                    "id": threat_id,
-                    "title": title,
-                    "status": "Open",
-                    "linked_equipment_id": CI_EQUIPMENT_ID,
-                    "asset": "CI Test Pump",
-                    "risk_score": 55,
-                    "risk_level": "Medium",
-                    "created_by": "ci-bootstrap",
-                    "updated_at": now,
-                },
+                "$set": _threat_doc(threat_id, title, now),
                 "$setOnInsert": {"created_at": now},
             },
             upsert=True,
@@ -120,6 +140,8 @@ async def seed_ci_fixtures() -> dict:
                 "priority": "medium",
                 "status": "open",
                 "created_by": admin_id,
+                "tenant_id": CI_TENANT_ID,
+                "created_at": now,
                 "updated_at": now,
             },
             "$setOnInsert": {"created_at": now},
@@ -138,6 +160,8 @@ async def seed_ci_fixtures() -> dict:
                 "severity": 6,
                 "occurrence": 4,
                 "detectability": 5,
+                "rpn": 120,
+                "tenant_id": CI_TENANT_ID,
                 "updated_at": now,
             },
             "$setOnInsert": {
@@ -147,6 +171,69 @@ async def seed_ci_fixtures() -> dict:
         },
         upsert=True,
     )
+
+    await db.failure_modes.update_one(
+        {"legacy_id": 53},
+        {
+            "$set": {
+                "legacy_id": 53,
+                "failure_mode": "Short Circuit",
+                "category": "Electrical",
+                "equipment": "System",
+                "keywords": ["short circuit"],
+                "severity": 8,
+                "occurrence": 5,
+                "detectability": 7,
+                "rpn": 280,
+                "version": 2,
+                "recommended_actions": [
+                    {"action": "Install protection", "action_type": "CM", "discipline": "Electrical"},
+                    {"action": "Inspect", "action_type": "PM", "discipline": "Electrical"},
+                    {"action": "Maintain", "action_type": "PM", "discipline": "Electrical"},
+                ],
+                "equipment_type_ids": ["switchgear", "transformer"],
+                "tenant_id": CI_TENANT_ID,
+                "updated_at": now,
+            },
+            "$setOnInsert": {"created_at": now},
+        },
+        upsert=True,
+    )
+    fm53 = await db.failure_modes.find_one({"legacy_id": 53})
+    if fm53:
+        fm_id = str(fm53["_id"])
+        v1_snapshot = {
+            "category": "Electrical",
+            "equipment": "System",
+            "failure_mode": "Short Circuit",
+            "keywords": ["short circuit"],
+            "severity": 7,
+            "occurrence": 3,
+            "detectability": 7,
+            "rpn": 147,
+            "recommended_actions": [
+                {"action": "Install protection", "action_type": "CM", "discipline": "Electrical"},
+                {"action": "Inspect", "action_type": "PM", "discipline": "Electrical"},
+                {"action": "Maintain", "action_type": "PM", "discipline": "Electrical"},
+            ],
+            "equipment_type_ids": ["switchgear", "transformer"],
+            "failure_mode_type": "generic",
+            "is_validated": False,
+        }
+        await db.failure_mode_versions.update_one(
+            {"failure_mode_id": fm_id, "version": 1},
+            {
+                "$set": {
+                    "failure_mode_id": fm_id,
+                    "version": 1,
+                    "snapshot": v1_snapshot,
+                    "updated_by": "ci-bootstrap",
+                    "change_reason": "CI seed version history",
+                    "created_at": datetime.now(timezone.utc),
+                }
+            },
+            upsert=True,
+        )
 
     dictionary_terms = [
         ("bearing", {"nl": "lager", "de": "Lager"}),

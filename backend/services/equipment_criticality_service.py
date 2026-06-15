@@ -20,6 +20,13 @@ _PROFILE_IMPACT_DEFAULTS = {
     "low": (1, 1, 1, 1),
 }
 
+_PROFILE_COLORS = {
+    "safety_critical": "#EF4444",
+    "production_critical": "#F97316",
+    "medium": "#EAB308",
+    "low": "#22C55E",
+}
+
 
 def _apply_profile_defaults(assignment: CriticalityAssignment) -> CriticalityAssignment:
     """Map legacy profile_id-only payloads to dimension scores."""
@@ -91,7 +98,10 @@ async def assign_criticality(
     reputation = assignment.reputation_impact or 0
     max_impact = max(safety, production, environmental, reputation)
 
-    if safety >= 4 or max_impact == 5:
+    if assignment.profile_id in _PROFILE_IMPACT_DEFAULTS:
+        level = assignment.profile_id
+        color = _PROFILE_COLORS.get(level, "#EAB308")
+    elif safety >= 4 or max_impact == 5:
         level = "safety_critical"
         color = "#EF4444"
     elif production >= 4 or max_impact >= 4:

@@ -42,6 +42,36 @@ def get_all_equipment_types():
     return sorted(list(equipment_types))
 
 
+def _filter_static_failure_modes(
+    *,
+    category: Optional[str] = None,
+    equipment: Optional[str] = None,
+    search: Optional[str] = None,
+    min_rpn: Optional[int] = None,
+) -> list:
+    """Apply list filters to the static failure mode library."""
+    results = FAILURE_MODES_LIBRARY.copy()
+    if search:
+        search_lower = search.lower()
+        results = [
+            fm for fm in results
+            if (
+                search_lower in fm["failure_mode"].lower()
+                or search_lower in fm["equipment"].lower()
+                or search_lower in fm["category"].lower()
+                or any(search_lower in kw.lower() for kw in fm.get("keywords", []))
+            )
+        ]
+    if category and category.lower() != "all":
+        results = [fm for fm in results if fm["category"].lower() == category.lower()]
+    if equipment:
+        results = [fm for fm in results if fm["equipment"].lower() == equipment.lower()]
+    if min_rpn:
+        results = [fm for fm in results if fm["rpn"] >= min_rpn]
+    results.sort(key=lambda x: -x["rpn"])
+    return results
+
+
 async def get_failure_modes(
     category: Optional[str] = None,
     equipment: Optional[str] = None,
@@ -73,50 +103,37 @@ async def get_failure_modes(
             user=current_user,
         )
         
-        # If MongoDB is empty, use static library as fallback
-        if result["total"] == 0 and not any([category, equipment, search, min_rpn, equipment_type_id, mechanism]):
-            logger.info("MongoDB failure_modes empty, using static library fallback")
-            results = FAILURE_MODES_LIBRARY.copy()
-            results.sort(key=lambda x: -x["rpn"])
+        if result["total"] == 0:
+            logger.info("MongoDB failure_modes empty for filters, using static library fallback")
+            results = _filter_static_failure_modes(
+                category=category,
+                equipment=equipment,
+                search=search,
+                min_rpn=min_rpn,
+            )
             return {"total": len(results), "failure_modes": results, "source": "static"}
         
         return result
     except Exception as e:
         logger.error(f"Error fetching from MongoDB, falling back to static: {e}")
-        # Fallback to static library
-        results = FAILURE_MODES_LIBRARY.copy()
-        
-        if search:
-            search_lower = search.lower()
-            results = [fm for fm in results if (
-                search_lower in fm["failure_mode"].lower() or
-                search_lower in fm["equipment"].lower() or
-                search_lower in fm["category"].lower() or
-                any(search_lower in kw.lower() for kw in fm.get("keywords", []))
-            )]
-        
-        if category and category.lower() != "all":
-            results = [fm for fm in results if fm["category"].lower() == category.lower()]
-        
-        if equipment:
-            results = [fm for fm in results if fm["equipment"].lower() == equipment.lower()]
-        
-        if min_rpn:
-            results = [fm for fm in results if fm["rpn"] >= min_rpn]
-        
-        results.sort(key=lambda x: -x["rpn"])
+        results = _filter_static_failure_modes(
+            category=category,
+            equipment=equipment,
+            search=search,
+            min_rpn=min_rpn,
+        )
         return {"total": len(results), "failure_modes": results, "source": "static"}
 
 async def get_categories(current_user: dict):
     """Get all unique categories."""
+    static_categories = get_all_categories()
     try:
         categories = await failure_modes_service.get_categories()
-        if categories:
+        if categories and len(categories) >= 8:
             return {"categories": categories}
     except Exception as e:
         logger.error(f"Error fetching categories from MongoDB: {e}")
-    # Fallback to static
-    return {"categories": get_all_categories()}
+    return {"categories": static_categories}
 
 async def get_equipment_types(current_user: dict):
     """Get all unique equipment types."""
@@ -338,7 +355,11 @@ async def get_failure_mode_by_id(
         legacy_id = int(mode_id)
         for fm in FAILURE_MODES_LIBRARY:
             if fm["id"] == legacy_id:
-                return fm
+                result = dict(fm)
+                result["legacy_id"] = legacy_id
+                result.setdefault("version", 1)
+                result["id"] = str(legacy_id)
+                return result
     except ValueError:
         pass
     

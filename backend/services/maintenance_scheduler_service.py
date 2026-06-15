@@ -1,4 +1,5 @@
 """Maintenance scheduler service — read queries, task lifecycle, technicians, programs."""
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -21,6 +22,15 @@ from services.maintenance_scheduler_scope import (
 from services.tenant_schema import tenant_id_from_user, with_tenant_id
 
 CORRECTIVE_TASK_TYPES = ("reactive", "corrective")
+logger = logging.getLogger(__name__)
+
+
+def _empty_dashboard_kpis() -> dict:
+    return {
+        "backlog": {"open_tasks": 0, "overdue_tasks": 0, "upcoming_tasks": 0},
+        "compliance": {"rate": 100.0, "completed_on_time": 0, "total_completed": 0},
+        "priority_breakdown": [],
+    }
 
 
 async def get_dashboard_kpis(
@@ -32,7 +42,16 @@ async def get_dashboard_kpis(
     week_end = (datetime.utcnow().date() + timedelta(days=7)).isoformat()
 
     base_query = {}
-    await scope_scheduled_tasks_query(base_query, equipment_type_id, user=user)
+    try:
+        await scope_scheduled_tasks_query(base_query, equipment_type_id, user=user)
+    except Exception as exc:
+        logger.warning("Scheduler scope query failed: %s", exc)
+        return _empty_dashboard_kpis()
+
+    program_filter = base_query.get("maintenance_program_id", {})
+    if isinstance(program_filter, dict) and program_filter.get("$in") == []:
+        return _empty_dashboard_kpis()
+
     base_query["task_type"] = {"$nin": list(CORRECTIVE_TASK_TYPES)}
 
     open_query = {
@@ -55,12 +74,15 @@ async def get_dashboard_kpis(
     upcoming_count = await db.scheduled_tasks.count_documents(upcoming_query)
 
     month_ago = (datetime.utcnow().date() - timedelta(days=30)).isoformat()
-    completed_on_time = await db.scheduled_tasks.count_documents({
-        **base_query,
-        "status": TaskStatus.COMPLETED.value,
-        "completed_at": {"$gte": month_ago},
-        "$expr": {"$lte": ["$completed_at", "$due_date"]},
-    })
+    try:
+        completed_on_time = await db.scheduled_tasks.count_documents({
+            **base_query,
+            "status": TaskStatus.COMPLETED.value,
+            "completed_at": {"$gte": month_ago},
+            "$expr": {"$lte": ["$completed_at", "$due_date"]},
+        })
+    except Exception:
+        completed_on_time = 0
     total_completed = await db.scheduled_tasks.count_documents({
         **base_query,
         "status": TaskStatus.COMPLETED.value,
