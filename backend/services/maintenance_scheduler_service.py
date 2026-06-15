@@ -25,11 +25,28 @@ CORRECTIVE_TASK_TYPES = ("reactive", "corrective")
 logger = logging.getLogger(__name__)
 
 
-def _empty_dashboard_kpis() -> dict:
+def _empty_dashboard_kpis(week_end: Optional[str] = None) -> dict:
+    if week_end is None:
+        week_end = (datetime.utcnow().date() + timedelta(days=7)).isoformat()
     return {
         "backlog": {"open_tasks": 0, "overdue_tasks": 0, "upcoming_tasks": 0},
         "compliance": {"rate": 100.0, "completed_on_time": 0, "total_completed": 0},
-        "priority_breakdown": [],
+        "calculations": {
+            "open_tasks": (
+                "Count of scheduled preventive tasks that are not completed or cancelled "
+                "(reactive/corrective excluded)."
+            ),
+            "overdue_tasks": (
+                "Open preventive tasks with due date before today "
+                "(reactive/corrective excluded)."
+            ),
+            "upcoming_tasks": (
+                f"Open preventive tasks due between today and {week_end} "
+                "(reactive/corrective excluded)."
+            ),
+            "compliance": "No completed tasks in the last 30 days — shown as 100%.",
+        },
+        "priority_breakdown": {},
     }
 
 
@@ -46,11 +63,11 @@ async def get_dashboard_kpis(
         await scope_scheduled_tasks_query(base_query, equipment_type_id, user=user)
     except Exception as exc:
         logger.warning("Scheduler scope query failed: %s", exc)
-        return _empty_dashboard_kpis()
+        return _empty_dashboard_kpis(week_end)
 
     program_filter = base_query.get("maintenance_program_id", {})
     if isinstance(program_filter, dict) and program_filter.get("$in") == []:
-        return _empty_dashboard_kpis()
+        return _empty_dashboard_kpis(week_end)
 
     base_query["task_type"] = {"$nin": list(CORRECTIVE_TASK_TYPES)}
 
