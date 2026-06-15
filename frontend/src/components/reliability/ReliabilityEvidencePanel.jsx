@@ -80,6 +80,7 @@ export function ReliabilityEvidencePanel({
 
   const resolvedEquipmentId = data?.equipment_id || equipmentId;
   const triggerLabel = buttonLabel || title;
+  const hoverLabel = "Evidence";
 
   return (
     <>
@@ -87,11 +88,15 @@ export function ReliabilityEvidencePanel({
         type="button"
         variant={buttonVariant}
         size={buttonSize}
-        className={className}
+        className={`group px-2.5 hover:px-3 ${className}`.trim()}
         onClick={() => setOpen(true)}
+        aria-label={triggerLabel}
+        title={hoverLabel}
       >
-        <GitBranch className="w-4 h-4 mr-2 text-indigo-600" />
-        {triggerLabel}
+        <GitBranch className="w-4 h-4 shrink-0 text-indigo-600" />
+        <span className="inline-block max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover:max-w-[5rem] group-hover:opacity-100 group-hover:ml-1.5">
+          {hoverLabel}
+        </span>
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>

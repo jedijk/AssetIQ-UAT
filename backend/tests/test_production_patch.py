@@ -9,7 +9,7 @@ import pytest
 from database import db
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="session")
 async def test_patch_production_submission_all_scenarios():
     from fastapi import HTTPException
     from services.production_submissions_service import update_production_submission

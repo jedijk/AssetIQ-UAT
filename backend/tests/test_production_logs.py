@@ -10,11 +10,13 @@ import io
 import json
 import time
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
+from conftest import TEST_OWNER_EMAIL, TEST_OWNER_PASSWORD
+
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
 
 # Test credentials
-OWNER_EMAIL = "jedijk@gmail.com"
-OWNER_PASSWORD = "Jaap8019@"
+OWNER_EMAIL = TEST_OWNER_EMAIL
+OWNER_PASSWORD = TEST_OWNER_PASSWORD
 
 # Sample CSV content for testing
 SAMPLE_CSV = """timestamp,asset_id,status,temperature,pressure

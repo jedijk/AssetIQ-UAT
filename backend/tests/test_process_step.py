@@ -16,11 +16,11 @@ class TestProcessStepFeature:
     """Test Process Step mapping feature for Equipment Manager"""
     
     @pytest.fixture(autouse=True)
-    def setup(self, api_client, auth_token):
+    def setup(self, api_client, owner_token):
         """Setup test data and cleanup after tests"""
         self.client = api_client
-        self.token = auth_token
-        self.client.headers.update({"Authorization": f"Bearer {auth_token}"})
+        self.token = owner_token
+        self.client.headers.update({"Authorization": f"Bearer {owner_token}"})
         self.created_node_ids = []
         yield
         # Cleanup: Delete all test nodes

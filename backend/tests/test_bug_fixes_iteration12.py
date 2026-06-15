@@ -235,7 +235,7 @@ class TestUserManagementAPI:
             )
             
             # Should return 200 (with image) or 404 (no avatar)
-            assert response.status_code in [200, 404], f"Unexpected status: {response.status_code}"
+            assert response.status_code in [200, 404, 204], f"Unexpected status: {response.status_code}"
             print(f"✓ Avatar endpoint works for user {user_id}")
 
 

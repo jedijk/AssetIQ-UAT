@@ -16,9 +16,11 @@ import uuid
 import pytest
 import requests
 
+from conftest import TEST_OWNER_EMAIL, TEST_OWNER_PASSWORD
+
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "").rstrip("/")
-EMAIL = "jedijk@gmail.com"
-PASSWORD = "Jaap8019@"
+EMAIL = TEST_OWNER_EMAIL
+PASSWORD = TEST_OWNER_PASSWORD
 
 
 @pytest.fixture(scope="session")

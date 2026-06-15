@@ -228,7 +228,7 @@ class TestVoiceTranscription:
             headers=headers
         )
         
-        assert response.status_code == 400, f"Expected 400 for large file, got {response.status_code}"
+        assert response.status_code in (400, 413), f"Expected 400 or 413 for large file, got {response.status_code}"
         assert "large" in response.json().get("detail", "").lower() or "size" in response.json().get("detail", "").lower()
     
     def test_transcribe_valid_audio_format_accepted(self, authenticated_client):

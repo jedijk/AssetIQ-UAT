@@ -59,9 +59,8 @@ def _fetch_auth_token(api_client, credentials: dict, label: str) -> str:
 # SHARED FIXTURES
 # =============================================
 
-@pytest.fixture(autouse=True)
-def _bind_session_event_loop():
-    """Re-bind the active pytest-asyncio loop after sync tests call asyncio.run()."""
+def _ensure_event_loop():
+    """Return an open event loop, creating one if needed."""
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:
@@ -70,7 +69,19 @@ def _bind_session_event_loop():
     if loop.is_closed():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+    return loop
+
+
+@pytest.fixture(autouse=True)
+def _bind_session_event_loop():
+    """Re-bind the active pytest-asyncio loop after sync tests call asyncio.run()."""
+    _ensure_event_loop()
     yield
+
+
+def pytest_runtest_teardown(item, nextitem):
+    """Recreate event loop if motor/sync tests closed it."""
+    _ensure_event_loop()
 
 
 @pytest.fixture(scope="session")

@@ -20,7 +20,7 @@ def _visc_doc(visc_id: str, when: datetime):
     }
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="session")
 async def test_viscosity_pairing():
     svc = FormService(db)
 

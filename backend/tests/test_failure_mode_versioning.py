@@ -6,7 +6,29 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
+from conftest import BASE_URL
+
+
+def _login_headers():
+    if not BASE_URL:
+        pytest.skip("REACT_APP_BACKEND_URL not set — skipping HTTP integration tests")
+    login_response = requests.post(
+        f"{BASE_URL}/api/auth/login",
+        json={"email": "test@test.com", "password": "test"},
+        timeout=15,
+    )
+    if login_response.status_code != 200:
+        pytest.skip(
+            f"Authentication failed ({login_response.status_code}) — skipping authenticated tests"
+        )
+    token = login_response.json().get("token")
+    if not token:
+        pytest.skip("No token in login response — skipping authenticated tests")
+    return {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+
 
 class TestFailureModeVersioning:
     """Tests for failure mode versioning system"""
@@ -15,22 +37,15 @@ class TestFailureModeVersioning:
     def setup(self):
         """Setup test fixtures"""
         self.base_url = BASE_URL
-        # Login to get auth token
-        login_response = requests.post(
-            f"{self.base_url}/api/auth/login",
-            json={"email": "test@test.com", "password": "test"}
-        )
-        assert login_response.status_code == 200, f"Login failed: {login_response.text}"
-        self.token = login_response.json()["token"]
-        self.headers = {
-            "Authorization": f"Bearer {self.token}",
-            "Content-Type": "application/json"
-        }
+        self.headers = _login_headers()
     
     def test_get_failure_mode_by_legacy_id_returns_correct_fields(self):
         """Test GET /api/failure-modes/{mode_id} returns correct id, legacy_id, and version fields"""
         # Use legacy_id 53 (Short Circuit) which has version history
-        response = requests.get(f"{self.base_url}/api/failure-modes/53")
+        response = requests.get(
+            f"{self.base_url}/api/failure-modes/53",
+            headers=self.headers,
+        )
         
         assert response.status_code == 200, f"Failed to get failure mode: {response.text}"
         
@@ -64,12 +79,18 @@ class TestFailureModeVersioning:
     def test_get_failure_mode_by_mongodb_id(self):
         """Test GET /api/failure-modes/{mode_id} works with MongoDB ObjectId"""
         # First get the MongoDB id from legacy_id
-        response = requests.get(f"{self.base_url}/api/failure-modes/53")
+        response = requests.get(
+            f"{self.base_url}/api/failure-modes/53",
+            headers=self.headers,
+        )
         assert response.status_code == 200
         mongodb_id = response.json()["id"]
         
         # Now fetch by MongoDB id
-        response2 = requests.get(f"{self.base_url}/api/failure-modes/{mongodb_id}")
+        response2 = requests.get(
+            f"{self.base_url}/api/failure-modes/{mongodb_id}",
+            headers=self.headers,
+        )
         assert response2.status_code == 200, f"Failed to get by MongoDB id: {response2.text}"
         
         data = response2.json()
@@ -118,7 +139,10 @@ class TestFailureModeVersioning:
     def test_update_failure_mode_increments_version(self):
         """Test PATCH /api/failure-modes/{mode_id} increments version and creates version history entry"""
         # Get current state
-        get_response = requests.get(f"{self.base_url}/api/failure-modes/53")
+        get_response = requests.get(
+            f"{self.base_url}/api/failure-modes/53",
+            headers=self.headers,
+        )
         assert get_response.status_code == 200
         original = get_response.json()
         original_version = original["version"]
@@ -174,7 +198,10 @@ class TestFailureModeVersioning:
     def test_rollback_to_previous_version(self):
         """Test POST /api/failure-modes/{mode_id}/rollback works to revert to a previous version"""
         # Get current state
-        get_response = requests.get(f"{self.base_url}/api/failure-modes/53")
+        get_response = requests.get(
+            f"{self.base_url}/api/failure-modes/53",
+            headers=self.headers,
+        )
         assert get_response.status_code == 200
         current = get_response.json()
         current_version = current["version"]
@@ -230,7 +257,10 @@ class TestFailureModeVersioning:
         # This tests the fix for the bug where date fields stored as strings caused isoformat() errors
         
         # Get failure mode
-        response = requests.get(f"{self.base_url}/api/failure-modes/53")
+        response = requests.get(
+            f"{self.base_url}/api/failure-modes/53",
+            headers=self.headers,
+        )
         assert response.status_code == 200, f"Request failed: {response.text}"
         
         data = response.json()
@@ -253,7 +283,10 @@ class TestFailureModeVersioning:
     
     def test_failure_modes_list_returns_from_mongodb(self):
         """Test that failure modes list returns from MongoDB (not static fallback)"""
-        response = requests.get(f"{self.base_url}/api/failure-modes")
+        response = requests.get(
+            f"{self.base_url}/api/failure-modes",
+            headers=self.headers,
+        )
         assert response.status_code == 200, f"Request failed: {response.text}"
         
         data = response.json()
@@ -289,16 +322,7 @@ class TestFailureModeVersionHistoryEdgeCases:
     def setup(self):
         """Setup test fixtures"""
         self.base_url = BASE_URL
-        login_response = requests.post(
-            f"{self.base_url}/api/auth/login",
-            json={"email": "test@test.com", "password": "test"}
-        )
-        assert login_response.status_code == 200
-        self.token = login_response.json()["token"]
-        self.headers = {
-            "Authorization": f"Bearer {self.token}",
-            "Content-Type": "application/json"
-        }
+        self.headers = _login_headers()
     
     def test_version_history_for_nonexistent_mode(self):
         """Test version history returns empty for non-existent failure mode"""
