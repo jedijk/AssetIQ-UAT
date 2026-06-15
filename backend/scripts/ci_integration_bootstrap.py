@@ -47,7 +47,6 @@ def _threat_doc(threat_id: str, title: str, now: str) -> dict:
         "recommended_actions": [],
         "created_by": "ci-bootstrap",
         "tenant_id": CI_TENANT_ID,
-        "created_at": now,
         "updated_at": now,
     }
 
@@ -141,7 +140,6 @@ async def seed_ci_fixtures() -> dict:
                 "status": "open",
                 "created_by": admin_id,
                 "tenant_id": CI_TENANT_ID,
-                "created_at": now,
                 "updated_at": now,
             },
             "$setOnInsert": {"created_at": now},
