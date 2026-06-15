@@ -945,8 +945,8 @@ export default function LabelsPage() {
 
   const filtered = useMemo(
     () =>
-      templates.filter((t) =>
-        search ? (t.name || "").toLowerCase().includes(search.toLowerCase()) : true
+      templates.filter((template) =>
+        search ? (template.name || "").toLowerCase().includes(search.toLowerCase()) : true
       ),
     [templates, search]
   );
@@ -1037,34 +1037,34 @@ export default function LabelsPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {filtered.map((t) => (
+                {filtered.map((template) => (
                   <motion.div
-                    key={t.id}
+                    key={template.id}
                     initial={{ opacity: 0, y: 4 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="bg-white border border-slate-200 rounded-xl p-4 hover:border-indigo-300 hover:shadow-sm transition-all"
-                    data-testid={`template-card-${t.id}`}
+                    data-testid={`template-card-${template.id}`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <h3 className="text-sm font-semibold text-slate-800 truncate">{t.name}</h3>
-                        <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{t.description || "—"}</p>
+                        <h3 className="text-sm font-semibold text-slate-800 truncate">{template.name}</h3>
+                        <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{template.description || "—"}</p>
                       </div>
-                      <Badge className={`text-[10px] ${STATUS_BADGE[t.status] || STATUS_BADGE.draft}`} variant="secondary">
-                        {t.status}
+                      <Badge className={`text-[10px] ${STATUS_BADGE[template.status] || STATUS_BADGE.draft}`} variant="secondary">
+                        {template.status}
                       </Badge>
                     </div>
                     <div className="flex flex-wrap gap-2 mt-3 text-[11px] text-slate-500">
-                      <span>{t.width_mm}×{t.height_mm}mm</span>
+                      <span>{template.width_mm}×{template.height_mm}mm</span>
                       <span>·</span>
-                      <span className="capitalize">{t.preset?.replace("_", " ")}</span>
+                      <span className="capitalize">{template.preset?.replace("_", " ")}</span>
                       <span>·</span>
-                      <span>v{t.version || 1}</span>
+                      <span>v{template.version || 1}</span>
                     </div>
                     <div className="flex gap-1 mt-3 border-t pt-2">
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setPrinting(t)} data-testid={`print-btn-${t.id}`}>
+                          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setPrinting(template)} data-testid={`print-btn-${template.id}`}>
                             <Printer className="w-3.5 h-3.5" />
                           </Button>
                         </TooltipTrigger>
@@ -1072,7 +1072,7 @@ export default function LabelsPage() {
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditing(t)} data-testid={`edit-btn-${t.id}`}>
+                          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditing(template)} data-testid={`edit-btn-${template.id}`}>
                             <Pencil className="w-3.5 h-3.5" />
                           </Button>
                         </TooltipTrigger>
@@ -1080,21 +1080,21 @@ export default function LabelsPage() {
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => duplicateMutation.mutate(t.id)}>
+                          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => duplicateMutation.mutate(template.id)}>
                             <Copy className="w-3.5 h-3.5" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>{t("tooltips.duplicate")}</TooltipContent>
                       </Tooltip>
                       <div className="flex-1" />
-                      {t.status !== "archived" && (
+                      {template.status !== "archived" && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
                               size="sm"
                               variant="ghost"
                               className="h-7 px-2 text-rose-500 hover:text-rose-600"
-                              onClick={() => archiveMutation.mutate(t.id)}
+                              onClick={() => archiveMutation.mutate(template.id)}
                             >
                               <Archive className="w-3.5 h-3.5" />
                             </Button>
