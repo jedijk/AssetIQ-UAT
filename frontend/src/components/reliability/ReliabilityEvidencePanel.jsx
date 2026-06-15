@@ -16,7 +16,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
-import { ScrollArea } from "../ui/scroll-area";
 
 async function fetchTraceEvidence({ equipmentId, anchorNodeType, anchorNodeId }) {
   let equipmentPayload = null;
@@ -96,7 +95,7 @@ export function ReliabilityEvidencePanel({
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0">
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden p-0 gap-0">
           <DialogHeader className="px-6 pt-6 pb-3 border-b shrink-0">
             <div className="flex items-start justify-between gap-3 pr-8">
               <div className="min-w-0">
@@ -119,7 +118,7 @@ export function ReliabilityEvidencePanel({
             </div>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 max-h-[calc(85vh-7rem)]">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
             <div className="px-6 py-4">
               {isLoading || (isFetching && !data) ? (
                 <div className="flex items-center gap-2 text-sm text-slate-500 py-8 justify-center">
@@ -141,7 +140,7 @@ export function ReliabilityEvidencePanel({
                 />
               )}
             </div>
-          </ScrollArea>
+          </div>
         </DialogContent>
       </Dialog>
     </>
