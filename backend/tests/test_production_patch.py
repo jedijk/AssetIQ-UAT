@@ -1,6 +1,7 @@
 """Regression tests for production submission PATCH supporting both
 form_submissions and production_logs (all scenarios in one event loop to
 avoid motor event-loop binding issues)."""
+import os
 import uuid
 from datetime import datetime
 
@@ -8,7 +9,13 @@ import pytest
 
 from database import db
 
-pytestmark = pytest.mark.usefixtures("require_mongo")
+pytestmark = [
+    pytest.mark.usefixtures("require_mongo"),
+    pytest.mark.skipif(
+        os.environ.get("REACT_APP_BACKEND_URL"),
+        reason="Skip motor event-loop tests in HTTP integration CI mode",
+    ),
+]
 
 
 @pytest.mark.asyncio(loop_scope="session")

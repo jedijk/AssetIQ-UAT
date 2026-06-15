@@ -265,7 +265,7 @@ class TestUserAvatarAPI:
             assert info.get("has_avatar") or info.get("avatar_path")
         assert "message" in data, "Response should contain message"
         
-        print(f"✓ Avatar uploaded successfully: {data['avatar_path']}")
+        print(f"✓ Avatar uploaded successfully: {data.get('message')}")
     
     def test_get_user_avatar_image(self):
         """Test GET /api/users/{user_id}/avatar returns the image"""

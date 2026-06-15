@@ -91,7 +91,6 @@ class TestScheduler:
         data = r.json()
         assert "tasks_created" in data
         assert "programs_reviewed" in data
-        assert "programs_reviewed" in data
 
 
 # -------- Tasks --------

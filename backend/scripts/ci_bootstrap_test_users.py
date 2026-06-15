@@ -17,6 +17,12 @@ from auth import hash_password  # noqa: E402
 from database import db  # noqa: E402
 from utils.mongo_regex import exact_case_insensitive  # noqa: E402
 
+CI_USER_SCOPE = {
+    "assigned_installations": ["Tyromer"],
+    "department": "Engineering",
+    "company_id": "default",
+}
+
 CI_USERS = [
     {
         "email": "test@test.com",
@@ -51,6 +57,7 @@ async def _upsert_user(spec: dict) -> None:
         "approval_status": "approved",
         "is_active": True,
         "updated_at": now,
+        **CI_USER_SCOPE,
     }
     if existing:
         await db.users.update_one(

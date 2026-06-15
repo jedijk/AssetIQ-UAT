@@ -1,4 +1,5 @@
 """Regression test for Mooney viscosity → Extruder auto-pairing."""
+import os
 import uuid
 from datetime import datetime, timezone
 
@@ -7,7 +8,13 @@ import pytest
 from database import db
 from services.form_service import FormService
 
-pytestmark = pytest.mark.usefixtures("require_mongo")
+pytestmark = [
+    pytest.mark.usefixtures("require_mongo"),
+    pytest.mark.skipif(
+        os.environ.get("REACT_APP_BACKEND_URL"),
+        reason="Skip motor event-loop tests in HTTP integration CI mode",
+    ),
+]
 
 
 def _visc_doc(visc_id: str, when: datetime):

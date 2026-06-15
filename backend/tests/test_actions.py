@@ -56,7 +56,7 @@ class TestActionsAPI:
             "discipline": "Mechanical",
             "due_date": "2026-04-01"
         }
-        response = self.client.post(f"{BASE_URL}/api/actions", json=action_data)
+        response = self.client.post(f"{BASE_URL}/api/actions", json=action_data, timeout=30)
         if response.status_code in (504, 502, 503):
             pytest.skip(f"Action create timed out or unavailable ({response.status_code})")
         if response.status_code == 200:

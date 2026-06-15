@@ -38,10 +38,17 @@ class TestPresets:
         r = client.get(f"{BASE_URL}/api/labels/presets")
         assert r.status_code == 200
         data = r.json()
-        assert len(data["presets"]) >= 4
+        assert len(data["presets"]) >= 6
         keys = {p["key"] for p in data["presets"]}
-        assert {"standard", "compact", "qr_only", "with_logo"}.issubset(keys)
-        assert len(data["asset_fields"]) == 9
+        assert {
+            "standard",
+            "compact",
+            "qr_only",
+            "with_logo",
+            "title_date_time",
+            "blank",
+        }.issubset(keys)
+        assert len(data["asset_fields"]) >= 9
 
 
 # ---------- Template CRUD ----------

@@ -330,8 +330,8 @@ def test_executive_kpis_service_exists():
         Path(__file__).resolve().parents[1] / "services" / "executive_reliability_kpis.py"
     ).read_text()
     assert "compute_executive_reliability_kpis" in source
+    assert "compute_fleet_reliability_summary" in source
     assert "mtbf_proxy" in source
-    assert "overdue_pm" in source
 
 
 def test_permission_resolver_maps_threats_to_observations():

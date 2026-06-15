@@ -10,7 +10,10 @@ BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 
 from conftest import TEST_OWNER_EMAIL, TEST_OWNER_PASSWORD
 
-pytestmark = pytest.mark.integration
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(not BASE_URL, reason="REACT_APP_BACKEND_URL not set — skipping HTTP integration tests"),
+]
 
 TEST_EMAIL = TEST_OWNER_EMAIL
 TEST_PASSWORD = TEST_OWNER_PASSWORD

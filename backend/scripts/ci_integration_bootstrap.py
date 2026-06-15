@@ -34,6 +34,7 @@ async def _upsert_user_fields() -> None:
                 "$set": {
                     "assigned_installations": [CI_INSTALLATION_NAME],
                     "department": "Engineering",
+                    "company_id": "default",
                     "updated_at": now,
                 }
             },

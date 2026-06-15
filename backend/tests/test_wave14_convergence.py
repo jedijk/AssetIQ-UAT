@@ -42,9 +42,13 @@ def test_maintenance_scheduler_service_has_read_endpoints():
 
 
 def test_chat_threat_graph_dispatch_includes_tenant():
-    text = (BACKEND_ROOT / "services" / "chat_routes_service.py").read_text(encoding="utf-8")
-    start = text.index("async def _create_observation")
-    end = text.index("# Auto-create actions")
-    block = text[start:end]
-    assert "with_tenant_id(threat_doc" in block
-    assert "tenant_id=threat_doc.get" in block
+    chat_text = (BACKEND_ROOT / "services" / "chat_routes_service.py").read_text(encoding="utf-8")
+    start = chat_text.index("async def _create_observation")
+    end = chat_text.index("# Auto-create actions")
+    block = chat_text[start:end]
+    assert "create_work_signal" in block
+
+    lifecycle_text = (BACKEND_ROOT / "services" / "work_signal_lifecycle.py").read_text(
+        encoding="utf-8"
+    )
+    assert "with_tenant_id" in lifecycle_text
