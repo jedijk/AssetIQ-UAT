@@ -25,6 +25,11 @@ EMAIL = TEST_OWNER_EMAIL
 PASSWORD = TEST_OWNER_PASSWORD
 
 
+def _skip_without_openai():
+    if not (os.environ.get("OPENAI_API_KEY") or os.environ.get("EMERGENT_LLM_KEY")):
+        pytest.skip("OPENAI_API_KEY not configured — skipping auto-translate integration tests")
+
+
 @pytest.fixture(scope="session")
 def token():
     last_err = None
@@ -141,6 +146,7 @@ def test_generate_all_investigation(headers):
 
 # ---------- 6. POST /api/observations triggers auto-translate ----------
 def test_create_observation_auto_translate(headers):
+    _skip_without_openai()
     desc = f"TEST_AUTO_TR_{uuid.uuid4().hex[:6]} Bearing showing abnormal vibration at high speed"
     r = requests.post(
         f"{BASE_URL}/api/observations",
@@ -203,6 +209,7 @@ def test_patch_threat_auto_translate(headers):
 
 # ---------- 8. POST /api/form-templates triggers auto-translate ----------
 def test_create_form_template_auto_translate(headers):
+    _skip_without_openai()
     name = f"TEST_AUTO_TR_Form_{uuid.uuid4().hex[:6]}"
     payload = {
         "name": name,
@@ -259,6 +266,7 @@ def test_generate_sync_small(headers):
 
 # ---------- 10. POST /api/failure-modes uses NAME as entity_id ----------
 def test_failure_mode_uses_name_as_entity_id(headers):
+    _skip_without_openai()
     name = f"TEST_FM_{uuid.uuid4().hex[:6]}"
     payload = {
         "name": name,

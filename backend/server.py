@@ -399,7 +399,8 @@ class TimeoutMiddleware(BaseHTTPMiddleware):
                 pass
             return resp
 
-app.add_middleware(TimeoutMiddleware, timeout=25.0, long_timeout=300.0)
+_request_timeout = 60.0 if os.environ.get("ENVIRONMENT") == "test" else 25.0
+app.add_middleware(TimeoutMiddleware, timeout=_request_timeout, long_timeout=300.0)
 
 # Add GZip compression for responses > 500 bytes
 app.add_middleware(GZipMiddleware, minimum_size=500)

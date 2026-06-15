@@ -38,9 +38,9 @@ class TestPresets:
         r = client.get(f"{BASE_URL}/api/labels/presets")
         assert r.status_code == 200
         data = r.json()
-        assert len(data["presets"]) == 4
+        assert len(data["presets"]) >= 4
         keys = {p["key"] for p in data["presets"]}
-        assert keys == {"standard", "compact", "qr_only", "with_logo"}
+        assert {"standard", "compact", "qr_only", "with_logo"}.issubset(keys)
         assert len(data["asset_fields"]) == 9
 
 

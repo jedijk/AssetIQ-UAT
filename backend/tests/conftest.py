@@ -30,6 +30,7 @@ TEST_OWNER_PASSWORD = os.environ.get('TEST_OWNER_PASSWORD', 'admin123')
 
 # Test data IDs (if needed)
 TEST_THREAT_ID = os.environ.get('TEST_THREAT_ID', '43455566-4f46-4c54-8130-fdd7a7d009a1')
+CI_THREAT_ID = os.environ.get("CI_THREAT_ID", "ci-threat-001")
 
 # CI integration env (see scripts/ci_integration_bootstrap.py):
 #   MONGO_URL=mongodb://localhost:27017/test
@@ -88,7 +89,8 @@ def _bind_session_event_loop():
 
 def pytest_runtest_teardown(item, nextitem):
     """Recreate event loop if motor/sync tests closed it."""
-    _ensure_event_loop()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
 
 @pytest.fixture(scope="session")

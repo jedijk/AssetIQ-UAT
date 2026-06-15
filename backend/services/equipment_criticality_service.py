@@ -13,12 +13,46 @@ from services.threat_score_service import recalculate_threat_scores_for_asset
 
 logger = logging.getLogger(__name__)
 
+_PROFILE_IMPACT_DEFAULTS = {
+    "safety_critical": (5, 3, 2, 2),
+    "production_critical": (2, 5, 2, 2),
+    "medium": (2, 3, 2, 2),
+    "low": (1, 1, 1, 1),
+}
+
+
+def _apply_profile_defaults(assignment: CriticalityAssignment) -> CriticalityAssignment:
+    """Map legacy profile_id-only payloads to dimension scores."""
+    if assignment.profile_id not in _PROFILE_IMPACT_DEFAULTS:
+        return assignment
+    has_any = any(
+        (getattr(assignment, field) or 0) > 0
+        for field in (
+            "safety_impact",
+            "production_impact",
+            "environmental_impact",
+            "reputation_impact",
+        )
+    )
+    if has_any:
+        return assignment
+    safety, production, environmental, reputation = _PROFILE_IMPACT_DEFAULTS[assignment.profile_id]
+    return assignment.model_copy(
+        update={
+            "safety_impact": safety,
+            "production_impact": production,
+            "environmental_impact": environmental,
+            "reputation_impact": reputation,
+        }
+    )
+
 
 async def assign_criticality(
     user: dict,
     node_id: str,
     assignment: CriticalityAssignment,
 ) -> dict:
+    assignment = _apply_profile_defaults(assignment)
     node = await db.equipment_nodes.find_one(
         merge_tenant_filter({"id": node_id}, user),
     )

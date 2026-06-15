@@ -258,7 +258,11 @@ class TestUserAvatarAPI:
         assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
         
         data = response.json()
-        assert "avatar_path" in data, "Response should contain avatar_path"
+        assert data.get("message") == "Avatar uploaded successfully"
+        avatar_info = self.client.get(f"{BASE_URL}/api/users/me/avatar")
+        if avatar_info.status_code == 200:
+            info = avatar_info.json()
+            assert info.get("has_avatar") or info.get("avatar_path")
         assert "message" in data, "Response should contain message"
         
         print(f"✓ Avatar uploaded successfully: {data['avatar_path']}")

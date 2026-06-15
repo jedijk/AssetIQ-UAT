@@ -15,9 +15,15 @@ pytestmark = pytest.mark.integration
 TEST_EMAIL = TEST_OWNER_EMAIL
 TEST_PASSWORD = TEST_OWNER_PASSWORD
 
-# Known equipment with files
-EQUIPMENT_ID_WITH_FILES = "8acba29d-7a74-4403-9698-62248b5afab8"  # Line-90
-FILE_ID = "415c9107-2499-46bf-9e85-238a632def1f"  # Tyromer PFD.pdf
+# Known equipment with files (production fixtures — skipped in CI when absent)
+EQUIPMENT_ID_WITH_FILES = os.environ.get(
+    "CI_EQUIPMENT_FILES_ID",
+    "8acba29d-7a74-4403-9698-62248b5afab8",
+)
+FILE_ID = os.environ.get(
+    "CI_EQUIPMENT_FILE_ID",
+    "415c9107-2499-46bf-9e85-238a632def1f",
+)
 
 
 @pytest.fixture(scope="module")
@@ -39,6 +45,18 @@ def auth_token():
 def auth_headers(auth_token):
     """Get headers with auth token"""
     return {"Authorization": f"Bearer {auth_token}"}
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _require_equipment_file_fixtures(auth_headers):
+    if os.environ.get("ENVIRONMENT") == "test":
+        probe = requests.get(
+            f"{BASE_URL}/api/equipment/{EQUIPMENT_ID_WITH_FILES}/files",
+            headers=auth_headers,
+            timeout=15,
+        )
+        if probe.status_code == 404:
+            pytest.skip("Equipment file fixtures not seeded in CI")
 
 
 class TestEquipmentFilesAPI:

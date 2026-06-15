@@ -411,21 +411,21 @@ class TestDisciplineAssignment:
         
         # Assign mechanical discipline
         disc_resp = owner_authenticated_client.post(
-            f"{BASE_URL}/api/equipment-hierarchy/nodes/{install_id}/discipline?discipline=mechanical"
+            f"{BASE_URL}/api/equipment-hierarchy/nodes/{install_id}/discipline?discipline=Rotating"
         )
         assert disc_resp.status_code == 200
-        assert disc_resp.json()["discipline"] == "mechanical"
+        assert disc_resp.json()["discipline"] == "Rotating"
         
         # Verify via GET
         get_resp = owner_authenticated_client.get(f"{BASE_URL}/api/equipment-hierarchy/nodes/{install_id}")
-        assert get_resp.json()["discipline"] == "mechanical"
+        assert get_resp.json()["discipline"] == "Rotating"
         
         # Cleanup
         owner_authenticated_client.delete(f"{BASE_URL}/api/equipment-hierarchy/nodes/{install_id}")
         
     def test_assign_all_disciplines(self, owner_authenticated_client):
         """Test all 4 disciplines can be assigned"""
-        disciplines = ["mechanical", "electrical", "instrumentation", "process"]
+        disciplines = ["Rotating", "Static", "Electrical", "Instrumentation"]
         
         # Create installation
         install_resp = owner_authenticated_client.post(
