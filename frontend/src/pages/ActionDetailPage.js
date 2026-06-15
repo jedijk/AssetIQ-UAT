@@ -402,7 +402,6 @@ export default function ActionDetailPage() {
             
             {/* LEFT COLUMN - Main content (spans 7 cols on desktop) */}
             <div className="lg:col-span-7 space-y-3">
-              <ActionOutcomeWidget actionId={actionId} actionStatus={action.status} />
               {/* Source & Scores + Status Row - Compact header */}
               <div className="bg-white rounded-lg border border-slate-200 p-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
@@ -597,6 +596,8 @@ export default function ActionDetailPage() {
                   </div>
                 </div>
               </div>
+
+              <ActionOutcomeWidget actionId={actionId} actionStatus={action.status} />
 
               {/* Timestamps - Compact */}
               <div className="text-[10px] text-slate-400 flex gap-3 px-1">

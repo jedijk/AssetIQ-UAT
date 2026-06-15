@@ -14,6 +14,35 @@ from services.tenant_schema import merge_tenant_filter
 
 NodeRef = Tuple[str, str]
 
+_MAX_DESCRIPTION_LABEL = 120
+
+
+def _build_id_or_query(id_list: List[str]) -> Dict[str, Any]:
+    """Match documents by string id field and/or MongoDB _id."""
+    clauses: List[Dict[str, Any]] = [{"id": {"$in": id_list}}]
+    object_ids = [ObjectId(nid) for nid in id_list if ObjectId.is_valid(nid)]
+    if object_ids:
+        clauses.append({"_id": {"$in": object_ids}})
+    if len(clauses) == 1:
+        return clauses[0]
+    return {"$or": clauses}
+
+
+def _doc_lookup_keys(doc: dict) -> List[str]:
+    keys: List[str] = []
+    if doc.get("_id") is not None:
+        keys.append(str(doc["_id"]))
+    if doc.get("id"):
+        keys.append(str(doc["id"]))
+    return keys
+
+
+def _truncate_label(text: str, limit: int = _MAX_DESCRIPTION_LABEL) -> str:
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "…"
+
 
 def node_ref_key(node_type: str, node_id: str) -> str:
     return f"{node_type}:{node_id}"
@@ -37,12 +66,29 @@ def _format_investigation(doc: dict) -> str:
     return title
 
 
-def _format_action(doc: dict) -> str:
+def _format_action(doc: dict) -> Optional[str]:
     title = _pick_label(doc, "title")
+    if not title:
+        description = _pick_label(doc, "description")
+        if description:
+            title = _truncate_label(description)
     number = doc.get("action_number")
     if title and number:
         return f"{number} · {title}"
     return title or (str(number) if number else None)
+
+
+def _observation_label(doc: dict) -> Optional[str]:
+    title = _pick_label(doc, "title", "asset")
+    if title:
+        return title
+    description = _pick_label(doc, "description")
+    equipment = _pick_label(doc, "equipment_name", "asset")
+    if description and equipment:
+        return f"{equipment} - {_truncate_label(description)}"
+    if description:
+        return _truncate_label(description)
+    return _pick_label(doc, "equipment_name", "failure_mode_name")
 
 
 def _failure_mode_label(doc: dict) -> Optional[str]:
@@ -152,23 +198,34 @@ async def _load_labels_for_type(
 
     if node_type == "observation":
         cursor = db.observations.find(
-            merge_tenant_filter({"id": {"$in": id_list}}, user),
-            {"_id": 0, "id": 1, "title": 1, "asset": 1},
+            merge_tenant_filter(_build_id_or_query(id_list), user),
+            {
+                "_id": 1,
+                "id": 1,
+                "title": 1,
+                "asset": 1,
+                "description": 1,
+                "equipment_name": 1,
+                "failure_mode_name": 1,
+            },
         )
-        for doc in await cursor.to_list(len(id_list)):
-            label = _pick_label(doc, "title", "asset")
-            if label:
-                labels[doc["id"]] = label
+        for doc in await cursor.to_list(len(id_list) * 2):
+            label = _observation_label(doc)
+            if not label:
+                continue
+            for key in _doc_lookup_keys(doc):
+                if key in node_ids:
+                    labels[key] = label
         missing = [nid for nid in id_list if nid not in labels]
         if missing:
             threat_cursor = db.threats.find(
                 merge_tenant_filter({"id": {"$in": missing}}, user),
-                {"_id": 0, "id": 1, "title": 1, "failure_mode": 1},
+                {"_id": 0, "id": 1, "title": 1, "failure_mode": 1, "description": 1},
             )
             for doc in await threat_cursor.to_list(len(missing)):
-                label = _pick_label(doc, "title", "failure_mode")
+                label = _pick_label(doc, "title", "failure_mode", "description")
                 if label:
-                    labels[doc["id"]] = label
+                    labels[doc["id"]] = _truncate_label(label)
         return labels
 
     if node_type == "investigation":
@@ -184,13 +241,16 @@ async def _load_labels_for_type(
 
     if node_type == "action":
         cursor = db.central_actions.find(
-            merge_tenant_filter({"id": {"$in": id_list}}, user),
-            {"_id": 0, "id": 1, "title": 1, "action_number": 1},
+            merge_tenant_filter(_build_id_or_query(id_list), user),
+            {"_id": 1, "id": 1, "title": 1, "action_number": 1, "description": 1},
         )
-        for doc in await cursor.to_list(len(id_list)):
+        for doc in await cursor.to_list(len(id_list) * 2):
             label = _format_action(doc)
-            if label:
-                labels[doc["id"]] = label
+            if not label:
+                continue
+            for key in _doc_lookup_keys(doc):
+                if key in node_ids:
+                    labels[key] = label
         return labels
 
     if node_type == "failure_mode":

@@ -113,3 +113,72 @@ async def test_enrich_edges_attaches_source_and_target_labels():
 
     assert enriched[0]["target_label"] == "Seal leak"
     assert labels["failure_mode:fm-1"] == "Seal leak"
+
+
+@pytest.mark.asyncio
+async def test_resolve_observation_by_object_id_uses_description():
+    from bson import ObjectId
+
+    obs_oid = ObjectId("507f1f77bcf86cd799439012")
+    mock_db = MagicMock()
+    mock_db.observations.find = MagicMock(
+        return_value=AsyncMock(
+            to_list=AsyncMock(
+                return_value=[
+                    {
+                        "_id": obs_oid,
+                        "description": "Pomp word er warm en loopt zwaar.",
+                        "equipment_name": "Oil Pump Filter",
+                    }
+                ]
+            )
+        )
+    )
+
+    edges = [
+        {
+            "id": "e1",
+            "source_type": "observation",
+            "source_id": str(obs_oid),
+            "target_type": "equipment",
+            "target_id": "eq-1",
+        }
+    ]
+
+    with patch("services.graph_node_label_service.db", mock_db):
+        labels = await resolve_node_labels(edges)
+
+    assert labels[f"observation:{obs_oid}"] == "Oil Pump Filter - Pomp word er warm en loopt zwaar."
+
+
+@pytest.mark.asyncio
+async def test_resolve_action_falls_back_to_description():
+    mock_db = MagicMock()
+    mock_db.central_actions.find = MagicMock(
+        return_value=AsyncMock(
+            to_list=AsyncMock(
+                return_value=[
+                    {
+                        "id": "act-1",
+                        "action_number": "ACT-0011",
+                        "description": "Monitor motor current during peak load",
+                    }
+                ]
+            )
+        )
+    )
+
+    edges = [
+        {
+            "id": "e1",
+            "source_type": "investigation",
+            "source_id": "inv-1",
+            "target_type": "action",
+            "target_id": "act-1",
+        }
+    ]
+
+    with patch("services.graph_node_label_service.db", mock_db):
+        labels = await resolve_node_labels(edges)
+
+    assert labels["action:act-1"] == "ACT-0011 · Monitor motor current during peak load"
