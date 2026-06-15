@@ -348,7 +348,7 @@ export default function ActionDetailPage() {
   );
 
   const attachmentsSection = (
-    <div className="bg-white rounded-lg border border-slate-200 p-4 sm:p-3">
+    <div className="bg-white rounded-lg border border-slate-200 p-3 h-full">
       <AttachmentsPanel
         title="Attachments"
         items={editForm.attachments || []}
@@ -366,7 +366,7 @@ export default function ActionDetailPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
+    <div className="min-h-screen bg-slate-50 pb-6">
       {/* Fixed Header - starts below main nav (top-12 = 48px) */}
       <div className="sticky-below-app-header bg-white border-b border-slate-200 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 max-w-2xl">
@@ -397,13 +397,10 @@ export default function ActionDetailPage() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          {/* Desktop: Two-column layout | Mobile: Single column */}
-          <div className="lg:grid lg:grid-cols-12 lg:gap-4">
-            
-            {/* LEFT COLUMN - Main content (spans 7 cols on desktop) */}
-            <div className="lg:col-span-7 space-y-3">
-              {/* Source & Scores + Status Row - Compact header */}
-              <div className="bg-white rounded-lg border border-slate-200 p-3">
+          {/* Desktop: paired rows (attachments ↔ outcome on same row) | Mobile: stacked */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:items-stretch">
+              {/* Source & Scores */}
+              <div className="lg:col-span-7 bg-white rounded-lg border border-slate-200 p-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   {/* Source Link */}
                   {action.source_type && action.source_id && (
@@ -445,59 +442,8 @@ export default function ActionDetailPage() {
                 </div>
               </div>
 
-              {/* Title & Description */}
-              <div className="bg-white rounded-lg border border-slate-200 p-4 sm:p-3 space-y-3 sm:space-y-2">
-                <div>
-                  <label className={fieldLabelClass}>Title</label>
-                  <Input
-                    value={editForm.title}
-                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                    className={fieldInputClass}
-                  />
-                </div>
-                <div>
-                  <label className={fieldLabelClass}>Description</label>
-                  <Textarea
-                    value={editForm.description}
-                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                    rows={isMobile ? 4 : 2}
-                    className={fieldTextareaClass}
-                  />
-                </div>
-              </div>
-
-              {/* Comments & Completion Notes */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                <div className="bg-white rounded-lg border border-slate-200 p-4 sm:p-3">
-                  <label className={fieldLabelClass}>Comments</label>
-                  <Textarea
-                    value={editForm.comments}
-                    onChange={(e) => setEditForm({ ...editForm, comments: e.target.value })}
-                    placeholder="Notes..."
-                    rows={isMobile ? 3 : 2}
-                    className={fieldTextareaClass}
-                  />
-                </div>
-                <div className="bg-white rounded-lg border border-slate-200 p-4 sm:p-3">
-                  <label className={`${fieldLabelClass} flex items-center gap-1`}>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-                    Completion Notes
-                  </label>
-                  <Textarea
-                    value={editForm.completion_notes}
-                    onChange={(e) => setEditForm({ ...editForm, completion_notes: e.target.value })}
-                    placeholder="How was this resolved?"
-                    rows={isMobile ? 3 : 2}
-                    className={fieldTextareaClass}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* RIGHT COLUMN - Metadata & Actions (spans 5 cols on desktop) */}
-            <div className="lg:col-span-5 space-y-3 mt-3 lg:mt-0">
               {/* Status & Priority */}
-              <div className="bg-white rounded-lg border border-slate-200 p-4 sm:p-3">
+              <div className="lg:col-span-5 bg-white rounded-lg border border-slate-200 p-4 sm:p-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-2">
                   <div>
                     <label className={fieldLabelClass}>Status</label>
@@ -529,8 +475,29 @@ export default function ActionDetailPage() {
                 </div>
               </div>
 
+              {/* Title & Description */}
+              <div className="lg:col-span-7 bg-white rounded-lg border border-slate-200 p-4 sm:p-3 space-y-3 sm:space-y-2">
+                <div>
+                  <label className={fieldLabelClass}>Title</label>
+                  <Input
+                    value={editForm.title}
+                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                    className={fieldInputClass}
+                  />
+                </div>
+                <div>
+                  <label className={fieldLabelClass}>Description</label>
+                  <Textarea
+                    value={editForm.description}
+                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                    rows={isMobile ? 4 : 2}
+                    className={fieldTextareaClass}
+                  />
+                </div>
+              </div>
+
               {/* Type & Discipline */}
-              <div className="bg-white rounded-lg border border-slate-200 p-4 sm:p-3">
+              <div className="lg:col-span-5 bg-white rounded-lg border border-slate-200 p-4 sm:p-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-2">
                   <div>
                     <label className={fieldLabelClass}>Type</label>
@@ -566,8 +533,35 @@ export default function ActionDetailPage() {
                 </div>
               </div>
 
+              {/* Comments & Completion Notes */}
+              <div className="lg:col-span-7 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div className="bg-white rounded-lg border border-slate-200 p-4 sm:p-3">
+                  <label className={fieldLabelClass}>Comments</label>
+                  <Textarea
+                    value={editForm.comments}
+                    onChange={(e) => setEditForm({ ...editForm, comments: e.target.value })}
+                    placeholder="Notes..."
+                    rows={isMobile ? 3 : 2}
+                    className={fieldTextareaClass}
+                  />
+                </div>
+                <div className="bg-white rounded-lg border border-slate-200 p-4 sm:p-3">
+                  <label className={`${fieldLabelClass} flex items-center gap-1`}>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                    Completion Notes
+                  </label>
+                  <Textarea
+                    value={editForm.completion_notes}
+                    onChange={(e) => setEditForm({ ...editForm, completion_notes: e.target.value })}
+                    placeholder="How was this resolved?"
+                    rows={isMobile ? 3 : 2}
+                    className={fieldTextareaClass}
+                  />
+                </div>
+              </div>
+
               {/* Assignee & Due Date */}
-              <div className="bg-white rounded-lg border border-slate-200 p-4 sm:p-3">
+              <div className="lg:col-span-5 bg-white rounded-lg border border-slate-200 p-4 sm:p-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-2">
                   <div>
                     <label className={fieldLabelClass}>Assignee</label>
@@ -597,50 +591,49 @@ export default function ActionDetailPage() {
                 </div>
               </div>
 
-              <ActionOutcomeWidget actionId={actionId} actionStatus={action.status} />
-
-              {/* Timestamps - Compact */}
-              <div className="text-[10px] text-slate-400 flex gap-3 px-1">
-                {action.created_at && <span>Created: {formatDate(action.created_at)}</span>}
-                {action.updated_at && <span>Updated: {formatDate(action.updated_at)}</span>}
+              {/* Attachments — aligned with Action Outcome */}
+              <div className="lg:col-span-7 min-h-0">
+                {attachmentsSection}
               </div>
 
-              {/* Action Buttons */}
-              <div className="space-y-2 pt-2 border-t border-slate-200">
-                {/* Create Recurring Task Button - Only for PM actions */}
-                {editForm.action_type === "PM" && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full text-blue-600 border-blue-200 hover:bg-blue-50 h-8 text-xs"
-                    onClick={() => {
-                      navigate("/tasks", {
-                        state: {
-                          createTask: true,
-                          prefill: {
-                            name: editForm.title,
-                            description: editForm.description || `Recurring maintenance task from action: ${editForm.title}`,
-                            discipline: editForm.discipline || "",
-                            source_action_id: actionId,
-                            source_action_title: editForm.title,
+              <div className="lg:col-span-5 flex flex-col gap-3 min-h-0">
+                <ActionOutcomeWidget actionId={actionId} actionStatus={action.status} />
+
+                {/* Timestamps - Compact */}
+                <div className="text-[10px] text-slate-400 flex gap-3 px-1">
+                  {action.created_at && <span>Created: {formatDate(action.created_at)}</span>}
+                  {action.updated_at && <span>Updated: {formatDate(action.updated_at)}</span>}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="space-y-2 pt-2 border-t border-slate-200 mt-auto">
+                  {editForm.action_type === "PM" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full text-blue-600 border-blue-200 hover:bg-blue-50 h-8 text-xs"
+                      onClick={() => {
+                        navigate("/tasks", {
+                          state: {
+                            createTask: true,
+                            prefill: {
+                              name: editForm.title,
+                              description: editForm.description || `Recurring maintenance task from action: ${editForm.title}`,
+                              discipline: editForm.discipline || "",
+                              source_action_id: actionId,
+                              source_action_title: editForm.title,
+                            }
                           }
-                        }
-                      });
-                    }}
-                    data-testid="create-recurring-task-btn"
-                  >
-                    <CalendarClock className="w-3 h-3 mr-1.5" />
-                    Create Recurring Task
-                  </Button>
-                )}
-
+                        });
+                      }}
+                      data-testid="create-recurring-task-btn"
+                    >
+                      <CalendarClock className="w-3 h-3 mr-1.5" />
+                      Create Recurring Task
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
-
-            {/* Attachments - full width at bottom */}
-            <div className="lg:col-span-12 mt-3">
-              {attachmentsSection}
-            </div>
           </div>
         </motion.div>
       </div>
