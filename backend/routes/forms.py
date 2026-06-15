@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Header, BackgroundTasks
 from datetime import datetime
-from database import db, form_service
+from database import form_service
 from services.cache_service import cache
 from auth import get_current_user, require_permission
 from services.background_jobs import schedule_tracked_job
@@ -246,176 +246,23 @@ async def reorder_form_fields(
 @router.get("/form-submissions")
 async def get_form_submissions(
     form_template_id: Optional[str] = None,
-    template_id: Optional[str] = None,  # Legacy parameter name
+    template_id: Optional[str] = None,
     has_warnings: Optional[bool] = None,
     has_critical: Optional[bool] = None,
     skip: int = 0,
     limit: int = 10,
-    current_user: dict = Depends(_forms_read)
+    current_user: dict = Depends(_forms_read),
 ):
-    """
-    Get form submissions list - ULTRA-LIGHTWEIGHT endpoint.
-    
-    Returns lightweight submission objects for list view.
-    For full submission details, use GET /api/form-submissions/{id}
-    
-    Performance target: < 500ms response time; supports skip/limit (max 200) and returns full match count in `total`.
-    """
-    import time
-    import asyncio
-    
-    start_time = time.time()
-    
-    # Pagination: default 10, max 200 (list view stays lightweight via projection)
-    limit = min(max(limit, 1), 200)
-    skip = max(skip, 0)
-    
-    # MINIMAL projection - lightweight fields only
-    projection = {
-        "_id": 0,
-        "id": 1,
-        "form_template_id": 1,
-        "form_template_name": 1,
-        # Critical for consistent reprints: use the label template captured at submission time
-        "label_template_id": 1,
-        "task_instance_id": 1,
-        "equipment_id": 1,
-        "equipment_name": 1,
-        "submitted_by": 1,
-        "submitted_by_name": 1,
-        "submitted_at": 1,
-        "created_at": 1,
-        "status": 1,
-        "has_warnings": 1,
-        "has_critical": 1,
-        "discipline": 1,
-        "task_template_name": 1
-    }
-    
-    # Build query
-    query = {}
-    effective_template_id = form_template_id or template_id
-    if effective_template_id:
-        query["form_template_id"] = effective_template_id
-    if has_warnings is not None:
-        query["has_warnings"] = has_warnings
-    if has_critical is not None:
-        query["has_critical"] = has_critical
-    
-    try:
-        total_matching = await asyncio.wait_for(
-            db.form_submissions.count_documents(query),
-            timeout=2.0,
-        )
+    """Get form submissions list (lightweight projection)."""
+    return await form_service.list_submissions_lightweight(
+        form_template_id=form_template_id,
+        template_id=template_id,
+        has_warnings=has_warnings,
+        has_critical=has_critical,
+        skip=skip,
+        limit=limit,
+    )
 
-        # 3 second hard timeout
-        async def execute_query():
-            # Query with projection, sort by submitted_at DESC, skip/limit
-            cursor = db.form_submissions.find(query, projection).sort("submitted_at", -1).skip(skip).limit(limit)
-            return await cursor.to_list(length=limit)
-        
-        raw_submissions = await asyncio.wait_for(execute_query(), timeout=2.0)
-        
-        # Collect equipment IDs for tag lookup
-        equipment_ids = list(set(doc.get("equipment_id") for doc in raw_submissions if doc.get("equipment_id")))
-        
-        # Batch fetch equipment tags
-        equipment_tag_map = {}
-        if equipment_ids:
-            try:
-                equip_cursor = db.equipment_nodes.find(
-                    {"id": {"$in": equipment_ids}},
-                    {"_id": 0, "id": 1, "tag": 1}
-                )
-                async for eq in equip_cursor:
-                    if eq.get("tag"):
-                        equipment_tag_map[eq["id"]] = eq["tag"]
-            except Exception:
-                pass
-        
-        # Collect user IDs for avatar lookup (fast batch query)
-        user_ids = list(set(doc.get("submitted_by") for doc in raw_submissions if doc.get("submitted_by")))
-        
-        # Quick user avatar lookup (1 second timeout)
-        user_avatars = {}
-        if user_ids:
-            try:
-                async def fetch_avatars():
-                    users = await db.users.find(
-                        {"id": {"$in": user_ids}},
-                        {"_id": 0, "id": 1, "avatar_path": 1, "avatar_data": 1}
-                    ).to_list(length=200)
-                    return {u["id"]: bool(u.get("avatar_path") or u.get("avatar_data")) for u in users}
-                user_avatars = await asyncio.wait_for(fetch_avatars(), timeout=1.0)
-            except asyncio.TimeoutError:
-                pass  # Skip avatars on timeout
-        
-        # Transform to response format matching frontend expectations
-        submissions = []
-        def serialize_datetime(dt):
-            """Serialize datetime to ISO format with UTC timezone suffix."""
-            if dt is None:
-                return None
-            if hasattr(dt, 'isoformat'):
-                iso_str = dt.isoformat()
-                # Ensure UTC suffix is present (MongoDB returns naive datetimes)
-                if not iso_str.endswith('Z') and '+' not in iso_str and '-' not in iso_str[-6:]:
-                    iso_str += '+00:00'
-                return iso_str
-            return dt
-        
-        for doc in raw_submissions:
-            # Handle datetime serialization - ensure UTC suffix
-            submitted_at = serialize_datetime(doc.get("submitted_at") or doc.get("created_at"))
-            created_at = serialize_datetime(doc.get("created_at"))
-            
-            # Build avatar URL if user has avatar
-            submitted_by = doc.get("submitted_by")
-            submitted_by_photo = None
-            if submitted_by and user_avatars.get(submitted_by):
-                submitted_by_photo = f"/api/users/{submitted_by}/avatar"
-            
-            submissions.append({
-                "id": doc.get("id"),
-                "form_template_id": doc.get("form_template_id"),
-                "form_template_name": doc.get("form_template_name"),
-                "label_template_id": doc.get("label_template_id"),
-                "task_instance_id": doc.get("task_instance_id"),
-                "task_template_name": doc.get("task_template_name"),
-                "equipment_id": doc.get("equipment_id"),
-                "equipment_name": doc.get("equipment_name"),
-                "equipment_tag": equipment_tag_map.get(doc.get("equipment_id")),
-                "submitted_by": submitted_by,
-                "submitted_by_name": doc.get("submitted_by_name"),
-                "submitted_by_photo": submitted_by_photo,
-                "submitted_at": submitted_at,
-                "created_at": created_at,
-                "status": doc.get("status", "completed"),
-                "has_warnings": doc.get("has_warnings", False),
-                "has_critical": doc.get("has_critical", False),
-                "discipline": doc.get("discipline")
-            })
-        
-        duration = time.time() - start_time
-        logger.info(
-            f"GET /api/form-submissions completed in {duration:.3f}s - returned {len(submissions)} of {total_matching} matching (skip={skip}, limit={limit})"
-        )
-        
-        # `total` = documents matching query; list may be shorter due to skip/limit
-        return {
-            "total": total_matching,
-            "returned": len(submissions),
-            "skip": skip,
-            "limit": limit,
-            "submissions": submissions,
-        }
-        
-    except asyncio.TimeoutError:
-        logger.error("GET /api/form-submissions TIMEOUT after 3s")
-        return {"total": 0, "submissions": [], "error": "timeout"}
-    except Exception as e:
-        logger.error(f"GET /api/form-submissions ERROR: {e}")
-        return {"total": 0, "submissions": [], "error": "timeout"}
 
 @router.get("/form-submissions/{submission_id}")
 async def get_form_submission(
@@ -443,58 +290,10 @@ async def submit_form(
 @router.delete("/form-submissions/{submission_id}")
 async def delete_form_submission(
     submission_id: str,
-    current_user: dict = Depends(_forms_delete)
+    current_user: dict = Depends(_forms_delete),
 ):
     """Delete a form submission by custom ID or MongoDB ObjectId."""
-    from bson import ObjectId
-    
-    # First, get the submission to check if it's linked to a task
-    submission = await db.form_submissions.find_one({"id": submission_id})
-    if not submission:
-        if ObjectId.is_valid(submission_id):
-            submission = await db.form_submissions.find_one({"_id": ObjectId(submission_id)})
-    
-    if not submission:
-        raise HTTPException(status_code=404, detail="Form submission not found")
-
-    # Authorization: only owner/admin or the original submitter can delete.
-    role = (current_user or {}).get("role")
-    user_id = (current_user or {}).get("id")
-    submitted_by = submission.get("submitted_by")
-    is_privileged = role in ("owner", "admin")
-    is_submitter = bool(user_id) and bool(submitted_by) and (submitted_by == user_id)
-    if not (is_privileged or is_submitter):
-        raise HTTPException(status_code=403, detail="Not allowed to delete this submission")
-    
-    task_instance_id = submission.get("task_instance_id") if submission else None
-    
-    # Delete the form submission
-    result = await db.form_submissions.delete_one({"id": submission_id})
-    
-    if result.deleted_count == 0:
-        # Fallback: try by MongoDB ObjectId
-        if ObjectId.is_valid(submission_id):
-            result = await db.form_submissions.delete_one({"_id": ObjectId(submission_id)})
-    
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Form submission not found")
-    
-    # If the submission was linked to a task instance, reset the task status
-    if task_instance_id:
-        await db.task_instances.update_one(
-            {"id": task_instance_id},
-            {
-                "$set": {
-                    "status": "planned",
-                    "completed_at": None,
-                    "completed_by_id": None,
-                    "completed_by_name": None,
-                    "completion_notes": None,
-                }
-            }
-        )
-    
-    return {"message": "Form submission deleted successfully"}
+    return await form_service.delete_submission(submission_id, current_user)
 
 
 # --- Form Analytics ---
@@ -523,90 +322,51 @@ async def upload_form_document(
     current_user: dict = Depends(_forms_write)
 ):
     """Upload a reference document to a form template."""
-    from bson import ObjectId
-    from services.storage_service import put_object_async, is_storage_available
-    
+    from services.storage_service import is_storage_available
+
     if not is_storage_available():
         raise HTTPException(status_code=501, detail="Storage service not available")
-    
-    # Verify template exists
+
     template = await form_service.get_template_by_id(template_id)
     if not template:
         raise HTTPException(status_code=404, detail="Form template not found")
-    
-    # Get file extension and validate
+
     filename = file.filename or "document"
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "bin"
     allowed_extensions = ["pdf", "doc", "docx", "xls", "xlsx", "txt", "csv", "jpg", "jpeg", "png"]
-    
+
     if ext not in allowed_extensions:
         raise HTTPException(status_code=400, detail=f"File type .{ext} not allowed. Allowed: {allowed_extensions}")
-    
-    # Read file data
+
     file_data = await file.read()
-    max_size = 25 * 1024 * 1024  # 25MB limit
-    if len(file_data) > max_size:
+    if len(file_data) > 25 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large. Maximum size is 25MB")
-    
-    # Generate storage path
-    doc_id = str(uuid.uuid4())
-    storage_path = f"forms/{template_id}/documents/{doc_id}.{ext}"
+
     content_type = MIME_TYPES.get(ext, "application/octet-stream")
-    
-    # Upload to MongoDB storage
-    try:
-        result = await put_object_async(storage_path, file_data, content_type)
-        doc_url = result.get("path", storage_path)
-    except Exception as e:
-        logger.error(f"Failed to upload document: {e}")
-        raise HTTPException(status_code=500, detail="Failed to upload document")
-    
-    # Create document metadata
-    doc_metadata = {
-        "id": doc_id,
-        "name": filename,
-        "url": doc_url,
-        "storage_path": storage_path,
-        "type": ext,
-        "content_type": content_type,
-        "size_bytes": len(file_data),
-        "description": description or "",
-        "uploaded_by": current_user["id"],
-        "uploaded_at": datetime.utcnow().isoformat(),
-    }
-    
-    # Add document to template using ObjectId
-    await db.form_templates.update_one(
-        {"_id": ObjectId(template_id)},
-        {"$push": {"documents": doc_metadata}}
+
+    return await form_service.add_template_document(
+        template_id,
+        filename=filename,
+        file_data=file_data,
+        content_type=content_type,
+        ext=ext,
+        description=description,
+        uploaded_by=current_user["id"],
     )
-    
-    return {"message": "Document uploaded successfully", "document": doc_metadata}
 
 
 @router.delete("/form-templates/{template_id}/documents/{document_id}")
 async def delete_form_document(
     template_id: str,
     document_id: str,
-    current_user: dict = Depends(_forms_delete)
+    current_user: dict = Depends(_forms_delete),
 ):
     """Delete a document from a form template."""
-    from bson import ObjectId
-    
     template = await form_service.get_template_by_id(template_id)
     if not template:
         raise HTTPException(status_code=404, detail="Form template not found")
-    
-    # Remove document from template using ObjectId
-    result = await db.form_templates.update_one(
-        {"_id": ObjectId(template_id)},
-        {"$pull": {"documents": {"id": document_id}}}
-    )
-    
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Document not found")
-    
-    return {"message": "Document deleted successfully"}
+
+    return await form_service.remove_template_document(template_id, document_id)
 
 
 @router.get("/form-documents/{document_path:path}")

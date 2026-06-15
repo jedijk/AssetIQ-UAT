@@ -90,4 +90,5 @@ async def test_task_service_complete_syncs_scheduled_task_edges():
 
     source = (pytest.importorskip("pathlib").Path(__file__).resolve().parents[1] / "services" / "task_service.py").read_text()
     assert "_sync_reliability_graph_on_complete" in source
+    assert "dispatch_graph_sync" in source
     assert "sync_edges_for_scheduled_task" in source

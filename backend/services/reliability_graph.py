@@ -8,9 +8,10 @@ and AI/RIL context assembly.
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from database import db
 
@@ -28,7 +29,7 @@ EDGE_STATUS_RETIRED = "retired"
 
 
 async def _run_graph_sync(coro, label: str) -> None:
-    """Log-and-continue unless strict/audit mode is enabled."""
+    """Execute graph sync inline; log-and-continue unless strict/audit mode is enabled."""
     from services.reliability_graph_strict import graph_sync_strict
 
     try:
@@ -37,6 +38,84 @@ async def _run_graph_sync(coro, label: str) -> None:
         logger.warning("%s graph sync failed: %s", label, exc)
         if graph_sync_strict():
             raise
+
+
+def graph_sync_async_enabled() -> bool:
+    """When true, graph sync is enqueued via domain event outbox instead of blocking requests."""
+    return os.environ.get("GRAPH_SYNC_ASYNC", "false").lower() == "true"
+
+
+_GRAPH_SYNC_EVENT_TYPES: Dict[str, str] = {}
+
+
+def _graph_event_type(sync_name: str) -> str:
+    if sync_name not in _GRAPH_SYNC_EVENT_TYPES:
+        from services.domain_events import DomainEventType
+
+        mapping = {
+            "sync_observation_edges": DomainEventType.GRAPH_SYNC_OBSERVATION.value,
+            "sync_threat_edges": DomainEventType.GRAPH_SYNC_THREAT.value,
+            "sync_investigation_edges": DomainEventType.GRAPH_SYNC_INVESTIGATION.value,
+            "sync_cause_edge": DomainEventType.GRAPH_SYNC_CAUSE.value,
+            "sync_action_edges": DomainEventType.GRAPH_SYNC_ACTION.value,
+            "sync_outcome_edges": DomainEventType.GRAPH_SYNC_OUTCOME.value,
+            "sync_edges_for_scheduled_task": DomainEventType.GRAPH_SYNC_SCHEDULED_TASK.value,
+            "sync_task_instance_completion_edges": DomainEventType.GRAPH_SYNC_TASK_COMPLETION.value,
+            "sync_edges_for_apply_strategy": DomainEventType.GRAPH_SYNC_APPLY_STRATEGY.value,
+        }
+        _GRAPH_SYNC_EVENT_TYPES.update(mapping)
+    return _GRAPH_SYNC_EVENT_TYPES.get(sync_name, f"graph.{sync_name}")
+
+
+async def dispatch_graph_sync(sync_name: str, label: str, **kwargs: Any) -> None:
+    """
+    Run graph sync inline or enqueue via outbox when GRAPH_SYNC_ASYNC=true.
+
+    All write-path graph updates should use this instead of calling sync_* directly.
+    """
+    if graph_sync_async_enabled():
+        from services.event_outbox import publish_event
+
+        aggregate_id = (
+            kwargs.get("observation_id")
+            or kwargs.get("threat_id")
+            or kwargs.get("investigation_id")
+            or kwargs.get("action_id")
+            or kwargs.get("task_instance_id")
+            or kwargs.get("equipment_type_id")
+            or (kwargs.get("scheduled_task") or {}).get("id")
+            or label
+        )
+        await publish_event(
+            event_type=_graph_event_type(sync_name),
+            aggregate_type="reliability_graph",
+            aggregate_id=str(aggregate_id),
+            payload={"sync_name": sync_name, "kwargs": kwargs, "label": label},
+            tenant_id=kwargs.get("tenant_id"),
+        )
+        try:
+            from services.observability_metrics import inc
+            inc("graph_sync_enqueued_total")
+        except Exception:
+            pass
+        return
+
+    handler = GRAPH_SYNC_HANDLERS.get(sync_name)
+    if not handler:
+        raise ValueError(f"unknown graph sync handler: {sync_name}")
+
+    if sync_name == "sync_edges_for_scheduled_task":
+        task_doc = kwargs.get("scheduled_task") or kwargs.get("task_doc") or {}
+        event_name = kwargs.get("event", "created")
+        await _run_graph_sync(handler(task_doc, event=event_name), label)
+        return
+
+    await _run_graph_sync(handler(**kwargs), label)
+    try:
+        from services.observability_metrics import inc
+        inc("graph_sync_inline_total")
+    except Exception:
+        pass
 
 
 def edge_document_id(
@@ -306,6 +385,18 @@ async def sync_edges_for_apply_strategy(
                 )
                 created += 1
 
+            pm_import_ref = trace.get("pm_import_task_id")
+            if pm_import_ref:
+                created += await sync_pm_import_program_task_links(
+                    pm_import_task_id=str(pm_import_ref),
+                    program_task_id=task_id,
+                    failure_mode_id=fm_id,
+                    equipment_id=equipment_id,
+                    equipment_type_id=equipment_type_id,
+                    tenant_id=tenant_id,
+                    apply_mode="apply_strategy",
+                )
+
         retired += await retire_stale_program_task_edges(
             equipment_id=equipment_id,
             active_task_ids=active_task_ids,
@@ -336,6 +427,43 @@ async def sync_edge_for_pm_import_task(
         tenant_id=tenant_id,
         metadata={"apply_mode": apply_mode},
     )
+
+
+async def sync_pm_import_program_task_links(
+    *,
+    pm_import_task_id: str,
+    program_task_id: str,
+    failure_mode_id: Optional[str] = None,
+    equipment_id: Optional[str] = None,
+    equipment_type_id: Optional[str] = None,
+    tenant_id: Optional[str] = None,
+    apply_mode: str = "program_sync",
+) -> int:
+    """Link a PM import staging task to its program task (and failure mode when known)."""
+    upserted = 0
+    await upsert_edge(
+        source_type="pm_import_task",
+        source_id=pm_import_task_id,
+        relation="imported_as",
+        target_type="program_task",
+        target_id=program_task_id,
+        equipment_id=equipment_id,
+        equipment_type_id=equipment_type_id,
+        tenant_id=tenant_id,
+        metadata={"apply_mode": apply_mode},
+    )
+    upserted += 1
+    if failure_mode_id:
+        await sync_edge_for_pm_import_task(
+            task_id=pm_import_task_id,
+            failure_mode_id=failure_mode_id,
+            equipment_id=equipment_id,
+            equipment_type_id=equipment_type_id,
+            apply_mode=apply_mode,
+            tenant_id=tenant_id,
+        )
+        upserted += 1
+    return upserted
 
 
 async def sync_edges_for_scheduled_task(
@@ -386,6 +514,18 @@ async def sync_edges_for_scheduled_task(
             metadata=base_meta,
         )
         upserted += 1
+
+    pm_import_id = scheduled_task.get("pm_import_task_id")
+    if pm_import_id and program_task_id:
+        upserted += await sync_pm_import_program_task_links(
+            pm_import_task_id=str(pm_import_id),
+            program_task_id=program_task_id,
+            failure_mode_id=failure_mode_id,
+            equipment_id=equipment_id,
+            equipment_type_id=equipment_type_id,
+            tenant_id=tenant_id,
+            apply_mode="scheduled_sync",
+        )
 
     if equipment_id:
         await upsert_edge(
@@ -677,7 +817,7 @@ async def sync_threat_edges(
         await upsert_edge(
             source_type="threat",
             source_id=threat_id,
-            relation="observed_on",
+            relation="linked_to_equipment",
             target_type="equipment",
             target_id=equipment_id,
             equipment_id=equipment_id,
@@ -899,3 +1039,17 @@ async def get_edges_for_node(
             ]
         }
     return await db[COLLECTION].find(query, {"_id": 0}).sort("updated_at", -1).to_list(limit)
+
+
+# Registry for dispatch_graph_sync — populated after handler definitions.
+GRAPH_SYNC_HANDLERS: Dict[str, Callable[..., Any]] = {
+    "sync_observation_edges": sync_observation_edges,
+    "sync_threat_edges": sync_threat_edges,
+    "sync_investigation_edges": sync_investigation_edges,
+    "sync_cause_edge": sync_cause_edge,
+    "sync_action_edges": sync_action_edges,
+    "sync_outcome_edges": sync_outcome_edges,
+    "sync_edges_for_scheduled_task": sync_edges_for_scheduled_task,
+    "sync_task_instance_completion_edges": sync_task_instance_completion_edges,
+    "sync_edges_for_apply_strategy": sync_edges_for_apply_strategy,
+}

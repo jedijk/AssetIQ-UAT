@@ -84,6 +84,7 @@ import RiskBadge from "../components/RiskBadge";
 import ObservationDetailsSection from "../components/workspace/ObservationDetailsSection";
 import { ALARPCard, ExposureCard, RiskSummaryCard } from "../components/workspace/ExposureCards";
 import { EquipmentReliabilityTimeline } from "../components/workspace/EquipmentReliabilityTimeline";
+import { ReliabilityEvidencePanel } from "../components/reliability/ReliabilityEvidencePanel";
 import { ReliabilityIntelligencePanel } from "../components/workspace/ReliabilityIntelligencePanel";
 import { RecommendedActionsPanel } from "../components/workspace/RecommendedActionsPanel";
 import ActionPlanPanel from "../components/workspace/ActionPlanPanel";
@@ -398,13 +399,26 @@ const ObservationWorkspacePage = () => {
                   {displayTitle}
                 </h1>
               </div>
-
-              {/* Mobile-only ⋯ slot — anchored top-right of the hero title row */}
-              <div id="workspace-hero-slot-mobile" className="lg:hidden flex-shrink-0 self-start" />
             </div>
 
-            {/* Action bar slot (desktop) — ObservationDetailsSection portals share/edit/delete/⋯ into here */}
-            <div id="workspace-hero-slot" className="hidden lg:flex lg:items-center lg:gap-2 lg:flex-shrink-0" />
+            <div className="flex items-center gap-2 flex-shrink-0 self-start sm:self-center">
+              <ReliabilityEvidencePanel
+                equipmentId={observation?.linked_equipment_id}
+                equipmentName={observation?.asset || observation?.equipment_type}
+                anchorNodeType="threat"
+                anchorNodeId={id}
+                anchorLabel={observation?.title || displayTitle}
+                labelHints={
+                  observation?.failure_mode_id && observation?.failure_mode
+                    ? { [`failure_mode:${observation.failure_mode_id}`]: observation.failure_mode }
+                    : {}
+                }
+                buttonLabel="Graph evidence"
+                buttonVariant="outline"
+              />
+              <div id="workspace-hero-slot-mobile" className="lg:hidden" />
+              <div id="workspace-hero-slot" className="hidden lg:flex lg:items-center lg:gap-2" />
+            </div>
           </div>
         </div>
       </div>

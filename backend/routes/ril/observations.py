@@ -1,74 +1,39 @@
-"""
-RIL Observations API
-Unified Observation Intelligence - Aggregate observations from all sources.
-"""
+"""RIL Observations API."""
+from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional
-from datetime import datetime
-from auth import get_current_user
+
+from models.ril import CreateObservationRequest, ObservationSource, ObservationSeverity
 from routes.ril._auth import _ril_read, _ril_write
-from services.ril_service import RILService
-from models.ril import (
-    CreateObservationRequest,
-    ObservationSource, ObservationSeverity
-)
+from services.ril_service_factory import get_ril_service, ril_owner_id
 
 router = APIRouter(prefix="/observations", tags=["RIL Observations"])
-
-
-def get_ril_service():
-    """Get RIL service instance"""
-    from database import db
-    return RILService(db)
 
 
 @router.post("", response_model=dict)
 async def create_observation(
     request: CreateObservationRequest,
-    current_user: dict = Depends(_ril_write)
+    current_user: dict = Depends(_ril_write),
 ):
-    """
-    Create a unified observation from any source.
-    
-    Sources include:
-    - Manual observations
-    - Operator rounds
-    - Vision AI
-    - Investigations
-    - PM Import
-    - External systems (historians, SCADA, DCS)
-    - Condition monitoring systems
-    """
     service = get_ril_service()
-    owner_id = current_user.get("owner_id") or current_user.get("id")
-    
-    observation = await service.create_observation(owner_id, request)
-    
-    return {
-        "success": True,
-        "observation": observation.dict()
-    }
+    observation = await service.create_observation(ril_owner_id(current_user), request)
+    return {"success": True, "observation": observation.dict()}
 
 
 @router.get("", response_model=dict)
 async def list_observations(
-    equipment_id: Optional[str] = Query(None, description="Filter by equipment ID"),
-    source: Optional[ObservationSource] = Query(None, description="Filter by source"),
-    severity: Optional[ObservationSeverity] = Query(None, description="Filter by severity"),
-    from_date: Optional[datetime] = Query(None, description="Start date filter"),
-    to_date: Optional[datetime] = Query(None, description="End date filter"),
+    equipment_id: Optional[str] = Query(None),
+    source: Optional[ObservationSource] = Query(None),
+    severity: Optional[ObservationSeverity] = Query(None),
+    from_date: Optional[datetime] = Query(None),
+    to_date: Optional[datetime] = Query(None),
     limit: int = Query(100, ge=1, le=500),
     skip: int = Query(0, ge=0),
-    current_user: dict = Depends(_ril_read)
+    current_user: dict = Depends(_ril_read),
 ):
-    """
-    List observations with optional filtering.
-    Returns unified observations from all sources.
-    """
     service = get_ril_service()
-    owner_id = current_user.get("owner_id") or current_user.get("id")
-    
+    owner_id = ril_owner_id(current_user)
     observations, total = await service.get_observations(
         owner_id,
         equipment_id=equipment_id,
@@ -77,33 +42,25 @@ async def list_observations(
         from_date=from_date,
         to_date=to_date,
         limit=limit,
-        skip=skip
+        skip=skip,
     )
-    
     return {
         "observations": [o.dict() for o in observations],
         "total": total,
         "limit": limit,
-        "skip": skip
+        "skip": skip,
     }
 
 
 @router.get("/{observation_id}", response_model=dict)
 async def get_observation(
     observation_id: str,
-    current_user: dict = Depends(_ril_read)
+    current_user: dict = Depends(_ril_read),
 ):
-    """Get a single observation by ID"""
-    from database import db
-    owner_id = current_user.get("owner_id") or current_user.get("id")
-    
-    doc = await db.ril_observations.find_one({
-        "owner_id": owner_id,
-        "id": observation_id
-    })
-    
+    doc = await get_ril_service().get_observation_doc(
+        ril_owner_id(current_user),
+        observation_id,
+    )
     if not doc:
         raise HTTPException(status_code=404, detail="Observation not found")
-    
-    doc.pop('_id', None)  # Remove MongoDB ObjectId
     return {"observation": doc}

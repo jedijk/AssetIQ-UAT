@@ -1051,3 +1051,249 @@ class RILService:
             "pending_recommendations": pending_recommendations,
             "cases_resolved_30d": cases_resolved_30d
         }
+
+    # ============= Route-layer helpers (Wave 19) =============
+
+    async def get_observation_doc(self, owner_id: str, observation_id: str) -> Optional[dict]:
+        doc = await self.db[self._collections["observations"]].find_one({
+            "owner_id": owner_id,
+            "id": observation_id,
+        })
+        if doc:
+            doc.pop("_id", None)
+        return doc
+
+    async def list_readings(
+        self,
+        owner_id: str,
+        *,
+        equipment_id: Optional[str] = None,
+        source_system: Optional[str] = None,
+        source_tag: Optional[str] = None,
+        from_date=None,
+        to_date=None,
+        alarms_only: bool = False,
+        limit: int = 100,
+        skip: int = 0,
+    ) -> Tuple[List[dict], int]:
+        query = {"owner_id": owner_id}
+        if equipment_id:
+            query["equipment_id"] = equipment_id
+        if source_system:
+            query["source_system"] = source_system
+        if source_tag:
+            query["source_tag"] = source_tag
+        if alarms_only:
+            query["is_alarm"] = True
+        if from_date:
+            query["timestamp"] = {"$gte": from_date}
+        if to_date:
+            query.setdefault("timestamp", {})["$lte"] = to_date
+
+        total = await self.db[self._collections["readings"]].count_documents(query)
+        cursor = self.db[self._collections["readings"]].find(query).sort(
+            "timestamp", -1,
+        ).skip(skip).limit(limit)
+
+        readings = []
+        async for doc in cursor:
+            doc.pop("_id", None)
+            readings.append(doc)
+        return readings, total
+
+    async def get_alert_doc(self, owner_id: str, alert_id: str) -> Optional[dict]:
+        doc = await self.db[self._collections["alerts"]].find_one({
+            "owner_id": owner_id,
+            "id": alert_id,
+        })
+        if doc:
+            doc.pop("_id", None)
+        return doc
+
+    async def update_alert_status(
+        self,
+        owner_id: str,
+        alert_id: str,
+        *,
+        status: Optional[str] = None,
+        assigned_to: Optional[str] = None,
+    ) -> Optional[dict]:
+        updates = {"updated_at": datetime.utcnow()}
+        if status:
+            updates["status"] = status
+            if status == "acknowledged":
+                updates["acknowledged_at"] = datetime.utcnow()
+            elif status == "resolved":
+                updates["resolved_at"] = datetime.utcnow()
+        if assigned_to:
+            updates["assigned_to"] = assigned_to
+
+        result = await self.db[self._collections["alerts"]].update_one(
+            {"owner_id": owner_id, "id": alert_id},
+            {"$set": updates},
+        )
+        if result.matched_count == 0:
+            return None
+        return await self.get_alert_doc(owner_id, alert_id)
+
+    async def get_correlation_detail(self, owner_id: str, correlation_id: str) -> Optional[dict]:
+        doc = await self.db[self._collections["correlations"]].find_one({
+            "owner_id": owner_id,
+            "id": correlation_id,
+        })
+        if not doc:
+            return None
+        doc.pop("_id", None)
+
+        observations = []
+        if doc.get("observation_ids"):
+            async for obs in self.db[self._collections["observations"]].find(
+                {"id": {"$in": doc["observation_ids"]}},
+            ):
+                obs.pop("_id", None)
+                observations.append(obs)
+
+        alerts = []
+        if doc.get("alert_ids"):
+            async for alert in self.db[self._collections["alerts"]].find(
+                {"id": {"$in": doc["alert_ids"]}},
+            ):
+                alert.pop("_id", None)
+                alerts.append(alert)
+
+        return {"correlation": doc, "observations": observations, "alerts": alerts}
+
+    async def get_equipment_prediction_cached(
+        self,
+        owner_id: str,
+        equipment_id: str,
+    ) -> Tuple[Optional[dict], bool]:
+        week_ago = datetime.utcnow() - timedelta(days=7)
+        doc = await self.db[self._collections["predictions"]].find_one({
+            "owner_id": owner_id,
+            "equipment_id": equipment_id,
+            "calculated_at": {"$gte": week_ago},
+        })
+        if doc:
+            doc.pop("_id", None)
+            return doc, True
+
+        prediction = await self.generate_prediction(owner_id, equipment_id)
+        if not prediction:
+            return None, False
+        return prediction.dict(), False
+
+    async def get_equipment_at_risk(
+        self,
+        owner_id: str,
+        *,
+        health_threshold: float = 70,
+        limit: int = 20,
+    ) -> list:
+        pipeline = [
+            {"$match": {"owner_id": owner_id}},
+            {"$sort": {"calculated_at": -1}},
+            {"$group": {"_id": "$equipment_id", "latest": {"$first": "$$ROOT"}}},
+            {"$replaceRoot": {"newRoot": "$latest"}},
+            {"$match": {"overall_health_score": {"$lt": health_threshold}}},
+            {"$sort": {"overall_health_score": 1}},
+            {"$limit": limit},
+        ]
+        at_risk = []
+        async for doc in self.db[self._collections["predictions"]].aggregate(pipeline):
+            doc.pop("_id", None)
+            at_risk.append(doc)
+        return at_risk
+
+    async def get_case_detail(self, owner_id: str, case_id: str) -> Optional[dict]:
+        case = await self.get_reliability_case(owner_id, case_id)
+        if not case:
+            return None
+
+        observations = []
+        if case.observation_ids:
+            async for obs in self.db[self._collections["observations"]].find(
+                {"id": {"$in": case.observation_ids}},
+            ):
+                obs.pop("_id", None)
+                observations.append(obs)
+
+        alerts = []
+        if case.alert_ids:
+            async for alert in self.db[self._collections["alerts"]].find(
+                {"id": {"$in": case.alert_ids}},
+            ):
+                alert.pop("_id", None)
+                alerts.append(alert)
+
+        equipment = None
+        if case.equipment_id:
+            equipment = await self.db.equipment_nodes.find_one({"id": case.equipment_id})
+            if equipment:
+                equipment.pop("_id", None)
+
+        return {
+            "case": case.dict(),
+            "observations": observations,
+            "alerts": alerts,
+            "equipment": equipment,
+        }
+
+    async def link_observation_to_case(
+        self,
+        owner_id: str,
+        case_id: str,
+        observation_id: str,
+    ) -> bool:
+        result = await self.db[self._collections["cases"]].update_one(
+            {"owner_id": owner_id, "id": case_id},
+            {
+                "$addToSet": {"observation_ids": observation_id},
+                "$set": {"updated_at": datetime.utcnow()},
+            },
+        )
+        if result.matched_count == 0:
+            return False
+        await self.db[self._collections["observations"]].update_one(
+            {"id": observation_id},
+            {"$set": {"reliability_case_id": case_id}},
+        )
+        return True
+
+    async def link_alert_to_case(
+        self,
+        owner_id: str,
+        case_id: str,
+        alert_id: str,
+    ) -> bool:
+        result = await self.db[self._collections["cases"]].update_one(
+            {"owner_id": owner_id, "id": case_id},
+            {
+                "$addToSet": {"alert_ids": alert_id},
+                "$set": {"updated_at": datetime.utcnow()},
+            },
+        )
+        if result.matched_count == 0:
+            return False
+        await self.db[self._collections["alerts"]].update_one(
+            {"id": alert_id},
+            {"$set": {"reliability_case_id": case_id}},
+        )
+        return True
+
+    async def link_investigation_to_case(
+        self,
+        owner_id: str,
+        case_id: str,
+        investigation_id: str,
+    ) -> bool:
+        result = await self.db[self._collections["cases"]].update_one(
+            {"owner_id": owner_id, "id": case_id},
+            {
+                "$set": {
+                    "investigation_id": investigation_id,
+                    "updated_at": datetime.utcnow(),
+                },
+            },
+        )
+        return result.matched_count > 0

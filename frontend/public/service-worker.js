@@ -72,6 +72,16 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Health probes must hit the network directly — never synthesize 503 from cache/offline logic.
+  const bypassServiceWorker =
+    url.pathname === "/api/health" ||
+    url.pathname === "/health" ||
+    url.pathname.startsWith("/api/storage/");
+  if (bypassServiceWorker) {
+    event.respondWith(fetch(request));
+    return;
+  }
+
   // API requests - network first, fallback to cache
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(networkFirstStrategy(request));

@@ -4,6 +4,7 @@
  */
 export const PERMISSION_FEATURE_NAME_KEYS = {
   dashboard_operational: "permissions.features.dashboard_operational.name",
+  supervisor_command_center: "permissions.features.supervisor_command_center.name",
   dashboard_production: "permissions.features.dashboard_production.name",
   dashboard_executive: "permissions.features.dashboard_executive.name",
   dashboard_builder: "permissions.features.dashboard_builder.name",
@@ -26,6 +27,7 @@ export const PERMISSION_FEATURE_NAME_KEYS = {
 
 export const PERMISSION_FEATURE_DESC_KEYS = {
   dashboard_operational: "permissions.features.dashboard_operational.description",
+  supervisor_command_center: "permissions.features.supervisor_command_center.description",
   dashboard_production: "permissions.features.dashboard_production.description",
   dashboard_executive: "permissions.features.dashboard_executive.description",
   dashboard_builder: "permissions.features.dashboard_builder.description",

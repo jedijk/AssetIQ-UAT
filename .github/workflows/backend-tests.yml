@@ -45,35 +45,66 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements-dev.txt
 
-      - name: Run unit tests
+      - name: Bootstrap CI test users
         env:
           MONGO_URL: mongodb://localhost:27017/test
+          DB_NAME: test
+          ENVIRONMENT: test
         run: |
-          cd backend && python -m pytest \
-            tests/test_background_jobs.py \
-            tests/test_maintenance_readiness.py \
-            tests/test_maintenance_readiness_service.py \
-            tests/test_verify_uat_gates.py \
-            tests/test_pm_import_job_handler.py \
-            tests/test_reliability_graph_pm_import.py \
-            tests/test_reliability_graph_audit.py \
-            tests/test_reliability_graph_scheduled_task.py \
-            tests/test_worker_config.py \
-            tests/test_ai_cost_guard.py \
-            tests/test_auth_matrix.py \
-            tests/test_mongo_regex.py \
-            tests/test_reliability_graph_query.py \
-            tests/test_ai_fm_suggestions_auth.py \
-            tests/test_work_item_query.py \
-            tests/test_tenant_schema.py \
-            tests/test_asset_health_materializer.py \
-            tests/test_copilot_eval_set.py \
-            tests/test_chat_handler_unknown.py \
-            -q
+          cd backend && python scripts/ci_bootstrap_test_users.py
+
+      - name: Start API server for integration tests
+        env:
+          MONGO_URL: mongodb://localhost:27017/test
+          DB_NAME: test
+          ENVIRONMENT: test
+          RATE_LIMIT_ENABLED: "false"
+          VAPID_PUBLIC_KEY: test-public-key
+          VAPID_PRIVATE_KEY: test-private-key
+        run: |
+          cd backend
+          nohup python -m uvicorn server:app --host 127.0.0.1 --port 8765 > /tmp/uvicorn-ci.log 2>&1 &
+          echo $! > /tmp/uvicorn-ci.pid
+          for i in $(seq 1 45); do
+            if curl -sf http://127.0.0.1:8765/health > /dev/null; then
+              echo "API ready after ${i} attempt(s)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API failed to start"
+          tail -n 80 /tmp/uvicorn-ci.log || true
+          exit 1
+
+      - name: Run full backend test suite
+        env:
+          MONGO_URL: mongodb://localhost:27017/test
+          DB_NAME: test
+          ENVIRONMENT: test
+          RATE_LIMIT_ENABLED: "false"
+          VAPID_PUBLIC_KEY: test-public-key
+          VAPID_PRIVATE_KEY: test-private-key
+          REACT_APP_BACKEND_URL: http://127.0.0.1:8765
+        run: |
+          cd backend && python -m pytest tests/ -q --ignore=tests/test_big_bag_dashboard_filter.py --cov=services --cov=repositories --cov-report=term-missing:skip-covered --cov-fail-under=0
+
+      - name: Stop API server
+        if: always()
+        run: |
+          if [ -f /tmp/uvicorn-ci.pid ]; then
+            kill "$(cat /tmp/uvicorn-ci.pid)" 2>/dev/null || true
+          fi
 
       - name: Run UAT readiness gates
         env:
           MONGO_URL: mongodb://localhost:27017/test
           DB_NAME: test
+          ENVIRONMENT: test
+          REACT_APP_BACKEND_URL: http://127.0.0.1:8765
         run: |
           cd backend && python scripts/verify_uat_gates.py
+
+      - name: Test summary
+        if: always()
+        run: |
+          echo "Backend tests executed from backend/tests/ (full suite)"

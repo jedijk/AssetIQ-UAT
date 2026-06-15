@@ -53,6 +53,9 @@ INDEX_DEFINITIONS = {
     # Observations - linked to equipment and threats
     "observations": [
         {"keys": [("id", 1)], "unique": True},
+        {"keys": [("tenant_id", 1)]},
+        {"keys": [("tenant_id", 1), ("equipment_id", 1), ("created_at", -1)]},
+        {"keys": [("tenant_id", 1), ("status", 1), ("created_at", -1)]},
         {"keys": [("equipment_id", 1)]},
         {"keys": [("threat_id", 1)]},
         {"keys": [("status", 1)]},
@@ -88,6 +91,7 @@ INDEX_DEFINITIONS = {
     
     # Task templates
     "task_templates": [
+        {"keys": [("tenant_id", 1)]},
         {"keys": [("id", 1)], "unique": True},
         {"keys": [("discipline", 1)]},
         {"keys": [("is_adhoc", 1)]},
@@ -96,6 +100,7 @@ INDEX_DEFINITIONS = {
     
     # Task plans
     "task_plans": [
+        {"keys": [("tenant_id", 1)]},
         {"keys": [("id", 1)], "unique": True},
         {"keys": [("task_template_id", 1)]},
         {"keys": [("equipment_id", 1)]},
@@ -155,6 +160,8 @@ INDEX_DEFINITIONS = {
     # Chat messages
     "chat_messages": [
         {"keys": [("id", 1)], "unique": True},
+        {"keys": [("tenant_id", 1)]},
+        {"keys": [("tenant_id", 1), ("user_id", 1), ("created_at", -1)]},
         {"keys": [("user_id", 1)]},
         {"keys": [("created_at", -1)]},
         {"keys": [("session_id", 1)]},
@@ -162,6 +169,8 @@ INDEX_DEFINITIONS = {
     
     # User events (large collection - important to index)
     "user_events": [
+        {"keys": [("tenant_id", 1)]},
+        {"keys": [("tenant_id", 1), ("user_id", 1), ("timestamp", -1)]},
         {"keys": [("user_id", 1)]},
         {"keys": [("event_type", 1)]},
         {"keys": [("timestamp", -1)]},
@@ -183,6 +192,7 @@ INDEX_DEFINITIONS = {
 
     # Equipment failure modes
     "equipment_failure_modes": [
+        {"keys": [("tenant_id", 1)]},
         {"keys": [("id", 1)], "unique": True},
         {"keys": [("equipment_id", 1)]},
         {"keys": [("failure_mode_id", 1)]},
@@ -409,6 +419,43 @@ INDEX_DEFINITIONS = {
         {"keys": [("tenant_id", 1), ("equipment_id", 1), ("snapshot_at", -1)]},
         {"keys": [("snapshot_at", -1)]},
     ],
+    "executive_kpi_snapshots": [
+        {"keys": [("tenant_id", 1), ("user_id", 1)], "unique": True},
+        {"keys": [("expires_at", 1)], "expireAfterSeconds": 0},
+    ],
+    "executive_dashboard_snapshots": [
+        {"keys": [("tenant_id", 1), ("user_id", 1), ("period_days", 1)], "unique": True},
+        {"keys": [("expires_at", 1)], "expireAfterSeconds": 0},
+    ],
+    "work_execution_kpi_snapshots": [
+        {"keys": [("tenant_id", 1), ("user_id", 1)], "unique": True},
+        {"keys": [("expires_at", 1)], "expireAfterSeconds": 0},
+    ],
+    "ril_dashboard_snapshots": [
+        {"keys": [("tenant_id", 1), ("user_id", 1)], "unique": True},
+        {"keys": [("expires_at", 1)], "expireAfterSeconds": 0},
+    ],
+    "production_dashboard_snapshots": [
+        {"keys": [("tenant_id", 1), ("cache_key", 1)], "unique": True},
+        {"keys": [("expires_at", 1)], "expireAfterSeconds": 0},
+    ],
+    "user_preferences": [
+        {"keys": [("user_id", 1)]},
+        {"keys": [("tenant_id", 1), ("user_id", 1)]},
+    ],
+    "granulometry_records": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("sample_date_dt", -1)]},
+        {"keys": [("tenant_id", 1), ("sample_date_dt", -1)]},
+        {"keys": [("tenant_id", 1), ("big_bag_no", 1)]},
+    ],
+    "domain_event_outbox": [
+        {"keys": [("id", 1)], "unique": True},
+        {"keys": [("status", 1), ("created_at", 1)]},
+        {"keys": [("event_type", 1), ("status", 1)]},
+        {"keys": [("tenant_id", 1), ("status", 1), ("created_at", 1)]},
+        {"keys": [("aggregate_type", 1), ("aggregate_id", 1)]},
+    ],
     "audit_log": [
         {"keys": [("ts", -1)]},
         {"keys": [("actor.id", 1), ("ts", -1)]},
@@ -431,6 +478,23 @@ INDEX_DEFINITIONS = {
     "ril_alerts": [
         {"keys": [("equipment_id", 1), ("created_at", -1)]},
         {"keys": [("status", 1)]},
+    ],
+    "production_logs": [
+        {"keys": [("tenant_id", 1)]},
+        {"keys": [("tenant_id", 1), ("asset_id", 1), ("timestamp", -1)]},
+        {"keys": [("asset_id", 1), ("timestamp", -1)]},
+        {"keys": [("timestamp", -1)]},
+        {"keys": [("event_type", 1), ("timestamp", -1)]},
+        {"keys": [("status", 1), ("timestamp", -1)]},
+    ],
+    "log_ingestion_jobs": [
+        {"keys": [("tenant_id", 1)]},
+        {"keys": [("status", 1), ("created_at", -1)]},
+        {"keys": [("created_at", -1)]},
+    ],
+    "asset_history": [
+        {"keys": [("asset_id", 1), ("hour", 1)]},
+        {"keys": [("hour", -1)]},
     ],
 }
 

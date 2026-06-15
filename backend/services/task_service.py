@@ -897,10 +897,8 @@ class TaskService:
 
         strict = graph_sync_strict()
         try:
-            from services.reliability_graph import (
-                sync_edges_for_scheduled_task,
-                sync_task_instance_completion_edges,
-            )
+            from services.reliability_graph import dispatch_graph_sync
+            from services.tenant_schema import merge_tenant_filter
 
             ti_id = str(result.get("id") or instance.get("id") or instance.get("_id", ""))
             sched_id = instance.get("scheduled_task_id")
@@ -910,12 +908,19 @@ class TaskService:
                 meta = instance.get("metadata") or {}
                 failure_mode_id = meta.get("failure_mode_id")
 
+            tenant_id = instance.get("tenant_id")
+            tenant_user = {"company_id": tenant_id} if tenant_id else None
+
             if sched_id:
-                scheduled_task = await self.db.scheduled_tasks.find_one({"id": sched_id})
+                sched_query = merge_tenant_filter({"id": sched_id}, tenant_user)
+                scheduled_task = await self.db.scheduled_tasks.find_one(sched_query)
                 if scheduled_task:
-                    await sync_edges_for_scheduled_task(
-                        scheduled_task,
+                    await dispatch_graph_sync(
+                        "sync_edges_for_scheduled_task",
+                        f"scheduled_task_completed_{sched_id}",
+                        scheduled_task=scheduled_task,
                         event="completed",
+                        tenant_id=tenant_id or scheduled_task.get("tenant_id"),
                         metadata={
                             "completed_at": completed_at.isoformat(),
                             "task_instance_id": ti_id,
@@ -927,13 +932,16 @@ class TaskService:
                 or instance.get("findings")
                 or (result.get("completion_data") or {}).get("findings")
             )
-            await sync_task_instance_completion_edges(
+            await dispatch_graph_sync(
+                "sync_task_instance_completion_edges",
+                f"task_instance_completed_{ti_id}",
                 task_instance_id=ti_id,
                 equipment_id=equipment_id,
                 failure_mode_id=failure_mode_id,
                 scheduled_task_id=sched_id,
                 completed_at=completed_at.isoformat(),
                 findings_text=findings_text,
+                tenant_id=tenant_id,
             )
         except Exception as exc:
             logger.warning("task instance graph edge sync failed: %s", exc)
@@ -991,16 +999,15 @@ class TaskService:
         try:
             await self.db.threats.insert_one(observation_doc)
             logger.info(f"Created observation from task: {observation_doc['id']}")
-            from services.reliability_graph import _run_graph_sync, sync_threat_edges
+            from services.reliability_graph import dispatch_graph_sync
 
             equipment_id = task_instance.get("equipment_id")
-            await _run_graph_sync(
-                sync_threat_edges(
-                    threat_id=observation_doc["id"],
-                    equipment_id=equipment_id,
-                    tenant_id=None,
-                ),
+            await dispatch_graph_sync(
+                "sync_threat_edges",
                 "task_observation_threat",
+                threat_id=observation_doc["id"],
+                equipment_id=equipment_id,
+                tenant_id=None,
             )
             return observation_doc["id"]
         except Exception as e:

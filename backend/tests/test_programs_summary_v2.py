@@ -35,7 +35,7 @@ async def test_programs_summary_includes_legacy_ui_fields():
     )
     mock_db.scheduled_tasks.count_documents = AsyncMock(return_value=2)
 
-    with patch("routes.maintenance_scheduler.programs.db", mock_db):
+    with patch("services.maintenance_scheduler_service.db", mock_db):
         result = await get_programs_summary("et-1", current_user={"id": "u1"})
 
     assert result["equipment_count"] == 2

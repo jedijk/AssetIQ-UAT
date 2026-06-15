@@ -107,12 +107,13 @@ async def api_health_check():
     
     routes_ok = route_load_error is None
     ready = bool(getattr(app.state, "ready", False))
-    critical_ok = db_status == "connected" and routes_ok and ready
+    # `ready` tracks background warmup only; routes + live DB ping mean we can serve traffic.
+    critical_ok = db_status == "connected" and routes_ok
     redis_degraded = redis_status == "unavailable"
-    overall_ok = critical_ok and not redis_degraded
+    overall_ok = critical_ok and ready and not redis_degraded
 
     payload = {
-        "status": "ok" if overall_ok else "degraded",
+        "status": "ok" if overall_ok else ("starting" if critical_ok and not ready else "degraded"),
         "database": db_status,
         "database_latency_ms": db_latency,
         "uptime_seconds": uptime,
@@ -291,7 +292,7 @@ BASE_ORIGINS = [
     "https://asset-iq-uat.vercel.app",
     "https://assetiq-uat.vercel.app",
     # Preview/Development
-    "https://flicker-solver.preview.emergentagent.com",
+    "https://reliability-graph-1.preview.emergentagent.com",
     "http://localhost:3000",
     "http://localhost:5000",
 ]
@@ -384,6 +385,14 @@ app.add_middleware(TimeoutMiddleware, timeout=25.0, long_timeout=300.0)
 
 # Add GZip compression for responses > 500 bytes
 app.add_middleware(GZipMiddleware, minimum_size=500)
+
+try:
+    from services.observability_metrics import RequestMetricsMiddleware
+
+    app.add_middleware(RequestMetricsMiddleware, slow_ms=float(os.environ.get("SLOW_API_MS", "2000")))
+    logger.info("Request metrics middleware enabled")
+except Exception as e:
+    logger.warning("Request metrics middleware not available: %s", e)
 
 try:
     from middleware.structured_logging import StructuredLoggingMiddleware
@@ -867,157 +876,19 @@ async def startup_event():
 async def background_startup():
     """Run heavy initialization tasks in background."""
     logger.info("Background startup tasks starting...")
-    
+
     try:
-        from database import db, verify_database_connection
-        
-        logger.info("Verifying database connection...")
-        connected = await verify_database_connection(max_retries=3, timeout=5.0)
-        
-        if connected:
-            logger.info("MongoDB connected successfully")
+        from database import db
+        from services.startup_lifecycle import run_safe_startup
 
-            try:
-                from services.cutover_config import cutover_gaps, cutover_snapshot
-                snap = cutover_snapshot()
-                logger.info("Cutover config snapshot: %s", snap)
-                gaps = cutover_gaps()
-                if gaps:
-                    logger.warning("90-day cutover gaps: %s", "; ".join(gaps))
-            except Exception as exc:
-                logger.warning("Cutover config check skipped: %s", exc)
+        await run_safe_startup(db, app)
 
-            # Ensure primary owner role in UAT DB (auth reads request DB first; UAT must have role=owner there)
-            try:
-                from database import client, AVAILABLE_DATABASES
-                from scripts.ensure_uat_owner import ensure_uat_primary_owner
-                await ensure_uat_primary_owner(client, AVAILABLE_DATABASES)
-            except Exception as e:
-                logger.warning(f"UAT owner bootstrap skipped: {e}")
-            
-            # Initialize MongoDB file storage
-            try:
-                from services.storage_service import init_mongo_storage
-                init_mongo_storage(db)
-                logger.info("MongoDB file storage initialized")
-            except Exception as e:
-                logger.warning(f"File storage init failed: {e}")
-            
-            # Create indexes
-            try:
-                from scripts.create_indexes import create_indexes
-                created, skipped = await create_indexes()
-                logger.info(f"Database indexes: {created} created, {skipped} skipped")
-            except Exception as e:
-                logger.warning(f"Index creation skipped: {e}")
-            
-            # Seed failure modes
-            try:
-                from scripts.seed_failure_modes import ensure_failure_modes_seeded
-                await ensure_failure_modes_seeded(db)
-                logger.info("Failure modes library ready")
-            except Exception as e:
-                logger.warning(f"Failure modes seeding skipped: {e}")
-
-            # Seed disciplines configurator (no-op if already populated)
-            try:
-                from routes.disciplines import seed_disciplines_if_empty
-                inserted = await seed_disciplines_if_empty()
-                if inserted:
-                    logger.info(f"Disciplines configurator seeded with {inserted} entries")
-                else:
-                    logger.info("Disciplines configurator already populated")
-            except Exception as e:
-                logger.warning(f"Disciplines seeding skipped: {e}")
-
-            # One-shot: migrate any legacy observation statuses to the new
-            # process-journey based status model (Observation, Assessment,
-            # Planning, Investigation, Action, Mitigated, Learning).
-            try:
-                from scripts.migrate_observation_statuses import migrate_observation_statuses
-                mig_stats = await migrate_observation_statuses(db)
-                if mig_stats["migrated"] > 0:
-                    logger.info(f"Observation status migration: {mig_stats}")
-            except Exception as e:
-                logger.warning(f"Observation status migration skipped: {e}")
-
-            # One-shot: backfill `discipline` on legacy central_actions whose
-            # discipline was never persisted (e.g. created before the add-rec
-            # endpoint copied discipline from the recommendation).
-            try:
-                from scripts.backfill_action_disciplines import backfill_action_disciplines
-                d_stats = await backfill_action_disciplines(db)
-                if d_stats["updated"] > 0:
-                    logger.info(f"Action discipline backfill: {d_stats}")
-            except Exception as e:
-                logger.warning(f"Action discipline backfill skipped: {e}")
-
-            # One-shot: drop legacy "Complete causal investigation" central_actions
-            # that the previous sync model created. Investigations are now surfaced
-            # as a synthetic IV entry in the action plan instead.
-            try:
-                result = await db.central_actions.delete_many({
-                    "source_type": "investigation",
-                    "source_id": {"$exists": True}
-                })
-                if result.deleted_count > 0:
-                    logger.info(f"Removed {result.deleted_count} legacy investigation-linked actions")
-            except Exception as e:
-                logger.warning(f"Legacy investigation-action cleanup skipped: {e}")
-
-            # Start the task-generation cron (Sunday 02:00 plant-local by default).
-            # Reads cron + timezone from app_settings.task_generation.
-            try:
-                from services.scheduler_job import init_scheduler
-                await init_scheduler()
-            except Exception as e:
-                logger.warning(f"Task-generation scheduler failed to start: {e}")
-            
-            # Start periodic cleanup of old pending registrations
-            asyncio.create_task(cleanup_pending_registrations_task(db))
-            
-            app.state.ready = True
-        else:
-            logger.warning("Database not connected - running in degraded mode")
-        
-        # Log route count
-        api_routes = [r for r in app.routes if hasattr(r, 'path') and r.path.startswith('/api')]
+        api_routes = [r for r in app.routes if hasattr(r, "path") and r.path.startswith("/api")]
         logger.info(f"Total API routes: {len(api_routes)}")
         logger.info("=== BACKGROUND STARTUP COMPLETE ===")
-        
+
     except Exception as e:
         logger.error(f"Background startup failed: {e}")
-
-
-async def cleanup_pending_registrations_task(db):
-    """
-    Periodically clean up pending registrations older than 48 hours.
-    Runs every 6 hours.
-    """
-    from datetime import datetime, timezone, timedelta
-    
-    CLEANUP_INTERVAL_HOURS = 6
-    PENDING_EXPIRY_HOURS = 48
-    
-    while True:
-        try:
-            await asyncio.sleep(CLEANUP_INTERVAL_HOURS * 3600)  # Sleep first, then cleanup
-            
-            cutoff_time = datetime.now(timezone.utc) - timedelta(hours=PENDING_EXPIRY_HOURS)
-            cutoff_iso = cutoff_time.isoformat()
-            
-            # Delete pending users created before cutoff
-            result = await db.users.delete_many({
-                "approval_status": "pending",
-                "created_at": {"$lt": cutoff_iso}
-            })
-            
-            if result.deleted_count > 0:
-                logger.info(f"Cleaned up {result.deleted_count} expired pending registrations (older than {PENDING_EXPIRY_HOURS}h)")
-        except asyncio.CancelledError:
-            break
-        except Exception as e:
-            logger.error(f"Pending registration cleanup error: {e}")
 
 
 # =============================================================================

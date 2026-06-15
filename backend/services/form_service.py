@@ -654,8 +654,7 @@ class FormService:
 
         try:
             from services.reliability_graph import (
-                _run_graph_sync,
-                sync_task_instance_completion_edges,
+                dispatch_graph_sync,
             )
             from services.threat_score_service import recalculate_threat_scores_for_asset
 
@@ -683,17 +682,16 @@ class FormService:
                     equipment_id = equipment_id or inst.get("equipment_id")
                     tenant_id = tenant_id or inst.get("tenant_id")
 
-                await _run_graph_sync(
-                    sync_task_instance_completion_edges(
-                        task_instance_id=str(task_instance_id),
-                        equipment_id=equipment_id,
-                        failure_mode_id=failure_mode_id,
-                        scheduled_task_id=scheduled_task_id,
-                        completed_at=completed_at,
-                        tenant_id=tenant_id,
-                        findings_text=notes or submission.get("form_template_name"),
-                    ),
+                await dispatch_graph_sync(
+                    "sync_task_instance_completion_edges",
                     "form_submission",
+                    task_instance_id=str(task_instance_id),
+                    equipment_id=equipment_id,
+                    failure_mode_id=failure_mode_id,
+                    scheduled_task_id=scheduled_task_id,
+                    completed_at=completed_at,
+                    tenant_id=tenant_id,
+                    findings_text=notes or submission.get("form_template_name"),
                 )
 
             if equipment_id:
@@ -1780,3 +1778,265 @@ class FormService:
             "task_template_name": doc.get("task_template_name"),
             "discipline": doc.get("discipline"),
         }
+
+    async def list_submissions_lightweight(
+        self,
+        *,
+        form_template_id: Optional[str] = None,
+        template_id: Optional[str] = None,
+        has_warnings: Optional[bool] = None,
+        has_critical: Optional[bool] = None,
+        skip: int = 0,
+        limit: int = 10,
+    ) -> Dict[str, Any]:
+        """
+        Get form submissions list - ULTRA-LIGHTWEIGHT endpoint.
+    
+        Returns lightweight submission objects for list view.
+        For full submission details, use GET /api/form-submissions/{id}
+    
+        Performance target: < 500ms response time; supports skip/limit (max 200) and returns full match count in `total`.
+        """
+        import time
+        import asyncio
+    
+        start_time = time.time()
+    
+        # Pagination: default 10, max 200 (list view stays lightweight via projection)
+        limit = min(max(limit, 1), 200)
+        skip = max(skip, 0)
+    
+        # MINIMAL projection - lightweight fields only
+        projection = {
+            "_id": 0,
+            "id": 1,
+            "form_template_id": 1,
+            "form_template_name": 1,
+            # Critical for consistent reprints: use the label template captured at submission time
+            "label_template_id": 1,
+            "task_instance_id": 1,
+            "equipment_id": 1,
+            "equipment_name": 1,
+            "submitted_by": 1,
+            "submitted_by_name": 1,
+            "submitted_at": 1,
+            "created_at": 1,
+            "status": 1,
+            "has_warnings": 1,
+            "has_critical": 1,
+            "discipline": 1,
+            "task_template_name": 1
+        }
+    
+        # Build query
+        query = {}
+        effective_template_id = form_template_id or template_id
+        if effective_template_id:
+            query["form_template_id"] = effective_template_id
+        if has_warnings is not None:
+            query["has_warnings"] = has_warnings
+        if has_critical is not None:
+            query["has_critical"] = has_critical
+    
+        try:
+            total_matching = await asyncio.wait_for(
+                self.submissions.count_documents(query),
+                timeout=2.0,
+            )
+
+            # 3 second hard timeout
+            async def execute_query():
+                # Query with projection, sort by submitted_at DESC, skip/limit
+                cursor = self.submissions.find(query, projection).sort("submitted_at", -1).skip(skip).limit(limit)
+                return await cursor.to_list(length=limit)
+        
+            raw_submissions = await asyncio.wait_for(execute_query(), timeout=2.0)
+        
+            # Collect equipment IDs for tag lookup
+            equipment_ids = list(set(doc.get("equipment_id") for doc in raw_submissions if doc.get("equipment_id")))
+        
+            # Batch fetch equipment tags
+            equipment_tag_map = {}
+            if equipment_ids:
+                try:
+                    equip_cursor = self.db.equipment_nodes.find(
+                        {"id": {"$in": equipment_ids}},
+                        {"_id": 0, "id": 1, "tag": 1}
+                    )
+                    async for eq in equip_cursor:
+                        if eq.get("tag"):
+                            equipment_tag_map[eq["id"]] = eq["tag"]
+                except Exception:
+                    pass
+        
+            # Collect user IDs for avatar lookup (fast batch query)
+            user_ids = list(set(doc.get("submitted_by") for doc in raw_submissions if doc.get("submitted_by")))
+        
+            # Quick user avatar lookup (1 second timeout)
+            user_avatars = {}
+            if user_ids:
+                try:
+                    async def fetch_avatars():
+                        users = await self.db.users.find(
+                            {"id": {"$in": user_ids}},
+                            {"_id": 0, "id": 1, "avatar_path": 1, "avatar_data": 1}
+                        ).to_list(length=200)
+                        return {u["id"]: bool(u.get("avatar_path") or u.get("avatar_data")) for u in users}
+                    user_avatars = await asyncio.wait_for(fetch_avatars(), timeout=1.0)
+                except asyncio.TimeoutError:
+                    pass  # Skip avatars on timeout
+        
+            # Transform to response format matching frontend expectations
+            submissions = []
+            def serialize_datetime(dt):
+                """Serialize datetime to ISO format with UTC timezone suffix."""
+                if dt is None:
+                    return None
+                if hasattr(dt, 'isoformat'):
+                    iso_str = dt.isoformat()
+                    # Ensure UTC suffix is present (MongoDB returns naive datetimes)
+                    if not iso_str.endswith('Z') and '+' not in iso_str and '-' not in iso_str[-6:]:
+                        iso_str += '+00:00'
+                    return iso_str
+                return dt
+        
+            for doc in raw_submissions:
+                # Handle datetime serialization - ensure UTC suffix
+                submitted_at = serialize_datetime(doc.get("submitted_at") or doc.get("created_at"))
+                created_at = serialize_datetime(doc.get("created_at"))
+            
+                # Build avatar URL if user has avatar
+                submitted_by = doc.get("submitted_by")
+                submitted_by_photo = None
+                if submitted_by and user_avatars.get(submitted_by):
+                    submitted_by_photo = f"/api/users/{submitted_by}/avatar"
+            
+                submissions.append({
+                    "id": doc.get("id"),
+                    "form_template_id": doc.get("form_template_id"),
+                    "form_template_name": doc.get("form_template_name"),
+                    "label_template_id": doc.get("label_template_id"),
+                    "task_instance_id": doc.get("task_instance_id"),
+                    "task_template_name": doc.get("task_template_name"),
+                    "equipment_id": doc.get("equipment_id"),
+                    "equipment_name": doc.get("equipment_name"),
+                    "equipment_tag": equipment_tag_map.get(doc.get("equipment_id")),
+                    "submitted_by": submitted_by,
+                    "submitted_by_name": doc.get("submitted_by_name"),
+                    "submitted_by_photo": submitted_by_photo,
+                    "submitted_at": submitted_at,
+                    "created_at": created_at,
+                    "status": doc.get("status", "completed"),
+                    "has_warnings": doc.get("has_warnings", False),
+                    "has_critical": doc.get("has_critical", False),
+                    "discipline": doc.get("discipline")
+                })
+        
+            duration = time.time() - start_time
+            logger.info(
+                f"GET /api/form-submissions completed in {duration:.3f}s - returned {len(submissions)} of {total_matching} matching (skip={skip}, limit={limit})"
+            )
+        
+            # `total` = documents matching query; list may be shorter due to skip/limit
+            return {
+                "total": total_matching,
+                "returned": len(submissions),
+                "skip": skip,
+                "limit": limit,
+                "submissions": submissions,
+            }
+        
+        except asyncio.TimeoutError:
+            logger.error("GET /api/form-submissions TIMEOUT after 3s")
+            return {"total": 0, "submissions": [], "error": "timeout"}
+        except Exception as e:
+            logger.error(f"GET /api/form-submissions ERROR: {e}")
+            return {"total": 0, "submissions": [], "error": "timeout"}
+
+    async def delete_submission(self, submission_id: str, user: dict) -> dict:
+        """Delete a form submission and reset linked task instance if needed."""
+        from fastapi import HTTPException
+
+        submission = await self.submissions.find_one({"id": submission_id})
+        if not submission:
+            if ObjectId.is_valid(submission_id):
+                submission = await self.submissions.find_one({"_id": ObjectId(submission_id)})
+        if not submission:
+            raise HTTPException(status_code=404, detail="Form submission not found")
+
+        role = (user or {}).get("role")
+        user_id = (user or {}).get("id")
+        submitted_by = submission.get("submitted_by")
+        is_privileged = role in ("owner", "admin")
+        is_submitter = bool(user_id) and bool(submitted_by) and (submitted_by == user_id)
+        if not (is_privileged or is_submitter):
+            raise HTTPException(status_code=403, detail="Not allowed to delete this submission")
+
+        task_instance_id = submission.get("task_instance_id")
+        result = await self.submissions.delete_one({"id": submission_id})
+        if result.deleted_count == 0 and ObjectId.is_valid(submission_id):
+            result = await self.submissions.delete_one({"_id": ObjectId(submission_id)})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Form submission not found")
+
+        if task_instance_id:
+            await self.db.task_instances.update_one(
+                {"id": task_instance_id},
+                {
+                    "$set": {
+                        "status": "planned",
+                        "completed_at": None,
+                        "completed_by_id": None,
+                        "completed_by_name": None,
+                        "completion_notes": None,
+                    }
+                },
+            )
+        return {"message": "Form submission deleted successfully"}
+
+    async def add_template_document(
+        self,
+        template_id: str,
+        *,
+        filename: str,
+        file_data: bytes,
+        content_type: str,
+        ext: str,
+        description: Optional[str],
+        uploaded_by: str,
+    ) -> dict:
+        from services.storage_service import put_object_async
+
+        doc_id = str(uuid.uuid4())
+        storage_path = f"forms/{template_id}/documents/{doc_id}.{ext}"
+        result = await put_object_async(storage_path, file_data, content_type)
+        doc_url = result.get("path", storage_path)
+        doc_metadata = {
+            "id": doc_id,
+            "name": filename,
+            "url": doc_url,
+            "storage_path": storage_path,
+            "type": ext,
+            "content_type": content_type,
+            "size_bytes": len(file_data),
+            "description": description or "",
+            "uploaded_by": uploaded_by,
+            "uploaded_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await self.templates.update_one(
+            {"_id": ObjectId(template_id)},
+            {"$push": {"documents": doc_metadata}},
+        )
+        return {"message": "Document uploaded successfully", "document": doc_metadata}
+
+    async def remove_template_document(self, template_id: str, document_id: str) -> dict:
+        from fastapi import HTTPException
+
+        result = await self.templates.update_one(
+            {"_id": ObjectId(template_id)},
+            {"$pull": {"documents": {"id": document_id}}},
+        )
+        if result.modified_count == 0:
+            raise HTTPException(status_code=404, detail="Document not found")
+        return {"message": "Document deleted successfully"}
+

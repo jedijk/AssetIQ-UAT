@@ -22,6 +22,7 @@ WAVE1_COLLECTIONS = frozenset({
     "equipment_nodes",
     "threats",
     "users",
+    "observations",
 })
 
 # Wave 2 — work execution and maintenance program collections.
@@ -48,8 +49,65 @@ WAVE3_COLLECTIONS = frozenset({
     "pm_import_sessions",
 })
 
+# Wave 4 — platform telemetry, chat, templates, production logs.
+WAVE4_COLLECTIONS = frozenset({
+    "chat_messages",
+    "user_events",
+    "task_templates",
+    "task_plans",
+    "equipment_failure_modes",
+    "disciplines",
+    "production_logs",
+    "log_ingestion_jobs",
+})
+
+# Wave 5 — preferences, graph impacts, granulometry, production read models.
+WAVE5_COLLECTIONS = frozenset({
+    "user_preferences",
+    "reliability_impacts",
+    "granulometry_records",
+})
+
+# Wave 6 — AI insight caches and domain event outbox (Wave 11 tenant hardening).
+WAVE6_COLLECTIONS = frozenset({
+    "ai_risk_insights",
+    "ai_causal_analysis",
+    "ai_fault_trees",
+    "ai_bow_ties",
+    "ai_action_optimization",
+    "ai_fm_suggestion_cache",
+    "domain_event_outbox",
+})
+
+# Wave 7 — AI extraction learning, scheduler telemetry (Wave 12 tenant hardening).
+WAVE7_COLLECTIONS = frozenset({
+    "ai_extraction_corrections",
+    "maintenance_history",
+    "technician_capacity",
+    "custom_equipment_types",
+})
+
+# Wave 8 — equipment attachments (Wave 16 tenant hardening).
+WAVE8_COLLECTIONS = frozenset({
+    "equipment_files",
+})
+
+# Wave 9 — unstructured import staging (Wave 18 tenant hardening).
+WAVE9_COLLECTIONS = frozenset({
+    "unstructured_items",
+})
+
 WAVE_COLLECTIONS = (
-    PILOT_COLLECTIONS | WAVE1_COLLECTIONS | WAVE2_COLLECTIONS | WAVE3_COLLECTIONS
+    PILOT_COLLECTIONS
+    | WAVE1_COLLECTIONS
+    | WAVE2_COLLECTIONS
+    | WAVE3_COLLECTIONS
+    | WAVE4_COLLECTIONS
+    | WAVE5_COLLECTIONS
+    | WAVE6_COLLECTIONS
+    | WAVE7_COLLECTIONS
+    | WAVE8_COLLECTIONS
+    | WAVE9_COLLECTIONS
 )
 
 DEFAULT_TENANT_FIELD = "tenant_id"

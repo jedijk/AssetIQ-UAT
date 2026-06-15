@@ -5,12 +5,7 @@
  * These components fetch media using Authorization headers and convert to blob URLs.
  */
 import { useState, useEffect } from "react";
-
-const getBackendUrl = () => {
-  const backendUrl = process.env.REACT_APP_BACKEND_URL;
-  if (!backendUrl) return "";
-  return backendUrl.endsWith("/") ? backendUrl.slice(0, -1) : backendUrl;
-};
+import { fetchAuthenticatedBlob } from "../lib/mediaClient";
 
 /**
  * Custom hook to fetch authenticated media as blob URL
@@ -34,25 +29,7 @@ export const useAuthenticatedMedia = (url) => {
       setError(null);
 
       try {
-        const token = localStorage.getItem("token");
-        
-        // Build full URL if needed
-        let fullUrl = url;
-        if (url.startsWith("/api/")) {
-          fullUrl = `${getBackendUrl()}${url}`;
-        }
-
-        const response = await fetch(fullUrl, {
-          headers: {
-            "Authorization": token ? `Bearer ${token}` : "",
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const blob = await response.blob();
+        const blob = await fetchAuthenticatedBlob(url);
         objectUrl = URL.createObjectURL(blob);
 
         if (isMounted) {
@@ -60,9 +37,12 @@ export const useAuthenticatedMedia = (url) => {
           setIsLoading(false);
         }
       } catch (err) {
-        console.error("Failed to fetch authenticated media:", err);
+        const status = err?.response?.status;
+        if (status !== 404) {
+          console.error("Failed to fetch authenticated media:", err);
+        }
         if (isMounted) {
-          setError(err.message);
+          setError(status === 404 ? null : err.message);
           setIsLoading(false);
         }
       }

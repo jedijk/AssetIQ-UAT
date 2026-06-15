@@ -12,7 +12,7 @@ if _frontend_env.exists():
             key, val = line.split('=', 1)
             os.environ.setdefault(key.strip(), val.strip())
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://flicker-solver.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://reliability-graph-1.preview.emergentagent.com').rstrip('/')
 
 
 class TestEquipmentHierarchyLibrary:
@@ -41,11 +41,11 @@ class TestEquipmentHierarchyLibrary:
         data = response.json()
         assert "disciplines" in data
         disciplines = data["disciplines"]
-        assert "mechanical" in disciplines
-        assert "electrical" in disciplines
-        assert "instrumentation" in disciplines
-        assert "process" in disciplines
-        assert len(disciplines) == 4
+        assert isinstance(disciplines, list)
+        assert len(disciplines) > 0
+        normalized = {d.lower() for d in disciplines}
+        expected = {"rotating", "electrical", "instrumentation", "static", "piping"}
+        assert expected.issubset(normalized), f"Missing ISO disciplines in {disciplines}"
         
     def test_get_criticality_profiles(self, api_client):
         """Get all criticality profiles"""

@@ -526,6 +526,7 @@ export default function EquipmentManagerPage() {
   const fileInputRef = useRef(null);
   const searchInputRef = useRef(null);
   const [selectedNode, setSelectedNode] = useState(null);
+  const [focusSection, setFocusSection] = useState(null);
   
   // Check if user is owner (can create installations)
   const isOwner = user?.role === 'owner';
@@ -630,6 +631,10 @@ export default function EquipmentManagerPage() {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const editId = params.get('edit');
+    const section = params.get('section');
+    if (section) {
+      setFocusSection(section);
+    }
     if (editId && nodes.length > 0) {
       // Find the node to edit
       const nodeToEdit = nodes.find(n => n.id === editId);
@@ -1351,6 +1356,8 @@ export default function EquipmentManagerPage() {
           criticalityProfiles={criticalityProfiles} 
           disciplines={disciplines} 
           allNodes={nodes || []}
+          focusSection={focusSection}
+          onFocusSectionHandled={() => setFocusSection(null)}
           onUpdate={(id, data) => updateMutation.mutate({ nodeId: id, data })} 
           onAssignCriticality={(id, a) => criticalityMutation.mutate({ nodeId: id, assignment: a })} 
           onAssignDiscipline={(id, d) => disciplineMutation.mutate({ nodeId: id, discipline: d })}

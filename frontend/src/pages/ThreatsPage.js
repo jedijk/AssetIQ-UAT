@@ -47,6 +47,7 @@ import {
   ChevronRight,
   ArrowUpDown,
   RefreshCw,
+  ClipboardCheck,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -201,6 +202,7 @@ const ThreatsPage = () => {
   // Permission checks
   const canWrite = hasPermission("observations", "write");
   const canDelete = hasPermission("observations", "delete");
+  const canOpenSupervisor = hasPermission("supervisor_command_center", "read");
 
   // Toggle status in multi-select
   const toggleStatus = (status) => {
@@ -528,6 +530,20 @@ const ThreatsPage = () => {
             >
               <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
             </Button>
+            {canOpenSupervisor && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                onClick={() => navigate("/supervisor")}
+                aria-label="Supervisor Command Center"
+                title="Supervisor Command Center"
+                data-testid="observations-supervisor-button"
+              >
+                <ClipboardCheck className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         </div>
         

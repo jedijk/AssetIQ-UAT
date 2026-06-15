@@ -38,7 +38,23 @@ def test_pilot_collections_include_projections():
 
 
 def test_wave1_collections():
-    assert WAVE1_COLLECTIONS == frozenset({"equipment_nodes", "threats", "users"})
+    assert WAVE1_COLLECTIONS == frozenset({
+        "equipment_nodes", "threats", "users", "observations",
+    })
+
+
+def test_wave4_collections():
+    from services.tenant_schema import WAVE4_COLLECTIONS
+
+    assert "chat_messages" in WAVE4_COLLECTIONS
+    assert "production_logs" in WAVE4_COLLECTIONS
+
+
+def test_wave5_collections():
+    from services.tenant_schema import WAVE5_COLLECTIONS
+
+    assert "granulometry_records" in WAVE5_COLLECTIONS
+    assert "reliability_impacts" in WAVE5_COLLECTIONS
 
 
 def test_wave2_collections():

@@ -1,359 +1,58 @@
 """
-RIL Dashboard API
-Dashboard statistics and KPIs for Reliability Intelligence Layer.
-
-Executive Dashboard KPIs:
-- Reliability Score
-- Risk Exposure
-- Predicted Failures
-- Cost Avoided
-- MTBF
-- MTTR
-- Availability
-- Backlog Health
-
-Intelligence Dashboard:
-- Correlation Insights
-- Emerging Risks
-- Fleet Intelligence
-- Failure Predictions
-- AI Recommendations
+RIL Dashboard API — orchestration only (Wave 8 convergence).
 """
+from datetime import datetime
 
 from fastapi import APIRouter, Depends
-from datetime import datetime, timedelta
-from auth import get_current_user
-from routes.ril._auth import _ril_read, _ril_write
-from services.ril_service import RILService
+
+from routes.ril._auth import _ril_read
 
 router = APIRouter(prefix="/dashboard", tags=["RIL Dashboard"])
 
 
-def get_ril_service():
-    """Get RIL service instance"""
-    from database import db
-    return RILService(db)
-
-
 @router.get("/stats", response_model=dict)
-async def get_dashboard_stats(
-    current_user: dict = Depends(_ril_read)
-):
-    """
-    Get main RIL dashboard statistics.
-    
-    Returns:
-    - Open cases by priority
-    - Observations this week
-    - Alerts this week
-    - Active correlations
-    - Pending recommendations
-    - Cases resolved this month
-    """
-    service = get_ril_service()
+async def get_dashboard_stats(current_user: dict = Depends(_ril_read)):
+    """Get main RIL dashboard statistics."""
+    from services import ril_dashboard_service
+
     owner_id = current_user.get("owner_id") or current_user.get("id")
-    
-    stats = await service.get_dashboard_stats(owner_id)
-    
-    return {
-        "success": True,
-        "stats": stats,
-        "generated_at": datetime.utcnow().isoformat()
-    }
+    return await ril_dashboard_service.get_dashboard_stats(current_user, owner_id)
 
 
 @router.get("/executive", response_model=dict)
-async def get_executive_dashboard(
-    current_user: dict = Depends(_ril_read)
-):
-    """
-    Get executive-level KPIs.
-    
-    Returns:
-    - Reliability Score (0-100)
-    - Risk Exposure (count of high-risk equipment)
-    - Predicted Failures (count)
-    - Cases by Status
-    - Trend indicators
-    """
-    from database import db
-    from services.executive_reliability_kpis import compute_executive_reliability_kpis
-    from services.reliability_graph_query import count_active_reliability_edges
+async def get_executive_dashboard(current_user: dict = Depends(_ril_read)):
+    """Get executive-level KPIs with evidence-backed calculations."""
+    from services import ril_dashboard_service
 
     owner_id = current_user.get("owner_id") or current_user.get("id")
-    service = get_ril_service()
-    
-    stats = await service.get_dashboard_stats(owner_id)
-    reliability_kpis = await compute_executive_reliability_kpis(owner_id, user=current_user)
-    
-    # Calculate reliability score
-    # Based on ratio of resolved cases, low alert volume, few predictions at risk
-    base_score = 85
-    
-    # Deduct for open P1/P2 cases
-    case_penalty = (stats.get("p1_cases", 0) * 5) + (stats.get("p2_cases", 0) * 2)
-    
-    # Deduct for high alert volume
-    alert_penalty = min(stats.get("alerts_7d", 0) * 0.5, 10)
-    
-    reliability_score = max(0, min(100, base_score - case_penalty - alert_penalty))
-    
-    # Count equipment at risk (from predictions)
-    at_risk_count = await db.ril_predictions.count_documents({
-        "owner_id": owner_id,
-        "overall_health_score": {"$lt": 70}
-    })
+    payload = await ril_dashboard_service.get_executive_dashboard(current_user, owner_id)
+    return payload
 
-    open_threats = reliability_kpis.get("open_threats", 0)
 
-    equipment_levels = ["equipment_unit", "equipment", "subunit", "maintainable_item", "unit"]
-    total_equipment = await db.equipment_nodes.count_documents({"level": {"$in": equipment_levels}})
-    strategy_equipment_types = [
-        et for et in await db.equipment_type_strategies.distinct("equipment_type_id") if et
-    ]
-    if strategy_equipment_types:
-        equipment_with_strategy = await db.equipment_nodes.count_documents({
-            "level": {"$in": equipment_levels},
-            "equipment_type_id": {"$in": strategy_equipment_types},
-        })
-    else:
-        equipment_with_strategy = 0
-    strategy_coverage_pct = round(
-        equipment_with_strategy / max(total_equipment, 1) * 100, 1
-    )
+@router.get("/supervisor", response_model=dict)
+async def get_supervisor_dashboard(current_user: dict = Depends(_ril_read)):
+    """Supervisor Command Center — operational queue composed from existing services."""
+    from services.supervisor_dashboard_service import get_supervisor_dashboard as build_supervisor
 
-    reliability_edges_total = await count_active_reliability_edges(current_user)
-    
-    # Get cases by status
-    cases_by_status = {}
-    for status in ["open", "in_progress", "under_investigation", "resolved", "closed"]:
-        count = await db.ril_cases.count_documents({
-            "owner_id": owner_id,
-            "status": status
-        })
-        cases_by_status[status] = count
-    
-    # Calculate trends (compare to previous week)
-    two_weeks_ago = datetime.utcnow() - timedelta(days=14)
-    seven_days_ago = datetime.utcnow() - timedelta(days=7)
-    
-    # Observations trend
-    obs_previous = await db.ril_observations.count_documents({
-        "owner_id": owner_id,
-        "created_at": {"$gte": two_weeks_ago, "$lt": seven_days_ago}
-    })
-    obs_current = stats.get("observations_7d", 0)
-    obs_trend = "up" if obs_current > obs_previous else ("down" if obs_current < obs_previous else "stable")
-    
-    # Alerts trend
-    alerts_previous = await db.ril_alerts.count_documents({
-        "owner_id": owner_id,
-        "alert_time": {"$gte": two_weeks_ago, "$lt": seven_days_ago}
-    })
-    alerts_current = stats.get("alerts_7d", 0)
-    alerts_trend = "up" if alerts_current > alerts_previous else ("down" if alerts_current < alerts_previous else "stable")
-    
-    overdue_pm = reliability_kpis.get("overdue_pm", {})
-    mtbf_proxy = reliability_kpis.get("mtbf_proxy", {})
-    high_risk_threats = reliability_kpis.get("high_risk_threats", 0)
-    p1_cases = stats.get("p1_cases", 0)
-    p2_cases = stats.get("p2_cases", 0)
-
-    return {
-        "reliability_score": round(reliability_score, 1),
-        "risk_exposure": at_risk_count,
-        "predicted_failures": at_risk_count,  # Equipment with low health score
-        "open_threats": open_threats,
-        "high_risk_threats": high_risk_threats,
-        "overdue_pm": overdue_pm,
-        "mtbf_proxy": mtbf_proxy,
-        "strategy_coverage_pct": strategy_coverage_pct,
-        "reliability_edges_total": reliability_edges_total,
-        "open_cases": stats.get("open_cases", 0),
-        "p1_cases": p1_cases,
-        "p2_cases": p2_cases,
-        "cases_by_status": cases_by_status,
-        "cases_resolved_30d": stats.get("cases_resolved_30d", 0),
-        "trends": {
-            "observations": {"current": obs_current, "previous": obs_previous, "direction": obs_trend},
-            "alerts": {"current": alerts_current, "previous": alerts_previous, "direction": alerts_trend}
-        },
-        "calculations": {
-            "reliability_score": (
-                f"Base score 85 minus penalties: P1 cases ({p1_cases}) × 5 + P2 cases ({p2_cases}) × 2 "
-                f"+ alerts in last 7 days ({stats.get('alerts_7d', 0)}) × 0.5 (max 10) "
-                f"= {round(reliability_score, 1)}"
-            ),
-            "open_cases": "Count of RIL cases with status open, in progress, or under investigation.",
-            "risk_exposure": (
-                f"Equipment with predicted health score below 70 = {at_risk_count}"
-            ),
-            "open_threats": f"Active open observations/threats in reliability layer = {open_threats}",
-            "overdue_pm": (
-                f"Overdue scheduled PM tasks ({overdue_pm.get('scheduled_tasks', 0)}) "
-                f"+ overdue task instances ({overdue_pm.get('task_instances', 0)}) "
-                f"= {overdue_pm.get('total', 0)}"
-            ),
-            "mtbf_proxy": (
-                f"Mean days between failures across {mtbf_proxy.get('sample_equipment_count', 0)} assets "
-                f"in a {mtbf_proxy.get('window_days', 90)}-day window"
-                if mtbf_proxy.get("fleet_mean_days") is not None
-                else "Insufficient failure history for fleet MTBF proxy."
-            ),
-            "high_risk_threats": (
-                f"Open threats with critical or high risk level = {high_risk_threats}"
-            ),
-            "strategy_coverage_pct": (
-                f"Equipment whose type has a maintenance strategy ÷ total equipment "
-                f"= {equipment_with_strategy} ÷ {total_equipment} × 100 = {strategy_coverage_pct}%"
-            ),
-            "predicted_failures": (
-                f"Equipment with predicted health score below 70 = {at_risk_count}"
-            ),
-            "reliability_edges_total": (
-                f"Active tenant-scoped reliability graph edges = {reliability_edges_total}"
-            ),
-        },
-        "generated_at": datetime.utcnow().isoformat()
-    }
+    return await build_supervisor(current_user)
 
 
 @router.get("/intelligence", response_model=dict)
-async def get_intelligence_dashboard(
-    current_user: dict = Depends(_ril_read)
-):
-    """
-    Get intelligence dashboard data.
-    
-    Returns:
-    - Recent correlations
-    - Emerging risks
-    - Fleet insights
-    - Pending recommendations
-    """
-    from database import db
+async def get_intelligence_dashboard(current_user: dict = Depends(_ril_read)):
+    """Get intelligence dashboard data."""
+    from services import ril_dashboard_service
+
     owner_id = current_user.get("owner_id") or current_user.get("id")
-    
-    # Recent correlations
-    correlations = []
-    async for doc in db.ril_correlations.find(
-        {"owner_id": owner_id, "is_active": True}
-    ).sort("created_at", -1).limit(5):
-        doc.pop('_id', None)  # Remove MongoDB ObjectId
-        correlations.append(doc)
-    
-    # Emerging risks (recent high-severity observations)
-    seven_days_ago = datetime.utcnow() - timedelta(days=7)
-    emerging_risks = []
-    async for doc in db.ril_observations.find({
-        "owner_id": owner_id,
-        "severity": {"$in": ["critical", "high"]},
-        "created_at": {"$gte": seven_days_ago}
-    }).sort("risk_score", -1).limit(5):
-        doc.pop('_id', None)  # Remove MongoDB ObjectId
-        emerging_risks.append(doc)
-    
-    # Fleet insights (equipment type statistics)
-    pipeline = [
-        {"$match": {"owner_id": owner_id}},
-        {"$group": {
-            "_id": "$equipment_type_id",
-            "count": {"$sum": 1},
-            "avg_health": {"$avg": "$overall_health_score"}
-        }},
-        {"$sort": {"avg_health": 1}},
-        {"$limit": 5}
-    ]
-    fleet_insights = []
-    async for doc in db.ril_predictions.aggregate(pipeline):
-        fleet_insights.append(doc)
-    
-    # Pending recommendations
-    recommendations = []
-    async for doc in db.ril_recommendations.find({
-        "owner_id": owner_id,
-        "status": "pending"
-    }).sort("created_at", -1).limit(5):
-        doc.pop('_id', None)  # Remove MongoDB ObjectId
-        recommendations.append(doc)
-    
-    return {
-        "correlations": correlations,
-        "emerging_risks": emerging_risks,
-        "fleet_insights": fleet_insights,
-        "recommendations": recommendations,
-        "generated_at": datetime.utcnow().isoformat()
-    }
+    return await ril_dashboard_service.get_intelligence_dashboard(current_user, owner_id)
 
 
 @router.get("/data-quality", response_model=dict)
-async def get_data_quality_dashboard(
-    current_user: dict = Depends(_ril_read)
-):
-    """
-    Get data quality statistics.
-    
-    Returns:
-    - Source coverage
-    - Data freshness
-    - Missing data indicators
-    - Confidence levels
-    """
-    from database import db
+async def get_data_quality_dashboard(current_user: dict = Depends(_ril_read)):
+    """Get data quality statistics."""
+    from services import ril_dashboard_service
+
     owner_id = current_user.get("owner_id") or current_user.get("id")
-    
-    # Count by source
-    pipeline = [
-        {"$match": {"owner_id": owner_id}},
-        {"$group": {
-            "_id": "$source",
-            "count": {"$sum": 1},
-            "avg_confidence": {"$avg": "$confidence"}
-        }}
-    ]
-    sources = []
-    async for doc in db.ril_observations.aggregate(pipeline):
-        sources.append({
-            "source": doc["_id"],
-            "count": doc["count"],
-            "avg_confidence": round(doc.get("avg_confidence", 0), 2)
-        })
-    
-    # Data freshness (last observation/reading times)
-    last_observation = await db.ril_observations.find_one(
-        {"owner_id": owner_id},
-        sort=[("created_at", -1)]
-    )
-    last_reading = await db.ril_readings.find_one(
-        {"owner_id": owner_id},
-        sort=[("received_at", -1)]
-    )
-    last_alert = await db.ril_alerts.find_one(
-        {"owner_id": owner_id},
-        sort=[("received_at", -1)]
-    )
-    
-    # Equipment coverage
-    total_equipment = await db.equipment_nodes.count_documents({"owner_id": owner_id})
-    equipment_with_observations = await db.ril_observations.distinct(
-        "equipment_id",
-        {"owner_id": owner_id, "equipment_id": {"$ne": None}}
-    )
-    
-    return {
-        "source_coverage": sources,
-        "data_freshness": {
-            "last_observation": last_observation.get("created_at") if last_observation else None,
-            "last_reading": last_reading.get("received_at") if last_reading else None,
-            "last_alert": last_alert.get("received_at") if last_alert else None
-        },
-        "equipment_coverage": {
-            "total": total_equipment,
-            "with_observations": len(equipment_with_observations),
-            "coverage_pct": round(len(equipment_with_observations) / max(total_equipment, 1) * 100, 1)
-        },
-        "generated_at": datetime.utcnow().isoformat()
-    }
+    return await ril_dashboard_service.get_data_quality_dashboard(current_user, owner_id)
 
 
 @router.get("/equipment/{equipment_id}/reliability-edges")
@@ -363,13 +62,32 @@ async def get_equipment_reliability_edges(
     current_user: dict = Depends(_ril_read),
 ):
     """Traversable reliability graph edges for an equipment item."""
-    from services.tenant_schema import tenant_id_from_user
     from services.reliability_graph import get_edges_for_equipment
+    from services.tenant_schema import tenant_id_from_user
 
     edges = await get_edges_for_equipment(
         equipment_id, limit=limit, tenant_id=tenant_id_from_user(current_user)
     )
     return {"equipment_id": equipment_id, "edges": edges, "total": len(edges)}
+
+
+@router.get("/equipment/{equipment_id}/reliability-profile")
+async def get_equipment_reliability_profile(
+    equipment_id: str,
+    refresh: bool = False,
+    current_user: dict = Depends(_ril_read),
+):
+    """Composed asset reliability profile — single source of truth for one equipment item."""
+    from services.equipment_reliability_profile_service import build_equipment_reliability_profile
+    from services.ril_service_factory import ril_owner_id
+
+    profile = await build_equipment_reliability_profile(
+        equipment_id,
+        ril_owner_id(current_user),
+        user=current_user,
+        refresh_context=refresh,
+    )
+    return {"success": True, "profile": profile}
 
 
 @router.get("/equipment/{equipment_id}/reliability-chain")
@@ -380,6 +98,7 @@ async def get_equipment_reliability_chain(
     current_user: dict = Depends(_ril_read),
 ):
     """Graph-backed reliability chain paths for an equipment item."""
+    from services.graph_node_label_service import enrich_edges_with_labels
     from services.reliability_graph_query import GraphTraversalService
 
     traversal = GraphTraversalService()
@@ -387,17 +106,98 @@ async def get_equipment_reliability_chain(
         equipment_id, depth=depth, user=current_user, edge_limit=limit
     )
     risk = await traversal.explain_risk(equipment_id, user=current_user)
+    edges, node_labels = await enrich_edges_with_labels(
+        chain.get("edges") or [],
+        user=current_user,
+        extra_refs=[("equipment", equipment_id)],
+    )
+    for threat in risk.get("open_threats") or []:
+        tid = threat.get("id")
+        title = threat.get("title")
+        if tid and title:
+            node_labels[f"threat:{tid}"] = title
+    chain = {**chain, "edges": edges}
     return {
         "equipment_id": equipment_id,
         "chain": chain,
         "risk_explanation": risk,
+        "node_labels": node_labels,
+    }
+
+
+@router.get("/nodes/{node_type}/{node_id}/reliability-trace")
+async def get_node_reliability_trace(
+    node_type: str,
+    node_id: str,
+    depth: int = 8,
+    current_user: dict = Depends(_ril_read),
+):
+    """Upstream/downstream graph evidence for a single node (evidence panels)."""
+    from services.graph_node_label_service import enrich_edges_with_labels
+    from services.reliability_graph_query import GraphTraversalService
+
+    traversal = GraphTraversalService()
+    upstream = await traversal.get_upstream(
+        node_type, node_id, depth=depth, user=current_user
+    )
+    downstream = await traversal.get_downstream(
+        node_type, node_id, depth=depth, user=current_user
+    )
+    edges = upstream.get("edges", []) + downstream.get("edges", [])
+    seen: set[str] = set()
+    merged: list = []
+    for edge in edges:
+        eid = edge.get("id")
+        if eid and eid in seen:
+            continue
+        if eid:
+            seen.add(eid)
+        merged.append(edge)
+
+    equipment_id = None
+    for edge in merged:
+        for key, ntype in (
+            (edge.get("source_id"), edge.get("source_type")),
+            (edge.get("target_id"), edge.get("target_type")),
+        ):
+            if ntype == "equipment" and key:
+                equipment_id = key
+                break
+        if equipment_id:
+            break
+
+    risk = None
+    node_labels: dict = {}
+    if equipment_id:
+        risk = await traversal.explain_risk(equipment_id, user=current_user)
+
+    merged, node_labels = await enrich_edges_with_labels(
+        merged,
+        user=current_user,
+        extra_refs=[(node_type, node_id)] + ([("equipment", equipment_id)] if equipment_id else []),
+    )
+    if risk:
+        for threat in risk.get("open_threats") or []:
+            tid = threat.get("id")
+            title = threat.get("title")
+            if tid and title:
+                node_labels[f"threat:{tid}"] = title
+
+    return {
+        "node_type": node_type,
+        "node_id": node_id,
+        "equipment_id": equipment_id,
+        "upstream": upstream,
+        "downstream": downstream,
+        "edges": merged,
+        "edge_count": len(merged),
+        "risk_explanation": risk,
+        "node_labels": node_labels,
     }
 
 
 @router.get("/reliability-graph/ontology")
-async def get_reliability_graph_ontology(
-    current_user: dict = Depends(_ril_read),
-):
+async def get_reliability_graph_ontology(current_user: dict = Depends(_ril_read)):
     """Reliability knowledge graph ontology schema and live edge counts."""
     from services.reliability_ontology import get_reliability_ontology_payload
 

@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from auth import get_current_user, require_permission
 from database import db
 from services.storage_service import put_object_async, get_object_async, MIME_TYPES
+from services.tenant_schema import with_tenant_id, merge_tenant_filter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Granulometry"])
@@ -334,6 +335,7 @@ async def create_granulometry_record(
         "created_by": current_user.get("id"),
         "created_by_name": current_user.get("name", "Unknown"),
     }
+    with_tenant_id(doc, current_user)
     await db.granulometry_records.insert_one(doc)
     return _serialize_record(doc)
 
@@ -366,6 +368,7 @@ async def list_granulometry_records(
             dt_q["$lte"] = end.replace(hour=23, minute=59, second=59)
         query["sample_date_dt"] = dt_q
 
+    query = merge_tenant_filter(query, current_user)
     cursor = db.granulometry_records.find(query, {"_id": 0}).sort("sample_date_dt", -1).skip(skip).limit(limit)
     items = [ _serialize_record(doc) async for doc in cursor ]
     total = await db.granulometry_records.count_documents(query)
@@ -377,7 +380,10 @@ async def get_granulometry_record(
     record_id: str,
     current_user: dict = Depends(_library_read),
 ):
-    doc = await db.granulometry_records.find_one({"id": record_id}, {"_id": 0})
+    doc = await db.granulometry_records.find_one(
+        merge_tenant_filter({"id": record_id}, current_user),
+        {"_id": 0},
+    )
     if not doc:
         raise HTTPException(status_code=404, detail="Record not found")
     return _serialize_record(doc)
@@ -389,7 +395,10 @@ async def update_granulometry_record(
     data: GranulometryUpdate,
     current_user: dict = Depends(require_permission("library:write")),
 ):
-    existing = await db.granulometry_records.find_one({"id": record_id}, {"_id": 0})
+    existing = await db.granulometry_records.find_one(
+        merge_tenant_filter({"id": record_id}, current_user),
+        {"_id": 0},
+    )
     if not existing:
         raise HTTPException(status_code=404, detail="Record not found")
 
@@ -409,8 +418,14 @@ async def update_granulometry_record(
     if data.imageUrl is not None:
         set_ops["image_url"] = (data.imageUrl or "").strip()
 
-    await db.granulometry_records.update_one({"id": record_id}, {"$set": set_ops})
-    doc = await db.granulometry_records.find_one({"id": record_id}, {"_id": 0})
+    await db.granulometry_records.update_one(
+        merge_tenant_filter({"id": record_id}, current_user),
+        {"$set": set_ops},
+    )
+    doc = await db.granulometry_records.find_one(
+        merge_tenant_filter({"id": record_id}, current_user),
+        {"_id": 0},
+    )
     return _serialize_record(doc)
 
 
@@ -419,7 +434,9 @@ async def delete_granulometry_record(
     record_id: str,
     current_user: dict = Depends(require_permission("library:write")),
 ):
-    res = await db.granulometry_records.delete_one({"id": record_id})
+    res = await db.granulometry_records.delete_one(
+        merge_tenant_filter({"id": record_id}, current_user)
+    )
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Record not found")
     return {"status": "deleted", "id": record_id}
@@ -443,8 +460,9 @@ async def list_big_bags(
         query["sample_date_dt"] = dt_q
 
     # Distinct isn't supported via proxy in some environments; do aggregation.
+    match_stage = merge_tenant_filter(query, current_user)
     pipeline = [
-        {"$match": query} if query else {"$match": {}},
+        {"$match": match_stage},
         {"$group": {"_id": "$big_bag_no"}},
         {"$project": {"_id": 0, "bigBagNo": "$_id"}},
         {"$sort": {"bigBagNo": 1}},

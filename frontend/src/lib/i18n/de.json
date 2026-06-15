@@ -231,6 +231,10 @@
         "name": "Betriebs-Dashboard",
         "description": "Dashboard-Tab für operativen Risikoüberblick"
       },
+      "supervisor_command_center": {
+        "name": "Supervisor Command Center",
+        "description": "Täglicher Schichtstart-Bildschirm mit priorisierter operativer Warteschlange und Drill-down-Links"
+      },
       "dashboard_production": {
         "name": "Produktions-Dashboard",
         "description": "Dashboard-Tab für Produktionskennzahlen und Monitoring"

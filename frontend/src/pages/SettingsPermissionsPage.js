@@ -40,6 +40,7 @@ import {
   Activity,
   Gauge,
   TrendingUp,
+  Monitor,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
@@ -122,6 +123,7 @@ const ROLE_CONFIG = {
 // Feature icons
 const FEATURE_ICONS = {
   dashboard_operational: Activity,
+  supervisor_command_center: Monitor,
   dashboard_production: Gauge,
   dashboard_executive: TrendingUp,
   dashboard_builder: LayoutDashboard,

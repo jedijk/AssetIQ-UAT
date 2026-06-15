@@ -26,8 +26,10 @@ import {
   Shield,
   ShieldOff,
   AlertTriangle,
-  AlertOctagon,
+  ShieldCheck,
+  CircleCheck,
   CheckCircle2,
+  ClipboardCheck,
   Activity,
   Sparkles,
   ChevronRight,
@@ -99,6 +101,8 @@ const KPICard = ({ title, kpi, icon: Icon, colorClass, onClick, isMobile }) => {
     : colorClass.includes("orange") ? "text-orange-600"
     : colorClass.includes("amber") ? "text-amber-600"
     : colorClass.includes("blue") ? "text-blue-600"
+    : colorClass.includes("teal") ? "text-teal-600"
+    : colorClass.includes("indigo") ? "text-indigo-600"
     : "text-slate-600";
 
   const cardBody = (
@@ -144,6 +148,10 @@ const KPICard = ({ title, kpi, icon: Icon, colorClass, onClick, isMobile }) => {
                 ? `${kpi.evidence_count} active maintenance program${kpi.evidence_count === 1 ? "" : "s"}`
                 : title === "Uncovered Exposure"
                   ? `${kpi.evidence_count} equipment item${kpi.evidence_count === 1 ? "" : "s"}`
+                  : title === "Assessment Coverage"
+                    ? `${kpi.evidence_count} unassessed item${kpi.evidence_count === 1 ? "" : "s"}`
+                    : title === "Active Exposure" || title === "Controlled Exposure" || title === "Resolved Exposure"
+                      ? `${kpi.evidence_count} observation${kpi.evidence_count === 1 ? "" : "s"}`
                   : `${kpi.evidence_count} evidence items`}
           </span>
           {onClick && <ChevronRight className="w-3 h-3" />}
@@ -349,10 +357,12 @@ const WaterfallChart = ({ data, currencySymbol, isMobile }) => {
 const OBSERVATION_EVIDENCE_TYPES = new Set([
   "active_threat_exposure",
   "critical_active_exposure",
+  "resolved_exposure",
 ]);
 
 const EQUIPMENT_EVIDENCE_TYPES = new Set([
   "uncovered_exposure",
+  "unassessed_assessments",
 ]);
 
 const formatEvidenceDate = (dateStr) => {
@@ -437,20 +447,31 @@ const ObservationEvidenceList = ({ evidence, onNavigate }) => (
 
 const formatCriticalityLabel = (criticality) => {
   if (!criticality) return null;
-  const normalized = String(criticality).replace(/_/g, " ");
+  let raw = criticality;
+  if (typeof criticality === "object") {
+    raw = criticality.level || criticality.profile_id || criticality.name || null;
+  }
+  if (raw == null || raw === "") return null;
+  const normalized = String(raw).replace(/_/g, " ");
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 };
 
-const EquipmentEvidenceList = ({ evidence, onNavigate }) => (
+const buildEquipmentAssessUrl = (equipmentId) =>
+  `/equipment-manager?edit=${equipmentId}&section=criticality`;
+
+const EquipmentEvidenceList = ({ evidence, onNavigate, assessMode = false }) => (
   <div className="mt-2 divide-y divide-slate-200 rounded-lg border border-slate-200 overflow-hidden">
     <div className="hidden sm:grid sm:grid-cols-[minmax(0,1fr)_7rem_6rem] gap-3 bg-slate-100 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
       <span>Equipment</span>
       <span>Status</span>
-      <span className="text-right">Impact</span>
+      <span className="text-right">{assessMode ? "Action" : "Impact"}</span>
     </div>
     {evidence.map((item, index) => {
       const label = item.asset || "Unnamed equipment";
       const criticalityLabel = formatCriticalityLabel(item.criticality);
+      const hoverClass = assessMode
+        ? "hover:bg-teal-50/70 active:bg-teal-50"
+        : "hover:bg-amber-50/70 active:bg-amber-50";
 
       return (
         <motion.button
@@ -461,14 +482,19 @@ const EquipmentEvidenceList = ({ evidence, onNavigate }) => (
           transition={{ delay: index * 0.03 }}
           onClick={() => item.id && onNavigate(item.id)}
           disabled={!item.id}
-          className="w-full text-left bg-white hover:bg-amber-50/70 active:bg-amber-50 transition-colors px-4 py-3 disabled:cursor-default disabled:hover:bg-white"
+          className={`w-full text-left bg-white transition-colors px-4 py-3 disabled:cursor-default disabled:hover:bg-white ${hoverClass}`}
           data-testid={item.id ? `evidence-equipment-${item.id}` : undefined}
         >
           <div className="flex items-start gap-3 sm:grid sm:grid-cols-[minmax(0,1fr)_7rem_6rem] sm:items-center sm:gap-3">
             <div className="min-w-0 flex-1">
               <div className="font-medium text-slate-900 break-words line-clamp-2">{label}</div>
-              {criticalityLabel && (
+              {item.level_label ? (
+                <div className="text-xs text-slate-500 mt-0.5">{item.level_label}</div>
+              ) : criticalityLabel ? (
                 <div className="text-xs text-slate-500 mt-0.5">{criticalityLabel} criticality</div>
+              ) : null}
+              {item.tag && (
+                <div className="text-xs text-slate-400 mt-0.5">{item.tag}</div>
               )}
             </div>
             <div className="shrink-0">
@@ -476,18 +502,40 @@ const EquipmentEvidenceList = ({ evidence, onNavigate }) => (
                 {item.control_status || "Uncovered"}
               </Badge>
             </div>
-            <div className="hidden sm:flex items-center justify-end gap-1 text-sm font-semibold text-slate-900 tabular-nums">
-              <span>{item.exposure_formatted}</span>
-              {item.id && <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />}
+            <div className="hidden sm:flex items-center justify-end gap-1 text-sm font-semibold tabular-nums">
+              {assessMode ? (
+                item.id && (
+                  <span className="inline-flex items-center gap-1 text-teal-700">
+                    Assess
+                    <ChevronRight className="w-4 h-4 shrink-0" />
+                  </span>
+                )
+              ) : (
+                <>
+                  <span className="text-slate-900">{item.exposure_formatted}</span>
+                  {item.id && <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />}
+                </>
+              )}
             </div>
           </div>
           <div className="mt-2 flex items-center justify-between sm:hidden">
-            <span className="text-sm font-semibold text-slate-900 tabular-nums">{item.exposure_formatted}</span>
-            {item.id && (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700">
-                Open
-                <ChevronRight className="w-3.5 h-3.5" />
-              </span>
+            {assessMode ? (
+              item.id && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-teal-700">
+                  Assess
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </span>
+              )
+            ) : (
+              <>
+                <span className="text-sm font-semibold text-slate-900 tabular-nums">{item.exposure_formatted}</span>
+                {item.id && (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700">
+                    Open
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </span>
+                )}
+              </>
             )}
           </div>
         </motion.button>
@@ -512,7 +560,11 @@ const EvidencePanel = ({ isOpen, onClose, title, evidence, evidenceType }) => {
 
   const handleEquipmentNavigate = (equipmentId) => {
     onClose();
-    navigate(`/equipment-manager?edit=${equipmentId}`);
+    navigate(
+      evidenceType === "unassessed_assessments"
+        ? buildEquipmentAssessUrl(equipmentId)
+        : `/equipment-manager?edit=${equipmentId}`
+    );
   };
 
   return (
@@ -530,7 +582,11 @@ const EvidencePanel = ({ isOpen, onClose, title, evidence, evidenceType }) => {
         ) : isObservationEvidence ? (
           <ObservationEvidenceList evidence={evidence} onNavigate={handleObservationNavigate} />
         ) : isEquipmentEvidence ? (
-          <EquipmentEvidenceList evidence={evidence} onNavigate={handleEquipmentNavigate} />
+          <EquipmentEvidenceList
+            evidence={evidence}
+            onNavigate={handleEquipmentNavigate}
+            assessMode={evidenceType === "unassessed_assessments"}
+          />
         ) : (
           <p className="text-center text-slate-500 py-8">No evidence items found</p>
         )}
@@ -617,7 +673,7 @@ export default function ExecutiveDashboard() {
       </div>
 
       {/* KPI Cards Row */}
-      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-8 gap-3 sm:gap-4">
         <KPICard
           title="Exposure Coverage"
           kpi={kpi_cards?.exposure_coverage}
@@ -638,6 +694,22 @@ export default function ExecutiveDashboard() {
           })}
         />
         <KPICard
+          title="Assessment Coverage"
+          kpi={kpi_cards?.assessment_coverage}
+          icon={ClipboardCheck}
+          colorClass="border-l-4 border-l-teal-500"
+          isMobile={isMobile}
+          onClick={
+            (kpi_cards?.assessment_coverage?.evidence_count ?? 0) > 0
+              ? () => setSelectedEvidence({
+                  type: "unassessed_assessments",
+                  title: "Unassessed Equipment",
+                  data: evidence_drill_down?.unassessed_assessments || [],
+                })
+              : undefined
+          }
+        />
+        <KPICard
           title="Active Exposure"
           kpi={kpi_cards?.active_threat_exposure}
           icon={AlertTriangle}
@@ -645,20 +717,32 @@ export default function ExecutiveDashboard() {
           isMobile={isMobile}
           onClick={() => setSelectedEvidence({
             type: "active_threat_exposure",
-            title: "Active Exposure Evidence",
+            title: "Uncontrolled Active Exposure",
             data: evidence_drill_down?.active_threat_exposure || []
           })}
         />
         <KPICard
-          title="High Exposure"
+          title="Controlled Exposure"
           kpi={kpi_cards?.critical_active_exposure}
-          icon={AlertOctagon}
-          colorClass="border-l-4 border-l-red-500"
+          icon={ShieldCheck}
+          colorClass="border-l-4 border-l-green-500"
           isMobile={isMobile}
           onClick={() => setSelectedEvidence({
             type: "critical_active_exposure",
-            title: "High Exposure Evidence",
+            title: "Controlled Exposure Evidence",
             data: evidence_drill_down?.critical_active_exposure || []
+          })}
+        />
+        <KPICard
+          title="Resolved Exposure"
+          kpi={kpi_cards?.resolved_exposure}
+          icon={CircleCheck}
+          colorClass="border-l-4 border-l-indigo-500"
+          isMobile={isMobile}
+          onClick={() => setSelectedEvidence({
+            type: "resolved_exposure",
+            title: "Resolved Exposure Evidence",
+            data: evidence_drill_down?.resolved_exposure || []
           })}
         />
         <KPICard
@@ -688,8 +772,8 @@ export default function ExecutiveDashboard() {
               </HoverCardTrigger>
               <HoverCardContent className="w-80">
                 <p className="text-sm text-slate-600">
-                  Shows the flow from total assessed exposure to actively managed and unmanaged exposure.
-                  Uncovered exposure is assessed production impact for equipment without a maintenance program.
+                  Shows the flow from total assessed exposure to uncontrolled, controlled, and resolved observation exposure.
+                  Resolved exposure is production impact from observations marked Mitigated.
                 </p>
               </HoverCardContent>
             </HoverCard>
@@ -697,7 +781,7 @@ export default function ExecutiveDashboard() {
         </h3>
         {isMobile && (
           <p className="text-xs text-slate-500 mb-3">
-            Flow from total assessed exposure to active and high exposure observations.
+            Flow from total assessed exposure to uncontrolled, controlled, and resolved observation exposure.
           </p>
         )}
         <WaterfallChart data={waterfall_data} currencySymbol={currencySymbol} isMobile={isMobile} />

@@ -46,6 +46,9 @@ import QRScanPage from "./pages/QRScanPage";
 const ObservationWorkspacePage = lazy(() => import("./pages/ObservationWorkspacePage"));
 const ActionDetailPage = lazy(() => import("./pages/ActionDetailPage"));
 const EquipmentManagerPage = lazy(() => import("./pages/EquipmentManagerPage"));
+const EquipmentReliabilityTracePage = lazy(() => import("./pages/EquipmentReliabilityTracePage"));
+const SupervisorCommandCenterPage = lazy(() => import("./pages/SupervisorCommandCenterPage"));
+const EquipmentReliabilityProfilePage = lazy(() => import("./pages/EquipmentReliabilityProfilePage"));
 const CausalEnginePage = lazy(() => import("./pages/CausalEnginePage"));
 const UnderDevelopmentPage = lazy(() => import("./pages/UnderDevelopmentPage"));
 const FeedbackPage = lazy(() => import("./pages/FeedbackPage"));
@@ -458,6 +461,9 @@ function App() {
                 <Route path="actions/:actionId" element={<Suspense fallback={<RouteFallback />}><ActionDetailPage /></Suspense>} />
                 <Route path="library" element={<Suspense fallback={<RouteFallback />}><FailureModesPage /></Suspense>} />
                 <Route path="equipment-manager" element={<Suspense fallback={<RouteFallback />}><EquipmentManagerPage /></Suspense>} />
+                <Route path="equipment/:id/trace" element={<Suspense fallback={<RouteFallback />}><EquipmentReliabilityTracePage /></Suspense>} />
+                <Route path="supervisor" element={<Suspense fallback={<RouteFallback />}><SupervisorCommandCenterPage /></Suspense>} />
+                <Route path="equipment/:id/reliability" element={<Suspense fallback={<RouteFallback />}><EquipmentReliabilityProfilePage /></Suspense>} />
                 <Route path="causal-engine" element={<Suspense fallback={<RouteFallback />}><CausalEnginePage /></Suspense>} />
                 <Route path="tasks" element={<Suspense fallback={<RouteFallback />}><TaskSchedulerPage /></Suspense>} />
                 <Route path="my-tasks" element={<Suspense fallback={<RouteFallback />}><MyTasksPage /></Suspense>} />

@@ -102,7 +102,6 @@ export function MaintenanceScheduleManager({ equipmentType }) {
 
   const equipmentTypeId = equipmentType?.id;
   const equipmentTypeName = equipmentType?.name || t("equipment.allEquipment");
-  const isGlobalView = !equipmentTypeId;
   const schedulerStaleTime = 60_000;
 
   // ============= Queries =============
@@ -126,7 +125,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
       // Fetch a wide window so panning in the Gantt always finds tasks
       const today = new Date();
       const past = new Date(today.getTime() - 30 * 86400000).toISOString().split("T")[0];
-      const future = new Date(today.getTime() + 365 * 86400000).toISOString().split("T")[0];
+      const future = new Date(today.getTime() + 120 * 86400000).toISOString().split("T")[0];
       return maintenanceSchedulerAPI.getTimeline({
         start_date: past,
         end_date: future,
@@ -147,23 +146,16 @@ export function MaintenanceScheduleManager({ equipmentType }) {
   const { data: affectedEquipmentData } = useQuery({
     queryKey: ["maintenance-strategy-v2-affected-equipment", equipmentTypeId],
     queryFn: () => maintenanceStrategyV2API.getAffectedEquipment(equipmentTypeId),
-    enabled: !!equipmentTypeId,
+    enabled: !!equipmentTypeId && applyDialogOpen,
   });
 
-  // For global view: fetch all equipment that could have strategies applied
-  const { data: allAffectedEquipmentData } = useQuery({
-    queryKey: ["maintenance-strategy-v2-all-affected-equipment"],
-    queryFn: () => maintenanceStrategyV2API.getAllAffectedEquipment(),
-    enabled: isGlobalView,
-  });
-
-  // Use appropriate affected equipment based on view
+  // For global view: apply strategy requires a specific equipment type — no bulk fetch on load.
   const effectiveAffectedEquipment = useMemo(() => {
     if (equipmentTypeId) {
       return affectedEquipmentData?.equipment || [];
     }
-    return allAffectedEquipmentData?.equipment || [];
-  }, [equipmentTypeId, affectedEquipmentData, allAffectedEquipmentData]);
+    return [];
+  }, [equipmentTypeId, affectedEquipmentData]);
 
   const { data: techniciansData } = useQuery({
     queryKey: ["maintenance-scheduler-technicians"],
@@ -176,6 +168,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
   const { data: nodesData } = useQuery({
     queryKey: ["equipment-hierarchy-nodes-for-schedule-filter"],
     queryFn: () => equipmentHierarchyAPI.getNodes(),
+    enabled: unitFilterOpen || !!selectedUnitId,
     staleTime: 1000 * 60 * 5,
   });
   const allNodes = useMemo(() => nodesData?.nodes || nodesData || [], [nodesData]);

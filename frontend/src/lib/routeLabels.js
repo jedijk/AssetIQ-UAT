@@ -40,6 +40,7 @@ const staticRouteLabels = {
   '/granulometry': 'Granulometry',
   '/feedback': 'Feedback',
   '/reliability': 'Reliability Intelligence',
+  '/supervisor': 'Supervisor Command Center',
   '/reliability/cases': 'Reliability Cases',
   '/definitions': 'Definitions',
   '/settings': 'Settings',
@@ -74,6 +75,8 @@ const dynamicRoutePatterns = [
   { pattern: /^\/threats\/([^/]+)\/workspace$/, label: 'Observation Workspace', icon: AlertTriangle },
   { pattern: /^\/threats\/([^/]+)$/, label: 'Observation Detail', icon: AlertTriangle },
   { pattern: /^\/actions\/([^/]+)$/, label: 'Action Detail', icon: ClipboardList },
+  { pattern: /^\/equipment\/([^/]+)\/trace$/, label: 'Reliability Trace', icon: GitBranch },
+  { pattern: /^\/equipment\/([^/]+)\/reliability$/, label: 'Reliability Profile', icon: Sparkles },
   { pattern: /^\/reliability\/cases\/([^/]+)$/, label: 'Case Detail', icon: Sparkles },
 ];
 
@@ -93,6 +96,7 @@ const staticRouteIcons = {
   '/granulometry': Sliders,
   '/feedback': FileText,
   '/reliability': Sparkles,
+  '/supervisor': ClipboardCheck,
   '/reliability/cases': Sparkles,
   '/definitions': Sliders,
   '/settings': Settings,

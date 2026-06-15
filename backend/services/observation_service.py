@@ -16,20 +16,46 @@ import logging
 import re
 
 from utils.mongo_regex import escape_regex
+from services.tenant_schema import merge_tenant_filter, with_tenant_id
+from repositories.observation_document_repository import ObservationRepository
+from repositories.threat_repository import ThreatRepository
+from repositories.equipment_repository import EquipmentRepository
 
 logger = logging.getLogger(__name__)
 
 
 class ObservationService:
-    """Service for observation/threat management."""
-    
+    """Service for observation/threat management — Wave 4 repository-backed."""
+
     def __init__(self, db: AsyncIOMotorDatabase):
         self.db = db
-        self.observations = db["observations"]  # New structured observations
-        self.threats = db["threats"]  # Existing threats from chat
+        self._obs_repo = ObservationRepository(db)
+        self._threat_repo = ThreatRepository(db)
+        self._equipment_repo = EquipmentRepository(db)
         self.efms = db["equipment_failure_modes"]
         self.failure_modes = db["failure_modes"]
-        self.equipment = db["equipment_nodes"]
+
+    @property
+    def threats(self):
+        """Transitional: prefer _threat_repo methods in new code."""
+        return self._threat_repo.collection
+
+    @property
+    def equipment(self):
+        return self._equipment_repo.collection
+
+    def _observation_id_query(self, obs_id: str) -> Dict[str, Any]:
+        """Match observation by ObjectId _id or string id field."""
+        clauses: List[Dict[str, Any]] = []
+        if ObjectId.is_valid(obs_id):
+            clauses.append({"_id": ObjectId(obs_id)})
+        clauses.append({"id": obs_id})
+        if len(clauses) == 1:
+            return clauses[0]
+        return {"$or": clauses}
+
+    def _scoped_query(self, base: Dict[str, Any], user: Optional[dict]) -> Dict[str, Any]:
+        return merge_tenant_filter(base, user)
     
     # ==================== OBSERVATION CRUD ====================
     
@@ -37,7 +63,8 @@ class ObservationService:
         self,
         data: Dict[str, Any],
         created_by: str,
-        source: str = "manual"
+        source: str = "manual",
+        user: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """Create a structured observation."""
         now = datetime.now(timezone.utc)
@@ -45,7 +72,10 @@ class ObservationService:
         # Get equipment info if provided
         equipment_name = None
         if data.get("equipment_id"):
-            equip = await self.equipment.find_one({"id": data["equipment_id"]})
+            equip = await self._equipment_repo.find_one(
+                {"id": data["equipment_id"]},
+                user=user,
+            )
             if equip:
                 equipment_name = equip.get("name")
         
@@ -79,21 +109,21 @@ class ObservationService:
             "created_at": now,
             "updated_at": now,
         }
-        
-        result = await self.observations.insert_one(doc)
-        doc["_id"] = result.inserted_id
+        with_tenant_id(doc, user)
 
-        obs_id = str(result.inserted_id)
-        from services.reliability_graph import _run_graph_sync, sync_observation_edges
+        inserted = await self._obs_repo.insert_document(doc, user=user)
+        doc["_id"] = inserted["_id"]
 
-        await _run_graph_sync(
-            sync_observation_edges(
-                observation_id=obs_id,
-                equipment_id=data.get("equipment_id"),
-                failure_mode_id=data.get("failure_mode_id"),
-                threat_id=data.get("threat_id"),
-            ),
+        obs_id = str(inserted["_id"])
+        from services.reliability_graph import dispatch_graph_sync
+
+        await dispatch_graph_sync(
+            "sync_observation_edges",
             "observation_create",
+            observation_id=obs_id,
+            equipment_id=data.get("equipment_id"),
+            failure_mode_id=data.get("failure_mode_id"),
+            threat_id=data.get("threat_id"),
         )
         
         # Update EFM observation count if linked
@@ -114,11 +144,12 @@ class ObservationService:
         to_date: Optional[datetime] = None,
         search: Optional[str] = None,
         skip: int = 0,
-        limit: int = 100
+        limit: int = 100,
+        user: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """Get observations with filters."""
         
-        query = {}
+        query: Dict[str, Any] = {}
         
         if equipment_id:
             query["equipment_id"] = equipment_id
@@ -157,29 +188,31 @@ class ObservationService:
             )
             if search_clause:
                 query.update(search_clause)
-        
-        cursor = self.observations.find(query).sort("created_at", -1).skip(skip).limit(limit)
-        
-        observations = []
-        async for doc in cursor:
-            observations.append(self._serialize_observation(doc))
-        
-        total = await self.observations.count_documents(query)
-        
+
+        query = self._scoped_query(query, user)
+
+        docs = await self._obs_repo.fetch_many(
+            query,
+            user=user,
+            sort=[("created_at", -1)],
+            skip=skip,
+            limit=limit,
+        )
+        observations = [self._serialize_observation(doc) for doc in docs]
+        total = await self._obs_repo.count(query, user=user)
+
         return {"total": total, "observations": observations}
     
-    async def get_observation_by_id(self, obs_id: str) -> Optional[Dict[str, Any]]:
+    async def get_observation_by_id(
+        self,
+        obs_id: str,
+        user: Optional[dict] = None,
+    ) -> Optional[Dict[str, Any]]:
         """Get a specific observation by _id (ObjectId) or id (string UUID) field."""
-        doc = None
-        
-        # First try to find by ObjectId (_id field)
-        if ObjectId.is_valid(obs_id):
-            doc = await self.observations.find_one({"_id": ObjectId(obs_id)})
-        
-        # If not found, try to find by string id field
-        if not doc:
-            doc = await self.observations.find_one({"id": obs_id})
-        
+        doc = await self._obs_repo.fetch_one(
+            self._observation_id_query(obs_id),
+            user=user,
+        )
         if doc:
             return self._serialize_observation(doc)
         return None
@@ -187,12 +220,10 @@ class ObservationService:
     async def update_observation(
         self,
         obs_id: str,
-        data: Dict[str, Any]
+        data: Dict[str, Any],
+        user: Optional[dict] = None,
     ) -> Optional[Dict[str, Any]]:
         """Update an observation."""
-        if not ObjectId.is_valid(obs_id):
-            return None
-        
         update = {"updated_at": datetime.now(timezone.utc)}
         
         allowed_fields = [
@@ -211,24 +242,23 @@ class ObservationService:
             if fm:
                 update["failure_mode_name"] = fm.get("failure_mode")
         
-        result = await self.observations.find_one_and_update(
-            {"_id": ObjectId(obs_id)},
+        result = await self._obs_repo.find_one_and_update(
+            self._observation_id_query(obs_id),
             {"$set": update},
-            return_document=True
+            user=user,
         )
         
         if result:
             serialized = self._serialize_observation(result)
-            from services.reliability_graph import _run_graph_sync, sync_observation_edges
+            from services.reliability_graph import dispatch_graph_sync
 
-            await _run_graph_sync(
-                sync_observation_edges(
-                    observation_id=serialized["id"],
-                    equipment_id=result.get("equipment_id"),
-                    failure_mode_id=result.get("failure_mode_id"),
-                    threat_id=result.get("threat_id"),
-                ),
+            await dispatch_graph_sync(
+                "sync_observation_edges",
                 "observation_update",
+                observation_id=serialized["id"],
+                equipment_id=result.get("equipment_id"),
+                failure_mode_id=result.get("failure_mode_id"),
+                threat_id=result.get("threat_id"),
             )
             return serialized
         return None
@@ -236,21 +266,19 @@ class ObservationService:
     async def close_observation(
         self,
         obs_id: str,
-        resolution_notes: Optional[str] = None
+        resolution_notes: Optional[str] = None,
+        user: Optional[dict] = None,
     ) -> Optional[Dict[str, Any]]:
         """Close an observation."""
-        if not ObjectId.is_valid(obs_id):
-            return None
-        
-        result = await self.observations.find_one_and_update(
-            {"_id": ObjectId(obs_id)},
+        result = await self._obs_repo.find_one_and_update(
+            self._observation_id_query(obs_id),
             {"$set": {
                 "status": "closed",
                 "resolution_notes": resolution_notes,
                 "closed_at": datetime.now(timezone.utc),
                 "updated_at": datetime.now(timezone.utc)
             }},
-            return_document=True
+            user=user,
         )
         
         if result:
@@ -323,13 +351,10 @@ class ObservationService:
         self,
         obs_id: str,
         failure_mode_id: str,
-        efm_id: Optional[str] = None
+        efm_id: Optional[str] = None,
+        user: Optional[dict] = None,
     ) -> Optional[Dict[str, Any]]:
         """Link a failure mode to an observation (accept AI suggestion)."""
-        if not ObjectId.is_valid(obs_id):
-            return None
-        
-        # Get failure mode details
         fm = await self.failure_modes.find_one({"_id": ObjectId(failure_mode_id)})
         if not fm:
             return None
@@ -344,24 +369,23 @@ class ObservationService:
             update["efm_id"] = efm_id
             await self._increment_efm_observation_count(efm_id)
         
-        result = await self.observations.find_one_and_update(
-            {"_id": ObjectId(obs_id)},
+        result = await self._obs_repo.find_one_and_update(
+            self._observation_id_query(obs_id),
             {"$set": update},
-            return_document=True
+            user=user,
         )
         
         if result:
             serialized = self._serialize_observation(result)
-            from services.reliability_graph import _run_graph_sync, sync_observation_edges
+            from services.reliability_graph import dispatch_graph_sync
 
-            await _run_graph_sync(
-                sync_observation_edges(
-                    observation_id=serialized["id"],
-                    equipment_id=result.get("equipment_id"),
-                    failure_mode_id=result.get("failure_mode_id"),
-                    threat_id=result.get("threat_id"),
-                ),
+            await dispatch_graph_sync(
+                "sync_observation_edges",
                 "observation_update",
+                observation_id=serialized["id"],
+                equipment_id=result.get("equipment_id"),
+                failure_mode_id=result.get("failure_mode_id"),
+                threat_id=result.get("threat_id"),
             )
             return serialized
         return None
@@ -370,15 +394,18 @@ class ObservationService:
     
     async def convert_threat_to_observation(
         self,
-        threat_id: str
+        threat_id: str,
+        user: Optional[dict] = None,
     ) -> Optional[Dict[str, Any]]:
         """Convert an existing threat to the new observation format."""
-        threat = await self.threats.find_one({"id": threat_id})
+        threat = await self.threats.find_one(
+            self._scoped_query({"id": threat_id}, user)
+        )
         if not threat:
             return None
         
         # Check if already converted
-        existing = await self.observations.find_one({"threat_id": threat_id})
+        existing = await self._obs_repo.fetch_one({"threat_id": threat_id}, user=user)
         if existing:
             return self._serialize_observation(existing)
         
@@ -402,36 +429,37 @@ class ObservationService:
             "created_at": datetime.fromisoformat(threat["created_at"]) if isinstance(threat.get("created_at"), str) else threat.get("created_at"),
             "updated_at": datetime.now(timezone.utc),
         }
+        if threat.get("tenant_id"):
+            obs_doc["tenant_id"] = threat["tenant_id"]
+        else:
+            with_tenant_id(obs_doc, user)
         
-        result = await self.observations.insert_one(obs_doc)
-        obs_doc["_id"] = result.inserted_id
+        obs_doc = await self._obs_repo.insert_document(obs_doc, user=user)
         
         # Update threat with observation link
         await self.threats.update_one(
-            {"id": threat_id},
-            {"$set": {"observation_id": str(result.inserted_id)}}
+            self._scoped_query({"id": threat_id}, user),
+            {"$set": {"observation_id": obs_id}}
         )
 
-        obs_id = str(result.inserted_id)
-        from services.reliability_graph import _run_graph_sync, sync_observation_edges, sync_threat_edges
+        obs_id = str(obs_doc["_id"])
+        from services.reliability_graph import dispatch_graph_sync
 
-        await _run_graph_sync(
-            sync_observation_edges(
-                observation_id=obs_id,
-                equipment_id=obs_doc.get("equipment_id"),
-                failure_mode_id=obs_doc.get("failure_mode_id"),
-                threat_id=threat_id,
-                escalate=True,
-            ),
+        await dispatch_graph_sync(
+            "sync_observation_edges",
             "threat_convert_observation",
+            observation_id=obs_id,
+            equipment_id=obs_doc.get("equipment_id"),
+            failure_mode_id=obs_doc.get("failure_mode_id"),
+            threat_id=threat_id,
+            escalate=True,
         )
-        await _run_graph_sync(
-            sync_threat_edges(
-                threat_id=threat_id,
-                equipment_id=obs_doc.get("equipment_id"),
-                observation_id=obs_id,
-            ),
+        await dispatch_graph_sync(
+            "sync_threat_edges",
             "threat_convert_threat",
+            threat_id=threat_id,
+            equipment_id=obs_doc.get("equipment_id"),
+            observation_id=obs_id,
         )
         
         return self._serialize_observation(obs_doc)
@@ -441,31 +469,36 @@ class ObservationService:
         user_id: str,
         include_converted: bool = True,
         skip: int = 0,
-        limit: int = 100
+        limit: int = 100,
+        user: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """Get observations combining both sources (observations + threats)."""
-        
-        # Get structured observations
-        obs_cursor = self.observations.find(
-            {"created_by": user_id}
-        ).sort("created_at", -1).skip(skip).limit(limit)
-        
-        observations = []
-        async for doc in obs_cursor:
-            observations.append(self._serialize_observation(doc))
-        
+        user_ctx = user or {"id": user_id}
+
+        docs = await self._obs_repo.fetch_many(
+            {},
+            user=user_ctx,
+            sort=[("created_at", -1)],
+            skip=skip,
+            limit=limit,
+        )
+        observations = [self._serialize_observation(doc) for doc in docs]
+
         # Get threats not yet converted
         if include_converted:
-            converted_threat_ids = await self.observations.distinct(
+            converted_threat_ids = await self._obs_repo.distinct(
                 "threat_id",
-                {"threat_id": {"$exists": True, "$ne": None}}
+                {"threat_id": {"$exists": True, "$ne": None}},
+                user=user_ctx,
             )
             
-            threat_query = {"created_by": user_id}
+            threat_query: Dict[str, Any] = {}
             if converted_threat_ids:
                 threat_query["id"] = {"$nin": converted_threat_ids}
             
-            threats_cursor = self.threats.find(threat_query).sort("created_at", -1).limit(limit)
+            threats_cursor = self.threats.find(
+                self._scoped_query(threat_query, user_ctx)
+            ).sort("created_at", -1).limit(limit)
             
             async for threat in threats_cursor:
                 observations.append(self._serialize_threat_as_observation(threat))
@@ -483,15 +516,17 @@ class ObservationService:
     async def get_observation_trends(
         self,
         equipment_id: Optional[str] = None,
-        days: int = 30
+        days: int = 30,
+        user: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """Get observation trends over time."""
         
         start_date = datetime.now(timezone.utc) - timedelta(days=days)
         
-        query = {"created_at": {"$gte": start_date}}
+        query: Dict[str, Any] = {"created_at": {"$gte": start_date}}
         if equipment_id:
             query["equipment_id"] = equipment_id
+        query = self._scoped_query(query, user)
         
         # Daily counts
         pipeline = [
@@ -508,7 +543,7 @@ class ObservationService:
         ]
         
         daily_counts = []
-        async for doc in self.observations.aggregate(pipeline):
+        for doc in await self._obs_repo.aggregate_scoped(pipeline, user=user):
             daily_counts.append({
                 "date": doc["_id"],
                 "count": doc["count"],
@@ -523,7 +558,7 @@ class ObservationService:
         ]
         
         by_severity = {}
-        async for doc in self.observations.aggregate(severity_pipeline):
+        for doc in await self._obs_repo.aggregate_scoped(severity_pipeline, user=user):
             by_severity[doc["_id"] or "unknown"] = doc["count"]
         
         # By failure mode
@@ -535,7 +570,7 @@ class ObservationService:
         ]
         
         top_failure_modes = []
-        async for doc in self.observations.aggregate(fm_pipeline):
+        for doc in await self._obs_repo.aggregate_scoped(fm_pipeline, user=user):
             top_failure_modes.append({
                 "failure_mode": doc["_id"],
                 "count": doc["count"]
@@ -550,13 +585,13 @@ class ObservationService:
         ]
         
         top_equipment = []
-        async for doc in self.observations.aggregate(equip_pipeline):
+        for doc in await self._obs_repo.aggregate_scoped(equip_pipeline, user=user):
             top_equipment.append({
                 "equipment": doc["_id"],
                 "count": doc["count"]
             })
         
-        total = await self.observations.count_documents(query)
+        total = await self._obs_repo.count(query, user=user)
         
         return {
             "period_days": days,
@@ -570,20 +605,23 @@ class ObservationService:
     async def get_unlinked_observations(
         self,
         user_id: str,
-        limit: int = 50
+        limit: int = 50,
+        user: Optional[dict] = None,
     ) -> List[Dict[str, Any]]:
         """Get observations that don't have a failure mode linked (need AI suggestion)."""
-        
-        query = {
-            "created_by": user_id,
-            "failure_mode_id": None,
-            "status": {"$ne": "closed"}
-        }
-        
-        cursor = self.observations.find(query).sort("created_at", -1).limit(limit)
-        
+        user_ctx = user or {"id": user_id}
+        docs = await self._obs_repo.fetch_many(
+            {
+                "failure_mode_id": None,
+                "status": {"$ne": "closed"},
+            },
+            user=user_ctx,
+            sort=[("created_at", -1)],
+            limit=limit,
+        )
+
         results = []
-        async for doc in cursor:
+        for doc in docs:
             obs = self._serialize_observation(doc)
             # Get AI suggestions
             suggestions = await self.suggest_failure_modes(

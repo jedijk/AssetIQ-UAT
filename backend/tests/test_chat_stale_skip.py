@@ -10,7 +10,7 @@ from routes.chat import _core_chat_process
 @pytest.mark.asyncio
 @pytest.mark.parametrize("command", ["skip", "cancel", "ok", "yes"])
 async def test_stale_control_command_in_initial_state_returns_empty_response(command):
-    with patch("routes.chat._read_conv", new_callable=AsyncMock) as read_conv:
+    with patch("services.chat_routes_service._read_conv", new_callable=AsyncMock) as read_conv:
         read_conv.return_value = {"state": ChatState.INITIAL}
         result = await _core_chat_process("user-1", command, "session-1", "en")
 

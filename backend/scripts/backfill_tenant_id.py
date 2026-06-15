@@ -24,7 +24,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import client, DEFAULT_DB_NAME  # noqa: E402
 from services.tenant_schema import (  # noqa: E402
     DEFAULT_TENANT_FIELD,
+    WAVE1_COLLECTIONS,
     WAVE2_COLLECTIONS,
+    WAVE3_COLLECTIONS,
+    WAVE4_COLLECTIONS,
+    WAVE5_COLLECTIONS,
     WAVE_COLLECTIONS,
     ensure_tenant_indexes,
     tenant_id_from_user,
@@ -103,6 +107,26 @@ async def main() -> int:
         help="Only Wave 2 collections (required before TENANT_STRICT_MODE)",
     )
     parser.add_argument(
+        "--wave1",
+        action="store_true",
+        help="Only Wave 1 collections (equipment_nodes, threats, users, observations)",
+    )
+    parser.add_argument(
+        "--wave3",
+        action="store_true",
+        help="Only Wave 3 collections (failure_modes, investigations, graph, etc.)",
+    )
+    parser.add_argument(
+        "--wave4",
+        action="store_true",
+        help="Only Wave 4 collections (chat, templates, production logs, etc.)",
+    )
+    parser.add_argument(
+        "--wave5",
+        action="store_true",
+        help="Only Wave 5 collections (user_preferences, reliability_impacts, granulometry_records)",
+    )
+    parser.add_argument(
         "--collections",
         default="",
         help="Comma-separated subset (default: all WAVE_COLLECTIONS)",
@@ -122,6 +146,14 @@ async def main() -> int:
 
     if args.wave2:
         names = set(WAVE2_COLLECTIONS)
+    elif args.wave1:
+        names = set(WAVE1_COLLECTIONS)
+    elif args.wave3:
+        names = set(WAVE3_COLLECTIONS)
+    elif args.wave4:
+        names = set(WAVE4_COLLECTIONS)
+    elif args.wave5:
+        names = set(WAVE5_COLLECTIONS)
     elif args.collections.strip():
         names: Set[str] = {c.strip() for c in args.collections.split(",") if c.strip()}
         unknown = names - set(WAVE_COLLECTIONS)

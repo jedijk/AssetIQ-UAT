@@ -18,9 +18,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from iso14224_models import EQUIPMENT_TYPES
-from database import db
 from auth import require_permission, get_current_user
 from services.ai_gateway import chat_completion_response, user_context
+from services import ai_fm_queries as fmq
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,6 @@ router = APIRouter(
 
 # In-memory cache (per-process). Backed by Mongo for cross-restart persistence.
 _suggestion_cache: Dict[str, Any] = {}
-_CACHE_COLLECTION = "ai_fm_suggestion_cache"
 
 # ============= Models =============
 
@@ -111,7 +110,7 @@ async def get_ai_suggestions(
 
     # 2) MongoDB-persisted cache (survives restarts -> consistent results forever)
     try:
-        cached_doc = await db[_CACHE_COLLECTION].find_one({"_id": cache_key})
+        cached_doc = await fmq.find_cache_doc(current_user, cache_key)
         if cached_doc and "suggestions" in cached_doc:
             suggestions = [EquipmentTypeSuggestions(**s) for s in cached_doc["suggestions"]]
             _suggestion_cache[cache_key] = suggestions
@@ -205,15 +204,15 @@ Return JSON:
         # Cache the result (in-memory + Mongo)
         _suggestion_cache[cache_key] = suggestions
         try:
-            await db[_CACHE_COLLECTION].update_one(
-                {"_id": cache_key},
-                {"$set": {
+            await fmq.upsert_cache_doc(
+                current_user,
+                cache_key,
+                {
                     "suggestions": [s.model_dump() for s in suggestions],
                     "equipment_type_ids": sorted(eq_ids),
                     "failure_mode_ids": sorted(fm_ids),
                     "created_at": datetime.now(timezone.utc).isoformat(),
-                }},
-                upsert=True,
+                },
             )
         except Exception as e:
             logger.warning(f"Failed to persist suggestions to Mongo cache (non-fatal): {e}")
@@ -253,8 +252,10 @@ async def suggest_failure_modes(
     missing_ids = [i for i in equipment_type_ids if i not in resolved_ids]
     if missing_ids:
         try:
-            custom_cursor = db.custom_equipment_types.find(
-                {"id": {"$in": missing_ids}}, {"_id": 0}
+            custom_cursor = fmq.find_custom_equipment_types(
+                current_user,
+                {"id": {"$in": missing_ids}},
+                {"_id": 0},
             )
             async for ct in custom_cursor:
                 equipment_types.append({
@@ -279,14 +280,13 @@ async def suggest_failure_modes(
 
 
 @router.post("/clear-cache")
-async def clear_suggestion_cache():
+async def clear_suggestion_cache(current_user: dict = Depends(get_current_user)):
     """Clear both in-memory and Mongo-persisted suggestion cache."""
     global _suggestion_cache
     mem_count = len(_suggestion_cache)
     _suggestion_cache = {}
     try:
-        result = await db[_CACHE_COLLECTION].delete_many({})
-        mongo_count = result.deleted_count
+        mongo_count = await fmq.clear_cache_docs(current_user)
     except Exception as e:
         logger.warning(f"Failed to clear Mongo cache (non-fatal): {e}")
         mongo_count = 0
@@ -433,7 +433,7 @@ async def get_equipment_type_mapping_suggestions(
         return _suggestion_cache[cache_key]
 
     try:
-        cached_doc = await db[_CACHE_COLLECTION].find_one({"_id": cache_key})
+        cached_doc = await fmq.find_cache_doc(current_user, cache_key)
         if cached_doc and "mapping_suggestions" in cached_doc:
             suggestions = [NodeMappingSuggestion(**s) for s in cached_doc["mapping_suggestions"]]
             _suggestion_cache[cache_key] = suggestions
@@ -559,16 +559,16 @@ If no equipment_type fits a node with confidence >= 0.70, set its best_match to 
 
         _suggestion_cache[cache_key] = suggestions
         try:
-            await db[_CACHE_COLLECTION].update_one(
-                {"_id": cache_key},
-                {"$set": {
+            await fmq.upsert_cache_doc(
+                current_user,
+                cache_key,
+                {
                     "mapping_suggestions": [s.model_dump() for s in suggestions],
                     "kind": "equipment_type_mapping",
                     "node_ids": sorted([n.id for n in nodes]),
                     "equipment_type_ids": sorted(et_ids),
                     "created_at": datetime.now(timezone.utc).isoformat(),
-                }},
-                upsert=True,
+                },
             )
         except Exception as e:
             logger.warning(f"Failed to persist mapping cache (non-fatal): {e}")
@@ -686,7 +686,7 @@ async def get_new_equipment_type_suggestions(
         return _suggestion_cache[cache_key]
 
     try:
-        cached_doc = await db[_CACHE_COLLECTION].find_one({"_id": cache_key})
+        cached_doc = await fmq.find_cache_doc(current_user, cache_key)
         if cached_doc and "new_type_suggestions" in cached_doc:
             suggestions = [NewEquipmentTypeSuggestion(**s) for s in cached_doc["new_type_suggestions"]]
             _suggestion_cache[cache_key] = suggestions
@@ -803,16 +803,16 @@ Return JSON:
 
         _suggestion_cache[cache_key] = suggestions
         try:
-            await db[_CACHE_COLLECTION].update_one(
-                {"_id": cache_key},
-                {"$set": {
+            await fmq.upsert_cache_doc(
+                current_user,
+                cache_key,
+                {
                     "new_type_suggestions": [s.model_dump() for s in suggestions],
                     "kind": "new_equipment_types",
                     "node_ids": sorted([n.id for n in nodes]),
                     "existing_type_ids": sorted(et_ids),
                     "created_at": datetime.now(timezone.utc).isoformat(),
-                }},
-                upsert=True,
+                },
             )
         except Exception as e:
             logger.warning(f"Failed to persist new-types cache (non-fatal): {e}")
@@ -954,7 +954,7 @@ async def get_new_failure_mode_suggestions(
         return _suggestion_cache[cache_key]
 
     try:
-        cached_doc = await db[_CACHE_COLLECTION].find_one({"_id": cache_key})
+        cached_doc = await fmq.find_cache_doc(current_user, cache_key)
         if cached_doc and "new_fm_suggestions" in cached_doc:
             suggestions = [NewFailureModeSuggestion(**s) for s in cached_doc["new_fm_suggestions"]]
             _suggestion_cache[cache_key] = suggestions
@@ -1090,16 +1090,16 @@ Return JSON:
 
         _suggestion_cache[cache_key] = suggestions
         try:
-            await db[_CACHE_COLLECTION].update_one(
-                {"_id": cache_key},
-                {"$set": {
+            await fmq.upsert_cache_doc(
+                current_user,
+                cache_key,
+                {
                     "new_fm_suggestions": [s.model_dump() for s in suggestions],
                     "kind": "new_failure_modes",
                     "equipment_type_ids": sorted([et.id for et in equipment_types]),
                     "existing_fm_count": len(existing_failure_modes),
                     "created_at": datetime.now(timezone.utc).isoformat(),
-                }},
-                upsert=True,
+                },
             )
         except Exception as e:
             logger.warning(f"Failed to persist new-FM cache (non-fatal): {e}")
@@ -1130,7 +1130,8 @@ async def suggest_new_failure_modes(
     full_existing_names = set()
     full_existing_briefs: List[ExistingFailureModeBrief] = []
     try:
-        cursor = db.failure_modes.find(
+        cursor = fmq.find_failure_modes(
+            current_user,
             {},
             {"_id": 0, "failure_mode": 1, "category": 1, "equipment_type_ids": 1},
         )
@@ -1331,7 +1332,7 @@ async def improve_failure_mode_with_ai(
         return _suggestion_cache[cache_key]
 
     try:
-        cached_doc = await db[_CACHE_COLLECTION].find_one({"_id": cache_key})
+        cached_doc = await fmq.find_cache_doc(current_user, cache_key)
         if cached_doc and "improved_fm" in cached_doc:
             improved = ImprovedFailureMode(**cached_doc["improved_fm"])
             _suggestion_cache[cache_key] = improved
@@ -1552,15 +1553,15 @@ Return JSON:
 
         _suggestion_cache[cache_key] = improved
         try:
-            await db[_CACHE_COLLECTION].update_one(
-                {"_id": cache_key},
-                {"$set": {
+            await fmq.upsert_cache_doc(
+                current_user,
+                cache_key,
+                {
                     "improved_fm": improved.model_dump(),
                     "kind": "improve_failure_mode",
                     "fm_id": fm.id,
                     "created_at": datetime.now(timezone.utc).isoformat(),
-                }},
-                upsert=True,
+                },
             )
         except Exception as e:
             logger.warning(f"Failed to persist improved-FM cache (non-fatal): {e}")

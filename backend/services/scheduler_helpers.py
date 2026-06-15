@@ -1,6 +1,8 @@
 """Pure scheduler helpers shared by routes and sync services (no route imports)."""
 from typing import Any, Dict, List, Optional, Set
 
+from models.maintenance_scheduler import TaskPriority
+
 STRATEGY_EXEMPT_TASK_SOURCES = frozenset(
     {
         "customer_imported",
@@ -148,3 +150,35 @@ def is_strategy_task_active(
         # No FM linkage: standalone template (e.g. manually added).
         return True
     return any(fm.get("enabled") is not False for fm in linked_fms)
+
+
+_PLANNING_HORIZON = {
+    "high": 7,
+    "medium": 14,
+    "low": 30,
+}
+
+
+def get_planning_horizon(criticality: str) -> int:
+    """Get planning horizon days based on criticality."""
+    return _PLANNING_HORIZON.get(criticality, 14)
+
+
+def calculate_priority(criticality: str, days_until_due: int, is_overdue: bool) -> TaskPriority:
+    """Calculate task priority based on criticality and due date."""
+    if is_overdue:
+        if criticality == "high":
+            return TaskPriority.CRITICAL
+        return TaskPriority.HIGH
+
+    if criticality == "high":
+        if days_until_due <= 3:
+            return TaskPriority.CRITICAL
+        return TaskPriority.HIGH
+    if criticality == "medium":
+        if days_until_due <= 3:
+            return TaskPriority.HIGH
+        return TaskPriority.MEDIUM
+    if days_until_due <= 3:
+        return TaskPriority.MEDIUM
+    return TaskPriority.LOW

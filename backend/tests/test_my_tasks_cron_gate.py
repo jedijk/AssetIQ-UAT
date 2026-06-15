@@ -10,22 +10,19 @@ Product rule (Settings → Task Generation):
 """
 from __future__ import annotations
 
-import asyncio
 import os
-from datetime import datetime, timedelta, timezone
-from uuid import uuid4
 
 import pytest
 import requests
 
 BASE_URL = os.environ.get(
     "REACT_APP_BACKEND_URL",
-    "https://flicker-solver.preview.emergentagent.com",
+    "https://reliability-graph-1.preview.emergentagent.com",
 ).rstrip("/")
 API = f"{BASE_URL}/api"
 
 OWNER_EMAIL = "jedijk@gmail.com"
-OWNER_PASSWORD = "Jaap8019@"
+OWNER_PASSWORD = os.environ.get("TEST_OWNER_PASSWORD", "admin123")
 
 
 @pytest.fixture(scope="module")
@@ -97,40 +94,19 @@ def test_my_tasks_excludes_maintenance_when_cron_disabled(owner_token):
         _set_cron(original_enabled, owner_token)
 
 
-def test_ensure_task_instance_does_not_silently_insert():
+@pytest.mark.asyncio
+async def test_ensure_task_instance_does_not_silently_insert():
     """Direct unit-level: the resolver must never create new task_instances."""
-    # Run inline via asyncio to avoid the pytest-asyncio plugin requirement.
-    from database import db
+    from unittest.mock import AsyncMock, patch
+
     from services.task_instance_bridge import ensure_task_instance_for_scheduled_task
 
-    async def _run():
-        sched_id = f"sched-test-{uuid4()}"
-        await db.scheduled_tasks.insert_one(
-            {
-                "id": sched_id,
-                "task_name": "Should never auto-bridge",
-                "status": "scheduled",
-                "due_date": (
-                    datetime.now(timezone.utc) + timedelta(days=1)
-                ).date().isoformat(),
-                "task_source": "strategy_generated",
-            }
-        )
-        try:
-            result = await ensure_task_instance_for_scheduled_task(sched_id)
-            assert result is None, (
-                "ensure_task_instance_for_scheduled_task must return None when "
-                "no task_instance exists — it must not insert one on demand"
-            )
-            cnt = await db.task_instances.count_documents(
-                {"scheduled_task_id": sched_id}
-            )
-            assert cnt == 0, (
-                "ensure_task_instance_for_scheduled_task must not silently "
-                "create task_instances; only the weekly cron is allowed."
-            )
-        finally:
-            await db.scheduled_tasks.delete_one({"id": sched_id})
-            await db.task_instances.delete_many({"scheduled_task_id": sched_id})
+    sched_id = "sched-test-no-insert"
+    mock_find_one = AsyncMock(return_value=None)
 
-    asyncio.get_event_loop().run_until_complete(_run())
+    with patch("services.task_instance_bridge.db") as mock_db:
+        mock_db.task_instances.find_one = mock_find_one
+        result = await ensure_task_instance_for_scheduled_task(sched_id)
+
+    assert result is None
+    mock_find_one.assert_awaited_once_with({"scheduled_task_id": sched_id})

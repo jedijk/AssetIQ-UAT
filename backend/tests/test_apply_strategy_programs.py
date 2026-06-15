@@ -7,7 +7,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from models.maintenance_scheduler import ApplyStrategyRequest
-from routes.maintenance_scheduler.programs import _apply_strategy_to_equipment_impl
+from services.apply_strategy_service import apply_strategy_to_equipment as _apply_strategy_to_equipment_impl
 
 
 @pytest.mark.asyncio
@@ -49,20 +49,20 @@ async def test_apply_strategy_reports_v2_programs_created_when_legacy_sync_off()
         "errors": [],
     }
 
-    with patch("routes.maintenance_scheduler.programs.db", mock_db), patch(
+    with patch("services.apply_strategy_service.db", mock_db), patch(
         "services.maintenance_program_service.MaintenanceProgramService.ensure_programs_for_equipment_ids",
         AsyncMock(return_value=v2_sync),
     ), patch(
-        "routes.maintenance_strategy_v2._resync_programs_with_strategy",
+        "services.strategy_propagation.resync_programs_with_strategy",
         AsyncMock(return_value={"programs_deactivated": 0}),
     ), patch(
-        "routes.maintenance_scheduler.programs.refresh_equipment_schedule",
+        "services.apply_strategy_service.refresh_equipment_schedule",
         AsyncMock(return_value={"strategy_programs_created": 0}),
     ), patch(
-        "routes.maintenance_scheduler.scheduler.schedule_programs_for_equipment",
+        "services.maintenance_scheduling.schedule_programs_for_equipment",
         AsyncMock(return_value=0),
     ), patch(
-        "routes.maintenance_strategy_v2.strategy_helpers.clear_strategy_needs_apply",
+        "services.strategy_apply_state.clear_strategy_needs_apply",
         AsyncMock(),
     ), patch(
         "services.reliability_graph.sync_edges_for_apply_strategy",

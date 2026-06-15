@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
-from database import db, observation_service
+from database import observation_service
 from auth import get_current_user, require_permission
 from services.background_jobs import schedule_tracked_job
 from utils.auto_translate import translate_observation
@@ -72,7 +72,8 @@ async def get_observations(
         to_date=to_dt,
         search=search,
         skip=skip,
-        limit=limit
+        limit=limit,
+        user=current_user,
     )
 
 @router.get("/observations/combined")
@@ -87,7 +88,8 @@ async def get_combined_observations(
         user_id=current_user["id"],
         include_converted=include_threats,
         skip=skip,
-        limit=limit
+        limit=limit,
+        user=current_user,
     )
 
 @router.get("/observations/unlinked")
@@ -98,7 +100,8 @@ async def get_unlinked_observations(
     """Get observations without failure mode links (need AI suggestions)."""
     return await observation_service.get_unlinked_observations(
         user_id=current_user["id"],
-        limit=limit
+        limit=limit,
+        user=current_user,
     )
 
 @router.get("/observations/trends")
@@ -110,7 +113,8 @@ async def get_observation_trends(
     """Get observation trends over time."""
     return await observation_service.get_observation_trends(
         equipment_id=equipment_id,
-        days=days
+        days=days,
+        user=current_user,
     )
 
 @router.get("/observations/{obs_id}")
@@ -119,7 +123,7 @@ async def get_observation(
     current_user: dict = Depends(get_current_user)
 ):
     """Get a specific observation."""
-    obs = await observation_service.get_observation_by_id(obs_id)
+    obs = await observation_service.get_observation_by_id(obs_id, user=current_user)
     if not obs:
         raise HTTPException(status_code=404, detail="Observation not found")
     return obs
@@ -134,7 +138,8 @@ async def create_observation(
     result = await observation_service.create_observation(
         data.model_dump(),
         created_by=current_user["id"],
-        source="manual"
+        source="manual",
+        user=current_user,
     )
     # Trigger auto-translation in background
     if result and result.get("id"):
@@ -164,6 +169,7 @@ async def update_observation(
     result = await observation_service.update_observation(
         obs_id,
         update_payload,
+        user=current_user,
     )
     if not result:
         raise HTTPException(status_code=404, detail="Observation not found")
@@ -190,7 +196,9 @@ async def close_observation(
     current_user: dict = Depends(_observations_write)
 ):
     """Close an observation."""
-    result = await observation_service.close_observation(obs_id, resolution_notes)
+    result = await observation_service.close_observation(
+        obs_id, resolution_notes, user=current_user
+    )
     if not result:
         raise HTTPException(status_code=404, detail="Observation not found")
     return result
@@ -204,84 +212,28 @@ async def delete_observation(
     current_user: dict = Depends(get_current_user)
 ):
     """Delete an observation. Optionally delete linked Actions and Investigations. Requires admin, owner, or reliability_engineer role."""
-    # Check if user has permission to delete
     if current_user.get("role") not in ["admin", "owner", "reliability_engineer"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions to delete observations")
-    
-    from bson import ObjectId
-    from bson.errors import InvalidId
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    # Try to find by ObjectId first, then by id field
-    observation = None
+
+    from repositories.observation_repository import delete_observation_cascade
+
     try:
-        observation = await db.observations.find_one({"_id": ObjectId(obs_id)})
-    except (TypeError, ValueError, InvalidId):
-        pass
-    
-    if not observation:
-        observation = await db.observations.find_one({"id": obs_id})
-    
-    if not observation:
-        raise HTTPException(status_code=404, detail="Observation not found")
-    
-    # Get the actual observation id (string) for linked queries
-    observation_id = observation.get("id") or str(observation.get("_id"))
-    
-    deleted_actions_count = 0
-    deleted_investigations_count = 0
-    
-    # Optionally delete linked Central Actions (source_type="threat" for observations)
-    if delete_actions:
-        result = await db.central_actions.delete_many({
-            "source_type": "threat",
-            "source_id": observation_id
-        })
-        deleted_actions_count = result.deleted_count
-        logger.info(f"Deleted {deleted_actions_count} central actions linked to observation {observation_id}")
-    
-    # Optionally delete linked Investigations
-    if delete_investigations:
-        # Find all investigations linked to this observation
-        linked_investigations = await db.investigations.find({"threat_id": observation_id}).to_list(100)
-        
-        for inv in linked_investigations:
-            inv_id = inv.get("id")
-            # Delete investigation's internal data
-            await db.timeline_events.delete_many({"investigation_id": inv_id})
-            await db.failure_identifications.delete_many({"investigation_id": inv_id})
-            await db.cause_nodes.delete_many({"investigation_id": inv_id})
-            await db.action_items.delete_many({"investigation_id": inv_id})
-            await db.evidence_items.delete_many({"investigation_id": inv_id})
-            
-            # Also delete Central Actions linked to this investigation if delete_actions is true
-            if delete_actions:
-                result = await db.central_actions.delete_many({
-                    "source_type": "investigation",
-                    "source_id": inv_id
-                })
-                deleted_actions_count += result.deleted_count
-        
-        # Delete the investigations themselves
-        result = await db.investigations.delete_many({"threat_id": observation_id})
-        deleted_investigations_count = result.deleted_count
-        logger.info(f"Deleted {deleted_investigations_count} investigations linked to observation {observation_id}")
-    
-    # Delete the observation
-    try:
-        result = await db.observations.delete_one({"_id": observation["_id"]})
-    except (TypeError, KeyError):
-        result = await db.observations.delete_one({"id": obs_id})
-    
-    if result.deleted_count == 0:
+        result = await delete_observation_cascade(
+            obs_id=obs_id,
+            delete_actions=delete_actions,
+            delete_investigations=delete_investigations,
+            user=current_user,
+        )
+    except ValueError as exc:
+        if str(exc) == "not_found":
+            raise HTTPException(status_code=404, detail="Observation not found")
         raise HTTPException(status_code=500, detail="Failed to delete observation")
-    
+
     return {
-        "status": "success", 
+        "status": "success",
         "message": "Observation deleted successfully",
-        "deleted_actions": deleted_actions_count,
-        "deleted_investigations": deleted_investigations_count
+        "deleted_actions": result["deleted_actions"],
+        "deleted_investigations": result["deleted_investigations"],
     }
 
 # --- AI Failure Mode Suggestions ---
@@ -317,7 +269,8 @@ async def link_failure_mode_to_observation(
     result = await observation_service.link_failure_mode_to_observation(
         obs_id=obs_id,
         failure_mode_id=failure_mode_id,
-        efm_id=efm_id
+        efm_id=efm_id,
+        user=current_user,
     )
     if not result:
         raise HTTPException(status_code=404, detail="Observation or failure mode not found")
@@ -331,7 +284,9 @@ async def convert_threat_to_observation(
     current_user: dict = Depends(get_current_user)
 ):
     """Convert an existing threat to the new observation format."""
-    result = await observation_service.convert_threat_to_observation(threat_id)
+    result = await observation_service.convert_threat_to_observation(
+        threat_id, user=current_user
+    )
     if not result:
         raise HTTPException(status_code=404, detail="Threat not found")
     return result

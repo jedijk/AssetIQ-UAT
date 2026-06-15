@@ -17,17 +17,24 @@ from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
-VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "").strip()
-VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "").strip()
 VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:support@assetiq.app").strip()
 
 
+def _vapid_public_key() -> str:
+    return os.environ.get("VAPID_PUBLIC_KEY", "").strip()
+
+
+def _vapid_private_key() -> str:
+    return os.environ.get("VAPID_PRIVATE_KEY", "").strip()
+
+
 def is_push_configured() -> bool:
-    return bool(VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY)
+    return bool(_vapid_public_key() and _vapid_private_key())
 
 
 def get_vapid_public_key() -> Optional[str]:
-    return VAPID_PUBLIC_KEY or None
+    key = _vapid_public_key()
+    return key or None
 
 
 def _subscription_doc(
@@ -128,7 +135,7 @@ async def send_push_to_user(
             webpush(
                 subscription_info=subscription_info,
                 data=data,
-                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_private_key=_vapid_private_key(),
                 vapid_claims={"sub": VAPID_SUBJECT},
             )
             sent += 1

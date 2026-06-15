@@ -87,6 +87,26 @@ def test_api_health_200_when_redis_unavailable(client, monkeypatch):
     assert data["routes_loaded"] is True
 
 
+def test_api_health_200_when_warmup_incomplete(client, monkeypatch):
+    from unittest.mock import AsyncMock, MagicMock
+
+    test_client, server = client
+    server.route_load_error = None
+    server.app.state.ready = False
+    mock_db = MagicMock()
+    mock_db.command = AsyncMock(return_value={"ok": 1})
+    monkeypatch.setattr("database.db", mock_db)
+
+    response = test_client.get("/api/health")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "starting"
+    assert data["ready"] is False
+    assert data["database"] == "connected"
+    assert data["routes_loaded"] is True
+
+
 def test_api_health_includes_routes_loaded(client):
     test_client, server = client
     server.route_load_error = None

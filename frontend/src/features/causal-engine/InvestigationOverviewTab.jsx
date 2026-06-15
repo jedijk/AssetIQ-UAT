@@ -37,6 +37,7 @@ import {
 } from "../../components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../components/ui/dropdown-menu";
 import AttachmentsPanel from "../../components/attachments/AttachmentsPanel";
+import { ReliabilityEvidencePanel } from "../../components/reliability/ReliabilityEvidencePanel";
 import RecurringIssueQuadrant from "../../components/causal-engine/RecurringIssueQuadrant";
 import EquipmentTimeline from "../../components/EquipmentTimeline";
 import { INVESTIGATION_STATUSES } from "../../components/causal-engine/constants";
@@ -79,6 +80,20 @@ export function InvestigationOverviewTab({
 }) {
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <ReliabilityEvidencePanel
+          equipmentId={investigation?.asset_id}
+          equipmentName={investigation?.asset_name}
+          anchorNodeType="investigation"
+          anchorNodeId={investigation?.id}
+          anchorLabel={
+            investigation?.case_number
+              ? `#${investigation.case_number} · ${investigation?.title || "Investigation"}`
+              : investigation?.title
+          }
+          buttonLabel="Graph evidence"
+        />
+      </div>
       {isEditingInvestigation ? (
         <div className="bg-white rounded-xl border p-6 space-y-4">
           <div className="flex items-center justify-between mb-2">

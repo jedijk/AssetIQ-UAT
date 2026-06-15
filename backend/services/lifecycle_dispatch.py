@@ -1,0 +1,65 @@
+"""
+Lifecycle domain events — Wave 3 event convergence.
+
+Cross-domain side effects publish through the outbox instead of synchronous writes.
+"""
+from __future__ import annotations
+
+from typing import Any, Dict, Optional
+
+from services.domain_events import DomainEventType
+from services.event_outbox import publish_event
+from services.tenant_schema import tenant_id_from_user
+
+
+async def publish_lifecycle_event(
+    event_type: DomainEventType,
+    *,
+    aggregate_type: str,
+    aggregate_id: str,
+    payload: Optional[Dict[str, Any]] = None,
+    user: Optional[dict] = None,
+) -> str:
+    tenant_id = tenant_id_from_user(user)
+    return await publish_event(
+        event_type=event_type.value,
+        aggregate_type=aggregate_type,
+        aggregate_id=aggregate_id,
+        payload=payload or {},
+        user=user,
+        tenant_id=tenant_id,
+    )
+
+
+async def publish_action_completed(
+    action_id: str,
+    *,
+    source_type: Optional[str] = None,
+    source_id: Optional[str] = None,
+    user: Optional[dict] = None,
+) -> str:
+    return await publish_lifecycle_event(
+        DomainEventType.ACTION_COMPLETED,
+        aggregate_type="central_action",
+        aggregate_id=action_id,
+        payload={"source_type": source_type, "source_id": source_id},
+        user=user,
+    )
+
+
+async def publish_threat_created(threat_id: str, *, user: Optional[dict] = None) -> str:
+    return await publish_lifecycle_event(
+        DomainEventType.THREAT_CREATED,
+        aggregate_type="threat",
+        aggregate_id=threat_id,
+        user=user,
+    )
+
+
+async def publish_observation_created(observation_id: str, *, user: Optional[dict] = None) -> str:
+    return await publish_lifecycle_event(
+        DomainEventType.OBSERVATION_CREATED,
+        aggregate_type="observation",
+        aggregate_id=observation_id,
+        user=user,
+    )

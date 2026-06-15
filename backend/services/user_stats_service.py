@@ -19,6 +19,17 @@ logger = logging.getLogger(__name__)
 # Session timeout in minutes
 SESSION_TIMEOUT_MINUTES = 15
 
+# Platform owner accounts are excluded from tenant usage analytics.
+EXCLUDED_USER_STATS_ROLES = frozenset({"owner"})
+
+
+def _normalize_role(role: Optional[str]) -> str:
+    return (role or "").lower().strip()
+
+
+def _is_excluded_stats_role(role: Optional[str]) -> bool:
+    return _normalize_role(role) in EXCLUDED_USER_STATS_ROLES
+
 
 class UserStatsService:
     """Service for user statistics and event tracking."""
@@ -28,6 +39,25 @@ class UserStatsService:
         self.events = db["user_events"]
         self.daily_stats = db["user_stats_daily"]
         self.users = db["users"]
+
+    def build_event_match_stage(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        user_role_filter: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Build a Mongo match stage for analytics, excluding platform owner activity."""
+        match_stage: Dict[str, Any] = {
+            "timestamp": {"$gte": start_date, "$lte": end_date},
+            "user_role": {"$nin": list(EXCLUDED_USER_STATS_ROLES)},
+        }
+        if user_role_filter and not _is_excluded_stats_role(user_role_filter):
+            match_stage["user_role"] = user_role_filter
+        return match_stage
+
+    def stats_users_query(self) -> Dict[str, Any]:
+        """User collection filter for statistics tables and totals."""
+        return {"role": {"$nin": list(EXCLUDED_USER_STATS_ROLES)}}
     
     # ==================== EVENT TRACKING ====================
     
@@ -102,13 +132,9 @@ class UserStatsService:
     ) -> Dict[str, Any]:
         """Get comprehensive user statistics for a date range."""
         
-        # Base match for date range
-        match_stage = {
-            "timestamp": {"$gte": start_date, "$lte": end_date}
-        }
-        
-        if user_role_filter:
-            match_stage["user_role"] = user_role_filter
+        match_stage = self.build_event_match_stage(
+            start_date, end_date, user_role_filter=user_role_filter
+        )
         
         # Get KPI metrics
         kpis = await self._get_kpi_metrics(match_stage)
@@ -132,8 +158,8 @@ class UserStatsService:
         most_used = module_usage[0]["module"] if module_usage else None
         least_used = module_usage[-1]["module"] if module_usage else None
         
-        # Get total user count
-        total_users = await self.users.count_documents({})
+        # Get total user count (exclude platform owners)
+        total_users = await self.users.count_documents(self.stats_users_query())
 
         return {
             "period_start": start_date.isoformat(),
@@ -246,8 +272,11 @@ class UserStatsService:
     async def _get_user_activity(self, match_stage: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Get user activity statistics combining tracked events and actual data."""
         
-        # Get all users first for name resolution
-        all_users = await self.users.find({}, {"_id": 0, "id": 1, "name": 1, "email": 1, "role": 1}).to_list(200)
+        # Get all users first for name resolution (exclude platform owners)
+        all_users = await self.users.find(
+            self.stats_users_query(),
+            {"_id": 0, "id": 1, "name": 1, "email": 1, "role": 1},
+        ).to_list(200)
         
         # Get tracked event data per user — group by user_name since user_id may be null
         # Build a name→user mapping for lookup
@@ -319,7 +348,7 @@ class UserStatsService:
 
         for user in all_users:
             uid = user.get("id")
-            if not uid:
+            if not uid or _is_excluded_stats_role(user.get("role")):
                 continue
             
             t = threats_m.get(uid, {})
@@ -552,7 +581,10 @@ class UserStatsService:
         cutoff = datetime.now(timezone.utc) - timedelta(minutes=SESSION_TIMEOUT_MINUTES)
         
         pipeline = [
-            {"$match": {"timestamp": {"$gte": cutoff}}},
+            {"$match": {
+                "timestamp": {"$gte": cutoff},
+                "user_role": {"$nin": list(EXCLUDED_USER_STATS_ROLES)},
+            }},
             {"$group": {
                 "_id": "$session_id",
                 "user_id": {"$first": "$user_id"},

@@ -172,33 +172,23 @@ export const getCachedData = async (key) => {
 };
 
 // Sync all pending items
-export const syncPendingItems = async (storeName, apiEndpoint, token) => {
+export const syncPendingItems = async (storeName, apiPath, _token) => {
   try {
+    const { api } = await import('./apiClient');
     const items = await getPendingItems(storeName);
     const results = { synced: 0, failed: 0 };
-    
+
     for (const item of items) {
       try {
-        const response = await fetch(apiEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify(item.data),
-        });
-        
-        if (response.ok) {
-          await removeFromQueue(storeName, item.id);
-          results.synced++;
-        } else {
-          results.failed++;
-        }
+        const path = apiPath.replace(/^\/api\//, '');
+        await api.post(path, item.data);
+        await removeFromQueue(storeName, item.id);
+        results.synced++;
       } catch (error) {
         results.failed++;
       }
     }
-    
+
     return results;
   } catch (error) {
     console.error('Failed to sync pending items:', error);

@@ -1,29 +1,23 @@
 """
 Scheduled Task lifecycle: list, daily/weekly planner, update, complete, defer.
 """
-from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from typing import Optional
 
-from database import db
 from auth import require_permission
 from models.maintenance_scheduler import (
-    MaintenanceHistory,
-    TaskStatus,
     UpdateTaskStatusRequest,
     CompleteTaskRequest,
     DeferTaskRequest,
 )
-from ._shared import ensure_imported_pm_tasks_scheduled, scope_scheduled_tasks_query
+from services import maintenance_scheduler_service as svc
 
 router = APIRouter()
 
 _scheduler_read = require_permission("scheduler:read")
 
-
-# Task types that are corrective/reactive — these are triggered on failure, not planned.
-# They must never appear in scheduled-task views.
-CORRECTIVE_TASK_TYPES = ("reactive", "corrective")
+# Re-export for tests and other scheduler modules.
+CORRECTIVE_TASK_TYPES = svc.CORRECTIVE_TASK_TYPES
 
 
 @router.get("/tasks")
@@ -38,42 +32,16 @@ async def get_scheduled_tasks(
     current_user: dict = Depends(_scheduler_read),
 ):
     """Get scheduled tasks with filtering."""
-    await ensure_imported_pm_tasks_scheduled(equipment_type_id)
-
-    query = {}
-
-    if status:
-        query["status"] = status
-    elif not include_completed:
-        query["status"] = {"$nin": [TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value]}
-
-    if priority:
-        query["priority"] = priority
-    if assigned_to:
-        query["assigned_technician_id"] = assigned_to
-    if from_date:
-        query["due_date"] = {"$gte": from_date}
-    if to_date:
-        if "due_date" in query:
-            query["due_date"]["$lte"] = to_date
-        else:
-            query["due_date"] = {"$lte": to_date}
-
-    await scope_scheduled_tasks_query(query, equipment_type_id)
-
-    tasks = await db.scheduled_tasks.find(query, {"_id": 0}).sort("due_date", 1).to_list(1000)
-
-    # Always exclude reactive/corrective tasks — they are triggered on failure
-    tasks = [t for t in tasks if t.get("task_type") not in CORRECTIVE_TASK_TYPES]
-
-    today = datetime.utcnow().date().isoformat()
-    for task in tasks:
-        task["is_overdue"] = (
-            task.get("due_date", "") < today
-            and task.get("status") not in ["completed", "cancelled"]
-        )
-
-    return {"tasks": tasks, "total": len(tasks)}
+    return await svc.list_scheduled_tasks(
+        current_user,
+        status=status,
+        priority=priority,
+        equipment_type_id=equipment_type_id,
+        assigned_to=assigned_to,
+        from_date=from_date,
+        to_date=to_date,
+        include_completed=include_completed,
+    )
 
 
 @router.get("/tasks/daily-planner")
@@ -82,44 +50,7 @@ async def get_daily_planner(
     current_user: dict = Depends(_scheduler_read),
 ):
     """Get tasks for daily planner view."""
-    await ensure_imported_pm_tasks_scheduled()
-
-    if not date:
-        date = datetime.utcnow().date().isoformat()
-
-    today = datetime.utcnow().date().isoformat()
-    tomorrow = (datetime.utcnow().date() + timedelta(days=1)).isoformat()
-
-    base_query = {
-        "status": {"$nin": [TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value]},
-        "task_type": {"$nin": list(CORRECTIVE_TASK_TYPES)},
-    }
-    await scope_scheduled_tasks_query(base_query, None)
-
-    overdue_tasks = await db.scheduled_tasks.find({
-        **base_query,
-        "due_date": {"$lt": today},
-    }, {"_id": 0}).sort("priority", -1).to_list(100)
-
-    today_tasks = await db.scheduled_tasks.find({
-        **base_query,
-        "due_date": today,
-    }, {"_id": 0}).sort("priority", -1).to_list(100)
-
-    tomorrow_tasks = await db.scheduled_tasks.find({
-        **base_query,
-        "due_date": tomorrow,
-    }, {"_id": 0}).sort("priority", -1).to_list(100)
-
-    for task in overdue_tasks:
-        task["is_overdue"] = True
-
-    return {
-        "date": date,
-        "overdue": {"tasks": overdue_tasks, "count": len(overdue_tasks)},
-        "today": {"tasks": today_tasks, "count": len(today_tasks)},
-        "tomorrow": {"tasks": tomorrow_tasks, "count": len(tomorrow_tasks)},
-    }
+    return await svc.get_daily_planner(current_user, date=date)
 
 
 @router.get("/tasks/weekly-planner")
@@ -128,52 +59,7 @@ async def get_weekly_planner(
     current_user: dict = Depends(_scheduler_read),
 ):
     """Get tasks for weekly planner view."""
-    await ensure_imported_pm_tasks_scheduled()
-
-    if not start_date:
-        today_date = datetime.utcnow().date()
-        start = today_date - timedelta(days=today_date.weekday())
-    else:
-        start = datetime.fromisoformat(start_date).date()
-
-    end = start + timedelta(days=6)
-
-    task_query = {
-        "planned_date": {"$gte": start.isoformat(), "$lte": end.isoformat()},
-        "status": {"$nin": [TaskStatus.COMPLETED.value, TaskStatus.CANCELLED.value]},
-        "task_type": {"$nin": list(CORRECTIVE_TASK_TYPES)},
-    }
-    await scope_scheduled_tasks_query(task_query, None)
-
-    tasks = await db.scheduled_tasks.find(task_query, {"_id": 0}).to_list(500)
-
-    days = {}
-    for i in range(7):
-        day = (start + timedelta(days=i)).isoformat()
-        days[day] = {
-            "date": day,
-            "day_name": (start + timedelta(days=i)).strftime("%A"),
-            "tasks": [],
-            "total_hours": 0,
-        }
-
-    today = datetime.utcnow().date().isoformat()
-
-    for task in tasks:
-        planned = task.get("planned_date")
-        if planned in days:
-            task["is_overdue"] = task.get("due_date", "") < today
-            days[planned]["tasks"].append(task)
-            days[planned]["total_hours"] += task.get("estimated_hours", 1.0)
-
-    technicians = await db.technician_capacity.find({"is_active": True}, {"_id": 0}).to_list(100)
-
-    return {
-        "start_date": start.isoformat(),
-        "end_date": end.isoformat(),
-        "days": list(days.values()),
-        "technicians": technicians,
-    }
+    return await svc.get_weekly_planner(current_user, start_date=start_date)
 
 
 @router.patch("/tasks/{task_id}")
@@ -183,49 +69,7 @@ async def update_task(
     current_user: dict = Depends(require_permission("scheduler:write")),
 ):
     """Update a scheduled task."""
-    task = await db.scheduled_tasks.find_one({"id": task_id})
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-
-    update_data = {"updated_at": datetime.utcnow().isoformat()}
-
-    if request.status:
-        update_data["status"] = request.status.value
-        if request.status == TaskStatus.IN_PROGRESS:
-            update_data["started_at"] = datetime.utcnow().isoformat()
-
-    if request.assigned_technician_id is not None:
-        update_data["assigned_technician_id"] = request.assigned_technician_id
-        update_data["assigned_technician_name"] = request.assigned_technician_name
-
-    if request.planned_date is not None:
-        update_data["planned_date"] = request.planned_date
-
-    if request.priority is not None:
-        update_data["priority"] = request.priority.value
-
-    if request.findings is not None:
-        update_data["findings"] = request.findings
-
-    if request.notes is not None:
-        update_data["notes"] = request.notes
-
-    if request.actual_hours is not None:
-        update_data["actual_hours"] = request.actual_hours
-
-    await db.scheduled_tasks.update_one(
-        {"id": task_id},
-        {"$set": update_data},
-    )
-
-    if request.status in (TaskStatus.COMPLETED, TaskStatus.CANCELLED):
-        from services.reliability_graph import sync_edges_for_scheduled_task
-
-        event = "completed" if request.status == TaskStatus.COMPLETED else "cancelled"
-        updated = {**task, **update_data, "status": request.status.value}
-        await sync_edges_for_scheduled_task(updated, event=event)
-
-    return {"message": "Task updated", "task_id": task_id}
+    return await svc.update_scheduled_task(current_user, task_id, request)
 
 
 @router.post("/tasks/{task_id}/complete")
@@ -235,142 +79,7 @@ async def complete_task(
     current_user: dict = Depends(require_permission("scheduler:write")),
 ):
     """Complete a scheduled task."""
-    task = await db.scheduled_tasks.find_one({"id": task_id})
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-
-    now = datetime.utcnow().isoformat()
-    today = datetime.utcnow().date().isoformat()
-
-    await db.scheduled_tasks.update_one(
-        {"id": task_id},
-        {"$set": {
-            "status": TaskStatus.COMPLETED.value,
-            "completed_at": now,
-            "actual_hours": request.actual_hours,
-            "findings": request.findings,
-            "notes": request.observations,
-            "updated_at": now,
-        }},
-    )
-
-    history = MaintenanceHistory(
-        equipment_id=task.get("equipment_id"),
-        equipment_name=task.get("equipment_name"),
-        equipment_tag=task.get("equipment_tag"),
-        task_name=task.get("task_name"),
-        task_type=task.get("task_type"),
-        scheduled_task_id=task_id,
-        maintenance_program_id=task.get("maintenance_program_id"),
-        completion_date=today,
-        technician_id=task.get("assigned_technician_id"),
-        technician_name=task.get("assigned_technician_name"),
-        actual_hours=request.actual_hours,
-        findings=request.findings,
-        observations=request.observations,
-        failure_observed=request.failure_observed,
-        strategy_id=task.get("strategy_id"),
-        strategy_version=task.get("strategy_version"),
-        failure_mode_id=task.get("failure_mode_id"),
-    )
-
-    await db.maintenance_history.insert_one(history.model_dump())
-
-    program_id = task.get("maintenance_program_id")
-    next_due = None
-    freq_days = 30
-
-    program_v2 = await db.maintenance_programs_v2.find_one(
-        {"tasks.id": program_id},
-        {"_id": 0},
-    )
-    if program_v2:
-        v2_task = next(
-            (t for t in (program_v2.get("tasks") or []) if t.get("id") == program_id),
-            None,
-        )
-        if v2_task:
-            freq_days = int(v2_task.get("frequency_days") or 30)
-        next_due = (datetime.utcnow().date() + timedelta(days=freq_days)).isoformat()
-        await db.maintenance_programs_v2.update_one(
-            {"tasks.id": program_id},
-            {
-                "$set": {
-                    "tasks.$.last_completion_date": today,
-                    "tasks.$.next_due_date": next_due,
-                    "updated_at": now,
-                }
-            },
-        )
-        from routes.maintenance_scheduler.scheduler import schedule_program
-        from services.scheduler_program_source import load_schedulable_programs
-
-        rows = await load_schedulable_programs(equipment_ids=[task.get("equipment_id")])
-        sched_row = next((r for r in rows if r.get("id") == program_id), None)
-        if sched_row:
-            sched_row = {**sched_row, "next_due_date": next_due}
-            await schedule_program(sched_row)
-    else:
-        from services.scheduler_config import should_read_legacy_maintenance_programs
-
-        program = None
-        if should_read_legacy_maintenance_programs():
-            program = await db.maintenance_programs.find_one({"id": program_id})
-
-        if program:
-            freq_days = program.get("frequency_days", 30)
-            next_due = (datetime.utcnow().date() + timedelta(days=freq_days)).isoformat()
-
-            await db.maintenance_programs.update_one(
-                {"id": program["id"]},
-                {"$set": {
-                    "last_completion_date": today,
-                    "next_due_date": next_due,
-                    "updated_at": now,
-                }},
-            )
-
-            from routes.maintenance_scheduler.scheduler import schedule_program
-            refreshed = await db.maintenance_programs.find_one({"id": program["id"]})
-            if refreshed:
-                await schedule_program(refreshed)
-
-    from services.reliability_graph import sync_edges_for_scheduled_task
-
-    completed_task = {
-        **task,
-        "status": TaskStatus.COMPLETED.value,
-        "completed_at": now,
-    }
-    await sync_edges_for_scheduled_task(
-        completed_task,
-        event="completed",
-        metadata={
-            "completed_at": now,
-            "actual_hours": request.actual_hours,
-            "failure_observed": request.failure_observed,
-        },
-    )
-
-    if request.findings and request.findings.strip() and task.get("equipment_id"):
-        from services.reliability_graph import _sync_finding_from_completion
-
-        completion_id = f"st:{task_id}"
-        await _sync_finding_from_completion(
-            completion_id=completion_id,
-            equipment_id=task["equipment_id"],
-            source_type="scheduled_task",
-            source_id=task_id,
-            findings_text=request.findings.strip(),
-            tenant_id=None,
-            completed_at=now,
-        )
-
-    return {
-        "message": "Task completed",
-        "task_id": task_id,
-        "next_due_date": next_due,
-    }
+    return await svc.complete_scheduled_task(current_user, task_id, request)
 
 
 @router.post("/tasks/{task_id}/defer")
@@ -380,23 +89,4 @@ async def defer_task(
     current_user: dict = Depends(require_permission("scheduler:write")),
 ):
     """Defer a scheduled task."""
-    task = await db.scheduled_tasks.find_one({"id": task_id})
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-
-    await db.scheduled_tasks.update_one(
-        {"id": task_id},
-        {"$set": {
-            "status": TaskStatus.DEFERRED.value,
-            "due_date": request.new_due_date,
-            "planned_date": request.new_due_date,
-            "notes": f"Deferred: {request.reason}",
-            "updated_at": datetime.utcnow().isoformat(),
-        }},
-    )
-
-    return {
-        "message": "Task deferred",
-        "task_id": task_id,
-        "new_due_date": request.new_due_date,
-    }
+    return await svc.defer_scheduled_task(current_user, task_id, request)

@@ -25,10 +25,10 @@ async def handle_apply_strategy(job: dict) -> dict:
         if user:
             current_user = user
 
-    from routes.maintenance_scheduler.programs import _apply_strategy_to_equipment_impl
+    from services.apply_strategy_service import apply_strategy_to_equipment
 
     request = ApplyStrategyRequest(equipment_ids=list(equipment_ids), run_async=False)
-    result = await _apply_strategy_to_equipment_impl(
+    result = await apply_strategy_to_equipment(
         equipment_type_id,
         request,
         current_user,
@@ -102,9 +102,41 @@ async def handle_reliability_snapshots_daily_refresh(job: dict) -> dict:
     return result
 
 
+async def handle_executive_kpi_refresh(job: dict) -> dict:
+    """Refresh materialized executive reliability KPI snapshots for a user."""
+    payload = job.get("payload") or {}
+    user = payload.get("user")
+    if not user:
+        return {"status": "skipped", "reason": "payload.user required"}
+
+    from services.executive_kpi_materializer import refresh_executive_kpis
+
+    owner_id = payload.get("owner_id") or user.get("owner_id") or user.get("id")
+    result = await refresh_executive_kpis(user, owner_id)
+    logger.info(
+        "executive_kpi_refresh tenant=%s user=%s generated_at=%s",
+        user.get("company_id") or user.get("organization_id"),
+        user.get("id"),
+        result.get("generated_at"),
+    )
+    return {"status": "ok", "generated_at": result.get("generated_at")}
+
+
+async def handle_process_domain_event_outbox(job: dict) -> dict:
+    """Drain domain event outbox batch (projection worker job type)."""
+    from workers.event_outbox_processor import process_outbox_batch
+
+    payload = job.get("payload") or {}
+    batch_size = int(payload.get("batch_size", 10))
+    processed = await process_outbox_batch(batch_size)
+    return {"status": "ok", "processed": processed}
+
+
 JOB_HANDLERS: Dict[str, Callable[..., Any]] = {
     "apply_strategy": handle_apply_strategy,
     "pm_import_ai_review": handle_pm_import_ai_review,
     "asset_health_daily_refresh": handle_asset_health_daily_refresh,
     "reliability_snapshots_daily_refresh": handle_reliability_snapshots_daily_refresh,
+    "executive_kpi_refresh": handle_executive_kpi_refresh,
+    "process_domain_event_outbox": handle_process_domain_event_outbox,
 }

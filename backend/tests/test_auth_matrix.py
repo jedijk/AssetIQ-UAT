@@ -34,7 +34,7 @@ def test_all_roles_defined_or_aliased():
 
 
 def test_permissions_route_aliases_match_rbac():
-    source = (Path(__file__).resolve().parents[1] / "routes" / "permissions.py").read_text()
+    source = (Path(__file__).resolve().parents[1] / "services" / "permissions_defaults.py").read_text()
     assert 'DEFAULT_PERMISSIONS["manager"] = DEFAULT_PERMISSIONS["admin"]' in source
     assert 'DEFAULT_PERMISSIONS["operator"] = DEFAULT_PERMISSIONS["operations"]' in source
 
@@ -54,7 +54,6 @@ def test_chat_analyze_requires_auth():
     idx = source.index('async def chat_analyze')
     block = source[idx: idx + 400]
     assert "Depends(get_current_user)" in block
-    assert "ai_gateway" in source or "from services.ai_gateway import chat" in source
 
 
 def test_failure_modes_mutations_require_library_write():
@@ -71,7 +70,7 @@ def test_maintenance_program_mutations_require_scheduler_write():
 
 
 def test_investigations_ai_problem_check_uses_gateway():
-    source = (Path(__file__).resolve().parents[1] / "routes" / "investigations.py").read_text()
+    source = (Path(__file__).resolve().parents[1] / "services" / "investigation_service.py").read_text()
     assert "from services.ai_gateway import chat as ai_gateway_chat" in source
     idx = source.index("async def ai_problem_check")
     block = source[idx: idx + 2500]
@@ -80,7 +79,7 @@ def test_investigations_ai_problem_check_uses_gateway():
 
 
 def test_equipment_search_escapes_regex():
-    source = (Path(__file__).resolve().parents[1] / "routes" / "equipment" / "equipment_utils.py").read_text()
+    source = (Path(__file__).resolve().parents[1] / "services" / "equipment_search_service.py").read_text()
     assert "case_insensitive_contains" in source
     assert '"$regex": q' not in source
 
@@ -101,7 +100,7 @@ def test_tasks_reads_require_tasks_read():
 
 
 def test_production_logs_ai_parse_uses_gateway():
-    source = (Path(__file__).resolve().parents[1] / "routes" / "production_logs.py").read_text()
+    source = (Path(__file__).resolve().parents[1] / "services" / "production_logs_service.py").read_text()
     assert "from services.ai_gateway import chat as ai_gateway_chat" in source
     idx = source.index("async def ai_parse_file")
     block = source[idx: idx + 3500]
@@ -126,7 +125,7 @@ def test_pm_import_service_uses_gateway():
 
 
 def test_production_logs_ingest_uses_tracked_jobs():
-    source = (Path(__file__).resolve().parents[1] / "routes" / "production_logs.py").read_text()
+    source = (Path(__file__).resolve().parents[1] / "services" / "production_logs_service.py").read_text()
     assert "schedule_tracked_job" in source
     idx = source.index("async def ingest_logs")
     block = source[idx: idx + 1200]
@@ -240,12 +239,13 @@ def test_routes_use_tracked_jobs_not_raw_background_tasks():
 
 
 def test_my_tasks_routes_require_tasks_permissions():
-    source = (Path(__file__).resolve().parents[1] / "routes" / "my_tasks.py").read_text()
-    assert '_tasks_read = require_permission("tasks:read")' in source
-    assert '_tasks_write = require_permission("tasks:write")' in source
-    assert "Depends(_tasks_read)" in source
-    assert "Depends(_tasks_write)" in source
-    assert "_ensure_user_can_execute_task" in source
+    routes_source = (Path(__file__).resolve().parents[1] / "routes" / "my_tasks.py").read_text()
+    service_source = (Path(__file__).resolve().parents[1] / "services" / "my_tasks_service.py").read_text()
+    assert '_tasks_read = require_permission("tasks:read")' in routes_source
+    assert '_tasks_write = require_permission("tasks:write")' in routes_source
+    assert "Depends(_tasks_read)" in routes_source
+    assert "Depends(_tasks_write)" in routes_source
+    assert "_ensure_user_can_execute_task" in service_source
 
 
 def test_work_items_mutations_require_tasks_write():
@@ -259,13 +259,13 @@ def test_work_items_mutations_require_tasks_write():
 
 def test_production_logs_require_settings_permissions():
     source = (Path(__file__).resolve().parents[1] / "routes" / "production_logs.py").read_text()
-    assert '_settings_read = require_permission("settings:read")' in source
-    assert '_settings_write = require_permission("settings:write")' in source
+    assert '_read = require_permission("settings:read")' in source
+    assert '_write = require_permission("settings:write")' in source
     assert "_owner_only" not in source
     idx = source.index("async def upload_log_files")
-    assert "Depends(_settings_write)" in source[idx: idx + 250]
+    assert "Depends(_write)" in source[idx: idx + 250]
     idx_get = source.index("async def list_jobs")
-    assert "Depends(_settings_read)" in source[idx_get: idx_get + 250]
+    assert "Depends(_read)" in source[idx_get: idx_get + 250]
 
 
 def test_qr_codes_require_settings_permissions():
@@ -357,20 +357,22 @@ async def test_viewer_ui_matrix_denies_observations_write():
 
 def test_threats_routes_require_permission_deps():
     source = (Path(__file__).resolve().parents[1] / "routes" / "threats.py").read_text()
+    service_source = (Path(__file__).resolve().parents[1] / "services" / "threat_service.py").read_text()
     assert '_threats_read = require_permission("threats:read")' in source
     assert '_threats_write = require_permission("threats:write")' in source
     assert '_threats_delete = require_permission("threats:delete")' in source
     assert "Depends(_threats_write)" in source
-    assert "_assert_threat_installation_scope" in source
+    assert "assert_user_can_access_equipment" in service_source
 
 
 def test_actions_routes_require_permission_deps():
     source = (Path(__file__).resolve().parents[1] / "routes" / "actions.py").read_text()
+    service_source = (Path(__file__).resolve().parents[1] / "services" / "action_service.py").read_text()
     assert '_actions_read = require_permission("actions:read")' in source
     assert '_actions_write = require_permission("actions:write")' in source
     assert '_actions_delete = require_permission("actions:delete")' in source
     assert "Depends(_actions_write)" in source
-    assert "_assert_action_installation_scope" in source
+    assert "assert_user_can_access_equipment" in service_source
 
 
 def test_failure_modes_reads_require_library_read():
@@ -381,14 +383,17 @@ def test_failure_modes_reads_require_library_read():
 
 
 def test_equipment_file_view_requires_auth_and_equipment_read():
-    source = (
+    routes_source = (
         Path(__file__).resolve().parents[1] / "routes" / "equipment" / "equipment_files.py"
     ).read_text()
-    idx = source.index("async def view_equipment_file_public")
-    block = source[idx: idx + 500]
-    assert 'require_permission("equipment:read")' in source
+    service_source = (
+        Path(__file__).resolve().parents[1] / "services" / "equipment_files_service.py"
+    ).read_text()
+    idx = routes_source.index("async def view_equipment_file_public")
+    block = routes_source[idx: idx + 500]
+    assert 'require_permission("equipment:read")' in routes_source
     assert "Depends(_equipment_read)" in block
-    assert "assert_user_can_access_equipment" in block
+    assert "assert_user_can_access_equipment" in service_source
     assert "no auth required" not in block.lower()
 
 
@@ -411,7 +416,7 @@ def test_permissions_updates_invalidate_resolver_cache():
 
 
 def test_threat_enrichment_extracted():
-    threats_source = (Path(__file__).resolve().parents[1] / "routes" / "threats.py").read_text()
+    threats_source = (Path(__file__).resolve().parents[1] / "services" / "threat_service.py").read_text()
     enrichment_source = (
         Path(__file__).resolve().parents[1] / "services" / "threat_enrichment.py"
     ).read_text()

@@ -277,7 +277,7 @@ class UnifiedCache:
         self._inc("invalidations", 1)
 
     # ------------------------------------------------------------------ entity: stats
-    def get_stats(self, key: str):
+    def get_stat_entry(self, key: str):
         with self._stats_lock:
             val = self._stats.get(key)
         if val is not None:
@@ -432,8 +432,8 @@ class CacheService:
         unified_cache.invalidate_failure_mode(fm_id)
 
     @staticmethod
-    def get_stats(key: str):
-        return unified_cache.get_stats(key)
+    def get_stat_entry(key: str):
+        return unified_cache.get_stat_entry(key)
 
     @staticmethod
     def set_stats(key: str, value):

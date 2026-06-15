@@ -11,6 +11,7 @@ import re
 import logging
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from middleware.rate_limit import RATE_LIMIT_ENABLED
 from typing import Optional
 
 from database import db, JWT_EXPIRATION_HOURS
@@ -31,7 +32,7 @@ router = APIRouter(tags=["Authentication"])
 logger = logging.getLogger(__name__)
 
 # Rate limiter
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=get_remote_address, enabled=RATE_LIMIT_ENABLED)
 
 # Rate limit configurations
 AUTH_RATE_LIMIT = "10/minute"  # 10 auth attempts per minute per IP
@@ -243,7 +244,7 @@ async def register(request: Request, user_data: RegisterWithProtection):
             raise HTTPException(status_code=400, detail=error_msg or "Verification failed. Please try again.")
     
     # 4. Check if email exists
-    existing = await db.users.find_one({"email": user_data.email})
+    existing = await db.users.find_one({"email": exact_case_insensitive(user_data.email)})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     
@@ -812,7 +813,7 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest):
     Returns user_found status to provide feedback to the user.
     """
     # Find user by email
-    user = await db.users.find_one({"email": body.email}, {"_id": 0})
+    user = await db.users.find_one({"email": exact_case_insensitive(body.email)}, {"_id": 0})
     
     if not user:
         # User not found - return feedback

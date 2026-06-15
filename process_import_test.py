@@ -13,7 +13,7 @@ from typing import Optional, Dict, Any
 from PIL import Image, ImageDraw, ImageFont
 
 # Configuration
-BASE_URL = "https://flicker-solver.preview.emergentagent.com/api"
+BASE_URL = "https://reliability-graph-1.preview.emergentagent.com/api"
 TEST_EMAIL = "jedijk@gmail.com"
 TEST_PASSWORD = "Jaap8019@"
 
