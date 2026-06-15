@@ -387,8 +387,10 @@ export default function ActionDetailPage() {
             <div className="lg:col-span-7 space-y-3">
               <ReliabilityEvidencePanel
                 equipmentId={action.linked_equipment_id}
+                equipmentName={action.equipment_name || action.threat_asset}
                 anchorNodeType="action"
                 anchorNodeId={actionId}
+                anchorLabel={action.title}
                 title="Reliability Graph Evidence"
               />
               <ActionOutcomeWidget actionId={actionId} actionStatus={action.status} />

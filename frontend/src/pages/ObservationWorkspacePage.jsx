@@ -529,8 +529,10 @@ const ObservationWorkspacePage = () => {
 
         <ReliabilityEvidencePanel
           equipmentId={observation?.linked_equipment_id}
+          equipmentName={observation?.asset || observation?.equipment_type}
           anchorNodeType="threat"
           anchorNodeId={id}
+          anchorLabel={observation?.title || displayTitle}
           title="Reliability Graph Evidence"
         />
 

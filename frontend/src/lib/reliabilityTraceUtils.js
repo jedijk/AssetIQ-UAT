@@ -14,7 +14,43 @@ const STAGE_ORDER = [
 ];
 
 export function formatNodeTypeLabel(type) {
+  const friendly = {
+    equipment: "Equipment",
+    failure_mode: "Failure mode",
+    observation: "Observation",
+    threat: "Observation",
+    finding: "Finding",
+    investigation: "Investigation",
+    cause: "Root cause",
+    action: "Action",
+    outcome: "Outcome",
+    reliability_impact: "Reliability impact",
+    program_task: "Program task",
+    scheduled_task: "Scheduled PM",
+    task_instance: "Task",
+    equipment_type_strategy: "Strategy",
+    maintenance_program_v2: "Maintenance program",
+  };
+  if (friendly[type]) return friendly[type];
   return (type || "unknown").replace(/_/g, " ");
+}
+
+const FALLBACK_LABELS = {
+  equipment: "Unknown equipment",
+  failure_mode: "Unknown failure mode",
+  observation: "Untitled observation",
+  threat: "Untitled observation",
+  finding: "Untitled finding",
+  investigation: "Untitled investigation",
+  action: "Untitled action",
+  outcome: "Outcome",
+  program_task: "Program task",
+  scheduled_task: "Scheduled task",
+  task_instance: "Task",
+};
+
+function nodeKey(type, id) {
+  return `${type}:${id}`;
 }
 
 export function getNodeRecordLink(nodeType, nodeId) {
@@ -36,11 +72,18 @@ export function getNodeRecordLink(nodeType, nodeId) {
   }
 }
 
-function nodeKey(type, id) {
-  return `${type}:${id}`;
+function resolveNodeLabel(type, id, edgeLabel, nodeLabels, labelHints) {
+  const key = nodeKey(type, id);
+  return (
+    edgeLabel ||
+    labelHints?.[key] ||
+    nodeLabels?.[key] ||
+    FALLBACK_LABELS[type] ||
+    formatNodeTypeLabel(type)
+  );
 }
 
-function collectNodesFromEdges(edges = []) {
+function collectNodesFromEdges(edges = [], { nodeLabels = {}, labelHints = {} } = {}) {
   const nodes = new Map();
   for (const edge of edges) {
     for (const [id, type, label] of [
@@ -53,7 +96,7 @@ function collectNodesFromEdges(edges = []) {
         nodes.set(key, {
           id,
           type,
-          label: label || `${formatNodeTypeLabel(type)} ${id.slice(0, 8)}`,
+          label: resolveNodeLabel(type, id, label, nodeLabels, labelHints),
           link: getNodeRecordLink(type, id),
         });
       }
@@ -62,9 +105,16 @@ function collectNodesFromEdges(edges = []) {
   return nodes;
 }
 
-export function buildTraceStages({ edges = [], chain = null, anchorNodeType = null, anchorNodeId = null } = {}) {
+export function buildTraceStages({
+  edges = [],
+  chain = null,
+  anchorNodeType = null,
+  anchorNodeId = null,
+  nodeLabels = {},
+  labelHints = {},
+} = {}) {
   const allEdges = edges.length ? edges : chain?.edges || [];
-  const nodes = collectNodesFromEdges(allEdges);
+  const nodes = collectNodesFromEdges(allEdges, { nodeLabels, labelHints });
 
   if (anchorNodeType && anchorNodeId) {
     const anchorKey = nodeKey(anchorNodeType, anchorNodeId);
@@ -72,22 +122,24 @@ export function buildTraceStages({ edges = [], chain = null, anchorNodeType = nu
       nodes.set(anchorKey, {
         id: anchorNodeId,
         type: anchorNodeType,
-        label: `${formatNodeTypeLabel(anchorNodeType)} ${anchorNodeId.slice(0, 8)}`,
+        label: resolveNodeLabel(anchorNodeType, anchorNodeId, null, nodeLabels, labelHints),
         link: getNodeRecordLink(anchorNodeType, anchorNodeId),
         isAnchor: true,
       });
     } else {
-      nodes.get(anchorKey).isAnchor = true;
+      const node = nodes.get(anchorKey);
+      node.isAnchor = true;
+      if (labelHints?.[anchorKey]) {
+        node.label = labelHints[anchorKey];
+      }
     }
   }
 
-  const stages = STAGE_ORDER.map(({ key, label, types }) => ({
+  return STAGE_ORDER.map(({ key, label, types }) => ({
     key,
     label,
     nodes: [...nodes.values()].filter((n) => types.includes(n.type)),
   })).filter((stage) => stage.nodes.length > 0);
-
-  return stages;
 }
 
 export function summarizeRiskExplanation(risk = {}) {
@@ -103,6 +155,16 @@ export function summarizeRiskExplanation(risk = {}) {
   };
 }
 
+export function buildLabelHintsFromRisk(risk = {}) {
+  const hints = {};
+  for (const threat of risk.open_threats || []) {
+    if (threat?.id && threat?.title) {
+      hints[`threat:${threat.id}`] = threat.title;
+    }
+  }
+  return hints;
+}
+
 export function mergeTracePayload(equipmentPayload, nodePayload) {
   if (!nodePayload) return equipmentPayload;
   const eqEdges = equipmentPayload?.chain?.edges || [];
@@ -115,6 +177,10 @@ export function mergeTracePayload(equipmentPayload, nodePayload) {
     if (id) seen.add(id);
     merged.push(edge);
   }
+  const node_labels = {
+    ...(equipmentPayload?.node_labels || {}),
+    ...(nodePayload?.node_labels || {}),
+  };
   return {
     equipment_id: equipmentPayload?.equipment_id || nodePayload?.equipment_id,
     chain: {
@@ -123,6 +189,7 @@ export function mergeTracePayload(equipmentPayload, nodePayload) {
       edge_count: merged.length,
     },
     risk_explanation: equipmentPayload?.risk_explanation || nodePayload?.risk_explanation,
+    node_labels,
     node_trace: nodePayload,
   };
 }

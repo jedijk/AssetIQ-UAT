@@ -41,12 +41,23 @@ async function fetchTraceEvidence({ equipmentId, anchorNodeType, anchorNodeId })
 
 export function ReliabilityEvidencePanel({
   equipmentId,
+  equipmentName = null,
   anchorNodeType = null,
   anchorNodeId = null,
+  anchorLabel = null,
+  labelHints = {},
   title = "Graph Evidence",
   className = "",
 }) {
   const enabled = Boolean(equipmentId || (anchorNodeType && anchorNodeId));
+
+  const mergedLabelHints = {
+    ...labelHints,
+    ...(equipmentId && equipmentName ? { [`equipment:${equipmentId}`]: equipmentName } : {}),
+    ...(anchorNodeType && anchorNodeId && anchorLabel
+      ? { [`${anchorNodeType}:${anchorNodeId}`]: anchorLabel }
+      : {}),
+  };
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["reliability-trace-evidence", equipmentId, anchorNodeType, anchorNodeId],
@@ -91,6 +102,10 @@ export function ReliabilityEvidencePanel({
             compact
             showRiskSummary={Boolean(resolvedEquipmentId)}
             equipmentId={resolvedEquipmentId}
+            equipmentName={equipmentName}
+            anchorNodeType={anchorNodeType}
+            anchorNodeId={anchorNodeId}
+            labelHints={mergedLabelHints}
           />
         )}
       </CardContent>

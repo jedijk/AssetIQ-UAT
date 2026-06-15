@@ -19,6 +19,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import {
+  buildLabelHintsFromRisk,
   buildTraceStages,
   formatNodeTypeLabel,
   summarizeRiskExplanation,
@@ -36,6 +37,23 @@ const STAGE_ICONS = {
 
 function RiskSummary({ riskSummary }) {
   if (!riskSummary) return null;
+
+  const hasRisk =
+    riskSummary.openThreatCount > 0 ||
+    riskSummary.graphLinkedThreatCount > 0 ||
+    riskSummary.overduePm > 0 ||
+    (riskSummary.topThreats?.length ?? 0) > 0;
+
+  if (!hasRisk) {
+    return (
+      <Card className="border-slate-200 bg-slate-50/80">
+        <CardContent className="py-3 text-sm text-slate-600">
+          No active risk signals on this asset right now. Graph evidence below shows linked maintenance and reliability records.
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card className="border-amber-200 bg-amber-50/60">
       <CardHeader className="pb-2">
@@ -100,7 +118,7 @@ function TraceStageRow({ stage, compact }) {
             >
               <div className="min-w-0">
                 <p className="text-sm font-medium text-slate-900 truncate">{node.label}</p>
-                <p className="text-xs text-slate-500">{formatNodeTypeLabel(node.type)}</p>
+                <p className="text-xs text-slate-500 capitalize">{formatNodeTypeLabel(node.type)}</p>
               </div>
               {node.link ? <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" /> : null}
             </div>
@@ -126,14 +144,22 @@ export function ReliabilityTraceView({
   showRiskSummary = true,
   equipmentName,
   equipmentId,
+  anchorNodeType = null,
+  anchorNodeId = null,
+  labelHints = {},
 }) {
   const stages = useMemo(() => {
     if (!traceData) return [];
+    const riskHints = buildLabelHintsFromRisk(traceData?.risk_explanation);
     return buildTraceStages({
       edges: traceData.chain?.edges || traceData.edges || [],
       chain: traceData.chain,
+      anchorNodeType,
+      anchorNodeId,
+      nodeLabels: traceData.node_labels || {},
+      labelHints: { ...riskHints, ...labelHints },
     });
-  }, [traceData]);
+  }, [traceData, anchorNodeType, anchorNodeId, labelHints]);
 
   const riskSummary = useMemo(
     () => summarizeRiskExplanation(traceData?.risk_explanation),

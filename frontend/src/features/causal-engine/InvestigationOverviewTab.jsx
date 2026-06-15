@@ -82,8 +82,14 @@ export function InvestigationOverviewTab({
     <div className="space-y-4">
       <ReliabilityEvidencePanel
         equipmentId={investigation?.asset_id}
+        equipmentName={investigation?.asset_name}
         anchorNodeType="investigation"
         anchorNodeId={investigation?.id}
+        anchorLabel={
+          investigation?.case_number
+            ? `#${investigation.case_number} · ${investigation?.title || "Investigation"}`
+            : investigation?.title
+        }
         title="Reliability Graph Evidence"
       />
       {isEditingInvestigation ? (

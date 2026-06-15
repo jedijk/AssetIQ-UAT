@@ -98,6 +98,7 @@ async def get_equipment_reliability_chain(
     current_user: dict = Depends(_ril_read),
 ):
     """Graph-backed reliability chain paths for an equipment item."""
+    from services.graph_node_label_service import enrich_edges_with_labels
     from services.reliability_graph_query import GraphTraversalService
 
     traversal = GraphTraversalService()
@@ -105,10 +106,22 @@ async def get_equipment_reliability_chain(
         equipment_id, depth=depth, user=current_user, edge_limit=limit
     )
     risk = await traversal.explain_risk(equipment_id, user=current_user)
+    edges, node_labels = await enrich_edges_with_labels(
+        chain.get("edges") or [],
+        user=current_user,
+        extra_refs=[("equipment", equipment_id)],
+    )
+    for threat in risk.get("open_threats") or []:
+        tid = threat.get("id")
+        title = threat.get("title")
+        if tid and title:
+            node_labels[f"threat:{tid}"] = title
+    chain = {**chain, "edges": edges}
     return {
         "equipment_id": equipment_id,
         "chain": chain,
         "risk_explanation": risk,
+        "node_labels": node_labels,
     }
 
 
@@ -120,6 +133,7 @@ async def get_node_reliability_trace(
     current_user: dict = Depends(_ril_read),
 ):
     """Upstream/downstream graph evidence for a single node (evidence panels)."""
+    from services.graph_node_label_service import enrich_edges_with_labels
     from services.reliability_graph_query import GraphTraversalService
 
     traversal = GraphTraversalService()
@@ -153,8 +167,21 @@ async def get_node_reliability_trace(
             break
 
     risk = None
+    node_labels: dict = {}
     if equipment_id:
         risk = await traversal.explain_risk(equipment_id, user=current_user)
+
+    merged, node_labels = await enrich_edges_with_labels(
+        merged,
+        user=current_user,
+        extra_refs=[(node_type, node_id)] + ([("equipment", equipment_id)] if equipment_id else []),
+    )
+    if risk:
+        for threat in risk.get("open_threats") or []:
+            tid = threat.get("id")
+            title = threat.get("title")
+            if tid and title:
+                node_labels[f"threat:{tid}"] = title
 
     return {
         "node_type": node_type,
@@ -165,6 +192,7 @@ async def get_node_reliability_trace(
         "edges": merged,
         "edge_count": len(merged),
         "risk_explanation": risk,
+        "node_labels": node_labels,
     }
 
 
