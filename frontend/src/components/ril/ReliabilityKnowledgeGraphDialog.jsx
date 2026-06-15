@@ -15,7 +15,6 @@ import {
 } from "../ui/dialog";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { ScrollArea } from "../ui/scroll-area";
 
 const NODE_LAYOUT = {
   equipment_type_strategy: { x: 70, y: 60 },
@@ -77,7 +76,7 @@ function NodeRelationBreakdown({ node }) {
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs max-h-[min(220px,32vh)] overflow-y-auto overscroll-contain pr-1">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
       <div>
         <p className="font-semibold text-slate-700 mb-1">
           Outgoing ({node.edge_count_outgoing ?? 0})
@@ -148,7 +147,7 @@ const ReliabilityOntologyGraph = ({
 
   return (
     <div
-      className="rounded-lg border border-slate-200 bg-slate-50/80 overflow-auto max-h-[min(420px,55vh)] touch-pan-x touch-pan-y"
+      className="rounded-lg border border-slate-200 bg-slate-50/80 overflow-x-auto"
       data-testid="reliability-knowledge-graph-scroll"
     >
       <svg
@@ -322,50 +321,53 @@ export default function ReliabilityKnowledgeGraphDialog({
       }}
     >
       <DialogContent
-        className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col"
+        className="fixed inset-0 left-0 top-0 z-[100] !flex h-[100dvh] w-screen max-h-none max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-x-hidden overflow-y-auto overscroll-y-contain touch-pan-y rounded-none border-0 p-0"
         data-testid="reliability-knowledge-graph-dialog"
       >
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Network className="w-5 h-5 text-blue-600" />
-            Reliability Knowledge Graph
-          </DialogTitle>
-          <DialogDescription>
-            Live edge topology from your tenant — node counts show incoming and outgoing
-            relations; arcs reflect actual source and target types in the graph store.
-          </DialogDescription>
-        </DialogHeader>
+        <div className="sticky top-0 z-10 shrink-0 border-b border-slate-200 bg-background px-4 py-4 sm:px-6">
+          <DialogHeader className="pr-10">
+            <DialogTitle className="flex items-center gap-2">
+              <Network className="w-5 h-5 text-blue-600" />
+              Reliability Knowledge Graph
+            </DialogTitle>
+            <DialogDescription>
+              Live edge topology from your tenant — node counts show incoming and outgoing
+              relations; arcs reflect actual source and target types in the graph store.
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
-          <Link2 className="w-4 h-4 shrink-0" />
-          <span>
-            <span className="font-semibold text-slate-900">
-              {totalEdges.toLocaleString()}
-            </span>{" "}
-            active graph edges
-            {!isLoading && !isError && listedEdgeSum === totalEdges && (
-              <span className="text-slate-400"> · matches arc totals below</span>
-            )}
-          </span>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="ml-auto h-7 text-xs"
-            onClick={() => refetch()}
-            disabled={isFetching}
-            data-testid="reliability-knowledge-graph-refresh"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 mr-1 ${isFetching ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-          {dataUpdatedAt ? (
-            <span className="text-xs text-slate-400 w-full sm:w-auto">
-              Updated {new Date(dataUpdatedAt).toLocaleTimeString()}
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+            <Link2 className="w-4 h-4 shrink-0" />
+            <span>
+              <span className="font-semibold text-slate-900">
+                {totalEdges.toLocaleString()}
+              </span>{" "}
+              active graph edges
+              {!isLoading && !isError && listedEdgeSum === totalEdges && (
+                <span className="text-slate-400"> · matches arc totals below</span>
+              )}
             </span>
-          ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="ml-auto h-7 text-xs"
+              onClick={() => refetch()}
+              disabled={isFetching}
+              data-testid="reliability-knowledge-graph-refresh"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 mr-1 ${isFetching ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+            {dataUpdatedAt ? (
+              <span className="text-xs text-slate-400 w-full sm:w-auto">
+                Updated {new Date(dataUpdatedAt).toLocaleTimeString()}
+              </span>
+            ) : null}
+          </div>
         </div>
 
+        <div className="px-4 pb-8 sm:px-6">
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="w-8 h-8 text-slate-400 animate-spin" />
@@ -375,14 +377,13 @@ export default function ReliabilityKnowledgeGraphDialog({
             Unable to load knowledge graph data.
           </div>
         ) : (
-          <ScrollArea className="flex-1 min-h-0 h-0">
-            <div className="space-y-4 pr-3 pb-1">
+          <div className="space-y-4 py-4">
               <div
                 className="space-y-3"
                 onMouseLeave={() => setHighlightedNode(null)}
               >
                 <p className="text-[11px] text-slate-400 sm:hidden">
-                  Scroll the graph horizontally to explore all nodes.
+                  Scroll to explore the graph and relation list below.
                 </p>
                 <ReliabilityOntologyGraph
                   nodeTypes={nodeTypes}
@@ -393,7 +394,7 @@ export default function ReliabilityKnowledgeGraphDialog({
                 />
 
                 <div
-                  className="min-h-[148px] max-h-[min(280px,38vh)] overflow-y-auto overscroll-contain rounded-lg border border-slate-200 bg-slate-50/60 p-3"
+                  className="rounded-lg border border-slate-200 bg-slate-50/60 p-3"
                   data-testid="reliability-knowledge-graph-node-detail"
                 >
                   {selectedNode ? (
@@ -459,8 +460,8 @@ export default function ReliabilityKnowledgeGraphDialog({
                 </div>
               </div>
             </div>
-          </ScrollArea>
         )}
+        </div>
       </DialogContent>
     </Dialog>
   );
