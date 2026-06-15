@@ -1,15 +1,22 @@
 /**
- * Compact graph evidence panel for embedding in detail pages.
+ * Reliability graph evidence — compact trigger button + modal (no inline space).
  */
-import React from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { GitBranch, Loader2, Network } from "lucide-react";
 import { rilDashboardAPI } from "../../lib/apis/rilAPI";
 import { mergeTracePayload } from "../../lib/reliabilityTraceUtils";
 import { ReliabilityTraceView } from "./ReliabilityTraceView";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
+import { ScrollArea } from "../ui/scroll-area";
 
 async function fetchTraceEvidence({ equipmentId, anchorNodeType, anchorNodeId }) {
   let equipmentPayload = null;
@@ -46,10 +53,14 @@ export function ReliabilityEvidencePanel({
   anchorNodeId = null,
   anchorLabel = null,
   labelHints = {},
-  title = "Graph Evidence",
+  title = "Reliability Graph Evidence",
+  buttonLabel = null,
   className = "",
+  buttonVariant = "outline",
+  buttonSize = "sm",
 }) {
-  const enabled = Boolean(equipmentId || (anchorNodeType && anchorNodeId));
+  const [open, setOpen] = useState(false);
+  const canLoad = Boolean(equipmentId || (anchorNodeType && anchorNodeId));
 
   const mergedLabelHints = {
     ...labelHints,
@@ -59,57 +70,81 @@ export function ReliabilityEvidencePanel({
       : {}),
   };
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, isFetching } = useQuery({
     queryKey: ["reliability-trace-evidence", equipmentId, anchorNodeType, anchorNodeId],
     queryFn: () => fetchTraceEvidence({ equipmentId, anchorNodeType, anchorNodeId }),
-    enabled,
+    enabled: open && canLoad,
     staleTime: 60_000,
   });
 
-  if (!enabled) return null;
+  if (!canLoad) return null;
 
   const resolvedEquipmentId = data?.equipment_id || equipmentId;
+  const triggerLabel = buttonLabel || title;
 
   return (
-    <Card className={className}>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <GitBranch className="w-4 h-4 text-indigo-600" />
-            {title}
-          </CardTitle>
-          {resolvedEquipmentId && (
-            <Button asChild variant="ghost" size="sm" className="h-8 text-xs">
-              <Link to={`/equipment/${resolvedEquipmentId}/trace`}>
-                <Network className="w-3.5 h-3.5 mr-1" />
-                Full trace
-              </Link>
-            </Button>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <div className="flex items-center gap-2 text-sm text-slate-500 py-4">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Loading graph evidence…
-          </div>
-        ) : (
-          <ReliabilityTraceView
-            traceData={data}
-            isLoading={false}
-            error={error}
-            compact
-            showRiskSummary={Boolean(resolvedEquipmentId)}
-            equipmentId={resolvedEquipmentId}
-            equipmentName={equipmentName}
-            anchorNodeType={anchorNodeType}
-            anchorNodeId={anchorNodeId}
-            labelHints={mergedLabelHints}
-          />
-        )}
-      </CardContent>
-    </Card>
+    <>
+      <Button
+        type="button"
+        variant={buttonVariant}
+        size={buttonSize}
+        className={className}
+        onClick={() => setOpen(true)}
+      >
+        <GitBranch className="w-4 h-4 mr-2 text-indigo-600" />
+        {triggerLabel}
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 pt-6 pb-3 border-b shrink-0">
+            <div className="flex items-start justify-between gap-3 pr-8">
+              <div className="min-w-0">
+                <DialogTitle className="flex items-center gap-2 text-lg">
+                  <GitBranch className="w-5 h-5 text-indigo-600 shrink-0" />
+                  {title}
+                </DialogTitle>
+                <DialogDescription className="mt-1">
+                  Graph-backed chain from this record to equipment, failure modes, and related work.
+                </DialogDescription>
+              </div>
+              {resolvedEquipmentId && (
+                <Button asChild variant="outline" size="sm" className="shrink-0 h-8 text-xs">
+                  <Link to={`/equipment/${resolvedEquipmentId}/trace`} onClick={() => setOpen(false)}>
+                    <Network className="w-3.5 h-3.5 mr-1" />
+                    Full trace
+                  </Link>
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 max-h-[calc(85vh-7rem)]">
+            <div className="px-6 py-4">
+              {isLoading || (isFetching && !data) ? (
+                <div className="flex items-center gap-2 text-sm text-slate-500 py-8 justify-center">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Loading graph evidence…
+                </div>
+              ) : (
+                <ReliabilityTraceView
+                  traceData={data}
+                  isLoading={false}
+                  error={error}
+                  compact
+                  showRiskSummary={Boolean(resolvedEquipmentId)}
+                  equipmentId={resolvedEquipmentId}
+                  equipmentName={equipmentName}
+                  anchorNodeType={anchorNodeType}
+                  anchorNodeId={anchorNodeId}
+                  labelHints={mergedLabelHints}
+                />
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

@@ -30,6 +30,8 @@ class TestActionsAPI:
     
     def teardown_method(self, method):
         """Cleanup created actions after each test"""
+        if not hasattr(self, "created_action_ids"):
+            return
         for action_id in self.created_action_ids:
             try:
                 self.client.delete(f"{BASE_URL}/api/actions/{action_id}")

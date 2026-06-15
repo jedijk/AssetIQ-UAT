@@ -6,6 +6,7 @@ import pytest
 import requests
 import os
 from pathlib import Path
+from typing import Optional
 
 # Load frontend .env to get REACT_APP_BACKEND_URL
 _frontend_env = Path(__file__).parent.parent.parent / 'frontend' / '.env'
@@ -28,6 +29,29 @@ TEST_OWNER_PASSWORD = os.environ.get('TEST_OWNER_PASSWORD', 'admin123')
 
 # Test data IDs (if needed)
 TEST_THREAT_ID = os.environ.get('TEST_THREAT_ID', '43455566-4f46-4c54-8130-fdd7a7d009a1')
+
+
+def _login_url() -> Optional[str]:
+    if not BASE_URL:
+        return None
+    return f"{BASE_URL}/api/auth/login"
+
+
+def _fetch_auth_token(api_client, credentials: dict, label: str) -> str:
+    login_url = _login_url()
+    if not login_url:
+        pytest.skip("REACT_APP_BACKEND_URL not set — skipping HTTP integration tests")
+    try:
+        response = api_client.post(login_url, json=credentials, timeout=15)
+    except requests.RequestException as exc:
+        pytest.skip(f"API unreachable at {BASE_URL} ({label}): {exc}")
+    if response.status_code == 200:
+        token = response.json().get("token")
+        if token:
+            return token
+    pytest.skip(
+        f"Authentication failed for {label} ({response.status_code}) — skipping authenticated tests"
+    )
 
 
 # =============================================
@@ -63,19 +87,13 @@ def owner_credentials():
 @pytest.fixture
 def auth_token(api_client, admin_credentials):
     """Get auth token for admin user."""
-    response = api_client.post(f"{BASE_URL}/api/auth/login", json=admin_credentials)
-    if response.status_code == 200:
-        return response.json().get("token")
-    pytest.skip(f"Authentication failed ({response.status_code}) — skipping authenticated tests")
+    return _fetch_auth_token(api_client, admin_credentials, "admin")
 
 
 @pytest.fixture
 def owner_token(api_client, owner_credentials):
     """Get auth token for owner user."""
-    response = api_client.post(f"{BASE_URL}/api/auth/login", json=owner_credentials)
-    if response.status_code == 200:
-        return response.json().get("token")
-    pytest.skip(f"Owner authentication failed ({response.status_code}) — skipping owner tests")
+    return _fetch_auth_token(api_client, owner_credentials, "owner")
 
 
 @pytest.fixture

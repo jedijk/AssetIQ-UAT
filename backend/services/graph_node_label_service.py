@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
+from bson import ObjectId
+
 from database import db
 from services.tenant_schema import merge_tenant_filter
 
@@ -41,6 +43,77 @@ def _format_action(doc: dict) -> str:
     if title and number:
         return f"{number} · {title}"
     return title or (str(number) if number else None)
+
+
+def _failure_mode_label(doc: dict) -> Optional[str]:
+    return _pick_label(doc, "failure_mode", "name", "category")
+
+
+def _failure_mode_lookup_keys(doc: dict) -> List[str]:
+    """All graph node ids that may reference this failure mode document."""
+    keys: List[str] = []
+    if doc.get("_id") is not None:
+        keys.append(str(doc["_id"]))
+    if doc.get("id"):
+        keys.append(str(doc["id"]))
+    if doc.get("legacy_id") is not None:
+        keys.append(str(doc["legacy_id"]))
+    return keys
+
+
+async def _load_failure_mode_labels(node_ids: Set[str]) -> Dict[str, str]:
+    """Resolve failure mode labels — graph stores Mongo ObjectId, legacy_id, or uuid."""
+    if not node_ids:
+        return {}
+
+    labels: Dict[str, str] = {}
+    remaining = set(node_ids)
+    projection = {"_id": 1, "id": 1, "legacy_id": 1, "failure_mode": 1, "name": 1, "category": 1}
+
+    object_ids = [nid for nid in remaining if ObjectId.is_valid(nid)]
+    if object_ids:
+        cursor = db.failure_modes.find(
+            {"_id": {"$in": [ObjectId(x) for x in object_ids]}},
+            projection,
+        )
+        for doc in await cursor.to_list(len(object_ids)):
+            label = _failure_mode_label(doc)
+            if not label:
+                continue
+            for key in _failure_mode_lookup_keys(doc):
+                if key in remaining:
+                    labels[key] = label
+                    remaining.discard(key)
+
+    legacy_ids: List[int] = []
+    for nid in list(remaining):
+        try:
+            legacy_ids.append(int(nid))
+        except ValueError:
+            continue
+    if legacy_ids:
+        cursor = db.failure_modes.find({"legacy_id": {"$in": legacy_ids}}, projection)
+        for doc in await cursor.to_list(len(legacy_ids)):
+            label = _failure_mode_label(doc)
+            if not label:
+                continue
+            for key in _failure_mode_lookup_keys(doc):
+                if key in remaining:
+                    labels[key] = label
+                    remaining.discard(key)
+
+    if remaining:
+        cursor = db.failure_modes.find({"id": {"$in": list(remaining)}}, projection)
+        for doc in await cursor.to_list(len(remaining)):
+            label = _failure_mode_label(doc)
+            if not label:
+                continue
+            for key in _failure_mode_lookup_keys(doc):
+                if key in remaining:
+                    labels[key] = label
+                    remaining.discard(key)
+
+    return labels
 
 
 async def _load_labels_for_type(
@@ -121,15 +194,7 @@ async def _load_labels_for_type(
         return labels
 
     if node_type == "failure_mode":
-        cursor = db.failure_modes.find(
-            {"id": {"$in": id_list}},
-            {"_id": 0, "id": 1, "name": 1, "category": 1},
-        )
-        for doc in await cursor.to_list(len(id_list)):
-            label = _pick_label(doc, "name", "category")
-            if label:
-                labels[doc["id"]] = label
-        return labels
+        return await _load_failure_mode_labels(node_ids)
 
     if node_type == "finding":
         cursor = db.findings.find(

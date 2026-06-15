@@ -280,6 +280,17 @@ export default function ActionDetailPage() {
 
   const headerActions = (
     <>
+      <ReliabilityEvidencePanel
+        equipmentId={action.linked_equipment_id}
+        equipmentName={action.equipment_name || action.threat_asset}
+        anchorNodeType="action"
+        anchorNodeId={actionId}
+        anchorLabel={action.title}
+        buttonLabel="Graph evidence"
+        buttonVariant="ghost"
+        buttonSize="sm"
+        className="h-9 sm:h-8"
+      />
       <Button
         size="sm"
         variant="ghost"
@@ -385,14 +396,6 @@ export default function ActionDetailPage() {
             
             {/* LEFT COLUMN - Main content (spans 7 cols on desktop) */}
             <div className="lg:col-span-7 space-y-3">
-              <ReliabilityEvidencePanel
-                equipmentId={action.linked_equipment_id}
-                equipmentName={action.equipment_name || action.threat_asset}
-                anchorNodeType="action"
-                anchorNodeId={actionId}
-                anchorLabel={action.title}
-                title="Reliability Graph Evidence"
-              />
               <ActionOutcomeWidget actionId={actionId} actionStatus={action.status} />
               {/* Source & Scores + Status Row - Compact header */}
               <div className="bg-white rounded-lg border border-slate-200 p-3">

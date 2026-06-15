@@ -40,6 +40,46 @@ async def test_resolve_threat_and_equipment_labels():
 
 
 @pytest.mark.asyncio
+async def test_resolve_failure_mode_by_object_id():
+    from bson import ObjectId
+
+    fm_oid = ObjectId("507f1f77bcf86cd799439011")
+    mock_db = MagicMock()
+    mock_db.failure_modes.find = MagicMock(
+        return_value=AsyncMock(
+            to_list=AsyncMock(
+                return_value=[
+                    {
+                        "_id": fm_oid,
+                        "legacy_id": 42,
+                        "failure_mode": "Bearing Failure",
+                        "category": "Mechanical",
+                    }
+                ]
+            )
+        )
+    )
+    mock_db.threats.find = MagicMock(
+        return_value=AsyncMock(to_list=AsyncMock(return_value=[]))
+    )
+
+    edges = [
+        {
+            "id": "e1",
+            "source_type": "threat",
+            "source_id": "th-1",
+            "target_type": "failure_mode",
+            "target_id": str(fm_oid),
+        }
+    ]
+
+    with patch("services.graph_node_label_service.db", mock_db):
+        labels = await resolve_node_labels(edges)
+
+    assert labels[f"failure_mode:{fm_oid}"] == "Bearing Failure"
+
+
+@pytest.mark.asyncio
 async def test_enrich_edges_attaches_source_and_target_labels():
     mock_db = MagicMock()
     mock_db.failure_modes.find = MagicMock(

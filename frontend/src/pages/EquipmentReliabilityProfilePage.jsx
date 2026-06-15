@@ -120,6 +120,11 @@ export default function EquipmentReliabilityProfilePage() {
               </h1>
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              <ReliabilityEvidencePanel
+                equipmentId={equipmentId}
+                equipmentName={equipmentName}
+                buttonLabel="Graph evidence"
+              />
               <Button asChild variant="outline" size="sm">
                 <Link to={`/equipment/${equipmentId}/trace`}>
                   <GitBranch className="w-4 h-4 mr-1.5" />
@@ -421,12 +426,6 @@ export default function EquipmentReliabilityProfilePage() {
                 </div>
               </div>
             </SectionCard>
-
-            {/* Graph Evidence */}
-            <ReliabilityEvidencePanel
-              equipmentId={equipmentId}
-              title="Graph Evidence"
-            />
 
             {/* AI Reliability Summary */}
             {profile.ai_reliability_summary && (
