@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { threatsAPI, statsAPI } from "../lib/api";
 import { queryKeys } from "../lib/queryKeys";
-import { isIOSLikeDevice } from "../lib/deviceUtils";
+import { isIOSLikeDevice, isTouchMobileDevice } from "../lib/deviceUtils";
 import {
   cancelPrefetchObservationWorkspace,
   prefetchTopObservationWhenIdle,
@@ -180,6 +180,7 @@ const ThreatsPage = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const isIOSLike = isIOSLikeDevice();
+  const touchMobile = isTouchMobileDevice();
   const caps = useCapabilities();
   const [searchParams, setSearchParams] = useSearchParams();
   // Default: show the 5 active in-progress stages (excludes terminal Mitigated & Learning)
@@ -452,7 +453,8 @@ const ThreatsPage = () => {
 
   const displayThreats = useMemo(() => sortedThreats.slice(0, caps.maxListItems), [sortedThreats, caps.maxListItems]);
   const threatsTruncated = Array.isArray(sortedThreats) && sortedThreats.length > caps.maxListItems;
-  const useVirtualThreatList = (isMobile && !isIOSLike) || caps.mode === "lite";
+  const useVirtualThreatList =
+    !touchMobile && ((isMobile && !isIOSLike) || caps.mode === "lite");
 
   const statCards = [
     {
@@ -967,9 +969,9 @@ const ThreatsPage = () => {
             return (
             <motion.div
               key={threat.id}
-              initial={caps.animations ? { opacity: 0, y: 10 } : false}
+              initial={!touchMobile && caps.animations ? { opacity: 0, y: 10 } : false}
               animate={{ opacity: 1, y: 0 }}
-              transition={caps.animations ? { delay: Math.min(idx * 0.05, 0.2) } : { duration: 0 }}
+              transition={!touchMobile && caps.animations ? { delay: Math.min(idx * 0.05, 0.2) } : { duration: 0 }}
               onClick={() => navigate(`/threats/${threat.id}/workspace`)}
               onMouseEnter={handleMouseEnter}
               onMouseLeave={handleMouseLeave}

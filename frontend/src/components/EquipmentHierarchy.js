@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { equipmentHierarchyAPI, threatsAPI } from "../lib/api";
 import { isIOSLikeDevice } from "../lib/deviceUtils";
+import { canUsePortalTarget } from "../lib/domUtils";
 import { queryKeys } from "../lib/queryKeys";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useEquipmentNodeIdMap } from "../hooks/useTranslatedEntities";
@@ -37,6 +38,7 @@ import {
   Eye,
   EyeOff,
   ClipboardList,
+  FoldVertical,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -194,8 +196,73 @@ function getDirectThreatCount(node, threatCounts) {
   return countById.get(node.id) || 0;
 }
 
+function hierarchyNodeCanViewMaintenanceProgram(node) {
+  return ["equipment_unit", "equipment", "subunit", "maintainable_item", "unit"].includes(node?.level);
+}
+
+function getHierarchyEquipmentTypeName(node, equipmentTypes) {
+  const typeId = node?.equipment_type_id || node?.equipment_type;
+  if (!typeId) return null;
+  const eqType = equipmentTypes?.find((et) => et.id === typeId);
+  if (eqType?.name) return eqType.name;
+  if (node.equipment_type_name) return node.equipment_type_name;
+  return typeId.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function getHierarchyDisciplineDisplay(node, equipmentTypes, t) {
+  const disciplines = {
+    mechanical: { label: t ? t("library.mechanical") : "Mechanical", color: "bg-blue-100 text-blue-700" },
+    electrical: { label: t ? t("library.electrical") : "Electrical", color: "bg-yellow-100 text-yellow-700" },
+    instrumentation: { label: t ? t("library.instrumentation") : "Instrumentation", color: "bg-purple-100 text-purple-700" },
+    process: { label: t ? t("library.process") : "Process", color: "bg-green-100 text-green-700" },
+    laboratory: { label: t ? t("library.laboratory") : "Laboratory", color: "bg-cyan-100 text-cyan-700" },
+    rotating: { label: t ? t("library.rotating") : "Rotating", color: "bg-orange-100 text-orange-700" },
+    static: { label: t ? t("library.static") : "Static", color: "bg-teal-100 text-teal-700" },
+  };
+  let disc = node?.discipline;
+  if (!disc) {
+    const typeId = node?.equipment_type_id || node?.equipment_type;
+    if (typeId) {
+      const eqType = equipmentTypes?.find((et) => et.id === typeId);
+      disc = eqType?.discipline;
+    }
+  }
+  if (!disc) return null;
+  const discLower = disc.toLowerCase();
+  if (disciplines[discLower]) return disciplines[discLower];
+  return {
+    label: disc.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+    color: "bg-slate-100 text-slate-700",
+  };
+}
+
+function getHierarchyCriticalityDetails(node) {
+  const dims = getCriticalityDimensions(node?.criticality);
+  if (!dims) return null;
+  const { safety, production, environmental, reputation } = dims;
+  const riskScore = computeCriticalityScore(node?.criticality);
+  if (riskScore == null) return null;
+  const crit = node.criticality;
+  return {
+    level: crit.level,
+    safety,
+    production,
+    environmental,
+    reputation,
+    riskScore,
+  };
+}
+
+function getHierarchyNodeConfig(node) {
+  return ISO_LEVEL_CONFIG[node.level] || ISO_LEVEL_CONFIG[normalizeLevel(node.level)] || {
+    icon: Cog,
+    label: node.level ? node.level.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "Item",
+    color: "text-slate-600",
+  };
+}
+
 // Tree node component
-const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level = 0, threatCount = 0, onAddThreat, onEditEquipment, t, equipmentTypes, isMobile = false, isSearchMatch = false }) => {
+const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level = 0, threatCount = 0, onEditEquipment, onShowContextMenu, t, equipmentTypes, isMobile = false, isSearchMatch = false }) => {
   const hasChildren = node.children && node.children.length > 0;
   // Translation lookup for hierarchy node name (id-keyed)
   const nodeTransMap = useEquipmentNodeIdMap();
@@ -209,35 +276,15 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
   const levelLabel = getEquipmentLevelLabel(t, node.level, normalizeLevel);
   const Icon = config.icon;
   const critColor = node.criticality?.level ? CRIT_COLORS[node.criticality.level] : null;
-  const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0 });
-  const [showDetails, setShowDetails] = useState(false);
-  const [showMaintenanceProgram, setShowMaintenanceProgram] = useState(false);
-  const contextMenuRef = useRef(null);
-  
-  // Check if this equipment level can have a maintenance program
-  const canViewMaintenanceProgram = ["equipment_unit", "equipment", "subunit", "maintainable_item", "unit"].includes(node.level);
-
-  // Close context menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
-        setContextMenu({ show: false, x: 0, y: 0 });
-      }
-    };
-    if (contextMenu.show) {
-      document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("touchstart", handleClickOutside);
-      return () => {
-        document.removeEventListener("mousedown", handleClickOutside);
-        document.removeEventListener("touchstart", handleClickOutside);
-      };
-    }
-  }, [contextMenu.show]);
 
   const handleContextMenu = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setContextMenu({ show: true, x: e.clientX, y: e.clientY });
+    openContextMenu(e.clientX, e.clientY);
+  };
+
+  const openContextMenu = (x, y) => {
+    onShowContextMenu?.(node, x, y);
   };
 
   // Handle click/tap on the equipment name/info area (NOT the arrow)
@@ -248,11 +295,7 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
       const menuX = Math.min(rect.left + 20, window.innerWidth - 200);
       const menuY = Math.min(rect.bottom + 5, window.innerHeight - 150);
       
-      setContextMenu({ 
-        show: true, 
-        x: menuX, 
-        y: menuY 
-      });
+      openContextMenu(menuX, menuY);
     } else {
       // Desktop behavior - single click navigates and toggles if has children
       if (hasChildren) onToggle?.();
@@ -264,104 +307,6 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
   const handleArrowClick = (e) => {
     e.stopPropagation();
     onToggle?.();
-  };
-
-  const handleAddThreatClick = () => {
-    setContextMenu({ show: false, x: 0, y: 0 });
-    const label = node.tag ? `${node.name} (${node.tag})` : node.name;
-    onAddThreat?.(label);
-  };
-
-  const handleShowDetails = () => {
-    setContextMenu({ show: false, x: 0, y: 0 });
-    setShowDetails(true);
-  };
-
-  const handleFilterOn = () => {
-    setContextMenu({ show: false, x: 0, y: 0 });
-    onClick?.(); // Navigate to filtered observations
-  };
-
-  const handleViewMaintenanceProgram = () => {
-    setContextMenu({ show: false, x: 0, y: 0 });
-    setShowMaintenanceProgram(true);
-  };
-
-  // Get equipment type name
-  const getEquipmentTypeName = () => {
-    // Check both equipment_type_id and equipment_type fields
-    const typeId = node.equipment_type_id || node.equipment_type;
-    if (!typeId) return null;
-    
-    // First try to find in equipment types list
-    const eqType = equipmentTypes?.find(et => et.id === typeId);
-    if (eqType?.name) return eqType.name;
-    
-    // If equipment_type_name is available, use it
-    if (node.equipment_type_name) return node.equipment_type_name;
-    
-    // Otherwise, format the typeId as a display name (capitalize, replace underscores)
-    return typeId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-  };
-
-  // Get discipline display name - from equipment type or node
-  const getDisciplineDisplay = () => {
-    const disciplines = {
-      mechanical: { label: t ? t("library.mechanical") : "Mechanical", color: "bg-blue-100 text-blue-700" },
-      electrical: { label: t ? t("library.electrical") : "Electrical", color: "bg-yellow-100 text-yellow-700" },
-      instrumentation: { label: t ? t("library.instrumentation") : "Instrumentation", color: "bg-purple-100 text-purple-700" },
-      process: { label: t ? t("library.process") : "Process", color: "bg-green-100 text-green-700" },
-      laboratory: { label: t ? t("library.laboratory") : "Laboratory", color: "bg-cyan-100 text-cyan-700" },
-      rotating: { label: t ? t("library.rotating") : "Rotating", color: "bg-orange-100 text-orange-700" },
-      static: { label: t ? t("library.static") : "Static", color: "bg-teal-100 text-teal-700" },
-    };
-    
-    // First check if discipline is directly on the node
-    let disc = node.discipline;
-    
-    // If not, try to get from equipment type
-    if (!disc) {
-      const typeId = node.equipment_type_id || node.equipment_type;
-      if (typeId) {
-        const eqType = equipmentTypes?.find(et => et.id === typeId);
-        disc = eqType?.discipline;
-      }
-    }
-    
-    if (!disc) return null;
-    
-    // Normalize to lowercase for lookup
-    const discLower = disc.toLowerCase();
-    if (disciplines[discLower]) {
-      return disciplines[discLower];
-    }
-    
-    // If discipline is a string but not in our map, display it formatted
-    return { 
-      label: disc.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), 
-      color: "bg-slate-100 text-slate-700" 
-    };
-  };
-
-  // Get criticality details
-  const getCriticalityDetails = () => {
-    const dims = getCriticalityDimensions(node.criticality);
-    if (!dims) return null;
-    const { safety, production, environmental, reputation } = dims;
-    const riskScore = computeCriticalityScore(node.criticality);
-    if (riskScore == null) return null;
-    const crit = node.criticality;
-    return {
-      level: crit.level,
-      safety,
-      production,
-      environmental,
-      reputation,
-      maxImpact:
-        crit.max_impact ||
-        Math.max(safety, production, environmental, reputation),
-      riskScore,
-    };
   };
   
   return (
@@ -436,97 +381,7 @@ const TreeNode = ({ node, children, isOpen, onToggle, onClick, isActive, level =
           )}
         </div>
       </div>
-      
-      {/* Context Menu - rendered via Portal to ensure it's on top of everything */}
-      {contextMenu.show && createPortal(
-        <div 
-          ref={contextMenuRef}
-          className="fixed bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[180px]"
-          style={{ left: contextMenu.x, top: contextMenu.y, zIndex: 99999 }}
-          data-testid="hierarchy-context-menu"
-        >
-          <button
-            onClick={handleFilterOn}
-            className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2 text-slate-700 hover:text-blue-700"
-            data-testid="context-menu-filter-on"
-          >
-            <Filter className="w-4 h-4" />
-            {t?.("hierarchy.filterOn") || "Filter on"}
-          </button>
-          <div className="border-t border-slate-100 my-1" />
-          <button
-            onClick={handleShowDetails}
-            className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2 text-slate-700 hover:text-slate-900"
-            data-testid="context-menu-show-details"
-          >
-            <Info className="w-4 h-4" />
-            {t?.("hierarchy.showDetails") || "Show Details"}
-          </button>
-          {canViewMaintenanceProgram && (
-            <>
-              <div className="border-t border-slate-100 my-1" />
-              <button
-                onClick={handleViewMaintenanceProgram}
-                className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2 text-slate-700 hover:text-blue-700"
-                data-testid="context-menu-maintenance-program"
-              >
-                <ClipboardList className="w-4 h-4" />
-                {t?.("equipment.viewMaintenanceProgram") || "View Maintenance Program"}
-              </button>
-            </>
-          )}
-          <div className="border-t border-slate-100 my-1" />
-          <button
-            onClick={handleAddThreatClick}
-            className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2 text-slate-700 hover:text-blue-700"
-            data-testid="context-menu-add-threat"
-          >
-            <Plus className="w-4 h-4" />
-            {t?.("hierarchy.addThreat") || "Add Observation"}
-          </button>
-        </div>,
-        document.body
-      )}
 
-      {/* Details Popup - rendered via Portal to ensure it's on top of everything */}
-      {showDetails && (
-        <EquipmentDetailsDialog
-          open={showDetails}
-          onClose={() => setShowDetails(false)}
-          node={node}
-          config={config}
-          critColor={critColor}
-          t={t}
-          getCriticalityDetails={getCriticalityDetails}
-          getEquipmentTypeName={getEquipmentTypeName}
-          getDisciplineDisplay={getDisciplineDisplay}
-          onEditEquipment={onEditEquipment}
-        />
-      )}
-      
-      {/* Maintenance Program Dialog */}
-      {showMaintenanceProgram && (
-        <Dialog open={showMaintenanceProgram} onOpenChange={setShowMaintenanceProgram}>
-          <DialogContent className="max-w-4xl w-[calc(100%-0.5rem)] max-h-[min(92dvh,100%)] sm:max-h-[85vh] overflow-hidden overflow-x-hidden flex flex-col gap-1 sm:gap-4 p-2 sm:p-6">
-            <DialogHeader className="flex-shrink-0 pr-8 max-sm:space-y-0.5">
-              <DialogTitle className="flex items-center gap-1.5 text-sm sm:text-lg">
-                <ClipboardList className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
-                {t?.("equipment.maintenanceProgram") || "Maintenance Program"}
-              </DialogTitle>
-              <DialogDescription className="text-xs sm:text-sm line-clamp-2 sm:line-clamp-none">
-                {translatedName || node.name}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex-1 overflow-y-auto min-h-0 py-0 sm:py-4 -mx-1 px-1">
-              <MaintenanceProgramPanel 
-                equipmentId={node.id} 
-                equipmentName={translatedName || node.name}
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-      
       {hasChildren && isOpen && (
         <div>
           {children}
@@ -788,13 +643,25 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
     </Dialog>
 
     {/* File Preview - Full screen DocumentViewer via Portal to escape stacking contexts */}
-    {previewFile && createPortal(
-      <DocumentViewer
-        document={previewFile}
-        onClose={() => setPreviewFile(null)}
-        onBack={() => setPreviewFile(null)}
-      />,
-      document.body
+    {previewFile && (
+      canUsePortalTarget(document.body)
+        ? createPortal(
+            <DocumentViewer
+              document={previewFile}
+              onClose={() => setPreviewFile(null)}
+              onBack={() => setPreviewFile(null)}
+            />,
+            document.body
+          )
+        : (
+          <div className="fixed inset-0 z-[99999]">
+            <DocumentViewer
+              document={previewFile}
+              onClose={() => setPreviewFile(null)}
+              onBack={() => setPreviewFile(null)}
+            />
+          </div>
+        )
     )}
     </>
   );
@@ -865,6 +732,11 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, in
   }, [expandedNodes]);
   
   const [selectedNodeId, setSelectedNodeId] = useState(null);
+  const [activeContextMenu, setActiveContextMenu] = useState({ show: false, node: null, x: 0, y: 0 });
+  const [detailsNode, setDetailsNode] = useState(null);
+  const [maintenanceNode, setMaintenanceNode] = useState(null);
+  const contextMenuRef = useRef(null);
+  const nodeTransMap = useEquipmentNodeIdMap();
   const [viewMode, setViewMode] = useState("tree"); // "tree" or "levels"
   const [filterLevel, setFilterLevel] = useState(null);
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
@@ -908,6 +780,29 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, in
       return next;
     });
   };
+
+  const closeContextMenu = useCallback(() => {
+    setActiveContextMenu({ show: false, node: null, x: 0, y: 0 });
+  }, []);
+
+  const handleShowContextMenu = useCallback((node, x, y) => {
+    setActiveContextMenu({ show: true, node, x, y });
+  }, []);
+
+  useEffect(() => {
+    if (!activeContextMenu.show) return;
+    const handleClickOutside = (e) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
+        closeContextMenu();
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [activeContextMenu.show, closeContextMenu]);
 
   // Fetch equipment hierarchy nodes
   const { data: nodesData, isLoading: nodesLoading } = useQuery({
@@ -1034,6 +929,18 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, in
     });
   };
 
+  const collapseAllNodes = useCallback(() => {
+    closeContextMenu();
+    if (searchQuery) {
+      setSearchQuery("");
+    }
+    setPreSearchExpandedNodes(null);
+    setExpandedNodes(new Set());
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }, [searchQuery, closeContextMenu]);
+
+  const hasExpandedNodes = expandedNodes.size > 0;
+
   // Helper function to collect all descendant names (including the node itself)
   const collectAllDescendantNames = (node) => {
     const names = [node.name];
@@ -1086,8 +993,8 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, in
             onClick={() => handleNodeClick(node)}
             isActive={selectedNodeId === node.id}
             threatCount={threatCount}
-            onAddThreat={onAddThreat}
             onEditEquipment={handleEditEquipment}
+            onShowContextMenu={handleShowContextMenu}
             t={t}
             equipmentTypes={equipmentTypes}
             isMobile={isMobile}
@@ -1101,7 +1008,7 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, in
 
   // Shared content JSX
   const contentJSX = (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
       {/* Header */}
       <div className={`flex items-center justify-between p-3 border-b border-slate-200 flex-shrink-0 ${isMobile ? 'bg-white sticky top-0 z-10' : ''}`}>
         <div className="flex items-center gap-2">
@@ -1248,6 +1155,22 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, in
         </div>
       )}
 
+      {viewMode === "tree" && !nodesLoading && treeData.length > 0 && hasExpandedNodes && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={collapseAllNodes}
+          className="absolute left-2 bottom-[4.5rem] z-20 h-7 px-2 text-[11px] shadow-md bg-white/95 backdrop-blur-sm border-slate-200 text-slate-600 hover:text-slate-900"
+          title={t("equipment.collapseAll")}
+          aria-label={t("equipment.collapseAll")}
+          data-testid="hierarchy-collapse-all"
+        >
+          <FoldVertical className="w-3.5 h-3.5" />
+          <span className="ml-1">{t("equipment.collapseAll")}</span>
+        </Button>
+      )}
+
       {/* Footer */}
       <div className="p-3 border-t border-slate-200 bg-slate-50 flex-shrink-0">
         {isMobile && (
@@ -1268,6 +1191,111 @@ const EquipmentHierarchy = ({ isOpen, onClose, isMobile = false, onAddThreat, in
           </button>
         </div>
       </div>
+
+      {activeContextMenu.show && activeContextMenu.node && canUsePortalTarget(document.body) && createPortal(
+        <div
+          ref={contextMenuRef}
+          className="fixed bg-white rounded-lg shadow-lg border border-slate-200 py-1 min-w-[180px]"
+          style={{ left: activeContextMenu.x, top: activeContextMenu.y, zIndex: 99999 }}
+          data-testid="hierarchy-context-menu"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              handleNodeClick(activeContextMenu.node);
+              closeContextMenu();
+            }}
+            className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2 text-slate-700 hover:text-blue-700"
+            data-testid="context-menu-filter-on"
+          >
+            <Filter className="w-4 h-4" />
+            {t?.("hierarchy.filterOn") || "Filter on"}
+          </button>
+          <div className="border-t border-slate-100 my-1" />
+          <button
+            type="button"
+            onClick={() => {
+              setDetailsNode(activeContextMenu.node);
+              closeContextMenu();
+            }}
+            className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2 text-slate-700 hover:text-slate-900"
+            data-testid="context-menu-show-details"
+          >
+            <Info className="w-4 h-4" />
+            {t?.("hierarchy.showDetails") || "Show Details"}
+          </button>
+          {hierarchyNodeCanViewMaintenanceProgram(activeContextMenu.node) && (
+            <>
+              <div className="border-t border-slate-100 my-1" />
+              <button
+                type="button"
+                onClick={() => {
+                  setMaintenanceNode(activeContextMenu.node);
+                  closeContextMenu();
+                }}
+                className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2 text-slate-700 hover:text-blue-700"
+                data-testid="context-menu-maintenance-program"
+              >
+                <ClipboardList className="w-4 h-4" />
+                {t?.("equipment.viewMaintenanceProgram") || "View Maintenance Program"}
+              </button>
+            </>
+          )}
+          <div className="border-t border-slate-100 my-1" />
+          <button
+            type="button"
+            onClick={() => {
+              const n = activeContextMenu.node;
+              closeContextMenu();
+              const label = n.tag ? `${n.name} (${n.tag})` : n.name;
+              onAddThreat?.(label);
+            }}
+            className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 flex items-center gap-2 text-slate-700 hover:text-blue-700"
+            data-testid="context-menu-add-threat"
+          >
+            <Plus className="w-4 h-4" />
+            {t?.("hierarchy.addThreat") || "Add Observation"}
+          </button>
+        </div>,
+        document.body
+      )}
+
+      {detailsNode && (
+        <EquipmentDetailsDialog
+          open={!!detailsNode}
+          onClose={() => setDetailsNode(null)}
+          node={detailsNode}
+          config={getHierarchyNodeConfig(detailsNode)}
+          critColor={detailsNode.criticality?.level ? CRIT_COLORS[detailsNode.criticality.level] : null}
+          t={t}
+          getCriticalityDetails={() => getHierarchyCriticalityDetails(detailsNode)}
+          getEquipmentTypeName={() => getHierarchyEquipmentTypeName(detailsNode, equipmentTypes)}
+          getDisciplineDisplay={() => getHierarchyDisciplineDisplay(detailsNode, equipmentTypes, t)}
+          onEditEquipment={handleEditEquipment}
+        />
+      )}
+
+      {maintenanceNode && (
+        <Dialog open={!!maintenanceNode} onOpenChange={(open) => { if (!open) setMaintenanceNode(null); }}>
+          <DialogContent className="max-w-4xl w-[calc(100%-0.5rem)] max-h-[min(92dvh,100%)] sm:max-h-[85vh] overflow-hidden overflow-x-hidden flex flex-col gap-1 sm:gap-4 p-2 sm:p-6">
+            <DialogHeader className="flex-shrink-0 pr-8 max-sm:space-y-0.5">
+              <DialogTitle className="flex items-center gap-1.5 text-sm sm:text-lg">
+                <ClipboardList className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
+                {t?.("equipment.maintenanceProgram") || "Maintenance Program"}
+              </DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm line-clamp-2 sm:line-clamp-none">
+                {nodeTransMap[maintenanceNode.id]?.name || maintenanceNode.name}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto min-h-0 py-0 sm:py-4 -mx-1 px-1">
+              <MaintenanceProgramPanel
+                equipmentId={maintenanceNode.id}
+                equipmentName={nodeTransMap[maintenanceNode.id]?.name || maintenanceNode.name}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 

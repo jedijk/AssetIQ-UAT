@@ -12,3 +12,17 @@ export function isIOSLikeDevice() {
 
 /** Alias used by print flows and legacy call sites. */
 export const isIOS = isIOSLikeDevice;
+
+export function isAndroidDevice() {
+  if (typeof navigator === "undefined") return false;
+  return /Android/i.test(navigator.userAgent || "");
+}
+
+/** Touch-first mobile browsers where heavy exit animations often break DOM unmount. */
+export function isTouchMobileDevice() {
+  return isIOSLikeDevice() || isAndroidDevice();
+}
+
+export function isConnectedDomNode(node) {
+  return !!(node && node.nodeType === 1 && node.isConnected);
+}

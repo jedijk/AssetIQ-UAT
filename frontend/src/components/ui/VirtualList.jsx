@@ -1,10 +1,11 @@
 import React from "react";
 import { Virtuoso } from "react-virtuoso";
-import { isIOSLikeDevice } from "../../lib/deviceUtils";
+import { isTouchMobileDevice } from "../../lib/deviceUtils";
 
 /**
  * Small wrapper to standardize list virtualization defaults.
  * Keeps DOM light on mobile to improve scroll smoothness.
+ * Skips react-virtuoso on touch mobile (iOS/Android) where DOM churn causes removeChild crashes.
  */
 class VirtuosoErrorBoundary extends React.Component {
   constructor(props) {
@@ -40,9 +41,9 @@ export function VirtualList({
   components,
   disableVirtualization, // optional explicit override
 }) {
-  const iOSLike = isIOSLikeDevice();
+  const touchMobile = isTouchMobileDevice();
   const shouldVirtualize =
-    disableVirtualization === true ? false : !iOSLike && hasResizeObserver();
+    disableVirtualization === true ? false : !touchMobile && hasResizeObserver();
 
   const safeData = Array.isArray(data) ? data : [];
 

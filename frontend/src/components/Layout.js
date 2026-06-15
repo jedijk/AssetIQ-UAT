@@ -27,7 +27,7 @@ import {
 } from "./layout/layoutNavConfig";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
-const APP_VERSION = process.env.REACT_APP_VERSION || "3.7.5";
+const APP_VERSION = process.env.REACT_APP_VERSION || "3.7.6";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -68,6 +68,7 @@ import { useOfflineSync } from "../hooks/useOfflineSync";
 import { usePageTracking } from "../hooks/useAnalyticsTracking";
 import { AppErrorBoundary } from "./AppErrorBoundary";
 import { useCapabilities } from "../core/performance";
+import { isTouchMobileDevice } from "../lib/deviceUtils";
 
 /** Skip pull-to-refresh when the user is scrolling inside a nested pane (tiles, chat, etc.). */
 function touchIsInNestedScrollPane(target) {
@@ -489,6 +490,7 @@ const Layout = () => {
 
   // Check if mobile viewport
   const [isMobileView, setIsMobileView] = useState(false);
+  const skipPageTransitions = isMobileView || isTouchMobileDevice();
   
   useEffect(() => {
     const checkMobile = () => setIsMobileView(window.innerWidth < 1024);
@@ -704,14 +706,8 @@ const Layout = () => {
             </div>
           )}
           
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={location.pathname}
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={pageTransition}
+          {skipPageTransitions ? (
+            <div
               className="h-full"
               style={{
                 paddingTop: isRefreshing ? 48 : pullDistance,
@@ -723,14 +719,40 @@ const Layout = () => {
                 title="This page crashed"
                 subtitle="Something went wrong while rendering this screen. Tap reload to recover."
               >
-                {/* Breadcrumb Navigation */}
                 <NavigationBreadcrumb className="px-4 sm:px-6 pt-4" />
                 <div className="sm:mt-0">
                   <Outlet />
                 </div>
               </AppErrorBoundary>
-            </motion.div>
-          </AnimatePresence>
+            </div>
+          ) : (
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={location.pathname}
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={pageTransition}
+                className="h-full"
+                style={{
+                  paddingTop: isRefreshing ? 48 : pullDistance,
+                  transition: "padding-top 0.2s ease",
+                }}
+              >
+                <AppErrorBoundary
+                  context="RouteOutlet"
+                  title="This page crashed"
+                  subtitle="Something went wrong while rendering this screen. Tap reload to recover."
+                >
+                  <NavigationBreadcrumb className="px-4 sm:px-6 pt-4" />
+                  <div className="sm:mt-0">
+                    <Outlet />
+                  </div>
+                </AppErrorBoundary>
+              </motion.div>
+            </AnimatePresence>
+          )}
         </main>
       </div>
 

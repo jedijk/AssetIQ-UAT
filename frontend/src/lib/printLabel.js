@@ -1,23 +1,23 @@
 /**
- * Cross-platform label print helper — v2, iOS-safe.
+ * Cross-platform label print helper — v2, mobile-safe.
  *
- * iOS Safari quirks:
+ * Mobile browser quirks (iOS Safari, Android Chrome):
  *  - `window.open` MUST be called synchronously inside a user-gesture event.
  *    Calling it after an `await` in a mutation's onSuccess is blocked.
- *  - `iframe.srcdoc + contentWindow.print()` does NOT reliably open AirPrint.
- *  - A top-level document with its own <script>window.print()</script> DOES
- *    fire AirPrint reliably.
+ *  - HTML injection + `window.print()` after an async fetch is unreliable
+ *    (scripts in innerHTML do not run; print() loses the user-gesture).
+ *  - PDF blob URLs opened in a pre-created window work reliably; users can
+ *    print/share from the native PDF viewer.
  *
  * Strategy:
  *  - `openPrintWindow()` synchronously opens `window.open('', '_blank', ...)`
  *    from the caller's click handler. Callers pass the returned handle into
  *    `printLabel({ win })` after the async fetch completes.
- *  - Desktop still uses the hidden-iframe path for pixel-perfect PDF output.
- *  - If no window handle is provided (e.g. async onSuccess chain), we fall
- *    back to downloading the PDF so the user can Share → Print.
+ *  - Mobile always uses the PDF-in-window path (same as iOS).
+ *  - Desktop uses a hidden iframe, or the pre-opened window when provided.
+ *  - If no window handle is provided on mobile, fall back to PDF download.
  */
 import { labelsAPI } from "./api";
-import { isIOS } from "./deviceUtils";
 
 export const isMobileDevice = () => {
   if (typeof navigator === "undefined") return false;
@@ -87,47 +87,6 @@ function removeOldPrintIframes() {
 }
 
 
-function writeHtmlIntoWindow(win, html) {
-  try {
-    // Strip Cloudflare challenge scripts injected by the proxy
-    const cleaned = String(html)
-      .replace(/<script\b[^>]*>[\s\S]*?cdn-cgi\/challenge-platform[\s\S]*?<\/script>/gi, "")
-      .replace(/<script\b[^>]*cloudflare[\s\S]*?<\/script>/gi, "");
-    // IMPORTANT: Do not sanitize the label HTML here. The backend generates a full
-    // print-ready document with critical <style> rules and @page sizing. Some
-    // sanitizers remove <style> which breaks print layout (seen on iOS/thermal).
-    //
-    // We still avoid document.write by parsing and copying head/body content.
-    const parser = new DOMParser();
-    const parsed = parser.parseFromString(cleaned, "text/html");
-    win.document.open();
-    win.document.close();
-    try {
-      win.document.title = parsed.title || "";
-    } catch (_t) {}
-    try {
-      win.document.head.innerHTML = parsed.head ? parsed.head.innerHTML : "";
-    } catch (_h) {}
-    try {
-      win.document.body.innerHTML = parsed.body ? parsed.body.innerHTML : "";
-    } catch (_b) {}
-    // The HTML itself contains an auto-print <script>. We also call
-    // win.print() as a belt-and-braces fallback after load.
-    const fallbackPrint = () => { try { win.focus(); win.print(); } catch (_e) { /* ignore */ } };
-    if (win.document.readyState === "complete") {
-      setTimeout(fallbackPrint, 350);
-    } else {
-      win.addEventListener("load", () => setTimeout(fallbackPrint, 350), { once: true });
-      // Safety net
-      setTimeout(fallbackPrint, 1800);
-    }
-    return true;
-  } catch (_err) {
-    return false;
-  }
-}
-
-
 function printPdfViaIframe(blob) {
   return new Promise((resolve) => {
     try {
@@ -169,6 +128,57 @@ function printPdfViaIframe(blob) {
 }
 
 
+async function printMobileViaPdf(payload, preOpened, filename) {
+  try {
+    const blob = await labelsAPI.printBlob(payload);
+    const url = URL.createObjectURL(blob);
+    if (preOpened && !preOpened.closed) {
+      try {
+        // Navigate the already-opened window to the PDF blob URL.
+        // User can Print/Share from the native PDF viewer.
+        preOpened.location.href = url;
+        // Best-effort: some browsers will allow print after load.
+        preOpened.addEventListener(
+          "load",
+          () => {
+            try {
+              preOpened.focus();
+              preOpened.print();
+            } catch (_e) {
+              /* ignore */
+            }
+          },
+          { once: true }
+        );
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        return { method: "window", ok: true, mobile: true };
+      } catch (_navErr) {
+        /* fall through to download */
+      }
+    }
+    downloadBlob(blob, filename);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    if (preOpened && !preOpened.closed) {
+      try {
+        preOpened.close();
+      } catch (_c) {
+        /* ignore */
+      }
+    }
+    return { method: "download", ok: true, mobile: true };
+  } catch (_err) {
+    if (preOpened && !preOpened.closed) {
+      try {
+        preOpened.close();
+      } catch (_c) {
+        /* ignore */
+      }
+    }
+    return { method: "download", ok: false, mobile: true };
+  }
+}
+
+
 /**
  * Trigger a native print for a label.
  *
@@ -185,85 +195,7 @@ export async function printLabel(payload, opts = {}) {
   const preOpened = opts.win || null;
 
   if (mobile) {
-    // iOS Safari does not reliably honor custom `@page size` for HTML printing
-    // (small label stock), which can cause mis-scaled/incorrect layouts.
-    // PDF output is pixel-perfect and matches desktop.
-    if (isIOS()) {
-      try {
-        const blob = await labelsAPI.printBlob(payload);
-        const url = URL.createObjectURL(blob);
-        if (preOpened && !preOpened.closed) {
-          try {
-            // Navigate the already-opened window to the PDF blob URL.
-            // User can Print/Share from the native PDF viewer.
-            preOpened.location.href = url;
-            // Best-effort: some browsers will allow print after load.
-            preOpened.addEventListener(
-              "load",
-              () => {
-                try {
-                  preOpened.focus();
-                  preOpened.print();
-                } catch (_e) {
-                  /* ignore */
-                }
-              },
-              { once: true }
-            );
-            // Cleanup later; keep URL alive long enough for the viewer.
-            setTimeout(() => URL.revokeObjectURL(url), 60000);
-            return { method: "window", ok: true, mobile: true };
-          } catch (_navErr) {
-            // fall through to download
-          }
-        }
-        downloadBlob(blob, filename);
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
-        if (preOpened && !preOpened.closed) {
-          try {
-            preOpened.close();
-          } catch (_c) {
-            /* ignore */
-          }
-        }
-        return { method: "download", ok: true, mobile: true };
-      } catch (_err) {
-        if (preOpened && !preOpened.closed) {
-          try {
-            preOpened.close();
-          } catch (_c) {
-            /* ignore */
-          }
-        }
-        return { method: "download", ok: false, mobile: true };
-      }
-    }
-
-    try {
-      const html = await labelsAPI.renderHtml({ ...payload, auto_print: true });
-      if (preOpened && !preOpened.closed) {
-        const ok = writeHtmlIntoWindow(preOpened, html);
-        if (ok) return { method: "window", ok: true, mobile: true };
-      }
-      // Fallback: download PDF so user can Share → Print from native viewer
-      try {
-        const blob = await labelsAPI.printBlob(payload);
-        downloadBlob(blob, filename);
-      } catch (_e) { /* swallow */ }
-      if (preOpened && !preOpened.closed) {
-        try { preOpened.close(); } catch (_c) { /* ignore */ }
-      }
-      return { method: "download", ok: false, mobile: true };
-    } catch (_err) {
-      try {
-        const blob = await labelsAPI.printBlob(payload);
-        downloadBlob(blob, filename);
-      } catch (_e2) { /* swallow */ }
-      if (preOpened && !preOpened.closed) {
-        try { preOpened.close(); } catch (_c) { /* ignore */ }
-      }
-      return { method: "download", ok: false, mobile: true };
-    }
+    return printMobileViaPdf(payload, preOpened, filename);
   }
 
   // Desktop: PDF in hidden iframe → native print dialog

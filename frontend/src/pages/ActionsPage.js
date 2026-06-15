@@ -267,7 +267,12 @@ export default function ActionsPage() {
       // Check if all actions for the source are now completed
       if (result?.completion_notification) {
         const notification = result.completion_notification;
-        setClosureSuggestion(notification);
+        if (notification.auto_mitigated) {
+          toast.success(notification.message || "Observation moved to Mitigated");
+          queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+        } else {
+          setClosureSuggestion(notification);
+        }
       }
     },
     onError: () => toast.error("Failed to update action"),

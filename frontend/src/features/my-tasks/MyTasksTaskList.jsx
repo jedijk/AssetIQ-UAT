@@ -39,7 +39,7 @@ export function MyTasksTaskList({
   handleDeleteTask,
 }) {
   return (
-    <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-6">
+    <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-6 mobile-scroll-pane">
       <div className="max-w-7xl mx-auto">
         <div className="space-y-3 pt-2">
         {activeFilter === "adhoc" ? (

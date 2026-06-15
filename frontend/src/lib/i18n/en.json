@@ -554,7 +554,7 @@
     "liteModeError": "Could not update performance preference."
   },
   "announcements": {
-    "liteModeTitle": "AssetIQ 3.7.5 — What's new",
+    "liteModeTitle": "AssetIQ 3.7.6 — What's new",
     "liteModeBody": "New observation workspace for reviewing and progressing issues. Simplified issue reporting in simple mode. Create Your First Observation tour in the Help menu. Plus bug fixes and stability improvements."
   },
   "enums": {
@@ -1335,6 +1335,7 @@
     "searchHighlightHint": "Matching items are highlighted in yellow",
     "expand": "Expand",
     "collapse": "Collapse",
+    "collapseAll": "Collapse all",
     "moveUp": "Move Up",
     "moveDown": "Move Down",
     "dropAsChild": "Drop as child",

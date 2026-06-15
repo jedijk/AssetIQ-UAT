@@ -13,6 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { canUsePortalTarget } from "../../lib/domUtils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -473,7 +474,11 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
   useEffect(() => {
     setHeroSlot(document.getElementById("workspace-hero-slot"));
     setHeroSlotMobile(document.getElementById("workspace-hero-slot-mobile"));
-  }, [threat]);
+    return () => {
+      setHeroSlot(null);
+      setHeroSlotMobile(null);
+    };
+  }, [threat?.id]);
 
   if (!threat) return null;
 
@@ -786,11 +791,11 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
   return (
     <div className="space-y-3">
       {/* Action bar — desktop hero portal. Falls back to inline if no slot found. */}
-      {heroSlot ? createPortal(actionBar, heroSlot) : (
+      {canUsePortalTarget(heroSlot) ? createPortal(actionBar, heroSlot) : (
         <div className="hidden lg:block bg-white rounded-xl border border-slate-200 p-4">{actionBar}</div>
       )}
       {/* Mobile ⋯ menu — anchored top-right of the hero title row. */}
-      {heroSlotMobile && createPortal(mobileMenu, heroSlotMobile)}
+      {canUsePortalTarget(heroSlotMobile) && createPortal(mobileMenu, heroSlotMobile)}
 
       {/* Score calculation popup — triggered by right-clicking the Risk KPI card (Row 1) via window event. */}
       {scoreCalcPopup.show && (() => {

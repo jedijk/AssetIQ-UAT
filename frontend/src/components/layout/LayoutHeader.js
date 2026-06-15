@@ -18,7 +18,7 @@ import {
 } from "../ui/dropdown-menu";
 import LayoutNotificationsMenu from "./LayoutNotificationsMenu";
 
-const APP_VERSION = process.env.REACT_APP_VERSION || "3.7.5";
+const APP_VERSION = process.env.REACT_APP_VERSION || "3.7.6";
 
 export default function LayoutHeader({
   isOperatorActive,

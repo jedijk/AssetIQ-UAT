@@ -1259,7 +1259,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
 
   // Form content
   const TaskFormContent = (
-    <div className="p-4 space-y-4">
+    <div className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] space-y-4">
       {/* Photo Data Capture */}
       {photoExtractionConfig?.enabled && (
         <PhotoDataCaptureField
@@ -1523,7 +1523,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
 
   // Main Task Execution View
   return (
-    <div className="h-full flex flex-col bg-slate-50 overscroll-contain overflow-x-hidden">
+    <div className="h-full flex flex-col min-h-0 bg-slate-50 overscroll-contain overflow-x-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 p-4 border-b border-slate-200 bg-white/95 backdrop-blur sticky top-0 z-10 pt-[calc(env(safe-area-inset-top,0px)+16px)]">
         <Button variant="ghost" size="sm" onClick={onBack} data-testid="back-btn">
@@ -1611,7 +1611,7 @@ const TaskExecutionFrame = ({ task, onBack, onComplete, onDelete }) => {
       </div>
       
       {/* Scrollable Form Content */}
-      <div ref={contentRef} className="flex-1 overflow-y-auto">
+      <div ref={contentRef} className="flex-1 min-h-0 overflow-y-auto mobile-scroll-pane">
         {TaskFormContent}
       </div>
     </div>

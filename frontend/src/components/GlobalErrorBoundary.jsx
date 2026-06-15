@@ -90,7 +90,9 @@ class GlobalErrorBoundary extends React.Component {
         errorMessage.includes("Loading chunk") ||
         errorMessage.includes("ChunkLoadError") ||
         errorMessage.includes("dynamically imported module");
-      const showRetry = retryCount < 2;
+      const isDomUnmountError =
+        /Failed to execute 'removeChild'|removeChild.*NotFoundError/i.test(errorMessage);
+      const showRetry = retryCount < 2 || isDomUnmountError;
 
       return (
         <div style={{

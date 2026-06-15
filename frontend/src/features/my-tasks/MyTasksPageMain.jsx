@@ -127,9 +127,11 @@ import { CSS } from "@dnd-kit/utilities";
 import { AppErrorBoundary } from "../../components/AppErrorBoundary";
 import { motion } from "framer-motion";
 import { pageTransition, pageVariants } from "../../components/animations/constants";
+import { isTouchMobileDevice } from "../../lib/deviceUtils";
 
 // API functions for My Tasks
 import { myTasksAPI } from "../../lib/api";
+import { openPrintWindow } from "../../lib/printLabel";
 
 // Main My Tasks Page Component
 export default function MyTasksPage() {
@@ -153,6 +155,11 @@ export default function MyTasksPage() {
   const [viewMode, setViewMode] = useState("list"); // "list" or "execution"
   const [selectedDisciplines, setSelectedDisciplines] = useState([]);
   const [disciplineDropdownOpen, setDisciplineDropdownOpen] = useState(false);
+
+  // Close Radix dropdown portals before swapping tab content (adhoc vs tasks).
+  useEffect(() => {
+    setDisciplineDropdownOpen(false);
+  }, [activeFilter]);
   const userChangedDisciplineRef = useRef(false);
   const [secondaryQueriesEnabled, setSecondaryQueriesEnabled] = useState(false);
 
@@ -183,14 +190,10 @@ export default function MyTasksPage() {
   );
 
   const isMobileView = useIsMobile();
-  const uaTouch =
-    typeof navigator !== "undefined" &&
-    /android|iphone|ipad|ipod|webos|iemobile|opera mini/i.test(
-      (navigator.userAgent || "").toLowerCase()
-    );
-  /** @dnd-kit + Virtuoso-like deps often fault on older mobile WebViews — render plain lists instead. */
+  const touchMobile = isTouchMobileDevice();
+  /** @dnd-kit often faults on touch mobile WebViews — render plain lists instead. */
   const canUseDnD =
-    typeof ResizeObserver !== "undefined" && !isMobileView && !uaTouch;
+    typeof ResizeObserver !== "undefined" && !isMobileView && !touchMobile;
   
   // User-scoped localStorage keys for manual sorting
   const sortKey = user?.id ? `myTasks_manualSort_${user.id}` : "myTasks_manualSort";
@@ -440,7 +443,13 @@ export default function MyTasksPage() {
         
         // Check if all actions for the source are now completed
         if (result?.completion_notification) {
-          setClosureSuggestion(result.completion_notification);
+          const notification = result.completion_notification;
+          if (notification.auto_mitigated) {
+            toast.success(notification.message || "Observation moved to Mitigated");
+            queryClient.invalidateQueries({ queryKey: queryKeys.threats.all() });
+          } else {
+            setClosureSuggestion(notification);
+          }
         }
 
         // Trigger label printing if configured on the form
@@ -493,20 +502,22 @@ export default function MyTasksPage() {
                 description: "Tap Print to open the print sheet",
                 action: {
                   label: "Print",
-                  onClick: async () => {
-                    const { openPrintWindow, printLabel } = await import("../../lib/printLabel");
+                  onClick: () => {
                     const win = openPrintWindow();
-                    try {
-                      const templateId = await resolveTemplateId();
-                      await printLabel({
-                        template_id: templateId,
-                        submission_id: submissionId,
-                        copies: 1,
-                      }, { win });
-                    } catch (_e) {
-                      if (win && !win.closed) win.close();
-                      toast.error("Label print failed");
-                    }
+                    (async () => {
+                      try {
+                        const { printLabel } = await import("../../lib/printLabel");
+                        const templateId = await resolveTemplateId();
+                        await printLabel({
+                          template_id: templateId,
+                          submission_id: submissionId,
+                          copies: 1,
+                        }, { win });
+                      } catch (_e) {
+                        if (win && !win.closed) win.close();
+                        toast.error("Label print failed");
+                      }
+                    })();
                   },
                 },
                 duration: 20000,
@@ -517,20 +528,22 @@ export default function MyTasksPage() {
               description: "Tap Print to open the print sheet",
               action: {
                 label: "Print",
-                onClick: async () => {
-                  const { openPrintWindow, printLabel } = await import("../../lib/printLabel");
+                onClick: () => {
                   const win = openPrintWindow();
-                  try {
-                    const templateId = await resolveTemplateId();
-                    await printLabel({
-                      template_id: templateId,
-                      submission_id: submissionId,
-                      copies: 1,
-                    }, { win });
-                  } catch (_e) {
-                    if (win && !win.closed) win.close();
-                    toast.error("Label print failed");
-                  }
+                  (async () => {
+                    try {
+                      const { printLabel } = await import("../../lib/printLabel");
+                      const templateId = await resolveTemplateId();
+                      await printLabel({
+                        template_id: templateId,
+                        submission_id: submissionId,
+                        copies: 1,
+                      }, { win });
+                    } catch (_e) {
+                      if (win && !win.closed) win.close();
+                      toast.error("Label print failed");
+                    }
+                  })();
                 },
               },
               duration: 20000,
@@ -857,31 +870,40 @@ export default function MyTasksPage() {
   
   // If in execution mode, show the execution frame
   if (viewMode === "execution" && selectedTask) {
+    const ExecutionShell = touchMobile ? "div" : motion.div;
     return (
-      <motion.div
-        className="h-[calc(100vh-64px)] bg-slate-50 overflow-x-hidden"
-        variants={pageVariants}
-        initial="initial"
-        animate="animate"
-        exit="exit"
-        transition={pageTransition}
+      <ExecutionShell
+        className="fixed inset-x-0 bottom-0 z-[36] flex flex-col min-h-0 overflow-hidden bg-slate-50"
+        style={{ top: "var(--app-header-offset)" }}
+        data-testid="task-execution-shell"
+        {...(touchMobile
+          ? {}
+          : {
+              variants: pageVariants,
+              initial: "initial",
+              animate: "animate",
+              exit: "exit",
+              transition: pageTransition,
+            })}
       >
         <AppErrorBoundary
           context="TaskExecutionFrame"
           title="Form crashed"
           subtitle="This form hit an error while you were filling it in. Tap reload and try again."
         >
-          <TaskExecutionFrame
-            task={selectedTask}
-            onBack={handleBackFromExecution}
-            onComplete={handleCompleteTask}
-            onDelete={(task) => {
-              handleBackFromExecution();
-              handleDeleteTask(task);
-            }}
-          />
+          <div className="flex-1 min-h-0 flex flex-col">
+            <TaskExecutionFrame
+              task={selectedTask}
+              onBack={handleBackFromExecution}
+              onComplete={handleCompleteTask}
+              onDelete={(task) => {
+                handleBackFromExecution();
+                handleDeleteTask(task);
+              }}
+            />
+          </div>
         </AppErrorBoundary>
-      </motion.div>
+      </ExecutionShell>
     );
   }
   

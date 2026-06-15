@@ -554,7 +554,7 @@
     "liteModeError": "Leistungseinstellung konnte nicht aktualisiert werden."
   },
   "announcements": {
-    "liteModeTitle": "AssetIQ 3.7.5 — Was gibt's Neues",
+    "liteModeTitle": "AssetIQ 3.7.6 — Was gibt's Neues",
     "liteModeBody": "Neuer Beobachtungs-Workspace zum Prüfen und Bearbeiten von Meldungen. Vereinfachte Problemmeldung im einfachen Modus. Tour Erste Beobachtung erstellen im Hilfe-Menü. Plus Fehlerbehebungen und Stabilitätsverbesserungen."
   },
   "enums": {

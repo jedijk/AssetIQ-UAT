@@ -631,49 +631,48 @@ async def update_central_action(
     
     # Check if all actions for the source are now completed
     completion_notification = None
-    if status_changed_to_completed and action.get("source_type") and action.get("source_id"):
-        source_type = action["source_type"]
-        source_id = action["source_id"]
-        
-        # Count remaining open actions for this source (not filtered by created_by - actions are shared)
-        remaining_open = await db.central_actions.count_documents({
-            "source_type": source_type,
-            "source_id": source_id,
-            "status": {"$ne": "completed"}
-        })
-        
-        if remaining_open == 0:
-            # All actions completed - prepare notification
-            total_actions = await db.central_actions.count_documents({
-                "source_type": source_type,
-                "source_id": source_id
-            })
-            
-            # Get source details
-            source_name = None
-            source_status = None
-            if source_type == "threat":
-                threat = await db.threats.find_one({"id": source_id}, {"_id": 0, "title": 1, "status": 1})
-                if threat:
-                    source_name = threat.get("title", "Observation")
-                    source_status = threat.get("status")
-            elif source_type == "investigation":
-                inv = await db.investigations.find_one({"id": source_id}, {"_id": 0, "title": 1, "status": 1})
-                if inv:
-                    source_name = inv.get("title", "Investigation")
-                    source_status = inv.get("status")
-            
-            # Only suggest closure if source is not already closed
-            if source_status not in ["closed", "completed"]:
-                completion_notification = {
-                    "type": "all_actions_completed",
+    if status_changed_to_completed:
+        from services.observation_mitigation import (
+            DONE_ACTION_STATUSES,
+            build_action_plan_completion_notification,
+        )
+
+        completion_notification = await build_action_plan_completion_notification(
+            action,
+            user_id=current_user.get("id"),
+        )
+        if not completion_notification and action.get("source_type") and action.get("source_id"):
+            source_type = action["source_type"]
+            source_id = action["source_id"]
+            if source_type == "investigation":
+                remaining_open = await db.central_actions.count_documents({
                     "source_type": source_type,
                     "source_id": source_id,
-                    "source_name": source_name,
-                    "total_actions": total_actions,
-                    "message": f"All {total_actions} action(s) for '{source_name}' are now complete! Consider closing this {source_type.replace('threat', 'observation')}.",
-                    "suggest_closure": True
-                }
+                    "status": {"$nin": list(DONE_ACTION_STATUSES)},
+                })
+                if remaining_open == 0:
+                    total_actions = await db.central_actions.count_documents({
+                        "source_type": source_type,
+                        "source_id": source_id,
+                    })
+                    inv = await db.investigations.find_one(
+                        {"id": source_id},
+                        {"_id": 0, "title": 1, "status": 1},
+                    )
+                    if inv and inv.get("status") not in ["completed", "closed"]:
+                        completion_notification = {
+                            "type": "all_actions_completed",
+                            "source_type": source_type,
+                            "source_id": source_id,
+                            "source_name": inv.get("title", "Investigation"),
+                            "total_actions": total_actions,
+                            "message": (
+                                f"All {total_actions} action(s) for "
+                                f"'{inv.get('title', 'Investigation')}' are now complete! "
+                                "Consider closing this investigation."
+                            ),
+                            "suggest_closure": True,
+                        }
     
     if status_changed_to_completed:
         from services.reliability_graph import _run_graph_sync, sync_outcome_edges

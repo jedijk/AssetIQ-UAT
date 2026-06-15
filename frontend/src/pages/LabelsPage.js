@@ -49,6 +49,7 @@ import {
   TooltipTrigger,
 } from "../components/ui/tooltip";
 import { labelsAPI } from "../lib/api";
+import { openPrintWindow, isMobileDevice } from "../lib/printLabel";
 import { formAPI } from "../components/forms/formAPI";
 import { useLanguage } from "../contexts/LanguageContext";
 
@@ -807,11 +808,8 @@ function PrintDialog({ open, template, onClose }) {
     if (!template) return;
     // Pre-open window synchronously within the click handler for iOS.
     let preOpened = null;
-    if (!download) {
-      try {
-        const { openPrintWindow, isMobileDevice } = await import("../lib/printLabel");
-        if (isMobileDevice()) preOpened = openPrintWindow();
-      } catch (_e) { /* ignore */ }
+    if (!download && isMobileDevice()) {
+      preOpened = openPrintWindow();
     }
     setPrinting(true);
     try {
