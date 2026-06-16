@@ -68,6 +68,34 @@ async def _upsert_user_fields() -> None:
         )
 
 
+async def _seed_failure_modes_library(now: str) -> None:
+    """Ensure CI Mongo has the full failure-mode library for list/versioning tests."""
+    from failure_modes import FAILURE_MODES_LIBRARY
+
+    if await db.failure_modes.count_documents({}) >= 100:
+        return
+
+    for fm in FAILURE_MODES_LIBRARY:
+        legacy_id = fm.get("id")
+        if legacy_id is None:
+            continue
+        payload = {k: v for k, v in fm.items() if k != "id"}
+        await db.failure_modes.update_one(
+            {"legacy_id": legacy_id},
+            {
+                "$set": {
+                    **payload,
+                    "legacy_id": legacy_id,
+                    "version": 1,
+                    "tenant_id": CI_TENANT_ID,
+                    "updated_at": now,
+                },
+                "$setOnInsert": {"created_at": now},
+            },
+            upsert=True,
+        )
+
+
 async def seed_ci_fixtures() -> dict:
     """Seed tenant-scoped data for integration smoke tests."""
     now = datetime.now(timezone.utc).isoformat()
@@ -237,6 +265,8 @@ async def seed_ci_fixtures() -> dict:
             },
             upsert=True,
         )
+
+    await _seed_failure_modes_library(now)
 
     dictionary_terms = [
         ("bearing", {"nl": "lager", "de": "Lager"}),

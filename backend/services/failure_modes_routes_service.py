@@ -14,88 +14,18 @@ from services.threat_score_service import recalculate_threat_scores_for_failure_
 from services.translation_service import TranslationService
 from models.translation import EntityType
 from failure_modes import FAILURE_MODES_LIBRARY
+from services.failure_modes.static_library_fallback import (
+    filter_static_failure_modes,
+    get_all_categories,
+    get_all_equipment_types,
+    list_uses_static_library_fallback,
+)
 logger = logging.getLogger(__name__)
-
 
 
 def _require_owner(current_user: dict) -> None:
     if current_user.get("role") != "owner":
         raise HTTPException(status_code=403, detail="Owner access required")
-
-
-# Helper functions for fallback data
-def get_all_categories():
-    """Get unique categories from static library."""
-    categories = set()
-    for fm in FAILURE_MODES_LIBRARY:
-        if fm.get("category"):
-            categories.add(fm["category"])
-    return sorted(list(categories))
-
-
-def get_all_equipment_types():
-    """Get unique equipment types from static library."""
-    equipment_types = set()
-    for fm in FAILURE_MODES_LIBRARY:
-        if fm.get("equipment"):
-            equipment_types.add(fm["equipment"])
-    return sorted(list(equipment_types))
-
-
-def _filter_static_failure_modes(
-    *,
-    category: Optional[str] = None,
-    equipment: Optional[str] = None,
-    search: Optional[str] = None,
-    min_rpn: Optional[int] = None,
-) -> list:
-    """Apply list filters to the static failure mode library."""
-    results = FAILURE_MODES_LIBRARY.copy()
-    if search:
-        search_lower = search.lower()
-        results = [
-            fm for fm in results
-            if (
-                search_lower in fm["failure_mode"].lower()
-                or search_lower in fm["equipment"].lower()
-                or search_lower in fm["category"].lower()
-                or any(search_lower in kw.lower() for kw in fm.get("keywords", []))
-            )
-        ]
-    if category and category.lower() != "all":
-        results = [fm for fm in results if fm["category"].lower() == category.lower()]
-    if equipment:
-        results = [fm for fm in results if fm["equipment"].lower() == equipment.lower()]
-    if min_rpn:
-        results = [fm for fm in results if fm["rpn"] >= min_rpn]
-    results.sort(key=lambda x: -x["rpn"])
-    return results
-
-
-def _list_uses_static_library_fallback(
-    *,
-    category: Optional[str] = None,
-    equipment: Optional[str] = None,
-    search: Optional[str] = None,
-    min_rpn: Optional[int] = None,
-    equipment_type_id: Optional[str] = None,
-    mechanism: Optional[str] = None,
-    is_validated: Optional[bool] = None,
-    failure_mode_type: Optional[str] = None,
-) -> bool:
-    """Use the bundled library when Mongo has a sparse seed (e.g. CI) and no list filters."""
-    return not any(
-        (
-            category,
-            equipment,
-            search,
-            min_rpn,
-            equipment_type_id,
-            mechanism,
-            is_validated is not None,
-            failure_mode_type,
-        )
-    )
 
 
 async def get_failure_modes(
@@ -131,7 +61,7 @@ async def get_failure_modes(
         
         if result["total"] == 0 or (
             result["total"] < 100
-            and _list_uses_static_library_fallback(
+            and list_uses_static_library_fallback(
                 category=category,
                 equipment=equipment,
                 search=search,
@@ -143,7 +73,7 @@ async def get_failure_modes(
             )
         ):
             logger.info("MongoDB failure_modes sparse for filters, using static library fallback")
-            results = _filter_static_failure_modes(
+            results = filter_static_failure_modes(
                 category=category,
                 equipment=equipment,
                 search=search,
@@ -154,7 +84,7 @@ async def get_failure_modes(
         return result
     except Exception as e:
         logger.error(f"Error fetching from MongoDB, falling back to static: {e}")
-        results = _filter_static_failure_modes(
+        results = filter_static_failure_modes(
             category=category,
             equipment=equipment,
             search=search,

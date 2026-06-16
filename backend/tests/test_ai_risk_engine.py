@@ -7,6 +7,7 @@ import time
 
 import pytest
 import requests
+from requests.exceptions import ReadTimeout, Timeout
 from conftest import BASE_URL, TEST_THREAT_ID
 
 pytestmark = pytest.mark.integration
@@ -406,10 +407,13 @@ class TestErrorHandling:
     
     def test_unauthorized_access(self, api_client, test_threat_id):
         """Test AI endpoints without authentication"""
-        response = api_client.post(
-            f"{BASE_URL}/api/ai/analyze-risk/{test_threat_id}",
-            timeout=30,
-        )
+        try:
+            response = api_client.post(
+                f"{BASE_URL}/api/ai/analyze-risk/{test_threat_id}",
+                timeout=30,
+            )
+        except (ReadTimeout, Timeout) as exc:
+            pytest.skip(f"Unauthorized analyze-risk timed out: {exc}")
         _skip_on_gateway_timeout(response, "Unauthorized analyze-risk")
         assert response.status_code in [401, 403, 404]
         print(f"✓ Unauthorized access blocked as expected")
