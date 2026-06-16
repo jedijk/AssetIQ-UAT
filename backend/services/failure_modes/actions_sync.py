@@ -13,13 +13,21 @@ import time
 
 from utils.mongo_regex import escape_regex, exact_case_insensitive
 from services.ai_gateway import chat as ai_gateway_chat
+from services.failure_modes.actions_consolidate import ActionsConsolidateMixin
+from services.failure_modes.action_duplicate_similarity import actions_similar_for_duplicates
 from services.failure_modes.cache import _cache, _invalidate_cache
 
 logger = logging.getLogger(__name__)
 
 
-class FailureModesMixin:
+class FailureModesMixin(ActionsConsolidateMixin):
     """Mixin — use only via FailureModesService."""
+
+    _ACTION_SIM_STOPWORDS = {
+        "the", "a", "an", "of", "in", "on", "and", "or", "by", "to", "for",
+        "from", "with", "at", "per", "every", "each", "all", "check", "inspect",
+        "frequency", "monthly", "weekly", "annual", "task", "pm", "action",
+    }
 
     @staticmethod
     def _normalize_action_text(value: Any) -> str:
@@ -55,6 +63,7 @@ class FailureModesMixin:
     ACTION_DUP_JACCARD = 0.48
     ACTION_DUP_RATIO = 0.75
     ACTION_DUP_AI_MIN_CONFIDENCE = 75.0
+    ACTION_DUP_FULL_FM_AI_MAX_ACTIONS = 20
 
     @classmethod
     def _actions_similar_pair(
@@ -68,15 +77,15 @@ class FailureModesMixin:
     ) -> bool:
         norm_a = cls._normalize_action_text(action_a)
         norm_b = cls._normalize_action_text(action_b)
-        if norm_a and norm_a == norm_b:
-            return True
-        if not norm_a or not norm_b:
-            return False
-        ratio = SequenceMatcher(None, norm_a, norm_b).ratio()
         jacc = cls._action_token_jaccard(action_a, action_b)
-        if strict_pairing:
-            return (ratio >= ratio_threshold and jacc >= jaccard_threshold) or ratio >= 0.88
-        return ratio >= ratio_threshold or jacc >= jaccard_threshold
+        return actions_similar_for_duplicates(
+            norm_a,
+            norm_b,
+            general_jaccard=jacc,
+            ratio_threshold=ratio_threshold,
+            jaccard_threshold=jaccard_threshold,
+            strict_pairing=strict_pairing,
+        )
 
     @classmethod
     def _action_indices_coherent(
@@ -85,6 +94,8 @@ class FailureModesMixin:
         indices: List[int],
         ratio_threshold: float,
         jaccard_threshold: float,
+        *,
+        strict_pairing: bool = True,
     ) -> bool:
         if len(indices) < 2:
             return False
@@ -95,7 +106,7 @@ class FailureModesMixin:
                     actions[indices[j]],
                     ratio_threshold,
                     jaccard_threshold,
-                    strict_pairing=True,
+                    strict_pairing=strict_pairing,
                 ):
                     return False
         return True
@@ -223,11 +234,14 @@ class FailureModesMixin:
             })
 
         sys_prompt = (
-            "You are a maintenance reliability engineer. Only group actions that are "
-            "CLEAR duplicates (same maintenance task and scope). DO NOT group inspect "
-            "vs replace/repair, lubrication vs overhaul, cleaning vs calibration, or "
-            "tasks that differ in action_type/discipline. When unsure, return no groups. "
-            "Return strict JSON only."
+            "You are a maintenance reliability engineer. Group actions that describe the "
+            "SAME maintenance task and scope, even when wording or discipline tags differ "
+            "(e.g. 'Check lubrication' Rotating vs 'Proper lubrication' Mechanical, or "
+            "'Replace worn bearings' vs 'Replace bearing on failure'). "
+            "DO NOT group different maintenance intents: inspect vs replace/repair, "
+            "lubrication vs overhaul, cleaning vs calibration, or unrelated PDM techniques "
+            "(e.g. listen for noise vs measure vibration) unless they clearly duplicate. "
+            "When unsure, return no groups. Return strict JSON only."
         )
         user_msg = (
             f"Failure mode: {failure_mode_name}\n"
@@ -284,6 +298,7 @@ class FailureModesMixin:
                 mapped,
                 self.ACTION_DUP_RATIO,
                 self.ACTION_DUP_JACCARD,
+                strict_pairing=False,
             ):
                 continue
             conf = g.get("confidence")
@@ -515,48 +530,72 @@ class FailureModesMixin:
             fm_name = doc.get("failure_mode") or ""
             equipment = doc.get("equipment") or ""
 
-            lexical_clusters = self._cluster_duplicate_action_indices(
+            lexical_clusters_loose = self._cluster_duplicate_action_indices(
                 actions,
                 ratio_threshold=ratio_threshold,
                 jaccard_threshold=jaccard_threshold,
-                strict_pairing=True,
+                strict_pairing=False,
             )
-            if not lexical_clusters:
-                continue
+            lexical_clusters_strict = (
+                self._cluster_duplicate_action_indices(
+                    actions,
+                    ratio_threshold=ratio_threshold,
+                    jaccard_threshold=jaccard_threshold,
+                    strict_pairing=True,
+                )
+                if lexical_clusters_loose
+                else []
+            )
 
             fm_ai_failed = False
             if use_ai and ai_failure_modes_processed < ai_max_failure_modes:
                 ai_failure_modes_processed += 1
-                clusters_reviewed = 0
-                for indices in lexical_clusters:
-                    if clusters_reviewed >= ai_max_clusters_per_fm:
-                        break
-                    if len(indices) < 2 or len(indices) > 12:
-                        continue
-                    clusters_reviewed += 1
-                    try:
+                try:
+                    if len(actions) <= self.ACTION_DUP_FULL_FM_AI_MAX_ACTIONS:
                         confirmed = await self._ai_confirm_duplicate_action_cluster(
                             fm_name,
                             equipment,
                             actions,
-                            indices,
+                            list(range(len(actions))),
                             user_id=user_id,
                             company_id=company_id,
                         )
                         duplicate_groups.extend(confirmed)
-                    except Exception as e:
-                        logger.warning(
-                            "AI duplicate-action cluster failed for %s: %s",
-                            fm_name,
-                            e,
-                        )
-                        ai_errors += 1
-                        fm_ai_failed = True
+                    else:
+                        clusters_reviewed = 0
+                        for indices in lexical_clusters_loose:
+                            if clusters_reviewed >= ai_max_clusters_per_fm:
+                                break
+                            if len(indices) < 2 or len(indices) > 12:
+                                continue
+                            clusters_reviewed += 1
+                            confirmed = await self._ai_confirm_duplicate_action_cluster(
+                                fm_name,
+                                equipment,
+                                actions,
+                                indices,
+                                user_id=user_id,
+                                company_id=company_id,
+                            )
+                            duplicate_groups.extend(confirmed)
+                except Exception as e:
+                    logger.warning(
+                        "AI duplicate-action cluster failed for %s: %s",
+                        fm_name,
+                        e,
+                    )
+                    ai_errors += 1
+                    fm_ai_failed = True
 
-            if not duplicate_groups and (not use_ai or fm_ai_failed):
-                for indices in lexical_clusters:
+            if not duplicate_groups:
+                fallback_clusters = lexical_clusters_loose or lexical_clusters_strict
+                for indices in fallback_clusters:
                     if not self._action_indices_coherent(
-                        actions, indices, ratio_threshold, jaccard_threshold
+                        actions,
+                        indices,
+                        ratio_threshold,
+                        jaccard_threshold,
+                        strict_pairing=not use_ai,
                     ):
                         continue
                     duplicate_groups.append(
@@ -564,9 +603,9 @@ class FailureModesMixin:
                             actions,
                             indices,
                             reason=(
-                                "Similar wording (strict lexical match)"
+                                "Similar maintenance task (lexical match)"
                                 if not use_ai
-                                else "Similar wording (AI unavailable, strict match)"
+                                else "Similar maintenance task (AI unavailable, lexical match)"
                             ),
                             detection_method="lexical",
                         )
@@ -600,258 +639,6 @@ class FailureModesMixin:
             "duplicate_group_count": duplicate_action_count,
             "results": results,
         }
-
-    CONSOLIDATE_ACTIONS_SYSTEM_PROMPT = (
-        "You are a senior reliability engineer cleaning up a failure-mode FMEA action list. "
-        "Merge duplicate and overlapping recommended maintenance actions into a concise set "
-        "of DISTINCT tasks. Each output action must be a different maintenance intent "
-        "(do not merge inspect vs replace vs lubricate vs overhaul unless they are true duplicates). "
-        "Prefer PM for scheduled upkeep, PDM for condition monitoring, CM for corrective work. "
-        "Use lowercase discipline keys: rotating, static, piping, electrical, instrumentation, "
-        "civil, operations, laboratory. "
-        "Return strict JSON only."
-    )
-
-    @classmethod
-    def _clamp_consolidation_targets(
-        cls, target_min: int, target_max: int
-    ) -> Tuple[int, int]:
-        lo = max(2, min(int(target_min or 3), 8))
-        hi = max(lo, min(int(target_max or 5), 8))
-        lo = max(2, min(lo, hi))
-        return lo, hi
-
-    def _build_consolidated_action_objects(
-        self,
-        actions: List[Any],
-        ai_items: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
-        """Merge source action metadata into AI-consolidated rows."""
-        n = len(actions)
-        used_indices: Set[int] = set()
-        consolidated: List[Dict[str, Any]] = []
-
-        for item in ai_items:
-            if not isinstance(item, dict):
-                continue
-            raw_indices = item.get("merged_from_indices") or item.get("source_indices") or []
-            indices: List[int] = []
-            for raw in raw_indices:
-                try:
-                    idx = int(raw)
-                except (TypeError, ValueError):
-                    continue
-                if 0 <= idx < n and idx not in used_indices:
-                    indices.append(idx)
-            if not indices:
-                continue
-            used_indices.update(indices)
-
-            merged = actions[indices[0]]
-            for ri in indices[1:]:
-                merged = self._merge_action_dict(merged, actions[ri])
-
-            if isinstance(merged, dict):
-                row: Dict[str, Any] = dict(merged)
-            else:
-                row = {"description": str(merged)}
-
-            description = (
-                (item.get("description") or item.get("action") or "").strip()
-                or self._action_display_label(row, indices[0])
-            )
-            row["description"] = description[:500]
-            row.pop("action", None)
-
-            action_type = item.get("action_type") or item.get("task_type")
-            if action_type:
-                row["action_type"] = str(action_type).upper()
-                row["task_type"] = row["action_type"]
-
-            discipline = item.get("discipline")
-            if discipline:
-                row["discipline"] = str(discipline).strip().lower()
-
-            est = item.get("estimated_minutes")
-            if est is not None:
-                try:
-                    row["estimated_minutes"] = int(est)
-                except (TypeError, ValueError):
-                    pass
-
-            if any(
-                isinstance(actions[i], dict) and actions[i].get("auto_create")
-                for i in indices
-            ):
-                row["auto_create"] = True
-
-            row["merged_from_indices"] = sorted(indices)
-            rationale = (item.get("rationale") or "").strip()
-            if rationale:
-                row["consolidation_rationale"] = rationale[:240]
-
-            consolidated.append(row)
-
-        return consolidated
-
-    async def consolidate_recommended_actions_with_ai(
-        self,
-        failure_mode_id: str,
-        *,
-        target_min: int = 3,
-        target_max: int = 5,
-        apply: bool = False,
-        updated_by: str = "AI action consolidation",
-        user_id: str = "system",
-        company_id: str = "default",
-    ) -> Dict[str, Any]:
-        """
-        Use AI to merge duplicate/overlapping recommended_actions into 3–5 distinct tasks.
-        """
-        import json
-
-        target_min, target_max = self._clamp_consolidation_targets(target_min, target_max)
-        doc = await self._resolve_fm_doc(failure_mode_id)
-        if not doc:
-            raise LookupError(f"Failure mode {failure_mode_id} not found")
-
-        actions = list(doc.get("recommended_actions") or [])
-        n = len(actions)
-        if n < 4:
-            raise ValueError("Need at least 4 recommended actions to consolidate")
-
-        fm_name = doc.get("failure_mode") or ""
-        equipment = doc.get("equipment") or ""
-        payload = []
-        for idx, action in enumerate(actions):
-            payload.append({
-                "index": idx,
-                "description": self._action_display_label(action, idx)[:400],
-                "action_type": (
-                    action.get("action_type") or action.get("task_type")
-                    if isinstance(action, dict)
-                    else ""
-                ),
-                "discipline": (
-                    action.get("discipline") if isinstance(action, dict) else ""
-                ),
-                "estimated_minutes": (
-                    action.get("estimated_minutes") if isinstance(action, dict) else None
-                ),
-            })
-
-        user_msg = (
-            f"Failure mode: {fm_name}\n"
-            f"Equipment: {equipment or '—'}\n"
-            f"Current action count: {n}\n"
-            f"Target consolidated count: {target_min}–{target_max} distinct actions\n\n"
-            f"Actions:\n{json.dumps(payload, indent=2)}\n\n"
-            "Merge duplicates and near-duplicates; combine overlapping inspect/lube tasks "
-            "only when they are the same maintenance scope. Keep PM, PDM, and CM separate "
-            "when they represent different work.\n\n"
-            'Return JSON: {"summary": "<=40 words", "consolidated_actions": ['
-            '{"description": "...", "action_type": "PM|CM|PDM", "discipline": "rotating|...", '
-            '"estimated_minutes": number|null, "merged_from_indices": [0,2], '
-            '"rationale": "<=20 words"}]}. '
-            f"Every input index 0–{n - 1} must appear in exactly one merged_from_indices list. "
-            f"Return {target_min}–{target_max} consolidated_actions."
-        )
-
-        content = await ai_gateway_chat(
-            [
-                {"role": "system", "content": self.CONSOLIDATE_ACTIONS_SYSTEM_PROMPT},
-                {"role": "user", "content": user_msg},
-            ],
-            user_id=user_id,
-            company_id=company_id,
-            endpoint="ai_fm_suggestions.consolidate_failure_mode_actions",
-            model="gpt-4o-mini",
-            temperature=0,
-            max_tokens=2500,
-            response_format={"type": "json_object"},
-        )
-        try:
-            data = json.loads(content.strip())
-        except json.JSONDecodeError as exc:
-            raise ValueError("Failed to parse AI consolidation response") from exc
-
-        ai_items = data.get("consolidated_actions") or []
-        consolidated = self._build_consolidated_action_objects(actions, ai_items)
-        if not consolidated:
-            raise ValueError("AI returned no valid consolidated actions")
-
-        if len(consolidated) > target_max + 1:
-            raise ValueError(
-                f"AI returned {len(consolidated)} actions; expected at most {target_max}"
-            )
-
-        covered = {
-            idx
-            for row in consolidated
-            for idx in (row.get("merged_from_indices") or [])
-        }
-        if covered != set(range(n)):
-            missing = sorted(set(range(n)) - covered)
-            extra = sorted(covered - set(range(n)))
-            raise ValueError(
-                "AI consolidation did not cover all actions"
-                + (f" (missing indices: {missing})" if missing else "")
-                + (f" (invalid indices: {extra})" if extra else "")
-            )
-
-        # Strip internal preview-only fields before persisting
-        persist_actions: List[Dict[str, Any]] = []
-        preview_actions: List[Dict[str, Any]] = []
-        for row in consolidated:
-            preview_row = dict(row)
-            persist_row = {
-                k: v
-                for k, v in row.items()
-                if k not in ("merged_from_indices", "consolidation_rationale")
-            }
-            persist_actions.append(persist_row)
-            preview_actions.append(preview_row)
-
-        mode_id_str = str(doc.get("id") or doc["_id"])
-        result: Dict[str, Any] = {
-            "failure_mode_id": mode_id_str,
-            "failure_mode": fm_name,
-            "equipment": equipment,
-            "actions_before": n,
-            "actions_after": len(persist_actions),
-            "target_min": target_min,
-            "target_max": target_max,
-            "summary": (data.get("summary") or "").strip()[:500],
-            "original_actions": [
-                {
-                    "index": i,
-                    "label": self._action_display_label(a, i),
-                    "action_type": (
-                        a.get("action_type") or a.get("task_type")
-                        if isinstance(a, dict)
-                        else None
-                    ),
-                    "discipline": a.get("discipline") if isinstance(a, dict) else None,
-                }
-                for i, a in enumerate(actions)
-            ],
-            "consolidated_actions": preview_actions,
-            "applied": False,
-        }
-
-        if apply:
-            updated = await self.update(
-                mode_id_str,
-                {"recommended_actions": persist_actions},
-                updated_by=updated_by,
-                change_reason="AI consolidated duplicate/overlapping recommended actions",
-            )
-            if not updated:
-                raise RuntimeError("Failed to update failure mode")
-            result["applied"] = True
-            _invalidate_cache()
-
-        return result
 
     async def _resolve_fm_doc(self, mode_id: str) -> Optional[Dict[str, Any]]:
         query = self._build_id_query(mode_id)

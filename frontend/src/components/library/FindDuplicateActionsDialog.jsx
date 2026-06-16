@@ -247,7 +247,9 @@ export default function FindDuplicateActionsDialog({
               mode{failureModes.length === 1 ? "" : "s"}.
               {scanMode === "ai" && (
                 <span className="block mt-1 text-slate-500">
-                  AI confirms only strict text matches (clear duplicates). Usually faster than a full-library GPT pass.
+                  AI confirms duplicate maintenance tasks even when discipline tags
+                  differ (e.g. Rotating vs Mechanical). Falls back to lexical matching
+                  when AI is unavailable.
                 </span>
               )}
             </p>

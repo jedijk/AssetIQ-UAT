@@ -358,7 +358,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Navigation */}
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1" persistKey="settings.sidebar">
           <nav className="p-2 space-y-1">
             {filteredSections.length === 0 && (
               <p className="px-3 py-6 text-sm text-slate-500 text-center">
@@ -453,7 +453,11 @@ export default function SettingsPage() {
           </div>
         )}
         
-        <ScrollArea className="h-full md:h-full" style={{ height: location.pathname.includes('/user-management') ? '100%' : 'calc(100% - 56px)' }}>
+        <ScrollArea
+          className="h-full md:h-full"
+          style={{ height: location.pathname.includes('/user-management') ? '100%' : 'calc(100% - 56px)' }}
+          persistKey={`settings.content.${location.pathname}`}
+        >
           <div className={cn(
             "md:p-6 xl:p-8",
             // No padding on mobile for user-management - it has its own layout

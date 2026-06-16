@@ -3,18 +3,59 @@ import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
 
 import { cn } from "../../lib/utils"
 
-const ScrollArea = React.forwardRef(({ className, children, ...props }, ref) => (
-  <ScrollAreaPrimitive.Root
-    ref={ref}
-    className={cn("relative overflow-hidden", className)}
-    {...props}>
-    <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">
-      {children}
-    </ScrollAreaPrimitive.Viewport>
-    <ScrollBar />
-    <ScrollAreaPrimitive.Corner />
-  </ScrollAreaPrimitive.Root>
-))
+const SCROLL_STORAGE_PREFIX = "assetiq.scroll."
+
+function restoreScrollTop(viewport, top) {
+  viewport.scrollTop = top
+  requestAnimationFrame(() => {
+    viewport.scrollTop = top
+    requestAnimationFrame(() => {
+      viewport.scrollTop = top
+    })
+  })
+}
+
+const ScrollArea = React.forwardRef(({ className, children, persistKey, ...props }, ref) => {
+  const viewportRef = React.useRef(null)
+  const storageKey = persistKey ? `${SCROLL_STORAGE_PREFIX}${persistKey}` : null
+
+  React.useLayoutEffect(() => {
+    if (!storageKey) return undefined
+
+    const viewport = viewportRef.current
+    if (!viewport) return undefined
+
+    const saved = sessionStorage.getItem(storageKey)
+    if (saved !== null) {
+      const top = Number(saved)
+      if (!Number.isNaN(top)) {
+        restoreScrollTop(viewport, top)
+      }
+    }
+
+    const onScroll = () => {
+      sessionStorage.setItem(storageKey, String(viewport.scrollTop))
+    }
+
+    viewport.addEventListener("scroll", onScroll, { passive: true })
+    return () => viewport.removeEventListener("scroll", onScroll)
+  }, [storageKey])
+
+  return (
+    <ScrollAreaPrimitive.Root
+      ref={ref}
+      className={cn("relative overflow-hidden", className)}
+      {...props}>
+      <ScrollAreaPrimitive.Viewport
+        ref={viewportRef}
+        className="h-full w-full rounded-[inherit]">
+        {children}
+      </ScrollAreaPrimitive.Viewport>
+      <ScrollBar />
+      <ScrollAreaPrimitive.Corner />
+    </ScrollAreaPrimitive.Root>
+  )
+})
 ScrollArea.displayName = ScrollAreaPrimitive.Root.displayName
 
 const ScrollBar = React.forwardRef(({ className, orientation = "vertical", ...props }, ref) => (
