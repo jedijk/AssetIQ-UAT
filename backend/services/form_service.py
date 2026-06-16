@@ -420,7 +420,8 @@ class FormService:
     async def submit_form(
         self,
         data: Dict[str, Any],
-        submitted_by: str
+        submitted_by: str,
+        user: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """Submit a form with data validation and threshold checking."""
         now = datetime.now(timezone.utc)
@@ -606,6 +607,7 @@ class FormService:
             "submitted_at": now,
             "created_at": now,
         }
+        with_tenant_id(doc, user)
         
         result = await self.submissions.insert_one(doc)
         doc["_id"] = result.inserted_id
@@ -732,7 +734,8 @@ class FormService:
         to_date: Optional[datetime] = None,
         skip: int = 0,
         limit: int = 10,  # REDUCED default limit for performance
-        include_details: bool = False  # NEW: Only include full details if requested
+        include_details: bool = False,  # NEW: Only include full details if requested
+        user: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """Get form submissions with filters - optimized for fast response."""
         import asyncio
@@ -768,6 +771,8 @@ class FormService:
                 query["submitted_at"]["$gte"] = from_date
             if to_date:
                 query["submitted_at"]["$lte"] = to_date
+
+        query = merge_tenant_filter(query, user)
         
         # LIGHTWEIGHT PROJECTION - exclude large fields for list view
         projection = {
@@ -967,7 +972,11 @@ class FormService:
         
         return {"total": total, "submissions": submissions}
     
-    async def get_submission_by_id(self, submission_id: str) -> Optional[Dict[str, Any]]:
+    async def get_submission_by_id(
+        self,
+        submission_id: str,
+        user: Optional[dict] = None,
+    ) -> Optional[Dict[str, Any]]:
         """Get a specific submission by custom ID or MongoDB ObjectId.
         
         Uses aggregation pipeline to handle large base64 attachments efficiently.
@@ -977,8 +986,8 @@ class FormService:
         # Build the pipeline to process attachments without loading huge data fields
         # MongoDB 4.2+ supports $map and $cond in aggregation
         pipeline = [
-            # Match the submission
-            {"$match": {"id": submission_id}},
+            # Match the submission (tenant-scoped)
+            {"$match": merge_tenant_filter({"id": submission_id}, user)},
             # Process attachments to exclude large base64 data
             {"$addFields": {
                 "attachments": {
@@ -1049,7 +1058,9 @@ class FormService:
             
             # Fallback: try by MongoDB ObjectId
             if ObjectId.is_valid(submission_id):
-                pipeline[0]["$match"] = {"_id": ObjectId(submission_id)}
+                pipeline[0]["$match"] = merge_tenant_filter(
+                    {"_id": ObjectId(submission_id)}, user
+                )
                 result = await asyncio.wait_for(
                     self.submissions.aggregate(pipeline).to_list(length=1),
                     timeout=5.0
@@ -1191,7 +1202,8 @@ class FormService:
         self,
         form_template_id: str,
         from_date: Optional[datetime] = None,
-        to_date: Optional[datetime] = None
+        to_date: Optional[datetime] = None,
+        user: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """Get analytics for a form template."""
         
@@ -1200,6 +1212,8 @@ class FormService:
             query["submitted_at"] = {"$gte": from_date}
         if to_date:
             query.setdefault("submitted_at", {})["$lte"] = to_date
+
+        query = merge_tenant_filter(query, user)
         
         # Total submissions
         total = await self.submissions.count_documents(query)
@@ -1387,6 +1401,7 @@ class FormService:
         has_critical: Optional[bool] = None,
         skip: int = 0,
         limit: int = 10,
+        user: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """
         Get form submissions list - ULTRA-LIGHTWEIGHT endpoint.
@@ -1436,6 +1451,8 @@ class FormService:
             query["has_warnings"] = has_warnings
         if has_critical is not None:
             query["has_critical"] = has_critical
+
+        query = merge_tenant_filter(query, user)
     
         try:
             total_matching = await asyncio.wait_for(
@@ -1446,7 +1463,9 @@ class FormService:
             # 3 second hard timeout
             async def execute_query():
                 # Query with projection, sort by submitted_at DESC, skip/limit
-                cursor = self.submissions.find(query, projection).sort("submitted_at", -1).skip(skip).limit(limit)
+                cursor = self.submissions.find(query, projection).sort(
+                    [("submitted_at", -1), ("created_at", -1)]
+                ).skip(skip).limit(limit)
                 return await cursor.to_list(length=limit)
         
             raw_submissions = await asyncio.wait_for(execute_query(), timeout=2.0)
@@ -1556,10 +1575,14 @@ class FormService:
         """Delete a form submission and reset linked task instance if needed."""
         from fastapi import HTTPException
 
-        submission = await self.submissions.find_one({"id": submission_id})
+        submission = await self.submissions.find_one(
+            merge_tenant_filter({"id": submission_id}, user)
+        )
         if not submission:
             if ObjectId.is_valid(submission_id):
-                submission = await self.submissions.find_one({"_id": ObjectId(submission_id)})
+                submission = await self.submissions.find_one(
+                    merge_tenant_filter({"_id": ObjectId(submission_id)}, user)
+                )
         if not submission:
             raise HTTPException(status_code=404, detail="Form submission not found")
 

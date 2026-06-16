@@ -261,6 +261,7 @@ async def get_form_submissions(
         has_critical=has_critical,
         skip=skip,
         limit=limit,
+        user=current_user,
     )
 
 
@@ -270,7 +271,7 @@ async def get_form_submission(
     current_user: dict = Depends(_forms_read)
 ):
     """Get a specific form submission."""
-    submission = await form_service.get_submission_by_id(submission_id)
+    submission = await form_service.get_submission_by_id(submission_id, user=current_user)
     if not submission:
         raise HTTPException(status_code=404, detail="Form submission not found")
     return submission
@@ -282,7 +283,9 @@ async def submit_form(
 ):
     """Submit a form with data validation and threshold evaluation."""
     try:
-        return await form_service.submit_form(data.model_dump(), current_user["id"])
+        return await form_service.submit_form(
+            data.model_dump(), current_user["id"], user=current_user
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -309,7 +312,9 @@ async def get_form_analytics(
     from_dt = datetime.fromisoformat(from_date) if from_date else None
     to_dt = datetime.fromisoformat(to_date) if to_date else None
     
-    return await form_service.get_form_analytics(template_id, from_dt, to_dt)
+    return await form_service.get_form_analytics(
+        template_id, from_dt, to_dt, user=current_user
+    )
 
 
 # --- Document Management ---

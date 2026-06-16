@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from bson import ObjectId
 from database import db
+from services.tenant_schema import merge_tenant_filter
 from services.production_helpers import (
     SHIFTS,
     EQUIPMENT_NAME,
@@ -386,12 +387,15 @@ async def build_production_dashboard(
                 time_window_or.append({"updated_at": {"$regex": f"^{day_prefix}"}})
                 scan_day += timedelta(days=1)
 
-        submissions_query = {
-            "$and": [
-                query,
-                {"$or": time_window_or},
-            ]
-        }
+        submissions_query = merge_tenant_filter(
+            {
+                "$and": [
+                    query,
+                    {"$or": time_window_or},
+                ]
+            },
+            current_user,
+        )
 
         all_subs = await db.form_submissions.find(
             submissions_query,
@@ -594,7 +598,10 @@ async def build_production_dashboard(
         try:
             seen_info_ids = {s.get("id") for s in information_subs if s.get("id")}
             pinned_raw = await db.form_submissions.find(
-                {"$and": [query, {INFORMATION_DASHBOARD_PINNED_FIELD: True}]},
+                merge_tenant_filter(
+                    {"$and": [query, {INFORMATION_DASHBOARD_PINNED_FIELD: True}]},
+                    current_user,
+                ),
                 {"_id": 0},
             ).sort([("submitted_at", -1), ("created_at", -1)]).to_list(500)
             for sub in pinned_raw:

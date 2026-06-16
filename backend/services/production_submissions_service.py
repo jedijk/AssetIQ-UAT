@@ -265,6 +265,8 @@ async def create_viscosity_submission(user: dict,
         "created_at": now,
         "updated_at": now,
     }
+    from services.tenant_schema import with_tenant_id
+    with_tenant_id(submission, user)
     
     await db.form_submissions.insert_one(submission)
     logger.info(f"Created new viscosity submission {submission_id} for datetime {datetime_val}, measurement={measurement}")

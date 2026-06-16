@@ -25,6 +25,34 @@ from utils.mongo_regex import case_insensitive_contains
 
 logger = logging.getLogger(__name__)
 
+
+def _json_safe_action(action: dict) -> dict:
+    """Recursively coerce BSON values so FastAPI can serialize action responses."""
+    try:
+        from bson import ObjectId
+    except ImportError:
+        ObjectId = ()  # type: ignore[misc, assignment]
+
+    def convert(value: Any) -> Any:
+        if value is None or isinstance(value, (bool, int, float, str)):
+            return value
+        if isinstance(value, datetime):
+            if value.tzinfo is None:
+                return value.replace(tzinfo=timezone.utc).isoformat()
+            return value.isoformat()
+        if ObjectId and isinstance(value, ObjectId):
+            return str(value)
+        if isinstance(value, bytes):
+            return value.decode("utf-8", errors="replace")
+        if isinstance(value, dict):
+            return {str(k): convert(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [convert(v) for v in value]
+        return str(value)
+
+    return convert(action)
+
+
 _action_repo = ActionRepository(db)
 _threat_repo = ThreatRepository(db)
 _equipment_repo = EquipmentRepository(db)
@@ -338,7 +366,7 @@ async def get_action_detail(action_id: str, current_user: dict) -> dict:
                 tags = await _equipment_repo.find_tags_by_ids([eq_id], user=current_user)
                 action["equipment_tag"] = tags.get(eq_id)
 
-    return action
+    return _json_safe_action(action)
 
 
 async def create_action(current_user: dict, data: Dict[str, Any]) -> dict:

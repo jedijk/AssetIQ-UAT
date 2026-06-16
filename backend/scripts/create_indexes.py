@@ -162,6 +162,8 @@ INDEX_DEFINITIONS = {
     # Form submissions
     "form_submissions": [
         {"keys": [("id", 1)], "unique": True},
+        {"keys": [("tenant_id", 1)]},
+        {"keys": [("tenant_id", 1), ("submitted_at", -1)]},
         {"keys": [("form_template_id", 1)]},
         {"keys": [("template_id", 1)]},  # Legacy field name
         {"keys": [("submitted_by", 1)]},

@@ -248,6 +248,10 @@ async def create_form_submission_from_task(
         "created_at": timestamp,
     }
 
+    tid = task_instance.get("tenant_id")
+    if tid:
+        submission_doc["tenant_id"] = tid
+
     try:
         ft_id = task_instance.get("form_template_id")
         if ft_id:
