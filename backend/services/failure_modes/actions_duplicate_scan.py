@@ -207,12 +207,12 @@ class ActionsDuplicateScanMixin:
 
         sys_prompt = (
             "You are a maintenance reliability engineer. Group actions that describe the "
-            "SAME maintenance task and scope, even when wording or discipline tags differ "
-            "(e.g. 'Check lubrication' Rotating vs 'Proper lubrication' Mechanical, or "
-            "'Replace worn bearings' vs 'Replace bearing on failure'). "
+            "SAME maintenance task and scope, even when wording, discipline tags, or "
+            "bracket labels differ (e.g. 'Check lubrication' vs 'Ensure proper lubrication "
+            "[Rotating]', 'Check oil condition' vs lubrication tasks, or 'Listen for bearing "
+            "noise' vs 'Check bearing temperatures'). "
             "DO NOT group different maintenance intents: inspect vs replace/repair, "
-            "lubrication vs overhaul, cleaning vs calibration, or unrelated PDM techniques "
-            "(e.g. listen for noise vs measure vibration) unless they clearly duplicate. "
+            "lubrication vs overhaul, or unrelated equipment scopes. "
             "When unsure, return no groups. Return strict JSON only."
         )
         user_msg = (
@@ -520,6 +520,7 @@ class ActionsDuplicateScanMixin:
             )
 
             fm_ai_failed = False
+            ai_covered_indices: Set[int] = set()
             if use_ai and ai_failure_modes_processed < ai_max_failure_modes:
                 ai_failure_modes_processed += 1
                 try:
@@ -550,6 +551,9 @@ class ActionsDuplicateScanMixin:
                                 company_id=company_id,
                             )
                             duplicate_groups.extend(confirmed)
+                    for group in duplicate_groups:
+                        for idx in group.get("action_indices") or []:
+                            ai_covered_indices.add(int(idx))
                 except Exception as e:
                     logger.warning(
                         "AI duplicate-action cluster failed for %s: %s",
@@ -559,29 +563,35 @@ class ActionsDuplicateScanMixin:
                     ai_errors += 1
                     fm_ai_failed = True
 
-            if not duplicate_groups:
-                fallback_clusters = lexical_clusters_loose or lexical_clusters_strict
-                for indices in fallback_clusters:
-                    if not self._action_indices_coherent(
+            fallback_clusters = lexical_clusters_loose or lexical_clusters_strict
+            for indices in fallback_clusters:
+                if ai_covered_indices and all(i in ai_covered_indices for i in indices):
+                    continue
+                if duplicate_groups and any(
+                    set(indices) == set(g.get("action_indices") or [])
+                    for g in duplicate_groups
+                ):
+                    continue
+                if not self._action_indices_coherent(
+                    actions,
+                    indices,
+                    ratio_threshold,
+                    jaccard_threshold,
+                    strict_pairing=not use_ai and not fm_ai_failed,
+                ):
+                    continue
+                duplicate_groups.append(
+                    self._format_action_group(
                         actions,
                         indices,
-                        ratio_threshold,
-                        jaccard_threshold,
-                        strict_pairing=not use_ai,
-                    ):
-                        continue
-                    duplicate_groups.append(
-                        self._format_action_group(
-                            actions,
-                            indices,
-                            reason=(
-                                "Similar maintenance task (lexical match)"
-                                if not use_ai
-                                else "Similar maintenance task (AI unavailable, lexical match)"
-                            ),
-                            detection_method="lexical",
-                        )
+                        reason=(
+                            "Similar maintenance task (lexical match)"
+                            if not use_ai or fm_ai_failed
+                            else "Similar maintenance task (lexical supplement)"
+                        ),
+                        detection_method="lexical",
                     )
+                )
 
             if duplicate_groups:
                 results.append({

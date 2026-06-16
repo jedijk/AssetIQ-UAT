@@ -66,3 +66,31 @@ def test_monitoring_pair_not_treated_as_duplicate():
         jaccard_threshold=0.48,
         strict_pairing=False,
     )
+
+
+BEARING_FAILURE_V25 = [
+    {"description": "Check oil condition", "action_type": "PDM", "discipline": "laboratory"},
+    {"description": "Replace bearings proactively [Rotating]", "action_type": "CM", "discipline": "mechanical"},
+    {"description": "Check bearing temperatures [Rotating]", "action_type": "PDM", "discipline": "rotating"},
+    {"description": "Ensure proper lubrication [Rotating]", "action_type": "PM", "discipline": "mechanical"},
+    {"description": "Check lubrication", "action_type": "PDM", "discipline": "mechanical"},
+    {"description": "Listen for bearing noise", "action_type": "PDM", "discipline": "rotating"},
+]
+
+
+def test_v25_lubrication_cluster():
+    clusters = FailureModesMixin._cluster_duplicate_action_indices(
+        BEARING_FAILURE_V25,
+        strict_pairing=False,
+    )
+    flat = {i for cluster in clusters for i in cluster}
+    assert {0, 3, 4}.issubset(flat), f"expected lube cluster, got {clusters}"
+
+
+def test_v25_bearing_pdm_cluster():
+    clusters = FailureModesMixin._cluster_duplicate_action_indices(
+        BEARING_FAILURE_V25,
+        strict_pairing=False,
+    )
+    flat = {i for cluster in clusters for i in cluster}
+    assert {2, 5}.issubset(flat), f"expected bearing PDM cluster, got {clusters}"
