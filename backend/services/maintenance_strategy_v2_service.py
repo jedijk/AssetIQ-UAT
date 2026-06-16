@@ -26,7 +26,10 @@ from models.maintenance_strategy_v2 import (
     TaskActivationState,
 )
 
-from services.maintenance_scheduler_sync import clear_equipment_type_schedule_after_strategy_delete
+from services.maintenance_scheduler_sync import (
+    clear_equipment_type_schedule_after_strategy_delete,
+    propagate_strategy_schedule_updates,
+)
 from services.maintenance_strategy_propagation import (
     _describe_task_change,
     _describe_fm_change,
@@ -53,6 +56,25 @@ from services.maintenance_strategy_helpers import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+async def _refresh_applied_equipment_timeline(
+    equipment_type_id: str,
+    user_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Regenerate programs + scheduled_tasks for equipment already covered by strategy."""
+    try:
+        return await propagate_strategy_schedule_updates(
+            equipment_type_id,
+            user_id=user_id,
+        )
+    except Exception as exc:
+        logger.exception(
+            "Schedule timeline refresh failed for equipment type %s: %s",
+            equipment_type_id,
+            exc,
+        )
+        return {}
 
 # Metadata-only task edits propagate immediately to v2 programs and open scheduled tasks.
 METADATA_PROPAGATION_KEYS = frozenset({
@@ -631,6 +653,11 @@ async def sync_equipment_type_strategy(
         },
     )
 
+    schedule_refresh = await _refresh_applied_equipment_timeline(
+        equipment_type_id,
+        user_id=current_user.get("user_id"),
+    )
+
     return {
         "message": "Strategy synced with library",
         "equipment_type_id": equipment_type_id,
@@ -642,6 +669,7 @@ async def sync_equipment_type_strategy(
         "total_tasks": len(all_tasks),
         "new_version": new_version,
         "strategy_needs_apply": True,
+        "schedule_refresh": schedule_refresh,
     }
 
 
@@ -813,6 +841,11 @@ async def update_failure_mode_strategy(
                 )
             )
 
+    schedule_refresh = await _refresh_applied_equipment_timeline(
+        equipment_type_id,
+        user_id=current_user.get("user_id"),
+    )
+
     return {
         "message": "Failure mode strategy updated",
         "failure_mode_id": failure_mode_id,
@@ -821,6 +854,7 @@ async def update_failure_mode_strategy(
         "coverage_score": round(coverage_score, 1),
         "version": new_version,
         "strategy_needs_apply": True,
+        "schedule_refresh": schedule_refresh,
         **fm_propagation,
     }
 
@@ -893,7 +927,17 @@ async def add_task_template(
         user_id=current_user.get("user_id"),
     )
 
-    return {**task_dict, "version": new_version, "strategy_needs_apply": True}
+    schedule_refresh = await _refresh_applied_equipment_timeline(
+        equipment_type_id,
+        user_id=current_user.get("user_id"),
+    )
+
+    return {
+        **task_dict,
+        "version": new_version,
+        "strategy_needs_apply": True,
+        "schedule_refresh": schedule_refresh,
+    }
 
 
 async def update_task_template(
@@ -971,6 +1015,11 @@ async def update_task_template(
         "metadata_propagated": metadata_only,
         **propagation,
     }
+    if not metadata_only:
+        response["schedule_refresh"] = await _refresh_applied_equipment_timeline(
+            equipment_type_id,
+            user_id=current_user.get("user_id"),
+        )
     if updated_task and any(
         k in updates for k in ["name", "description", "procedure_steps"]
     ):
@@ -1019,6 +1068,10 @@ async def delete_task_template(
 
     programs_deactivated = await _deactivate_programs_for_task(equipment_type_id, task_id)
     scheduled_cancelled = await _cancel_open_scheduled_tasks_for_task(equipment_type_id, task_id)
+    schedule_refresh = await _refresh_applied_equipment_timeline(
+        equipment_type_id,
+        user_id=current_user.get("user_id"),
+    )
 
     return {
         "message": "Task template deleted",
@@ -1027,6 +1080,7 @@ async def delete_task_template(
         "strategy_needs_apply": True,
         "programs_deactivated": programs_deactivated,
         "scheduled_tasks_cancelled": scheduled_cancelled,
+        "schedule_refresh": schedule_refresh,
     }
 
 

@@ -1230,6 +1230,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
     onSuccess: () => {
       toast.success(t("maintenance.strategySavedApplyHint"));
       queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
+      refreshMaintenanceSchedulerQueries(queryClient);
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to update");
@@ -1243,6 +1244,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
       setTaskDialogOpen(false);
       setEditingTask(null);
       queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
+      refreshMaintenanceSchedulerQueries(queryClient);
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to add task");
@@ -1257,6 +1259,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
       setTaskDialogOpen(false);
       setEditingTask(null);
       queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
+      refreshMaintenanceSchedulerQueries(queryClient);
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to update task");
@@ -1268,6 +1271,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
     onSuccess: () => {
       toast.success(t("maintenance.strategySavedApplyHint"));
       queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
+      refreshMaintenanceSchedulerQueries(queryClient);
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to delete task");
@@ -1304,6 +1308,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
       toast.info(t("maintenance.strategySavedApplyHint"));
       queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
       queryClient.invalidateQueries({ queryKey: ["maint-task-template-batch"] });
+      refreshMaintenanceSchedulerQueries(queryClient);
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to sync with library");

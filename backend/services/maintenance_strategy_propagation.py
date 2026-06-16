@@ -418,11 +418,11 @@ async def _sync_maintenance_programs_v2(
     equipment_type_id: str,
     user_id: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Regenerate maintenance_programs_v2 for all equipment of this type."""
-    from services.maintenance_program_service import MaintenanceProgramService
+    """Regenerate maintenance_programs_v2 and refresh timeline for applied equipment."""
+    from services.maintenance_scheduler_sync import propagate_strategy_schedule_updates
 
     try:
-        result = await MaintenanceProgramService.sync_programs_for_equipment_type(
+        schedule_refresh = await propagate_strategy_schedule_updates(
             equipment_type_id,
             user_id=user_id,
         )
@@ -434,23 +434,12 @@ async def _sync_maintenance_programs_v2(
         )
         return {"programs_regenerated": 0, "equipment_ids": [], "errors": [{"error": str(exc)}]}
 
-    try:
-        from services.maintenance_scheduler_sync import refresh_equipment_type_schedules
-
-        schedule_refresh = await refresh_equipment_type_schedules(
-            equipment_type_id,
-            user_id=user_id,
-        )
-        result["schedule_refresh"] = schedule_refresh
-    except Exception as exc:
-        logger.exception(
-            "Schedule refresh failed after v2 sync for equipment type %s: %s",
-            equipment_type_id,
-            exc,
-        )
-        result["schedule_refresh_error"] = str(exc)
-
-    return result
+    return {
+        "programs_regenerated": schedule_refresh.get("programs_regenerated", 0),
+        "equipment_ids": [],
+        "scheduled_tasks_created": schedule_refresh.get("scheduled_tasks_created", 0),
+        "schedule_refresh": schedule_refresh,
+    }
 
 
 async def _bump_strategy_version(

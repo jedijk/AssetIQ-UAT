@@ -975,3 +975,63 @@ async def refresh_equipment_type_schedules(
         }
     )
     return totals
+
+
+async def propagate_strategy_schedule_updates(
+    equipment_type_id: str,
+    user_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Regenerate v2 maintenance programs and scheduled_tasks for equipment that
+    already had strategy applied (maintenance_programs_v2 exists).
+
+    Strategy edits alone do not run the Apply Strategy dialog; this keeps the
+    schedule timeline in sync for equipment already covered.
+    """
+    from services.maintenance_program_service import MaintenanceProgramService
+    from services.maintenance_scheduling import schedule_programs_for_equipment
+    from services.strategy_propagation import resync_programs_with_strategy
+
+    program_docs = await db.maintenance_programs_v2.find(
+        {"equipment_type_id": equipment_type_id},
+        {"equipment_id": 1, "_id": 0},
+    ).to_list(5000)
+    equipment_ids = list(
+        {doc["equipment_id"] for doc in program_docs if doc.get("equipment_id")}
+    )
+    if not equipment_ids:
+        return {
+            "equipment_type_id": equipment_type_id,
+            "equipment_count": 0,
+            "programs_regenerated": 0,
+            "scheduled_tasks_created": 0,
+        }
+
+    await resync_programs_with_strategy(equipment_type_id)
+
+    regenerated = 0
+    errors: List[str] = []
+    for equipment_id in equipment_ids:
+        try:
+            await MaintenanceProgramService.regenerate_program(
+                equipment_id=equipment_id,
+                user_id=user_id,
+            )
+            regenerated += 1
+        except Exception as exc:
+            logger.warning(
+                "Regenerate program failed for %s after strategy change: %s",
+                equipment_id,
+                exc,
+            )
+            errors.append(f"{equipment_id}: {exc}")
+
+    scheduled_created = await schedule_programs_for_equipment(equipment_ids)
+
+    return {
+        "equipment_type_id": equipment_type_id,
+        "equipment_count": len(equipment_ids),
+        "programs_regenerated": regenerated,
+        "scheduled_tasks_created": scheduled_created,
+        "errors": errors,
+    }

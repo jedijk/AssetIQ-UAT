@@ -79,6 +79,8 @@ async def scope_scheduled_tasks_query(
     equipment_type_id: Optional[str] = None,
     user: Optional[dict] = None,
 ) -> None:
+    base_filters = dict(query)
+
     try:
         rows = await load_schedulable_program_rows(equipment_type_id)
     except Exception as exc:
@@ -94,22 +96,34 @@ async def scope_scheduled_tasks_query(
             seen.add(equipment_id)
             equipped_ids.append(equipment_id)
 
-    scoped_query: Dict = {}
+    scope_clause: Dict = {}
     if not program_ids and not equipped_ids:
-        scoped_query = {"_id": {"$exists": False}}
+        scope_clause = {"_id": {"$exists": False}}
     else:
+        or_parts: List[Dict] = []
         if program_ids:
-            scoped_query["maintenance_program_id"] = {"$in": program_ids}
+            or_parts.append({"maintenance_program_id": {"$in": program_ids}})
         if equipped_ids:
-            scoped_query["equipment_id"] = {"$in": equipped_ids}
+            or_parts.append({"equipment_id": {"$in": equipped_ids}})
+        if len(or_parts) == 1:
+            scope_clause = or_parts[0]
+        else:
+            scope_clause = {"$or": or_parts}
 
-    if user:
-        scoped = scheduler_scoped(scoped_query, user)
-        query.clear()
-        query.update(scoped)
-    else:
-        query.clear()
-        query.update(scoped_query)
+    query.clear()
+    parts: List[Dict] = []
+    if base_filters:
+        parts.append(base_filters)
+    if scope_clause:
+        scoped = scheduler_scoped(scope_clause, user) if user else scope_clause
+        parts.append(scoped)
+    elif user:
+        parts.append(scheduler_scoped({}, user))
+
+    if len(parts) == 1:
+        query.update(parts[0])
+    elif len(parts) > 1:
+        query["$and"] = parts
 
 
 # Re-export scheduler helper symbols used by route _shared consumers.
