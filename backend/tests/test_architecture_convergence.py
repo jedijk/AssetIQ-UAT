@@ -633,7 +633,6 @@ SERVICE_LOC_ALLOWLIST = {
     "decision_engine.py": 822,
     "equipment_import_service.py": 1034,
     "executive_dashboard_service.py": 997,
-    "failure_modes/actions_sync.py": 888,
     "failure_modes_routes_service.py": 1004,
     "form_service.py": 1680,
     "intelligence_map_routes_service.py": 855,
