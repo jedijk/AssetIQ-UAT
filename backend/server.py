@@ -497,9 +497,12 @@ async def set_database_context(request, call_next):
         elif explicit_env == "production":
             db_env = "production"
 
-    if db_env in AVAILABLE_DATABASES:
+    if explicit_env and db_env in AVAILABLE_DATABASES:
         db_name = AVAILABLE_DATABASES[db_env]["name"]
     else:
+        # No owner override (or override ignored): use process DB_NAME, not the
+        # production switch target. Keeps CI/test and UAT default hosts on their
+        # configured database while explicit production header still reaches assetiq.
         db_name = DEFAULT_DB_NAME
 
     set_request_db(db_name)
