@@ -128,6 +128,17 @@ async def update_failure_mode_strategy(
     )
 
 
+@router.post("/{equipment_type_id}/failure-modes/{failure_mode_id}/sync")
+async def sync_failure_mode_from_library(
+    equipment_type_id: str,
+    failure_mode_id: str,
+    current_user: dict = Depends(_library_write),
+):
+    return await svc.sync_failure_mode_from_library(
+        equipment_type_id, failure_mode_id, current_user
+    )
+
+
 @router.get("/{equipment_type_id}/tasks")
 async def get_task_templates(
     equipment_type_id: str,

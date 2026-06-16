@@ -371,7 +371,9 @@ const FailureModeStrategyRow = ({
   onUpdateTask,
   onEditTask,
   taskTemplates,
-  onViewInFMEA 
+  onViewInFMEA,
+  onSyncNewVersion,
+  isSyncingFm,
 }) => {
   const { t } = useLanguage();
   const fmNameMap = useFailureModeNameMap();
@@ -408,8 +410,19 @@ const FailureModeStrategyRow = ({
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Badge className="text-[10px] bg-blue-100 text-blue-700 border-blue-200 animate-pulse">
-                        <RefreshCw className="w-3 h-3 mr-1" />
+                      <Badge
+                        className="text-[10px] bg-blue-100 text-blue-700 border-blue-200 animate-pulse cursor-pointer hover:bg-blue-200"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSyncNewVersion?.();
+                        }}
+                        role="button"
+                      >
+                        {isSyncingFm ? (
+                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                        ) : (
+                          <RefreshCw className="w-3 h-3 mr-1" />
+                        )}
                         New Version
                       </Badge>
                     </TooltipTrigger>
@@ -418,7 +431,7 @@ const FailureModeStrategyRow = ({
                         <p className="font-medium">{t("maintenance.failureModeUpdatedInLibrary")}</p>
                         <p>{t("maintenance.yourVersion")}: v{fmStrategy.fm_version || 1}</p>
                         <p>{t("maintenance.libraryVersion")}: v{fmStrategy.library_version || 1}</p>
-                        <p className="text-blue-600 pt-1">{t("maintenance.clickSyncLibraryToUpdate")}</p>
+                        <p className="text-blue-600 pt-1">{t("maintenance.clickNewVersionToSync")}</p>
                       </div>
                     </TooltipContent>
                   </Tooltip>
@@ -1162,9 +1175,36 @@ const patchStrategyVersionInCache = (queryClient, equipmentTypeId, version) => {
   });
 };
 
-const invalidateStrategyQueries = (queryClient, equipmentTypeId) => {
-  queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
-  queryClient.invalidateQueries(["maintenance-strategy-v2-history", equipmentTypeId]);
+const patchFmInCache = (queryClient, equipmentTypeId, failureModeId, fmPatch, newVersion) => {
+  if (!equipmentTypeId || !failureModeId) return;
+  queryClient.setQueryData(["maintenance-strategy-v2", equipmentTypeId], (old) => {
+    if (!old?.strategy) return old;
+    const fms = (old.strategy.failure_mode_strategies || []).map((fm) => {
+      if (String(fm.failure_mode_id) !== String(failureModeId)) return fm;
+      const nextVersion = fmPatch.fm_version ?? fm.fm_version;
+      return {
+        ...fm,
+        ...fmPatch,
+        fm_version: nextVersion,
+        library_version: nextVersion,
+        has_new_version: false,
+      };
+    });
+    return {
+      ...old,
+      strategy: {
+        ...old.strategy,
+        version: newVersion || old.strategy.version,
+        failure_mode_strategies: fms,
+        failure_modes_with_updates: fms.filter((fm) => fm.has_new_version).length,
+      },
+    };
+  });
+};
+
+const invalidateStrategyQueries = async (queryClient, equipmentTypeId) => {
+  await queryClient.invalidateQueries({ queryKey: ["maintenance-strategy-v2", equipmentTypeId] });
+  await queryClient.invalidateQueries({ queryKey: ["maintenance-strategy-v2-history", equipmentTypeId] });
 };
 
 const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
@@ -1179,6 +1219,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const [editingTask, setEditingTask] = useState(null);
   const [affectedEquipmentDialogOpen, setAffectedEquipmentDialogOpen] = useState(false);
   const [showInactiveInMatrix, setShowInactiveInMatrix] = useState(false);
+  const [syncingFmId, setSyncingFmId] = useState(null);
 
   const equipmentTypeId = equipmentType?.id;
   const equipmentTypeName = equipmentType?.name;
@@ -1307,7 +1348,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
 
   const syncStrategyMutation = useMutation({
     mutationFn: () => maintenanceStrategyV2API.syncStrategy(equipmentTypeId),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       patchStrategyVersionInCache(queryClient, equipmentTypeId, data?.new_version);
       const refreshed = data.tasks_refreshed || 0;
       const msg = [
@@ -1321,12 +1362,40 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
         .join(", ");
       toast.success(msg);
       toast.info(t("maintenance.strategySavedApplyHint"));
-      invalidateStrategyQueries(queryClient, equipmentTypeId);
+      await invalidateStrategyQueries(queryClient, equipmentTypeId);
       queryClient.invalidateQueries({ queryKey: ["maint-task-template-batch"] });
       refreshMaintenanceSchedulerQueries(queryClient);
     },
     onError: (err) => {
       toast.error(err.response?.data?.detail || "Failed to sync with library");
+    },
+  });
+
+  const syncFmMutation = useMutation({
+    mutationFn: (failureModeId) =>
+      maintenanceStrategyV2API.syncFailureModeFromLibrary(equipmentTypeId, failureModeId),
+    onMutate: (failureModeId) => setSyncingFmId(failureModeId),
+    onSettled: () => setSyncingFmId(null),
+    onSuccess: async (data, failureModeId) => {
+      if (data?.updated) {
+        patchStrategyVersionInCache(queryClient, equipmentTypeId, data?.new_version);
+        patchFmInCache(
+          queryClient,
+          equipmentTypeId,
+          failureModeId,
+          data.failure_mode_strategy || {},
+          data.new_version,
+        );
+        toast.success(data.message || "Failure mode synced from library");
+        toast.info(t("maintenance.strategySavedApplyHint"));
+      } else {
+        toast.info(data?.message || "Failure mode already up to date");
+      }
+      await invalidateStrategyQueries(queryClient, equipmentTypeId);
+      refreshMaintenanceSchedulerQueries(queryClient);
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.detail || "Failed to sync failure mode from library");
     },
   });
 
@@ -1672,6 +1741,8 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                     onEditTask={handleEditTask}
                     taskTemplates={strategy?.task_templates}
                     onViewInFMEA={handleViewInFMEA}
+                    onSyncNewVersion={() => syncFmMutation.mutate(fm.failure_mode_id)}
+                    isSyncingFm={syncingFmId === fm.failure_mode_id && syncFmMutation.isPending}
                   />
                 ))
               )}

@@ -2082,6 +2082,7 @@
     "yourVersion": "Ihre Version",
     "failureModeUpdatedInLibrary": "Fehlermodus in Bibliothek aktualisiert",
     "clickSyncLibraryToUpdate": "Klicken Sie auf \"Bibliothek synchronisieren\", um zu aktualisieren",
+    "clickNewVersionToSync": "Klicken Sie, um diesen Fehlermodus aus der Bibliothek zu synchronisieren",
     "failureModeVersionLabel": "Fehlermodusversion",
     "viewInFmeaLibrary": "In FMEA-Bibliothek anzeigen",
     "linkedTasks": "Verknüpfte Aufgaben",

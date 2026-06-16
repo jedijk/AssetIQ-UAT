@@ -43,6 +43,43 @@ def strip_fm_enrichment_fields(fm_strategy: Dict[str, Any]) -> Dict[str, Any]:
     return cleaned
 
 
+def normalize_fm_id(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def fm_strategy_row_matches_id(fm_strategy: Dict[str, Any], failure_mode_id: str) -> bool:
+    """Match strategy FM row by id (string or legacy int)."""
+    fid = normalize_fm_id(failure_mode_id)
+    if not fid:
+        return False
+    strat_id = normalize_fm_id(fm_strategy.get("failure_mode_id"))
+    if strat_id == fid:
+        return True
+    try:
+        return int(strat_id) == int(fid)
+    except (TypeError, ValueError):
+        return False
+
+
+def library_fm_matches_strategy_row(library_fm: Dict[str, Any], fm_strategy: Dict[str, Any]) -> bool:
+    """True when a library FM document corresponds to a strategy FM row."""
+    lib_id = normalize_fm_id(library_fm.get("id"))
+    strat_id = normalize_fm_id(fm_strategy.get("failure_mode_id"))
+    if lib_id and strat_id:
+        if lib_id == strat_id:
+            return True
+        try:
+            if int(lib_id) == int(strat_id):
+                return True
+        except (TypeError, ValueError):
+            pass
+    lib_name = (library_fm.get("failure_mode") or library_fm.get("name") or "").strip().lower()
+    strat_name = (fm_strategy.get("failure_mode_name") or "").strip().lower()
+    return bool(lib_name and strat_name and lib_name == strat_name)
+
+
 async def mark_strategy_needs_apply(equipment_type_id: str) -> None:
     from services.strategy_apply_state import mark_strategy_needs_apply as _mark
 

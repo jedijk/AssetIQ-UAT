@@ -72,6 +72,16 @@ export const maintenanceStrategyV2API = {
     return response.data;
   },
 
+  /**
+   * Sync one failure mode strategy row from the library (newer FM version).
+   */
+  syncFailureModeFromLibrary: async (equipmentTypeId, failureModeId) => {
+    const response = await api.post(
+      `/maintenance-strategies-v2/${equipmentTypeId}/failure-modes/${failureModeId}/sync`
+    );
+    return response.data;
+  },
+
   // ============= Task Templates =============
 
   /**

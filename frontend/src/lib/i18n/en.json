@@ -19,7 +19,8 @@
     "maintenanceReadiness": "Maintenance Readiness",
     "taskScheduler": "Execution",
     "formSubmissions": "Reports",
-    "reliabilityIntelligence": "Reliability Intelligence"
+    "reliabilityIntelligence": "Reliability Intelligence",
+    "visualManagement": "Visual Management"
   },
   "settings": {
     "userManagement": "User Management",
@@ -1975,6 +1976,7 @@
     "yourVersion": "Your version",
     "failureModeUpdatedInLibrary": "Failure Mode Updated in Library",
     "clickSyncLibraryToUpdate": "Click \"Sync Library\" to update",
+    "clickNewVersionToSync": "Click to sync this failure mode from the library",
     "failureModeVersionLabel": "Failure Mode Version",
     "viewInFmeaLibrary": "View in FMEA Library",
     "linkedTasks": "Linked Tasks",

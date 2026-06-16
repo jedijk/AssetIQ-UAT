@@ -55,6 +55,9 @@ from services.maintenance_strategy_helpers import (
     clear_strategy_needs_apply,
     coerce_fm_library_version,
     strip_fm_enrichment_fields,
+    normalize_fm_id,
+    fm_strategy_row_matches_id,
+    library_fm_matches_strategy_row,
 )
 
 logger = logging.getLogger(__name__)
@@ -510,8 +513,16 @@ async def sync_equipment_type_strategy(
     
     # Get existing FM IDs and names for comparison
     existing_fm_strategies = existing_strategy.get("failure_mode_strategies", [])
-    existing_fm_ids = {fm.get("failure_mode_id") for fm in existing_fm_strategies}
-    existing_fm_names = {fm.get("failure_mode_name") for fm in existing_fm_strategies}
+    existing_fm_ids = {
+        normalize_fm_id(fm.get("failure_mode_id"))
+        for fm in existing_fm_strategies
+        if fm.get("failure_mode_id") is not None
+    }
+    existing_fm_names = {
+        (fm.get("failure_mode_name") or "").strip().lower()
+        for fm in existing_fm_strategies
+        if fm.get("failure_mode_name")
+    }
     existing_tasks = existing_strategy.get("task_templates", [])
     
     # Track what was added
@@ -540,18 +551,18 @@ async def sync_equipment_type_strategy(
                 refreshed_task_templates.append(task)
     
     for fm in library_failure_modes:
-        fm_id = fm.get("id", str(uuid.uuid4()))
+        fm_id = normalize_fm_id(fm.get("id", str(uuid.uuid4())))
         fm_name = fm.get("failure_mode", fm.get("name", "Unknown"))
         fm_version = coerce_fm_library_version(fm.get("version", 1))
         fm_updated_at = fm.get("updated_at")
         if fm_updated_at:
             fm_updated_at = str(fm_updated_at)
+        fm_name_key = fm_name.strip().lower()
         
         # Check if this FM already exists in strategy
-        if fm_id in existing_fm_ids or fm_name in existing_fm_names:
-            # Update version info for existing FM
+        if fm_id in existing_fm_ids or fm_name_key in existing_fm_names:
             for existing_fm in existing_fm_strategies:
-                if existing_fm.get("failure_mode_id") == fm_id or existing_fm.get("failure_mode_name") == fm_name:
+                if library_fm_matches_strategy_row(fm, existing_fm):
                     if coerce_fm_library_version(existing_fm.get("fm_version", 1)) < fm_version:
                         await _apply_library_fm_refresh(existing_fm, fm)
                     break
@@ -620,6 +631,7 @@ async def sync_equipment_type_strategy(
     # Merge: existing + new
     all_fm_strategies = existing_fm_strategies + [fm.model_dump() for fm in new_fm_strategies]
     all_tasks = existing_tasks + [t.model_dump() for t in new_tasks]
+    persisted_fms = [strip_fm_enrichment_fields(fm) for fm in all_fm_strategies]
     
     # Update totals
     total_fms = len(all_fm_strategies)
@@ -652,7 +664,7 @@ async def sync_equipment_type_strategy(
         {"equipment_type_id": equipment_type_id},
         {
             "$set": {
-                "failure_mode_strategies": all_fm_strategies,
+                "failure_mode_strategies": persisted_fms,
                 "task_templates": all_tasks,
                 "total_failure_modes": total_fms,
                 "total_tasks": len(all_tasks),
@@ -694,6 +706,94 @@ async def sync_equipment_type_strategy(
         "total_failure_modes": total_fms,
         "total_tasks": len(all_tasks),
         "new_version": new_version,
+        "strategy_needs_apply": True,
+        "schedule_refresh": schedule_refresh,
+    }
+
+
+async def sync_failure_mode_from_library(
+    equipment_type_id: str,
+    failure_mode_id: str,
+    current_user: dict,
+):
+    """Refresh one failure mode strategy row from the library when a newer version exists."""
+    existing_strategy = await db.equipment_type_strategies.find_one({
+        "equipment_type_id": equipment_type_id
+    })
+    if not existing_strategy:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+
+    fm_strategies = existing_strategy.get("failure_mode_strategies", [])
+    existing_fm = None
+    for fm in fm_strategies:
+        if fm_strategy_row_matches_id(fm, failure_mode_id):
+            existing_fm = fm
+            break
+    if not existing_fm:
+        raise HTTPException(status_code=404, detail="Failure mode strategy not found")
+
+    library_fm = await lookup_library_failure_mode(
+        existing_fm.get("failure_mode_id"),
+        existing_fm.get("failure_mode_name"),
+    )
+    if not library_fm:
+        raise HTTPException(status_code=404, detail="Failure mode not found in library")
+
+    library_version = coerce_fm_library_version(library_fm.get("version") or 1)
+    strategy_version = coerce_fm_library_version(existing_fm.get("fm_version", 1))
+    if strategy_version >= library_version:
+        return {
+            "message": "Failure mode already up to date",
+            "failure_mode_id": failure_mode_id,
+            "fm_version": strategy_version,
+            "updated": False,
+            "failure_mode_strategy": existing_fm,
+        }
+
+    existing_tasks = list(existing_strategy.get("task_templates", []))
+    _, existing_tasks, tasks_refreshed = refresh_failure_mode_strategy_from_library(
+        library_fm, existing_fm, existing_tasks
+    )
+
+    fm_name = library_fm.get("failure_mode") or existing_fm.get("failure_mode_name") or failure_mode_id
+    new_version = await _bump_strategy_version(
+        existing_strategy,
+        [{
+            "type": "failure_mode_sync",
+            "summary": (
+                f"Synced failure mode '{fm_name}' from library "
+                f"(v{strategy_version} → v{library_version}, {tasks_refreshed} tasks refreshed)"
+            ),
+        }],
+        current_user.get("user_id"),
+    )
+
+    persisted_fms = [strip_fm_enrichment_fields(fm) for fm in fm_strategies]
+    await db.equipment_type_strategies.update_one(
+        {"equipment_type_id": equipment_type_id},
+        {
+            "$set": {
+                "failure_mode_strategies": persisted_fms,
+                "task_templates": existing_tasks,
+                "total_tasks": len(existing_tasks),
+                "updated_at": datetime.utcnow().isoformat(),
+            },
+        },
+    )
+
+    schedule_refresh = await _refresh_applied_equipment_timeline(
+        equipment_type_id,
+        user_id=current_user.get("user_id"),
+    )
+
+    return {
+        "message": f"Synced failure mode from library (v{strategy_version} → v{library_version})",
+        "failure_mode_id": failure_mode_id,
+        "fm_version": library_version,
+        "new_version": new_version,
+        "updated": True,
+        "tasks_refreshed": tasks_refreshed,
+        "failure_mode_strategy": existing_fm,
         "strategy_needs_apply": True,
         "schedule_refresh": schedule_refresh,
     }

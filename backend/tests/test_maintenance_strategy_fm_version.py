@@ -7,6 +7,8 @@ from services.maintenance_strategy_helpers import (
     coerce_fm_library_version,
     refresh_failure_mode_strategy_from_library,
     strip_fm_enrichment_fields,
+    fm_strategy_row_matches_id,
+    library_fm_matches_strategy_row,
 )
 
 
@@ -54,6 +56,73 @@ def test_refresh_failure_mode_strategy_updates_fm_version():
         library_fm, fm_strategy, tasks
     )
     assert updated_fm["fm_version"] == 3
+
+
+def test_fm_strategy_row_matches_legacy_int_id():
+    fm = {"failure_mode_id": 42, "failure_mode_name": "Seal leak"}
+    assert fm_strategy_row_matches_id(fm, "42")
+    assert fm_strategy_row_matches_id(fm, 42)
+
+
+def test_library_fm_matches_strategy_row_by_name_or_id():
+    library_fm = {"id": "fm-1", "failure_mode": "Seal leak", "version": 2}
+    strategy_fm = {"failure_mode_id": "fm-1", "failure_mode_name": "Seal leak", "fm_version": 1}
+    assert library_fm_matches_strategy_row(library_fm, strategy_fm)
+
+
+@pytest.mark.asyncio
+async def test_sync_failure_mode_from_library_updates_version():
+    from services import maintenance_strategy_v2_service as svc
+
+    existing_fm = {
+        "failure_mode_id": "fm-1",
+        "failure_mode_name": "Seal leak",
+        "fm_version": 2,
+        "task_ids": [],
+        "strategy_type": "preventive",
+        "detection_methods": ["visual"],
+    }
+    strategy = {
+        "equipment_type_id": "et-1",
+        "version": "1.0",
+        "failure_mode_strategies": [existing_fm],
+        "task_templates": [],
+    }
+    library_fm = {
+        "id": "fm-1",
+        "failure_mode": "Seal leak",
+        "version": 3,
+        "severity": 8,
+        "occurrence": 5,
+        "detectability": 4,
+    }
+
+    find_one = AsyncMock(return_value=strategy)
+    update_one = AsyncMock()
+
+    mock_db = MagicMock()
+    mock_db.equipment_type_strategies.find_one = find_one
+    mock_db.equipment_type_strategies.update_one = update_one
+
+    with patch("services.maintenance_strategy_v2_service.db", mock_db), patch(
+        "services.maintenance_strategy_v2_service.lookup_library_failure_mode",
+        AsyncMock(return_value=library_fm),
+    ), patch(
+        "services.maintenance_strategy_v2_service._bump_strategy_version",
+        AsyncMock(return_value="1.1"),
+    ), patch(
+        "services.maintenance_strategy_v2_service._refresh_applied_equipment_timeline",
+        AsyncMock(return_value={}),
+    ):
+        result = await svc.sync_failure_mode_from_library("et-1", "fm-1", {"user_id": "u1"})
+
+    assert result["updated"] is True
+    assert result["fm_version"] == 3
+    assert existing_fm["fm_version"] == 3
+    update_one.assert_called_once()
+    persisted = update_one.call_args[0][1]["$set"]["failure_mode_strategies"][0]
+    assert persisted["fm_version"] == 3
+    assert "has_new_version" not in persisted
 
 
 @pytest.mark.asyncio

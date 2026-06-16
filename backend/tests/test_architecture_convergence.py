@@ -640,7 +640,7 @@ SERVICE_LOC_ALLOWLIST = {
     "maintenance_program_routes_service.py": 819,
     "maintenance_program_service.py": 1750,
     "maintenance_scheduler_sync.py": 1037,
-    "maintenance_strategy_v2_service.py": 1592,
+    "maintenance_strategy_v2_service.py": 1718,
     "observation_workspace_service.py": 1100,
     "pm_import/ai_review.py": 939,
     "process_import_service.py": 1088,

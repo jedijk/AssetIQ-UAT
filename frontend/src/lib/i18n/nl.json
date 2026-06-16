@@ -2083,6 +2083,7 @@
     "yourVersion": "Uw versie",
     "failureModeUpdatedInLibrary": "Faalmodus bijgewerkt in bibliotheek",
     "clickSyncLibraryToUpdate": "Klik op \"Bibliotheek synchroniseren\" om bij te werken",
+    "clickNewVersionToSync": "Klik om deze faalmodus vanuit de bibliotheek te synchroniseren",
     "failureModeVersionLabel": "Faalmodusversie",
     "viewInFmeaLibrary": "Bekijk in FMEA-bibliotheek",
     "linkedTasks": "Gekoppelde taken",
