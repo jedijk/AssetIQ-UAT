@@ -48,7 +48,8 @@ ROLES = {
             "decision_engine:read", "decision_engine:write",
             "analytics:read", "analytics:export",
             "settings:read", "settings:write",
-            "installations:all"  # Special permission to see all installations
+            "installations:all",  # Special permission to see all installations
+            "vmb:read", "vmb:write", "vmb:publish", "vmb:admin",
         ]
     },
     "admin": {
@@ -67,7 +68,8 @@ ROLES = {
             "observations:read", "observations:write", "observations:delete",
             "decision_engine:read", "decision_engine:write",
             "analytics:read", "analytics:export",
-            "settings:read", "settings:write"
+            "settings:read", "settings:write",
+            "vmb:read", "vmb:write", "vmb:publish", "vmb:admin",
         ]
     },
     "reliability_engineer": {
@@ -85,7 +87,8 @@ ROLES = {
             "observations:read", "observations:write", "observations:delete",
             "decision_engine:read", "decision_engine:write",
             "analytics:read", "analytics:export",
-            "settings:read"
+            "settings:read",
+            "vmb:read", "vmb:write",
         ]
     },
     "maintenance": {
@@ -102,7 +105,8 @@ ROLES = {
             "forms:read", "forms:write",
             "observations:read", "observations:write",
             "decision_engine:read",
-            "analytics:read"
+            "analytics:read",
+            "vmb:read",
         ]
     },
     "operations": {
@@ -118,7 +122,8 @@ ROLES = {
             "scheduler:read",
             "forms:read", "forms:write",
             "observations:read", "observations:write",
-            "analytics:read"
+            "analytics:read",
+            "vmb:read",
         ]
     },
     "viewer": {
@@ -134,7 +139,8 @@ ROLES = {
             "scheduler:read",
             "forms:read",
             "observations:read",
-            "analytics:read"
+            "analytics:read",
+            "vmb:read",
         ]
     }
 }

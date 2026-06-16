@@ -28,6 +28,13 @@ const FEATURE_PATHS = {
   forms: ["/forms", "/form-submissions", "/granulometry"],
   equipment: ["/equipment", "/definitions", "/equipment-manager"],
   library: ["/library"],
+  visual_boards: [
+    "/visual-management",
+    "/visual-management/boards",
+    "/visual-management/templates",
+    "/visual-management/screens",
+    "/visual-management/analytics",
+  ],
   reliability_intelligence: ["/reliability"],
   // chat is currently a sidebar (no dedicated route), keep mapping empty for now
   chat: [],

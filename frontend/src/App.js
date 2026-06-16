@@ -84,6 +84,11 @@ const GranulometryPage = lazy(() => import("./pages/GranulometryPage"));
 const RILCasesPage = lazy(() => import("./pages/RILCasesPage"));
 const RILCaseDetailPage = lazy(() => import("./pages/RILCaseDetailPage"));
 
+const VisualBoardsPage = lazy(() => import("./pages/visual-boards/VisualBoardsPage"));
+const VisualBoardEditorPage = lazy(() => import("./pages/visual-boards/VisualBoardEditorPage"));
+const VisualBoardPreviewPage = lazy(() => import("./pages/visual-boards/VisualBoardPreviewPage"));
+const VisualBoardDisplayPage = lazy(() => import("./pages/visual-boards/VisualBoardDisplayPage"));
+
 function RouteFallback() {
   return (
     <AppShell />
@@ -435,6 +440,12 @@ function App() {
                   <QRScanPage />
                 </Suspense>
               } />
+              {/* Visual Management Board — public kiosk display (token auth, no login) */}
+              <Route path="/vmb/:token" element={
+                <Suspense fallback={<RouteFallback />}>
+                  <VisualBoardDisplayPage />
+                </Suspense>
+              } />
               <Route path="/" element={
                 <ProtectedRoute>
                   <FirstLoginFlow>
@@ -471,6 +482,14 @@ function App() {
                 {/* Reliability Intelligence Layer (RIL) Routes */}
                 <Route path="reliability/cases" element={<Suspense fallback={<RouteFallback />}><RILCasesPage /></Suspense>} />
                 <Route path="reliability/cases/:id" element={<Suspense fallback={<RouteFallback />}><RILCaseDetailPage /></Suspense>} />
+
+                {/* Visual Management Studio */}
+                <Route path="visual-management/boards" element={<Suspense fallback={<RouteFallback />}><VisualBoardsPage /></Suspense>} />
+                <Route path="visual-management/boards/:boardId/edit" element={<Suspense fallback={<RouteFallback />}><VisualBoardEditorPage /></Suspense>} />
+                <Route path="visual-management/boards/:boardId/preview" element={<Suspense fallback={<RouteFallback />}><VisualBoardPreviewPage /></Suspense>} />
+                <Route path="visual-management/templates" element={<Suspense fallback={<RouteFallback />}><UnderDevelopmentPage /></Suspense>} />
+                <Route path="visual-management/screens" element={<Suspense fallback={<RouteFallback />}><UnderDevelopmentPage /></Suspense>} />
+                <Route path="visual-management/analytics" element={<Suspense fallback={<RouteFallback />}><UnderDevelopmentPage /></Suspense>} />
                 
                 {/* Settings Layout with nested routes */}
                 <Route path="settings" element={<Suspense fallback={<RouteFallback />}><SettingsPage /></Suspense>}>

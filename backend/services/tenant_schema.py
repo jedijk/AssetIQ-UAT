@@ -97,6 +97,14 @@ WAVE9_COLLECTIONS = frozenset({
     "unstructured_items",
 })
 
+# Wave 10 — Visual Management Studio collections.
+WAVE10_COLLECTIONS = frozenset({
+    "visual_boards",
+    "visual_board_versions",
+    "visual_board_tokens",
+    "visual_board_screens",
+})
+
 WAVE_COLLECTIONS = (
     PILOT_COLLECTIONS
     | WAVE1_COLLECTIONS
@@ -108,6 +116,7 @@ WAVE_COLLECTIONS = (
     | WAVE7_COLLECTIONS
     | WAVE8_COLLECTIONS
     | WAVE9_COLLECTIONS
+    | WAVE10_COLLECTIONS
 )
 
 DEFAULT_TENANT_FIELD = "tenant_id"

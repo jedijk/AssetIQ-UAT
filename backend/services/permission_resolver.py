@@ -28,12 +28,15 @@ API_TO_UI_FEATURE: Dict[str, str] = {
     "settings": "settings",
     "analytics": "statistics",
     "decision_engine": "reliability_intelligence",
+    "vmb": "visual_boards",
 }
 
 # Permissions with no UI matrix row — always use static ROLES fallback.
 API_ONLY_PERMISSIONS = frozenset({
     "installations:all",
     "analytics:export",
+    "vmb:publish",
+    "vmb:admin",
 })
 
 _rbac = RBACService.__new__(RBACService)

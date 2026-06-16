@@ -55,6 +55,8 @@ from routes.work_items import router as work_items_router
 from routes.observation_workspace import router as observation_workspace_router
 from routes.push_notifications import router as push_notifications_router
 from routes.executive_dashboard import router as executive_dashboard_router
+from routes.visual_boards import router as visual_boards_router
+from routes.visual_board_public import router as visual_board_public_router
 
 all_routers = [
     auth_router,
@@ -111,4 +113,6 @@ all_routers = [
     observation_workspace_router,
     push_notifications_router,
     executive_dashboard_router,
+    visual_boards_router,
+    visual_board_public_router,
 ]

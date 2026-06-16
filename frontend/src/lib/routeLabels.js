@@ -31,6 +31,7 @@ const staticRouteLabels = {
   '/threats': 'Observations',
   '/actions': 'Actions',
   '/library': 'Strategy',
+  '/visual-management/boards': 'Visual Management',
   '/equipment-manager': 'Equipment Manager',
   '/causal-engine': 'Causal Engine',
   '/tasks': 'Task Scheduler',
