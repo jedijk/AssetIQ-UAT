@@ -121,7 +121,12 @@ async def seed_ci_fixtures() -> dict:
         {"email": exact_case_insensitive("test@test.com")},
         {"_id": 0, "id": 1},
     )
+    owner = await db.users.find_one(
+        {"email": exact_case_insensitive("jedijk@gmail.com")},
+        {"_id": 0, "id": 1},
+    )
     admin_id = (admin or {}).get("id") or "ci-bootstrap"
+    action_owner_id = (owner or admin or {}).get("id") or admin_id
 
     await db.central_actions.update_one(
         {"id": CI_ACTION_ID},
@@ -138,7 +143,7 @@ async def seed_ci_fixtures() -> dict:
                 "linked_equipment_id": CI_EQUIPMENT_ID,
                 "priority": "medium",
                 "status": "open",
-                "created_by": admin_id,
+                "created_by": action_owner_id,
                 "tenant_id": CI_TENANT_ID,
                 "updated_at": now,
             },

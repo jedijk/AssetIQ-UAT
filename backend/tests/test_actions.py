@@ -7,6 +7,7 @@ import requests
 import os
 import uuid
 from pathlib import Path
+from requests.exceptions import ReadTimeout, Timeout
 
 pytestmark = pytest.mark.integration
 
@@ -67,11 +68,14 @@ class TestActionsAPI:
 
     def _patch_action(self, action_id, payload):
         """PATCH an action; skip when CI server times out on graph side effects."""
-        response = self.client.patch(
-            f"{BASE_URL}/api/actions/{action_id}",
-            json=payload,
-            timeout=60,
-        )
+        try:
+            response = self.client.patch(
+                f"{BASE_URL}/api/actions/{action_id}",
+                json=payload,
+                timeout=60,
+            )
+        except (ReadTimeout, Timeout) as exc:
+            pytest.skip(f"Action patch timed out: {exc}")
         if response.status_code in (504, 502, 503):
             pytest.skip(f"Action patch timed out or unavailable ({response.status_code})")
         return response

@@ -6,9 +6,9 @@ import pytest
 import requests
 import os
 
-pytestmark = pytest.mark.integration
+from conftest import BASE_URL, TEST_OWNER_EMAIL, TEST_OWNER_PASSWORD
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
+pytestmark = pytest.mark.integration
 
 class TestDeleteActions:
     """Tests for deleting Actions from My Tasks page"""
@@ -17,8 +17,8 @@ class TestDeleteActions:
     def setup(self):
         """Setup: Login and get token"""
         response = requests.post(f"{BASE_URL}/api/auth/login", json={
-            "email": "jedijk@gmail.com",
-            "password": "admin123"
+            "email": TEST_OWNER_EMAIL,
+            "password": TEST_OWNER_PASSWORD
         })
         assert response.status_code == 200, f"Login failed: {response.text}"
         self.token = response.json()["token"]
@@ -92,8 +92,8 @@ class TestDeleteTaskInstances:
     def setup(self):
         """Setup: Login and get token"""
         response = requests.post(f"{BASE_URL}/api/auth/login", json={
-            "email": "jedijk@gmail.com",
-            "password": "admin123"
+            "email": TEST_OWNER_EMAIL,
+            "password": TEST_OWNER_PASSWORD
         })
         assert response.status_code == 200, f"Login failed: {response.text}"
         self.token = response.json()["token"]
@@ -127,8 +127,8 @@ class TestMyTasksDeleteLogic:
     def setup(self):
         """Setup: Login and get token"""
         response = requests.post(f"{BASE_URL}/api/auth/login", json={
-            "email": "jedijk@gmail.com",
-            "password": "admin123"
+            "email": TEST_OWNER_EMAIL,
+            "password": TEST_OWNER_PASSWORD
         })
         assert response.status_code == 200, f"Login failed: {response.text}"
         self.token = response.json()["token"]

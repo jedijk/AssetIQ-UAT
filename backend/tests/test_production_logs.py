@@ -434,9 +434,7 @@ class TestProductionLogsJobManagement:
             f"{BASE_URL}/api/production-logs/jobs/{job_id}",
             headers=self.auth_headers
         )
-        assert verify_response.status_code in (404, 200)
-        if verify_response.status_code == 200:
-            assert verify_response.json().get("status") in ("deleted", "removed")
+        assert verify_response.status_code == 404
         
         print("PASS: Create and delete job flow works correctly")
 

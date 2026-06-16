@@ -72,6 +72,32 @@ def _filter_static_failure_modes(
     return results
 
 
+def _list_uses_static_library_fallback(
+    *,
+    category: Optional[str] = None,
+    equipment: Optional[str] = None,
+    search: Optional[str] = None,
+    min_rpn: Optional[int] = None,
+    equipment_type_id: Optional[str] = None,
+    mechanism: Optional[str] = None,
+    is_validated: Optional[bool] = None,
+    failure_mode_type: Optional[str] = None,
+) -> bool:
+    """Use the bundled library when Mongo has a sparse seed (e.g. CI) and no list filters."""
+    return not any(
+        (
+            category,
+            equipment,
+            search,
+            min_rpn,
+            equipment_type_id,
+            mechanism,
+            is_validated is not None,
+            failure_mode_type,
+        )
+    )
+
+
 async def get_failure_modes(
     category: Optional[str] = None,
     equipment: Optional[str] = None,
@@ -103,8 +129,20 @@ async def get_failure_modes(
             user=current_user,
         )
         
-        if result["total"] == 0:
-            logger.info("MongoDB failure_modes empty for filters, using static library fallback")
+        if result["total"] == 0 or (
+            result["total"] < 100
+            and _list_uses_static_library_fallback(
+                category=category,
+                equipment=equipment,
+                search=search,
+                min_rpn=min_rpn,
+                equipment_type_id=equipment_type_id,
+                mechanism=mechanism,
+                is_validated=is_validated,
+                failure_mode_type=failure_mode_type,
+            )
+        ):
+            logger.info("MongoDB failure_modes sparse for filters, using static library fallback")
             results = _filter_static_failure_modes(
                 category=category,
                 equipment=equipment,

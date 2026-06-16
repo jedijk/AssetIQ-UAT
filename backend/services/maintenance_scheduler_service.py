@@ -1,7 +1,8 @@
 """Maintenance scheduler service — read queries, task lifecycle, technicians, programs."""
 import logging
-from datetime import datetime, timedelta
-from typing import Optional
+import os
+from datetime import datetime, timedelta, timezone
+from typing import Any, Optional
 
 from fastapi import HTTPException
 
@@ -23,6 +24,34 @@ from services.tenant_schema import tenant_id_from_user, with_tenant_id
 
 CORRECTIVE_TASK_TYPES = ("reactive", "corrective")
 logger = logging.getLogger(__name__)
+
+
+def _json_safe_value(value: Any) -> Any:
+    """Recursively coerce BSON values for JSON responses."""
+    try:
+        from bson import ObjectId
+    except ImportError:
+        ObjectId = ()  # type: ignore[misc, assignment]
+
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc).isoformat()
+        return value.isoformat()
+    if ObjectId and isinstance(value, ObjectId):
+        return str(value)
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    if isinstance(value, dict):
+        return {str(k): _json_safe_value(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe_value(v) for v in value]
+    return str(value)
+
+
+def _json_safe_tasks(tasks: list) -> list:
+    return [_json_safe_value(task) for task in tasks]
 
 
 def _empty_dashboard_kpis(week_end: Optional[str] = None) -> dict:
@@ -63,6 +92,9 @@ async def get_dashboard_kpis(
         await scope_scheduled_tasks_query(base_query, equipment_type_id, user=user)
     except Exception as exc:
         logger.warning("Scheduler scope query failed: %s", exc)
+        return _empty_dashboard_kpis(week_end)
+
+    if base_query.get("_id") == {"$exists": False}:
         return _empty_dashboard_kpis(week_end)
 
     program_filter = base_query.get("maintenance_program_id", {})
@@ -107,10 +139,14 @@ async def get_dashboard_kpis(
     })
 
     compliance_rate = (completed_on_time / total_completed * 100) if total_completed > 0 else 100
-    priority_breakdown = await db.scheduled_tasks.aggregate([
-        {"$match": open_query},
-        {"$group": {"_id": "$priority", "count": {"$sum": 1}}},
-    ]).to_list(10)
+    priority_breakdown = []
+    try:
+        priority_breakdown = await db.scheduled_tasks.aggregate([
+            {"$match": open_query},
+            {"$group": {"_id": "$priority", "count": {"$sum": 1}}},
+        ]).to_list(10)
+    except Exception as exc:
+        logger.warning("Scheduler priority breakdown aggregate failed: %s", exc)
 
     return {
         "backlog": {
@@ -190,7 +226,7 @@ async def get_timeline(
     return {
         "start_date": start_date,
         "end_date": end_date,
-        "timeline": list(equipment_timeline.values()),
+        "timeline": _json_safe_tasks(list(equipment_timeline.values())),
         "total_tasks": len(tasks),
     }
 
@@ -239,7 +275,7 @@ async def list_scheduled_tasks(
             and task.get("status") not in ["completed", "cancelled"]
         )
 
-    return {"tasks": tasks, "total": len(tasks)}
+    return {"tasks": _json_safe_tasks(tasks), "total": len(tasks)}
 
 
 async def get_daily_planner(
@@ -281,9 +317,9 @@ async def get_daily_planner(
 
     return {
         "date": date,
-        "overdue": {"tasks": overdue_tasks, "count": len(overdue_tasks)},
-        "today": {"tasks": today_tasks, "count": len(today_tasks)},
-        "tomorrow": {"tasks": tomorrow_tasks, "count": len(tomorrow_tasks)},
+        "overdue": {"tasks": _json_safe_tasks(overdue_tasks), "count": len(overdue_tasks)},
+        "today": {"tasks": _json_safe_tasks(today_tasks), "count": len(today_tasks)},
+        "tomorrow": {"tasks": _json_safe_tasks(tomorrow_tasks), "count": len(tomorrow_tasks)},
     }
 
 
@@ -334,11 +370,17 @@ async def get_weekly_planner(
         {"_id": 0},
     ).to_list(100)
 
+    safe_days = []
+    for day in days.values():
+        safe_day = dict(day)
+        safe_day["tasks"] = _json_safe_tasks(day.get("tasks") or [])
+        safe_days.append(safe_day)
+
     return {
         "start_date": start.isoformat(),
         "end_date": end.isoformat(),
-        "days": list(days.values()),
-        "technicians": technicians,
+        "days": safe_days,
+        "technicians": _json_safe_tasks(technicians),
     }
 
 

@@ -178,6 +178,7 @@ def test_create_observation_auto_translate(headers):
 
 # ---------- 7. PATCH /api/threats/{id} triggers auto-translate ----------
 def test_patch_threat_auto_translate(headers):
+    _skip_without_openai()
     # find any existing threat
     r = requests.get(f"{BASE_URL}/api/threats?limit=1", headers=headers, timeout=20)
     if r.status_code != 200 or not r.json():

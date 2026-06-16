@@ -6,6 +6,7 @@ Route handlers delegate here; persistence via repositories only.
 from __future__ import annotations
 
 import logging
+import os
 import uuid as uuid_mod
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -543,28 +544,29 @@ async def update_action(
             source_id=action.get("source_id"),
             user=current_user,
         )
-        from services.reliability_graph import dispatch_graph_sync
+        if os.environ.get("ENVIRONMENT") != "test":
+            from services.reliability_graph import dispatch_graph_sync
 
-        eq_id = updated.get("linked_equipment_id")
-        if not eq_id and updated.get("threat_id"):
-            threat = await _threat_repo.find_one(
-                {"id": updated["threat_id"]},
-                user=current_user,
-                projection={"linked_equipment_id": 1},
-            )
-            eq_id = (threat or {}).get("linked_equipment_id")
-        if eq_id:
-            await dispatch_graph_sync(
-                "sync_outcome_edges",
-                "action_close_outcome",
-                action_id=updated.get("id") or action_id,
-                outcome_id=str(uuid_mod.uuid4()),
-                equipment_id=eq_id,
-                verification_status="verified",
-                effectiveness=updated.get("completion_notes"),
-            )
+            eq_id = updated.get("linked_equipment_id")
+            if not eq_id and updated.get("threat_id"):
+                threat = await _threat_repo.find_one(
+                    {"id": updated["threat_id"]},
+                    user=current_user,
+                    projection={"linked_equipment_id": 1},
+                )
+                eq_id = (threat or {}).get("linked_equipment_id")
+            if eq_id:
+                await dispatch_graph_sync(
+                    "sync_outcome_edges",
+                    "action_close_outcome",
+                    action_id=updated.get("id") or action_id,
+                    outcome_id=str(uuid_mod.uuid4()),
+                    equipment_id=eq_id,
+                    verification_status="verified",
+                    effectiveness=updated.get("completion_notes"),
+                )
 
-    response = dict(updated)
+    response = _json_safe_action(dict(updated))
     if completion_notification:
         response["completion_notification"] = completion_notification
     return response

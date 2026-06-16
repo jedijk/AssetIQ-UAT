@@ -1,5 +1,6 @@
 """Tenant-scoped query helpers for the maintenance scheduler."""
 import asyncio
+import logging
 import time
 from typing import Dict, List, Optional, Set
 
@@ -14,6 +15,7 @@ from services.scheduler_helpers import (
 _PM_SYNC_LOCK = asyncio.Lock()
 _PM_SYNC_LAST_AT: Dict[str, float] = {}
 PM_SYNC_COOLDOWN_SECONDS = 600
+logger = logging.getLogger(__name__)
 
 
 async def ensure_imported_pm_tasks_scheduled(
@@ -77,7 +79,12 @@ async def scope_scheduled_tasks_query(
     equipment_type_id: Optional[str] = None,
     user: Optional[dict] = None,
 ) -> None:
-    rows = await load_schedulable_program_rows(equipment_type_id)
+    try:
+        rows = await load_schedulable_program_rows(equipment_type_id)
+    except Exception as exc:
+        logger.warning("load_schedulable_program_rows failed: %s", exc)
+        rows = []
+
     program_ids = [row["id"] for row in rows if row.get("id")]
     equipped_ids: List[str] = []
     seen: Set[str] = set()
@@ -86,12 +93,23 @@ async def scope_scheduled_tasks_query(
         if equipment_id and equipment_id not in seen:
             seen.add(equipment_id)
             equipped_ids.append(equipment_id)
-    scope_query_to_program_ids(query, program_ids)
-    scope_query_to_equipment_ids(query, equipped_ids)
+
+    scoped_query: Dict = {}
+    if not program_ids and not equipped_ids:
+        scoped_query = {"_id": {"$exists": False}}
+    else:
+        if program_ids:
+            scoped_query["maintenance_program_id"] = {"$in": program_ids}
+        if equipped_ids:
+            scoped_query["equipment_id"] = {"$in": equipped_ids}
+
     if user:
-        scoped = scheduler_scoped(user, query)
+        scoped = scheduler_scoped(scoped_query, user)
         query.clear()
         query.update(scoped)
+    else:
+        query.clear()
+        query.update(scoped_query)
 
 
 # Re-export scheduler helper symbols used by route _shared consumers.

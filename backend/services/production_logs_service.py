@@ -176,23 +176,6 @@ async def upload_log_files(user: dict,
     if not uploaded_files:
         raise HTTPException(status_code=400, detail="No valid files found")
 
-    # Create ingestion job
-    job = {
-        "id": job_id,
-        "status": "uploaded",
-        "files": uploaded_files,
-        "total_files": len(uploaded_files),
-        "records_parsed": 0,
-        "records_ingested": 0,
-        "records_failed": 0,
-        "parse_template": None,
-        "created_by": user.get("id"),
-        "created_by_name": user.get("name", "Unknown"),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
-    await db.log_ingestion_jobs.insert_one(job)
-
     return {
         "job_id": job_id,
         "files_uploaded": len(uploaded_files),
