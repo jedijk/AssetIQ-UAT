@@ -29,14 +29,14 @@ def _static_path_checks() -> list[str]:
 
     checks = [
         (
-            BACKEND_ROOT / "services" / "task_service.py",
+            BACKEND_ROOT / "services" / "task_service_completion.py",
             ["sync_edges_for_scheduled_task", "sync_task_instance_completion_edges"],
-            "task_service graph sync",
+            "task_service_completion graph sync",
         ),
         (
-            BACKEND_ROOT / "routes" / "maintenance_scheduler" / "programs.py",
+            BACKEND_ROOT / "services" / "apply_strategy_service.py",
             ["sync_edges_for_apply_strategy"],
-            "programs apply strategy",
+            "apply_strategy_service",
         ),
         (
             BACKEND_ROOT / "services" / "pm_import" / "failure_mode_apply.py",
@@ -44,9 +44,9 @@ def _static_path_checks() -> list[str]:
             "pm_import failure_mode_apply",
         ),
         (
-            BACKEND_ROOT / "routes" / "maintenance_scheduler" / "scheduler.py",
+            BACKEND_ROOT / "services" / "maintenance_scheduling.py",
             ['event="created"'],
-            "scheduler create-time sync",
+            "maintenance_scheduling create-time sync",
         ),
         (
             BACKEND_ROOT / "services" / "observation_service.py",
@@ -54,19 +54,19 @@ def _static_path_checks() -> list[str]:
             "observation_service",
         ),
         (
-            BACKEND_ROOT / "routes" / "chat.py",
+            BACKEND_ROOT / "services" / "threat_service.py",
             ["sync_threat_edges"],
-            "chat threat create",
+            "threat_service",
         ),
         (
-            BACKEND_ROOT / "routes" / "investigations.py",
+            BACKEND_ROOT / "services" / "investigation_service.py",
             ["sync_investigation_edges", "sync_cause_edge"],
-            "investigations routes",
+            "investigation_service",
         ),
         (
-            BACKEND_ROOT / "routes" / "actions.py",
+            BACKEND_ROOT / "services" / "action_service.py",
             ["sync_action_edges", "sync_outcome_edges"],
-            "actions routes",
+            "action_service",
         ),
         (
             BACKEND_ROOT / "services" / "reliability_graph_query.py",
