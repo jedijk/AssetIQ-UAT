@@ -298,3 +298,80 @@ async def calculate_alarp_progress(observation: dict, actions: list, investigati
     }
 
 
+def _fmea_score_from_sources(
+    observation: dict,
+    failure_mode_data: Optional[dict],
+) -> int:
+    """Resolve FMEA contribution (0–100) from failure mode RPN or stored threat fields."""
+    if failure_mode_data:
+        rpn = failure_mode_data.get("rpn")
+        if rpn is not None:
+            try:
+                return min(100, int(float(rpn) / 10))
+            except (TypeError, ValueError):
+                pass
+    for key in ("fmea_score", "base_risk_score"):
+        raw = observation.get(key)
+        if raw is not None:
+            try:
+                return min(100, max(0, int(raw)))
+            except (TypeError, ValueError):
+                continue
+    return 50
+
+
+async def compute_workspace_risk_summary(
+    observation: dict,
+    criticality: Optional[dict],
+    failure_mode_data: Optional[dict],
+    installation_id: Optional[str] = None,
+) -> dict:
+    """
+    Derive risk KPI values from the same equipment criticality assessment used by
+    exposure cards, blended with FMEA per installation risk settings.
+    """
+    from services.criticality_score import compute_criticality_score
+    from services.threat_score_service import (
+        calculate_risk_score,
+        get_risk_settings_for_installation,
+    )
+
+    fmea_score = _fmea_score_from_sources(observation, failure_mode_data)
+
+    crit_score = 0
+    if criticality and isinstance(criticality, dict):
+        safety = int(criticality.get("safety_impact") or 0)
+        production = int(criticality.get("production_impact") or 0)
+        environmental = int(criticality.get("environmental_impact") or 0)
+        reputation = int(criticality.get("reputation_impact") or 0)
+        if safety or production or environmental or reputation:
+            crit_score = compute_criticality_score(
+                safety, production, environmental, reputation
+            )
+        elif criticality.get("risk_score") is not None:
+            try:
+                stored = float(criticality.get("risk_score"))
+                crit_score = min(100, round(stored / 3.5 if stored > 100 else stored))
+            except (TypeError, ValueError):
+                crit_score = 0
+    else:
+        crit_score = int(observation.get("criticality_score") or 0)
+
+    risk_settings = await get_risk_settings_for_installation(installation_id or "")
+    risk_score, risk_level = calculate_risk_score(crit_score, fmea_score, risk_settings)
+
+    rpn = None
+    if failure_mode_data and failure_mode_data.get("rpn") is not None:
+        rpn = failure_mode_data.get("rpn")
+    else:
+        rpn = observation.get("fmea_rpn") or observation.get("rpn")
+
+    return {
+        "risk_score": risk_score,
+        "risk_level": risk_level,
+        "criticality_score": crit_score,
+        "fmea_score": fmea_score,
+        "rpn": rpn,
+    }
+
+

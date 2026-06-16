@@ -431,10 +431,15 @@ const ObservationWorkspacePage = () => {
           <ExposureCard
             type={t("observationWorkspace.productionExposure")}
             data={{
-              primary: exposure?.production?.formatted_value || "$0",
-              secondary: exposure?.production?.downtime_range 
-                ? t("observationWorkspace.hoursDowntime", { hours: exposure.production.downtime_range })
-                : t("observationWorkspace.notAssessed"),
+              primary: exposure?.production?.not_assessed
+                ? undefined
+                : exposure?.production?.formatted_value,
+              secondary: exposure?.production?.not_assessed
+                ? undefined
+                : exposure?.production?.downtime_range
+                  ? t("observationWorkspace.hoursDowntime", { hours: exposure.production.downtime_range })
+                  : t("observationWorkspace.notAssessed"),
+              not_assessed: exposure?.production?.not_assessed,
             }}
             icon={DollarSign}
             color="amber"

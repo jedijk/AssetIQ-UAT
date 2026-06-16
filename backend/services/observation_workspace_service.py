@@ -25,6 +25,7 @@ from services.observation_workspace_exposure import (
     calculate_production_exposure,
     calculate_reputation_exposure,
     calculate_safety_exposure,
+    compute_workspace_risk_summary,
     get_criticality_definitions_for_equipment,
     get_production_loss_config as _get_production_loss_config,
     resolve_installation_id as _resolve_installation_id,
@@ -818,10 +819,25 @@ async def get_workspace(user: dict, observation_id: str, language: Optional[str]
         if d:
             reputation_exposure["impact_rating"] = d.get("label") or d.get("name") or reputation_exposure.get("impact_rating", "Low")
             reputation_exposure["definition"] = d.get("reputation") or (d.get("definitions") or {}).get("reputation", "")
-    
+
+    installation_id = await _resolve_installation_id(equipment_node)
+    risk_summary = await compute_workspace_risk_summary(
+        observation,
+        criticality,
+        failure_mode_data,
+        installation_id=installation_id,
+    )
+    observation_aligned = {
+        **observation,
+        "risk_score": risk_summary["risk_score"],
+        "risk_level": risk_summary["risk_level"],
+        "criticality_score": risk_summary.get("criticality_score"),
+        "fmea_score": risk_summary.get("fmea_score"),
+    }
+
     alarp_progress, process_journey = await asyncio.gather(
-        calculate_alarp_progress(observation, action_plan, investigation),
-        get_process_journey(observation, action_plan, investigation),
+        calculate_alarp_progress(observation_aligned, action_plan, investigation),
+        get_process_journey(observation_aligned, action_plan, investigation),
     )
     
     exposure_data = {
@@ -830,13 +846,7 @@ async def get_workspace(user: dict, observation_id: str, language: Optional[str]
         "environmental": environmental_exposure,
         "reputation": reputation_exposure,
         "alarp": alarp_progress,
-        "risk_summary": {
-            "risk_score": observation.get("risk_score", 0),
-            "risk_level": observation.get("risk_level", "Low"),
-            "rpn": observation.get("fmea_rpn") or observation.get("rpn") or (
-                failure_mode_data.get("rpn") if failure_mode_data else None
-            )
-        }
+        "risk_summary": risk_summary,
     }
     
     # 2-4 already fetched in parallel above
@@ -876,7 +886,7 @@ async def get_workspace(user: dict, observation_id: str, language: Optional[str]
     
     payload = {
         "observation_id": observation_id,
-        "observation": _build_observation_payload(observation, equipment_node),
+        "observation": _build_observation_payload(observation_aligned, equipment_node),
         "work_signal": project_detail(observation),
         "equipment": {
             "id": equipment_node.get("id") if equipment_node else None,
