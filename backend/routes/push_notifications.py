@@ -40,10 +40,7 @@ async def vapid_public_key(current_user: dict = Depends(get_current_user)):
     del current_user  # auth gate only
     public_key = get_vapid_public_key()
     if not public_key:
-        raise HTTPException(
-            status_code=503,
-            detail="Web Push is not configured on this server (missing VAPID keys)",
-        )
+        return {"publicKey": None, "configured": False}
     return {"publicKey": public_key, "configured": True}
 
 

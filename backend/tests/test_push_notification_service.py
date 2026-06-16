@@ -15,6 +15,13 @@ def test_is_push_configured_with_keys():
     assert push_svc.get_vapid_public_key() == "test-public-key"
 
 
+def test_is_push_configured_without_keys(monkeypatch):
+    monkeypatch.setattr(push_svc, "_vapid_public_key", lambda: "")
+    monkeypatch.setattr(push_svc, "_vapid_private_key", lambda: "")
+    assert push_svc.is_push_configured() is False
+    assert push_svc.get_vapid_public_key() is None
+
+
 def test_subscription_doc_shape():
     doc = push_svc._subscription_doc(
         "user-1",

@@ -269,7 +269,11 @@ export async function subscribeToPush() {
     if (!subscription) {
       let publicKey;
       try {
-        const { publicKey: key } = await pushNotificationsAPI.getVapidPublicKey();
+        const { publicKey: key, configured } = await pushNotificationsAPI.getVapidPublicKey();
+        if (configured === false || !key) {
+          console.warn('[Notifications] Server Web Push not configured (missing VAPID keys)');
+          return null;
+        }
         publicKey = key;
       } catch (error) {
         console.warn('[Notifications] Server Web Push not configured:', error?.response?.data?.detail || error.message);
