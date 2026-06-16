@@ -1167,6 +1167,22 @@ const isTaskActive = (task, failureModeStrategies = []) => {
   return linkedFms.some((fm) => fm?.enabled !== false);
 };
 
+const formatVersionHistoryChange = (change) => {
+  if (typeof change === "string") {
+    return change.replace(/_/g, " ");
+  }
+  if (change && typeof change === "object") {
+    return (
+      change.summary ||
+      change.change_summary ||
+      change.type ||
+      change.field ||
+      "update"
+    );
+  }
+  return String(change ?? "");
+};
+
 const patchStrategyVersionInCache = (queryClient, equipmentTypeId, version) => {
   if (!version || !equipmentTypeId) return;
   queryClient.setQueryData(["maintenance-strategy-v2", equipmentTypeId], (old) => {
@@ -1918,14 +1934,19 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                               v{entry.version}
                             </Badge>
                             <span className="text-xs text-slate-500">
-                              {entry.updated_at ? new Date(entry.updated_at).toLocaleString() : "Unknown date"}
+                              {entry.updated_at || entry.changed_at
+                                ? new Date(entry.updated_at || entry.changed_at).toLocaleString()
+                                : "Unknown date"}
                             </span>
                           </div>
+                          {entry.change_summary && (
+                            <p className="text-xs text-slate-600 mt-2">{entry.change_summary}</p>
+                          )}
                           {entry.changes && entry.changes.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-2">
                               {entry.changes.slice(0, 5).map((change, i) => (
                                 <Badge key={i} variant="outline" className="text-[10px]">
-                                  {change.replace(/_/g, " ")}
+                                  {formatVersionHistoryChange(change)}
                                 </Badge>
                               ))}
                               {entry.changes.length > 5 && (

@@ -19,7 +19,8 @@
     "maintenanceReadiness": "Maintenance Readiness",
     "taskScheduler": "Planer",
     "formSubmissions": "Berichte",
-    "reliabilityIntelligence": "Zuverlässigkeitsintelligenz"
+    "reliabilityIntelligence": "Zuverlässigkeitsintelligenz",
+    "visualManagement": "Visuelles Management"
   },
   "settings": {
     "userManagement": "Benutzerverwaltung",

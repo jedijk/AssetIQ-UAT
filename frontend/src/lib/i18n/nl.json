@@ -19,7 +19,8 @@
     "maintenanceReadiness": "Onderhoudsgereedheid",
     "taskScheduler": "Uitvoering",
     "formSubmissions": "Rapporten",
-    "reliabilityIntelligence": "Betrouwbaarheidsintelligentie"
+    "reliabilityIntelligence": "Betrouwbaarheidsintelligentie",
+    "visualManagement": "Visueel Management"
   },
   "settings": {
     "userManagement": "Gebruikersbeheer",

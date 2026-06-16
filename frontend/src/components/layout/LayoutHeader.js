@@ -133,7 +133,7 @@ export default function LayoutHeader({
                         : "text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white"
                     }`
                   }
-                  data-testid={`nav-${item.navTestId || item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                  data-testid={`nav-${item.navTestId || String(item.label || "").toLowerCase().replace(/\s+/g, "-")}`}
                 >
                   {({ isActive }) => (
                     <motion.div
@@ -468,7 +468,7 @@ export default function LayoutHeader({
                         : "text-slate-600 hover:bg-slate-50"
                     }`
                   }
-                  data-testid={`mobile-nav-${item.navTestId || item.label.toLowerCase().replace(/\s+/g, "-")}`}
+                  data-testid={`mobile-nav-${item.navTestId || String(item.label || "").toLowerCase().replace(/\s+/g, "-")}`}
                 >
                   <item.icon className="w-5 h-5" />
                   {item.label}
