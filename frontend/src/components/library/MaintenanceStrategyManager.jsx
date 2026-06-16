@@ -1154,6 +1154,19 @@ const isTaskActive = (task, failureModeStrategies = []) => {
   return linkedFms.some((fm) => fm?.enabled !== false);
 };
 
+const patchStrategyVersionInCache = (queryClient, equipmentTypeId, version) => {
+  if (!version || !equipmentTypeId) return;
+  queryClient.setQueryData(["maintenance-strategy-v2", equipmentTypeId], (old) => {
+    if (!old?.strategy) return old;
+    return { ...old, strategy: { ...old.strategy, version } };
+  });
+};
+
+const invalidateStrategyQueries = (queryClient, equipmentTypeId) => {
+  queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
+  queryClient.invalidateQueries(["maintenance-strategy-v2-history", equipmentTypeId]);
+};
+
 const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
@@ -1227,9 +1240,10 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const updateFMStrategyMutation = useMutation({
     mutationFn: ({ failureModeId, data }) =>
       maintenanceStrategyV2API.updateFailureModeStrategy(equipmentTypeId, failureModeId, data),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      patchStrategyVersionInCache(queryClient, equipmentTypeId, data?.version);
       toast.success(t("maintenance.strategySavedApplyHint"));
-      queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
+      invalidateStrategyQueries(queryClient, equipmentTypeId);
       refreshMaintenanceSchedulerQueries(queryClient);
     },
     onError: (err) => {
@@ -1294,6 +1308,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const syncStrategyMutation = useMutation({
     mutationFn: () => maintenanceStrategyV2API.syncStrategy(equipmentTypeId),
     onSuccess: (data) => {
+      patchStrategyVersionInCache(queryClient, equipmentTypeId, data?.new_version);
       const refreshed = data.tasks_refreshed || 0;
       const msg = [
         `Synced with library: ${data.new_failure_modes_added || 0} new failure modes`,
@@ -1306,7 +1321,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
         .join(", ");
       toast.success(msg);
       toast.info(t("maintenance.strategySavedApplyHint"));
-      queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
+      invalidateStrategyQueries(queryClient, equipmentTypeId);
       queryClient.invalidateQueries({ queryKey: ["maint-task-template-batch"] });
       refreshMaintenanceSchedulerQueries(queryClient);
     },

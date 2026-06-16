@@ -19,6 +19,29 @@ from models.maintenance_strategy_v2 import (
 
 logger = logging.getLogger(__name__)
 
+# Response-only keys added during GET enrichment — never persist to MongoDB.
+_FM_ENRICHMENT_ONLY_KEYS = frozenset({
+    "library_version",
+    "library_updated_at",
+    "has_new_version",
+})
+
+
+def coerce_fm_library_version(value: Any) -> int:
+    """Normalize failure-mode library version counters for safe comparisons."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 1
+
+
+def strip_fm_enrichment_fields(fm_strategy: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove GET-only enrichment fields before persisting FM strategy rows."""
+    cleaned = dict(fm_strategy)
+    for key in _FM_ENRICHMENT_ONLY_KEYS:
+        cleaned.pop(key, None)
+    return cleaned
+
 
 async def mark_strategy_needs_apply(equipment_type_id: str) -> None:
     from services.strategy_apply_state import mark_strategy_needs_apply as _mark
@@ -481,7 +504,7 @@ def refresh_failure_mode_strategy_from_library(
             del by_id[tid]
 
     fm_strategy["task_ids"] = new_ids
-    fm_strategy["fm_version"] = library_fm.get("version") or 1
+    fm_strategy["fm_version"] = coerce_fm_library_version(library_fm.get("version") or 1)
     updated_at = library_fm.get("updated_at")
     fm_strategy["fm_updated_at"] = str(updated_at) if updated_at else fm_strategy.get("fm_updated_at")
 

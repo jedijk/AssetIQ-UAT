@@ -53,6 +53,8 @@ from services.maintenance_strategy_helpers import (
     log_strategy_audit,
     enrich_strategy_needs_apply,
     clear_strategy_needs_apply,
+    coerce_fm_library_version,
+    strip_fm_enrichment_fields,
 )
 
 logger = logging.getLogger(__name__)
@@ -137,7 +139,8 @@ async def get_equipment_type_strategy(
     # Enrich failure mode strategies with potential_effects from library if missing
     # Also check for version updates
     fm_strategies = strategy.get("failure_mode_strategies", [])
-    needs_update = False
+    needs_effects_backfill = False
+    effects_backfill: List[Dict[str, Any]] = []
     
     for fm_strategy in fm_strategies:
         fm_id = fm_strategy.get("failure_mode_id")
@@ -150,18 +153,20 @@ async def get_equipment_type_strategy(
             # Check if potential_effects is missing or empty
             if not fm_strategy.get("potential_effects") and library_fm.get("potential_effects"):
                 fm_strategy["potential_effects"] = library_fm["potential_effects"]
-                needs_update = True
+                needs_effects_backfill = True
+                effects_backfill.append({
+                    "failure_mode_id": fm_id,
+                    "potential_effects": library_fm["potential_effects"],
+                })
             
             # Add current library version info for comparison
-            library_version = library_fm.get("version") or 1
+            library_version = coerce_fm_library_version(library_fm.get("version") or 1)
             library_updated_at = library_fm.get("updated_at")
             if library_updated_at:
                 library_updated_at = str(library_updated_at)
             
             # Get strategy's FM version (handle None explicitly)
-            strategy_fm_version = fm_strategy.get("fm_version")
-            if strategy_fm_version is None:
-                strategy_fm_version = 1
+            strategy_fm_version = coerce_fm_library_version(fm_strategy.get("fm_version"))
             
             # Add version info to the response
             fm_strategy["library_version"] = library_version
@@ -169,7 +174,7 @@ async def get_equipment_type_strategy(
             fm_strategy["has_new_version"] = library_version > strategy_fm_version
             # Also set fm_version to 1 if it was None for display purposes
             if fm_strategy.get("fm_version") is None:
-                fm_strategy["fm_version"] = 1
+                fm_strategy["fm_version"] = strategy_fm_version
     
     # Calculate coverage based on active failure modes
     total_fms = len(fm_strategies)
@@ -204,15 +209,36 @@ async def get_equipment_type_strategy(
         equipment_type_id, strategy
     )
     
-    # Optionally update the database with the enriched data
-    if needs_update or strategy.get("active_failure_modes") != active_fms:
+    # Persist only safe backfills — never rewrite the full FM list from a stale GET snapshot
+    # (that could undo a concurrent library sync bumping fm_version).
+    if needs_effects_backfill:
+        fresh = await db.equipment_type_strategies.find_one(
+            {"equipment_type_id": equipment_type_id},
+            {"failure_mode_strategies": 1},
+        )
+        if fresh:
+            fresh_fms = [
+                strip_fm_enrichment_fields(fm)
+                for fm in fresh.get("failure_mode_strategies", [])
+            ]
+            for patch in effects_backfill:
+                patch_id = patch.get("failure_mode_id")
+                for i, fm in enumerate(fresh_fms):
+                    if fm.get("failure_mode_id") == patch_id:
+                        fresh_fms[i]["potential_effects"] = patch["potential_effects"]
+                        break
+            await db.equipment_type_strategies.update_one(
+                {"equipment_type_id": equipment_type_id},
+                {"$set": {"failure_mode_strategies": fresh_fms}},
+            )
+
+    if strategy.get("active_failure_modes") != active_fms:
         await db.equipment_type_strategies.update_one(
             {"equipment_type_id": equipment_type_id},
             {"$set": {
-                "failure_mode_strategies": fm_strategies,
                 "active_failure_modes": active_fms,
-                "coverage_score": round(coverage_score, 1)
-            }}
+                "coverage_score": round(coverage_score, 1),
+            }},
         )
     
     return {
@@ -283,7 +309,7 @@ async def create_equipment_type_strategy(
             potential_effects = [potential_effects] if potential_effects else []
         
         # Get version info for tracking updates
-        fm_version = fm.get("version", 1)
+        fm_version = coerce_fm_library_version(fm.get("version", 1))
         fm_updated_at = fm.get("updated_at")
         if fm_updated_at:
             fm_updated_at = str(fm_updated_at)
@@ -516,7 +542,7 @@ async def sync_equipment_type_strategy(
     for fm in library_failure_modes:
         fm_id = fm.get("id", str(uuid.uuid4()))
         fm_name = fm.get("failure_mode", fm.get("name", "Unknown"))
-        fm_version = fm.get("version", 1)
+        fm_version = coerce_fm_library_version(fm.get("version", 1))
         fm_updated_at = fm.get("updated_at")
         if fm_updated_at:
             fm_updated_at = str(fm_updated_at)
@@ -526,7 +552,7 @@ async def sync_equipment_type_strategy(
             # Update version info for existing FM
             for existing_fm in existing_fm_strategies:
                 if existing_fm.get("failure_mode_id") == fm_id or existing_fm.get("failure_mode_name") == fm_name:
-                    if existing_fm.get("fm_version", 1) < fm_version:
+                    if coerce_fm_library_version(existing_fm.get("fm_version", 1)) < fm_version:
                         await _apply_library_fm_refresh(existing_fm, fm)
                     break
             continue
@@ -587,8 +613,8 @@ async def sync_equipment_type_strategy(
         )
         if not library_fm:
             continue
-        library_version = library_fm.get("version") or 1
-        if existing_fm.get("fm_version", 1) < library_version:
+        library_version = coerce_fm_library_version(library_fm.get("version") or 1)
+        if coerce_fm_library_version(existing_fm.get("fm_version", 1)) < library_version:
             await _apply_library_fm_refresh(existing_fm, library_fm)
     
     # Merge: existing + new
