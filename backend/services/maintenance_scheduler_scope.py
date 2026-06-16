@@ -115,10 +115,10 @@ async def scope_scheduled_tasks_query(
     if base_filters:
         parts.append(base_filters)
     if scope_clause:
-        scoped = scheduler_scoped(scope_clause, user) if user else scope_clause
+        scoped = scheduler_scoped(user, scope_clause) if user else scope_clause
         parts.append(scoped)
     elif user:
-        parts.append(scheduler_scoped({}, user))
+        parts.append(scheduler_scoped(user, {}))
 
     if len(parts) == 1:
         query.update(parts[0])

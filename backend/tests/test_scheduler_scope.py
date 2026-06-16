@@ -43,3 +43,29 @@ async def test_scope_empty_programs_returns_no_results():
 
   assert "$and" in query
   assert query["$and"][1] == {"_id": {"$exists": False}}
+
+
+@pytest.mark.asyncio
+async def test_scope_applies_tenant_filter_not_user_fields():
+  """Regression: scheduler_scoped(user, query) must not receive swapped args."""
+  query = {"due_date": {"$gte": "2026-01-01"}}
+  rows = [{"id": "prog-1", "equipment_id": "eq-1"}]
+  user = {"company_id": "tenant-abc", "user_id": "user-1"}
+
+  with patch(
+      "services.maintenance_scheduler_scope.load_schedulable_program_rows",
+      new=AsyncMock(return_value=rows),
+  ):
+      await scope_scheduled_tasks_query(query, equipment_type_id="type-1", user=user)
+
+  assert "user_id" not in query
+  assert "$and" in query
+  scope_part = query["$and"][1]
+  assert "user_id" not in scope_part
+  # scope + tenant merged (nested $and), not the raw user dict
+  inner = scope_part.get("$and", [scope_part])
+  scope_or = next((p for p in inner if "$or" in p), None)
+  assert scope_or is not None
+  assert {"maintenance_program_id": {"$in": ["prog-1"]}} in scope_or["$or"]
+  tenant_part = next((p for p in inner if "tenant_id" in str(p)), None)
+  assert tenant_part is not None
