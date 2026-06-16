@@ -24,16 +24,21 @@ if not mongo_url:
     logger.error("MONGO_URL environment variable not set!")
     raise ValueError("MONGO_URL environment variable is required")
 
-# Database configuration - supports multiple environments
-DEFAULT_DB_NAME = os.environ.get('DB_NAME', 'assetiq')
+# Database configuration - supports multiple environments.
+# PRODUCTION_DB_NAME / UAT_DB_NAME are fixed switch targets. DB_NAME only sets the
+# process default (e.g. assetiq-UAT on a UAT Railway service) and must not redefine
+# which Mongo database "production" points to when owners switch environments.
+PRODUCTION_DB_NAME = os.environ.get("PRODUCTION_DB_NAME", "assetiq").strip('"')
+UAT_DB_NAME = os.environ.get("UAT_DB_NAME", "assetiq-UAT").strip('"')
+DEFAULT_DB_NAME = os.environ.get("DB_NAME", PRODUCTION_DB_NAME).strip('"')
 AVAILABLE_DATABASES = {
     "production": {
-        "name": DEFAULT_DB_NAME,
+        "name": PRODUCTION_DB_NAME,
         "label": "Production",
         "description": "Live production database"
     },
     "uat": {
-        "name": "assetiq-UAT",
+        "name": UAT_DB_NAME,
         "label": "UAT",
         "description": "User Acceptance Testing database"
     }
