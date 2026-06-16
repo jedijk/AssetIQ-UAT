@@ -106,6 +106,16 @@ export const failureModesAPI = {
     return response.data;
   },
 
+  /** AI-consolidate recommended actions within one failure mode (target 3–5). */
+  consolidateFailureModeActions: async (body = {}) => {
+    const response = await api.post(
+      "/ai-suggestions/consolidate-failure-mode-actions",
+      body,
+      { timeout: 120000 },
+    );
+    return response.data;
+  },
+
   /**
    * Merge losers into winner. Pass dry_run: true to preview.
    * Supports winner_id + loser_ids or primary_id + merge_id.

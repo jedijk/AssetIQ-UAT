@@ -197,6 +197,7 @@ const FailureModesPage = () => {
   const [isReviewDisciplinesOpen, setIsReviewDisciplinesOpen] = useState(false); // AI review action disciplines
   const [isFindSimilarOpen, setIsFindSimilarOpen] = useState(false); // AI find similar failure modes
   const [isFindDuplicateActionsOpen, setIsFindDuplicateActionsOpen] = useState(false);
+  const [isConsolidateActionsOpen, setIsConsolidateActionsOpen] = useState(false);
   
   // Failure mode dialog state
   const [isFmDialogOpen, setIsFmDialogOpen] = useState(false);
@@ -764,6 +765,18 @@ const FailureModesPage = () => {
     updateFmMutation.mutate({ id: selectedFm.id, data: merged, oldData: selectedFm });
   };
 
+  const handleConsolidateActionsApplied = async () => {
+    queryClient.invalidateQueries({ queryKey: ["failureModes"] });
+    if (selectedFm?.id) {
+      try {
+        const updated = await failureModesAPI.getById(selectedFm.id);
+        setSelectedFm(updated);
+      } catch (_e) {
+        // List refresh still runs via invalidateQueries
+      }
+    }
+  };
+
   const handleSaveFm = () => {
     if (editingFm) {
       updateFmMutation.mutate({ id: editingFm.id, data: newFm, oldData: editingFm });
@@ -938,6 +951,9 @@ const FailureModesPage = () => {
                 onUnvalidate={handleUnvalidateFm}
                 onShowVersionHistory={handleShowVersionHistory}
                 onImproveWithAI={() => setIsAIImproveOpen(true)}
+                onConsolidateActions={
+                  canUseAITools ? () => setIsConsolidateActionsOpen(true) : undefined
+                }
                 equipmentTypes={equipmentTypes}
                 categories={categories}
                 currentUser={user}
@@ -962,6 +978,9 @@ const FailureModesPage = () => {
               onUnvalidate={handleUnvalidateFm}
               onShowVersionHistory={handleShowVersionHistory}
               onImproveWithAI={() => setIsAIImproveOpen(true)}
+              onConsolidateActions={
+                canUseAITools ? () => setIsConsolidateActionsOpen(true) : undefined
+              }
               equipmentTypes={equipmentTypes}
               categories={categories}
               currentUser={user}
@@ -1123,6 +1142,8 @@ const FailureModesPage = () => {
         setIsFindSimilarOpen={setIsFindSimilarOpen}
         isFindDuplicateActionsOpen={isFindDuplicateActionsOpen}
         setIsFindDuplicateActionsOpen={setIsFindDuplicateActionsOpen}
+        isConsolidateActionsOpen={isConsolidateActionsOpen}
+        setIsConsolidateActionsOpen={setIsConsolidateActionsOpen}
         equipmentTypes={equipmentTypes}
         failureModes={failureModes}
         displayedFailureModes={displayedFailureModes}
@@ -1132,6 +1153,7 @@ const FailureModesPage = () => {
         onInvalidateFailureModes={() => {
           queryClient.invalidateQueries({ queryKey: ["failureModes"] });
         }}
+        onConsolidateActionsApplied={handleConsolidateActionsApplied}
         onInvalidateEquipmentTypes={() => {
           queryClient.invalidateQueries({ queryKey: ["equipment-types"] });
         }}

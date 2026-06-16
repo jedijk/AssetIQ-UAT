@@ -2000,3 +2000,85 @@ async def find_similar_failure_modes(
         equipment_type_id=request.equipment_type_id,
         groups=all_groups,
     )
+
+
+# ============= Consolidate recommended actions (per failure mode) =============
+
+
+class ConsolidateFailureModeActionsRequest(BaseModel):
+    failure_mode_id: str
+    target_min: int = 3
+    target_max: int = 5
+    apply: bool = False
+
+
+class ConsolidatedActionPreview(BaseModel):
+    description: str
+    action_type: Optional[str] = None
+    discipline: Optional[str] = None
+    estimated_minutes: Optional[int] = None
+    auto_create: Optional[bool] = None
+    merged_from_indices: List[int] = []
+    consolidation_rationale: Optional[str] = None
+
+
+class OriginalActionPreview(BaseModel):
+    index: int
+    label: str
+    action_type: Optional[str] = None
+    discipline: Optional[str] = None
+
+
+class ConsolidateFailureModeActionsResponse(BaseModel):
+    failure_mode_id: str
+    failure_mode: str
+    equipment: Optional[str] = None
+    actions_before: int
+    actions_after: int
+    target_min: int
+    target_max: int
+    summary: Optional[str] = None
+    original_actions: List[OriginalActionPreview]
+    consolidated_actions: List[ConsolidatedActionPreview]
+    applied: bool = False
+
+
+@router.post(
+    "/consolidate-failure-mode-actions",
+    response_model=ConsolidateFailureModeActionsResponse,
+)
+async def consolidate_failure_mode_actions_endpoint(
+    request: ConsolidateFailureModeActionsRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    AI-merge duplicate/overlapping recommended actions within one failure mode
+    down to a concise set (default 3–5 distinct maintenance tasks).
+    """
+    from database import failure_modes_service
+
+    fm_id = (request.failure_mode_id or "").strip()
+    if not fm_id:
+        raise HTTPException(status_code=400, detail="failure_mode_id is required")
+
+    user_id, company_id = user_context(current_user)
+    try:
+        result = await failure_modes_service.consolidate_recommended_actions_with_ai(
+            fm_id,
+            target_min=request.target_min,
+            target_max=request.target_max,
+            apply=request.apply,
+            updated_by=current_user.get("email") or current_user.get("id") or "AI",
+            user_id=user_id,
+            company_id=company_id,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.error("consolidate-failure-mode-actions error: %s", e)
+        raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}") from e
+
+    return ConsolidateFailureModeActionsResponse(**result)
+

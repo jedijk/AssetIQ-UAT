@@ -81,6 +81,7 @@ export function FailureModeViewPanel({
   onUnvalidate,
   onShowVersionHistory,
   onImproveWithAI,
+  onConsolidateActions,
   equipmentTypes,
   categories,
   currentUser,
@@ -748,12 +749,26 @@ export function FailureModeViewPanel({
         <div>
           <div className="flex items-center justify-between mb-2">
             <Label className="text-xs text-slate-500">{t("library.recommendedActions")}</Label>
-            {!isEditing && fm.recommended_actions?.some(a => a.auto_create) && (
-              <span className="text-xs text-green-600 flex items-center gap-1">
-                <CheckCircle className="w-3 h-3" />
-                Auto-create enabled
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {!isEditing && onConsolidateActions && (fm.recommended_actions?.length || 0) >= 4 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onConsolidateActions}
+                  className="h-7 text-xs border-violet-200 text-violet-700 hover:bg-violet-50"
+                  data-testid="view-panel-consolidate-actions-btn"
+                >
+                  <Wand2 className="w-3 h-3 mr-1" />
+                  Consolidate (AI)
+                </Button>
+              )}
+              {!isEditing && fm.recommended_actions?.some(a => a.auto_create) && (
+                <span className="text-xs text-green-600 flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" />
+                  Auto-create enabled
+                </span>
+              )}
+            </div>
           </div>
           <div className="space-y-2">
             {(isEditing ? formData?.recommended_actions : fm.recommended_actions)?.map((action, idx) => {
