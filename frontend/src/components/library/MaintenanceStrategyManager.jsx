@@ -1218,6 +1218,52 @@ const patchFmInCache = (queryClient, equipmentTypeId, failureModeId, fmPatch, ne
   });
 };
 
+const patchFmEnabledInCache = (queryClient, equipmentTypeId, failureModeId, enabled, newVersion) => {
+  if (!equipmentTypeId || !failureModeId) return;
+  queryClient.setQueryData(["maintenance-strategy-v2", equipmentTypeId], (old) => {
+    if (!old?.strategy) return old;
+    const fms = (old.strategy.failure_mode_strategies || []).map((fm) =>
+      String(fm.failure_mode_id) === String(failureModeId) ? { ...fm, enabled } : fm,
+    );
+    const active = fms.filter((fm) => fm.enabled !== false).length;
+    const total = fms.length;
+    return {
+      ...old,
+      strategy: {
+        ...old.strategy,
+        version: newVersion || old.strategy.version,
+        failure_mode_strategies: fms,
+        active_failure_modes: active,
+        coverage_score: total ? Math.round((active / total) * 1000) / 10 : 0,
+      },
+    };
+  });
+};
+
+const patchTaskMandatoryInCache = (queryClient, equipmentTypeId, taskId, isMandatory, newVersion) => {
+  if (!equipmentTypeId || !taskId) return;
+  queryClient.setQueryData(["maintenance-strategy-v2", equipmentTypeId], (old) => {
+    if (!old?.strategy) return old;
+    const tasks = (old.strategy.task_templates || []).map((task) =>
+      String(task.id) === String(taskId) ? { ...task, is_mandatory: isMandatory } : task,
+    );
+    return {
+      ...old,
+      strategy: {
+        ...old.strategy,
+        version: newVersion || old.strategy.version,
+        task_templates: tasks,
+      },
+    };
+  });
+};
+
+const isEnableOnlyFmUpdate = (data) =>
+  data && Object.keys(data).length === 1 && data.enabled !== undefined;
+
+const isMandatoryOnlyTaskUpdate = (data) =>
+  data && Object.keys(data).length === 1 && data.is_mandatory !== undefined;
+
 const invalidateStrategyQueries = async (queryClient, equipmentTypeId) => {
   await queryClient.invalidateQueries({ queryKey: ["maintenance-strategy-v2", equipmentTypeId] });
   await queryClient.invalidateQueries({ queryKey: ["maintenance-strategy-v2-history", equipmentTypeId] });
@@ -1297,13 +1343,33 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const updateFMStrategyMutation = useMutation({
     mutationFn: ({ failureModeId, data }) =>
       maintenanceStrategyV2API.updateFailureModeStrategy(equipmentTypeId, failureModeId, data),
-    onSuccess: (data) => {
+    onMutate: async ({ failureModeId, data }) => {
+      if (!isEnableOnlyFmUpdate(data)) return undefined;
+      await queryClient.cancelQueries({ queryKey: ["maintenance-strategy-v2", equipmentTypeId] });
+      const previous = queryClient.getQueryData(["maintenance-strategy-v2", equipmentTypeId]);
+      patchFmEnabledInCache(queryClient, equipmentTypeId, failureModeId, data.enabled);
+      return { previous };
+    },
+    onSuccess: (data, { failureModeId, data: updates }) => {
+      if (isEnableOnlyFmUpdate(updates)) {
+        patchFmEnabledInCache(
+          queryClient,
+          equipmentTypeId,
+          failureModeId,
+          updates.enabled,
+          data?.version,
+        );
+        return;
+      }
       patchStrategyVersionInCache(queryClient, equipmentTypeId, data?.version);
       toast.success(t("maintenance.strategySavedApplyHint"));
       invalidateStrategyQueries(queryClient, equipmentTypeId);
       refreshMaintenanceSchedulerQueries(queryClient);
     },
-    onError: (err) => {
+    onError: (err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["maintenance-strategy-v2", equipmentTypeId], context.previous);
+      }
       toast.error(err.response?.data?.detail || "Failed to update");
     },
   });
@@ -1325,14 +1391,34 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const updateTaskMutation = useMutation({
     mutationFn: ({ taskId, data }) =>
       maintenanceStrategyV2API.updateTaskTemplate(equipmentTypeId, taskId, data),
-    onSuccess: () => {
+    onMutate: async ({ taskId, data }) => {
+      if (!isMandatoryOnlyTaskUpdate(data)) return undefined;
+      await queryClient.cancelQueries({ queryKey: ["maintenance-strategy-v2", equipmentTypeId] });
+      const previous = queryClient.getQueryData(["maintenance-strategy-v2", equipmentTypeId]);
+      patchTaskMandatoryInCache(queryClient, equipmentTypeId, taskId, data.is_mandatory);
+      return { previous };
+    },
+    onSuccess: (data, { taskId, data: updates }) => {
+      if (isMandatoryOnlyTaskUpdate(updates)) {
+        patchTaskMandatoryInCache(
+          queryClient,
+          equipmentTypeId,
+          taskId,
+          updates.is_mandatory,
+          data?.version,
+        );
+        return;
+      }
       toast.success(t("maintenance.strategySavedApplyHint"));
       setTaskDialogOpen(false);
       setEditingTask(null);
       queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
       refreshMaintenanceSchedulerQueries(queryClient);
     },
-    onError: (err) => {
+    onError: (err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["maintenance-strategy-v2", equipmentTypeId], context.previous);
+      }
       toast.error(err.response?.data?.detail || "Failed to update task");
     },
   });

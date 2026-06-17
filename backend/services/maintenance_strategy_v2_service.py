@@ -40,6 +40,8 @@ from services.maintenance_strategy_propagation import (
     _cancel_open_scheduled_tasks_for_task,
     _toggle_programs_for_failure_mode,
     _cancel_open_scheduled_tasks_for_failure_mode,
+    is_enable_only_fm_toggle,
+    is_mandatory_only_task_toggle,
 )
 from services.maintenance_strategy_helpers import (
     calculate_frequency_for_criticality,
@@ -955,6 +957,7 @@ async def update_failure_mode_strategy(
     )
 
     fm_propagation = {}
+    enable_only = is_enable_only_fm_toggle(request)
     if request.enabled is not None:
         toggled = await _toggle_programs_for_failure_mode(
             equipment_type_id, failure_mode_id, request.enabled
@@ -967,10 +970,17 @@ async def update_failure_mode_strategy(
                 )
             )
 
-    schedule_refresh = await _refresh_applied_equipment_timeline(
-        equipment_type_id,
-        user_id=current_user.get("user_id"),
-    )
+    schedule_refresh: Dict[str, Any] = {}
+    if not enable_only:
+        schedule_refresh = await _refresh_applied_equipment_timeline(
+            equipment_type_id,
+            user_id=current_user.get("user_id"),
+        )
+    else:
+        await clear_strategy_needs_apply(
+            equipment_type_id,
+            applied_version=new_version,
+        )
 
     return {
         "message": "Failure mode strategy updated",
@@ -979,7 +989,7 @@ async def update_failure_mode_strategy(
         "total_failure_modes": total_fms,
         "coverage_score": round(coverage_score, 1),
         "version": new_version,
-        "strategy_needs_apply": True,
+        "strategy_needs_apply": not enable_only,
         "schedule_refresh": schedule_refresh,
         **fm_propagation,
     }
@@ -1117,6 +1127,7 @@ async def update_task_template(
     )
 
     metadata_only = bool(updates) and set(updates.keys()).issubset(METADATA_PROPAGATION_KEYS)
+    mandatory_only = is_mandatory_only_task_toggle(updates)
     propagation = {}
     needs_apply = True
     if metadata_only and updated_task:
@@ -1131,6 +1142,17 @@ async def update_task_template(
             applied_version=new_version,
         )
         needs_apply = False
+    elif mandatory_only:
+        from services.strategy_propagation import resync_programs_with_strategy
+
+        propagation["program_resync"] = await resync_programs_with_strategy(
+            equipment_type_id
+        )
+        await clear_strategy_needs_apply(
+            equipment_type_id,
+            applied_version=new_version,
+        )
+        needs_apply = False
 
 
     response = {
@@ -1139,9 +1161,10 @@ async def update_task_template(
         "version": new_version,
         "strategy_needs_apply": needs_apply,
         "metadata_propagated": metadata_only,
+        "toggle_propagated": mandatory_only,
         **propagation,
     }
-    if not metadata_only:
+    if not metadata_only and not mandatory_only:
         response["schedule_refresh"] = await _refresh_applied_equipment_timeline(
             equipment_type_id,
             user_id=current_user.get("user_id"),

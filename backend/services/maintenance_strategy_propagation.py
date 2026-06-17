@@ -352,6 +352,21 @@ from services.strategy_propagation import resync_programs_with_strategy as _resy
 
 # ---------- Human-readable version-history descriptors ----------
 
+def is_enable_only_fm_toggle(request) -> bool:
+    """True when the request only flips failure-mode enabled/disabled."""
+    return (
+        request.enabled is not None
+        and request.strategy_type is None
+        and request.detection_methods is None
+        and request.task_ids is None
+        and request.frequency_override is None
+    )
+
+
+def is_mandatory_only_task_toggle(updates: Dict[str, Any]) -> bool:
+    return set(updates.keys()) == {"is_mandatory"}
+
+
 def _describe_task_change(task: dict, changed_fields: list, action: str = "edit") -> str:
     """Build a human-readable change description for the strategy version history."""
     name = (task or {}).get("name") or "Task"
