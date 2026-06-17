@@ -30,6 +30,8 @@ class WidgetType(str, Enum):
     MOONEY_CHART = "mooney_chart"
     FORM_SUBMISSIONS_LIST = "form_submissions_list"
     RISK_OBSERVATION_LIST = "risk_observation_list"
+    TEXT_BLOCK = "text_block"
+    INFORMATION_PANEL = "information_panel"
 
 
 class ReliabilityStatus(str, Enum):
@@ -54,6 +56,10 @@ class WidgetConfig(BaseModel):
     period: str = "today"
     queue_mode: str = "open"
     font_size: str = "md"  # xs | sm | md | lg | xl
+    text_content: Optional[str] = None
+    text_align: str = "left"  # left | center | right
+    show_title: bool = True
+    parts: Optional[Dict[str, bool]] = None
 
 
 class VisualBoardWidget(BaseModel):
@@ -231,6 +237,7 @@ class PublicLayoutResponse(BaseModel):
     widgets: List[VisualBoardWidget]
     refresh_interval_seconds: int = 30
     theme: str = "dark"
+    board_type: BoardType = BoardType.RELIABILITY
 
 
 class StatusIndicatorPayload(BaseModel):
@@ -432,10 +439,10 @@ def default_tyromer_operations_widgets() -> List[VisualBoardWidget]:
             position=WidgetPosition(x=0, y=8, w=24, h=8),
         ),
         VisualBoardWidget(
-            id="w_form_submissions",
-            type=WidgetType.FORM_SUBMISSIONS_LIST,
-            title="Recent Form Submissions",
-            config=WidgetConfig(limit=8),
+            id="w_information",
+            type=WidgetType.INFORMATION_PANEL,
+            title="Information",
+            config=WidgetConfig(limit=12, period="today"),
             position=WidgetPosition(x=0, y=16, w=8, h=8),
         ),
         VisualBoardWidget(

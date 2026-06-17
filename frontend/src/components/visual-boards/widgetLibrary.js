@@ -1,7 +1,9 @@
 export const WIDGET_LIBRARY = [
+  { type: "text_block", label: "Text", defaultTitle: "Heading", defaultConfig: { text_content: "Add your message here", text_align: "left", show_title: true }, defaultSize: { w: 8, h: 3 } },
   { type: "kpi_card", label: "KPI Card", defaultTitle: "KPI", defaultConfig: { metric: "active_threat_exposure" }, defaultSize: { w: 6, h: 4 } },
   { type: "production_kpi", label: "Production KPI", defaultTitle: "Total Input", defaultConfig: { production_metric: "total_input", period: "today" }, defaultSize: { w: 4, h: 4 } },
   { type: "mooney_chart", label: "Mooney Chart", defaultTitle: "Mooney Viscosity", defaultConfig: { period: "today" }, defaultSize: { w: 24, h: 8 } },
+  { type: "information_panel", label: "Information", defaultTitle: "Information", defaultConfig: { limit: 12, period: "today" }, defaultSize: { w: 8, h: 8 } },
   { type: "form_submissions_list", label: "Form Submissions", defaultTitle: "Recent Form Submissions", defaultConfig: { limit: 8 }, defaultSize: { w: 8, h: 8 } },
   { type: "risk_observation_list", label: "Risk Observations", defaultTitle: "Top Risk Observations", defaultConfig: { limit: 10 }, defaultSize: { w: 8, h: 8 } },
   { type: "status_indicator", label: "Status Indicator", defaultTitle: "Reliability Status", defaultConfig: {}, defaultSize: { w: 6, h: 6 } },

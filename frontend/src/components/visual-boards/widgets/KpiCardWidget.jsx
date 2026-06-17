@@ -1,5 +1,6 @@
 import React from "react";
 import { boardCardClass, boardMutedText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
+import { isWidgetPartEnabled } from "../widgetDisplayParts";
 
 function accentClass(metric, theme) {
   if (theme !== "light") return "";
@@ -16,6 +17,7 @@ function formatChange(change) {
 }
 
 const KpiCardWidget = ({ widget, data, theme = "dark" }) => {
+  const config = widget?.config || {};
   const metric = widget?.config?.metric || widget?.id;
   const payload = data?.widgets?.[widget?.id] || data?.kpis?.[metric] || {};
   const value = payload.formatted_value ?? payload.value ?? "—";
@@ -24,14 +26,20 @@ const KpiCardWidget = ({ widget, data, theme = "dark" }) => {
   const evidence = payload.evidence_count;
   const subtitle = payload.subtitle || (evidence != null ? `${evidence} observations` : null);
 
+  const showTitle = isWidgetPartEnabled(config, "title");
+  const showChange = isWidgetPartEnabled(config, "change");
+  const showSubtitle = isWidgetPartEnabled(config, "subtitle");
+
   return (
     <div
       className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)} justify-center gap-0.5 ${accentClass(metric, theme)}`}
     >
-      <div className={`shrink-0 ${vmbText.label} ${boardMutedText(theme)}`}>{label}</div>
+      {showTitle ? (
+        <div className={`shrink-0 ${vmbText.label} ${boardMutedText(theme)}`}>{label}</div>
+      ) : null}
       <div className="flex items-baseline gap-1 min-w-0 overflow-hidden">
         <span className={`${vmbText.value} min-w-0`}>{value}</span>
-        {change ? (
+        {showChange && change ? (
           <span
             className={`shrink-0 ${vmbText.small} font-medium ${
               Number(payload.change_percent) >= 0 ? "text-orange-500" : "text-green-600"
@@ -41,7 +49,7 @@ const KpiCardWidget = ({ widget, data, theme = "dark" }) => {
           </span>
         ) : null}
       </div>
-      {subtitle ? (
+      {showSubtitle && subtitle ? (
         <div className={`shrink-0 ${vmbText.small} truncate ${boardMutedText(theme)}`}>{subtitle}</div>
       ) : null}
     </div>

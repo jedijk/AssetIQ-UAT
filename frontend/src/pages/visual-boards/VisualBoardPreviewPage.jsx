@@ -93,6 +93,7 @@ const VisualBoardPreviewPage = () => {
           layout={canvasBoard.layout}
           widgets={canvasBoard.widgets}
           theme={canvasBoard.theme}
+          boardType={board?.board_type}
           data={{
             widgets: previewData?.widgets,
             status: previewData?.status,

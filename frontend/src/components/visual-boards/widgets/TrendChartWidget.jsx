@@ -1,19 +1,27 @@
-import React from "react";
-import { boardCardClass, boardMutedText, widgetChartFontSize, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import React, { useRef } from "react";
+import { boardCardClass, boardMutedText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
+import { useVmbContainerFont } from "../useVmbContainerFont";
+import { isWidgetPartEnabled } from "../widgetDisplayParts";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const CHART_MARGIN = { top: 4, right: 6, bottom: 2, left: 2 };
 
 const TrendChartWidget = ({ widget, data, theme = "dark" }) => {
+  const config = widget?.config || {};
+  const chartRef = useRef(null);
+  const chartFs = useVmbContainerFont(chartRef, { min: 8, max: 13, ratio: 0.075 });
   const payload = data?.widgets?.[widget?.id] || {};
   const points = payload.points || [];
-  const chartFs = widgetChartFontSize(widget?.config);
   const titleClass = theme === "light" ? "text-slate-700" : "text-white";
+  const showTitle = isWidgetPartEnabled(config, "title");
+  const showGrid = isWidgetPartEnabled(config, "grid");
 
   return (
     <div className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)}`}>
-      <div className={`shrink-0 ${vmbText.title} ${titleClass} mb-1`}>{widget?.title || "Trend"}</div>
-      <div className="flex-1 min-h-0 w-full relative">
+      {showTitle ? (
+        <div className={`shrink-0 ${vmbText.title} ${titleClass} mb-1`}>{widget?.title || "Trend"}</div>
+      ) : null}
+      <div ref={chartRef} className="flex-1 min-h-0 w-full relative">
         {points.length === 0 ? (
           <div className={`${vmbText.body} ${boardMutedText(theme)} h-full flex items-center justify-center`}>
             No trend data
@@ -21,6 +29,7 @@ const TrendChartWidget = ({ widget, data, theme = "dark" }) => {
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={points} margin={CHART_MARGIN}>
+              {showGrid ? <CartesianGrid strokeDasharray="3 3" stroke="#334155" strokeOpacity={0.3} /> : null}
               <XAxis
                 dataKey="date"
                 tick={{ fill: "#94a3b8", fontSize: chartFs }}

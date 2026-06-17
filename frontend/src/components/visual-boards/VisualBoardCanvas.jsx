@@ -17,8 +17,11 @@ import ProductionKpiWidget from "./widgets/ProductionKpiWidget";
 import MooneyChartWidget from "./widgets/MooneyChartWidget";
 import FormSubmissionsListWidget from "./widgets/FormSubmissionsListWidget";
 import RiskObservationListWidget from "./widgets/RiskObservationListWidget";
+import TextBlockWidget from "./widgets/TextBlockWidget";
+import InformationPanelWidget from "./widgets/InformationPanelWidget";
 import { boardSurfaceClass, widgetFontVars } from "./boardTheme";
 import VisualBoardLogo from "./VisualBoardLogo";
+import TyromerBoardLogo from "./TyromerBoardLogo";
 import { computeGridCellSize, getCanvasSizeClass } from "./boardLayoutUtils";
 
 const WIDGET_RENDERERS = {
@@ -32,6 +35,8 @@ const WIDGET_RENDERERS = {
   mooney_chart: MooneyChartWidget,
   form_submissions_list: FormSubmissionsListWidget,
   risk_observation_list: RiskObservationListWidget,
+  text_block: TextBlockWidget,
+  information_panel: InformationPanelWidget,
 };
 
 function ResizeHandle({ onResizeDelta }) {
@@ -114,8 +119,8 @@ function DraggableWidgetCell({
     <div
       ref={editable ? setNodeRef : undefined}
       style={style}
-      className={`relative min-h-0 min-w-0 h-full overflow-hidden @container ${editable ? "cursor-grab active:cursor-grabbing" : ""} ${
-        selected ? "ring-2 ring-blue-500 rounded-xl" : ""
+      className={`relative min-h-0 min-w-0 h-full overflow-hidden @container rounded-[length:var(--vmb-radius,1rem)] ${editable ? "cursor-grab active:cursor-grabbing" : ""} ${
+        selected ? "ring-2 ring-blue-500 ring-offset-1 ring-offset-transparent" : ""
       }`}
       onClick={editable ? () => onSelect?.(widget.id) : undefined}
       {...(editable ? { ...listeners, ...attributes } : {})}
@@ -133,6 +138,7 @@ const VisualBoardCanvas = ({
   widgets = [],
   data,
   theme = "dark",
+  boardType,
   previewSize = "tv-55",
   editable = false,
   selectedWidgetId,
@@ -190,14 +196,17 @@ const VisualBoardCanvas = ({
     </div>
   );
 
+  const showTyromerLogo = boardType === "operations";
+
   return (
     <div
       className={`relative mx-auto ${sizeClass} ${boardSurfaceClass(theme)} rounded-lg overflow-hidden shadow-2xl flex flex-col ${
         previewSize === "fullscreen" ? "rounded-none shadow-none" : ""
       }`}
     >
-      <div className="shrink-0 px-4 pt-3 pb-1">
+      <div className="shrink-0 px-4 pt-3 pb-1 flex items-center justify-between gap-3 min-h-[2.25rem]">
         <VisualBoardLogo theme={theme} />
+        {showTyromerLogo ? <TyromerBoardLogo /> : <span className="w-0" aria-hidden />}
       </div>
       <div className="flex-1 min-h-0">
         {editable ? (

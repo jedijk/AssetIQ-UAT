@@ -111,6 +111,29 @@ async def build_mooney_chart(user: dict, period: str = "today") -> Dict[str, Any
     }
 
 
+async def build_information_panel(
+    user: dict,
+    *,
+    period: str = "today",
+    limit: int = 12,
+) -> Dict[str, Any]:
+    data = await production_dashboard_for_user(user, period)
+    entries = data.get("information_entries") or []
+    items = []
+    for row in entries[: max(1, limit)]:
+        items.append(
+            {
+                "text": row.get("text") or "",
+                "submitted_at": row.get("submitted_at") or row.get("datetime"),
+                "time": row.get("time"),
+                "submitted_by": row.get("submitted_by") or "—",
+                "submission_id": row.get("submission_id"),
+                "pinned": bool(row.get("pinned")),
+            }
+        )
+    return {"type": "information_panel", "items": items, "total": len(entries)}
+
+
 async def build_form_submissions_list(user: dict, limit: int = 8) -> Dict[str, Any]:
     filt = merge_tenant_filter({}, user)
     cursor = db.form_submissions.find(

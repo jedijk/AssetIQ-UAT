@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from database import db
 from models.visual_board import (
+    BoardType,
     PublicBoardDataResponse,
     PublicLayoutResponse,
     ReliabilityStatus,
@@ -47,6 +48,7 @@ async def get_public_layout(raw_token: str) -> PublicLayoutResponse:
         widgets=widgets,
         refresh_interval_seconds=int(board.get("refresh_interval_seconds") or 30),
         theme=board.get("theme", "dark"),
+        board_type=BoardType(board.get("board_type", BoardType.RELIABILITY.value)),
     )
 
 
@@ -365,6 +367,22 @@ async def build_widget_data(
             from services.visual_board_operations_data import build_risk_observation_list
 
             result[widget.id] = await build_risk_observation_list(user, widget.config.limit)
+        elif wtype == WidgetType.TEXT_BLOCK.value:
+            result[widget.id] = {
+                "type": WidgetType.TEXT_BLOCK.value,
+                "text_content": widget.config.text_content or "",
+                "text_align": widget.config.text_align or "left",
+                "show_title": widget.config.show_title,
+                "title": widget.title,
+            }
+        elif wtype == WidgetType.INFORMATION_PANEL.value:
+            from services.visual_board_operations_data import build_information_panel
+
+            result[widget.id] = await build_information_panel(
+                user,
+                period=widget.config.period or "today",
+                limit=widget.config.limit or 12,
+            )
         else:
             result[widget.id] = {
                 "type": wtype,

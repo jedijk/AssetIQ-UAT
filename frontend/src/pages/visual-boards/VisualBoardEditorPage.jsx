@@ -323,6 +323,7 @@ const VisualBoardEditorPage = () => {
             layout={layout}
             widgets={widgets}
             theme={theme}
+            boardType={boardType}
             data={{ widgets: previewData?.widgets, status: previewData?.status }}
             previewSize="desktop"
             editable

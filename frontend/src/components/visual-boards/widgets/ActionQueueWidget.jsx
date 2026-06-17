@@ -1,5 +1,6 @@
 import React from "react";
 import { boardCardClass, boardMutedText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
+import { isWidgetPartEnabled } from "../widgetDisplayParts";
 
 function statusClass(status) {
   const s = String(status || "").toLowerCase();
@@ -19,15 +20,22 @@ function formatStatus(status) {
 }
 
 const ActionQueueWidget = ({ widget, data, theme = "dark" }) => {
+  const config = widget?.config || {};
   const payload = data?.widgets?.[widget?.id] || {};
   const items = payload.items || [];
   const isRecent = widget?.config?.queue_mode === "recent";
+  const showTitle = isWidgetPartEnabled(config, "title");
+  const showSubtitle = isWidgetPartEnabled(config, "subtitle");
+  const showOwner = isWidgetPartEnabled(config, "owner");
+  const showStatus = isWidgetPartEnabled(config, "status");
 
   return (
     <div className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)}`}>
-      <div className={`shrink-0 ${vmbText.title} mb-1 ${theme === "light" ? "text-slate-700" : "text-white"}`}>
-        {widget?.title || "Action Queue"}
-      </div>
+      {showTitle ? (
+        <div className={`shrink-0 ${vmbText.title} mb-1 ${theme === "light" ? "text-slate-700" : "text-white"}`}>
+          {widget?.title || "Action Queue"}
+        </div>
+      ) : null}
       <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
         {items.length === 0 ? (
           <div className={`${vmbText.body} ${boardMutedText(theme)}`}>No actions</div>
@@ -48,19 +56,27 @@ const ActionQueueWidget = ({ widget, data, theme = "dark" }) => {
               <div className={`font-medium truncate ${theme === "light" ? "text-slate-800" : "text-white"}`}>
                 {item.action}
               </div>
-              {item.subtitle ? (
+              {showSubtitle && item.subtitle ? (
                 <div className={`truncate mt-0.5 ${boardMutedText(theme)}`}>{item.subtitle}</div>
               ) : null}
-              <div className="flex items-center justify-between gap-2 mt-1">
-                <span className={`truncate ${boardMutedText(theme)}`}>{item.owner || "—"}</span>
-                {theme === "light" ? (
-                  <span className={`shrink-0 px-2 py-0.5 rounded-full ${vmbText.small} font-medium ${statusClass(item.status)}`}>
-                    {formatStatus(item.status)}
-                  </span>
-                ) : (
-                  <span className={`${vmbText.small} capitalize ${boardMutedText(theme)}`}>{item.status}</span>
-                )}
-              </div>
+              {(showOwner || showStatus) ? (
+                <div className="flex items-center justify-between gap-2 mt-1">
+                  {showOwner ? (
+                    <span className={`truncate ${boardMutedText(theme)}`}>{item.owner || "—"}</span>
+                  ) : (
+                    <span />
+                  )}
+                  {showStatus ? (
+                    theme === "light" ? (
+                      <span className={`shrink-0 px-2 py-0.5 rounded-full ${vmbText.small} font-medium ${statusClass(item.status)}`}>
+                        {formatStatus(item.status)}
+                      </span>
+                    ) : (
+                      <span className={`${vmbText.small} capitalize ${boardMutedText(theme)}`}>{item.status}</span>
+                    )
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           ))
         )}

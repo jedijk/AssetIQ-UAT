@@ -3,6 +3,7 @@ import { Trash2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { Textarea } from "../ui/textarea";
 import {
   Select,
   SelectContent,
@@ -13,6 +14,7 @@ import {
 import { CHART_METRICS, KPI_METRICS, PRODUCTION_METRICS } from "./widgetLibrary";
 import { FONT_SIZE_OPTIONS } from "./boardTheme";
 import { clampWidgetPosition } from "./boardLayoutUtils";
+import WidgetPartToggles from "./WidgetPartToggles";
 
 const WidgetConfigPanel = ({ widget, layout, onChange, onRemove }) => {
   if (!widget) {
@@ -72,6 +74,34 @@ const WidgetConfigPanel = ({ widget, layout, onChange, onRemove }) => {
         <Input value={widget.type} disabled className="bg-slate-100" />
       </div>
 
+      {widget.type === "text_block" && (
+        <>
+          <div className="space-y-2">
+            <Label>Text</Label>
+            <Textarea
+              rows={5}
+              value={widget.config?.text_content ?? ""}
+              onChange={(e) => updateConfig({ text_content: e.target.value })}
+              placeholder="Enter board text…"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Alignment</Label>
+            <Select
+              value={widget.config?.text_align || "left"}
+              onValueChange={(v) => updateConfig({ text_align: v })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="left">Left</SelectItem>
+                <SelectItem value="center">Center</SelectItem>
+                <SelectItem value="right">Right</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </>
+      )}
+
       {widget.type === "kpi_card" && (
         <div className="space-y-2">
           <Label>Metric</Label>
@@ -121,7 +151,7 @@ const WidgetConfigPanel = ({ widget, layout, onChange, onRemove }) => {
         </>
       )}
 
-      {widget.type === "mooney_chart" && (
+      {(widget.type === "mooney_chart" || widget.type === "information_panel") && (
         <div className="space-y-2">
           <Label>Period</Label>
           <Select
@@ -137,7 +167,7 @@ const WidgetConfigPanel = ({ widget, layout, onChange, onRemove }) => {
         </div>
       )}
 
-      {(widget.type === "observation_list" || widget.type === "action_queue" || widget.type === "form_submissions_list" || widget.type === "risk_observation_list") && (
+      {(widget.type === "observation_list" || widget.type === "action_queue" || widget.type === "form_submissions_list" || widget.type === "risk_observation_list" || widget.type === "information_panel") && (
         <div className="space-y-2">
           <Label>Item limit</Label>
           <Input
@@ -194,6 +224,8 @@ const WidgetConfigPanel = ({ widget, layout, onChange, onRemove }) => {
           </div>
         </>
       )}
+
+      <WidgetPartToggles widget={widget} onConfigChange={updateConfig} />
 
       <div className="grid grid-cols-2 gap-2 pt-2 border-t">
         <div className="space-y-1">

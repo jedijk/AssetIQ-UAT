@@ -1,7 +1,9 @@
 import React from "react";
 import { boardCardClass, boardMutedText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
+import { isWidgetPartEnabled } from "../widgetDisplayParts";
 
 const ExposureWaterfallWidget = ({ widget, data, theme = "dark" }) => {
+  const config = widget?.config || {};
   const payload = data?.widgets?.[widget?.id] || {};
   const segments = payload.segments || [];
   const rows = segments.length
@@ -16,12 +18,15 @@ const ExposureWaterfallWidget = ({ widget, data, theme = "dark" }) => {
 
   const titleClass = theme === "light" ? "text-slate-700" : "text-white";
   const valueClass = theme === "light" ? "text-slate-900" : "text-white";
+  const showTitle = isWidgetPartEnabled(config, "title");
 
   return (
     <div className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)}`}>
-      <div className={`shrink-0 ${vmbText.title} ${titleClass} mb-1`}>
-        {widget?.title || "Exposure Waterfall"}
-      </div>
+      {showTitle ? (
+        <div className={`shrink-0 ${vmbText.title} ${titleClass} mb-1`}>
+          {widget?.title || "Exposure Waterfall"}
+        </div>
+      ) : null}
       <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
         {rows.map((row) => (
           <div key={row.label || row.key} className={`flex justify-between gap-2 min-w-0 ${vmbText.small}`}>

@@ -5,9 +5,11 @@ export function boardSurfaceClass(theme) {
 }
 
 export function boardCardClass(theme) {
-  return theme === "light"
-    ? "bg-white border border-slate-200 text-slate-900"
-    : "bg-slate-900/80 border border-slate-700/50 text-white";
+  const palette =
+    theme === "light"
+      ? "bg-white border border-slate-200 text-slate-900"
+      : "bg-slate-900/80 border border-slate-700/50 text-white";
+  return `${palette} rounded-[length:var(--vmb-radius,1rem)] shadow-sm`;
 }
 
 export function boardMutedText(theme) {
@@ -28,28 +30,36 @@ export const FONT_SIZE_OPTIONS = [
 
 const FONT_BASE_PX = { xs: 10, sm: 11, md: 12, lg: 14, xl: 16 };
 
-/** Shared layout shell — clip content to grid cell bounds. */
+/** Shared layout shell — clips content to the grid cell; parent cell is the @container. */
 export const vmbWidgetShell =
-  "h-full min-h-0 min-w-0 overflow-hidden @container flex flex-col";
+  "h-full min-h-0 min-w-0 overflow-hidden flex flex-col";
 
-export const vmbWidgetPad = "p-2 sm:p-3";
+export const vmbWidgetPad = "p-[length:var(--vmb-pad,0.5rem)]";
 
-/** CSS variables for scalable widget typography (inherits to children). */
+/**
+ * Typography + chrome scale with card size (cqmin) and user font_size preference.
+ * Applied on the grid cell so all descendants inherit variables.
+ */
 export function widgetFontVars(config) {
   const key = config?.font_size || "md";
   const base = FONT_BASE_PX[key] ?? FONT_BASE_PX.md;
-  const chart = Math.max(8, Math.round(base * 0.85));
-  const titlePx = Math.round(base * 1.1);
-  const valuePx = Math.round(base * 1.35);
-  const smallPx = Math.max(8, Math.round(base * 0.85));
-  const statusPx = Math.round(base * 1.25);
+  const scale = base / 12;
+  const titleMax = Math.round(base * 1.1);
+  const valueMax = Math.round(base * 1.35);
+  const smallMax = Math.max(8, Math.round(base * 0.85));
+  const statusMax = Math.round(base * 1.25);
+
+  const cq = (n) => `${(n * scale).toFixed(2)}cqmin`;
+
   return {
-    "--vmb-fs": `${base}px`,
-    "--vmb-fs-title": `clamp(0.625rem, ${titlePx}px, ${titlePx}px)`,
-    "--vmb-fs-value": `clamp(0.65rem, ${Math.max(10, valuePx - 2)}px, ${valuePx}px)`,
-    "--vmb-fs-small": `clamp(0.5rem, ${smallPx}px, ${smallPx}px)`,
-    "--vmb-fs-status": `clamp(0.75rem, ${statusPx}px, ${statusPx}px)`,
-    "--vmb-chart-fs": `${chart}px`,
+    "--vmb-fs": `clamp(0.5rem, ${cq(2.2)}, ${base}px)`,
+    "--vmb-fs-title": `clamp(0.6rem, ${cq(3.2)}, ${titleMax}px)`,
+    "--vmb-fs-value": `clamp(0.65rem, ${cq(5.8)}, ${valueMax}px)`,
+    "--vmb-fs-small": `clamp(0.5rem, ${cq(2)}, ${smallMax}px)`,
+    "--vmb-fs-status": `clamp(0.7rem, ${cq(4.5)}, ${statusMax}px)`,
+    "--vmb-chart-fs": `clamp(6px, ${cq(1.8)}, ${Math.max(8, Math.round(base * 0.85))}px)`,
+    "--vmb-pad": `clamp(0.35rem, ${cq(2.5)}, 0.875rem)`,
+    "--vmb-radius": `clamp(0.625rem, ${cq(4)}, 1.25rem)`,
     fontSize: "var(--vmb-fs)",
   };
 }
