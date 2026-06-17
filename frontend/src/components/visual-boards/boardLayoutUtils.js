@@ -2,6 +2,60 @@ export const FINE_GRID_COLUMNS = 24;
 export const LEGACY_GRID_COLUMNS = 12;
 export const DEFAULT_FINE_LAYOUT = { columns: FINE_GRID_COLUMNS, rows: 16 };
 
+export const CANVAS_PREVIEW_SIZES = {
+  desktop: "w-full max-w-6xl aspect-video",
+  tablet: "w-full max-w-3xl aspect-[4/3]",
+  "tv-55": "w-full max-w-5xl aspect-video",
+  "tv-75": "w-full max-w-6xl aspect-video",
+  "tv-98": "w-full max-w-7xl aspect-video",
+  fullscreen: "h-full w-full min-h-0",
+};
+
+export function getCanvasSizeClass(previewSize = "desktop") {
+  return CANVAS_PREVIEW_SIZES[previewSize] || CANVAS_PREVIEW_SIZES.desktop;
+}
+
+/** Normalize stored board layout for canvas rendering (editor, preview, kiosk). */
+export function normalizeBoardForCanvas(board) {
+  if (!board) {
+    return {
+      layout: DEFAULT_FINE_LAYOUT,
+      widgets: [],
+      theme: "dark",
+    };
+  }
+  const upgraded = upgradeToFineGrid(board.layout, board.widgets || []);
+  return {
+    layout: upgraded.layout,
+    widgets: upgraded.widgets,
+    theme: board.theme || "dark",
+  };
+}
+
+export function readBoardDraft(boardId) {
+  if (!boardId || typeof sessionStorage === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(`vmb-board-draft:${boardId}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeBoardDraft(boardId, draft) {
+  if (!boardId || typeof sessionStorage === "undefined") return;
+  try {
+    sessionStorage.setItem(`vmb-board-draft:${boardId}`, JSON.stringify(draft));
+  } catch {
+    /* ignore quota errors */
+  }
+}
+
+export function clearBoardDraft(boardId) {
+  if (!boardId || typeof sessionStorage === "undefined") return;
+  sessionStorage.removeItem(`vmb-board-draft:${boardId}`);
+}
+
 export function isLegacyLayout(layout) {
   const cols = layout?.columns ?? LEGACY_GRID_COLUMNS;
   return cols < FINE_GRID_COLUMNS;

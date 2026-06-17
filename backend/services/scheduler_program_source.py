@@ -135,7 +135,7 @@ async def load_pm_import_scheduler_rows(
     """
     from services.maintenance_program_pm_import import pm_import_task_to_program_dict
     from services.maintenance_program_service import MaintenanceProgramService
-    from services.pm_import_constants import is_pm_import_review_accepted
+            from services.pm_import_constants import is_pm_import_review_accepted, normalize_pm_import_display_status
 
     covered_pm_refs = covered_pm_refs or set()
     equipment_filter = set(equipment_ids) if equipment_ids else None
@@ -200,6 +200,13 @@ async def load_pm_import_scheduler_rows(
             if task_type in ("reactive", "corrective"):
                 continue
 
+            display_status = normalize_pm_import_display_status(pm_task)
+            task_source = (
+                TaskSource.STRATEGY_GENERATED.value
+                if display_status in ("merged", "applied")
+                else TaskSource.CUSTOMER_IMPORTED.value
+            )
+
             rows.append(
                 {
                     "id": task_id,
@@ -225,9 +232,10 @@ async def load_pm_import_scheduler_rows(
                     "strategy_version": "pm_import",
                     "failure_mode_id": trace.get("failure_mode_id"),
                     "failure_mode_name": trace.get("failure_mode_name"),
-                    "task_source": TaskSource.CUSTOMER_IMPORTED.value,
+                    "task_source": task_source,
                     "discipline": program_task.get("discipline"),
                     "pm_import_task_id": pm_ref,
+                    "pm_import_incorporated": display_status in ("merged", "applied"),
                     "is_active": True,
                 }
             )

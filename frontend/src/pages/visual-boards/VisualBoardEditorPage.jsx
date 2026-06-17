@@ -12,6 +12,8 @@ import {
   upgradeToFineGrid,
   clampWidgetPosition,
   pixelDeltaToGridSteps,
+  writeBoardDraft,
+  clearBoardDraft,
 } from "../../components/visual-boards/boardLayoutUtils";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -87,7 +89,9 @@ const VisualBoardEditorPage = () => {
       }),
     onSuccess: () => {
       toast.success("Board saved");
+      clearBoardDraft(boardId);
       queryClient.invalidateQueries({ queryKey: ["visual-board", boardId] });
+      queryClient.invalidateQueries({ queryKey: ["visual-board-preview", boardId] });
       refetchPreview();
     },
     onError: (err) => toast.error(err.response?.data?.detail || "Failed to save board"),
@@ -180,6 +184,11 @@ const VisualBoardEditorPage = () => {
     if (selectedWidgetId === id) setSelectedWidgetId(null);
   };
 
+  const openPreview = () => {
+    writeBoardDraft(boardId, { name, layout, widgets, theme });
+    navigate(`/visual-management/boards/${boardId}/preview`);
+  };
+
   const selectedWidget = widgets.find((w) => w.id === selectedWidgetId);
 
   if (isLoading) {
@@ -206,7 +215,7 @@ const VisualBoardEditorPage = () => {
             <History className="w-4 h-4 mr-1" />
             Versions
           </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate(`/visual-management/boards/${boardId}/preview`)}>
+          <Button variant="outline" size="sm" onClick={openPreview}>
             <Eye className="w-4 h-4 mr-1" />
             Preview
           </Button>

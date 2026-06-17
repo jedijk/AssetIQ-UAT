@@ -3,6 +3,7 @@ import { Calendar, Clock, ListChecks, Loader2, Sparkles } from "lucide-react";
 import { Badge } from "../../ui/badge";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import { useTaskStatusConfig, usePriorityConfig } from "./constants";
+import { isMaintenanceImportTask } from "./taskSourceFilter";
 
 export function TaskListView({ tasks, isLoading, onTaskClick, onStatusChange }) {
   const { t } = useLanguage();
@@ -62,7 +63,7 @@ export function TaskListView({ tasks, isLoading, onTaskClick, onStatusChange }) 
                         {task.equipment_tag}
                       </Badge>
                     )}
-                    {task.task_source === "customer_imported" && (
+                    {isMaintenanceImportTask(task) && (
                       <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700 border-purple-200">
                         PM Import
                       </Badge>

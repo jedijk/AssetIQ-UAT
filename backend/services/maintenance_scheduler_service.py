@@ -23,6 +23,7 @@ from services.maintenance_scheduler_scope import (
 from services.maintenance_scheduler_disabled import (
     PROGRAM_DISABLE_CANCEL_NOTES,
     annotate_disabled_in_program,
+    annotate_scheduled_task_sources,
     load_inactive_program_task_keys,
 )
 from services.tenant_schema import tenant_id_from_user, with_tenant_id
@@ -220,6 +221,7 @@ async def get_timeline(
     equipment_ids = list({t.get("equipment_id") for t in tasks if t.get("equipment_id")})
     inactive_keys = await load_inactive_program_task_keys(equipment_ids)
     annotate_disabled_in_program(tasks, inactive_keys)
+    await annotate_scheduled_task_sources(tasks)
 
     equipment_timeline = {}
     today = datetime.utcnow().date().isoformat()
@@ -290,6 +292,8 @@ async def list_scheduled_tasks(
             and task.get("status") not in ["completed", "cancelled"]
         )
 
+    await annotate_scheduled_task_sources(tasks)
+
     return {"tasks": _json_safe_tasks(tasks), "total": len(tasks)}
 
 
@@ -329,6 +333,9 @@ async def get_daily_planner(
 
     for task in overdue_tasks:
         task["is_overdue"] = True
+
+    all_planner_tasks = overdue_tasks + today_tasks + tomorrow_tasks
+    await annotate_scheduled_task_sources(all_planner_tasks)
 
     return {
         "date": date,
@@ -379,6 +386,8 @@ async def get_weekly_planner(
             task["is_overdue"] = task.get("due_date", "") < today
             days[planned]["tasks"].append(task)
             days[planned]["total_hours"] += task.get("estimated_hours", 1.0)
+
+    await annotate_scheduled_task_sources(tasks)
 
     technicians = await db.technician_capacity.find(
         scheduler_scoped(user, {"is_active": True}),

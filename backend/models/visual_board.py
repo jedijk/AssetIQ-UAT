@@ -65,12 +65,12 @@ class VisualBoardWidget(BaseModel):
 
 
 class VisualBoardLayout(BaseModel):
-    columns: int = 12
-    rows: int = 6
+    columns: int = 24
+    rows: int = 16
 
 
 def default_tyromer_operations_layout() -> VisualBoardLayout:
-    return VisualBoardLayout(columns=12, rows=12)
+    return VisualBoardLayout(columns=24, rows=24)
 
 
 class CreateBoardRequest(BaseModel):
@@ -261,48 +261,48 @@ def default_reliability_widgets() -> List[VisualBoardWidget]:
             id="w_status",
             type=WidgetType.STATUS_INDICATOR,
             title="Reliability Status",
-            position=WidgetPosition(x=0, y=0, w=3, h=3),
+            position=WidgetPosition(x=0, y=0, w=6, h=6),
         ),
         VisualBoardWidget(
             id="w_active_exposure",
             type=WidgetType.KPI_CARD,
             title="Active Exposure",
             config=WidgetConfig(metric="active_threat_exposure"),
-            position=WidgetPosition(x=3, y=0, w=3, h=2),
+            position=WidgetPosition(x=6, y=0, w=6, h=4),
         ),
         VisualBoardWidget(
             id="w_pm_compliance",
             type=WidgetType.KPI_CARD,
             title="PM Compliance",
             config=WidgetConfig(metric="pm_compliance"),
-            position=WidgetPosition(x=6, y=0, w=3, h=2),
+            position=WidgetPosition(x=12, y=0, w=6, h=4),
         ),
         VisualBoardWidget(
             id="w_critical",
             type=WidgetType.KPI_CARD,
             title="Critical Risks",
             config=WidgetConfig(metric="critical_active_exposure"),
-            position=WidgetPosition(x=9, y=0, w=3, h=2),
+            position=WidgetPosition(x=18, y=0, w=6, h=4),
         ),
         VisualBoardWidget(
             id="w_waterfall",
             type=WidgetType.EXPOSURE_WATERFALL,
             title="Exposure Waterfall",
-            position=WidgetPosition(x=0, y=3, w=6, h=3),
+            position=WidgetPosition(x=0, y=6, w=12, h=6),
         ),
         VisualBoardWidget(
             id="w_observations",
             type=WidgetType.OBSERVATION_LIST,
             title="Open Observations",
             config=WidgetConfig(limit=8),
-            position=WidgetPosition(x=6, y=2, w=6, h=4),
+            position=WidgetPosition(x=12, y=4, w=12, h=8),
         ),
         VisualBoardWidget(
             id="w_actions",
             type=WidgetType.ACTION_QUEUE,
             title="Action Queue",
             config=WidgetConfig(limit=8),
-            position=WidgetPosition(x=0, y=6, w=6, h=3),
+            position=WidgetPosition(x=0, y=12, w=12, h=4),
         ),
     ]
 
@@ -314,21 +314,21 @@ def default_maintenance_widgets() -> List[VisualBoardWidget]:
             type=WidgetType.KPI_CARD,
             title="PM Compliance",
             config=WidgetConfig(metric="pm_compliance"),
-            position=WidgetPosition(x=0, y=0, w=4, h=2),
+            position=WidgetPosition(x=0, y=0, w=8, h=4),
         ),
         VisualBoardWidget(
             id="w_actions",
             type=WidgetType.ACTION_QUEUE,
             title="Overdue Tasks",
             config=WidgetConfig(limit=10),
-            position=WidgetPosition(x=4, y=0, w=8, h=4),
+            position=WidgetPosition(x=8, y=0, w=16, h=8),
         ),
         VisualBoardWidget(
             id="w_trend",
             type=WidgetType.TREND_CHART,
             title="PM Compliance Trend",
             config=WidgetConfig(chart_metric="pm_compliance", days=30),
-            position=WidgetPosition(x=0, y=2, w=4, h=3),
+            position=WidgetPosition(x=0, y=4, w=8, h=6),
         ),
     ]
 
@@ -339,21 +339,21 @@ def default_executive_widgets() -> List[VisualBoardWidget]:
             id="w_waterfall",
             type=WidgetType.EXPOSURE_WATERFALL,
             title="Exposure Waterfall",
-            position=WidgetPosition(x=0, y=0, w=8, h=4),
+            position=WidgetPosition(x=0, y=0, w=16, h=8),
         ),
         VisualBoardWidget(
             id="w_active_exposure",
             type=WidgetType.KPI_CARD,
             title="Active Exposure",
             config=WidgetConfig(metric="active_threat_exposure"),
-            position=WidgetPosition(x=8, y=0, w=4, h=2),
+            position=WidgetPosition(x=16, y=0, w=8, h=4),
         ),
         VisualBoardWidget(
             id="w_trend",
             type=WidgetType.TREND_CHART,
             title="Exposure Trend",
             config=WidgetConfig(chart_metric="active_threat_exposure", days=30),
-            position=WidgetPosition(x=8, y=2, w=4, h=2),
+            position=WidgetPosition(x=16, y=4, w=8, h=4),
         ),
     ]
 
@@ -366,90 +366,90 @@ def default_tyromer_operations_widgets() -> List[VisualBoardWidget]:
             type=WidgetType.PRODUCTION_KPI,
             title="Total Input",
             config=WidgetConfig(production_metric="total_input"),
-            position=WidgetPosition(x=0, y=0, w=2, h=2),
+            position=WidgetPosition(x=0, y=0, w=4, h=4),
         ),
         VisualBoardWidget(
             id="w_waste",
             type=WidgetType.PRODUCTION_KPI,
             title="Waste",
             config=WidgetConfig(production_metric="waste"),
-            position=WidgetPosition(x=2, y=0, w=2, h=2),
+            position=WidgetPosition(x=4, y=0, w=4, h=4),
         ),
         VisualBoardWidget(
             id="w_yield",
             type=WidgetType.PRODUCTION_KPI,
             title="Yield",
             config=WidgetConfig(production_metric="yield"),
-            position=WidgetPosition(x=4, y=0, w=2, h=2),
+            position=WidgetPosition(x=8, y=0, w=4, h=4),
         ),
         VisualBoardWidget(
             id="w_avg_mooney",
             type=WidgetType.PRODUCTION_KPI,
             title="Avg Mooney",
             config=WidgetConfig(production_metric="avg_mooney"),
-            position=WidgetPosition(x=6, y=0, w=2, h=2),
+            position=WidgetPosition(x=12, y=0, w=4, h=4),
         ),
         VisualBoardWidget(
             id="w_rsd",
             type=WidgetType.PRODUCTION_KPI,
             title="RSD",
             config=WidgetConfig(production_metric="rsd"),
-            position=WidgetPosition(x=8, y=0, w=2, h=2),
+            position=WidgetPosition(x=16, y=0, w=4, h=4),
         ),
         VisualBoardWidget(
             id="w_runtime",
             type=WidgetType.PRODUCTION_KPI,
             title="Runtime",
             config=WidgetConfig(production_metric="runtime"),
-            position=WidgetPosition(x=10, y=0, w=2, h=2),
+            position=WidgetPosition(x=20, y=0, w=4, h=4),
         ),
         VisualBoardWidget(
             id="w_active_exposure",
             type=WidgetType.KPI_CARD,
             title="Active Exposure",
             config=WidgetConfig(metric="active_threat_exposure"),
-            position=WidgetPosition(x=0, y=2, w=4, h=2),
+            position=WidgetPosition(x=0, y=4, w=8, h=4),
         ),
         VisualBoardWidget(
             id="w_controlled_exposure",
             type=WidgetType.KPI_CARD,
             title="Controlled Exposure",
             config=WidgetConfig(metric="critical_active_exposure"),
-            position=WidgetPosition(x=4, y=2, w=4, h=2),
+            position=WidgetPosition(x=8, y=4, w=8, h=4),
         ),
         VisualBoardWidget(
             id="w_page_views",
             type=WidgetType.KPI_CARD,
             title="Page Views",
             config=WidgetConfig(metric="page_views"),
-            position=WidgetPosition(x=8, y=2, w=4, h=2),
+            position=WidgetPosition(x=16, y=4, w=8, h=4),
         ),
         VisualBoardWidget(
             id="w_mooney_chart",
             type=WidgetType.MOONEY_CHART,
             title="Mooney Viscosity",
             config=WidgetConfig(period="today"),
-            position=WidgetPosition(x=0, y=4, w=12, h=4),
+            position=WidgetPosition(x=0, y=8, w=24, h=8),
         ),
         VisualBoardWidget(
             id="w_form_submissions",
             type=WidgetType.FORM_SUBMISSIONS_LIST,
             title="Recent Form Submissions",
             config=WidgetConfig(limit=8),
-            position=WidgetPosition(x=0, y=8, w=4, h=4),
+            position=WidgetPosition(x=0, y=16, w=8, h=8),
         ),
         VisualBoardWidget(
             id="w_recent_actions",
             type=WidgetType.ACTION_QUEUE,
             title="Recent Actions",
             config=WidgetConfig(limit=8, queue_mode="recent"),
-            position=WidgetPosition(x=4, y=8, w=4, h=4),
+            position=WidgetPosition(x=8, y=16, w=8, h=8),
         ),
         VisualBoardWidget(
             id="w_top_risk",
             type=WidgetType.RISK_OBSERVATION_LIST,
             title="Top 10 Highest Risk Observations",
             config=WidgetConfig(limit=10),
-            position=WidgetPosition(x=8, y=8, w=4, h=4),
+            position=WidgetPosition(x=16, y=16, w=8, h=8),
         ),
     ]

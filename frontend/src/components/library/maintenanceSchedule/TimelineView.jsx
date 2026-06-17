@@ -11,6 +11,7 @@ import {
   maintenanceTimelineRowKey,
   dedupeTimelineOccurrences,
 } from "../../../lib/maintenanceTimelineUtils";
+import { isMaintenanceImportTask } from "./taskSourceFilter";
 
 export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedule }) {
   const { t } = useLanguage();
@@ -49,16 +50,12 @@ export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedul
             equipment_id: equipment.equipment_id,
             _equipmentName: equipment.equipment_name,
             _equipmentTag: equipment.equipment_tag,
-            _isImported:
-              t.task_source === "customer_imported" || !!t.pm_import_task_id,
+            _isImported: isMaintenanceImportTask(t),
             occurrences: [],
           });
         }
         const row = map.get(key);
-        row._isImported =
-          row._isImported ||
-          t.task_source === "customer_imported" ||
-          !!t.pm_import_task_id;
+        row._isImported = row._isImported || isMaintenanceImportTask(t);
         row._disabledInProgram =
           row._disabledInProgram || t.disabled_in_program === true;
         row.occurrences.push(t);

@@ -19,7 +19,7 @@ import FormSubmissionsListWidget from "./widgets/FormSubmissionsListWidget";
 import RiskObservationListWidget from "./widgets/RiskObservationListWidget";
 import { boardSurfaceClass, widgetFontVars } from "./boardTheme";
 import VisualBoardLogo from "./VisualBoardLogo";
-import { computeGridCellSize } from "./boardLayoutUtils";
+import { computeGridCellSize, getCanvasSizeClass } from "./boardLayoutUtils";
 
 const WIDGET_RENDERERS = {
   kpi_card: KpiCardWidget,
@@ -159,14 +159,7 @@ const VisualBoardCanvas = ({
     return () => ro.disconnect();
   }, [layout, onGridMetricsChange]);
 
-  const sizeClass =
-    previewSize === "desktop"
-      ? "max-w-6xl aspect-video"
-      : previewSize === "tablet"
-        ? "max-w-3xl aspect-[4/3]"
-        : editable
-          ? "w-full min-h-[480px]"
-          : "w-full min-h-0";
+  const sizeClass = getCanvasSizeClass(previewSize);
 
   const cols = layout?.columns || 24;
   const rows = layout?.rows || 16;
@@ -198,7 +191,11 @@ const VisualBoardCanvas = ({
   );
 
   return (
-    <div className={`relative mx-auto ${sizeClass} ${boardSurfaceClass(theme)} rounded-lg overflow-hidden shadow-2xl flex flex-col`}>
+    <div
+      className={`relative mx-auto ${sizeClass} ${boardSurfaceClass(theme)} rounded-lg overflow-hidden shadow-2xl flex flex-col ${
+        previewSize === "fullscreen" ? "rounded-none shadow-none" : ""
+      }`}
+    >
       <div className="shrink-0 px-4 pt-3 pb-1">
         <VisualBoardLogo theme={theme} />
       </div>

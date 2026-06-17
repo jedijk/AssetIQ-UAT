@@ -1,5 +1,6 @@
 from services.maintenance_scheduler_disabled import (
     PROGRAM_DISABLE_CANCEL_NOTES,
+    annotate_incorporated_pm_import_tasks,
     scheduled_task_program_keys,
     task_disabled_in_program,
 )
@@ -45,3 +46,23 @@ def test_scheduled_task_program_keys_collects_refs():
     assert ("eq-1", "v2-1") in keys
     assert ("eq-1", "sess:task-1") in keys
     assert ("eq-1", "prog-1") in keys
+
+
+def test_incorporated_pm_import_relabels_schedule_task_source():
+    tasks = [
+        {
+            "id": "st-1",
+            "pm_import_task_id": "sess:task-1",
+            "task_source": "customer_imported",
+        },
+        {
+            "id": "st-2",
+            "pm_import_task_id": "sess:task-2",
+            "task_source": "customer_imported",
+        },
+    ]
+    annotate_incorporated_pm_import_tasks(tasks, {"sess:task-1"})
+    assert tasks[0]["task_source"] == "strategy_generated"
+    assert tasks[0]["pm_import_incorporated"] is True
+    assert tasks[1]["task_source"] == "customer_imported"
+    assert "pm_import_incorporated" not in tasks[1]

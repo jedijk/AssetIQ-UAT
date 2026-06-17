@@ -77,7 +77,7 @@ async def test_create_operations_board_seeds_tyromer_widgets(mock_user, mock_db)
 
     assert result.board_type == BoardType.OPERATIONS
     assert result.theme == "light"
-    assert result.layout.rows == 12
+    assert result.layout.rows == 24
     assert len(result.widgets) == 13
     widget_types = {w.type.value if hasattr(w.type, "value") else w.type for w in result.widgets}
     assert "production_kpi" in widget_types

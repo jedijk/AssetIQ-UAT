@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
 import VisualBoardCanvas from "../../components/visual-boards/VisualBoardCanvas";
+import { normalizeBoardForCanvas, readBoardDraft } from "../../components/visual-boards/boardLayoutUtils";
 import { Button } from "../../components/ui/button";
 import {
   Select,
@@ -23,7 +24,7 @@ const PREVIEW_SIZES = [
 
 const VisualBoardPreviewPage = () => {
   const { boardId } = useParams();
-  const [previewSize, setPreviewSize] = useState("tv-55");
+  const [previewSize, setPreviewSize] = useState("desktop");
 
   const { data: board, isLoading } = useQuery({
     queryKey: ["visual-board-preview", boardId],
@@ -39,6 +40,18 @@ const VisualBoardPreviewPage = () => {
     enabled: !!boardId,
     refetchInterval: refreshSeconds * 1000,
   });
+
+  const draft = useMemo(() => readBoardDraft(boardId), [boardId]);
+  const canvasBoard = useMemo(() => {
+    if (draft) {
+      return normalizeBoardForCanvas({
+        layout: draft.layout,
+        widgets: draft.widgets,
+        theme: draft.theme,
+      });
+    }
+    return normalizeBoardForCanvas(board);
+  }, [board, draft]);
 
   if (isLoading) {
     return (
@@ -57,7 +70,10 @@ const VisualBoardPreviewPage = () => {
               <ArrowLeft className="w-4 h-4" />
             </Link>
           </Button>
-          <span className="text-white font-medium">{board?.name} — Preview</span>
+          <span className="text-white font-medium">
+            {draft?.name || board?.name} — Preview
+            {draft ? " (unsaved draft)" : " (saved version)"}
+          </span>
         </div>
         <Select value={previewSize} onValueChange={setPreviewSize}>
           <SelectTrigger className="w-40 bg-slate-800 border-slate-700 text-white">
@@ -74,9 +90,9 @@ const VisualBoardPreviewPage = () => {
       </div>
       <div className="flex-1 p-6 flex items-center justify-center">
         <VisualBoardCanvas
-          layout={board?.layout}
-          widgets={board?.widgets || []}
-          theme={board?.theme || "dark"}
+          layout={canvasBoard.layout}
+          widgets={canvasBoard.widgets}
+          theme={canvasBoard.theme}
           data={{
             widgets: previewData?.widgets,
             status: previewData?.status,

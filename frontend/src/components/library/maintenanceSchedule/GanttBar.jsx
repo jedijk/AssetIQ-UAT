@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Badge } from "../../ui/badge";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import { usePriorityConfig } from "./constants";
+import { isMaintenanceImportTask } from "./taskSourceFilter";
 
 export function GanttBar({ task, startDate, dayPx, totalDays, onClick, onReschedule }) {
   const { t } = useLanguage();
@@ -22,8 +23,7 @@ export function GanttBar({ task, startDate, dayPx, totalDays, onClick, onResched
   if (startIdx + durationDays < 0 || startIdx > totalDays) return null;
 
   const priorityCfg = priorityConfigMap[task.priority] || priorityConfigMap.medium;
-  const isImported =
-    task.task_source === "customer_imported" || !!task.pm_import_task_id;
+  const isImported = isMaintenanceImportTask(task);
 
   let barColor = "bg-blue-500";
   if (isDisabledInProgram) barColor = "bg-slate-300";

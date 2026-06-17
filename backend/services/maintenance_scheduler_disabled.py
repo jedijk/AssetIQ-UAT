@@ -3,7 +3,12 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Set, Tuple
 
-from services.pm_import_constants import is_pm_import_review_accepted
+from services.pm_import_constants import (
+    is_pm_import_review_accepted,
+    normalize_pm_import_display_status,
+)
+
+INCORPORATED_PM_IMPORT_STATUSES = frozenset({"merged", "applied"})
 
 PROGRAM_DISABLE_CANCEL_NOTES = frozenset(
     {
@@ -98,6 +103,55 @@ async def load_inactive_program_task_keys(
             keys.add((equipment_id, f"{session_id}:{task_id}"))
 
     return keys
+
+
+async def load_incorporated_pm_import_refs(pm_refs: Set[str]) -> Set[str]:
+    """PM import task refs merged or applied into the failure-mode strategy library."""
+    from database import db
+
+    if not pm_refs:
+        return set()
+
+    incorporated: Set[str] = set()
+    async for session in db.pm_import_sessions.find(
+        {},
+        {"_id": 0, "session_id": 1, "tasks_extracted": 1},
+    ):
+        session_id = session.get("session_id")
+        if not session_id:
+            continue
+        for pm_task in session.get("tasks_extracted") or []:
+            if normalize_pm_import_display_status(pm_task) not in INCORPORATED_PM_IMPORT_STATUSES:
+                continue
+            task_id = pm_task.get("task_id") or pm_task.get("id")
+            if not task_id:
+                continue
+            pm_ref = f"{session_id}:{task_id}"
+            if pm_ref in pm_refs:
+                incorporated.add(pm_ref)
+    return incorporated
+
+
+def annotate_incorporated_pm_import_tasks(
+    tasks: List[Dict[str, Any]],
+    incorporated_refs: Set[str],
+) -> None:
+    """Show merged PM import rows as strategy-backed on the maintenance schedule."""
+    if not incorporated_refs:
+        return
+    for task in tasks:
+        pm_ref = task.get("pm_import_task_id")
+        if not pm_ref or pm_ref not in incorporated_refs:
+            continue
+        task["pm_import_incorporated"] = True
+        if (task.get("task_source") or "").lower() == "customer_imported":
+            task["task_source"] = "strategy_generated"
+
+
+async def annotate_scheduled_task_sources(tasks: List[Dict[str, Any]]) -> None:
+    pm_refs = {str(t["pm_import_task_id"]) for t in tasks if t.get("pm_import_task_id")}
+    incorporated = await load_incorporated_pm_import_refs(pm_refs)
+    annotate_incorporated_pm_import_tasks(tasks, incorporated)
 
 
 def annotate_disabled_in_program(

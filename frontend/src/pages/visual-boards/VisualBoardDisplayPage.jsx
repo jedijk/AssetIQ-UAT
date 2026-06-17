@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
 import VisualBoardCanvas from "../../components/visual-boards/VisualBoardCanvas";
 import { boardSurfaceClass } from "../../components/visual-boards/boardTheme";
+import { normalizeBoardForCanvas } from "../../components/visual-boards/boardLayoutUtils";
 import { useVisualBoardRealtime } from "../../hooks/useVisualBoardRealtime";
 
 /**
@@ -74,7 +75,8 @@ const VisualBoardDisplayPage = () => {
   const isLoading = layoutLoading || dataLoading;
   const error = layoutError;
 
-  const boardTheme = layout?.theme || "dark";
+  const canvasBoard = useMemo(() => normalizeBoardForCanvas(layout), [layout]);
+  const boardTheme = canvasBoard.theme;
 
   const pageClass = useMemo(
     () =>
@@ -117,14 +119,14 @@ const VisualBoardDisplayPage = () => {
         </div>
         <div className="flex-1 min-h-0">
           <VisualBoardCanvas
-            layout={layout?.layout}
-            widgets={layout?.widgets || []}
+            layout={canvasBoard.layout}
+            widgets={canvasBoard.widgets}
             theme={boardTheme}
             data={{
               widgets: displayData?.widgets,
               status: displayData?.status,
             }}
-            previewSize="tv-75"
+            previewSize="fullscreen"
           />
         </div>
       </div>

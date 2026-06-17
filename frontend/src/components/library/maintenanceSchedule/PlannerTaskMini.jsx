@@ -1,6 +1,7 @@
 import React from "react";
 import { Badge } from "../../ui/badge";
 import { usePriorityConfig } from "./constants";
+import { isMaintenanceImportTask } from "./taskSourceFilter";
 
 export function PlannerTaskMini({ task, compact = false, onClick }) {
   const priorityConfigMap = usePriorityConfig();
@@ -14,7 +15,7 @@ export function PlannerTaskMini({ task, compact = false, onClick }) {
       <div className="flex items-center justify-between gap-1">
         <span className="truncate font-medium text-[11px]">{task.task_name}</span>
         <div className="flex items-center gap-1 shrink-0">
-          {task.task_source === "customer_imported" && (
+          {isMaintenanceImportTask(task) && (
             <Badge variant="outline" className="text-[8px] px-1 py-0 bg-purple-50 text-purple-700 border-purple-200">
               PM
             </Badge>
