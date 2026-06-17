@@ -522,7 +522,7 @@ export default function DashboardPageMain({ initialTab }) {
   const completedInvestigations = investigationsByStatus["completed"] || 0;
   
   // Used for stat card subtitle
-  const openObservations = observationsByStatus["Open"] || 0;
+  const mitigatedObservations = observationsByStatus["Mitigated"] || 0;
 
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col overflow-x-hidden" data-testid="dashboard-page">
@@ -749,7 +749,7 @@ export default function DashboardPageMain({ initialTab }) {
           icon={AlertTriangle}
           color="text-amber-600"
           bg="bg-amber-50"
-          subtitle={`${openObservations} ${t("common.open") || "open"}`}
+          subtitle={`${mitigatedObservations} ${t("observations.statusMitigated") || "Mitigated"}`}
           calculation={t("dashboard.totalObservationsCalculation")}
           clickable={true}
           onClick={() => navigate("/threats", { state: navState })}

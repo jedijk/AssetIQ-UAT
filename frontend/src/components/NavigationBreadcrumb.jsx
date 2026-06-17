@@ -1,7 +1,6 @@
 import React from 'react';
 import { ArrowLeft, ChevronRight, Home } from 'lucide-react';
 import { useBreadcrumb } from '../contexts/BreadcrumbContext';
-import { getRouteIcon } from '../lib/routeLabels';
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -13,7 +12,7 @@ import {
 
 /**
  * NavigationBreadcrumb - Back button plus breadcrumb trail of recently visited pages
- * Mobile: icon-only trail; desktop: text labels
+ * Mobile: back button only; desktop: full text trail
  */
 const NavigationBreadcrumb = ({ className = '' }) => {
   const {
@@ -32,7 +31,11 @@ const NavigationBreadcrumb = ({ className = '' }) => {
   }
 
   return (
-    <div className={`sticky top-[var(--app-header-offset)] z-[35] bg-slate-50 flex items-center gap-2 mb-0.5 sm:mb-4 pointer-events-auto ${className}`}>
+    <div
+      className={`sticky top-[var(--app-header-offset)] z-[35] bg-slate-50 items-center gap-2 mb-0.5 sm:mb-4 pointer-events-auto ${
+        canGoBack ? 'flex' : 'hidden sm:flex'
+      } ${className}`}
+    >
       {canGoBack && (
         <button
           type="button"
@@ -47,52 +50,6 @@ const NavigationBreadcrumb = ({ className = '' }) => {
       )}
 
       {showTrail && (
-        <>
-          {/* Mobile View - icon-only breadcrumb trail */}
-          <nav
-            className="flex sm:hidden items-center gap-0.5 min-w-0"
-            aria-label="breadcrumb"
-          >
-            {breadcrumbs.map((entry, index) => {
-              const isLast = index === breadcrumbs.length - 1;
-              const isHome = isHomeBreadcrumbPath(entry.path);
-              const label = getDisplayLabel(entry);
-              const Icon = isHome ? Home : getRouteIcon(entry.path);
-              const iconClass = 'w-4 h-4 flex-shrink-0';
-
-              return (
-                <React.Fragment key={entry.path + '-' + index}>
-                  {index > 0 && (
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-300 flex-shrink-0" aria-hidden="true" />
-                  )}
-                  {isLast ? (
-                    <span
-                      aria-current="page"
-                      aria-label={label}
-                      title={label}
-                      className="inline-flex items-center justify-center p-2 rounded-md bg-slate-100 text-slate-900"
-                      style={{ minHeight: '36px', minWidth: '36px' }}
-                    >
-                      <Icon className={iconClass} aria-hidden="true" />
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => navigateTo(index)}
-                      aria-label={label}
-                      title={label}
-                      className="inline-flex items-center justify-center p-2 rounded-md text-slate-500 hover:text-blue-600 hover:bg-blue-50 active:bg-blue-100 transition-colors touch-manipulation"
-                      style={{ minHeight: '36px', minWidth: '36px' }}
-                    >
-                      <Icon className={iconClass} aria-hidden="true" />
-                    </button>
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </nav>
-
-          {/* Desktop View - Full breadcrumb trail */}
           <Breadcrumb className="hidden sm:block min-w-0">
             <BreadcrumbList>
               {breadcrumbs.map((entry, index) => {
@@ -132,7 +89,6 @@ const NavigationBreadcrumb = ({ className = '' }) => {
               })}
             </BreadcrumbList>
           </Breadcrumb>
-        </>
       )}
     </div>
   );
