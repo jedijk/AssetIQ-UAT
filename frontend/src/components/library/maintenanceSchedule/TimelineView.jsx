@@ -7,6 +7,10 @@ import { ScrollArea } from "../../ui/scroll-area";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import { getISOWeek } from "./ganttUtils";
 import { GanttRow } from "./GanttRow";
+import {
+  maintenanceTimelineRowKey,
+  dedupeTimelineOccurrences,
+} from "../../../lib/maintenanceTimelineUtils";
 
 export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedule }) {
   const { t } = useLanguage();
@@ -30,16 +34,14 @@ export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedul
     return d;
   });
 
-  // Group occurrences by maintenance_program_id so the same task on the same
-  // equipment shows multiple bars on ONE row.
+  // Group by equipment + normalized task name so duplicate programs for the same
+  // logical task show multiple bars on ONE row.
   const rows = useMemo(() => {
     if (!timeline?.timeline) return [];
     const map = new Map();
     for (const equipment of timeline.timeline) {
       for (const t of equipment.tasks || []) {
-        const key =
-          t.maintenance_program_id ||
-          `${equipment.equipment_id}::${t.task_name}`;
+        const key = maintenanceTimelineRowKey(equipment.equipment_id, t);
         if (!map.has(key)) {
           map.set(key, {
             id: key,
@@ -52,12 +54,18 @@ export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedul
             occurrences: [],
           });
         }
-        map.get(key).occurrences.push(t);
+        const row = map.get(key);
+        row._isImported =
+          row._isImported ||
+          t.task_source === "customer_imported" ||
+          !!t.pm_import_task_id;
+        row.occurrences.push(t);
       }
     }
-    // Sort each row's occurrences chronologically; sort rows by first occurrence
+    // Dedupe merged occurrences; sort each row chronologically; sort rows by first occurrence
     const list = Array.from(map.values());
     for (const r of list) {
+      r.occurrences = dedupeTimelineOccurrences(r.occurrences);
       r.occurrences.sort((a, b) =>
         (a.planned_date || a.due_date || "").localeCompare(
           b.planned_date || b.due_date || "",
