@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Set, Tuple
 
+from services.pm_import_constants import is_pm_import_review_accepted
+
 PROGRAM_DISABLE_CANCEL_NOTES = frozenset(
     {
         "Auto-cancelled: maintenance program task removed or deactivated",
