@@ -19,6 +19,7 @@ from models.maintenance_scheduler import CriticalityLevel, EquipmentMaintenanceP
 from services.scheduler_config import should_sync_legacy_maintenance_programs
 from services.scheduler_helpers import (
     build_task_to_failure_modes,
+    coerce_optional_str_id,
     frequency_to_days,
     is_strategy_task_active,
     normalize_program_criticality,
@@ -87,7 +88,9 @@ async def sync_strategy_programs_for_equipment(
             (fm for fm in linked_fms if fm.get("enabled") is not False),
             linked_fms[0] if linked_fms else None,
         )
-        fm_id = enabled_fm.get("failure_mode_id") if enabled_fm else None
+        fm_id = coerce_optional_str_id(
+            enabled_fm.get("failure_mode_id") if enabled_fm else None
+        )
         fm_name = enabled_fm.get("failure_mode_name") if enabled_fm else None
 
         common_fields = {
@@ -95,7 +98,7 @@ async def sync_strategy_programs_for_equipment(
             "equipment_tag": equipment.get("tag"),
             "equipment_type_id": equipment_type_id,
             "equipment_type_name": strategy.get("equipment_type_name", ""),
-            "task_name": task.get("name"),
+            "task_name": task.get("name") or "Maintenance Task",
             "task_description": task.get("description"),
             "task_type": task_type,
             "frequency": frequency,
@@ -125,7 +128,7 @@ async def sync_strategy_programs_for_equipment(
                 equipment_type_id=equipment_type_id,
                 equipment_type_name=strategy.get("equipment_type_name", ""),
                 task_template_id=task_id,
-                task_name=task.get("name", "Maintenance Task"),
+                task_name=task.get("name") or "Maintenance Task",
                 task_description=task.get("description"),
                 task_type=task_type,
                 frequency=frequency,

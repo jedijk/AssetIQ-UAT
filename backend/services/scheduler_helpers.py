@@ -31,6 +31,14 @@ def frequency_to_days(frequency: str) -> int:
     return _FREQUENCY_DAYS.get(frequency, 30)
 
 
+def coerce_optional_str_id(value: Any) -> Optional[str]:
+    """Normalize library / BSON ids (often ints) for Pydantic string fields."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
 def normalize_program_criticality(raw) -> str:
     """Map equipment/RPN criticality labels to high|medium|low."""
     if raw is None:

@@ -11,8 +11,10 @@ import {
   SelectValue,
 } from "../ui/select";
 import { CHART_METRICS, KPI_METRICS, PRODUCTION_METRICS } from "./widgetLibrary";
+import { FONT_SIZE_OPTIONS } from "./boardTheme";
+import { clampWidgetPosition } from "./boardLayoutUtils";
 
-const WidgetConfigPanel = ({ widget, onChange, onRemove }) => {
+const WidgetConfigPanel = ({ widget, layout, onChange, onRemove }) => {
   if (!widget) {
     return (
       <div className="text-sm text-slate-500 p-4">
@@ -21,11 +23,20 @@ const WidgetConfigPanel = ({ widget, onChange, onRemove }) => {
     );
   }
 
+  const cols = layout?.columns ?? 24;
+  const rows = layout?.rows ?? 16;
+
   const update = (patch) => onChange({ ...widget, ...patch });
   const updateConfig = (patch) =>
     onChange({ ...widget, config: { ...(widget.config || {}), ...patch } });
   const updatePosition = (patch) =>
-    onChange({ ...widget, position: { ...(widget.position || {}), ...patch } });
+    onChange({
+      ...widget,
+      position: clampWidgetPosition(
+        { ...(widget.position || {}), ...patch },
+        layout,
+      ),
+    });
 
   return (
     <div className="space-y-4 p-4">
@@ -39,6 +50,21 @@ const WidgetConfigPanel = ({ widget, onChange, onRemove }) => {
       <div className="space-y-2">
         <Label>Title</Label>
         <Input value={widget.title || ""} onChange={(e) => update({ title: e.target.value })} />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Font size</Label>
+        <Select
+          value={widget.config?.font_size || "md"}
+          onValueChange={(v) => updateConfig({ font_size: v })}
+        >
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {FONT_SIZE_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="space-y-2">
@@ -175,8 +201,8 @@ const WidgetConfigPanel = ({ widget, onChange, onRemove }) => {
           <Input
             type="number"
             min={1}
-            max={12}
-            value={widget.position?.w ?? 3}
+            max={cols}
+            value={widget.position?.w ?? 6}
             onChange={(e) => updatePosition({ w: Number(e.target.value) })}
           />
         </div>
@@ -185,8 +211,8 @@ const WidgetConfigPanel = ({ widget, onChange, onRemove }) => {
           <Input
             type="number"
             min={1}
-            max={12}
-            value={widget.position?.h ?? 2}
+            max={rows}
+            value={widget.position?.h ?? 4}
             onChange={(e) => updatePosition({ h: Number(e.target.value) })}
           />
         </div>
@@ -195,7 +221,7 @@ const WidgetConfigPanel = ({ widget, onChange, onRemove }) => {
           <Input
             type="number"
             min={0}
-            max={11}
+            max={cols - 1}
             value={widget.position?.x ?? 0}
             onChange={(e) => updatePosition({ x: Number(e.target.value) })}
           />
@@ -205,12 +231,15 @@ const WidgetConfigPanel = ({ widget, onChange, onRemove }) => {
           <Input
             type="number"
             min={0}
-            max={11}
+            max={rows - 1}
             value={widget.position?.y ?? 0}
             onChange={(e) => updatePosition({ y: Number(e.target.value) })}
           />
         </div>
       </div>
+      <p className="text-[10px] text-slate-400">
+        Grid: {cols}×{rows} cells. Drag on canvas or edit values above.
+      </p>
     </div>
   );
 };

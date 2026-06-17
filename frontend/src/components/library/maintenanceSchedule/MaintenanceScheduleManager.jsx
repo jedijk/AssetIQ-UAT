@@ -23,6 +23,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
+import { formatApiError } from "../../../lib/apiErrors";
 import { Card, CardContent } from "../../ui/card";
 import { Button } from "../../ui/button";
 import { Badge } from "../../ui/badge";
@@ -296,7 +297,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
       await refreshMaintenanceSchedulerQueries(queryClient);
     },
     onError: (err) => {
-      toast.error(err.response?.data?.detail || t("maintenance.failedRunScheduler"));
+      toast.error(formatApiError(err, t("maintenance.failedRunScheduler")));
     },
   });
 
@@ -336,7 +337,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
       });
     },
     onError: (err) => {
-      toast.error(err.response?.data?.detail || t("maintenance.failedApplyStrategy"));
+      toast.error(formatApiError(err, t("maintenance.failedApplyStrategy")));
     },
   });
 
@@ -354,7 +355,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
       setAiPlanOpen(true);
     },
     onError: (err) => {
-      toast.error(err.response?.data?.detail || t("maintenance.aiPlannerFailed"));
+      toast.error(formatApiError(err, t("maintenance.aiPlannerFailed")));
     },
   });
 
@@ -370,7 +371,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
       await refreshMaintenanceSchedulerQueries(queryClient);
     },
     onError: (err) => {
-      toast.error(err.response?.data?.detail || t("maintenance.failedApplyAiPlan"));
+      toast.error(formatApiError(err, t("maintenance.failedApplyAiPlan")));
     },
   });
 
@@ -382,7 +383,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
       setSelectedTask(null);
     },
     onError: (err) => {
-      toast.error(err.response?.data?.detail || t("maintenance.failedUpdateTask"));
+      toast.error(formatApiError(err, t("maintenance.failedUpdateTask")));
     },
   });
 
@@ -394,7 +395,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
       setSelectedTask(null);
     },
     onError: (err) => {
-      toast.error(err.response?.data?.detail || t("maintenance.failedCompleteTask"));
+      toast.error(formatApiError(err, t("maintenance.failedCompleteTask")));
     },
   });
 
@@ -406,7 +407,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
       setSelectedTask(null);
     },
     onError: (err) => {
-      toast.error(err.response?.data?.detail || t("maintenance.failedDeferTask"));
+      toast.error(formatApiError(err, t("maintenance.failedDeferTask")));
     },
   });
 

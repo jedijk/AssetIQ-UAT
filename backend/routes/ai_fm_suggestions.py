@@ -1637,8 +1637,8 @@ async def review_action_disciplines(
     """Classify a batch of recommended actions into Settings disciplines."""
     if not request.actions:
         return ReviewActionDisciplinesResponse(results=[])
-    if len(request.actions) > 60:
-        raise HTTPException(status_code=400, detail="Send at most 60 actions per batch.")
+    if len(request.actions) > 16:
+        raise HTTPException(status_code=400, detail="Send at most 16 actions per batch.")
 
     uid, cid = user_context(current_user)
     try:

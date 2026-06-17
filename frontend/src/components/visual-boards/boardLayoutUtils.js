@@ -1,0 +1,101 @@
+export const FINE_GRID_COLUMNS = 24;
+export const LEGACY_GRID_COLUMNS = 12;
+export const DEFAULT_FINE_LAYOUT = { columns: FINE_GRID_COLUMNS, rows: 16 };
+
+export function isLegacyLayout(layout) {
+  const cols = layout?.columns ?? LEGACY_GRID_COLUMNS;
+  return cols < FINE_GRID_COLUMNS;
+}
+
+export function scalePosition(pos, factor) {
+  const p = pos || {};
+  return {
+    x: Math.round((p.x || 0) * factor),
+    y: Math.round((p.y || 0) * factor),
+    w: Math.max(1, Math.round((p.w || 3) * factor)),
+    h: Math.max(1, Math.round((p.h || 2) * factor)),
+  };
+}
+
+/** Upgrade 12-col (or smaller) boards to 24-col fine grid for editor placement. */
+export function upgradeToFineGrid(layout, widgets) {
+  const cols = layout?.columns ?? LEGACY_GRID_COLUMNS;
+  if (cols >= FINE_GRID_COLUMNS) {
+    return {
+      layout: layout || DEFAULT_FINE_LAYOUT,
+      widgets: widgets || [],
+    };
+  }
+  const factor = FINE_GRID_COLUMNS / cols;
+  const rows = layout?.rows ?? 6;
+  return {
+    layout: {
+      columns: FINE_GRID_COLUMNS,
+      rows: Math.max(8, Math.round(rows * factor)),
+    },
+    widgets: (widgets || []).map((w) => ({
+      ...w,
+      position: scalePosition(w.position, factor),
+    })),
+  };
+}
+
+export function clampWidgetPosition(position, layout) {
+  const cols = layout?.columns ?? FINE_GRID_COLUMNS;
+  const rows = layout?.rows ?? 16;
+  const w = Math.max(1, Math.min(cols, position?.w ?? 6));
+  const h = Math.max(1, Math.min(rows, position?.h ?? 4));
+  return {
+    x: Math.max(0, Math.min(cols - w, position?.x ?? 0)),
+    y: Math.max(0, Math.min(rows - h, position?.y ?? 0)),
+    w,
+    h,
+  };
+}
+
+export function computeGridCellSize(gridEl, layout) {
+  if (!gridEl) {
+    return { colWidth: 36, rowHeight: 28, gap: 8 };
+  }
+  const cols = layout?.columns ?? FINE_GRID_COLUMNS;
+  const rows = layout?.rows ?? 16;
+  const style = getComputedStyle(gridEl);
+  const gap = parseFloat(style.rowGap) || parseFloat(style.gap) || 8;
+  const padX =
+    parseFloat(style.paddingLeft || 0) + parseFloat(style.paddingRight || 0);
+  const padY =
+    parseFloat(style.paddingTop || 0) + parseFloat(style.paddingBottom || 0);
+  const rect = gridEl.getBoundingClientRect();
+  const colWidth = (rect.width - padX - gap * Math.max(0, cols - 1)) / cols;
+  const rowHeight = (rect.height - padY - gap * Math.max(0, rows - 1)) / rows;
+  return {
+    colWidth: Math.max(8, colWidth),
+    rowHeight: Math.max(8, rowHeight),
+    gap,
+  };
+}
+
+export function pixelDeltaToGridSteps(deltaX, deltaY, metrics) {
+  const stepX = metrics.colWidth + metrics.gap;
+  const stepY = metrics.rowHeight + metrics.gap;
+  return {
+    dx: Math.round(deltaX / stepX),
+    dy: Math.round(deltaY / stepY),
+  };
+}
+
+export function accumulateResizeSteps(pixelDx, pixelDy, metrics, accum) {
+  const next = { dx: accum.dx + pixelDx, dy: accum.dy + pixelDy };
+  const stepX = metrics.colWidth + metrics.gap;
+  const stepY = metrics.rowHeight + metrics.gap;
+  const dw = Math.trunc(next.dx / stepX);
+  const dh = Math.trunc(next.dy / stepY);
+  return {
+    dw,
+    dh,
+    remainder: {
+      dx: next.dx - dw * stepX,
+      dy: next.dy - dh * stepY,
+    },
+  };
+}

@@ -1,5 +1,5 @@
 import React from "react";
-import { boardCardClass, boardMutedText } from "../boardTheme";
+import { boardCardClass, boardMutedText, vmbText } from "../boardTheme";
 
 function statusClass(status) {
   const s = String(status || "").toLowerCase();
@@ -15,20 +15,20 @@ export default function FormSubmissionsListWidget({ widget, data, theme = "dark"
 
   return (
     <div className={`h-full rounded-xl p-3 sm:p-4 flex flex-col overflow-hidden ${boardCardClass(theme)}`}>
-      <h3 className={`text-sm font-semibold mb-2 ${theme === "light" ? "text-slate-700" : "text-slate-200"}`}>
+      <h3 className={`${vmbText.title} mb-2 ${theme === "light" ? "text-slate-700" : "text-slate-200"}`}>
         {title}
       </h3>
       <div className="flex-1 overflow-y-auto space-y-2">
         {items.length === 0 ? (
-          <p className={`text-sm ${boardMutedText(theme)}`}>No recent submissions</p>
+          <p className={`${vmbText.body} ${boardMutedText(theme)}`}>No recent submissions</p>
         ) : (
           items.map((item) => (
-            <div key={item.id} className="flex items-start justify-between gap-2 text-xs border-b border-slate-100 pb-2">
+            <div key={item.id} className={`flex items-start justify-between gap-2 ${vmbText.small} border-b border-slate-100 pb-2`}>
               <div className="min-w-0">
                 <div className="font-medium truncate">{item.title}</div>
                 <div className={`${boardMutedText(theme)} truncate`}>{item.submitted_by}</div>
               </div>
-              <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-medium ${statusClass(item.status)}`}>
+              <span className={`shrink-0 px-2 py-0.5 rounded-full ${vmbText.small} font-medium ${statusClass(item.status)}`}>
                 {item.status || "Completed"}
               </span>
             </div>

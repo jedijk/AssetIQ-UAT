@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useEffect, useCallback } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -17,8 +17,9 @@ import ProductionKpiWidget from "./widgets/ProductionKpiWidget";
 import MooneyChartWidget from "./widgets/MooneyChartWidget";
 import FormSubmissionsListWidget from "./widgets/FormSubmissionsListWidget";
 import RiskObservationListWidget from "./widgets/RiskObservationListWidget";
-import { boardSurfaceClass } from "./boardTheme";
+import { boardSurfaceClass, widgetFontVars } from "./boardTheme";
 import VisualBoardLogo from "./VisualBoardLogo";
+import { computeGridCellSize } from "./boardLayoutUtils";
 
 const WIDGET_RENDERERS = {
   kpi_card: KpiCardWidget,
@@ -33,6 +34,36 @@ const WIDGET_RENDERERS = {
   risk_observation_list: RiskObservationListWidget,
 };
 
+function ResizeHandle({ onResizeDelta }) {
+  const remainder = useRef({ dx: 0, dy: 0 });
+
+  const handlePointerDown = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const onMove = (ev) => {
+      const pixelDx = ev.movementX;
+      const pixelDy = ev.movementY;
+      onResizeDelta(pixelDx, pixelDy, remainder);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      remainder.current = { dx: 0, dy: 0 };
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
+  return (
+    <div
+      role="separator"
+      aria-label="Resize widget"
+      className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 cursor-se-resize rounded-sm bg-blue-500 border border-white shadow z-20 touch-none"
+      onPointerDown={handlePointerDown}
+    />
+  );
+}
+
 function DraggableWidgetCell({
   widget,
   layout,
@@ -41,6 +72,8 @@ function DraggableWidgetCell({
   editable,
   selected,
   onSelect,
+  onResizeWidget,
+  gridMetricsRef,
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: widget.id,
@@ -55,19 +88,42 @@ function DraggableWidgetCell({
     transform: editable ? CSS.Translate.toString(transform) : undefined,
     opacity: isDragging ? 0.6 : 1,
     zIndex: isDragging || selected ? 10 : 1,
+    ...widgetFontVars(widget.config),
   };
+
+  const handleResizeDelta = useCallback(
+    (pixelDx, pixelDy, remainderRef) => {
+      if (!onResizeWidget || !gridMetricsRef?.current) return;
+      const metrics = gridMetricsRef.current;
+      const stepX = metrics.colWidth + metrics.gap;
+      const stepY = metrics.rowHeight + metrics.gap;
+      const acc = remainderRef.current;
+      acc.dx += pixelDx;
+      acc.dy += pixelDy;
+      const dw = Math.trunc(acc.dx / stepX);
+      const dh = Math.trunc(acc.dy / stepY);
+      if (dw === 0 && dh === 0) return;
+      acc.dx -= dw * stepX;
+      acc.dy -= dh * stepY;
+      onResizeWidget(widget.id, dw, dh);
+    },
+    [onResizeWidget, widget.id, gridMetricsRef],
+  );
 
   return (
     <div
       ref={editable ? setNodeRef : undefined}
       style={style}
-      className={`relative min-h-0 ${editable ? "cursor-grab active:cursor-grabbing" : ""} ${
+      className={`relative min-h-0 h-full ${editable ? "cursor-grab active:cursor-grabbing" : ""} ${
         selected ? "ring-2 ring-blue-500 rounded-xl" : ""
       }`}
       onClick={editable ? () => onSelect?.(widget.id) : undefined}
       {...(editable ? { ...listeners, ...attributes } : {})}
     >
       <Renderer widget={widget} data={data} theme={theme} />
+      {editable && selected && onResizeWidget ? (
+        <ResizeHandle onResizeDelta={handleResizeDelta} />
+      ) : null}
     </div>
   );
 }
@@ -82,8 +138,26 @@ const VisualBoardCanvas = ({
   selectedWidgetId,
   onSelectWidget,
   onDragEnd,
+  onResizeWidget,
+  onGridMetricsChange,
 }) => {
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const gridRef = useRef(null);
+  const gridMetricsRef = useRef({ colWidth: 36, rowHeight: 28, gap: 8 });
+
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return undefined;
+    const update = () => {
+      const metrics = computeGridCellSize(el, layout);
+      gridMetricsRef.current = metrics;
+      onGridMetricsChange?.(metrics);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [layout, onGridMetricsChange]);
 
   const sizeClass =
     previewSize === "desktop"
@@ -94,12 +168,16 @@ const VisualBoardCanvas = ({
           ? "w-full min-h-[480px]"
           : "w-full min-h-0";
 
+  const cols = layout?.columns || 24;
+  const rows = layout?.rows || 16;
+
   const grid = (
     <div
-      className="grid h-full w-full gap-3 p-4"
+      ref={gridRef}
+      className={`grid h-full w-full gap-2 p-3`}
       style={{
-        gridTemplateColumns: `repeat(${layout?.columns || 12}, minmax(0, 1fr))`,
-        gridTemplateRows: `repeat(${layout?.rows || 6}, minmax(0, 1fr))`,
+        gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+        gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
       }}
     >
       {widgets.map((widget) => (
@@ -112,6 +190,8 @@ const VisualBoardCanvas = ({
           editable={editable}
           selected={selectedWidgetId === widget.id}
           onSelect={onSelectWidget}
+          onResizeWidget={onResizeWidget}
+          gridMetricsRef={gridMetricsRef}
         />
       ))}
     </div>

@@ -20,9 +20,10 @@ import {
 } from "../ui/select";
 import { toast } from "sonner";
 import api from "../../lib/api";
+import { failureModesAPI } from "../../lib/apis/failureModes";
 import { useDisciplines } from "../../hooks/useDisciplines";
 
-const BATCH_SIZE = 25; // Actions per OpenAI call
+const BATCH_SIZE = 8; // Small batches to stay under proxy timeouts
 
 /**
  * Dialog that asks AI to re-classify the `discipline` field of every
@@ -117,10 +118,8 @@ export default function AIReviewActionDisciplines({ open, onClose, failureModes 
       if (cancelRef.current) break;
       const batch = batches[b];
       try {
-        const resp = await api.post("/ai-suggestions/review-action-disciplines", {
-          actions: batch,
-        });
-        const items = resp?.data?.results || [];
+        const data = await failureModesAPI.reviewActionDisciplines(batch);
+        const items = data?.results || [];
         collected.push(...items);
         setResults((prev) => {
           const next = [...prev, ...items];
@@ -275,7 +274,7 @@ export default function AIReviewActionDisciplines({ open, onClose, failureModes 
                 {flatActions.length} recommended actions across {failureModes.length} failure modes
               </p>
               <p className="text-sm text-slate-500 mt-1">
-                Estimated time: ~{Math.ceil(flatActions.length / BATCH_SIZE) * 4}s. Runs in
+                Estimated time: ~{Math.ceil(flatActions.length / BATCH_SIZE) * 6}s. Runs in
                 batches of {BATCH_SIZE}.
               </p>
             </div>

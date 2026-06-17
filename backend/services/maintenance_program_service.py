@@ -18,7 +18,12 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any, Tuple
 
 from database import db
-from services.scheduler_helpers import normalize_program_criticality, build_task_to_failure_modes, is_strategy_task_active
+from services.scheduler_helpers import (
+    normalize_program_criticality,
+    build_task_to_failure_modes,
+    is_strategy_task_active,
+    coerce_optional_str_id,
+)
 from services.maintenance_program_pm_import import (
     enrich_program_response_with_pm_import as _enrich_program_response_with_pm_import,
     fetch_pm_import_tasks_for_equipment as _fetch_pm_import_tasks_for_equipment,
@@ -344,7 +349,9 @@ class MaintenanceProgramService:
                 (fm for fm in linked_fms if fm.get("enabled") is not False),
                 linked_fms[0] if linked_fms else None,
             )
-            fm_id = enabled_fm.get("failure_mode_id") if enabled_fm else None
+            fm_id = coerce_optional_str_id(
+                enabled_fm.get("failure_mode_id") if enabled_fm else None
+            )
             fm_name = enabled_fm.get("failure_mode_name") if enabled_fm else None
             
             # Map task type to category

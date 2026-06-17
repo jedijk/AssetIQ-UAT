@@ -8,6 +8,7 @@ from database import db
 from models.maintenance_program import TaskSource
 from services.scheduler_config import should_read_legacy_maintenance_programs
 from services.scheduler_helpers import (
+    coerce_optional_str_id,
     frequency_to_days,
     normalize_program_criticality,
     program_is_schedulable,
@@ -99,7 +100,7 @@ def expand_v2_program_to_scheduler_rows(
                 "strategy_version": program_v2.get("source_strategy_version")
                 or program_v2.get("version")
                 or "1.0",
-                "failure_mode_id": trace.get("failure_mode_id"),
+                "failure_mode_id": coerce_optional_str_id(trace.get("failure_mode_id")),
                 "failure_mode_name": trace.get("failure_mode_name"),
                 "task_source": source,
                 "discipline": task.get("discipline"),
@@ -132,6 +133,7 @@ async def load_pm_import_scheduler_rows(
     maintenance_programs_v2 until a strategy is applied — the schedule view must
     load them directly from pm_import_sessions.
     """
+    from services.maintenance_program_pm_import import pm_import_task_to_program_dict
     from services.maintenance_program_service import MaintenanceProgramService
     from services.pm_import_constants import is_pm_import_review_accepted
 
@@ -170,9 +172,7 @@ async def load_pm_import_scheduler_rows(
             if equipment_filter is not None and equipment_id not in equipment_filter:
                 continue
 
-            program_task = MaintenanceProgramService._pm_import_task_to_program_dict(
-                pm_task, session
-            )
+            program_task = pm_import_task_to_program_dict(pm_task, session)
             if not MaintenanceProgramService._is_scheduleable_imported_pm_task(program_task):
                 continue
 

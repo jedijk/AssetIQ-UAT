@@ -53,6 +53,7 @@ class WidgetConfig(BaseModel):
     production_metric: Optional[str] = None
     period: str = "today"
     queue_mode: str = "open"
+    font_size: str = "md"  # xs | sm | md | lg | xl
 
 
 class VisualBoardWidget(BaseModel):

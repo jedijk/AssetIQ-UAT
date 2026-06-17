@@ -1,5 +1,5 @@
 import React from "react";
-import { boardCardClass, boardMutedText } from "../boardTheme";
+import { boardCardClass, boardMutedText, vmbText } from "../boardTheme";
 
 function statusClass(status) {
   const s = String(status || "").toLowerCase();
@@ -16,15 +16,15 @@ export default function RiskObservationListWidget({ widget, data, theme = "dark"
 
   return (
     <div className={`h-full rounded-xl p-3 sm:p-4 flex flex-col overflow-hidden ${boardCardClass(theme)}`}>
-      <h3 className={`text-sm font-semibold mb-2 ${theme === "light" ? "text-slate-700" : "text-slate-200"}`}>
+      <h3 className={`${vmbText.title} mb-2 ${theme === "light" ? "text-slate-700" : "text-slate-200"}`}>
         {title}
       </h3>
       <div className="flex-1 overflow-y-auto space-y-2">
         {items.length === 0 ? (
-          <p className={`text-sm ${boardMutedText(theme)}`}>No observations</p>
+          <p className={`${vmbText.body} ${boardMutedText(theme)}`}>No observations</p>
         ) : (
           items.map((item, idx) => (
-            <div key={item.id || idx} className="flex items-start gap-2 text-xs border-b border-slate-100 pb-2">
+            <div key={item.id || idx} className={`flex items-start gap-2 ${vmbText.small} border-b border-slate-100 pb-2`}>
               <span className={`shrink-0 w-5 text-center font-semibold ${boardMutedText(theme)}`}>{idx + 1}</span>
               <div className="min-w-0 flex-1">
                 <div className="font-medium truncate">{item.equipment}</div>
@@ -36,7 +36,7 @@ export default function RiskObservationListWidget({ widget, data, theme = "dark"
                   {item.rpn != null ? (
                     <span className={boardMutedText(theme)}>RPN {item.rpn}</span>
                   ) : null}
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] ${statusClass(item.status)}`}>
+                  <span className={`px-1.5 py-0.5 rounded ${vmbText.small} ${statusClass(item.status)}`}>
                     {item.status}
                   </span>
                 </div>

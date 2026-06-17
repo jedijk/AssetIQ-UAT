@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from database import db
 from models.maintenance_scheduler import ScheduledTask, TaskStatus
-from services.scheduler_helpers import calculate_priority
+from services.scheduler_helpers import calculate_priority, coerce_optional_str_id
 
 # Default 1-year horizon so quarterly/semi-annual tasks show 4+ occurrences
 # on the Gantt. Per-program cap prevents daily/weekly tasks from exploding.
@@ -76,11 +76,11 @@ async def schedule_program(program: dict, horizon_days: int = DEFAULT_HORIZON_DA
 
         task = ScheduledTask(
             equipment_id=program.get("equipment_id"),
-            equipment_name=program.get("equipment_name"),
+            equipment_name=program.get("equipment_name") or "",
             equipment_tag=program.get("equipment_tag"),
-            task_name=program.get("task_name"),
+            task_name=program.get("task_name") or "Maintenance Task",
             task_description=program.get("task_description"),
-            task_type=program.get("task_type"),
+            task_type=program.get("task_type") or "preventive",
             due_date=iso,
             planned_date=iso,
             priority=priority,
@@ -93,12 +93,12 @@ async def schedule_program(program: dict, horizon_days: int = DEFAULT_HORIZON_DA
             v2_task_id=program.get("v2_task_id"),
             v2_program_id=program.get("v2_program_id"),
             program_source=program.get("program_source"),
-            strategy_id=program.get("strategy_id"),
-            strategy_version=program.get("strategy_version"),
-            failure_mode_id=program.get("failure_mode_id"),
+            strategy_id=program.get("strategy_id") or "",
+            strategy_version=program.get("strategy_version") or "1.0",
+            failure_mode_id=coerce_optional_str_id(program.get("failure_mode_id")),
             failure_mode_name=program.get("failure_mode_name"),
             task_source=program.get("task_source"),
-            pm_import_task_id=program.get("pm_import_task_id"),
+            pm_import_task_id=coerce_optional_str_id(program.get("pm_import_task_id")),
         )
         new_tasks.append(task.model_dump())
         created_ids.append(task.id)

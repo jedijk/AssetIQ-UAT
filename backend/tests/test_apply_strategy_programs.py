@@ -11,6 +11,85 @@ from services.apply_strategy_service import apply_strategy_to_equipment as _appl
 
 
 @pytest.mark.asyncio
+async def test_schedule_program_coerces_integer_failure_mode_id():
+    """Library failure modes use numeric ids (e.g. bearing_radial FM 532)."""
+    program = {
+        "id": "task-1",
+        "equipment_id": "eq-bearing",
+        "equipment_name": "Radial Bearing",
+        "task_name": "Vibration analysis",
+        "task_type": "predictive",
+        "frequency_days": 30,
+        "criticality": "medium",
+        "strategy_id": "bearing_radial",
+        "strategy_version": "1.0",
+        "failure_mode_id": 532,
+        "failure_mode_name": "Bearing Seizure",
+        "program_source": "v2",
+        "v2_task_id": "task-1",
+        "is_active": True,
+    }
+
+    mock_db = MagicMock()
+    mock_db.scheduled_tasks.find = MagicMock(
+        return_value=MagicMock(to_list=AsyncMock(return_value=[]))
+    )
+    mock_db.scheduled_tasks.insert_many = AsyncMock()
+
+    with patch("services.maintenance_scheduling.db", mock_db), patch(
+        "services.reliability_graph.dispatch_graph_sync",
+        AsyncMock(),
+    ):
+        from services.maintenance_scheduling import schedule_program
+
+        created = await schedule_program(program, horizon_days=30)
+
+    assert created
+    inserted = mock_db.scheduled_tasks.insert_many.call_args[0][0]
+    assert inserted[0]["failure_mode_id"] == "532"
+
+
+@pytest.mark.asyncio
+async def test_generate_tasks_from_strategy_coerces_integer_failure_mode_id():
+    strategy = {
+        "equipment_type_id": "bearing_radial",
+        "version": "1.0",
+        "task_templates": [
+            {
+                "id": "tpl-vib",
+                "name": "Vibration analysis",
+                "task_type": "predictive",
+                "frequency_matrix": {"low": "quarterly", "medium": "monthly", "high": "weekly"},
+                "failure_mode_ids": [532],
+            }
+        ],
+        "failure_mode_strategies": [
+            {
+                "failure_mode_id": 532,
+                "failure_mode_name": "Bearing Seizure",
+                "task_ids": ["tpl-vib"],
+                "enabled": True,
+            }
+        ],
+    }
+
+    mock_db = MagicMock()
+    mock_db.equipment_type_strategies.find_one = AsyncMock(return_value=strategy)
+
+    with patch("services.maintenance_program_service.db", mock_db):
+        from services.maintenance_program_service import MaintenanceProgramService
+
+        tasks = await MaintenanceProgramService.generate_tasks_from_strategy(
+            equipment_type_id="bearing_radial",
+            equipment_id="eq-bearing",
+            criticality_level="medium",
+        )
+
+    assert len(tasks) == 1
+    assert tasks[0].traceability.failure_mode_id == "532"
+
+
+@pytest.mark.asyncio
 async def test_apply_strategy_reports_v2_programs_created_when_legacy_sync_off():
     equipment_type_id = "et-1"
     equipment_id = "eq-1"

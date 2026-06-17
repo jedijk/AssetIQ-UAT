@@ -10,6 +10,9 @@ from services.ai_gateway import chat_completion_response
 
 logger = logging.getLogger(__name__)
 
+# Keep each OpenAI call small so Railway/Vercel proxy stays under ~60s.
+_CLASSIFY_CHUNK_SIZE = 8
+
 # Detailed routing guidance for the default ISO taxonomy (value-keyed).
 _STANDARD_GUIDANCE: Dict[str, str] = {
     "rotating": (
@@ -164,31 +167,18 @@ def build_discipline_system_prompt(taxonomy: List[Dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-async def classify_recommended_actions(
+async def _classify_action_chunk(
     actions: List[Dict[str, Any]],
     *,
+    taxonomy: List[Dict[str, Any]],
+    allowed_values: List[str],
+    alias_map: Dict[str, str],
+    default_value: str,
     user_id: str,
     company_id: str,
-    endpoint: str = "ai_fm_suggestions.classify_action_disciplines",
-) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    """
-    Classify action rows into tenant disciplines.
-
-    Each action dict must include: fm_id, action_index, description.
-    Optional: action_type, current_discipline, failure_mode, fm_discipline.
-
-    Returns (results, taxonomy) where each result has fm_id, action_index,
-    current_discipline, suggested_discipline, reason, changed.
-    """
-    if not actions:
-        taxonomy = await load_discipline_taxonomy()
-        return [], taxonomy
-
-    taxonomy = await load_discipline_taxonomy()
-    allowed_values = [d["value"] for d in taxonomy if d.get("value")]
-    alias_map = build_alias_map(taxonomy)
-    default_value = allowed_values[0] if allowed_values else "rotating"
-
+    endpoint: str,
+) -> List[Dict[str, Any]]:
+    allowed_set = set(allowed_values)
     payload = [
         {
             "i": idx,
@@ -215,18 +205,19 @@ Actions:
 
 Return JSON: {{"results": [{{"i": 0, "discipline": "rotating", "reason": "..."}}]}}"""
 
+    max_tokens = min(1800, max(400, len(actions) * 90 + 120))
     response = await chat_completion_response(
         user_id=user_id,
         company_id=company_id,
         endpoint=endpoint,
-        max_retries=4,
+        max_retries=2,
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": build_discipline_system_prompt(taxonomy)},
             {"role": "user", "content": user_prompt},
         ],
         temperature=0,
-        max_tokens=1800,
+        max_tokens=max_tokens,
         seed=42,
         response_format={"type": "json_object"},
     )
@@ -242,7 +233,6 @@ Return JSON: {{"results": [{{"i": 0, "discipline": "rotating", "reason": "..."}}
         except (TypeError, ValueError):
             continue
 
-    allowed_set = set(allowed_values)
     results: List[Dict[str, Any]] = []
     for idx, a in enumerate(actions):
         r = by_index.get(idx, {})
@@ -253,9 +243,6 @@ Return JSON: {{"results": [{{"i": 0, "discipline": "rotating", "reason": "..."}}
                 or default_value
             )
         raw_current = (a.get("current_discipline") or "").strip().lower()
-        normalized_current = normalize_discipline_value(
-            a.get("current_discipline"), taxonomy, alias_map
-        )
         results.append(
             {
                 "fm_id": a.get("fm_id"),
@@ -267,5 +254,47 @@ Return JSON: {{"results": [{{"i": 0, "discipline": "rotating", "reason": "..."}}
                 "changed": suggested != raw_current,
             }
         )
+    return results
+
+
+async def classify_recommended_actions(
+    actions: List[Dict[str, Any]],
+    *,
+    user_id: str,
+    company_id: str,
+    endpoint: str = "ai_fm_suggestions.classify_action_disciplines",
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """
+    Classify action rows into tenant disciplines.
+
+    Each action dict must include: fm_id, action_index, description.
+    Optional: action_type, current_discipline, failure_mode, fm_discipline.
+
+    Returns (results, taxonomy) where each result has fm_id, action_index,
+    current_discipline, suggested_discipline, reason, changed.
+    """
+    if not actions:
+        taxonomy = await load_discipline_taxonomy()
+        return [], taxonomy
+
+    taxonomy = await load_discipline_taxonomy()
+    allowed_values = [d["value"] for d in taxonomy if d.get("value")]
+    alias_map = build_alias_map(taxonomy)
+    default_value = allowed_values[0] if allowed_values else "rotating"
+
+    results: List[Dict[str, Any]] = []
+    for start in range(0, len(actions), _CLASSIFY_CHUNK_SIZE):
+        chunk = actions[start : start + _CLASSIFY_CHUNK_SIZE]
+        chunk_results = await _classify_action_chunk(
+            chunk,
+            taxonomy=taxonomy,
+            allowed_values=allowed_values,
+            alias_map=alias_map,
+            default_value=default_value,
+            user_id=user_id,
+            company_id=company_id,
+            endpoint=endpoint,
+        )
+        results.extend(chunk_results)
 
     return results, taxonomy

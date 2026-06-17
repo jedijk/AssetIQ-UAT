@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -7,6 +7,12 @@ import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
 import VisualBoardCanvas from "../../components/visual-boards/VisualBoardCanvas";
 import WidgetConfigPanel from "../../components/visual-boards/WidgetConfigPanel";
 import { WIDGET_LIBRARY, createWidgetFromLibrary } from "../../components/visual-boards/widgetLibrary";
+import {
+  DEFAULT_FINE_LAYOUT,
+  upgradeToFineGrid,
+  clampWidgetPosition,
+  pixelDeltaToGridSteps,
+} from "../../components/visual-boards/boardLayoutUtils";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -33,10 +39,11 @@ const VisualBoardEditorPage = () => {
   const [refreshInterval, setRefreshInterval] = useState(30);
   const [theme, setTheme] = useState("dark");
   const [widgets, setWidgets] = useState([]);
-  const [layout, setLayout] = useState({ columns: 12, rows: 8 });
+  const [layout, setLayout] = useState(DEFAULT_FINE_LAYOUT);
   const [selectedWidgetId, setSelectedWidgetId] = useState(null);
   const [publishResult, setPublishResult] = useState(null);
   const [showVersions, setShowVersions] = useState(false);
+  const gridMetricsRef = useRef({ colWidth: 36, rowHeight: 28, gap: 8 });
 
   const { data: board, isLoading } = useQuery({
     queryKey: ["visual-board", boardId],
@@ -62,8 +69,9 @@ const VisualBoardEditorPage = () => {
       setBoardType(board.board_type || "reliability");
       setRefreshInterval(board.refresh_interval_seconds || 30);
       setTheme(board.theme || "dark");
-      setWidgets(board.widgets || []);
-      setLayout(board.layout || { columns: 12, rows: 8 });
+      const upgraded = upgradeToFineGrid(board.layout, board.widgets || []);
+      setWidgets(upgraded.widgets);
+      setLayout(upgraded.layout);
     }
   }, [board]);
 
@@ -112,27 +120,56 @@ const VisualBoardEditorPage = () => {
     (event) => {
       const { active, delta } = event;
       if (!active || (delta.x === 0 && delta.y === 0)) return;
-      const colWidth = 72;
-      const rowHeight = 36;
-      const dx = Math.round(delta.x / colWidth);
-      const dy = Math.round(delta.y / rowHeight);
+      const { dx, dy } = pixelDeltaToGridSteps(delta.x, delta.y, gridMetricsRef.current);
+      if (dx === 0 && dy === 0) return;
       setWidgets((prev) =>
         prev.map((w) => {
           if (w.id !== active.id) return w;
           const pos = w.position || {};
           return {
             ...w,
-            position: {
-              ...pos,
-              x: Math.max(0, Math.min((layout.columns || 12) - (pos.w || 3), (pos.x || 0) + dx)),
-              y: Math.max(0, Math.min((layout.rows || 8) - (pos.h || 2), (pos.y || 0) + dy)),
-            },
+            position: clampWidgetPosition(
+              {
+                ...pos,
+                x: (pos.x || 0) + dx,
+                y: (pos.y || 0) + dy,
+              },
+              layout,
+            ),
           };
         }),
       );
     },
     [layout],
   );
+
+  const handleResizeWidget = useCallback(
+    (widgetId, dw, dh) => {
+      if (dw === 0 && dh === 0) return;
+      setWidgets((prev) =>
+        prev.map((w) => {
+          if (w.id !== widgetId) return w;
+          const pos = w.position || {};
+          return {
+            ...w,
+            position: clampWidgetPosition(
+              {
+                ...pos,
+                w: (pos.w || 6) + dw,
+                h: (pos.h || 4) + dh,
+              },
+              layout,
+            ),
+          };
+        }),
+      );
+    },
+    [layout],
+  );
+
+  const handleGridMetrics = useCallback((metrics) => {
+    gridMetricsRef.current = metrics;
+  }, []);
 
   const updateWidget = (updated) => {
     setWidgets((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
@@ -215,6 +252,40 @@ const VisualBoardEditorPage = () => {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-2">
+            <Label>Grid columns</Label>
+            <Input
+              type="number"
+              min={12}
+              max={48}
+              step={2}
+              value={layout.columns}
+              onChange={(e) =>
+                setLayout((prev) => ({
+                  ...prev,
+                  columns: Math.max(12, Math.min(48, Number(e.target.value) || 24)),
+                }))
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Grid rows</Label>
+            <Input
+              type="number"
+              min={8}
+              max={48}
+              value={layout.rows}
+              onChange={(e) =>
+                setLayout((prev) => ({
+                  ...prev,
+                  rows: Math.max(8, Math.min(48, Number(e.target.value) || 16)),
+                }))
+              }
+            />
+          </div>
+          <p className="text-[11px] text-slate-500 leading-snug">
+            Fine 24-column grid. Drag widgets to move; drag the blue handle to resize. Save after layout changes.
+          </p>
           <div className="pt-2 border-t">
             <div className="text-xs font-semibold text-slate-500 uppercase mb-2">Widget Library</div>
             <div className="space-y-1">
@@ -249,12 +320,15 @@ const VisualBoardEditorPage = () => {
             selectedWidgetId={selectedWidgetId}
             onSelectWidget={setSelectedWidgetId}
             onDragEnd={handleDragEnd}
+            onResizeWidget={handleResizeWidget}
+            onGridMetricsChange={handleGridMetrics}
           />
         </main>
 
         <aside className="w-72 border-l bg-white overflow-auto shrink-0">
           <WidgetConfigPanel
             widget={selectedWidget}
+            layout={layout}
             onChange={updateWidget}
             onRemove={removeWidget}
           />

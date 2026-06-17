@@ -1,4 +1,5 @@
 import React from "react";
+import { vmbText } from "../boardTheme";
 
 const ExposureWaterfallWidget = ({ widget, data }) => {
   const payload = data?.widgets?.[widget?.id] || {};
@@ -15,10 +16,10 @@ const ExposureWaterfallWidget = ({ widget, data }) => {
 
   return (
     <div className="h-full rounded-xl border border-slate-700/50 bg-slate-900/80 p-4">
-      <div className="text-sm font-semibold text-white mb-3">{widget?.title || "Exposure Waterfall"}</div>
+      <div className={`${vmbText.title} text-white mb-3`}>{widget?.title || "Exposure Waterfall"}</div>
       <div className="space-y-2">
         {rows.map((row) => (
-          <div key={row.label || row.key} className="flex justify-between text-sm">
+          <div key={row.label || row.key} className={`flex justify-between ${vmbText.body}`}>
             <span className="text-slate-400">{row.label}</span>
             <span className="text-white font-medium tabular-nums">
               {typeof row.value === "object"

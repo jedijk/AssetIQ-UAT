@@ -116,6 +116,16 @@ export const failureModesAPI = {
     return response.data;
   },
 
+  /** Batch-classify recommended-action disciplines (library-wide AI review). */
+  reviewActionDisciplines: async (actions) => {
+    const response = await api.post(
+      "/ai-suggestions/review-action-disciplines",
+      { actions },
+      { timeout: 120000 },
+    );
+    return response.data;
+  },
+
   /** Map recommended-action disciplines to Settings taxonomy for one failure mode. */
   mapFailureModeActionDisciplines: async (body = {}) => {
     const response = await api.post(

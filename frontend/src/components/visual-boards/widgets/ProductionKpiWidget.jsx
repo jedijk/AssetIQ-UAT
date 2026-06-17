@@ -1,5 +1,5 @@
 import React from "react";
-import { boardCardClass, boardMutedText, boardSubtleText } from "../boardTheme";
+import { boardCardClass, boardMutedText, boardSubtleText, vmbText } from "../boardTheme";
 
 export default function ProductionKpiWidget({ widget, data, theme = "dark" }) {
   const payload = data?.widgets?.[widget?.id] || {};
@@ -9,18 +9,18 @@ export default function ProductionKpiWidget({ widget, data, theme = "dark" }) {
 
   return (
     <div className={`h-full rounded-xl p-3 sm:p-4 flex flex-col justify-center ${boardCardClass(theme)}`}>
-      <div className={`text-[10px] sm:text-xs uppercase tracking-wide mb-1 ${boardMutedText(theme)}`}>
+      <div className={`${vmbText.label} mb-1 ${boardMutedText(theme)}`}>
         {label}
       </div>
       <div className="flex items-baseline gap-1.5">
-        <span className="text-xl sm:text-2xl font-bold tabular-nums">{value}</span>
-        {unit ? <span className={`text-sm ${boardMutedText(theme)}`}>{unit}</span> : null}
+        <span className={vmbText.value}>{value}</span>
+        {unit ? <span className={`${vmbText.body} ${boardMutedText(theme)}`}>{unit}</span> : null}
       </div>
       {payload.subtitle ? (
-        <div className={`text-[10px] sm:text-xs mt-1 truncate ${boardMutedText(theme)}`}>{payload.subtitle}</div>
+        <div className={`${vmbText.small} mt-1 truncate ${boardMutedText(theme)}`}>{payload.subtitle}</div>
       ) : null}
       {payload.detail ? (
-        <div className={`text-[10px] truncate ${boardSubtleText(theme)}`}>{payload.detail}</div>
+        <div className={`${vmbText.small} truncate ${boardSubtleText(theme)}`}>{payload.detail}</div>
       ) : null}
     </div>
   );

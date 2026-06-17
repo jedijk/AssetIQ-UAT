@@ -1,5 +1,5 @@
 import React from "react";
-import { boardCardClass, boardMutedText } from "../boardTheme";
+import { boardCardClass, boardMutedText, vmbText } from "../boardTheme";
 
 function statusClass(status) {
   const s = String(status || "").toLowerCase();
@@ -25,17 +25,17 @@ const ActionQueueWidget = ({ widget, data, theme = "dark" }) => {
 
   return (
     <div className={`h-full rounded-xl p-3 sm:p-4 flex flex-col overflow-hidden ${boardCardClass(theme)}`}>
-      <div className={`text-sm font-semibold mb-2 ${theme === "light" ? "text-slate-700" : "text-white"}`}>
+      <div className={`${vmbText.title} mb-2 ${theme === "light" ? "text-slate-700" : "text-white"}`}>
         {widget?.title || "Action Queue"}
       </div>
       <div className="flex-1 overflow-auto space-y-2">
         {items.length === 0 ? (
-          <div className={`text-sm ${boardMutedText(theme)}`}>No actions</div>
+          <div className={`${vmbText.body} ${boardMutedText(theme)}`}>No actions</div>
         ) : (
           items.map((item) => (
             <div
               key={item.id}
-              className={`rounded-lg px-2 py-2 text-xs ${
+              className={`rounded-lg px-2 py-2 ${vmbText.small} ${
                 item.overdue && !isRecent
                   ? theme === "light"
                     ? "bg-red-50 border border-red-200"
@@ -54,11 +54,11 @@ const ActionQueueWidget = ({ widget, data, theme = "dark" }) => {
               <div className="flex items-center justify-between gap-2 mt-1">
                 <span className={`truncate ${boardMutedText(theme)}`}>{item.owner || "—"}</span>
                 {theme === "light" ? (
-                  <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-medium ${statusClass(item.status)}`}>
+                  <span className={`shrink-0 px-2 py-0.5 rounded-full ${vmbText.small} font-medium ${statusClass(item.status)}`}>
                     {formatStatus(item.status)}
                   </span>
                 ) : (
-                  <span className={`text-[10px] capitalize ${boardMutedText(theme)}`}>{item.status}</span>
+                  <span className={`${vmbText.small} capitalize ${boardMutedText(theme)}`}>{item.status}</span>
                 )}
               </div>
             </div>
