@@ -59,6 +59,8 @@ export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedul
           row._isImported ||
           t.task_source === "customer_imported" ||
           !!t.pm_import_task_id;
+        row._disabledInProgram =
+          row._disabledInProgram || t.disabled_in_program === true;
         row.occurrences.push(t);
       }
     }
@@ -233,7 +235,9 @@ export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedul
                   data-testid={`gantt-row-label-${r.id}`}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="truncate font-medium text-slate-900">{r.task_name}</div>
+                    <div className={`truncate font-medium ${r._disabledInProgram ? "text-slate-400" : "text-slate-900"}`}>
+                      {r.task_name}
+                    </div>
                     <div className="truncate text-[10px] text-slate-500 flex items-center gap-1">
                       <span className="truncate">
                         {r._equipmentName}

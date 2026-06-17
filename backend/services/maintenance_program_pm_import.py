@@ -138,6 +138,47 @@ def pm_import_task_to_program_dict(
     return program_task
 
 
+PM_IMPORT_DISABLE_CANCEL_NOTE = "Auto-cancelled: PM import task disabled"
+
+
+async def reschedule_pm_import_task_occurrences(
+    equipment_id: str,
+    pm_ref: str,
+) -> Dict[str, int]:
+    """Restore or create schedule rows for one PM import task (no full equipment refresh)."""
+    restore_result = await db.scheduled_tasks.update_many(
+        {
+            "pm_import_task_id": pm_ref,
+            "status": "cancelled",
+            "notes": PM_IMPORT_DISABLE_CANCEL_NOTE,
+        },
+        {
+            "$set": {
+                "status": "scheduled",
+                "notes": "",
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+        },
+    )
+    scheduled_restored = restore_result.modified_count
+
+    scheduled_created = 0
+    if scheduled_restored == 0:
+        from services.maintenance_scheduling import schedule_program
+        from services.scheduler_program_source import load_schedulable_programs
+
+        programs = await load_schedulable_programs(equipment_ids=[equipment_id])
+        for program in programs:
+            if program.get("pm_import_task_id") != pm_ref:
+                continue
+            scheduled_created += len(await schedule_program(program))
+
+    return {
+        "scheduled_tasks_restored": scheduled_restored,
+        "scheduled_tasks_created": scheduled_created,
+    }
+
+
 async def propagate_pm_import_task_active_state(
     session_id: str,
     task_id: str,
@@ -200,6 +241,8 @@ async def propagate_pm_import_task_active_state(
         programs_updated += legacy_result.modified_count
 
     scheduled_cancelled = 0
+    scheduled_restored = 0
+    scheduled_created = 0
     if not is_active:
         cancel_result = await db.scheduled_tasks.update_many(
             {
@@ -209,16 +252,16 @@ async def propagate_pm_import_task_active_state(
             {
                 "$set": {
                     "status": "cancelled",
-                    "notes": "Auto-cancelled: PM import task disabled",
+                    "notes": PM_IMPORT_DISABLE_CANCEL_NOTE,
                     "updated_at": datetime.utcnow().isoformat(),
                 }
             },
         )
         scheduled_cancelled = cancel_result.modified_count
     elif equipment_id:
-        from services.maintenance_scheduler_sync import refresh_equipment_schedule
-
-        await refresh_equipment_schedule(equipment_id, user_id=user_id)
+        reschedule = await reschedule_pm_import_task_occurrences(equipment_id, pm_ref)
+        scheduled_restored = reschedule["scheduled_tasks_restored"]
+        scheduled_created = reschedule["scheduled_tasks_created"]
 
     return {
         "pm_import_task_id": pm_ref,
@@ -226,6 +269,8 @@ async def propagate_pm_import_task_active_state(
         "is_active": is_active,
         "programs_updated": programs_updated,
         "scheduled_tasks_cancelled": scheduled_cancelled,
+        "scheduled_tasks_restored": scheduled_restored,
+        "scheduled_tasks_created": scheduled_created,
     }
 
 

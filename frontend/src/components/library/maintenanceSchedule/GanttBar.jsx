@@ -1,10 +1,14 @@
 import React, { useState } from "react";
 import { Badge } from "../../ui/badge";
+import { useLanguage } from "../../../contexts/LanguageContext";
 import { usePriorityConfig } from "./constants";
 
 export function GanttBar({ task, startDate, dayPx, totalDays, onClick, onReschedule }) {
+  const { t } = useLanguage();
   const priorityConfigMap = usePriorityConfig();
   const [drag, setDrag] = useState(null);
+  const isDisabledInProgram = task.disabled_in_program === true;
+  const disabledLabel = t("maintenance.disabledInProgram") || "Disabled in program";
 
   const taskStart = task.planned_date || task.due_date;
   if (!taskStart) return null;
@@ -22,7 +26,8 @@ export function GanttBar({ task, startDate, dayPx, totalDays, onClick, onResched
     task.task_source === "customer_imported" || !!task.pm_import_task_id;
 
   let barColor = "bg-blue-500";
-  if (task.is_overdue) barColor = "bg-red-500";
+  if (isDisabledInProgram) barColor = "bg-slate-300";
+  else if (task.is_overdue) barColor = "bg-red-500";
   else if (task.status === "completed") barColor = "bg-green-500";
   else if (task.status === "in_progress") barColor = "bg-amber-500";
   else if (task.status === "assigned") barColor = "bg-purple-500";
@@ -34,6 +39,10 @@ export function GanttBar({ task, startDate, dayPx, totalDays, onClick, onResched
 
   const handlePointerDown = (e) => {
     e.stopPropagation();
+    if (isDisabledInProgram) {
+      onClick?.();
+      return;
+    }
     e.preventDefault();
     const startX = e.clientX;
     setDrag({ startX, deltaDays: 0 });
@@ -65,11 +74,19 @@ export function GanttBar({ task, startDate, dayPx, totalDays, onClick, onResched
     <>
       <div
         className={`absolute top-1.5 h-7 rounded-md ${barColor} ${
-          drag ? "opacity-70 cursor-grabbing ring-2 ring-blue-300" : "cursor-grab"
-        } shadow-sm hover:brightness-110 transition-[filter] z-[1] flex items-center px-2 overflow-hidden`}
+          isDisabledInProgram
+            ? "opacity-60 cursor-not-allowed"
+            : drag
+              ? "opacity-70 cursor-grabbing ring-2 ring-blue-300"
+              : "cursor-grab"
+        } shadow-sm ${isDisabledInProgram ? "" : "hover:brightness-110"} transition-[filter,opacity] z-[1] flex items-center px-2 overflow-hidden`}
         style={{ left: visibleLeft, width: visibleWidth }}
         onPointerDown={handlePointerDown}
-        title={`${task.task_name} · ${taskStart}${deltaDays !== 0 ? ` → ${new Date(new Date(taskStart).getTime() + deltaDays * 86400000).toISOString().split("T")[0]}` : ""} · ${task.estimated_hours}h`}
+        title={
+          isDisabledInProgram
+            ? `${task.task_name} · ${taskStart} · ${disabledLabel}`
+            : `${task.task_name} · ${taskStart}${deltaDays !== 0 ? ` → ${new Date(new Date(taskStart).getTime() + deltaDays * 86400000).toISOString().split("T")[0]}` : ""} · ${task.estimated_hours}h`
+        }
       >
         {dayPx >= 30 && (
           <Badge className={`ml-auto text-[9px] py-0 px-1 ${priorityCfg.color} pointer-events-none`}>

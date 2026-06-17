@@ -170,6 +170,17 @@ async def add_task_template(
     return result
 
 
+@router.get("/{equipment_type_id}/tasks/{task_id}/program-impact")
+async def get_task_template_program_impact(
+    equipment_type_id: str,
+    task_id: str,
+    current_user: dict = Depends(_library_read),
+):
+    return await svc.get_task_template_program_impact(
+        equipment_type_id, task_id, current_user
+    )
+
+
 @router.patch("/{equipment_type_id}/tasks/{task_id}")
 async def update_task_template(
     equipment_type_id: str,

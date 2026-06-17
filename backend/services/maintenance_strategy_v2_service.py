@@ -1180,6 +1180,36 @@ async def update_task_template(
     return response
 
 
+async def get_task_template_program_impact(
+    equipment_type_id: str,
+    task_id: str,
+    current_user: dict,
+):
+    """Return how many active maintenance programs include this strategy task."""
+    strategy = await db.equipment_type_strategies.find_one({
+        "equipment_type_id": equipment_type_id
+    })
+    if not strategy:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+
+    if not any(t.get("id") == task_id for t in strategy.get("task_templates", [])):
+        raise HTTPException(status_code=404, detail="Task template not found")
+
+    from services.program_task_resolution import (
+        count_active_maintenance_programs_for_task_template,
+    )
+
+    active_program_count = await count_active_maintenance_programs_for_task_template(
+        equipment_type_id,
+        task_id,
+    )
+    return {
+        "task_template_id": task_id,
+        "active_program_count": active_program_count,
+        "has_impact": active_program_count > 0,
+    }
+
+
 async def delete_task_template(
     equipment_type_id: str,
     task_id: str, current_user: dict

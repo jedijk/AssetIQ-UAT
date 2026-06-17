@@ -59,7 +59,6 @@ import {
 } from "../../constants/disciplines";
 import { toast } from "sonner";
 import { pmImportAPI, isPmImportFinalized, isPmImportReviewAccepted, isPmImportTaskActive, getPmImportStatusDisplay } from "../../lib/apis/pmImport";
-import { refreshMaintenanceSchedulerQueries } from "../../lib/apis/maintenanceScheduler";
 import { AIReviewModal } from "../library/AIReviewModal";
 import PMApplyFailureModeDialog from "../library/PMApplyFailureModeDialog";
 
@@ -117,15 +116,38 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
     onError: (e) => toast.error(`Update failed: ${e?.message || 'error'}`),
   });
 
+  const patchTaskActiveInCache = (task, isActive) => {
+    queryClient.setQueryData(["pm-import-tasks"], (old) => {
+      if (!old?.tasks) return old;
+      return {
+        ...old,
+        tasks: old.tasks.map((row) =>
+          row.task_id === task.task_id && row.session_id === task.session_id
+            ? { ...row, is_active: isActive }
+            : row,
+        ),
+      };
+    });
+  };
+
   const toggleActiveMutation = useMutation({
     mutationFn: ({ task, isActive }) =>
       pmImportAPI.updateTask(task.session_id, task.task_id, { is_active: isActive }),
+    onMutate: async ({ task, isActive }) => {
+      await queryClient.cancelQueries({ queryKey: ["pm-import-tasks"] });
+      const previous = queryClient.getQueryData(["pm-import-tasks"]);
+      patchTaskActiveInCache(task, isActive);
+      return { previous };
+    },
     onSuccess: (_data, { isActive }) => {
       toast.success(isActive ? "Task enabled for scheduling" : "Task disabled");
-      invalidateTasks();
-      refreshMaintenanceSchedulerQueries(queryClient);
     },
-    onError: (e) => toast.error(e?.response?.data?.detail || e?.message || "Toggle failed"),
+    onError: (e, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["pm-import-tasks"], context.previous);
+      }
+      toast.error(e?.response?.data?.detail || e?.message || "Toggle failed");
+    },
   });
   
   const mappingMutation = useMutation({

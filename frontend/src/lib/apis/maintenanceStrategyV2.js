@@ -112,6 +112,16 @@ export const maintenanceStrategyV2API = {
   },
 
   /**
+   * Count active maintenance programs affected by editing a task template.
+   */
+  getTaskTemplateProgramImpact: async (equipmentTypeId, taskId) => {
+    const response = await api.get(
+      `/maintenance-strategies-v2/${equipmentTypeId}/tasks/${taskId}/program-impact`
+    );
+    return response.data;
+  },
+
+  /**
    * Delete a task template
    */
   deleteTaskTemplate: async (equipmentTypeId, taskId) => {

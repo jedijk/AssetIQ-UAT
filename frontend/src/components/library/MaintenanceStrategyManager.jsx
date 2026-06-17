@@ -1282,6 +1282,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const [affectedEquipmentDialogOpen, setAffectedEquipmentDialogOpen] = useState(false);
   const [showInactiveInMatrix, setShowInactiveInMatrix] = useState(false);
   const [syncingFmId, setSyncingFmId] = useState(null);
+  const [taskImpactConfirm, setTaskImpactConfirm] = useState(null);
 
   const equipmentTypeId = equipmentType?.id;
   const equipmentTypeName = equipmentType?.name;
@@ -1531,12 +1532,45 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
     updateStrategyMutation.mutate({ status: newStatus });
   };
 
-  const handleSaveTask = (formData) => {
+  const handleSaveTask = async (formData) => {
     if (editingTask) {
-      updateTaskMutation.mutate({ taskId: editingTask.id, data: formData });
+      await requestTaskUpdate(editingTask.id, formData);
     } else {
       addTaskMutation.mutate(formData);
     }
+  };
+
+  const requestTaskUpdate = async (taskId, data) => {
+    try {
+      const impact = await maintenanceStrategyV2API.getTaskTemplateProgramImpact(
+        equipmentTypeId,
+        taskId,
+      );
+      const count = impact?.active_program_count ?? 0;
+      if (count > 0) {
+        setTaskImpactConfirm({ taskId, data, count });
+        return;
+      }
+    } catch (err) {
+      toast.error(
+        err.response?.data?.detail || t("maintenance.taskChangeProgramImpactCheckFailed"),
+      );
+      return;
+    }
+    updateTaskMutation.mutate({ taskId, data });
+  };
+
+  const handleConfirmTaskImpact = () => {
+    if (!taskImpactConfirm) return;
+    updateTaskMutation.mutate({
+      taskId: taskImpactConfirm.taskId,
+      data: taskImpactConfirm.data,
+    });
+    setTaskImpactConfirm(null);
+  };
+
+  const handleUpdateTaskWithConfirm = (taskId, updates) => {
+    requestTaskUpdate(taskId, updates);
   };
 
   const handleEditTask = (task) => {
@@ -1839,7 +1873,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                     isExpanded={expandedFMs.has(fm.failure_mode_id)}
                     onToggle={() => handleToggleFM(fm.failure_mode_id)}
                     onUpdate={(updates) => handleUpdateFMStrategy(fm.failure_mode_id, updates)}
-                    onUpdateTask={(taskId, updates) => updateTaskMutation.mutate({ taskId, data: updates })}
+                    onUpdateTask={handleUpdateTaskWithConfirm}
                     onEditTask={handleEditTask}
                     taskTemplates={strategy?.task_templates}
                     onViewInFMEA={handleViewInFMEA}
@@ -2071,6 +2105,32 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
         onSave={handleSaveTask}
         isLoading={addTaskMutation.isPending || updateTaskMutation.isPending}
       />
+
+      <AlertDialog
+        open={Boolean(taskImpactConfirm)}
+        onOpenChange={(open) => {
+          if (!open) setTaskImpactConfirm(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("maintenance.taskChangeProgramImpactTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {taskImpactConfirm?.count === 1
+                ? t("maintenance.taskChangeProgramImpactDescriptionOne")
+                : t("maintenance.taskChangeProgramImpactDescription", {
+                    count: taskImpactConfirm?.count ?? 0,
+                  })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmTaskImpact}>
+              {t("maintenance.continueAnyway")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Affected Equipment Dialog */}
       <Dialog open={affectedEquipmentDialogOpen} onOpenChange={setAffectedEquipmentDialogOpen}>

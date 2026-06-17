@@ -20,6 +20,11 @@ from services.maintenance_scheduler_scope import (
     scheduler_scoped,
     scope_scheduled_tasks_query,
 )
+from services.maintenance_scheduler_disabled import (
+    PROGRAM_DISABLE_CANCEL_NOTES,
+    annotate_disabled_in_program,
+    load_inactive_program_task_keys,
+)
 from services.tenant_schema import tenant_id_from_user, with_tenant_id
 
 CORRECTIVE_TASK_TYPES = ("reactive", "corrective")
@@ -199,12 +204,22 @@ async def get_timeline(
 
     query = {
         "due_date": {"$gte": start_date, "$lte": end_date},
-        "status": {"$nin": [TaskStatus.CANCELLED.value]},
         "task_type": {"$nin": list(CORRECTIVE_TASK_TYPES)},
+        "$or": [
+            {"status": {"$nin": [TaskStatus.CANCELLED.value]}},
+            {
+                "status": TaskStatus.CANCELLED.value,
+                "notes": {"$in": list(PROGRAM_DISABLE_CANCEL_NOTES)},
+            },
+        ],
     }
     await scope_scheduled_tasks_query(query, equipment_type_id, user=user)
 
     tasks = await db.scheduled_tasks.find(query, {"_id": 0}).sort("due_date", 1).to_list(1000)
+
+    equipment_ids = list({t.get("equipment_id") for t in tasks if t.get("equipment_id")})
+    inactive_keys = await load_inactive_program_task_keys(equipment_ids)
+    annotate_disabled_in_program(tasks, inactive_keys)
 
     equipment_timeline = {}
     today = datetime.utcnow().date().isoformat()

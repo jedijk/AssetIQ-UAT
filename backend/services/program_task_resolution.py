@@ -182,6 +182,48 @@ async def scheduler_program_ids_for_failure_mode(
     return _dedupe(ids)
 
 
+async def count_active_maintenance_programs_for_task_template(
+    equipment_type_id: str,
+    task_template_id: str,
+) -> int:
+    """Count equipment maintenance programs with an active linked strategy task."""
+    equipment_ids: Set[str] = set()
+    async for prog in db.maintenance_programs_v2.find(
+        {"equipment_type_id": equipment_type_id},
+        {"_id": 0, "equipment_id": 1, "status": 1, "tasks": 1},
+    ):
+        status = (prog.get("status") or "active").lower()
+        if status not in ("active", "draft"):
+            continue
+        equipment_id = prog.get("equipment_id")
+        if not equipment_id:
+            continue
+        for task in prog.get("tasks") or []:
+            trace = task.get("traceability") or {}
+            if trace.get("task_template_id") != task_template_id:
+                continue
+            if not task.get("is_active", True):
+                continue
+            equipment_ids.add(equipment_id)
+            break
+
+    from services.scheduler_config import should_read_legacy_maintenance_programs
+
+    if should_read_legacy_maintenance_programs():
+        async for prog in db.maintenance_programs.find(
+            {
+                "equipment_type_id": equipment_type_id,
+                "task_template_id": task_template_id,
+                "is_active": True,
+            },
+            {"equipment_id": 1, "_id": 0},
+        ):
+            if prog.get("equipment_id"):
+                equipment_ids.add(prog["equipment_id"])
+
+    return len(equipment_ids)
+
+
 async def scheduler_program_ids_for_equipment_type(
     equipment_type_id: str,
     *,
