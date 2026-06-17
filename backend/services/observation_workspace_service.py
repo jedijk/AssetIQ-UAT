@@ -19,6 +19,7 @@ from services.tenant_schema import merge_tenant_filter, with_tenant_id
 from utils.auto_translate import translate_action
 from utils.workspace_localization import localize_workspace_payload
 from services.work_signal_projection import project_detail
+from services.criticality_score import resolve_observation_criticality
 from services.observation_workspace_exposure import (
     calculate_alarp_progress,
     calculate_environmental_exposure,
@@ -740,11 +741,7 @@ async def get_workspace(user: dict, observation_id: str, language: Optional[str]
         ),
     )
 
-    criticality = None
-    if equipment_node:
-        criticality = equipment_node.get("criticality")
-    if not criticality and observation.get("equipment_criticality_data"):
-        criticality = observation.get("equipment_criticality_data")
+    criticality = resolve_observation_criticality(observation, equipment_node)
 
     # Run independent queries in parallel for better performance
     action_plan_task = asyncio.create_task(get_action_plan(observation_id, investigation, user=user))

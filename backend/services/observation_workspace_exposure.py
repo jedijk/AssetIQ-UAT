@@ -54,7 +54,9 @@ async def get_production_loss_config(user_id: str) -> dict:
 
 async def calculate_production_exposure(observation: dict, criticality: dict, user_id: str) -> dict:
     """Calculate production exposure based on criticality, observation data, and user's production loss config"""
-    production_impact = (criticality or {}).get("production_impact") or 0
+    from services.criticality_score import get_criticality_dimensions
+
+    production_impact = get_criticality_dimensions(criticality)["production"]
     if not production_impact:  # None or 0 → not rated on the 1-5 scale
         return {"not_assessed": True, "production_impact_score": None, "formatted_value": "Not Assessed"}
     
@@ -116,7 +118,9 @@ async def calculate_production_exposure(observation: dict, criticality: dict, us
 
 def calculate_safety_exposure(observation: dict, criticality: dict) -> dict:
     """Calculate safety exposure based on criticality"""
-    safety_impact = (criticality or {}).get("safety_impact") or 0
+    from services.criticality_score import get_criticality_dimensions
+
+    safety_impact = get_criticality_dimensions(criticality)["safety"]
     if not safety_impact:
         return {"not_assessed": True, "safety_impact_score": None, "severity": "Not Assessed"}
     
@@ -146,7 +150,9 @@ def calculate_safety_exposure(observation: dict, criticality: dict) -> dict:
 
 def calculate_environmental_exposure(observation: dict, criticality: dict) -> dict:
     """Calculate environmental exposure"""
-    env_impact = (criticality or {}).get("environmental_impact") or 0
+    from services.criticality_score import get_criticality_dimensions
+
+    env_impact = get_criticality_dimensions(criticality)["environmental"]
     if not env_impact:
         return {"not_assessed": True, "environmental_impact_score": None, "impact_rating": "Not Assessed"}
     
@@ -166,7 +172,9 @@ def calculate_environmental_exposure(observation: dict, criticality: dict) -> di
 
 def calculate_reputation_exposure(observation: dict, criticality: dict) -> dict:
     """Calculate reputation exposure based on criticality.reputation_impact (1-5)."""
-    rep_impact = (criticality or {}).get("reputation_impact") or 0
+    from services.criticality_score import get_criticality_dimensions
+
+    rep_impact = get_criticality_dimensions(criticality)["reputation"]
     if not rep_impact:
         return {"not_assessed": True, "reputation_impact_score": None, "impact_rating": "Not Assessed"}
     impact_mapping = {
@@ -340,10 +348,13 @@ async def compute_workspace_risk_summary(
 
     crit_score = 0
     if criticality and isinstance(criticality, dict):
-        safety = int(criticality.get("safety_impact") or 0)
-        production = int(criticality.get("production_impact") or 0)
-        environmental = int(criticality.get("environmental_impact") or 0)
-        reputation = int(criticality.get("reputation_impact") or 0)
+        from services.criticality_score import get_criticality_dimensions
+
+        dims = get_criticality_dimensions(criticality)
+        safety = dims["safety"]
+        production = dims["production"]
+        environmental = dims["environmental"]
+        reputation = dims["reputation"]
         if safety or production or environmental or reputation:
             crit_score = compute_criticality_score(
                 safety, production, environmental, reputation
