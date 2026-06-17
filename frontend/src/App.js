@@ -88,6 +88,9 @@ const VisualBoardsPage = lazy(() => import("./pages/visual-boards/VisualBoardsPa
 const VisualBoardEditorPage = lazy(() => import("./pages/visual-boards/VisualBoardEditorPage"));
 const VisualBoardPreviewPage = lazy(() => import("./pages/visual-boards/VisualBoardPreviewPage"));
 const VisualBoardDisplayPage = lazy(() => import("./pages/visual-boards/VisualBoardDisplayPage"));
+const VisualBoardScreensPage = lazy(() => import("./pages/visual-boards/VisualBoardScreensPage"));
+const VisualBoardTemplatesPage = lazy(() => import("./pages/visual-boards/VisualBoardTemplatesPage"));
+const VisualBoardAnalyticsPage = lazy(() => import("./pages/visual-boards/VisualBoardAnalyticsPage"));
 
 function RouteFallback() {
   return (
@@ -487,9 +490,9 @@ function App() {
                 <Route path="visual-management/boards" element={<Suspense fallback={<RouteFallback />}><VisualBoardsPage /></Suspense>} />
                 <Route path="visual-management/boards/:boardId/edit" element={<Suspense fallback={<RouteFallback />}><VisualBoardEditorPage /></Suspense>} />
                 <Route path="visual-management/boards/:boardId/preview" element={<Suspense fallback={<RouteFallback />}><VisualBoardPreviewPage /></Suspense>} />
-                <Route path="visual-management/templates" element={<Suspense fallback={<RouteFallback />}><UnderDevelopmentPage /></Suspense>} />
-                <Route path="visual-management/screens" element={<Suspense fallback={<RouteFallback />}><UnderDevelopmentPage /></Suspense>} />
-                <Route path="visual-management/analytics" element={<Suspense fallback={<RouteFallback />}><UnderDevelopmentPage /></Suspense>} />
+                <Route path="visual-management/templates" element={<Suspense fallback={<RouteFallback />}><VisualBoardTemplatesPage /></Suspense>} />
+                <Route path="visual-management/screens" element={<Suspense fallback={<RouteFallback />}><VisualBoardScreensPage /></Suspense>} />
+                <Route path="visual-management/analytics" element={<Suspense fallback={<RouteFallback />}><VisualBoardAnalyticsPage /></Suspense>} />
                 
                 {/* Settings Layout with nested routes */}
                 <Route path="settings" element={<Suspense fallback={<RouteFallback />}><SettingsPage /></Suspense>}>

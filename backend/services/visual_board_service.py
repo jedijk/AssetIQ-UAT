@@ -4,7 +4,7 @@ Visual Management Board service — CRUD, publish lifecycle, versions, screens s
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
@@ -13,18 +13,31 @@ from database import db
 from models.visual_board import (
     BoardStatus,
     BoardType,
+    CreateBoardFromTemplateRequest,
     CreateBoardRequest,
     CreateScreenRequest,
+    CreateTemplateRequest,
+    CreateTokenRequest,
+    CreateTokenResponse,
     PublishBoardRequest,
     PublishBoardResponse,
+    RollbackVersionRequest,
     RotateTokenRequest,
+    ScreenResponse,
+    TemplateResponse,
+    TokenSummary,
     UpdateBoardRequest,
+    UpdateScreenRequest,
+    UpdateTemplateRequest,
     VisualBoardLayout,
     VisualBoardResponse,
     VisualBoardWidget,
+    default_executive_widgets,
+    default_maintenance_widgets,
     default_reliability_widgets,
 )
 from services.tenant_schema import merge_tenant_filter, with_tenant_id
+from services.visual_board_qr import generate_qr_data_url
 from services.visual_board_token import generate_token, hash_token
 
 logger = logging.getLogger(__name__)
@@ -33,6 +46,10 @@ BOARDS_COLLECTION = "visual_boards"
 VERSIONS_COLLECTION = "visual_board_versions"
 TOKENS_COLLECTION = "visual_board_tokens"
 SCREENS_COLLECTION = "visual_board_screens"
+TEMPLATES_COLLECTION = "visual_board_templates"
+ANALYTICS_COLLECTION = "visual_board_analytics"
+
+SCREEN_OFFLINE_THRESHOLD_SECONDS = 300
 
 
 def _now_iso() -> str:
@@ -72,6 +89,10 @@ def _serialize_board(doc: dict, *, has_active_token: bool = False) -> VisualBoar
 def _default_widgets(board_type: BoardType) -> List[VisualBoardWidget]:
     if board_type == BoardType.RELIABILITY:
         return default_reliability_widgets()
+    if board_type == BoardType.MAINTENANCE:
+        return default_maintenance_widgets()
+    if board_type == BoardType.EXECUTIVE:
+        return default_executive_widgets()
     return []
 
 
@@ -195,6 +216,47 @@ async def delete_board(board_id: str, user: dict) -> Dict[str, bool]:
     return {"deleted": True}
 
 
+async def _issue_token(
+    board_id: str,
+    user: dict,
+    *,
+    version: int,
+    screen_name: str,
+    deactivate_token_id: Optional[str] = None,
+) -> PublishBoardResponse:
+    now = _now_iso()
+    raw_token, token_hash = generate_token()
+    token_id = _new_id("vbt")
+    if deactivate_token_id:
+        await db[TOKENS_COLLECTION].update_one(
+            merge_tenant_filter({"id": deactivate_token_id, "board_id": board_id}, user),
+            {"$set": {"is_active": False}},
+        )
+    token_doc = with_tenant_id(
+        {
+            "id": token_id,
+            "board_id": board_id,
+            "token_hash": token_hash,
+            "screen_name": screen_name,
+            "is_active": True,
+            "version": version,
+            "created_at": now,
+            "last_used_at": None,
+        },
+        user,
+    )
+    await db[TOKENS_COLLECTION].insert_one(token_doc)
+    url = f"/vmb/{raw_token}"
+    return PublishBoardResponse(
+        board_id=board_id,
+        version=version,
+        token=raw_token,
+        url=url,
+        token_id=token_id,
+        qr_code_data_url=generate_qr_data_url(url),
+    )
+
+
 async def publish_board(
     board_id: str,
     user: dict,
@@ -225,27 +287,10 @@ async def publish_board(
     )
     await db[VERSIONS_COLLECTION].insert_one(version_doc)
 
-    raw_token, token_hash = generate_token()
-    token_id = _new_id("vbt")
     screen_name = (request.screen_name if request else None) or doc.get("name", "Display")
-    token_doc = with_tenant_id(
-        {
-            "id": token_id,
-            "board_id": board_id,
-            "token_hash": token_hash,
-            "screen_name": screen_name,
-            "is_active": True,
-            "version": new_version,
-            "created_at": now,
-            "last_used_at": None,
-        },
-        user,
+    result = await _issue_token(
+        board_id, user, version=new_version, screen_name=screen_name
     )
-    await db[TOKENS_COLLECTION].update_many(
-        merge_tenant_filter({"board_id": board_id, "is_active": True}, user),
-        {"$set": {"is_active": False}},
-    )
-    await db[TOKENS_COLLECTION].insert_one(token_doc)
 
     await db[BOARDS_COLLECTION].update_one(
         merge_tenant_filter({"id": board_id}, user),
@@ -259,12 +304,19 @@ async def publish_board(
         },
     )
 
-    return PublishBoardResponse(
-        board_id=board_id,
-        version=new_version,
-        token=raw_token,
-        url=f"/vmb/{raw_token}",
-    )
+    try:
+        from services.visual_board_ws_hub import vmb_ws_hub
+
+        token_hashes = await _active_token_hashes(board_id, user)
+        await vmb_ws_hub.broadcast_board_tokens(
+            token_hashes,
+            "board_updated",
+            {"board_id": board_id, "version": new_version},
+        )
+    except Exception:
+        logger.debug("WS broadcast skipped on publish", exc_info=True)
+
+    return result.model_copy(update={"version": new_version})
 
 
 async def unpublish_board(board_id: str, user: dict) -> Dict[str, Any]:
@@ -302,36 +354,119 @@ async def rotate_token(
         raise HTTPException(status_code=400, detail="Board must be published to rotate token")
 
     version = int(doc.get("version") or 1)
-    now = _now_iso()
-    raw_token, token_hash = generate_token()
-    token_id = _new_id("vbt")
+    token_id = request.token_id if request else None
     screen_name = (request.screen_name if request else None) or doc.get("name", "Display")
-
-    await db[TOKENS_COLLECTION].update_many(
-        merge_tenant_filter({"board_id": board_id, "is_active": True}, user),
-        {"$set": {"is_active": False}},
-    )
-    token_doc = with_tenant_id(
-        {
-            "id": token_id,
-            "board_id": board_id,
-            "token_hash": token_hash,
-            "screen_name": screen_name,
-            "is_active": True,
-            "version": version,
-            "created_at": now,
-            "last_used_at": None,
-        },
+    if token_id:
+        existing = await db[TOKENS_COLLECTION].find_one(
+            merge_tenant_filter({"id": token_id, "board_id": board_id}, user),
+            {"_id": 0},
+        )
+        if existing:
+            screen_name = request.screen_name or existing.get("screen_name") or screen_name
+            version = int(existing.get("version") or version)
+    return await _issue_token(
+        board_id,
         user,
+        version=version,
+        screen_name=screen_name,
+        deactivate_token_id=token_id,
     )
-    await db[TOKENS_COLLECTION].insert_one(token_doc)
 
-    return PublishBoardResponse(
+
+async def create_board_token(
+    board_id: str,
+    user: dict,
+    request: Optional[CreateTokenRequest] = None,
+) -> CreateTokenResponse:
+    doc = await db[BOARDS_COLLECTION].find_one(
+        merge_tenant_filter({"id": board_id}, user),
+        {"_id": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Board not found")
+    if doc.get("status") != BoardStatus.PUBLISHED.value:
+        raise HTTPException(status_code=400, detail="Board must be published to create display tokens")
+
+    version = int((request.version if request else None) or doc.get("version") or 1)
+    screen_name = (request.screen_name if request else None) or doc.get("name", "Display")
+    issued = await _issue_token(board_id, user, version=version, screen_name=screen_name)
+    return CreateTokenResponse(
+        token_id=issued.token_id or "",
         board_id=board_id,
         version=version,
-        token=raw_token,
-        url=f"/vmb/{raw_token}",
+        token=issued.token,
+        url=issued.url,
+        screen_name=screen_name,
     )
+
+
+async def list_board_tokens(board_id: str, user: dict) -> Dict[str, Any]:
+    doc = await db[BOARDS_COLLECTION].find_one(
+        merge_tenant_filter({"id": board_id}, user),
+        {"_id": 0, "id": 1},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Board not found")
+    tokens = await db[TOKENS_COLLECTION].find(
+        merge_tenant_filter({"board_id": board_id}, user),
+        {"_id": 0, "token_hash": 0},
+    ).sort("created_at", -1).to_list(100)
+    items = [TokenSummary(**t).model_dump() for t in tokens]
+    return {"board_id": board_id, "items": items}
+
+
+async def revoke_board_token(board_id: str, token_id: str, user: dict) -> Dict[str, Any]:
+    result = await db[TOKENS_COLLECTION].update_one(
+        merge_tenant_filter({"id": token_id, "board_id": board_id}, user),
+        {"$set": {"is_active": False}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Token not found")
+    return {"revoked": True, "token_id": token_id}
+
+
+async def _active_token_hashes(board_id: str, user: dict) -> list[str]:
+    tokens = await db[TOKENS_COLLECTION].find(
+        merge_tenant_filter({"board_id": board_id, "is_active": True}, user),
+        {"_id": 0, "token_hash": 1},
+    ).to_list(50)
+    return [t["token_hash"] for t in tokens if t.get("token_hash")]
+
+
+async def rollback_board_version(
+    board_id: str,
+    user: dict,
+    request: RollbackVersionRequest,
+) -> VisualBoardResponse:
+    doc = await db[BOARDS_COLLECTION].find_one(
+        merge_tenant_filter({"id": board_id}, user),
+        {"_id": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Board not found")
+
+    version_doc = await db[VERSIONS_COLLECTION].find_one(
+        merge_tenant_filter({"board_id": board_id, "version": request.version}, user),
+        {"_id": 0},
+    )
+    if not version_doc:
+        raise HTTPException(status_code=404, detail="Version not found")
+
+    now = _now_iso()
+    await db[BOARDS_COLLECTION].update_one(
+        merge_tenant_filter({"id": board_id}, user),
+        {
+            "$set": {
+                "widgets": version_doc.get("widgets") or [],
+                "layout": version_doc.get("layout") or {},
+                "version": request.version,
+                "updated_at": now,
+                "plant": (version_doc.get("filters") or {}).get("plant"),
+                "area": (version_doc.get("filters") or {}).get("area"),
+            }
+        },
+    )
+    return await get_board(board_id, user)
 
 
 async def list_versions(board_id: str, user: dict) -> Dict[str, Any]:
@@ -454,14 +589,53 @@ async def record_heartbeat(
             screen_doc["tenant_id"] = tenant_id
         await db[SCREENS_COLLECTION].insert_one(screen_doc)
 
+    await record_analytics_event(
+        board_id=board_id,
+        tenant_id=tenant_id,
+        event_type="heartbeat",
+        token_id=token_doc.get("id"),
+        screen_id=screen_id,
+    )
+
     return {"ok": True, "screen_id": screen_id, "last_seen": now}
 
 
+def _derive_screen_status(last_seen: Optional[str]) -> str:
+    if not last_seen:
+        return "inactive"
+    try:
+        seen = datetime.fromisoformat(last_seen.replace("Z", "+00:00"))
+        if seen.tzinfo is None:
+            seen = seen.replace(tzinfo=timezone.utc)
+        delta = datetime.now(timezone.utc) - seen
+        if delta.total_seconds() <= SCREEN_OFFLINE_THRESHOLD_SECONDS:
+            return "online"
+        return "offline"
+    except Exception:
+        return "inactive"
+
+
+def _serialize_screen(doc: dict, board_name: Optional[str] = None) -> dict:
+    status = doc.get("status") or _derive_screen_status(doc.get("last_seen"))
+    if doc.get("last_seen"):
+        status = _derive_screen_status(doc.get("last_seen"))
+    return ScreenResponse(
+        id=doc["id"],
+        board_id=doc.get("board_id", ""),
+        token_id=doc.get("token_id"),
+        screen_name=doc.get("screen_name", ""),
+        location=doc.get("location"),
+        device_id=doc.get("device_id"),
+        last_seen=doc.get("last_seen"),
+        status=status,
+        board_name=board_name,
+    ).model_dump()
+
+
 async def list_screens(board_id: str, user: dict) -> Dict[str, Any]:
-    """Stub: list registered screens for a board."""
     doc = await db[BOARDS_COLLECTION].find_one(
         merge_tenant_filter({"id": board_id}, user),
-        {"_id": 0, "id": 1},
+        {"_id": 0, "id": 1, "name": 1},
     )
     if not doc:
         raise HTTPException(status_code=404, detail="Board not found")
@@ -469,7 +643,25 @@ async def list_screens(board_id: str, user: dict) -> Dict[str, Any]:
         merge_tenant_filter({"board_id": board_id}, user),
         {"_id": 0},
     ).to_list(100)
-    return {"board_id": board_id, "items": screens}
+    items = [_serialize_screen(s, doc.get("name")) for s in screens]
+    return {"board_id": board_id, "items": items}
+
+
+async def list_all_screens(user: dict) -> Dict[str, Any]:
+    screens = await db[SCREENS_COLLECTION].find(
+        merge_tenant_filter({}, user),
+        {"_id": 0},
+    ).sort("last_seen", -1).to_list(500)
+    board_ids = list({s.get("board_id") for s in screens if s.get("board_id")})
+    board_names: Dict[str, str] = {}
+    if board_ids:
+        boards = await db[BOARDS_COLLECTION].find(
+            merge_tenant_filter({"id": {"$in": board_ids}}, user),
+            {"_id": 0, "id": 1, "name": 1},
+        ).to_list(len(board_ids))
+        board_names = {b["id"]: b.get("name", "") for b in boards}
+    items = [_serialize_screen(s, board_names.get(s.get("board_id", ""))) for s in screens]
+    return {"items": items, "total": len(items)}
 
 
 async def create_screen(
@@ -477,7 +669,6 @@ async def create_screen(
     request: CreateScreenRequest,
     user: dict,
 ) -> Dict[str, Any]:
-    """Stub: register a screen for a board."""
     doc = await db[BOARDS_COLLECTION].find_one(
         merge_tenant_filter({"id": board_id}, user),
         {"_id": 0, "id": 1},
@@ -502,4 +693,267 @@ async def create_screen(
         user,
     )
     await db[SCREENS_COLLECTION].insert_one(screen_doc)
-    return screen_doc
+    return _serialize_screen(screen_doc)
+
+
+async def update_screen(screen_id: str, request: UpdateScreenRequest, user: dict) -> dict:
+    doc = await db[SCREENS_COLLECTION].find_one(
+        merge_tenant_filter({"id": screen_id}, user),
+        {"_id": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Screen not found")
+    updates: Dict[str, Any] = {}
+    for key in ("screen_name", "location", "device_id", "token_id"):
+        val = getattr(request, key, None)
+        if val is not None:
+            updates[key] = val
+    if updates:
+        await db[SCREENS_COLLECTION].update_one(
+            merge_tenant_filter({"id": screen_id}, user),
+            {"$set": updates},
+        )
+    updated = await db[SCREENS_COLLECTION].find_one(
+        merge_tenant_filter({"id": screen_id}, user),
+        {"_id": 0},
+    )
+    return _serialize_screen(updated or doc)
+
+
+async def delete_screen(screen_id: str, user: dict) -> Dict[str, bool]:
+    result = await db[SCREENS_COLLECTION].delete_one(
+        merge_tenant_filter({"id": screen_id}, user),
+    )
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Screen not found")
+    return {"deleted": True}
+
+
+async def record_analytics_event(
+    *,
+    board_id: str,
+    tenant_id: Optional[str],
+    event_type: str,
+    token_id: Optional[str] = None,
+    screen_id: Optional[str] = None,
+) -> None:
+    doc: Dict[str, Any] = {
+        "id": _new_id("vba"),
+        "board_id": board_id,
+        "event_type": event_type,
+        "token_id": token_id,
+        "screen_id": screen_id,
+        "created_at": _now_iso(),
+    }
+    if tenant_id:
+        doc["tenant_id"] = tenant_id
+    try:
+        await db[ANALYTICS_COLLECTION].insert_one(doc)
+    except Exception:
+        logger.debug("Analytics event insert failed", exc_info=True)
+
+
+async def record_board_view(raw_token: str) -> None:
+    try:
+        ctx = await resolve_token(raw_token)
+    except HTTPException:
+        return
+    token_doc = ctx["token"]
+    await record_analytics_event(
+        board_id=token_doc["board_id"],
+        tenant_id=ctx.get("tenant_id"),
+        event_type="view",
+        token_id=token_doc.get("id"),
+    )
+
+
+async def get_analytics(user: dict, *, days: int = 30) -> Dict[str, Any]:
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    filt = merge_tenant_filter({"created_at": {"$gte": since}}, user)
+    events = await db[ANALYTICS_COLLECTION].find(filt, {"_id": 0}).to_list(10000)
+    screens = await db[SCREENS_COLLECTION].find(
+        merge_tenant_filter({}, user),
+        {"_id": 0},
+    ).to_list(500)
+
+    view_count = sum(1 for e in events if e.get("event_type") == "view")
+    heartbeat_count = sum(1 for e in events if e.get("event_type") == "heartbeat")
+    views_by_board: Dict[str, int] = {}
+    for e in events:
+        if e.get("event_type") == "view":
+            bid = e.get("board_id", "")
+            views_by_board[bid] = views_by_board.get(bid, 0) + 1
+
+    online_screens = sum(1 for s in screens if _derive_screen_status(s.get("last_seen")) == "online")
+    offline_screens = sum(1 for s in screens if _derive_screen_status(s.get("last_seen")) == "offline")
+
+    board_ids = list(views_by_board.keys())
+    board_names: Dict[str, str] = {}
+    if board_ids:
+        boards = await db[BOARDS_COLLECTION].find(
+            merge_tenant_filter({"id": {"$in": board_ids}}, user),
+            {"_id": 0, "id": 1, "name": 1},
+        ).to_list(len(board_ids))
+        board_names = {b["id"]: b.get("name", b["id"]) for b in boards}
+
+    most_viewed = sorted(
+        [{"board_id": k, "name": board_names.get(k, k), "views": v} for k, v in views_by_board.items()],
+        key=lambda x: x["views"],
+        reverse=True,
+    )[:10]
+
+    return {
+        "period_days": days,
+        "total_views": view_count,
+        "total_heartbeats": heartbeat_count,
+        "active_screens": online_screens,
+        "offline_screens": offline_screens,
+        "total_screens": len(screens),
+        "most_viewed_boards": most_viewed,
+        "screens": [_serialize_screen(s) for s in screens[:50]],
+    }
+
+
+def _serialize_template(doc: dict) -> TemplateResponse:
+    widgets_raw = doc.get("widgets") or []
+    widgets = [VisualBoardWidget(**w) if isinstance(w, dict) else w for w in widgets_raw]
+    layout_raw = doc.get("layout") or {}
+    layout = VisualBoardLayout(**layout_raw) if isinstance(layout_raw, dict) else layout_raw
+    return TemplateResponse(
+        id=doc["id"],
+        name=doc.get("name", ""),
+        description=doc.get("description"),
+        board_type=BoardType(doc.get("board_type", BoardType.RELIABILITY.value)),
+        widgets=widgets,
+        layout=layout,
+        theme=doc.get("theme", "dark"),
+        created_by=doc.get("created_by"),
+        created_at=doc.get("created_at"),
+        updated_at=doc.get("updated_at"),
+    )
+
+
+async def list_templates(user: dict) -> Dict[str, Any]:
+    filt = merge_tenant_filter({}, user)
+    docs = await db[TEMPLATES_COLLECTION].find(filt, {"_id": 0}).sort("updated_at", -1).to_list(100)
+    if not docs:
+        await _seed_default_templates(user)
+        docs = await db[TEMPLATES_COLLECTION].find(filt, {"_id": 0}).sort("updated_at", -1).to_list(100)
+    items = [_serialize_template(d).model_dump() for d in docs]
+    return {"items": items, "total": len(items)}
+
+
+async def _seed_default_templates(user: dict) -> None:
+    now = _now_iso()
+    defaults = [
+        ("Reliability Board", BoardType.RELIABILITY, default_reliability_widgets()),
+        ("Maintenance Board", BoardType.MAINTENANCE, default_maintenance_widgets()),
+        ("Executive Board", BoardType.EXECUTIVE, default_executive_widgets()),
+    ]
+    for name, btype, widgets in defaults:
+        existing = await db[TEMPLATES_COLLECTION].find_one(
+            merge_tenant_filter({"name": name, "board_type": btype.value}, user),
+        )
+        if existing:
+            continue
+        doc = with_tenant_id(
+            {
+                "id": _new_id("vbtpl"),
+                "name": name,
+                "description": f"Default {name.lower()} template",
+                "board_type": btype.value,
+                "widgets": [w.model_dump() for w in widgets],
+                "layout": VisualBoardLayout().model_dump(),
+                "theme": "dark",
+                "created_by": user.get("id"),
+                "created_at": now,
+                "updated_at": now,
+            },
+            user,
+        )
+        await db[TEMPLATES_COLLECTION].insert_one(doc)
+
+
+async def create_template(request: CreateTemplateRequest, user: dict) -> TemplateResponse:
+    now = _now_iso()
+    widgets = request.widgets or _default_widgets(request.board_type)
+    layout = request.layout or VisualBoardLayout()
+    doc = with_tenant_id(
+        {
+            "id": _new_id("vbtpl"),
+            "name": request.name,
+            "description": request.description or "",
+            "board_type": request.board_type.value,
+            "widgets": [w.model_dump() for w in widgets],
+            "layout": layout.model_dump() if hasattr(layout, "model_dump") else layout,
+            "theme": request.theme,
+            "created_by": user.get("id"),
+            "created_at": now,
+            "updated_at": now,
+        },
+        user,
+    )
+    await db[TEMPLATES_COLLECTION].insert_one(doc)
+    return _serialize_template(doc)
+
+
+async def update_template(template_id: str, request: UpdateTemplateRequest, user: dict) -> TemplateResponse:
+    doc = await db[TEMPLATES_COLLECTION].find_one(
+        merge_tenant_filter({"id": template_id}, user),
+        {"_id": 0},
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Template not found")
+    updates: Dict[str, Any] = {"updated_at": _now_iso()}
+    data = request.model_dump(exclude_unset=True)
+    if "widgets" in data and data["widgets"] is not None:
+        updates["widgets"] = [w.model_dump() if hasattr(w, "model_dump") else w for w in data["widgets"]]
+    if "layout" in data and data["layout"] is not None:
+        layout = data["layout"]
+        updates["layout"] = layout.model_dump() if hasattr(layout, "model_dump") else layout
+    for key in ("name", "description", "theme"):
+        if key in data and data[key] is not None:
+            updates[key] = data[key]
+    if "board_type" in data and data["board_type"] is not None:
+        bt = data["board_type"]
+        updates["board_type"] = bt.value if hasattr(bt, "value") else bt
+    await db[TEMPLATES_COLLECTION].update_one(
+        merge_tenant_filter({"id": template_id}, user),
+        {"$set": updates},
+    )
+    updated = await db[TEMPLATES_COLLECTION].find_one(
+        merge_tenant_filter({"id": template_id}, user),
+        {"_id": 0},
+    )
+    return _serialize_template(updated or doc)
+
+
+async def delete_template(template_id: str, user: dict) -> Dict[str, bool]:
+    result = await db[TEMPLATES_COLLECTION].delete_one(
+        merge_tenant_filter({"id": template_id}, user),
+    )
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return {"deleted": True}
+
+
+async def create_board_from_template(request: CreateBoardFromTemplateRequest, user: dict) -> VisualBoardResponse:
+    tpl = await db[TEMPLATES_COLLECTION].find_one(
+        merge_tenant_filter({"id": request.template_id}, user),
+        {"_id": 0},
+    )
+    if not tpl:
+        raise HTTPException(status_code=404, detail="Template not found")
+    create_req = CreateBoardRequest(
+        name=request.name,
+        board_type=BoardType(tpl.get("board_type", BoardType.RELIABILITY.value)),
+        theme=tpl.get("theme", "dark"),
+    )
+    board = await create_board(create_req, user)
+    widgets = tpl.get("widgets") or []
+    layout = tpl.get("layout") or VisualBoardLayout().model_dump()
+    await db[BOARDS_COLLECTION].update_one(
+        merge_tenant_filter({"id": board.id}, user),
+        {"$set": {"widgets": widgets, "layout": layout, "updated_at": _now_iso()}},
+    )
+    return await get_board(board.id, user)

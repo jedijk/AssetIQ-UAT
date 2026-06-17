@@ -57,7 +57,7 @@ async def test_create_board_seeds_reliability_widgets(mock_user, mock_db):
 
     assert result.name == "Test Board"
     assert result.status == BoardStatus.DRAFT
-    assert len(result.widgets) == 6
+    assert len(result.widgets) == 7
     widget_ids = {w.id for w in result.widgets}
     assert "w_active_exposure" in widget_ids
     assert "w_status" in widget_ids
@@ -116,6 +116,65 @@ async def test_resolve_token_invalid(mock_db):
         with pytest.raises(HTTPException) as exc:
             await svc.resolve_token("vmb_" + "a" * 64)
     assert exc.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_publish_board_adds_token_without_deactivating_others(mock_user, mock_db):
+    board_doc = {
+        "id": "board-1",
+        "name": "Reliability Board",
+        "version": 1,
+        "layout": {"columns": 12, "rows": 6},
+        "widgets": [],
+        "plant": None,
+        "area": None,
+        "tenant_id": "co-1",
+    }
+    boards = mock_db["visual_boards"]
+    boards.find_one = AsyncMock(return_value=board_doc)
+    tokens = mock_db["visual_board_tokens"]
+    tokens.update_many = AsyncMock()
+
+    with patch("services.visual_board_service.db", mock_db):
+        result = await svc.publish_board("board-1", mock_user)
+
+    assert result.token.startswith("vmb_")
+    tokens.update_many.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_rollback_board_version(mock_user, mock_db):
+    board_doc = {
+        "id": "board-1",
+        "name": "Board",
+        "version": 2,
+        "widgets": [{"id": "w1"}],
+        "layout": {"columns": 12, "rows": 6},
+        "status": "published",
+        "board_type": "reliability",
+        "tenant_id": "co-1",
+    }
+    version_doc = {
+        "board_id": "board-1",
+        "version": 1,
+        "widgets": [{"id": "w_old", "type": "kpi_card", "title": "Old KPI", "config": {}, "position": {"x": 0, "y": 0, "w": 3, "h": 2}}],
+        "layout": {"columns": 12, "rows": 8},
+        "filters": {"plant": None, "area": None},
+    }
+    boards = mock_db["visual_boards"]
+    boards.find_one = AsyncMock(side_effect=[board_doc, {**board_doc, "widgets": version_doc["widgets"], "layout": version_doc["layout"], "version": 1}])
+    versions = mock_db["visual_board_versions"]
+    versions.find_one = AsyncMock(return_value=version_doc)
+    tokens = mock_db["visual_board_tokens"]
+    tokens.count_documents = AsyncMock(return_value=0)
+
+    from models.visual_board import RollbackVersionRequest
+
+    with patch("services.visual_board_service.db", mock_db):
+        result = await svc.rollback_board_version("board-1", mock_user, RollbackVersionRequest(version=1))
+
+    assert result.version == 1
+    boards.update_one.assert_awaited()
 
 
 @pytest.mark.asyncio

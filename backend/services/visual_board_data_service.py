@@ -6,7 +6,7 @@ Maps widget configurations to scoped read queries, reusing executive dashboard p
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from database import db
@@ -142,6 +142,121 @@ async def _observation_list_payload(user: dict, limit: int = 10) -> Dict[str, An
     return {"type": WidgetType.OBSERVATION_LIST.value, "items": items, "total": len(items)}
 
 
+async def _action_queue_payload(user: dict, limit: int = 10) -> Dict[str, Any]:
+    now_iso = datetime.now(timezone.utc).isoformat()
+    cursor = db.central_actions.find(
+        merge_tenant_filter(
+            {"status": {"$nin": ["completed", "closed", "cancelled", "done"]}},
+            user,
+        ),
+        {
+            "_id": 0,
+            "id": 1,
+            "title": 1,
+            "description": 1,
+            "owner": 1,
+            "assigned_to": 1,
+            "owner_name": 1,
+            "due_date": 1,
+            "status": 1,
+            "priority": 1,
+        },
+    ).sort([("due_date", 1), ("priority", -1)]).limit(limit)
+    rows = await cursor.to_list(limit)
+    items = []
+    for row in rows:
+        due = row.get("due_date")
+        overdue = bool(due and due < now_iso)
+        items.append(
+            {
+                "id": row.get("id"),
+                "action": row.get("title") or row.get("description") or "—",
+                "owner": row.get("owner_name") or row.get("owner") or row.get("assigned_to") or "—",
+                "due_date": due,
+                "status": row.get("status") or "open",
+                "priority": row.get("priority"),
+                "overdue": overdue,
+            }
+        )
+    return {"type": WidgetType.ACTION_QUEUE.value, "items": items, "total": len(items)}
+
+
+async def _trend_chart_payload(
+    user: dict,
+    *,
+    chart_metric: str = "active_threat_exposure",
+    days: int = 30,
+    period_days: int = 30,
+) -> Dict[str, Any]:
+    """Build time-series from executive dashboard snapshots or daily observation counts."""
+    tenant_id = user.get("company_id")
+    points: list[dict] = []
+    metric_key = chart_metric or "active_threat_exposure"
+
+    if tenant_id:
+        since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        cursor = db.executive_dashboard_snapshots.find(
+            {"tenant_id": tenant_id, "refreshed_at": {"$gte": since}},
+            {"_id": 0, "refreshed_at": 1, "payload": 1},
+        ).sort("refreshed_at", 1).limit(60)
+        snapshots = await cursor.to_list(60)
+        for snap in snapshots:
+            payload = snap.get("payload") or {}
+            kpi = (payload.get("kpi_cards") or {}).get(metric_key)
+            if kpi is None:
+                continue
+            val = kpi.get("value") if isinstance(kpi, dict) else getattr(kpi, "value", None)
+            if val is not None:
+                points.append({"date": snap.get("refreshed_at", "")[:10], "value": float(val)})
+
+    if len(points) < 2:
+        dashboard = await get_or_compute_executive_dashboard(user, period_days)
+        kpi = dashboard.kpi_cards.get(metric_key)
+        current = float(kpi.value) if kpi else 0.0
+        previous = float(kpi.previous_value) if kpi and kpi.previous_value is not None else current
+        today = datetime.now(timezone.utc).date()
+        mid = today - timedelta(days=days // 2)
+        start = today - timedelta(days=days)
+        points = [
+            {"date": start.isoformat(), "value": previous},
+            {"date": mid.isoformat(), "value": (previous + current) / 2},
+            {"date": today.isoformat(), "value": current},
+        ]
+
+    if metric_key == "observation_count":
+        since_dt = datetime.now(timezone.utc) - timedelta(days=days)
+        filt = merge_tenant_filter(
+            {
+                "created_at": {"$gte": since_dt.isoformat()},
+                "status": {"$nin": list(TERMINAL_OBSERVATION_STATUSES)},
+            },
+            user,
+        )
+        pipeline = [
+            {"$match": filt},
+            {
+                "$group": {
+                    "_id": {"$substr": ["$created_at", 0, 10]},
+                    "value": {"$sum": 1},
+                }
+            },
+            {"$sort": {"_id": 1}},
+        ]
+        try:
+            agg = await db.threats.aggregate(pipeline).to_list(days + 1)
+            if agg:
+                points = [{"date": row["_id"], "value": float(row["value"])} for row in agg if row.get("_id")]
+        except Exception:
+            pass
+
+    return {
+        "type": WidgetType.TREND_CHART.value,
+        "metric": metric_key,
+        "points": points,
+        "days": days,
+    }
+
+
 def _waterfall_payload(dashboard) -> Dict[str, Any]:
     metrics = dashboard.exposure_metrics
     segments = [
@@ -196,10 +311,19 @@ async def build_widget_data(
             result[widget.id] = await _observation_list_payload(user, widget.config.limit)
         elif wtype == WidgetType.EXPOSURE_WATERFALL.value:
             result[widget.id] = _waterfall_payload(dashboard)
+        elif wtype == WidgetType.ACTION_QUEUE.value:
+            result[widget.id] = await _action_queue_payload(user, widget.config.limit)
+        elif wtype == WidgetType.TREND_CHART.value:
+            result[widget.id] = await _trend_chart_payload(
+                user,
+                chart_metric=widget.config.chart_metric or widget.config.metric or "active_threat_exposure",
+                days=widget.config.days or 30,
+                period_days=period_days,
+            )
         else:
             result[widget.id] = {
                 "type": wtype,
-                "error": "Widget type not yet supported in Phase 1",
+                "error": f"Unsupported widget type: {wtype}",
             }
 
     return result

@@ -57,6 +57,8 @@ from routes.push_notifications import router as push_notifications_router
 from routes.executive_dashboard import router as executive_dashboard_router
 from routes.visual_boards import router as visual_boards_router
 from routes.visual_board_public import router as visual_board_public_router
+from routes.visual_board_templates import router as visual_board_templates_router
+from routes.visual_board_screens import router as visual_board_screens_router
 
 all_routers = [
     auth_router,
@@ -115,4 +117,6 @@ all_routers = [
     executive_dashboard_router,
     visual_boards_router,
     visual_board_public_router,
+    visual_board_templates_router,
+    visual_board_screens_router,
 ]

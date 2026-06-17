@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
 import VisualBoardCanvas from "../../components/visual-boards/VisualBoardCanvas";
+import { useVisualBoardRealtime } from "../../hooks/useVisualBoardRealtime";
 
 /**
  * Public kiosk display — no AssetIQ login, token-only access.
@@ -12,8 +13,10 @@ import VisualBoardCanvas from "../../components/visual-boards/VisualBoardCanvas"
 const VisualBoardDisplayPage = () => {
   const { token } = useParams();
   const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const fullscreen = searchParams.get("fullscreen") === "true";
   const refreshSeconds = Number(searchParams.get("rotation")) || undefined;
+  const [liveData, setLiveData] = useState(null);
 
   const { data: layout, isLoading: layoutLoading, error: layoutError } = useQuery({
     queryKey: ["vmb-layout", token],
@@ -29,6 +32,20 @@ const VisualBoardDisplayPage = () => {
     queryFn: () => visualBoardAPI.getPublicData(token),
     enabled: !!token && !!layout,
     refetchInterval: intervalMs,
+  });
+
+  const onDataRefreshed = useCallback(
+    (payload) => {
+      setLiveData(payload);
+      queryClient.setQueryData(["vmb-data", token], payload);
+    },
+    [queryClient, token],
+  );
+
+  useVisualBoardRealtime(token, {
+    enabled: !!token && !!layout,
+    refreshIntervalSec: refreshSeconds || layout?.refresh_interval_seconds || 30,
+    onDataRefreshed,
   });
 
   useEffect(() => {
@@ -52,6 +69,7 @@ const VisualBoardDisplayPage = () => {
     return undefined;
   }, [fullscreen]);
 
+  const displayData = liveData || boardData;
   const isLoading = layoutLoading || dataLoading;
   const error = layoutError;
 
@@ -95,8 +113,8 @@ const VisualBoardDisplayPage = () => {
             layout={layout?.layout}
             widgets={layout?.widgets || []}
             data={{
-              widgets: boardData?.widgets,
-              status: boardData?.status,
+              widgets: displayData?.widgets,
+              status: displayData?.status,
             }}
             previewSize="tv-75"
           />

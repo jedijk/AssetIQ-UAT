@@ -51,13 +51,83 @@ export const visualBoardAPI = {
     return response.data;
   },
 
+  createToken: async (boardId, data = {}) => {
+    const response = await api.post(`/boards/${boardId}/tokens`, data);
+    return response.data;
+  },
+
+  listTokens: async (boardId) => {
+    const response = await api.get(`/boards/${boardId}/tokens`);
+    return response.data;
+  },
+
+  revokeToken: async (boardId, tokenId) => {
+    const response = await api.delete(`/boards/${boardId}/tokens/${tokenId}`);
+    return response.data;
+  },
+
   listVersions: async (boardId) => {
     const response = await api.get(`/boards/${boardId}/versions`);
     return response.data;
   },
 
+  rollbackVersion: async (boardId, version) => {
+    const response = await api.post(`/boards/${boardId}/rollback`, { version });
+    return response.data;
+  },
+
+  generateQrCode: async (url) => {
+    const response = await api.post("/boards/qr-code", { url });
+    return response.data;
+  },
+
   listScreens: async (boardId) => {
     const response = await api.get(`/boards/${boardId}/screens`);
+    return response.data;
+  },
+
+  listAllScreens: async () => {
+    const response = await api.get("/board-screens");
+    return response.data;
+  },
+
+  createScreen: async (boardId, data) => {
+    const response = await api.post(`/boards/${boardId}/screens`, data);
+    return response.data;
+  },
+
+  updateScreen: async (screenId, data) => {
+    const response = await api.put(`/board-screens/${screenId}`, data);
+    return response.data;
+  },
+
+  deleteScreen: async (screenId) => {
+    const response = await api.delete(`/board-screens/${screenId}`);
+    return response.data;
+  },
+
+  listTemplates: async () => {
+    const response = await api.get("/board-templates");
+    return response.data;
+  },
+
+  createTemplate: async (data) => {
+    const response = await api.post("/board-templates", data);
+    return response.data;
+  },
+
+  deleteTemplate: async (templateId) => {
+    const response = await api.delete(`/board-templates/${templateId}`);
+    return response.data;
+  },
+
+  createBoardFromTemplate: async (data) => {
+    const response = await api.post("/board-templates/create-board", data);
+    return response.data;
+  },
+
+  getAnalytics: async (days = 30) => {
+    const response = await api.get("/boards/analytics", { params: { days } });
     return response.data;
   },
 

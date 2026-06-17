@@ -49,6 +49,11 @@ const VisualBoardsPage = () => {
           <p className="text-sm text-slate-500 mt-1">
             Create, preview, and publish shop-floor display boards.
           </p>
+          <div className="flex gap-3 mt-2 text-sm">
+            <Link to="/visual-management/templates" className="text-blue-600 hover:underline">Templates</Link>
+            <Link to="/visual-management/screens" className="text-blue-600 hover:underline">Screens</Link>
+            <Link to="/visual-management/analytics" className="text-blue-600 hover:underline">Analytics</Link>
+          </div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => refetch()}>

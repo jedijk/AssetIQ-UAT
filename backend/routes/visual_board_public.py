@@ -21,6 +21,7 @@ def _validate_path_token(token: str) -> str:
 async def get_board_layout(token: str):
     """Return published board layout and widget configuration."""
     _validate_path_token(token)
+    await svc.record_board_view(token)
     return await data_svc.get_public_layout(token)
 
 

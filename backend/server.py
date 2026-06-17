@@ -251,6 +251,8 @@ try:
         api_router.include_router(router)
     
     app.include_router(api_router)
+    from routes.visual_board_ws import router as visual_board_ws_router
+    app.include_router(visual_board_ws_router)
     logger.info("Loaded %s route modules — all API routes mounted", len(all_routers))
 except Exception as e:
     import traceback
