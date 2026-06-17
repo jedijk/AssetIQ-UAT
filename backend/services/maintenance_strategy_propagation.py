@@ -367,6 +367,13 @@ def is_mandatory_only_task_toggle(updates: Dict[str, Any]) -> bool:
     return set(updates.keys()) == {"is_mandatory"}
 
 
+METADATA_PROPAGATION_KEYS = frozenset({
+    "name", "description", "task_type", "duration_hours", "discipline",
+    "frequency_matrix", "procedure_steps", "skills_required", "tools_required",
+    "spare_parts", "estimated_cost_eur",
+})
+
+
 def _describe_task_change(task: dict, changed_fields: list, action: str = "edit") -> str:
     """Build a human-readable change description for the strategy version history."""
     name = (task or {}).get("name") or "Task"

@@ -14,7 +14,7 @@ from models.maintenance_strategy_v2 import (
 )
 from services import maintenance_strategy_v2_service as svc
 from services.background_jobs import schedule_tracked_job
-from services.maintenance_strategy_v2_service import METADATA_PROPAGATION_KEYS
+from services.maintenance_strategy_propagation import METADATA_PROPAGATION_KEYS
 from utils.auto_translate import translate_maintenance_task
 
 router = APIRouter(prefix="/maintenance-strategies-v2", tags=["Maintenance Strategies V2"])
