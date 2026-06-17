@@ -116,6 +116,16 @@ export const failureModesAPI = {
     return response.data;
   },
 
+  /** Map recommended-action disciplines to Settings taxonomy for one failure mode. */
+  mapFailureModeActionDisciplines: async (body = {}) => {
+    const response = await api.post(
+      "/ai-suggestions/map-failure-mode-action-disciplines",
+      body,
+      { timeout: 120000 },
+    );
+    return response.data;
+  },
+
   /**
    * Merge losers into winner. Pass dry_run: true to preview.
    * Supports winner_id + loser_ids or primary_id + merge_id.

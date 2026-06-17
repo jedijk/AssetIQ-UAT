@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -1596,52 +1596,10 @@ async def improve_failure_mode_endpoint(
 
 # ============= Action Discipline Review =============
 #
-# Classifies the maintenance discipline for each recommended action attached to
-# a failure mode. The library was bulk-seeded with "mechanical" so this tool
-# lets the user re-allocate them based on the action text + action_type.
+# Classifies recommended-action disciplines using the tenant taxonomy from
+# Settings → Disciplines (with built-in fallback).
 
-ACTION_DISCIPLINES = [
-    "rotating",
-    "static",
-    "piping",
-    "electrical",
-    "instrumentation",
-    "civil",
-    "operations",
-    "laboratory",
-]
-
-REVIEW_ACTION_DISCIPLINE_SYSTEM_PROMPT = """You are an industrial reliability engineer responsible for routing maintenance work orders to the right discipline crew.
-
-Given a list of recommended maintenance actions, classify EACH one into exactly ONE of these disciplines (return the lowercase key in the JSON; the human label is shown for context only):
-
-- rotating (Rotating): work on rotating equipment — pumps, compressors, turbines, motors (mechanical side), fans, gearboxes, bearings, mechanical seals, alignment, vibration, lubrication, couplings, shafts, impellers
-- static (Static): work on static equipment — pressure vessels, heat exchangers, tanks, columns, reactors, filters, strainers, gaskets, manways, fouling, corrosion, fatigue cracking on static metal
-- piping (Piping): piping and valves — leak repair on pipe/flange/valve, valve overhaul, line blockages, gasket replacement on flanged joints, pipe support, line walks
-- electrical (Electrical): motors (windings/insulation), cabling, switchgear, transformers, MCCs, grounding, megger tests, electrical isolation, short-circuit work, breakers
-- instrumentation (Instrumentation): sensors, transmitters, control loops, calibration, signal/communication faults, PLCs, level/pressure/temperature/flow instruments, valve positioners, loop checks, DCS work
-- civil (Civil): foundations, baseplates, grouting, structural steel, concrete, anchor bolts, building/containment, insulation/cladding (civil scope)
-- operations (Operations): operator rounds, procedure changes, training, manual operations, shift logbook, housekeeping, watchkeeping, setpoint changes, process-condition adjustments (NPSH, flow, temperature, dosing), permits
-- laboratory (Laboratory): oil analysis, vibration analysis (lab-based), metallurgical testing, sampling for lab, fluid testing, NDE/UT/RT/PT/MT inspection
-
-Tie-breakers when ambiguous:
-- "Inspect/replace bearings, seals, shaft, impeller" → rotating
-- "Inspect/replace gasket on flange, isolate valve" → piping
-- "Inspect tank/vessel/heat-exchanger for corrosion/fouling/cracks" → static
-- "Adjust NPSH / setpoint / flow / chemical dosing / operating window" → operations
-- "Calibrate / loop check / replace transmitter" → instrumentation
-- "Megger motor / check insulation / electrical isolation" → electrical
-- "Re-grout baseplate / repair foundation / anchor bolts" → civil
-- "Send oil sample to lab / spectroscopy / metallurgical test / NDT" → laboratory
-
-Rules:
-1. JSON output: use the lowercase key (e.g. "rotating", not "Rotating").
-2. Human reasoning text: refer to the discipline using its human label (e.g. "Rotating work").
-3. Use the action text first, then `action_type` (PM/CM/PDM) as a tiebreaker.
-4. If ambiguous, prefer the discipline that does the *physical* work.
-5. Never invent a discipline outside the 8 listed above.
-6. Output STRICT JSON only — an array entry per input, in the SAME order.
-"""
+from services.failure_modes.action_discipline_map import classify_recommended_actions
 
 
 class ActionDisciplineInput(BaseModel):
@@ -1650,9 +1608,8 @@ class ActionDisciplineInput(BaseModel):
     description: str
     action_type: Optional[str] = None
     current_discipline: Optional[str] = None
-    # Optional context to improve classification quality
     failure_mode: Optional[str] = None
-    fm_discipline: Optional[str] = None  # asset discipline (Rotating, Static, ...)
+    fm_discipline: Optional[str] = None
 
 
 class ActionDisciplineResult(BaseModel):
@@ -1672,144 +1629,162 @@ class ReviewActionDisciplinesResponse(BaseModel):
     results: List[ActionDisciplineResult]
 
 
-def _normalize_discipline(value: Optional[str]) -> str:
-    if not value:
-        return ""
-    v = value.strip().lower()
-    # Map common variants to the 8 canonical discipline keys used in the app
-    # (see /app/frontend/src/constants/disciplines.js).
-    aliases = {
-        "mech": "rotating",  # legacy: most "mechanical" actions are rotating-equipment work
-        "mechanic": "rotating",
-        "mechanical": "rotating",
-        "rotating equipment": "rotating",
-        "static equipment": "static",
-        "pipe": "piping",
-        "piping/valves": "piping",
-        "valves": "piping",
-        "elec": "electrical",
-        "i&c": "instrumentation", "ic": "instrumentation",
-        "instrumentation & control": "instrumentation", "instrument": "instrumentation",
-        "ops": "operations", "operator": "operations",
-        "process": "operations",  # process-condition tweaks → operations crew
-        "maintenance": "operations",
-        "safety": "operations",
-        "reliability": "operations",
-        "engineering": "operations",
-        "civil/structural": "civil", "structural": "civil",
-        "lab": "laboratory",
-        "inspection": "laboratory",
-    }
-    if v in aliases:
-        return aliases[v]
-    if v in ACTION_DISCIPLINES:
-        return v
-    return v
-
-
 @router.post("/review-action-disciplines", response_model=ReviewActionDisciplinesResponse)
 async def review_action_disciplines(
     request: ReviewActionDisciplinesRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """Classify a batch of recommended-action items into the correct discipline.
-
-    The caller is expected to chunk the full library into batches (~25 actions
-    per call). The endpoint returns one classification per input action,
-    preserving fm_id + action_index so the frontend can apply changes back to
-    the right slot.
-    """
+    """Classify a batch of recommended actions into Settings disciplines."""
     if not request.actions:
         return ReviewActionDisciplinesResponse(results=[])
     if len(request.actions) > 60:
         raise HTTPException(status_code=400, detail="Send at most 60 actions per batch.")
 
-    payload = [
-        {
-            "i": idx,
-            "description": a.description[:280],
-            "action_type": a.action_type or "",
-            "current_discipline": _normalize_discipline(a.current_discipline),
-            "failure_mode": (a.failure_mode or "")[:120],
-            "fm_discipline": a.fm_discipline or "",
-        }
-        for idx, a in enumerate(request.actions)
-    ]
-
-    user_prompt = f"""Allowed disciplines: {", ".join(ACTION_DISCIPLINES)}
-
-For each action below, return:
-- "i": same index you received
-- "discipline": one of the allowed values
-- "reason": <= 14 words, why this discipline fits
-
-Actions:
-{json.dumps(payload, indent=2)}
-
-Return JSON: {{"results": [{{"i": 0, "discipline": "mechanical", "reason": "..."}}]}}"""
-
+    uid, cid = user_context(current_user)
     try:
-        uid, cid = user_context(current_user)
-        response = await chat_completion_response(
+        raw_results, _taxonomy = await classify_recommended_actions(
+            [a.model_dump() for a in request.actions],
             user_id=uid,
             company_id=cid,
             endpoint="ai_fm_suggestions.review_action_disciplines",
-            max_retries=4,
-            model="gpt-4o-mini",  # cheaper/faster model is plenty for classification
-            messages=[
-                {"role": "system", "content": REVIEW_ACTION_DISCIPLINE_SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0,
-            max_tokens=1800,
-            seed=42,
-            response_format={"type": "json_object"},
         )
-        data = json.loads(response.choices[0].message.content.strip())
-        raw_results = data.get("results") or []
     except json.JSONDecodeError as e:
-        logger.error(f"Action-discipline classifier JSON parse failed: {e}")
-        raise HTTPException(status_code=500, detail="Failed to parse AI response")
+        logger.error("Action-discipline classifier JSON parse failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to parse AI response") from e
     except RateLimitError as e:
-        logger.error(f"Action-discipline classifier rate limit: {e}")
-        raise HTTPException(status_code=429, detail="OpenAI rate limit — try again in a moment.")
+        logger.error("Action-discipline classifier rate limit: %s", e)
+        raise HTTPException(status_code=429, detail="OpenAI rate limit — try again in a moment.") from e
     except Exception as e:
-        logger.error(f"Action-discipline classifier error: {e}")
-        raise HTTPException(status_code=500, detail=f"AI service error: {e}")
+        logger.error("Action-discipline classifier error: %s", e)
+        raise HTTPException(status_code=500, detail=f"AI service error: {e}") from e
 
-    by_index: Dict[int, Dict[str, Any]] = {}
-    for r in raw_results:
-        if not isinstance(r, dict):
-            continue
-        try:
-            i = int(r.get("i"))
-        except (TypeError, ValueError):
-            continue
-        by_index[i] = r
+    results = [
+        ActionDisciplineResult(
+            fm_id=r["fm_id"],
+            action_index=r["action_index"],
+            current_discipline=r.get("current_discipline"),
+            suggested_discipline=r["suggested_discipline"],
+            reason=r["reason"],
+            changed=r["changed"],
+        )
+        for r in raw_results
+    ]
+    return ReviewActionDisciplinesResponse(results=results)
 
-    results: List[ActionDisciplineResult] = []
-    for idx, a in enumerate(request.actions):
-        r = by_index.get(idx, {})
-        suggested = _normalize_discipline(r.get("discipline"))
-        if suggested not in ACTION_DISCIPLINES:
-            # Fallback: keep the current one so we never produce garbage.
-            suggested = _normalize_discipline(a.current_discipline) or "rotating"
-        # Return the RAW current discipline (lowercased) — not the normalized
-        # form — so the diff catches legacy values like "mechanical" that
-        # should be re-tagged to one of the 8 canonical keys.
-        raw_current = (a.current_discipline or "").strip().lower()
-        results.append(
-            ActionDisciplineResult(
-                fm_id=a.fm_id,
-                action_index=a.action_index,
-                current_discipline=raw_current or None,
-                suggested_discipline=suggested,
-                reason=(r.get("reason") or "").strip()[:200] or "Classified by AI reliability engineer.",
-                changed=(suggested != raw_current),
-            )
+
+class MapFailureModeActionDisciplinesRequest(BaseModel):
+    failure_mode_id: str
+    apply: bool = False
+
+
+class MapFailureModeActionDisciplinesResponse(BaseModel):
+    failure_mode_id: str
+    failure_mode: str
+    actions_before: int
+    changes_suggested: int
+    results: List[ActionDisciplineResult]
+    applied: bool = False
+    disciplines: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+@router.post(
+    "/map-failure-mode-action-disciplines",
+    response_model=MapFailureModeActionDisciplinesResponse,
+)
+async def map_failure_mode_action_disciplines(
+    request: MapFailureModeActionDisciplinesRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Map recommended actions for one failure mode to Settings disciplines."""
+    from database import failure_modes_service
+
+    fm_id = (request.failure_mode_id or "").strip()
+    if not fm_id:
+        raise HTTPException(status_code=400, detail="failure_mode_id is required")
+
+    fm = await failure_modes_service.get_by_id(fm_id)
+    if not fm:
+        raise HTTPException(status_code=404, detail="Failure mode not found")
+
+    actions_in = []
+    for idx, act in enumerate(fm.get("recommended_actions") or []):
+        if not act:
+            continue
+        if isinstance(act, str):
+            description = act
+            action_type = ""
+            current_discipline = ""
+        else:
+            description = act.get("action") or act.get("description") or ""
+            action_type = act.get("action_type") or ""
+            current_discipline = act.get("discipline") or ""
+        if not description:
+            continue
+        actions_in.append(
+            {
+                "fm_id": fm_id,
+                "action_index": idx,
+                "description": description,
+                "action_type": action_type,
+                "current_discipline": current_discipline,
+                "failure_mode": fm.get("failure_mode") or "",
+                "fm_discipline": fm.get("discipline") or fm.get("category") or "",
+            }
         )
 
-    return ReviewActionDisciplinesResponse(results=results)
+    if not actions_in:
+        raise HTTPException(status_code=400, detail="No recommended actions to classify.")
+
+    uid, cid = user_context(current_user)
+    try:
+        raw_results, taxonomy = await classify_recommended_actions(
+            actions_in,
+            user_id=uid,
+            company_id=cid,
+            endpoint="ai_fm_suggestions.map_failure_mode_action_disciplines",
+        )
+    except RateLimitError as e:
+        raise HTTPException(status_code=429, detail="OpenAI rate limit — try again in a moment.") from e
+    except Exception as e:
+        logger.error("map-failure-mode-action-disciplines error: %s", e)
+        raise HTTPException(status_code=500, detail=f"AI service error: {e}") from e
+
+    results = [ActionDisciplineResult(**r) for r in raw_results]
+    changes = [r for r in results if r.changed]
+
+    applied = False
+    if request.apply and changes:
+        next_actions = [
+            dict(a) if isinstance(a, dict) else {"action": a}
+            for a in (fm.get("recommended_actions") or [])
+        ]
+        for r in changes:
+            if 0 <= r.action_index < len(next_actions):
+                next_actions[r.action_index] = {
+                    **next_actions[r.action_index],
+                    "discipline": r.suggested_discipline,
+                }
+        await failure_modes_service.update(
+            fm_id,
+            {"recommended_actions": next_actions},
+            updated_by=current_user.get("email") or current_user.get("id") or "AI",
+            change_reason="AI mapped action disciplines to Settings taxonomy",
+        )
+        applied = True
+
+    return MapFailureModeActionDisciplinesResponse(
+        failure_mode_id=fm_id,
+        failure_mode=fm.get("failure_mode") or "",
+        actions_before=len(actions_in),
+        changes_suggested=len(changes),
+        results=results,
+        applied=applied,
+        disciplines=[
+            {"value": d.get("value"), "label": d.get("label")}
+            for d in taxonomy
+            if d.get("value")
+        ],
+    )
 
 
 # ============= Find Similar Failure Modes (semantic dedupe) =============

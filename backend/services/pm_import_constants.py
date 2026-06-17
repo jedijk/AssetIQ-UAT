@@ -30,6 +30,11 @@ def is_pm_import_review_accepted(task: Dict[str, Any]) -> bool:
     return status != "rejected"
 
 
+def is_pm_import_task_active(task: Dict[str, Any]) -> bool:
+    """Whether a PM import task is enabled for scheduling (separate from review accept/reject)."""
+    return task.get("is_active", True) is not False
+
+
 def _sanitize_for_json(value: Any) -> Any:
     """Recursively convert MongoDB / Python values to JSON-safe types."""
     if value is None or isinstance(value, bool):

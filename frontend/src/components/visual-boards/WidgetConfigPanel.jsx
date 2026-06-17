@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { CHART_METRICS, KPI_METRICS } from "./widgetLibrary";
+import { CHART_METRICS, KPI_METRICS, PRODUCTION_METRICS } from "./widgetLibrary";
 
 const WidgetConfigPanel = ({ widget, onChange, onRemove }) => {
   if (!widget) {
@@ -63,7 +63,55 @@ const WidgetConfigPanel = ({ widget, onChange, onRemove }) => {
         </div>
       )}
 
-      {(widget.type === "observation_list" || widget.type === "action_queue") && (
+      {widget.type === "production_kpi" && (
+        <>
+          <div className="space-y-2">
+            <Label>Production metric</Label>
+            <Select
+              value={widget.config?.production_metric || "total_input"}
+              onValueChange={(v) => updateConfig({ production_metric: v })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PRODUCTION_METRICS.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Period</Label>
+            <Select
+              value={widget.config?.period || "today"}
+              onValueChange={(v) => updateConfig({ period: v })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="week">This week</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </>
+      )}
+
+      {widget.type === "mooney_chart" && (
+        <div className="space-y-2">
+          <Label>Period</Label>
+          <Select
+            value={widget.config?.period || "today"}
+            onValueChange={(v) => updateConfig({ period: v })}
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="week">This week</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {(widget.type === "observation_list" || widget.type === "action_queue" || widget.type === "form_submissions_list" || widget.type === "risk_observation_list") && (
         <div className="space-y-2">
           <Label>Item limit</Label>
           <Input
@@ -73,6 +121,22 @@ const WidgetConfigPanel = ({ widget, onChange, onRemove }) => {
             value={widget.config?.limit ?? 10}
             onChange={(e) => updateConfig({ limit: Number(e.target.value) })}
           />
+        </div>
+      )}
+
+      {widget.type === "action_queue" && (
+        <div className="space-y-2">
+          <Label>Queue mode</Label>
+          <Select
+            value={widget.config?.queue_mode || "open"}
+            onValueChange={(v) => updateConfig({ queue_mode: v })}
+          >
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="open">Open actions only</SelectItem>
+              <SelectItem value="recent">Recent (all statuses)</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       )}
 

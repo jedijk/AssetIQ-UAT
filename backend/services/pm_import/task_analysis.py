@@ -137,6 +137,7 @@ class PMImportMixin:
             "confidence_score": confidence,
             "ai_reasoning": ai_analysis.get("reasoning", ""),
             "review_status": "pending",
+            "is_active": True,
             "source_document": file_name,
             "source_row": row
         }
@@ -592,6 +593,7 @@ Respond in JSON format:
             # Match + review
             "equipment_match": task.get("equipment_match"),
             "review_status": task.get("review_status") or "pending",
+            "is_active": task.get("is_active", True),
             # Raw source preserved for traceability
             "original_task": task.get("original_task") or "",
         }

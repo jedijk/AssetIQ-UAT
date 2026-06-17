@@ -35,6 +35,8 @@ from models.visual_board import (
     default_executive_widgets,
     default_maintenance_widgets,
     default_reliability_widgets,
+    default_tyromer_operations_layout,
+    default_tyromer_operations_widgets,
 )
 from services.tenant_schema import merge_tenant_filter, with_tenant_id
 from services.visual_board_qr import generate_qr_data_url
@@ -93,7 +95,21 @@ def _default_widgets(board_type: BoardType) -> List[VisualBoardWidget]:
         return default_maintenance_widgets()
     if board_type == BoardType.EXECUTIVE:
         return default_executive_widgets()
+    if board_type == BoardType.OPERATIONS:
+        return default_tyromer_operations_widgets()
     return []
+
+
+def _default_layout(board_type: BoardType) -> VisualBoardLayout:
+    if board_type == BoardType.OPERATIONS:
+        return default_tyromer_operations_layout()
+    return VisualBoardLayout()
+
+
+def _default_theme(board_type: BoardType, requested: str = "dark") -> str:
+    if board_type == BoardType.OPERATIONS and requested == "dark":
+        return "light"
+    return requested
 
 
 async def _board_has_active_token(board_id: str, user: dict) -> bool:
@@ -116,8 +132,8 @@ async def create_board(request: CreateBoardRequest, user: dict) -> VisualBoardRe
             "board_type": request.board_type.value,
             "version": 0,
             "widgets": [w.model_dump() for w in widgets],
-            "layout": VisualBoardLayout().model_dump(),
-            "theme": request.theme,
+            "layout": _default_layout(request.board_type).model_dump(),
+            "theme": _default_theme(request.board_type, request.theme),
             "refresh_interval_seconds": request.refresh_interval_seconds,
             "plant": request.plant,
             "area": request.area,
@@ -849,6 +865,11 @@ async def _seed_default_templates(user: dict) -> None:
         ("Reliability Board", BoardType.RELIABILITY, default_reliability_widgets()),
         ("Maintenance Board", BoardType.MAINTENANCE, default_maintenance_widgets()),
         ("Executive Board", BoardType.EXECUTIVE, default_executive_widgets()),
+        (
+            "Tyromer Operations Board",
+            BoardType.OPERATIONS,
+            default_tyromer_operations_widgets(),
+        ),
     ]
     for name, btype, widgets in defaults:
         existing = await db[TEMPLATES_COLLECTION].find_one(
@@ -863,8 +884,12 @@ async def _seed_default_templates(user: dict) -> None:
                 "description": f"Default {name.lower()} template",
                 "board_type": btype.value,
                 "widgets": [w.model_dump() for w in widgets],
-                "layout": VisualBoardLayout().model_dump(),
-                "theme": "dark",
+                "layout": (
+                    default_tyromer_operations_layout().model_dump()
+                    if btype == BoardType.OPERATIONS
+                    else VisualBoardLayout().model_dump()
+                ),
+                "theme": "light" if btype == BoardType.OPERATIONS else "dark",
                 "created_by": user.get("id"),
                 "created_at": now,
                 "updated_at": now,

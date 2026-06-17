@@ -5,7 +5,8 @@ import {
   AlertTriangle, Edit, Trash2, X, Plus, Link, CheckCircle, 
   User, Briefcase, Calendar, History, RotateCcw, Clock, ShieldCheck,
   Cog, Thermometer, Activity, Zap, Shield, Leaf, Maximize2, Minimize2, Image, Search,
-  Wand2
+  Wand2,
+  Tags,
 } from "lucide-react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -82,6 +83,7 @@ export function FailureModeViewPanel({
   onShowVersionHistory,
   onImproveWithAI,
   onConsolidateActions,
+  onMapActionDisciplines,
   equipmentTypes,
   categories,
   currentUser,
@@ -750,6 +752,18 @@ export function FailureModeViewPanel({
           <div className="flex items-center justify-between mb-2">
             <Label className="text-xs text-slate-500">{t("library.recommendedActions")}</Label>
             <div className="flex items-center gap-2">
+              {!isEditing && onMapActionDisciplines && (fm.recommended_actions?.length || 0) > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onMapActionDisciplines}
+                  className="h-7 text-xs border-purple-200 text-purple-700 hover:bg-purple-50"
+                  data-testid="view-panel-map-disciplines-btn"
+                >
+                  <Tags className="w-3 h-3 mr-1" />
+                  Map Disciplines (AI)
+                </Button>
+              )}
               {!isEditing && onConsolidateActions && (fm.recommended_actions?.length || 0) >= 4 && (
                 <Button
                   size="sm"

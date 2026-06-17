@@ -70,6 +70,9 @@ export const isPmImportReviewAccepted = (task) => {
   return status !== "rejected";
 };
 
+/** Whether the task is enabled for scheduling (independent of accept/reject review). */
+export const isPmImportTaskActive = (task) => task?.is_active !== false;
+
 /** User-facing label/style for the PM Import status column. */
 export const getPmImportStatusDisplay = (task) => {
   const status = resolvePmImportStatus(task);

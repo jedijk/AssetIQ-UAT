@@ -31,6 +31,7 @@ const VisualBoardEditorPage = () => {
   const [name, setName] = useState("");
   const [boardType, setBoardType] = useState("reliability");
   const [refreshInterval, setRefreshInterval] = useState(30);
+  const [theme, setTheme] = useState("dark");
   const [widgets, setWidgets] = useState([]);
   const [layout, setLayout] = useState({ columns: 12, rows: 8 });
   const [selectedWidgetId, setSelectedWidgetId] = useState(null);
@@ -60,6 +61,7 @@ const VisualBoardEditorPage = () => {
       setName(board.name || "");
       setBoardType(board.board_type || "reliability");
       setRefreshInterval(board.refresh_interval_seconds || 30);
+      setTheme(board.theme || "dark");
       setWidgets(board.widgets || []);
       setLayout(board.layout || { columns: 12, rows: 8 });
     }
@@ -70,6 +72,7 @@ const VisualBoardEditorPage = () => {
       visualBoardAPI.updateBoard(boardId, {
         name,
         board_type: boardType,
+        theme,
         refresh_interval_seconds: refreshInterval,
         widgets,
         layout,
@@ -202,6 +205,16 @@ const VisualBoardEditorPage = () => {
             <Label>Refresh (sec)</Label>
             <Input type="number" min={10} max={300} value={refreshInterval} onChange={(e) => setRefreshInterval(Number(e.target.value))} />
           </div>
+          <div className="space-y-2">
+            <Label>Theme</Label>
+            <Select value={theme} onValueChange={setTheme}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="dark">Dark</SelectItem>
+                <SelectItem value="light">Light</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="pt-2 border-t">
             <div className="text-xs font-semibold text-slate-500 uppercase mb-2">Widget Library</div>
             <div className="space-y-1">
@@ -229,6 +242,7 @@ const VisualBoardEditorPage = () => {
           <VisualBoardCanvas
             layout={layout}
             widgets={widgets}
+            theme={theme}
             data={{ widgets: previewData?.widgets, status: previewData?.status }}
             previewSize="desktop"
             editable

@@ -142,26 +142,39 @@ async def _observation_list_payload(user: dict, limit: int = 10) -> Dict[str, An
     return {"type": WidgetType.OBSERVATION_LIST.value, "items": items, "total": len(items)}
 
 
-async def _action_queue_payload(user: dict, limit: int = 10) -> Dict[str, Any]:
+async def _action_queue_payload(
+    user: dict,
+    limit: int = 10,
+    *,
+    queue_mode: str = "open",
+) -> Dict[str, Any]:
     now_iso = datetime.now(timezone.utc).isoformat()
-    cursor = db.central_actions.find(
-        merge_tenant_filter(
-            {"status": {"$nin": ["completed", "closed", "cancelled", "done"]}},
-            user,
-        ),
-        {
-            "_id": 0,
-            "id": 1,
-            "title": 1,
-            "description": 1,
-            "owner": 1,
-            "assigned_to": 1,
-            "owner_name": 1,
-            "due_date": 1,
-            "status": 1,
-            "priority": 1,
-        },
-    ).sort([("due_date", 1), ("priority", -1)]).limit(limit)
+    fields = {
+        "_id": 0,
+        "id": 1,
+        "title": 1,
+        "description": 1,
+        "owner": 1,
+        "assigned_to": 1,
+        "owner_name": 1,
+        "due_date": 1,
+        "status": 1,
+        "priority": 1,
+        "equipment_name": 1,
+        "asset_name": 1,
+        "updated_at": 1,
+    }
+    if queue_mode == "recent":
+        filt = merge_tenant_filter({}, user)
+        cursor = db.central_actions.find(filt, fields).sort("updated_at", -1).limit(limit)
+    else:
+        cursor = db.central_actions.find(
+            merge_tenant_filter(
+                {"status": {"$nin": ["completed", "closed", "cancelled", "done"]}},
+                user,
+            ),
+            fields,
+        ).sort([("due_date", 1), ("priority", -1)]).limit(limit)
     rows = await cursor.to_list(limit)
     items = []
     for row in rows:
@@ -171,6 +184,7 @@ async def _action_queue_payload(user: dict, limit: int = 10) -> Dict[str, Any]:
             {
                 "id": row.get("id"),
                 "action": row.get("title") or row.get("description") or "—",
+                "subtitle": row.get("equipment_name") or row.get("asset_name") or "",
                 "owner": row.get("owner_name") or row.get("owner") or row.get("assigned_to") or "—",
                 "due_date": due,
                 "status": row.get("status") or "open",
@@ -289,16 +303,21 @@ async def build_widget_data(
         wtype = widget.type.value if hasattr(widget.type, "value") else widget.type
         if wtype == WidgetType.KPI_CARD.value:
             metric = widget.config.metric or "active_threat_exposure"
-            kpi = dashboard.kpi_cards.get(metric)
-            if kpi:
-                result[widget.id] = _kpi_payload(kpi)
+            if metric == "page_views":
+                from services.visual_board_operations_data import build_page_views_kpi
+
+                result[widget.id] = await build_page_views_kpi(user)
             else:
-                result[widget.id] = {
-                    "type": WidgetType.KPI_CARD.value,
-                    "value": 0,
-                    "formatted_value": "—",
-                    "error": f"Unknown metric: {metric}",
-                }
+                kpi = dashboard.kpi_cards.get(metric)
+                if kpi:
+                    result[widget.id] = _kpi_payload(kpi)
+                else:
+                    result[widget.id] = {
+                        "type": WidgetType.KPI_CARD.value,
+                        "value": 0,
+                        "formatted_value": "—",
+                        "error": f"Unknown metric: {metric}",
+                    }
         elif wtype == WidgetType.STATUS_INDICATOR.value:
             result[widget.id] = {
                 "type": WidgetType.STATUS_INDICATOR.value,
@@ -312,7 +331,11 @@ async def build_widget_data(
         elif wtype == WidgetType.EXPOSURE_WATERFALL.value:
             result[widget.id] = _waterfall_payload(dashboard)
         elif wtype == WidgetType.ACTION_QUEUE.value:
-            result[widget.id] = await _action_queue_payload(user, widget.config.limit)
+            result[widget.id] = await _action_queue_payload(
+                user,
+                widget.config.limit,
+                queue_mode=widget.config.queue_mode or "open",
+            )
         elif wtype == WidgetType.TREND_CHART.value:
             result[widget.id] = await _trend_chart_payload(
                 user,
@@ -320,6 +343,28 @@ async def build_widget_data(
                 days=widget.config.days or 30,
                 period_days=period_days,
             )
+        elif wtype == WidgetType.PRODUCTION_KPI.value:
+            from services.visual_board_operations_data import build_production_kpi
+
+            result[widget.id] = await build_production_kpi(
+                user,
+                widget.config.production_metric or "total_input",
+                period=widget.config.period or "today",
+            )
+        elif wtype == WidgetType.MOONEY_CHART.value:
+            from services.visual_board_operations_data import build_mooney_chart
+
+            result[widget.id] = await build_mooney_chart(
+                user, period=widget.config.period or "today"
+            )
+        elif wtype == WidgetType.FORM_SUBMISSIONS_LIST.value:
+            from services.visual_board_operations_data import build_form_submissions_list
+
+            result[widget.id] = await build_form_submissions_list(user, widget.config.limit)
+        elif wtype == WidgetType.RISK_OBSERVATION_LIST.value:
+            from services.visual_board_operations_data import build_risk_observation_list
+
+            result[widget.id] = await build_risk_observation_list(user, widget.config.limit)
         else:
             result[widget.id] = {
                 "type": wtype,

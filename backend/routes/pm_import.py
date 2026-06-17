@@ -43,6 +43,7 @@ class TaskUpdateRequest(BaseModel):
     frequency: Optional[str] = None
     frequency_days: Optional[int] = None
     estimated_hours: Optional[float] = None
+    is_active: Optional[bool] = None
 
 
 class ImportRequest(BaseModel):
@@ -288,6 +289,16 @@ async def update_task(
     
     if not result:
         raise HTTPException(status_code=404, detail="Session or task not found")
+
+    if "is_active" in update_data:
+        from services.maintenance_program_service import MaintenanceProgramService
+
+        await MaintenanceProgramService.propagate_pm_import_task_active_state(
+            session_id,
+            task_id,
+            bool(update_data["is_active"]),
+            user_id=current_user.get("id") or current_user.get("email"),
+        )
     
     return {
         "success": True,
@@ -890,6 +901,7 @@ async def list_all_tasks(
                 "confidence_score": task.get("confidence_score") or 50,
                 "equipment_match": equipment_match,
                 "review_status": task.get("review_status") or "pending",
+                "is_active": task.get("is_active", True),
                 "import_status": normalize_pm_import_display_status(task),
                 "apply_mode": task.get("apply_mode"),
                 "target_failure_mode_id": task.get("target_failure_mode_id"),

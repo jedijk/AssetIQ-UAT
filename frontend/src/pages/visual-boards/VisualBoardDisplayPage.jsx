@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
 import VisualBoardCanvas from "../../components/visual-boards/VisualBoardCanvas";
+import { boardSurfaceClass } from "../../components/visual-boards/boardTheme";
 import { useVisualBoardRealtime } from "../../hooks/useVisualBoardRealtime";
 
 /**
@@ -73,12 +74,14 @@ const VisualBoardDisplayPage = () => {
   const isLoading = layoutLoading || dataLoading;
   const error = layoutError;
 
+  const boardTheme = layout?.theme || "dark";
+
   const pageClass = useMemo(
     () =>
       fullscreen
-        ? "fixed inset-0 bg-slate-950 z-50"
-        : "min-h-screen bg-slate-950",
-    [fullscreen],
+        ? `fixed inset-0 z-50 ${boardSurfaceClass(boardTheme)}`
+        : `min-h-screen ${boardSurfaceClass(boardTheme)}`,
+    [fullscreen, boardTheme],
   );
 
   if (!token) {
@@ -105,13 +108,18 @@ const VisualBoardDisplayPage = () => {
     <div className={pageClass}>
       <div className="h-full w-full p-2 md:p-4 flex flex-col">
         <div className="flex items-center justify-between px-2 py-1 mb-2">
-          <h1 className="text-white text-lg font-semibold truncate">{layout?.name}</h1>
-          <span className="text-xs text-slate-500">v{layout?.version || 1}</span>
+          <h1 className={`text-lg font-semibold truncate ${boardTheme === "light" ? "text-slate-800" : "text-white"}`}>
+            {layout?.name}
+          </h1>
+          <span className={`text-xs ${boardTheme === "light" ? "text-slate-400" : "text-slate-500"}`}>
+            v{layout?.version || 1}
+          </span>
         </div>
         <div className="flex-1 min-h-0">
           <VisualBoardCanvas
             layout={layout?.layout}
             widgets={layout?.widgets || []}
+            theme={boardTheme}
             data={{
               widgets: displayData?.widgets,
               status: displayData?.status,

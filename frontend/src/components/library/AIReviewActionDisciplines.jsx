@@ -20,30 +20,9 @@ import {
 } from "../ui/select";
 import { toast } from "sonner";
 import api from "../../lib/api";
-import { DISCIPLINES, getDisciplineLabel } from "../../constants/disciplines";
+import { useDisciplines } from "../../hooks/useDisciplines";
 
 const BATCH_SIZE = 25; // Actions per OpenAI call
-
-// Use the SAME 8 disciplines as the rest of the app (Rotating / Static /
-// Piping / Electrical / Instrumentation / Civil / Operations / Laboratory).
-// Single source of truth: /app/frontend/src/constants/disciplines.js
-const DISCIPLINE_OPTIONS = DISCIPLINES.map((d) => ({ value: d.value, label: d.label }));
-const ALLOWED_DISCIPLINES = DISCIPLINES.map((d) => d.value);
-
-const DISCIPLINE_COLOR = Object.fromEntries(
-  DISCIPLINES.map((d) => [d.value, `${d.color} border-slate-200`]),
-);
-
-const DisciplineBadge = ({ value }) => {
-  const v = (value || "").toLowerCase();
-  const cls = DISCIPLINE_COLOR[v] || "bg-slate-100 text-slate-600 border-slate-200";
-  const label = getDisciplineLabel(v) || value || "—";
-  return (
-    <Badge variant="outline" className={`${cls} text-[11px] font-medium`}>
-      {label}
-    </Badge>
-  );
-};
 
 /**
  * Dialog that asks AI to re-classify the `discipline` field of every
@@ -51,6 +30,19 @@ const DisciplineBadge = ({ value }) => {
  * apply suggested changes per row.
  */
 export default function AIReviewActionDisciplines({ open, onClose, failureModes = [], onApplied }) {
+  const { selectOptions, getLabel, getColor } = useDisciplines();
+
+  const DisciplineBadge = ({ value }) => {
+    const v = (value || "").toLowerCase();
+    const cls = `${getColor(v)} border-slate-200`;
+    const label = getLabel(v) || value || "—";
+    return (
+      <Badge variant="outline" className={`${cls} text-[11px] font-medium`}>
+        {label}
+      </Badge>
+    );
+  };
+
   // ----- phase: idle | running | done -----
   const [phase, setPhase] = useState("idle");
   // Progress
@@ -267,9 +259,8 @@ export default function AIReviewActionDisciplines({ open, onClose, failureModes 
             Review Action Disciplines (AI)
           </DialogTitle>
           <DialogDescription>
-            AI will re-classify the maintenance discipline of every recommended
-            action in your library based on the action text. Review the
-            suggestions before applying.
+            Classify each recommended action into your configured Settings disciplines.
+            Review the suggestions before applying.
           </DialogDescription>
         </DialogHeader>
 
@@ -430,7 +421,7 @@ export default function AIReviewActionDisciplines({ open, onClose, failureModes 
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {DISCIPLINE_OPTIONS.map((d) => (
+                                {selectOptions.map((d) => (
                                   <SelectItem key={d.value} value={d.value}>
                                     {d.label}
                                   </SelectItem>

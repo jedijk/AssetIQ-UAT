@@ -198,6 +198,7 @@ const FailureModesPage = () => {
   const [isFindSimilarOpen, setIsFindSimilarOpen] = useState(false); // AI find similar failure modes
   const [isFindDuplicateActionsOpen, setIsFindDuplicateActionsOpen] = useState(false);
   const [isConsolidateActionsOpen, setIsConsolidateActionsOpen] = useState(false);
+  const [isMapActionDisciplinesOpen, setIsMapActionDisciplinesOpen] = useState(false);
   
   // Failure mode dialog state
   const [isFmDialogOpen, setIsFmDialogOpen] = useState(false);
@@ -954,6 +955,9 @@ const FailureModesPage = () => {
                 onConsolidateActions={
                   canUseAITools ? () => setIsConsolidateActionsOpen(true) : undefined
                 }
+                onMapActionDisciplines={
+                  canUseAITools ? () => setIsMapActionDisciplinesOpen(true) : undefined
+                }
                 equipmentTypes={equipmentTypes}
                 categories={categories}
                 currentUser={user}
@@ -980,6 +984,9 @@ const FailureModesPage = () => {
               onImproveWithAI={() => setIsAIImproveOpen(true)}
               onConsolidateActions={
                 canUseAITools ? () => setIsConsolidateActionsOpen(true) : undefined
+              }
+              onMapActionDisciplines={
+                canUseAITools ? () => setIsMapActionDisciplinesOpen(true) : undefined
               }
               equipmentTypes={equipmentTypes}
               categories={categories}
@@ -1144,6 +1151,8 @@ const FailureModesPage = () => {
         setIsFindDuplicateActionsOpen={setIsFindDuplicateActionsOpen}
         isConsolidateActionsOpen={isConsolidateActionsOpen}
         setIsConsolidateActionsOpen={setIsConsolidateActionsOpen}
+        isMapActionDisciplinesOpen={isMapActionDisciplinesOpen}
+        setIsMapActionDisciplinesOpen={setIsMapActionDisciplinesOpen}
         equipmentTypes={equipmentTypes}
         failureModes={failureModes}
         displayedFailureModes={displayedFailureModes}

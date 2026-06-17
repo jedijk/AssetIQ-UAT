@@ -26,6 +26,7 @@ from services.pm_import_constants import (
     TASK_TYPES,
     _sanitize_for_json,
     normalize_pm_import_display_status,
+    is_pm_import_task_active,
 )
 
 logger = logging.getLogger(__name__)
@@ -77,6 +78,14 @@ class PMImportMixin:
                 skipped_details.append({
                     "task": task.get("original_task", "")[:100],
                     "reason": "Rejected by user"
+                })
+                continue
+
+            if not is_pm_import_task_active(task):
+                skipped_count += 1
+                skipped_details.append({
+                    "task": task.get("original_task", "")[:100],
+                    "reason": "Task disabled",
                 })
                 continue
             

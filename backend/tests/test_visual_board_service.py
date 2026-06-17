@@ -69,6 +69,24 @@ async def test_create_board_seeds_reliability_widgets(mock_user, mock_db):
 
 
 @pytest.mark.asyncio
+async def test_create_operations_board_seeds_tyromer_widgets(mock_user, mock_db):
+    request = CreateBoardRequest(name="Tyromer Ops", board_type=BoardType.OPERATIONS)
+
+    with patch("services.visual_board_service.db", mock_db):
+        result = await svc.create_board(request, mock_user)
+
+    assert result.board_type == BoardType.OPERATIONS
+    assert result.theme == "light"
+    assert result.layout.rows == 12
+    assert len(result.widgets) == 13
+    widget_types = {w.type.value if hasattr(w.type, "value") else w.type for w in result.widgets}
+    assert "production_kpi" in widget_types
+    assert "mooney_chart" in widget_types
+    assert "form_submissions_list" in widget_types
+    assert "risk_observation_list" in widget_types
+
+
+@pytest.mark.asyncio
 async def test_get_board_not_found(mock_user, mock_db):
     boards = mock_db["visual_boards"]
     boards.find_one = AsyncMock(return_value=None)

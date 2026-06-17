@@ -226,8 +226,9 @@ class PMImportMixin:
                     updates = dict(updates)
                     updates["discipline"] = normalize_pm_import_discipline(updates.get("discipline"))
                 task.update(updates)
-                # Only set to "edited" if review_status is not explicitly being updated
-                if "review_status" not in updates:
+                # Only set to "edited" when substantive fields change (not enable/disable).
+                substantive = set(updates.keys()) - {"review_status", "is_active"}
+                if substantive and "review_status" not in updates:
                     task["review_status"] = "edited"
                 break
         

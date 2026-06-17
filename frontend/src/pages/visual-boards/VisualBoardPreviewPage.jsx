@@ -76,6 +76,7 @@ const VisualBoardPreviewPage = () => {
         <VisualBoardCanvas
           layout={board?.layout}
           widgets={board?.widgets || []}
+          theme={board?.theme || "dark"}
           data={{
             widgets: previewData?.widgets,
             status: previewData?.status,

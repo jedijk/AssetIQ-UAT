@@ -29,6 +29,13 @@ import {
 } from "../ui/select";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { Switch } from "../ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../ui/tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../ui/dialog";
 import { ScrollArea } from "../ui/scroll-area";
 import {
@@ -51,7 +58,8 @@ import {
   normalizeDiscipline,
 } from "../../constants/disciplines";
 import { toast } from "sonner";
-import { pmImportAPI, isPmImportFinalized, isPmImportReviewAccepted, getPmImportStatusDisplay } from "../../lib/apis/pmImport";
+import { pmImportAPI, isPmImportFinalized, isPmImportReviewAccepted, isPmImportTaskActive, getPmImportStatusDisplay } from "../../lib/apis/pmImport";
+import { refreshMaintenanceSchedulerQueries } from "../../lib/apis/maintenanceScheduler";
 import { AIReviewModal } from "../library/AIReviewModal";
 import PMApplyFailureModeDialog from "../library/PMApplyFailureModeDialog";
 
@@ -107,6 +115,17 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
     mutationFn: ({ task, updates }) => pmImportAPI.updateTask(task.session_id, task.task_id, updates),
     onSuccess: () => { toast.success('Task updated'); invalidateTasks(); setEditingTask(null); },
     onError: (e) => toast.error(`Update failed: ${e?.message || 'error'}`),
+  });
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ task, isActive }) =>
+      pmImportAPI.updateTask(task.session_id, task.task_id, { is_active: isActive }),
+    onSuccess: (_data, { isActive }) => {
+      toast.success(isActive ? "Task enabled for scheduling" : "Task disabled");
+      invalidateTasks();
+      refreshMaintenanceSchedulerQueries(queryClient);
+    },
+    onError: (e) => toast.error(e?.response?.data?.detail || e?.message || "Toggle failed"),
   });
   
   const mappingMutation = useMutation({
@@ -210,6 +229,7 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
   // Stats
   const totalTasks = allTasks.length;
   const acceptedTasks = allTasks.filter(isPmImportReviewAccepted).length;
+  const activeTasks = allTasks.filter((t) => isPmImportTaskActive(t)).length;
   
   const getDisciplineBadge = (discipline) => {
     if (!discipline) return null;
@@ -314,7 +334,7 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
       </div>
       
       {/* Stats Cards */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div className="card p-4">
           <div className="text-2xl font-bold text-purple-600">{totalTasks}</div>
           <div className="text-sm text-gray-500">Total Tasks Imported</div>
@@ -322,6 +342,10 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
         <div className="card p-4">
           <div className="text-2xl font-bold text-green-600">{acceptedTasks}</div>
           <div className="text-sm text-gray-500">Tasks Accepted</div>
+        </div>
+        <div className="card p-4">
+          <div className="text-2xl font-bold text-blue-600">{activeTasks}</div>
+          <div className="text-sm text-gray-500">Tasks Enabled</div>
         </div>
         <div className="card p-4">
           <div className="text-2xl font-bold text-gray-600">{sessionCount}</div>
@@ -464,6 +488,7 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
                   <th className="text-left px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Equipment Type</th>
                   <th className="text-left px-3 py-3 text-xs font-medium text-gray-600">Task Description</th>
                   <th className="text-left px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Status</th>
+                  <th className="text-center px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Enabled</th>
                   <th className="text-left px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Type</th>
                   <th className="text-left px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Discipline</th>
                   <th className="text-left px-3 py-3 text-xs font-medium text-gray-600 whitespace-nowrap">Frequency</th>
@@ -472,8 +497,20 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredTasks.map((task, idx) => (
-                  <tr key={task.task_id || idx} className="hover:bg-gray-50 group">
+                {filteredTasks.map((task, idx) => {
+                  const taskActive = isPmImportTaskActive(task);
+                  const toggleDisabled =
+                    toggleActiveMutation.isPending
+                    || task.review_status === "rejected"
+                    || isPmImportFinalized(task);
+                  return (
+                  <tr
+                    key={task.task_id || idx}
+                    className={cn(
+                      "hover:bg-gray-50 group",
+                      !taskActive && "opacity-60 bg-slate-50/80",
+                    )}
+                  >
                     <td className="px-3 py-3 whitespace-nowrap">
                       <PMHierarchyChip
                         task={task}
@@ -523,6 +560,34 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap">
                       {getImportStatusBadge(task)}
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap text-center">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="inline-flex items-center justify-center">
+                              <Switch
+                                checked={taskActive}
+                                disabled={toggleDisabled}
+                                onCheckedChange={(checked) =>
+                                  toggleActiveMutation.mutate({ task, isActive: checked })
+                                }
+                                aria-label={taskActive ? "Disable task" : "Enable task"}
+                                data-testid={`pm-task-active-toggle-${task.task_id}`}
+                              />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {task.review_status === "rejected"
+                              ? "Rejected tasks cannot be enabled"
+                              : isPmImportFinalized(task)
+                                ? "Finalized tasks cannot be toggled"
+                                : taskActive
+                                  ? "Included in maintenance schedule"
+                                  : "Excluded from maintenance schedule"}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </td>
                     <td className="px-3 py-3">
                       {getTaskTypeBadge(task.task_type)}
@@ -598,7 +663,8 @@ export const CustomPMImportTab = ({ onOpenImportWizard, onOpenEquipmentTypeStrat
                       </div>
                     </td>
                   </tr>
-                ))}
+                );
+                })}
               </tbody>
             </table>
           </div>

@@ -930,7 +930,7 @@ class MaintenanceProgramService:
                     "failure_mode_id": trace.get("failure_mode_id"),
                     "failure_mode_name": trace.get("failure_mode_name"),
                     "discipline": task.get("discipline"),
-                    "is_active": True,
+                    "is_active": bool(task.get("is_active", True)),
                     "updated_at": datetime.utcnow().isoformat(),
                 }
 
@@ -1463,7 +1463,7 @@ class MaintenanceProgramService:
                 failure_mode_id=pm_task.get("matched_failure_mode_id"),
                 failure_mode_name=pm_task.get("matched_failure_mode_name"),
             ),
-            is_active=review_status != "rejected",
+            is_active=bool(pm_task.get("is_active", True)) and review_status != "rejected",
             is_mandatory=True,
         ).model_dump()
         program_task["traceability"]["pm_import_task_id"] = pm_ref
@@ -1472,6 +1472,97 @@ class MaintenanceProgramService:
         program_task["task_type"] = task_type
         program_task["pm_import_task_type"] = str(raw_type).upper()
         return program_task
+
+    @staticmethod
+    async def propagate_pm_import_task_active_state(
+        session_id: str,
+        task_id: str,
+        is_active: bool,
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Mirror PM Import task enable/disable to programs and the maintenance schedule."""
+        pm_ref = f"{session_id}:{task_id}"
+        session = await db.pm_import_sessions.find_one(
+            {"session_id": session_id},
+            {"_id": 0, "tasks_extracted": 1},
+        )
+        equipment_id = None
+        if session:
+            for pm_task in session.get("tasks_extracted") or []:
+                if pm_task.get("task_id") == task_id:
+                    em = pm_task.get("equipment_match") or {}
+                    equipment_id = em.get("equipment_id")
+                    break
+
+        programs_updated = 0
+        if equipment_id:
+            stored = await db.maintenance_programs_v2.find_one(
+                {"equipment_id": equipment_id},
+                {"_id": 0, "tasks": 1},
+            )
+            if stored:
+                tasks = list(stored.get("tasks") or [])
+                changed = False
+                for i, task in enumerate(tasks):
+                    trace = task.get("traceability") or {}
+                    if (
+                        trace.get("pm_import_task_id") == pm_ref
+                        or task.get("id") == f"pm-import:{pm_ref}"
+                    ):
+                        if task.get("is_active", True) != is_active:
+                            tasks[i] = {**task, "is_active": is_active}
+                            changed = True
+                if changed:
+                    await db.maintenance_programs_v2.update_one(
+                        {"equipment_id": equipment_id},
+                        {
+                            "$set": {
+                                "tasks": tasks,
+                                "updated_at": datetime.utcnow().isoformat(),
+                            }
+                        },
+                    )
+                    programs_updated += 1
+
+            legacy_result = await db.maintenance_programs.update_many(
+                {"equipment_id": equipment_id, "pm_import_task_id": pm_ref},
+                {
+                    "$set": {
+                        "is_active": is_active,
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }
+                },
+            )
+            programs_updated += legacy_result.modified_count
+
+        scheduled_cancelled = 0
+        if not is_active:
+            cancel_result = await db.scheduled_tasks.update_many(
+                {
+                    "pm_import_task_id": pm_ref,
+                    "status": {"$nin": ["completed", "cancelled"]},
+                },
+                {
+                    "$set": {
+                        "status": "cancelled",
+                        "notes": "Auto-cancelled: PM import task disabled",
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }
+                },
+            )
+            scheduled_cancelled = cancel_result.modified_count
+        elif equipment_id:
+            from services.maintenance_scheduler_sync import refresh_equipment_schedule
+
+            await refresh_equipment_schedule(equipment_id, user_id=user_id)
+
+        return {
+            "pm_import_task_id": pm_ref,
+            "equipment_id": equipment_id,
+            "is_active": is_active,
+            "programs_updated": programs_updated,
+            "scheduled_tasks_cancelled": scheduled_cancelled,
+        }
 
     @staticmethod
     async def fetch_pm_import_tasks_for_equipment(
@@ -1598,6 +1689,9 @@ class MaintenanceProgramService:
                         ),
                         "estimated_duration_hours": pm_task_dict.get(
                             "estimated_duration_hours", existing.get("estimated_duration_hours")
+                        ),
+                        "is_active": pm_task_dict.get(
+                            "is_active", existing.get("is_active", True)
                         ),
                     }
                 continue
