@@ -18,6 +18,7 @@ import MooneyChartWidget from "./widgets/MooneyChartWidget";
 import FormSubmissionsListWidget from "./widgets/FormSubmissionsListWidget";
 import RiskObservationListWidget from "./widgets/RiskObservationListWidget";
 import { boardSurfaceClass } from "./boardTheme";
+import VisualBoardLogo from "./VisualBoardLogo";
 
 const WIDGET_RENDERERS = {
   kpi_card: KpiCardWidget,
@@ -117,14 +118,19 @@ const VisualBoardCanvas = ({
   );
 
   return (
-    <div className={`mx-auto ${sizeClass} ${boardSurfaceClass(theme)} rounded-lg overflow-hidden shadow-2xl`}>
-      {editable ? (
-        <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-          {grid}
-        </DndContext>
-      ) : (
-        grid
-      )}
+    <div className={`relative mx-auto ${sizeClass} ${boardSurfaceClass(theme)} rounded-lg overflow-hidden shadow-2xl flex flex-col`}>
+      <div className="shrink-0 px-4 pt-3 pb-1">
+        <VisualBoardLogo theme={theme} />
+      </div>
+      <div className="flex-1 min-h-0">
+        {editable ? (
+          <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+            {grid}
+          </DndContext>
+        ) : (
+          grid
+        )}
+      </div>
     </div>
   );
 };
