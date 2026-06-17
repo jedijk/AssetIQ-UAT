@@ -1,5 +1,5 @@
 import React from "react";
-import { boardCardClass, boardMutedText, vmbText } from "../boardTheme";
+import { boardCardClass, boardMutedText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
 
 function statusClass(status) {
   const s = String(status || "").toLowerCase();
@@ -24,11 +24,11 @@ const ActionQueueWidget = ({ widget, data, theme = "dark" }) => {
   const isRecent = widget?.config?.queue_mode === "recent";
 
   return (
-    <div className={`h-full rounded-xl p-3 sm:p-4 flex flex-col overflow-hidden ${boardCardClass(theme)}`}>
-      <div className={`${vmbText.title} mb-2 ${theme === "light" ? "text-slate-700" : "text-white"}`}>
+    <div className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)}`}>
+      <div className={`shrink-0 ${vmbText.title} mb-1 ${theme === "light" ? "text-slate-700" : "text-white"}`}>
         {widget?.title || "Action Queue"}
       </div>
-      <div className="flex-1 overflow-auto space-y-2">
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
         {items.length === 0 ? (
           <div className={`${vmbText.body} ${boardMutedText(theme)}`}>No actions</div>
         ) : (

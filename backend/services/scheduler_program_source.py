@@ -135,7 +135,7 @@ async def load_pm_import_scheduler_rows(
     """
     from services.maintenance_program_pm_import import pm_import_task_to_program_dict
     from services.maintenance_program_service import MaintenanceProgramService
-            from services.pm_import_constants import is_pm_import_review_accepted, normalize_pm_import_display_status
+    from services.pm_import_constants import is_pm_import_review_accepted, normalize_pm_import_display_status
 
     covered_pm_refs = covered_pm_refs or set()
     equipment_filter = set(equipment_ids) if equipment_ids else None

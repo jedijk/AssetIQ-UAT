@@ -1,5 +1,5 @@
 import React from "react";
-import { boardCardClass, boardMutedText, vmbText } from "../boardTheme";
+import { boardCardClass, boardMutedText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
 
 function accentClass(metric, theme) {
   if (theme !== "light") return "";
@@ -26,16 +26,14 @@ const KpiCardWidget = ({ widget, data, theme = "dark" }) => {
 
   return (
     <div
-      className={`h-full rounded-xl p-3 sm:p-4 flex flex-col justify-center ${boardCardClass(theme)} ${accentClass(metric, theme)}`}
+      className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)} justify-center gap-0.5 ${accentClass(metric, theme)}`}
     >
-      <div className={`${vmbText.label} mb-1 ${boardMutedText(theme)}`}>
-        {label}
-      </div>
-      <div className="flex items-baseline gap-2 flex-wrap">
-        <span className={vmbText.value}>{value}</span>
+      <div className={`shrink-0 ${vmbText.label} ${boardMutedText(theme)}`}>{label}</div>
+      <div className="flex items-baseline gap-1 min-w-0 overflow-hidden">
+        <span className={`${vmbText.value} min-w-0`}>{value}</span>
         {change ? (
           <span
-            className={`${vmbText.small} font-medium ${
+            className={`shrink-0 ${vmbText.small} font-medium ${
               Number(payload.change_percent) >= 0 ? "text-orange-500" : "text-green-600"
             }`}
           >
@@ -44,7 +42,7 @@ const KpiCardWidget = ({ widget, data, theme = "dark" }) => {
         ) : null}
       </div>
       {subtitle ? (
-        <div className={`${vmbText.small} mt-1 ${boardMutedText(theme)}`}>{subtitle}</div>
+        <div className={`shrink-0 ${vmbText.small} truncate ${boardMutedText(theme)}`}>{subtitle}</div>
       ) : null}
     </div>
   );

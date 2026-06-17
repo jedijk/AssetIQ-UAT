@@ -114,7 +114,7 @@ function DraggableWidgetCell({
     <div
       ref={editable ? setNodeRef : undefined}
       style={style}
-      className={`relative min-h-0 h-full ${editable ? "cursor-grab active:cursor-grabbing" : ""} ${
+      className={`relative min-h-0 min-w-0 h-full overflow-hidden @container ${editable ? "cursor-grab active:cursor-grabbing" : ""} ${
         selected ? "ring-2 ring-blue-500 rounded-xl" : ""
       }`}
       onClick={editable ? () => onSelect?.(widget.id) : undefined}

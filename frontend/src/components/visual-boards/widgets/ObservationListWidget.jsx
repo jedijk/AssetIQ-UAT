@@ -1,26 +1,32 @@
 import React from "react";
-import { vmbText } from "../boardTheme";
+import { boardCardClass, boardMutedText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
 
-const ObservationListWidget = ({ widget, data }) => {
+const ObservationListWidget = ({ widget, data, theme = "dark" }) => {
   const payload = data?.widgets?.[widget?.id] || {};
   const items = payload.items || data?.observations || [];
 
   return (
-    <div className="h-full rounded-xl border border-slate-700/50 bg-slate-900/80 p-4 flex flex-col overflow-hidden">
-      <div className={`${vmbText.title} text-white mb-3`}>{widget?.title || "Observations"}</div>
-      <div className="flex-1 overflow-auto space-y-2">
+    <div className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)}`}>
+      <div className={`shrink-0 ${vmbText.title} mb-1 ${theme === "light" ? "text-slate-700" : "text-white"}`}>
+        {widget?.title || "Observations"}
+      </div>
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
         {items.length === 0 ? (
-          <div className={`${vmbText.body} text-slate-500`}>No active observations</div>
+          <div className={`${vmbText.body} ${boardMutedText(theme)}`}>No active observations</div>
         ) : (
           items.map((item) => (
             <div
               key={item.id || item.observation_id}
-              className={`rounded-lg bg-slate-800/80 px-3 py-2 ${vmbText.body}`}
+              className={`rounded-lg px-2 py-1.5 ${vmbText.small} ${
+                theme === "light" ? "border-b border-slate-100" : "bg-slate-800/80"
+              }`}
             >
-              <div className="font-medium text-white truncate">{item.asset || item.equipment_name || "—"}</div>
-              <div className={`flex justify-between ${vmbText.small} text-slate-400 mt-1`}>
-                <span>{item.status || "open"}</span>
-                <span>{item.exposure_formatted || item.risk_level || ""}</span>
+              <div className={`font-medium truncate ${theme === "light" ? "text-slate-800" : "text-white"}`}>
+                {item.asset || item.equipment_name || "—"}
+              </div>
+              <div className={`flex justify-between gap-2 min-w-0 ${boardMutedText(theme)} mt-0.5`}>
+                <span className="truncate">{item.status || "open"}</span>
+                <span className="shrink-0">{item.exposure_formatted || item.risk_level || ""}</span>
               </div>
             </div>
           ))
