@@ -30,7 +30,7 @@ export function buildNavItems(t) {
     { path: "/tasks", label: t("nav.taskScheduler"), icon: Calendar, desktopOnly: true, feature: "tasks", navTestId: "task-scheduler" },
     { path: "/form-submissions", label: t("nav.formSubmissions"), icon: FileText, feature: "forms", navTestId: "form-submissions" },
     { path: "/library", label: t("nav.library"), icon: BookOpen, desktopOnly: true, feature: "library", navTestId: "library" },
-    { path: "/visual-management/boards", label: t("nav.visualManagement"), icon: Monitor, desktopOnly: true, feature: "visual_boards", navTestId: "visual-management" },
+    { path: "/visual-management/boards", label: t("nav.visualManagement"), icon: Monitor, desktopOnly: true, feature: "visual_boards", navTestId: "visual-management", activePrefix: "/visual-management" },
   ];
 }
 

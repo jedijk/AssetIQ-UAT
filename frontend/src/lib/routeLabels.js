@@ -33,7 +33,7 @@ const staticRouteLabels = {
   '/library': 'Strategy',
   '/visual-management/boards': 'Visual Management',
   '/visual-management/templates': 'Templates',
-  '/visual-management/screens': 'Screens',
+  '/visual-management/screens': 'Pair Displays',
   '/visual-management/analytics': 'Analytics',
   '/equipment-manager': 'Equipment Manager',
   '/causal-engine': 'Causal Engine',

@@ -50,12 +50,12 @@ const DISPLAY_STEPS = [
     body: () => "Use a laptop, phone, or tablet where you are already logged into AssetIQ.",
   },
   {
-    title: "Go to Visual Management → Screens",
+    title: "Go to Visual Management → Pair Displays",
     body: () => (
       <>
         In the app menu, open{" "}
-        <span className="text-slate-300 font-medium">Visual Management</span>, then{" "}
-        <span className="text-slate-300 font-medium">Screens</span>.
+        <span className="text-slate-300 font-medium">Visual Management</span>, then click{" "}
+        <span className="text-slate-300 font-medium">Pair Displays</span>.
       </>
     ),
   },

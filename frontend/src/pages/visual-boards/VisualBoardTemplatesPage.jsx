@@ -7,6 +7,7 @@ import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
+import { VisualManagementNav } from "../../components/visual-boards/VisualManagementNav";
 
 const VisualBoardTemplatesPage = () => {
   const navigate = useNavigate();
@@ -43,10 +44,12 @@ const VisualBoardTemplatesPage = () => {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <VisualManagementNav />
+
       <div>
         <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
           <LayoutTemplate className="w-7 h-7 text-blue-600" />
-          Visual Management — Templates
+          Templates
         </h1>
         <p className="text-sm text-slate-500 mt-1">Start new boards from reusable layouts.</p>
       </div>

@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/ca
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { DisplayPairingInstructions, getDisplayPairingUrl } from "../../components/visual-boards/DisplayPairingInstructions";
+import { VisualManagementNav } from "../../components/visual-boards/VisualManagementNav";
 
 const STATUS_VARIANT = {
   online: "default",
@@ -104,13 +105,15 @@ const VisualBoardScreensPage = () => {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <VisualManagementNav />
+
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <Monitor className="w-7 h-7 text-blue-600" />
-            Visual Management — Screens
+            Pair Displays
           </h1>
-          <p className="text-sm text-slate-500 mt-1">Pair TVs and displays, then assign boards.</p>
+          <p className="text-sm text-slate-500 mt-1">Connect shop-floor TVs and tablets, then assign a board to each screen.</p>
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline" size="sm">

@@ -2,12 +2,13 @@ import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Plus, Monitor, RefreshCw, Loader2, ExternalLink } from "lucide-react";
+import { Plus, Monitor, RefreshCw, Loader2, ExternalLink, Tv } from "lucide-react";
 import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { getDisplayPairingUrl } from "../../components/visual-boards/DisplayPairingInstructions";
+import { VisualManagementNav } from "../../components/visual-boards/VisualManagementNav";
 
 const STATUS_VARIANT = {
   draft: "secondary",
@@ -41,22 +42,25 @@ const VisualBoardsPage = () => {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <VisualManagementNav />
+
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <Monitor className="w-7 h-7 text-blue-600" />
-            Visual Management — Boards
+            Boards
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             Create, preview, and publish shop-floor display boards.
           </p>
-          <div className="flex gap-3 mt-2 text-sm">
-            <Link to="/visual-management/templates" className="text-blue-600 hover:underline">Templates</Link>
-            <Link to="/visual-management/screens" className="text-blue-600 hover:underline">Screens</Link>
-            <Link to="/visual-management/analytics" className="text-blue-600 hover:underline">Analytics</Link>
-          </div>
         </div>
         <div className="flex gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link to="/visual-management/screens">
+              <Tv className="w-4 h-4 mr-1" />
+              Pair a TV
+            </Link>
+          </Button>
           <Button variant="outline" size="sm" onClick={() => refetch()}>
             <RefreshCw className="w-4 h-4 mr-1" />
             Refresh
@@ -72,19 +76,24 @@ const VisualBoardsPage = () => {
         </div>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="font-medium text-slate-800">Shop-floor TVs:</span>
-        <span>
-          Open{" "}
-          <a href={getDisplayPairingUrl()} target="_blank" rel="noopener noreferrer" className="font-mono text-blue-600 hover:underline">
-            {getDisplayPairingUrl()}
-          </a>{" "}
-          on the display, then pair under{" "}
-          <Link to="/visual-management/screens" className="text-blue-600 hover:underline font-medium">
-            Screens
+      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm text-slate-700 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="font-semibold text-slate-900">Connect a shop-floor TV</p>
+          <p className="mt-1 text-slate-600">
+            Open{" "}
+            <a href={getDisplayPairingUrl()} target="_blank" rel="noopener noreferrer" className="font-mono text-blue-700 hover:underline">
+              {getDisplayPairingUrl()}
+            </a>{" "}
+            on the display, then enter the code under{" "}
+            <span className="font-medium">Pair Displays</span>.
+          </p>
+        </div>
+        <Button asChild size="sm">
+          <Link to="/visual-management/screens">
+            <Tv className="w-4 h-4 mr-1" />
+            Pair Displays
           </Link>
-          .
-        </span>
+        </Button>
       </div>
 
       {isLoading ? (

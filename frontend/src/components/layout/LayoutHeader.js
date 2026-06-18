@@ -51,6 +51,13 @@ export default function LayoutHeader({
   dismissedNotifications,
   setDismissedNotifications,
 }) {
+  const navItemIsActive = (item) => (_, loc) => {
+    if (item.activePrefix) {
+      return loc.pathname === item.activePrefix || loc.pathname.startsWith(`${item.activePrefix}/`);
+    }
+    return loc.pathname === item.path || (item.path !== "/" && loc.pathname.startsWith(`${item.path}/`));
+  };
+
   return (
     <header className="app-header bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 pointer-events-auto">
         <div className="header-content relative max-w-full px-4">
@@ -126,6 +133,7 @@ export default function LayoutHeader({
                   key={item.path}
                   to={item.path}
                   end={item.path === "/"}
+                  isActive={navItemIsActive(item)}
                   className={({ isActive }) =>
                     `flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap ${
                       isActive 
@@ -460,6 +468,7 @@ export default function LayoutHeader({
                 <NavLink
                   to={item.path}
                   end={item.path === "/"}
+                  isActive={navItemIsActive(item)}
                   onClick={() => setMobileMenuOpen(false)}
                   className={({ isActive }) =>
                     `flex items-center gap-3 p-3 rounded-lg transition-colors ${
