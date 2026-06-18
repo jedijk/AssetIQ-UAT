@@ -130,7 +130,11 @@ async def test_publish_board_creates_version_and_token(mock_user, mock_db):
 async def test_resolve_token_invalid(mock_db):
     tokens = mock_db["visual_board_tokens"]
     tokens.find_one = AsyncMock(return_value=None)
-    with patch("services.visual_board_service.db", mock_db):
+
+    def fake_get_database(db_name):
+        return mock_db
+
+    with patch("services.visual_board_service.get_database", side_effect=fake_get_database):
         with pytest.raises(HTTPException) as exc:
             await svc.resolve_token("vmb_" + "a" * 64)
     assert exc.value.status_code == 404

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Save, Eye, Rocket, Loader2, History, Plus, QrCode } from "lucide-react";
+import { ArrowLeft, Save, Eye, Rocket, Loader2, History, Plus, QrCode, Copy, Share2 } from "lucide-react";
 import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
 import VisualBoardCanvas from "../../components/visual-boards/VisualBoardCanvas";
 import WidgetConfigPanel from "../../components/visual-boards/WidgetConfigPanel";
@@ -59,6 +59,42 @@ const VisualBoardEditorPage = () => {
   const [publishResult, setPublishResult] = useState(null);
   const [showVersions, setShowVersions] = useState(false);
   const gridMetricsRef = useRef({ colWidth: 36, rowHeight: 28, gap: 8 });
+
+  const publishedDisplayUrl = publishResult?.url ? resolveBoardDisplayUrl(publishResult.url) : "";
+
+  const copyPublishedUrl = async () => {
+    if (!publishedDisplayUrl) return;
+    try {
+      await navigator.clipboard.writeText(publishedDisplayUrl);
+      toast.success("Display URL copied");
+    } catch {
+      const textArea = document.createElement("textarea");
+      textArea.value = publishedDisplayUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      toast.success("Display URL copied");
+    }
+  };
+
+  const sharePublishedUrl = async () => {
+    if (!publishedDisplayUrl) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: name || "Visual Management Board",
+          text: "Open this board on a display device",
+          url: publishedDisplayUrl,
+        });
+      } catch (err) {
+        if (err?.name !== "AbortError") copyPublishedUrl();
+      }
+      return;
+    }
+    await copyPublishedUrl();
+    toast.info("Share is not available here — link copied instead");
+  };
 
   const { data: board, isLoading } = useQuery({
     queryKey: ["visual-board", boardId],
@@ -368,25 +404,37 @@ const VisualBoardEditorPage = () => {
       </div>
 
       <Dialog open={!!publishResult} onOpenChange={(open) => !open && setPublishResult(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-md sm:max-w-lg w-[calc(100%-2rem)] overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <QrCode className="w-5 h-5" />
+              <QrCode className="w-5 h-5 shrink-0" />
               Board Published
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 text-sm">
-            {publishResult?.url ? (
-              <div className="space-y-1">
+          <div className="space-y-3 text-sm min-w-0">
+            {publishedDisplayUrl ? (
+              <div className="space-y-2 min-w-0">
                 <p className="text-slate-600">Display URL</p>
-                <a
-                  href={resolveBoardDisplayUrl(publishResult.url)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block break-all text-blue-600 hover:underline font-mono text-xs bg-slate-100 px-2 py-1.5 rounded"
-                >
-                  {resolveBoardDisplayUrl(publishResult.url)}
-                </a>
+                <div className="min-w-0 max-w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                  <a
+                    href={publishedDisplayUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block font-mono text-xs leading-relaxed text-blue-600 hover:underline break-all [overflow-wrap:anywhere]"
+                  >
+                    {publishedDisplayUrl}
+                  </a>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={copyPublishedUrl}>
+                    <Copy className="w-3.5 h-3.5" />
+                    Copy link
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={sharePublishedUrl}>
+                    <Share2 className="w-3.5 h-3.5" />
+                    Share
+                  </Button>
+                </div>
                 <p className="text-[11px] text-slate-500">
                   Open this link on a TV or tablet (frontend app). It is not served from the API host.
                 </p>
@@ -394,7 +442,7 @@ const VisualBoardEditorPage = () => {
             ) : null}
             {publishResult?.qr_code_data_url && (
               <div className="flex justify-center py-2">
-                <img src={publishResult.qr_code_data_url} alt="Board QR code" className="w-40 h-40" />
+                <img src={publishResult.qr_code_data_url} alt="Board QR code" className="w-40 h-40 max-w-full" />
               </div>
             )}
             <p className="text-slate-500">Scan the QR code to open this board on a phone or tablet without login.</p>

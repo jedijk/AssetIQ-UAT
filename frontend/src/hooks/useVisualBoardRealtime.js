@@ -9,7 +9,7 @@ function wsBaseUrl() {
 /**
  * WebSocket client for public VMB display with polling fallback.
  */
-export function useVisualBoardRealtime(token, { enabled, refreshIntervalSec = 30, onDataRefreshed }) {
+export function useVisualBoardRealtime(token, { enabled, dbEnv, refreshIntervalSec = 30, onDataRefreshed }) {
   const wsRef = useRef(null);
   const pollRef = useRef(null);
   const onDataRef = useRef(onDataRefreshed);
@@ -17,10 +17,11 @@ export function useVisualBoardRealtime(token, { enabled, refreshIntervalSec = 30
 
   const startPolling = useCallback(() => {
     if (pollRef.current) return;
+    const dbQuery = dbEnv && dbEnv !== "production" ? `?db_env=${encodeURIComponent(dbEnv)}` : "";
     pollRef.current = setInterval(async () => {
       try {
         const res = await fetch(
-          `${getBackendUrl()}/api/vmb/${encodeURIComponent(token)}/data`,
+          `${getBackendUrl()}/api/vmb/${encodeURIComponent(token)}/data${dbQuery}`,
         );
         if (res.ok) {
           const data = await res.json();
@@ -30,7 +31,7 @@ export function useVisualBoardRealtime(token, { enabled, refreshIntervalSec = 30
         /* ignore */
       }
     }, Math.max(refreshIntervalSec, 10) * 1000);
-  }, [token, refreshIntervalSec]);
+  }, [token, refreshIntervalSec, dbEnv]);
 
   useEffect(() => {
     if (!enabled || !token) return undefined;

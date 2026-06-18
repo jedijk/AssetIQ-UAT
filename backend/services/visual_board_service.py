@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
 
-from database import db
+from database import AVAILABLE_DATABASES, db, get_database, get_current_db_name, set_request_db
 from models.visual_board import (
     BoardStatus,
     BoardType,
@@ -52,11 +52,32 @@ def _frontend_base_url() -> str:
     ).rstrip("/")
 
 
-def _display_url(path: str) -> str:
+def _token_lookup_db_names() -> List[str]:
+    """Databases to search for public board tokens (order: request default, then others)."""
+    names: List[str] = []
+    for candidate in (get_current_db_name(), *[m["name"] for m in AVAILABLE_DATABASES.values()]):
+        if candidate and candidate not in names:
+            names.append(candidate)
+    return names
+
+
+def _db_env_for_current_request() -> Optional[str]:
+    current = get_current_db_name()
+    for env_key, meta in AVAILABLE_DATABASES.items():
+        if meta["name"] == current:
+            return env_key
+    return None
+
+
+def _display_url(path: str, *, db_env: Optional[str] = None) -> str:
     if not path.startswith("/"):
         path = f"/{path}"
     base = _frontend_base_url()
-    return f"{base}{path}" if base else path
+    url = f"{base}{path}" if base else path
+    if db_env and db_env != "production":
+        sep = "&" if "?" in url else "?"
+        url = f"{url}{sep}db_env={db_env}"
+    return url
 
 
 def _parse_header(raw) -> VisualBoardHeaderConfig:
@@ -249,7 +270,7 @@ async def _issue_token(
     await db[TOKENS_COLLECTION].insert_one(token_doc)
     path = f"/vmb/{raw_token}"
     base = _frontend_base_url()
-    url = _display_url(path)
+    url = _display_url(path, db_env=_db_env_for_current_request())
     return PublishBoardResponse(
         board_id=board_id,
         version=version,
@@ -497,10 +518,16 @@ async def resolve_token(raw_token: str) -> Dict[str, Any]:
     Used by public routes — no JWT.
     """
     token_hash = hash_token(raw_token)
-    token_doc = await db[TOKENS_COLLECTION].find_one(
-        {"token_hash": token_hash, "is_active": True},
-        {"_id": 0},
-    )
+    token_doc = None
+    for db_name in _token_lookup_db_names():
+        coll = get_database(db_name)[TOKENS_COLLECTION]
+        token_doc = await coll.find_one(
+            {"token_hash": token_hash, "is_active": True},
+            {"_id": 0},
+        )
+        if token_doc:
+            set_request_db(db_name)
+            break
     if not token_doc:
         raise HTTPException(status_code=404, detail="Invalid or inactive board token")
 

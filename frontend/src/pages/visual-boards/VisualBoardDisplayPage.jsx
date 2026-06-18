@@ -17,12 +17,13 @@ const VisualBoardDisplayPage = () => {
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const fullscreen = searchParams.get("fullscreen") === "true";
+  const dbEnv = searchParams.get("db_env") || undefined;
   const refreshSeconds = Number(searchParams.get("rotation")) || undefined;
   const [liveData, setLiveData] = useState(null);
 
   const { data: layout, isLoading: layoutLoading, error: layoutError } = useQuery({
-    queryKey: ["vmb-layout", token],
-    queryFn: () => visualBoardAPI.getPublicLayout(token),
+    queryKey: ["vmb-layout", token, dbEnv],
+    queryFn: () => visualBoardAPI.getPublicLayout(token, { dbEnv }),
     enabled: !!token,
     retry: false,
   });
@@ -30,8 +31,8 @@ const VisualBoardDisplayPage = () => {
   const intervalMs = (refreshSeconds || layout?.refresh_interval_seconds || 30) * 1000;
 
   const { data: boardData, isLoading: dataLoading } = useQuery({
-    queryKey: ["vmb-data", token],
-    queryFn: () => visualBoardAPI.getPublicData(token),
+    queryKey: ["vmb-data", token, dbEnv],
+    queryFn: () => visualBoardAPI.getPublicData(token, undefined, { dbEnv }),
     enabled: !!token && !!layout,
     refetchInterval: intervalMs,
   });
@@ -46,6 +47,7 @@ const VisualBoardDisplayPage = () => {
 
   useVisualBoardRealtime(token, {
     enabled: !!token && !!layout,
+    dbEnv,
     refreshIntervalSec: refreshSeconds || layout?.refresh_interval_seconds || 30,
     onDataRefreshed,
   });
@@ -56,12 +58,12 @@ const VisualBoardDisplayPage = () => {
       visualBoardAPI.sendHeartbeat(token, {
         user_agent: navigator.userAgent,
         fullscreen,
-      }).catch(() => {});
+      }, { dbEnv }).catch(() => {});
     };
     heartbeat();
     const id = setInterval(heartbeat, 60000);
     return () => clearInterval(id);
-  }, [token, fullscreen]);
+  }, [token, fullscreen, dbEnv]);
 
   useEffect(() => {
     if (fullscreen) {

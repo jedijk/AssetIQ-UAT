@@ -3,6 +3,18 @@ import { getBackendUrl } from "../apiConfig";
 
 const publicBase = () => getBackendUrl();
 
+function publicVmbParams(options = {}) {
+  const params = new URLSearchParams();
+  if (options.dbEnv && options.dbEnv !== "production") {
+    params.set("db_env", options.dbEnv);
+  }
+  if (options.periodDays != null) {
+    params.set("period_days", String(options.periodDays));
+  }
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
 export const visualBoardAPI = {
   listBoards: async (params = {}) => {
     const response = await api.get("/boards", { params });
@@ -131,8 +143,10 @@ export const visualBoardAPI = {
     return response.data;
   },
 
-  getPublicLayout: async (token) => {
-    const response = await fetch(`${publicBase()}/api/vmb/${encodeURIComponent(token)}/layout`);
+  getPublicLayout: async (token, options = {}) => {
+    const response = await fetch(
+      `${publicBase()}/api/vmb/${encodeURIComponent(token)}/layout${publicVmbParams(options)}`,
+    );
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       throw new Error(err.detail || "Failed to load board layout");
@@ -140,9 +154,9 @@ export const visualBoardAPI = {
     return response.json();
   },
 
-  getPublicData: async (token, periodDays = 30) => {
+  getPublicData: async (token, periodDays = 30, options = {}) => {
     const response = await fetch(
-      `${publicBase()}/api/vmb/${encodeURIComponent(token)}/data?period_days=${periodDays}`,
+      `${publicBase()}/api/vmb/${encodeURIComponent(token)}/data${publicVmbParams({ ...options, periodDays })}`,
     );
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
@@ -151,11 +165,14 @@ export const visualBoardAPI = {
     return response.json();
   },
 
-  sendHeartbeat: async (token, payload = {}) => {
-    await fetch(`${publicBase()}/api/vmb/${encodeURIComponent(token)}/heartbeat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+  sendHeartbeat: async (token, payload = {}, options = {}) => {
+    await fetch(
+      `${publicBase()}/api/vmb/${encodeURIComponent(token)}/heartbeat${publicVmbParams(options)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
   },
 };
