@@ -506,7 +506,7 @@
     "observationResolution": "Dreigingsoplossing",
     "actionCompletion": "Actie-afronding",
     "investigationProgress": "Onderzoeksvoortgang",
-    "topRiskObservations": "Top 10 Hoogste Risico Observaties",
+    "topRiskObservations": "Observaties met hoog risico",
     "observationsByStatus": "Dreigingen per status",
     "observationsByRisk": "Dreigingen per risiconiveau",
     "actionsByStatus": "Acties per status",

@@ -88,7 +88,7 @@ export function OperationalDashboardTab(props) {
         />
       </div>
 
-      {/* Top 10 Highest Scoring Observations */}
+      {/* High Risk Observations */}
       {topObservations.length > 0 && (
         <div className="mb-6">
           <div className="themed-card rounded-xl border p-4">
@@ -96,7 +96,7 @@ export function OperationalDashboardTab(props) {
               <div className="flex items-center gap-2">
                 <AlertOctagon className="w-4 h-4 text-red-500" />
                 <h3 className="text-sm font-medium text-secondary">
-                  {t("dashboard.topRiskObservations") || "Top 10 Highest Risk Observations"}
+                  {t("dashboard.topRiskObservations") || "High Risk Observations"}
                 </h3>
               </div>
               <button 

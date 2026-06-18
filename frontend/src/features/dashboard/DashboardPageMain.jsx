@@ -433,7 +433,7 @@ export default function DashboardPageMain({ initialTab }) {
   // Top 10 highest scoring observations
   const { data: topObservationsData = [] } = useQuery({
     queryKey: queryKeys.threats.top(),
-    queryFn: () => threatsAPI.getTop(10),
+    queryFn: () => threatsAPI.getTop(10, { excludeMitigated: true }),
   });
   const topObservations = Array.isArray(topObservationsData) ? topObservationsData : [];
   
@@ -838,7 +838,7 @@ export default function DashboardPageMain({ initialTab }) {
         />
       </div>
 
-      {/* Top 10 Highest Scoring Observations */}
+      {/* High Risk Observations */}
       {topObservations.length > 0 && (
         <div className="mb-6">
           <div className="themed-card rounded-xl border p-4">
@@ -846,7 +846,7 @@ export default function DashboardPageMain({ initialTab }) {
               <div className="flex items-center gap-2">
                 <AlertOctagon className="w-4 h-4 text-red-500" />
                 <h3 className="text-sm font-medium text-secondary">
-                  {t("dashboard.topRiskObservations") || "Top 10 Highest Risk Observations"}
+                  {t("dashboard.topRiskObservations") || "High Risk Observations"}
                 </h3>
               </div>
               <button 

@@ -35,12 +35,13 @@ async def get_threats(
 async def get_top_threats(
     limit: int = 10,
     language: Optional[str] = Query(None, description="UI language (en, nl, de) for localized titles"),
+    exclude_mitigated: bool = Query(False, description="Exclude mitigated observations from results"),
     current_user: dict = Depends(_threats_read),
 ):
     from services import threat_service
 
     return await threat_service.list_top_threats(
-        current_user, limit=limit, language=language
+        current_user, limit=limit, language=language, exclude_mitigated=exclude_mitigated
     )
 
 

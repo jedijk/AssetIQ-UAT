@@ -14,6 +14,7 @@ export const threatsAPI = {
   getTop: async (limit = 10, options = {}) => {
     const params = new URLSearchParams({ limit: String(limit) });
     if (options.language) params.append("language", options.language);
+    if (options.excludeMitigated) params.append("exclude_mitigated", "true");
     const response = await api.get(`/threats/top?${params.toString()}`);
     return response.data;
   },

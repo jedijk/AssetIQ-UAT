@@ -506,7 +506,7 @@
     "observationResolution": "Beobachtungsauflösung",
     "actionCompletion": "Maßnahmenabschluss",
     "investigationProgress": "Untersuchungsfortschritt",
-    "topRiskObservations": "Top 10 Beobachtungen mit höchstem Risiko",
+    "topRiskObservations": "Beobachtungen mit hohem Risiko",
     "observationsByStatus": "Beobachtungen nach Status",
     "observationsByRisk": "Beobachtungen nach Risikostufe",
     "actionsByStatus": "Maßnahmen nach Status",

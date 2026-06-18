@@ -506,7 +506,7 @@
     "observationResolution": "Observation Resolution",
     "actionCompletion": "Action Completion",
     "investigationProgress": "Investigation Progress",
-    "topRiskObservations": "Top 10 Highest Risk Observations",
+    "topRiskObservations": "High Risk Observations",
     "observationsByStatus": "Observations by Status",
     "observationsByRisk": "Observations by Risk Level",
     "actionsByStatus": "Actions by Status",
