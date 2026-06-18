@@ -100,8 +100,13 @@ const DisplayPairingPage = () => {
 
         if (status.status === "paired" && status.device_token) {
           setDisplayDbEnv(getDisplayDbEnv());
-          localStorage.setItem(DISPLAY_DEVICE_TOKEN_KEY, status.device_token);
-          localStorage.setItem(DISPLAY_DEVICE_ID_KEY, status.device_id || "");
+          try {
+            localStorage.setItem(DISPLAY_DEVICE_TOKEN_KEY, status.device_token);
+            localStorage.setItem(DISPLAY_DEVICE_ID_KEY, status.device_id || "");
+          } catch {
+            setError("Could not save pairing — this TV browser blocked storage. Check privacy settings and try again.");
+            return;
+          }
           setPairedInfo(status);
           setPaired(true);
           navigate("/tv/board?fullscreen=true", { replace: true });

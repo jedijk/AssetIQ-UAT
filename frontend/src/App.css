@@ -1603,6 +1603,11 @@ html.theme-transitioning * {
 /* ==================== MOBILE LANDSCAPE BLOCK ==================== */
 /* Block landscape orientation on mobile devices */
 /* But NOT when the document viewer is open (users need landscape for files) */
+/* Also skip for TV kiosk routes (/tv) — TVs are always landscape. */
+html.display-kiosk .landscape-blocker {
+  display: none !important;
+}
+
 @media screen and (max-width: 896px) and (orientation: landscape) {
   .landscape-blocker {
     display: flex !important;

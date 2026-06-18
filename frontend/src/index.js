@@ -22,7 +22,15 @@ import {
   isNotificationSupported,
   syncPushSubscription,
 } from "./services/notificationService";
-import { isIOSLikeDevice } from "./lib/deviceUtils";
+import { isIOSLikeDevice, isDisplayKioskContext } from "./lib/deviceUtils";
+import { isPublicKioskPath } from "./lib/publicRoutes";
+
+// Mark kiosk routes early so CSS can suppress mobile-only overlays (landscape blocker).
+if (typeof window !== "undefined" && isPublicKioskPath(window.location.pathname)) {
+  try {
+    document.documentElement.classList.add("display-kiosk");
+  } catch (_e) {}
+}
 
 // Patch ResizeObserver to prevent "loop completed with undelivered notifications" errors
 // This is a known issue with cmdk, Radix UI, and other libraries that use ResizeObserver
@@ -174,19 +182,25 @@ function showBootError(message) {
 }
 
 const IOS_WEBAPP_STANDALONE = isIOSWebAppStandalone();
+const IS_DISPLAY_KIOSK = isDisplayKioskContext();
 try {
   if (IOS_WEBAPP_STANDALONE) {
     debugLog("ios_webapp_standalone", { standalone: true });
+  }
+  if (IS_DISPLAY_KIOSK) {
+    debugLog("display_kiosk_boot", { path: window.location.pathname });
   }
 } catch (_e) {}
 
 // Register Service Worker for PWA (OFF by default: avoids mobile white-screen
 // issues due to stale caches / SW update races). Enable explicitly by setting:
 // REACT_APP_ENABLE_SERVICE_WORKER=true at build time.
-const ENABLE_SERVICE_WORKER = process.env.REACT_APP_ENABLE_SERVICE_WORKER === "true";
+// Also skip on TV/kiosk paths — embedded TV browsers often break on SW/cache races.
+const ENABLE_SERVICE_WORKER =
+  process.env.REACT_APP_ENABLE_SERVICE_WORKER === "true" && !IS_DISPLAY_KIOSK;
 
 // If SW is disabled, unregister the cache service worker only (keep push-sw.js).
-if ("serviceWorker" in navigator && !ENABLE_SERVICE_WORKER) {
+if ("serviceWorker" in navigator && (!ENABLE_SERVICE_WORKER || IS_DISPLAY_KIOSK)) {
   try {
     navigator.serviceWorker.getRegistrations().then(async (regs) => {
       const cacheRegs = (regs || []).filter((r) => {
@@ -249,7 +263,7 @@ if ('serviceWorker' in navigator && ENABLE_SERVICE_WORKER) {
 }
 
 // Re-register Web Push subscription after reload when notifications are already enabled.
-if (typeof window !== "undefined" && isNotificationSupported()) {
+if (typeof window !== "undefined" && isNotificationSupported() && !IS_DISPLAY_KIOSK) {
   window.addEventListener("load", () => {
     setTimeout(() => {
       if (getPermissionStatus() === "granted" && getNotificationSettings().enabled) {
@@ -312,8 +326,8 @@ function bootstrapApp() {
   if (SAFE_MODE) {
     // Safe mode: minimal UI for debugging
     appTree = <SafeMode />;
-  } else if (IOS_WEBAPP_STANDALONE) {
-    // iOS standalone: skip StrictMode, wrap with GlobalErrorBoundary
+  } else if (IOS_WEBAPP_STANDALONE || IS_DISPLAY_KIOSK) {
+    // iOS standalone / TV kiosk: skip StrictMode double-invocation to reduce white screens.
     appTree = (
       <GlobalErrorBoundary>
         <App />
@@ -362,7 +376,7 @@ function bootstrapApp() {
           });
           showBootError("The app started but did not render. Tap Reload to recover, or add ?safe=1 to URL for Safe Mode.");
         }
-      }, IOS_WEBAPP_STANDALONE ? 4500 : 6500);
+      }, IS_DISPLAY_KIOSK ? 4500 : IOS_WEBAPP_STANDALONE ? 4500 : 6500);
       
       // Final watchdog at 12 seconds
       setTimeout(() => {
@@ -381,4 +395,8 @@ function bootstrapApp() {
   } catch (_e) {}
 }
 
-ensureFreshBuild().finally(bootstrapApp);
+if (typeof window !== "undefined" && isPublicKioskPath(window.location.pathname)) {
+  bootstrapApp();
+} else {
+  ensureFreshBuild().finally(bootstrapApp);
+}

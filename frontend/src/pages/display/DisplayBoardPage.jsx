@@ -169,7 +169,12 @@ const DisplayBoardPage = () => {
   const dataLoadError = dataError?.message;
 
   if (!deviceToken) {
-    return null;
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-8 text-center">
+        <Loader2 className="w-10 h-10 animate-spin text-slate-500 mb-4" />
+        <p className="text-slate-400">Opening pairing screen…</p>
+      </div>
+    );
   }
 
   if (error) {

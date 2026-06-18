@@ -23,6 +23,9 @@ import { debugLog } from "./lib/debug";
 import { isPublicKioskPath } from "./lib/publicRoutes";
 import "./App.css";
 import { AppShell } from "./components/AppShell";
+import KioskErrorBoundary from "./components/KioskErrorBoundary";
+import DisplayPairingPage from "./pages/display/DisplayPairingPage";
+import DisplayBoardPage from "./pages/display/DisplayBoardPage";
 import { CapabilitiesProvider, useCapabilities } from "./core/performance";
 import { ProductionReleaseToast } from "./components/ProductionReleaseToast";
 
@@ -94,13 +97,20 @@ const VisualBoardDevicesListPage = lazy(() => import("./pages/visual-boards/Visu
 const VisualBoardDeviceDetailPage = lazy(() => import("./pages/visual-boards/VisualBoardDeviceDetailPage"));
 const VisualBoardTemplatesPage = lazy(() => import("./pages/visual-boards/VisualBoardTemplatesPage"));
 const VisualBoardAnalyticsPage = lazy(() => import("./pages/visual-boards/VisualBoardAnalyticsPage"));
-const DisplayPairingPage = lazy(() => import("./pages/display/DisplayPairingPage"));
-const DisplayBoardPage = lazy(() => import("./pages/display/DisplayBoardPage"));
 
 function RouteFallback() {
   return (
     <AppShell />
   );
+}
+
+function KioskRoute({ children }) {
+  return <KioskErrorBoundary>{children}</KioskErrorBoundary>;
+}
+
+function useIsKioskRoute() {
+  const location = useLocation();
+  return isPublicKioskPath(location.pathname);
 }
 
 function AuthExpiredListener() {
@@ -170,6 +180,10 @@ const requestReload = (remoteVersion) => {
 // Version check hook - polls backend and forces refresh when a newer version is deployed
 const useVersionCheck = () => {
   useEffect(() => {
+    if (typeof window !== "undefined" && isPublicKioskPath(window.location.pathname)) {
+      return undefined;
+    }
+
     const backendUrl = getBackendUrl().replace(/\/$/, "");
     let cancelled = false;
     let promptedFor = null;
@@ -379,6 +393,18 @@ const MobileLayout = () => {
   return <MobileApp />;
 };
 
+function KioskAwareLandscapeBlocker() {
+  const isKiosk = useIsKioskRoute();
+  if (isKiosk) return null;
+  return <LandscapeBlocker />;
+}
+
+function KioskAwareNotificationPrompt() {
+  const isKiosk = useIsKioskRoute();
+  if (isKiosk) return null;
+  return <NotificationPrompt />;
+}
+
 function App() {
   // Check for version updates on app load
   useVersionCheck();
@@ -407,7 +433,7 @@ function App() {
                     },
                   }}
                 />
-                <LandscapeBlocker />
+                <KioskAwareLandscapeBlocker />
               <Routes>
               <Route path="/mobile" element={<MobileLayout />} />
               <Route path="/login" element={
@@ -457,14 +483,14 @@ function App() {
               } />
               {/* Display device pairing — no login (Phase 4a) */}
               <Route path="/tv" element={
-                <Suspense fallback={<RouteFallback />}>
+                <KioskRoute>
                   <DisplayPairingPage />
-                </Suspense>
+                </KioskRoute>
               } />
               <Route path="/tv/board" element={
-                <Suspense fallback={<RouteFallback />}>
+                <KioskRoute>
                   <DisplayBoardPage />
-                </Suspense>
+                </KioskRoute>
               } />
               <Route path="/display" element={<Navigate to="/tv" replace />} />
               <Route path="/" element={
@@ -547,7 +573,7 @@ function App() {
               </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
-            <NotificationPrompt />
+            <KioskAwareNotificationPrompt />
             </BreadcrumbProvider>
             </BrowserRouter>
           </UndoProvider>

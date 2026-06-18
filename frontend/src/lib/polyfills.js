@@ -130,6 +130,37 @@ if (typeof window !== 'undefined' && typeof window.IntersectionObserver === 'und
   };
 }
 
+// String.prototype.padStart / padEnd (Samsung TV / older Chromium)
+if (!String.prototype.padStart) {
+  String.prototype.padStart = function padStart(targetLength, padString) {
+    const str = String(this);
+    const len = targetLength >> 0;
+    if (str.length >= len) return str;
+    const fill = padString === undefined ? " " : String(padString);
+    if (fill.length === 0) return str;
+    let pad = "";
+    while (pad.length < len - str.length) {
+      pad += fill;
+    }
+    return pad.slice(0, len - str.length) + str;
+  };
+}
+
+if (!String.prototype.padEnd) {
+  String.prototype.padEnd = function padEnd(targetLength, padString) {
+    const str = String(this);
+    const len = targetLength >> 0;
+    if (str.length >= len) return str;
+    const fill = padString === undefined ? " " : String(padString);
+    if (fill.length === 0) return str;
+    let pad = "";
+    while (pad.length < len - str.length) {
+      pad += fill;
+    }
+    return str + pad.slice(0, len - str.length);
+  };
+}
+
 // Array.prototype.at polyfill
 if (!Array.prototype.at) {
   Array.prototype.at = function(index) {
