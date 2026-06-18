@@ -91,6 +91,7 @@ const VisualBoardDisplayPage = lazy(() => import("./pages/visual-boards/VisualBo
 const VisualBoardScreensPage = lazy(() => import("./pages/visual-boards/VisualBoardScreensPage"));
 const VisualBoardTemplatesPage = lazy(() => import("./pages/visual-boards/VisualBoardTemplatesPage"));
 const VisualBoardAnalyticsPage = lazy(() => import("./pages/visual-boards/VisualBoardAnalyticsPage"));
+const DisplayPairingPage = lazy(() => import("./pages/display/DisplayPairingPage"));
 
 function RouteFallback() {
   return (
@@ -447,6 +448,12 @@ function App() {
               <Route path="/vmb/:token" element={
                 <Suspense fallback={<RouteFallback />}>
                   <VisualBoardDisplayPage />
+                </Suspense>
+              } />
+              {/* Display device pairing — no login (Phase 4a) */}
+              <Route path="/display" element={
+                <Suspense fallback={<RouteFallback />}>
+                  <DisplayPairingPage />
                 </Suspense>
               } />
               <Route path="/" element={

@@ -3,7 +3,10 @@
 **Version:** 1.0  
 **Date:** June 2026  
 **Status:** Phase 1 foundation  
-**Companion:** Technical design in `ASSETIQ_VISUAL_MANAGEMENT_STUDIO_TECHNICAL_DESIGN.md`
+**Companion docs:**
+
+- Technical design: `ASSETIQ_VISUAL_MANAGEMENT_STUDIO_TECHNICAL_DESIGN.md`
+- Device pairing (TV registration): `ASSETIQ_VISUAL_MANAGEMENT_DEVICE_PAIRING_SPEC.md`
 
 ---
 
@@ -462,3 +465,4 @@ A supervisor should be able to:
 | **3 — Screens & tokens** | Multiple tokens, screen registry, heartbeat analytics |
 | **4 — Designer** | Drag-and-drop, templates, version rollback |
 | **5 — Realtime** | WebSocket push, view analytics, QR codes |
+| **6 — Device pairing** | Teams/YouTube-style pairing codes, device tokens, `/display` kiosk, managed screens — see `ASSETIQ_VISUAL_MANAGEMENT_DEVICE_PAIRING_SPEC.md` |

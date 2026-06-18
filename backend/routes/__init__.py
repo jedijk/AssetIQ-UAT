@@ -59,6 +59,7 @@ from routes.visual_boards import router as visual_boards_router
 from routes.visual_board_public import router as visual_board_public_router
 from routes.visual_board_templates import router as visual_board_templates_router
 from routes.visual_board_screens import router as visual_board_screens_router
+from routes.visual_display import router as visual_display_router
 
 all_routers = [
     auth_router,
@@ -119,4 +120,5 @@ all_routers = [
     visual_board_public_router,
     visual_board_templates_router,
     visual_board_screens_router,
+    visual_display_router,
 ]

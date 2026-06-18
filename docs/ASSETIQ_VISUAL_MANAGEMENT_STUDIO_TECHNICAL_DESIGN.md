@@ -11,6 +11,8 @@
 
 Visual Management Studio (VMB) uses a **dual API surface** to isolate TV/display traffic from operational AssetIQ APIs.
 
+**Device pairing (planned):** See `ASSETIQ_VISUAL_MANAGEMENT_DEVICE_PAIRING_SPEC.md` for the `/api/display/*` and `/display` pairing flow. Phase 2–3 uses board tokens (`/api/vmb/{token}`); Phase 4+ adds managed devices with pairing codes and `DeviceToken` auth.
+
 ```mermaid
 flowchart LR
   subgraph Admin["Authenticated surface"]
@@ -358,6 +360,9 @@ On `POST /boards` with `board_type: reliability`, seed widgets:
 | **3** | Multiple tokens, screen CRUD, heartbeat analytics | Screen manager UI |
 | **4** | Version rollback, template CRUD | Drag-and-drop designer |
 | **5** | WebSocket hub | Realtime client, QR, analytics |
+| **6** | Device pairing APIs, `visual_display_*` collections | `/display` pairing UI, screen admin |
+
+Full pairing spec: `ASSETIQ_VISUAL_MANAGEMENT_DEVICE_PAIRING_SPEC.md`.
 
 ---
 

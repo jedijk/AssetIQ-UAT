@@ -105,6 +105,9 @@ WAVE10_COLLECTIONS = frozenset({
     "visual_board_screens",
     "visual_board_templates",
     "visual_board_analytics",
+    "visual_display_devices",
+    "visual_display_pairings",
+    "visual_display_events",
 })
 
 WAVE_COLLECTIONS = (
