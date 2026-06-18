@@ -36,6 +36,7 @@ class TokenResponse(BaseModel):
     token: str
     user: UserResponse
     must_change_password: Optional[bool] = False
+    csrf_token: Optional[str] = None
 
 
 class ChatMessageCreate(BaseModel):

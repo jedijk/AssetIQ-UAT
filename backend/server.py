@@ -334,6 +334,7 @@ cors_kwargs = {
     "allow_origins": ALLOWED_ORIGINS,
     "allow_methods": ["*"],
     "allow_headers": ["*"],
+    "expose_headers": ["X-CSRF-Token"],
 }
 
 # Broad wildcard preview origins are OFF by default for safety.
@@ -657,9 +658,9 @@ async def csrf_protect_cookie_auth(request: Request, call_next):
         if not request.cookies.get(auth_cookie_name):
             return await call_next(request)
 
-        csrf_cookie = request.cookies.get(os.environ.get("CSRF_COOKIE_NAME", "assetiq_csrf"))
-        csrf_header = request.headers.get("x-csrf-token")
-        if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+        auth_token = request.cookies.get(auth_cookie_name)
+        from auth import validate_csrf_request
+        if not validate_csrf_request(request, auth_token):
             resp = JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
             # Ensure the browser can read the response even when this middleware
             # runs before CORSMiddleware (otherwise it surfaces as a CORS error).

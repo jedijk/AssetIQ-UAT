@@ -15,7 +15,17 @@ from middleware.rate_limit import RATE_LIMIT_ENABLED
 from typing import Optional
 
 from database import db, JWT_EXPIRATION_HOURS
-from auth import hash_password, verify_password, create_token, get_current_user, AUTH_COOKIE_NAME, CSRF_COOKIE_NAME
+from auth import (
+    hash_password,
+    verify_password,
+    create_token,
+    get_current_user,
+    AUTH_COOKIE_NAME,
+    CSRF_COOKIE_NAME,
+    set_session_auth_cookies,
+    clear_session_auth_cookies,
+    attach_csrf_response_header,
+)
 from models.api_models import UserCreate, UserLogin, UserResponse, TokenResponse
 from pydantic import BaseModel, EmailStr, field_validator
 from utils.spam_protection import is_disposable_email, validate_honeypot, verify_recaptcha
@@ -391,53 +401,15 @@ async def login(request: Request, credentials: UserLogin, response: Response):
     must_change_password = user.get("must_change_password", False)
     has_seen_intro = user.get("has_seen_intro", True)  # Default to True for existing users
 
-    # Cookie-based auth (recommended). Still returns the token in JSON for backwards compatibility.
-    # Cross-site cookies (Vercel -> Railway) require SameSite=None; Secure.
+    csrf_token = None
     cookie_enabled = os.environ.get("AUTH_SET_COOKIE_ON_LOGIN", "true").lower() == "true"
     if cookie_enabled:
         try:
-            # For cross-origin SPA (Vercel) -> API (Railway), cookies must be
-            # SameSite=None; Secure or browsers won't send them on XHR/fetch.
-            origin = request.headers.get("origin") or ""
-            host = request.headers.get("host") or ""
-            proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "").lower()
-
-            is_https = proto == "https"
-            is_cross_site = bool(origin) and bool(host) and (host not in origin)
-
-            force_cross_site = os.environ.get("FORCE_CROSS_SITE_COOKIES", "true").lower() == "true"
-            if force_cross_site and is_cross_site:
-                secure = True
-                same_site = "none"
-            else:
-                secure = is_https
-                same_site = "none" if secure else "lax"
-
-            csrf_token = secrets.token_urlsafe(32)
-            max_age = int(timedelta(hours=float(JWT_EXPIRATION_HOURS)).total_seconds())
-
-            response.set_cookie(
-                key=AUTH_COOKIE_NAME,
-                value=token,
-                httponly=True,
-                secure=secure,
-                samesite=same_site,
-                path="/",
-                max_age=max_age,
-            )
-            # Non-HttpOnly CSRF token cookie (double-submit). Frontend must echo it in X-CSRF-Token.
-            response.set_cookie(
-                key=CSRF_COOKIE_NAME,
-                value=csrf_token,
-                httponly=False,
-                secure=secure,
-                samesite=same_site,
-                path="/",
-                max_age=max_age,
-            )
+            csrf_token = set_session_auth_cookies(response, request, token)
         except Exception as e:
             # Never fail login just because cookie config failed
             logger.warning(f"Auth cookie setup failed: {type(e).__name__}: {e}")
+            csrf_token = None
     
     # Convert datetime to string for Pydantic model
     created_at = user.get("created_at")
@@ -449,6 +421,7 @@ async def login(request: Request, credentials: UserLogin, response: Response):
     return TokenResponse(
         token=token,
         must_change_password=must_change_password,
+        csrf_token=csrf_token,
         user=UserResponse(
             id=user["id"],
             email=user["email"],
@@ -469,32 +442,12 @@ async def login(request: Request, credentials: UserLogin, response: Response):
 @router.post("/auth/logout", response_model=dict)
 async def logout(request: Request, response: Response):
     """Clear auth cookies (cookie-auth mode)."""
-    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
-    secure = proto == "https"
-    same_site = "none" if secure else "lax"
-
-    response.set_cookie(
-        key=AUTH_COOKIE_NAME,
-        value="",
-        httponly=True,
-        secure=secure,
-        samesite=same_site,
-        path="/",
-        max_age=0,
-    )
-    response.set_cookie(
-        key=CSRF_COOKIE_NAME,
-        value="",
-        httponly=False,
-        secure=secure,
-        samesite=same_site,
-        path="/",
-        max_age=0,
-    )
+    clear_session_auth_cookies(response, request)
     return {"status": "ok"}
 
 @router.get("/auth/me", response_model=UserResponse)
-async def get_me(current_user: dict = Depends(get_current_user)):
+async def get_me(request: Request, response: Response, current_user: dict = Depends(get_current_user)):
+    attach_csrf_response_header(request, response)
     # Build avatar URL if user has an avatar
     avatar_url = None
     if current_user.get("avatar_path") or current_user.get("avatar_data"):

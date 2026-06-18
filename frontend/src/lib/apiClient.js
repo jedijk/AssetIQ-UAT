@@ -1,5 +1,5 @@
 import axios from "axios";
-import { getApiUrl, getBackendUrl, AUTH_MODE, getCsrfToken } from "./apiConfig";
+import { getApiUrl, getBackendUrl, AUTH_MODE, getCsrfToken, setCsrfToken } from "./apiConfig";
 import { debugLog } from "./debug";
 import { getDatabaseEnvironment } from "./databaseEnv";
 
@@ -96,6 +96,13 @@ function handleUnauthorizedResponse(error) {
   });
 }
 
+function captureCsrfFromResponse(response) {
+  const csrf =
+    response?.headers?.["x-csrf-token"] ||
+    response?.headers?.["X-CSRF-Token"];
+  if (csrf) setCsrfToken(csrf);
+}
+
 // Global axios defaults for cookie-auth (AuthContext and legacy raw axios calls).
 if (AUTH_MODE === "cookie") {
   axios.defaults.withCredentials = true;
@@ -103,6 +110,13 @@ if (AUTH_MODE === "cookie") {
     config.headers = config.headers || {};
     return applyCookieAuthHeaders(config);
   });
+  axios.interceptors.response.use(
+    (response) => {
+      captureCsrfFromResponse(response);
+      return response;
+    },
+    (error) => Promise.reject(error)
+  );
 }
 
 // Log API configuration at startup (development only)
@@ -154,6 +168,9 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => {
+    if (AUTH_MODE === "cookie") {
+      captureCsrfFromResponse(response);
+    }
     try {
       debugLog("api_response", {
         status: response.status,

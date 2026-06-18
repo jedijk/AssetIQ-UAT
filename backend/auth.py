@@ -2,12 +2,15 @@
 Authentication helpers: password hashing, JWT tokens, current user dependency.
 """
 import os
+import hmac
+import hashlib
 import jwt
 import bcrypt
 from datetime import datetime, timezone, timedelta
-from fastapi import Depends, HTTPException, Query, Request
+from fastapi import Depends, HTTPException, Query, Request, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional
+from urllib.parse import urlparse
 
 from database import (
     db,
@@ -28,6 +31,124 @@ CSRF_COOKIE_NAME = os.environ.get("CSRF_COOKIE_NAME", "assetiq_csrf")
 ALLOW_COOKIE_AUTH = os.environ.get("ALLOW_COOKIE_AUTH", "true").lower() == "true"
 
 PRODUCTION_DB_NAME = AVAILABLE_DATABASES.get("production", {}).get("name", "assetiq")
+
+
+def derive_csrf_token(auth_token: str) -> str:
+    """Deterministic CSRF token derived from the session JWT (HttpOnly cookie)."""
+    if not auth_token:
+        return ""
+    digest = hmac.new(
+        JWT_SECRET.encode("utf-8"),
+        auth_token.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    return digest[:43]
+
+
+def request_forwarded_host(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-host") or request.headers.get("host") or ""
+    return forwarded.split(",")[0].strip().lower()
+
+
+def cookie_security_attrs(request: Request) -> tuple[bool, str]:
+    """
+    Cookie SameSite/Secure attrs. Uses x-forwarded-host so Vercel /api rewrites
+    to Railway are treated as same-site with the SPA origin.
+    """
+    origin = request.headers.get("origin") or ""
+    host = request_forwarded_host(request)
+    proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "").lower()
+    is_https = proto == "https"
+
+    origin_host = ""
+    if origin:
+        try:
+            origin_host = (urlparse(origin).hostname or "").lower()
+        except Exception:
+            origin_host = ""
+
+    is_cross_site = bool(origin_host) and bool(host) and (host != origin_host)
+    force_cross_site = os.environ.get("FORCE_CROSS_SITE_COOKIES", "true").lower() == "true"
+    if force_cross_site and is_cross_site:
+        return True, "none"
+    secure = is_https
+    return secure, ("none" if secure else "lax")
+
+
+def set_session_auth_cookies(response: Response, request: Request, auth_token: str) -> str:
+    """Set auth + CSRF cookies; return CSRF token for JSON body / sessionStorage fallback."""
+    csrf_token = derive_csrf_token(auth_token)
+    secure, same_site = cookie_security_attrs(request)
+    max_age = int(timedelta(hours=float(JWT_EXPIRATION_HOURS)).total_seconds())
+    response.set_cookie(
+        key=AUTH_COOKIE_NAME,
+        value=auth_token,
+        httponly=True,
+        secure=secure,
+        samesite=same_site,
+        path="/",
+        max_age=max_age,
+    )
+    response.set_cookie(
+        key=CSRF_COOKIE_NAME,
+        value=csrf_token,
+        httponly=False,
+        secure=secure,
+        samesite=same_site,
+        path="/",
+        max_age=max_age,
+    )
+    return csrf_token
+
+
+def clear_session_auth_cookies(response: Response, request: Request) -> None:
+    secure, same_site = cookie_security_attrs(request)
+    for name, httponly in ((AUTH_COOKIE_NAME, True), (CSRF_COOKIE_NAME, False)):
+        response.set_cookie(
+            key=name,
+            value="",
+            httponly=httponly,
+            secure=secure,
+            samesite=same_site,
+            path="/",
+            max_age=0,
+        )
+
+
+def validate_csrf_request(request: Request, auth_token: Optional[str]) -> bool:
+    csrf_header = request.headers.get("x-csrf-token")
+    if not csrf_header:
+        return False
+    csrf_cookie = request.cookies.get(CSRF_COOKIE_NAME)
+    if csrf_cookie and csrf_cookie == csrf_header:
+        return True
+    if auth_token:
+        return csrf_header == derive_csrf_token(auth_token)
+    return False
+
+
+def attach_csrf_response_header(request: Request, response: Response) -> None:
+    """Expose CSRF token for clients when the CSRF cookie is blocked by a proxy."""
+    auth_token = request.cookies.get(AUTH_COOKIE_NAME)
+    if not auth_token:
+        return
+    csrf_token = derive_csrf_token(auth_token)
+    response.headers["X-CSRF-Token"] = csrf_token
+    # Best-effort refresh of readable CSRF cookie.
+    try:
+        secure, same_site = cookie_security_attrs(request)
+        max_age = int(timedelta(hours=float(JWT_EXPIRATION_HOURS)).total_seconds())
+        response.set_cookie(
+            key=CSRF_COOKIE_NAME,
+            value=csrf_token,
+            httponly=False,
+            secure=secure,
+            samesite=same_site,
+            path="/",
+            max_age=max_age,
+        )
+    except Exception:
+        pass
 
 
 def hash_password(password: str) -> str:

@@ -18,6 +18,7 @@ const DEBUG_API_CONFIG = false;
 
 export const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
 export const CSRF_COOKIE_NAME = process.env.REACT_APP_CSRF_COOKIE_NAME || "assetiq_csrf";
+const CSRF_SESSION_KEY = "assetiq_csrf_token";
 
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -32,8 +33,28 @@ export function getCookie(name) {
   return null;
 }
 
+export function setCsrfToken(value) {
+  try {
+    if (value) {
+      sessionStorage.setItem(CSRF_SESSION_KEY, value);
+    } else {
+      sessionStorage.removeItem(CSRF_SESSION_KEY);
+    }
+  } catch (_e) {}
+}
+
+export function clearCsrfToken() {
+  setCsrfToken(null);
+}
+
 export function getCsrfToken() {
-  return getCookie(CSRF_COOKIE_NAME);
+  const fromCookie = getCookie(CSRF_COOKIE_NAME);
+  if (fromCookie) return fromCookie;
+  try {
+    return sessionStorage.getItem(CSRF_SESSION_KEY);
+  } catch (_e) {
+    return null;
+  }
 }
 
 function isUnsafeMethod(method) {

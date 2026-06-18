@@ -4,6 +4,7 @@ import { getApiUrl } from "../lib/apiConfig";
 import { updateCachedPreferences, clearCachedPreferences } from "../lib/dateUtils";
 import { clearRolePreviewStorage } from "./RolePreviewContext";
 import { enforceDatabaseEnvironmentForRole } from "../lib/databaseEnv";
+import { setCsrfToken, clearCsrfToken } from "../lib/apiConfig";
 
 const AuthContext = createContext(null);
 const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
@@ -69,6 +70,7 @@ export const AuthProvider = ({ children }) => {
       } catch (_e) {}
     }
     localStorage.removeItem("token");
+    clearCsrfToken();
     clearRolePreviewStorage();
     delete axios.defaults.headers.common["Authorization"];
     setToken(null);
@@ -158,7 +160,7 @@ export const AuthProvider = ({ children }) => {
     
     try {
       const response = await axios.post(loginUrl, { email, password }, { withCredentials: AUTH_MODE === "cookie" });
-      const { token: newToken, user: userData, must_change_password } = response.data;
+      const { token: newToken, user: userData, must_change_password, csrf_token: csrfToken } = response.data;
 
     if (AUTH_MODE === "bearer") {
       localStorage.setItem("token", newToken);
@@ -168,6 +170,9 @@ export const AuthProvider = ({ children }) => {
       // Cookie mode: token is in HttpOnly cookie, keep state token null.
       axios.defaults.withCredentials = true;
       setToken(null);
+      if (csrfToken) {
+        setCsrfToken(csrfToken);
+      }
     }
     setUser(userData);
     enforceDatabaseEnvironmentForRole(userData?.role);
