@@ -449,6 +449,7 @@ _PUBLIC_DB_ENV_PREFIXES = (
     "/api/display/heartbeat",
     "/api/display/config",
     "/api/display/board/",
+    "/api/display/accept-token-rotation",
     "/api/vmb/",
 )
 

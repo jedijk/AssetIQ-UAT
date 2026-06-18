@@ -42,21 +42,22 @@ const DisplayBoardPage = () => {
     }
   }, [deviceToken, navigate]);
 
-  const { data: config, isLoading: configLoading, error: configError } = useQuery({
+  const { data: layout, isLoading: layoutLoading, error: layoutError } = useQuery({
+    queryKey: ["display-board-layout", deviceToken],
+    queryFn: () => displayDeviceAPI.getBoardLayout(deviceToken),
+    enabled: !!deviceToken,
+    retry: false,
+  });
+
+  const { data: config, error: configError } = useQuery({
     queryKey: ["display-config", deviceToken],
     queryFn: () => displayDeviceAPI.getConfig(deviceToken),
     enabled: !!deviceToken,
     retry: false,
   });
 
-  const refreshSeconds = config?.refresh_interval || 30;
-
-  const { data: layout, isLoading: layoutLoading, error: layoutError } = useQuery({
-    queryKey: ["display-board-layout", deviceToken],
-    queryFn: () => displayDeviceAPI.getBoardLayout(deviceToken),
-    enabled: !!deviceToken && !!config,
-    retry: false,
-  });
+  const refreshSeconds =
+    config?.refresh_interval || layout?.refresh_interval_seconds || 30;
 
   const { data: boardData, isLoading: dataLoading, isFetching: dataFetching, error: dataError } = useQuery({
     queryKey: ["display-board-data", deviceToken],
@@ -108,7 +109,7 @@ const DisplayBoardPage = () => {
   );
 
   const { isLive: isWsLive } = useDisplayDeviceRealtime(deviceToken, {
-    enabled: !!deviceToken && !!config,
+    enabled: !!deviceToken && !!layout,
     refreshIntervalSec: refreshSeconds,
     onEvent: handleRealtimeEvent,
     onDataRefreshed: setLiveBoardData,
@@ -164,8 +165,7 @@ const DisplayBoardPage = () => {
     [fullscreen, boardTheme],
   );
 
-  const error = connectError || configError?.message || layoutError?.message;
-  const isLoading = configLoading || layoutLoading;
+  const error = connectError || layoutError?.message || configError?.message;
   const dataLoadError = dataError?.message;
 
   if (!deviceToken) {
@@ -190,9 +190,9 @@ const DisplayBoardPage = () => {
     );
   }
 
-  if (isLoading || !layout) {
+  if (layoutLoading || !layout) {
     return (
-      <div className={`${pageClass} flex items-center justify-center`}>
+      <div className={`min-h-screen bg-slate-950 flex items-center justify-center`}>
         <Loader2 className="w-12 h-12 animate-spin text-slate-500" />
       </div>
     );

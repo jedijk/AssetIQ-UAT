@@ -220,6 +220,9 @@ async def get_device_layout(raw_token: str) -> Dict[str, Any]:
 
 async def get_device_data(raw_token: str, *, period_days: int = 30) -> Dict[str, Any]:
     ctx = await resolve_device_token(raw_token)
+    board_db_name = ctx.get("board_db_name")
+    if board_db_name:
+        set_request_db(board_db_name)
     data = await get_public_data_from_context(
         ctx["board"],
         ctx["version"],

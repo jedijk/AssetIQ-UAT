@@ -55,14 +55,13 @@ const DisplayPairingPage = () => {
   }, []);
 
   useEffect(() => {
-    if (paired) return;
     try {
       const existingToken = localStorage.getItem(DISPLAY_DEVICE_TOKEN_KEY);
       if (existingToken) {
         navigate("/tv/board?fullscreen=true", { replace: true });
       }
     } catch (_e) {}
-  }, [paired, navigate]);
+  }, [navigate]);
 
   useEffect(() => {
     if (!paired) {

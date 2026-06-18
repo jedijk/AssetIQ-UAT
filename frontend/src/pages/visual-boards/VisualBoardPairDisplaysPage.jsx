@@ -62,7 +62,7 @@ const VisualBoardPairDisplaysPage = () => {
         location: pairForm.location || undefined,
         area: pairForm.area || undefined,
       };
-      if (pairForm.board_db_env && pairForm.board_db_env !== pairPreview.database_environment) {
+      if (pairForm.board_db_env) {
         payload.database_environment = pairForm.board_db_env;
       }
       return displayDeviceAPI.completePairing(payload);

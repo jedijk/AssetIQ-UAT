@@ -252,11 +252,22 @@ async def complete_pairing(
     if database_environment and database_environment in AVAILABLE_DATABASES:
         board_db_name = AVAILABLE_DATABASES[database_environment]["name"]
 
-    board_coll = get_database(board_db_name)[BOARDS_COLLECTION]
-    board = await board_coll.find_one(
-        merge_tenant_filter({"id": board_id}, user),
-        {"_id": 0, "id": 1, "name": 1, "status": 1},
-    )
+    board_query = merge_tenant_filter({"id": board_id}, user)
+    board = None
+    resolved_board_db_name = board_db_name
+    db_names: list[str] = [board_db_name]
+    for meta in AVAILABLE_DATABASES.values():
+        if meta["name"] not in db_names:
+            db_names.append(meta["name"])
+    for candidate_db in db_names:
+        found = await get_database(candidate_db)[BOARDS_COLLECTION].find_one(
+            board_query,
+            {"_id": 0, "id": 1, "name": 1, "status": 1},
+        )
+        if found:
+            board = found
+            resolved_board_db_name = candidate_db
+            break
     if not board:
         raise HTTPException(
             status_code=404,
@@ -267,7 +278,7 @@ async def complete_pairing(
     raw_token, token_hash = generate_device_token()
     now = now_iso()
     device_id = new_id("device")
-    board_db_env = database_environment or _db_env_for_db_name(board_db_name)
+    board_db_env = database_environment or _db_env_for_db_name(resolved_board_db_name)
 
     device_doc = with_tenant_id(
         {
