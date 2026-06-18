@@ -7,6 +7,7 @@ import {
   getOrCreateDeviceFingerprint,
 } from "../../lib/apis/displayDeviceAPI";
 import { Button } from "../../components/ui/button";
+import { DisplayPairingInstructions } from "../../components/visual-boards/DisplayPairingInstructions";
 
 function formatCountdown(seconds) {
   const m = Math.floor(seconds / 60);
@@ -124,15 +125,15 @@ const DisplayPairingPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6">
-      <div className="max-w-lg w-full text-center space-y-8">
-        <div>
+      <div className="max-w-xl w-full space-y-6">
+        <div className="text-center">
           <p className="text-blue-400 text-sm font-semibold tracking-wide uppercase mb-2">AssetIQ Display</p>
           <h1 className="text-3xl font-bold">Pair this device</h1>
-          <p className="text-slate-400 mt-2 text-sm">
-            In AssetIQ go to Visual Management → Screens → Register Screen and enter the code below.
-          </p>
         </div>
 
+        <DisplayPairingInstructions variant="display" />
+
+        <div className="text-center space-y-6">
         {loading && !pairCode ? (
           <Loader2 className="w-10 h-10 animate-spin text-slate-500 mx-auto" />
         ) : (
@@ -159,9 +160,10 @@ const DisplayPairingPage = () => {
 
         {error && <p className="text-red-400 text-sm">{error}</p>}
 
-        <p className="text-xs text-slate-600">
+        <p className="text-xs text-slate-600 text-center">
           {window.screen?.width}×{window.screen?.height} · {navigator.userAgent?.split(" ").slice(-2).join(" ")}
         </p>
+        </div>
       </div>
     </div>
   );

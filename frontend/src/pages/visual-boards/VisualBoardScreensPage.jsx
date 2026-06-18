@@ -10,6 +10,7 @@ import { Badge } from "../../components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
+import { DisplayPairingInstructions, getDisplayPairingUrl } from "../../components/visual-boards/DisplayPairingInstructions";
 
 const STATUS_VARIANT = {
   online: "default",
@@ -125,8 +126,23 @@ const VisualBoardScreensPage = () => {
         </div>
       </div>
 
+      <DisplayPairingInstructions variant="admin" />
+
       <Card>
-        <CardHeader><CardTitle className="text-base">Register Screen — Enter Pairing Code</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Register Screen — Enter Pairing Code</CardTitle>
+          <p className="text-sm text-slate-500 font-normal mt-1">
+            Display URL for TVs:{" "}
+            <a
+              href={getDisplayPairingUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-blue-600 hover:underline"
+            >
+              {getDisplayPairingUrl()}
+            </a>
+          </p>
+        </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2">
             <Input

@@ -7,6 +7,7 @@ import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { getDisplayPairingUrl } from "../../components/visual-boards/DisplayPairingInstructions";
 
 const STATUS_VARIANT = {
   draft: "secondary",
@@ -69,6 +70,21 @@ const VisualBoardsPage = () => {
             New Board
           </Button>
         </div>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="font-medium text-slate-800">Shop-floor TVs:</span>
+        <span>
+          Open{" "}
+          <a href={getDisplayPairingUrl()} target="_blank" rel="noopener noreferrer" className="font-mono text-blue-600 hover:underline">
+            {getDisplayPairingUrl()}
+          </a>{" "}
+          on the display, then pair under{" "}
+          <Link to="/visual-management/screens" className="text-blue-600 hover:underline font-medium">
+            Screens
+          </Link>
+          .
+        </span>
       </div>
 
       {isLoading ? (
