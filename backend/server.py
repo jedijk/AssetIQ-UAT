@@ -451,6 +451,20 @@ def _allows_public_db_env(path: str) -> bool:
     return any(path.startswith(prefix) for prefix in _PUBLIC_DB_ENV_PREFIXES)
 
 
+async def _allows_uat_db_env(user, path: str) -> bool:
+    """Allow VMB admins to use UAT DB for display pairing management routes."""
+    if not user or not path.startswith("/api/display/"):
+        return False
+    if path.startswith("/api/display/request-pairing"):
+        return False
+    from services.permission_resolver import check_api_permission
+
+    role = user.get("role", "viewer")
+    if role == "owner":
+        return True
+    return await check_api_permission(role, "vmb:admin")
+
+
 @app.middleware("http")
 async def set_database_context(request, call_next):
     """
@@ -499,7 +513,11 @@ async def set_database_context(request, call_next):
         role = user.get("role") if user else None
         user_email = user.get("email") if user else "none"
         if explicit_env == "uat":
-            if _role_can_switch_database(role) or _allows_public_db_env(request.url.path or ""):
+            if (
+                _role_can_switch_database(role)
+                or _allows_public_db_env(request.url.path or "")
+                or await _allows_uat_db_env(user, request.url.path or "")
+            ):
                 db_env = "uat"
             else:
                 logger.warning(

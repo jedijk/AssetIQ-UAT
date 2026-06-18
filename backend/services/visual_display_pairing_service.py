@@ -224,7 +224,10 @@ async def complete_pairing(
         {"_id": 0, "id": 1, "name": 1, "status": 1},
     )
     if not board:
-        raise HTTPException(status_code=404, detail="Board not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Board not found in the pairing database — ensure the board exists in the same environment as the display",
+        )
 
     raw_token, token_hash = generate_device_token()
     now = now_iso()

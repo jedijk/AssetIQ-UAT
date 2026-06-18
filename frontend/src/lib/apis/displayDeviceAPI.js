@@ -1,5 +1,6 @@
 import { api } from "../apiClient";
 import { getBackendUrl } from "../apiConfig";
+import { isUatHostname } from "../databaseEnv";
 
 const publicBase = () => getBackendUrl();
 
@@ -10,9 +11,13 @@ export function getDisplayDbEnv() {
     const fromUrl = new URLSearchParams(window.location.search).get("db_env");
     if (fromUrl === "uat" || fromUrl === "production") return fromUrl;
   } catch (_e) {}
-  const host = window.location.hostname.toLowerCase();
-  if (host.includes("-uat") || host.includes("uat.")) return "uat";
+  if (isUatHostname()) return "uat";
   return null;
+}
+
+function adminDbParams() {
+  const dbEnv = getDisplayDbEnv();
+  return dbEnv && dbEnv !== "production" ? { db_env: dbEnv } : undefined;
 }
 
 function publicDisplayQuery(extraParams) {
@@ -70,17 +75,21 @@ export const displayDeviceAPI = {
   },
 
   previewPairing: async (pairCode) => {
-    const response = await api.get(`/display/pairing/${encodeURIComponent(pairCode)}`);
+    const response = await api.get(`/display/pairing/${encodeURIComponent(pairCode)}`, {
+      params: adminDbParams(),
+    });
     return response.data;
   },
 
   completePairing: async (payload) => {
-    const response = await api.post("/display/pairing/complete", payload);
+    const response = await api.post("/display/pairing/complete", payload, {
+      params: adminDbParams(),
+    });
     return response.data;
   },
 
   listDevices: async () => {
-    const response = await api.get("/display/devices");
+    const response = await api.get("/display/devices", { params: adminDbParams() });
     return response.data;
   },
 };
