@@ -130,7 +130,7 @@ const VisualBoardScreensPage = () => {
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline" size="sm">
-            <Link to="/display" target="_blank" rel="noopener noreferrer">
+            <Link to="/tv" target="_blank" rel="noopener noreferrer">
               <Link2 className="w-4 h-4 mr-1" />
               Open display pairing
             </Link>
@@ -260,7 +260,7 @@ const VisualBoardScreensPage = () => {
         {isLoading ? (
           <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div>
         ) : devices.length === 0 ? (
-          <Card><CardContent className="py-10 text-center text-slate-500">No paired devices yet. Open <Link to="/display" className="text-blue-600 underline" target="_blank" rel="noreferrer">/display</Link> on a TV to get a code.</CardContent></Card>
+          <Card><CardContent className="py-10 text-center text-slate-500">No paired devices yet. Open <Link to="/tv" className="text-blue-600 underline" target="_blank" rel="noreferrer">/tv</Link> on a TV to get a code.</CardContent></Card>
         ) : (
           <div className="space-y-3">
             {devices.map((device) => (

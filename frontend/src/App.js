@@ -451,11 +451,12 @@ function App() {
                 </Suspense>
               } />
               {/* Display device pairing — no login (Phase 4a) */}
-              <Route path="/display" element={
+              <Route path="/tv" element={
                 <Suspense fallback={<RouteFallback />}>
                   <DisplayPairingPage />
                 </Suspense>
               } />
+              <Route path="/display" element={<Navigate to="/tv" replace />} />
               <Route path="/" element={
                 <ProtectedRoute>
                   <FirstLoginFlow>

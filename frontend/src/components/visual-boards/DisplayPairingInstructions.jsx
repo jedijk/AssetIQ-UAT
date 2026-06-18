@@ -4,9 +4,9 @@ import { Monitor, Tv } from "lucide-react";
 
 export function getDisplayPairingUrl() {
   if (typeof window !== "undefined" && window.location?.origin) {
-    return `${window.location.origin}/display`;
+    return `${window.location.origin}/tv`;
   }
-  return "/display";
+  return "/tv";
 }
 
 const ADMIN_STEPS = [
