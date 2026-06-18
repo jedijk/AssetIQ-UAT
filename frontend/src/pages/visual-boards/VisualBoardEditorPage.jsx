@@ -6,9 +6,12 @@ import { ArrowLeft, Save, Eye, Rocket, Loader2, History, Plus, QrCode } from "lu
 import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
 import VisualBoardCanvas from "../../components/visual-boards/VisualBoardCanvas";
 import WidgetConfigPanel from "../../components/visual-boards/WidgetConfigPanel";
+import BoardHeaderSettings from "../../components/visual-boards/BoardHeaderSettings";
 import { WIDGET_LIBRARY, createWidgetFromLibrary } from "../../components/visual-boards/widgetLibrary";
 import {
+  DEFAULT_BOARD_HEADER,
   DEFAULT_FINE_LAYOUT,
+  normalizeBoardHeader,
   upgradeToFineGrid,
   clampWidgetPosition,
   pixelDeltaToGridSteps,
@@ -42,6 +45,7 @@ const VisualBoardEditorPage = () => {
   const [theme, setTheme] = useState("dark");
   const [widgets, setWidgets] = useState([]);
   const [layout, setLayout] = useState(DEFAULT_FINE_LAYOUT);
+  const [header, setHeader] = useState({ ...DEFAULT_BOARD_HEADER });
   const [selectedWidgetId, setSelectedWidgetId] = useState(null);
   const [publishResult, setPublishResult] = useState(null);
   const [showVersions, setShowVersions] = useState(false);
@@ -74,6 +78,7 @@ const VisualBoardEditorPage = () => {
       const upgraded = upgradeToFineGrid(board.layout, board.widgets || []);
       setWidgets(upgraded.widgets);
       setLayout(upgraded.layout);
+      setHeader(normalizeBoardHeader(board.header));
     }
   }, [board]);
 
@@ -86,6 +91,7 @@ const VisualBoardEditorPage = () => {
         refresh_interval_seconds: refreshInterval,
         widgets,
         layout,
+        header,
       }),
     onSuccess: () => {
       toast.success("Board saved");
@@ -114,6 +120,7 @@ const VisualBoardEditorPage = () => {
       toast.success("Board rolled back");
       setWidgets(updated.widgets || []);
       setLayout(updated.layout || layout);
+      setHeader(normalizeBoardHeader(updated.header));
       setShowVersions(false);
       queryClient.invalidateQueries({ queryKey: ["visual-board", boardId] });
     },
@@ -185,7 +192,7 @@ const VisualBoardEditorPage = () => {
   };
 
   const openPreview = () => {
-    writeBoardDraft(boardId, { name, layout, widgets, theme });
+    writeBoardDraft(boardId, { name, layout, widgets, theme, header });
     navigate(`/visual-management/boards/${boardId}/preview`);
   };
 
@@ -295,6 +302,11 @@ const VisualBoardEditorPage = () => {
           <p className="text-[11px] text-slate-500 leading-snug">
             Fine 24-column grid. Drag widgets to move; drag the blue handle to resize. Save after layout changes.
           </p>
+          <BoardHeaderSettings
+            header={header}
+            onChange={setHeader}
+            showTyromerControls={boardType === "operations"}
+          />
           <div className="pt-2 border-t">
             <div className="text-xs font-semibold text-slate-500 uppercase mb-2">Widget Library</div>
             <div className="space-y-1">
@@ -324,6 +336,7 @@ const VisualBoardEditorPage = () => {
             widgets={widgets}
             theme={theme}
             boardType={boardType}
+            header={header}
             data={{ widgets: previewData?.widgets, status: previewData?.status }}
             previewSize="desktop"
             editable

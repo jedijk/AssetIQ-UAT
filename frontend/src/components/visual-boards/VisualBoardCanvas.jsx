@@ -23,6 +23,7 @@ import { boardSurfaceClass, widgetFontVars } from "./boardTheme";
 import VisualBoardLogo from "./VisualBoardLogo";
 import TyromerBoardLogo from "./TyromerBoardLogo";
 import { computeGridCellSize, getCanvasSizeClass } from "./boardLayoutUtils";
+import { headerMinHeightPx, normalizeBoardHeader } from "./boardHeaderConfig";
 
 const WIDGET_RENDERERS = {
   kpi_card: KpiCardWidget,
@@ -139,6 +140,7 @@ const VisualBoardCanvas = ({
   data,
   theme = "dark",
   boardType,
+  header,
   previewSize = "tv-55",
   editable = false,
   selectedWidgetId,
@@ -197,6 +199,7 @@ const VisualBoardCanvas = ({
   );
 
   const showTyromerLogo = boardType === "operations";
+  const headerConfig = normalizeBoardHeader(header);
   const headerTitleClass =
     theme === "light"
       ? "text-slate-800"
@@ -208,15 +211,29 @@ const VisualBoardCanvas = ({
         previewSize === "fullscreen" ? "rounded-none shadow-none" : ""
       }`}
     >
-      <div className="shrink-0 relative px-4 pt-3 pb-2 flex items-center justify-between gap-3 min-h-[4.5rem]">
-        <VisualBoardLogo theme={theme} className="relative z-10" />
+      <div
+        className="shrink-0 relative px-4 pt-3 pb-2 flex items-center justify-between gap-3"
+        style={{ minHeight: `${headerMinHeightPx(headerConfig)}px` }}
+      >
+        <VisualBoardLogo
+          theme={theme}
+          className="relative z-10"
+          heightPx={headerConfig.assetiq_logo_height}
+          transparentBackground={headerConfig.transparent_logo_background !== false}
+        />
         <h1
-          className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center font-semibold text-sm sm:text-base tracking-wide whitespace-nowrap px-2 ${headerTitleClass}`}
+          className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center font-semibold tracking-wide whitespace-nowrap px-2 ${headerTitleClass}`}
+          style={{ fontSize: `${headerConfig.title_font_size}px` }}
         >
           Visual Management Board
         </h1>
         {showTyromerLogo ? (
-          <TyromerBoardLogo className="relative z-10" />
+          <TyromerBoardLogo
+            className="relative z-10"
+            theme={theme}
+            heightPx={headerConfig.tyromer_logo_height}
+            transparentBackground={headerConfig.transparent_logo_background !== false}
+          />
         ) : (
           <span className="w-0" aria-hidden />
         )}

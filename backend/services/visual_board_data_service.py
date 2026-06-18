@@ -16,6 +16,7 @@ from models.visual_board import (
     PublicLayoutResponse,
     ReliabilityStatus,
     StatusIndicatorPayload,
+    VisualBoardHeaderConfig,
     VisualBoardLayout,
     VisualBoardWidget,
     WidgetType,
@@ -40,6 +41,12 @@ async def get_public_layout(raw_token: str) -> PublicLayoutResponse:
     widgets = [VisualBoardWidget(**w) for w in widgets_raw]
     layout_raw = version.get("layout") or board.get("layout") or {}
     layout = VisualBoardLayout(**layout_raw)
+    header_raw = version.get("header") or board.get("header") or {}
+    header = (
+        VisualBoardHeaderConfig(**header_raw)
+        if isinstance(header_raw, dict) and header_raw
+        else VisualBoardHeaderConfig()
+    )
     return PublicLayoutResponse(
         board_id=board["id"],
         name=board.get("name", ""),
@@ -49,6 +56,7 @@ async def get_public_layout(raw_token: str) -> PublicLayoutResponse:
         refresh_interval_seconds=int(board.get("refresh_interval_seconds") or 30),
         theme=board.get("theme", "dark"),
         board_type=BoardType(board.get("board_type", BoardType.RELIABILITY.value)),
+        header=header,
     )
 
 

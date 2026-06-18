@@ -123,6 +123,7 @@ const VisualBoardDisplayPage = () => {
             widgets={canvasBoard.widgets}
             theme={boardTheme}
             boardType={layout?.board_type}
+            header={canvasBoard.header}
             data={{
               widgets: displayData?.widgets,
               status: displayData?.status,

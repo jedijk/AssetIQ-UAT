@@ -1,3 +1,7 @@
+/** Visual Management Studio — board layout helpers. */
+import { DEFAULT_BOARD_HEADER, normalizeBoardHeader } from "./boardHeaderConfig";
+
+export { DEFAULT_BOARD_HEADER, normalizeBoardHeader };
 export const FINE_GRID_COLUMNS = 24;
 export const LEGACY_GRID_COLUMNS = 12;
 export const DEFAULT_FINE_LAYOUT = { columns: FINE_GRID_COLUMNS, rows: 16 };
@@ -22,6 +26,7 @@ export function normalizeBoardForCanvas(board) {
       layout: DEFAULT_FINE_LAYOUT,
       widgets: [],
       theme: "dark",
+      header: { ...DEFAULT_BOARD_HEADER },
     };
   }
   const upgraded = upgradeToFineGrid(board.layout, board.widgets || []);
@@ -29,6 +34,7 @@ export function normalizeBoardForCanvas(board) {
     layout: upgraded.layout,
     widgets: upgraded.widgets,
     theme: board.theme || "dark",
+    header: normalizeBoardHeader(board.header),
   };
 }
 
