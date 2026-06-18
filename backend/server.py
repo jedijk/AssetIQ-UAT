@@ -642,6 +642,7 @@ async def csrf_protect_cookie_auth(request: Request, call_next):
             "/api/auth/forgot-password",
             "/api/auth/reset-password",
             "/api/auth/verify-reset-token",
+            "/api/display/request-pairing",
             "/health",
             "/api/health",
         )

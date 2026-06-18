@@ -24,6 +24,7 @@ export const displayDeviceAPI = {
     const response = await fetch(`${publicBase()}/api/display/request-pairing`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "omit",
       body: JSON.stringify(payload),
     });
     if (!response.ok) {
@@ -37,6 +38,7 @@ export const displayDeviceAPI = {
     const params = new URLSearchParams({ device_fingerprint: deviceFingerprint });
     const response = await fetch(
       `${publicBase()}/api/display/pairing/${encodeURIComponent(pairCode)}/status?${params}`,
+      { credentials: "omit" },
     );
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
