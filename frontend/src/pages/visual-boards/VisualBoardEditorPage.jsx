@@ -35,6 +35,15 @@ import {
   DialogTitle,
 } from "../../components/ui/dialog";
 
+function resolveBoardDisplayUrl(url) {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return `${window.location.origin}${url.startsWith("/") ? url : `/${url}`}`;
+  }
+  return url;
+}
+
 const VisualBoardEditorPage = () => {
   const { boardId } = useParams();
   const navigate = useNavigate();
@@ -367,7 +376,22 @@ const VisualBoardEditorPage = () => {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 text-sm">
-            <p>Display URL: <code className="bg-slate-100 px-1 rounded">{publishResult?.url}</code></p>
+            {publishResult?.url ? (
+              <div className="space-y-1">
+                <p className="text-slate-600">Display URL</p>
+                <a
+                  href={resolveBoardDisplayUrl(publishResult.url)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block break-all text-blue-600 hover:underline font-mono text-xs bg-slate-100 px-2 py-1.5 rounded"
+                >
+                  {resolveBoardDisplayUrl(publishResult.url)}
+                </a>
+                <p className="text-[11px] text-slate-500">
+                  Open this link on a TV or tablet (frontend app). It is not served from the API host.
+                </p>
+              </div>
+            ) : null}
             {publishResult?.qr_code_data_url && (
               <div className="flex justify-center py-2">
                 <img src={publishResult.qr_code_data_url} alt="Board QR code" className="w-40 h-40" />

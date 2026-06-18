@@ -4,6 +4,7 @@ Visual Management Board service — CRUD, publish lifecycle, versions.
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
@@ -40,6 +41,22 @@ from services.visual_board_qr import generate_qr_data_url
 from services.visual_board_token import generate_token, hash_token
 
 logger = logging.getLogger(__name__)
+
+
+def _frontend_base_url() -> str:
+    """Public frontend origin for kiosk display links (not the API host)."""
+    return (
+        os.environ.get("FRONTEND_URL")
+        or os.environ.get("EMAIL_FRONTEND_URL")
+        or ""
+    ).rstrip("/")
+
+
+def _display_url(path: str) -> str:
+    if not path.startswith("/"):
+        path = f"/{path}"
+    base = _frontend_base_url()
+    return f"{base}{path}" if base else path
 
 
 def _parse_header(raw) -> VisualBoardHeaderConfig:
@@ -230,14 +247,16 @@ async def _issue_token(
         user,
     )
     await db[TOKENS_COLLECTION].insert_one(token_doc)
-    url = f"/vmb/{raw_token}"
+    path = f"/vmb/{raw_token}"
+    base = _frontend_base_url()
+    url = _display_url(path)
     return PublishBoardResponse(
         board_id=board_id,
         version=version,
         token=raw_token,
         url=url,
         token_id=token_id,
-        qr_code_data_url=generate_qr_data_url(url),
+        qr_code_data_url=generate_qr_data_url(path, base_url=base or None),
     )
 
 

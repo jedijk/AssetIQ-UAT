@@ -119,7 +119,7 @@ async def test_publish_board_creates_version_and_token(mock_user, mock_db):
     assert result.board_id == "board-1"
     assert result.version == 1
     assert result.token.startswith("vmb_")
-    assert result.url == f"/vmb/{result.token}"
+    assert result.url.endswith(f"/vmb/{result.token}")
     versions.insert_one.assert_awaited_once()
     token_insert = tokens.insert_one.await_args[0][0]
     assert token_insert["token_hash"] == hash_token(result.token)

@@ -23,6 +23,7 @@ from models.visual_board import (
 from services import visual_board_data_service as data_svc
 from services import visual_board_service as svc
 from services.visual_board_qr import generate_qr_data_url
+from services.visual_board_service import _frontend_base_url
 
 router = APIRouter(prefix="/boards", tags=["Visual Management Boards"])
 
@@ -74,7 +75,13 @@ async def generate_qr(
     request: QrCodeRequest,
     current_user: dict = Depends(_vmb_read),
 ):
-    return {"url": request.url, "qr_code_data_url": generate_qr_data_url(request.url)}
+    return {
+        "url": request.url,
+        "qr_code_data_url": generate_qr_data_url(
+            request.url,
+            base_url=_frontend_base_url() or None,
+        ),
+    }
 
 
 @router.get("/{board_id}")
