@@ -296,6 +296,9 @@ export const excludedRoutes = [
   '/reset-password',
   '/login/callback',
   '/mobile',
+  '/tv',
+  '/display',
+  '/vmb',
 ];
 
 /**

@@ -20,6 +20,7 @@ import { useEffect } from "react";
 import { getBackendUrl } from "./lib/apiConfig";
 import { api } from "./lib/apiClient";
 import { debugLog } from "./lib/debug";
+import { isPublicKioskPath } from "./lib/publicRoutes";
 import "./App.css";
 import { AppShell } from "./components/AppShell";
 import { CapabilitiesProvider, useCapabilities } from "./core/performance";
@@ -109,7 +110,8 @@ function AuthExpiredListener() {
       try {
         debugLog("auth_expired_event", { path: window.location.pathname });
       } catch (_e) {}
-      if (!window.location.pathname.includes("/login")) {
+      const path = window.location.pathname;
+      if (!path.includes("/login") && !isPublicKioskPath(path)) {
         navigate("/login", { replace: true });
       }
     };

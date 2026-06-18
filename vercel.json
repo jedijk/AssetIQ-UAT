@@ -9,7 +9,19 @@
       "destination": "/index.html"
     },
     {
+      "source": "/tv",
+      "destination": "/index.html"
+    },
+    {
       "source": "/tv/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/display",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/display/:path*",
       "destination": "/index.html"
     },
     {

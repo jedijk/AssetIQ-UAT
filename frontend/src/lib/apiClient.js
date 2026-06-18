@@ -2,6 +2,7 @@ import axios from "axios";
 import { getApiUrl, getBackendUrl, AUTH_MODE, getCsrfToken, setCsrfToken } from "./apiConfig";
 import { debugLog } from "./debug";
 import { getDatabaseEnvironment } from "./databaseEnv";
+import { isPublicKioskPath } from "./publicRoutes";
 
 // Get API URL at initialization for static uses
 export const API_URL = getApiUrl();
@@ -74,7 +75,10 @@ async function isSessionActuallyExpired() {
 function handleUnauthorizedResponse(error) {
   const url = `${error.config?.baseURL || ""}${error.config?.url || ""}`;
   if (isPreLoginAuthUrl(url)) return;
-  if (typeof window !== "undefined" && window.location.pathname.includes("/login")) return;
+  if (typeof window !== "undefined") {
+    const path = window.location.pathname;
+    if (path.includes("/login") || isPublicKioskPath(path)) return;
+  }
 
   try {
     debugLog("api_401", { url });

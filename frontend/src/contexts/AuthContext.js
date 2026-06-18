@@ -5,6 +5,7 @@ import { updateCachedPreferences, clearCachedPreferences } from "../lib/dateUtil
 import { clearRolePreviewStorage } from "./RolePreviewContext";
 import { enforceDatabaseEnvironmentForRole } from "../lib/databaseEnv";
 import { setCsrfToken, clearCsrfToken } from "../lib/apiConfig";
+import { isPublicKioskPath } from "../lib/publicRoutes";
 
 const AuthContext = createContext(null);
 const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
@@ -116,6 +117,11 @@ export const AuthProvider = ({ children }) => {
   }, [logout]);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && isPublicKioskPath(window.location.pathname)) {
+      setLoading(false);
+      return;
+    }
+
     if (AUTH_MODE === "cookie") {
       // Cookie auth: always attempt to fetch current user on boot.
       axios.defaults.withCredentials = true;
