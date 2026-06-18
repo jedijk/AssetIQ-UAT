@@ -5,7 +5,7 @@ export const WIDGET_LIBRARY = [
   { type: "mooney_chart", label: "Mooney Chart", defaultTitle: "Mooney Viscosity", defaultConfig: { period: "today" }, defaultSize: { w: 24, h: 8 } },
   { type: "information_panel", label: "Information", defaultTitle: "Information", defaultConfig: { limit: 12, period: "today" }, defaultSize: { w: 8, h: 8 } },
   { type: "form_submissions_list", label: "Form Submissions", defaultTitle: "Recent Form Submissions", defaultConfig: { limit: 8 }, defaultSize: { w: 8, h: 8 } },
-  { type: "risk_observation_list", label: "Risk Observations", defaultTitle: "Top Risk Observations", defaultConfig: { limit: 10 }, defaultSize: { w: 8, h: 8 } },
+  { type: "risk_observation_list", label: "Risk Observations", defaultTitle: "High Risk Observations", defaultConfig: { limit: 10 }, defaultSize: { w: 8, h: 8 } },
   { type: "status_indicator", label: "Status Indicator", defaultTitle: "Reliability Status", defaultConfig: {}, defaultSize: { w: 6, h: 6 } },
   { type: "observation_list", label: "Observation List", defaultTitle: "Open Observations", defaultConfig: { limit: 8 }, defaultSize: { w: 12, h: 8 } },
   { type: "exposure_waterfall", label: "Exposure Waterfall", defaultTitle: "Exposure Waterfall", defaultConfig: {}, defaultSize: { w: 12, h: 6 } },

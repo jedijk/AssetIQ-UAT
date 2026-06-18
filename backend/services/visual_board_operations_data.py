@@ -167,7 +167,7 @@ async def build_form_submissions_list(user: dict, limit: int = 8) -> Dict[str, A
 async def build_risk_observation_list(user: dict, limit: int = 10) -> Dict[str, Any]:
     from services.threat_service import list_top_threats
 
-    threats = await list_top_threats(user, limit=limit)
+    threats = await list_top_threats(user, limit=limit, exclude_mitigated=True)
     items = []
     for row in threats:
         rpn = row.get("fmea_rpn") or row.get("rpn") or row.get("risk_score")

@@ -191,13 +191,20 @@ async def list_threats(
     return normalize_threat_list_items(threats)
 
 
+_MITIGATED_THREAT_STATUSES = ["Mitigated", "mitigated"]
+
+
 async def list_top_threats(
     user: dict,
     *,
     limit: int = 10,
     language: Optional[str] = None,
+    exclude_mitigated: bool = False,
 ) -> List[dict]:
-    query = await _installation_scoped_threat_query(user, {"status": {"$ne": "Closed"}})
+    status_filter: Dict[str, Any] = {"status": {"$ne": "Closed"}}
+    if exclude_mitigated:
+        status_filter = {"status": {"$nin": ["Closed", "closed", *_MITIGATED_THREAT_STATUSES]}}
+    query = await _installation_scoped_threat_query(user, status_filter)
     if query is None:
         return []
     threats = await _threat_repo.find_many(

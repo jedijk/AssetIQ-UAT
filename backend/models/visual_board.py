@@ -455,7 +455,7 @@ def default_tyromer_operations_widgets() -> List[VisualBoardWidget]:
         VisualBoardWidget(
             id="w_top_risk",
             type=WidgetType.RISK_OBSERVATION_LIST,
-            title="Top 10 Highest Risk Observations",
+            title="High Risk Observations",
             config=WidgetConfig(limit=10),
             position=WidgetPosition(x=16, y=16, w=8, h=8),
         ),
