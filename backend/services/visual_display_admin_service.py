@@ -107,6 +107,13 @@ def _board_db_name(database_environment: Optional[str]) -> str:
     return get_current_db_name()
 
 
+def _db_env_for_db_name(db_name: str) -> Optional[str]:
+    for env_key, meta in AVAILABLE_DATABASES.items():
+        if meta["name"] == db_name:
+            return env_key
+    return None
+
+
 async def _fetch_board_meta(
     board_ids: List[str],
     user: dict,
@@ -230,11 +237,13 @@ async def reassign_board(
 
     now = now_iso()
     board_version = int(board.get("version") or 1)
+    board_db_env = database_environment or _db_env_for_db_name(board_db_name)
     await db[DEVICES_COLLECTION].update_one(
         merge_tenant_filter({"id": device_id}, user),
         {
             "$set": {
                 "board_id": board_id,
+                "board_database_environment": board_db_env,
                 "board_version": board_version,
                 "updated_at": now,
             }

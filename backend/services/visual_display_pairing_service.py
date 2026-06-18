@@ -267,12 +267,14 @@ async def complete_pairing(
     raw_token, token_hash = generate_device_token()
     now = now_iso()
     device_id = new_id("device")
+    board_db_env = database_environment or _db_env_for_db_name(board_db_name)
 
     device_doc = with_tenant_id(
         {
             "id": device_id,
             "screen_name": screen_name.strip(),
             "board_id": board_id,
+            "board_database_environment": board_db_env,
             "location": location or "",
             "area": area or "",
             "status": "active",

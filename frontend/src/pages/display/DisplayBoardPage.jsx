@@ -58,10 +58,11 @@ const DisplayBoardPage = () => {
     retry: false,
   });
 
-  const { data: boardData, isLoading: dataLoading } = useQuery({
+  const { data: boardData, isLoading: dataLoading, isFetching: dataFetching, error: dataError } = useQuery({
     queryKey: ["display-board-data", deviceToken],
     queryFn: () => displayDeviceAPI.getBoardData(deviceToken),
     enabled: !!deviceToken && !!layout,
+    retry: 1,
   });
 
   const handleRealtimeEvent = useCallback(
@@ -164,7 +165,8 @@ const DisplayBoardPage = () => {
   );
 
   const error = connectError || configError?.message || layoutError?.message;
-  const isLoading = configLoading || layoutLoading || dataLoading;
+  const isLoading = configLoading || layoutLoading;
+  const dataLoadError = dataError?.message;
 
   if (!deviceToken) {
     return null;
@@ -233,6 +235,17 @@ const DisplayBoardPage = () => {
             theme={boardTheme}
             isRealtime={isWsLive || !!liveBoardData}
           />
+          {(dataLoading || dataFetching) && !effectiveBoardData?.widgets && (
+            <div className="pointer-events-none absolute bottom-2 left-2 z-20 flex items-center gap-2 text-xs text-slate-400">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              Loading data…
+            </div>
+          )}
+          {dataLoadError && (
+            <div className="pointer-events-none absolute bottom-10 left-2 z-20 max-w-xs text-xs text-amber-400/90">
+              Data refresh failed — layout is shown; retrying…
+            </div>
+          )}
         </div>
       </div>
     </div>

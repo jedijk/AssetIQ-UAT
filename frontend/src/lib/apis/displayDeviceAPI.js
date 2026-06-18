@@ -4,16 +4,6 @@ import { getDatabaseEnvironment } from "../databaseEnv";
 
 const publicBase = () => getBackendUrl();
 
-/** Display kiosk DB env: URL override, else same as admin UI preference. */
-export function getDisplayDbEnv() {
-  if (typeof window === "undefined") return null;
-  try {
-    const fromUrl = new URLSearchParams(window.location.search).get("db_env");
-    if (fromUrl === "uat" || fromUrl === "production") return fromUrl;
-  } catch (_e) {}
-  return getDatabaseEnvironment();
-}
-
 function adminDbParams() {
   const dbEnv = getDatabaseEnvironment();
   return dbEnv ? { db_env: dbEnv } : undefined;
@@ -32,6 +22,32 @@ function publicDisplayQuery(extraParams) {
 export const DISPLAY_DEVICE_TOKEN_KEY = "assetiq_display_device_token";
 export const DISPLAY_DEVICE_ID_KEY = "assetiq_display_device_id";
 export const DISPLAY_FINGERPRINT_KEY = "assetiq_display_fingerprint";
+export const DISPLAY_DB_ENV_KEY = "assetiq_display_db_env";
+
+/** Display kiosk DB env: URL override, paired-device storage, else hostname default. */
+export function getDisplayDbEnv() {
+  if (typeof window === "undefined") return null;
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get("db_env");
+    if (fromUrl === "uat" || fromUrl === "production") return fromUrl;
+  } catch (_e) {}
+  try {
+    const stored = localStorage.getItem(DISPLAY_DB_ENV_KEY);
+    if (stored === "uat" || stored === "production") return stored;
+  } catch (_e) {}
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname.toLowerCase();
+    if (host.includes("-uat") || host.includes("uat.")) return "uat";
+  }
+  return "production";
+}
+
+export function setDisplayDbEnv(dbEnv) {
+  if (dbEnv !== "uat" && dbEnv !== "production") return;
+  try {
+    localStorage.setItem(DISPLAY_DB_ENV_KEY, dbEnv);
+  } catch (_e) {}
+}
 
 export function getOrCreateDeviceFingerprint() {
   try {

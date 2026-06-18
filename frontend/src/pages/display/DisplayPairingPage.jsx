@@ -5,7 +5,9 @@ import {
   displayDeviceAPI,
   DISPLAY_DEVICE_ID_KEY,
   DISPLAY_DEVICE_TOKEN_KEY,
+  getDisplayDbEnv,
   getOrCreateDeviceFingerprint,
+  setDisplayDbEnv,
 } from "../../lib/apis/displayDeviceAPI";
 import { Button } from "../../components/ui/button";
 import { DisplayPairingInstructions } from "../../components/visual-boards/DisplayPairingInstructions";
@@ -98,6 +100,7 @@ const DisplayPairingPage = () => {
         }
 
         if (status.status === "paired" && status.device_token) {
+          setDisplayDbEnv(getDisplayDbEnv());
           localStorage.setItem(DISPLAY_DEVICE_TOKEN_KEY, status.device_token);
           localStorage.setItem(DISPLAY_DEVICE_ID_KEY, status.device_id || "");
           setPairedInfo(status);

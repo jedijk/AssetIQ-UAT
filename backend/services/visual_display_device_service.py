@@ -66,7 +66,8 @@ async def _record_event(
         logger.debug("Display event insert failed", exc_info=True)
 
 
-async def _load_board_context(device: dict) -> Dict[str, Any]:
+async def _find_board_for_device(device: dict) -> tuple[dict, dict, str]:
+    """Load board + version snapshot, searching across DBs when needed."""
     board_id = device.get("board_id")
     if not board_id:
         raise HTTPException(status_code=404, detail="No board assigned to this device")
@@ -76,18 +77,37 @@ async def _load_board_context(device: dict) -> Dict[str, Any]:
     if tenant_id:
         board_query["tenant_id"] = tenant_id
 
-    board = await db[BOARDS_COLLECTION].find_one(board_query, {"_id": 0})
-    if not board:
+    db_names: list[str] = []
+    env_key = device.get("board_database_environment")
+    if env_key and env_key in AVAILABLE_DATABASES:
+        db_names.append(AVAILABLE_DATABASES[env_key]["name"])
+    current = get_current_db_name()
+    if current and current not in db_names:
+        db_names.append(current)
+    for meta in AVAILABLE_DATABASES.values():
+        if meta["name"] not in db_names:
+            db_names.append(meta["name"])
+
+    board = None
+    board_db_name = None
+    for db_name in db_names:
+        found = await get_database(db_name)[BOARDS_COLLECTION].find_one(board_query, {"_id": 0})
+        if found:
+            board = found
+            board_db_name = db_name
+            break
+
+    if not board or not board_db_name:
         raise HTTPException(status_code=404, detail="Assigned board not found")
 
-    if board.get("status") != BoardStatus.PUBLISHED.value:
-        raise HTTPException(status_code=403, detail="Assigned board is not published")
+    if board.get("status") == BoardStatus.ARCHIVED.value:
+        raise HTTPException(status_code=403, detail="Assigned board is archived")
 
     version_num = int(board.get("version") or 1)
     version_query: Dict[str, Any] = {"board_id": board_id, "version": version_num}
     if tenant_id:
         version_query["tenant_id"] = tenant_id
-    version = await db[VERSIONS_COLLECTION].find_one(version_query, {"_id": 0})
+    version = await get_database(board_db_name)[VERSIONS_COLLECTION].find_one(version_query, {"_id": 0})
     if not version:
         version = {
             "layout": board.get("layout") or {},
@@ -96,11 +116,19 @@ async def _load_board_context(device: dict) -> Dict[str, Any]:
             "version": version_num,
         }
 
+    return board, version, board_db_name
+
+
+async def _load_board_context(device: dict) -> Dict[str, Any]:
+    board, version, board_db_name = await _find_board_for_device(device)
+    tenant_id = device.get("tenant_id")
+
     return {
         "device": device,
         "board": board,
         "version": version,
         "tenant_id": tenant_id,
+        "board_db_name": board_db_name,
     }
 
 
