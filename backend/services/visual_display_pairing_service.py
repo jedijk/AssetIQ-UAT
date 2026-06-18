@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import HTTPException
 
-from database import db
+from database import db, get_database, get_current_db_name, set_request_db, AVAILABLE_DATABASES
 from models.visual_display import (
     CompletePairingResponse,
     DisplayDeviceSummary,
@@ -28,6 +28,15 @@ from services.visual_display_helpers import (
 from services.visual_display_token import generate_device_token, generate_pair_code
 
 logger = logging.getLogger(__name__)
+
+
+def _pairing_lookup_db_names() -> list[str]:
+    """Databases to search for pairing codes (request default, then others)."""
+    names: list[str] = []
+    for candidate in (get_current_db_name(), *[m["name"] for m in AVAILABLE_DATABASES.values()]):
+        if candidate and candidate not in names:
+            names.append(candidate)
+    return names
 
 
 def _normalize_pair_code(code: str) -> str:
@@ -158,7 +167,13 @@ async def request_pairing(
 
 async def _get_pairing_by_code(pair_code: str) -> dict:
     code = _normalize_pair_code(pair_code)
-    doc = await db[PAIRINGS_COLLECTION].find_one({"pair_code": code}, {"_id": 0})
+    doc = None
+    for db_name in _pairing_lookup_db_names():
+        coll = get_database(db_name)[PAIRINGS_COLLECTION]
+        doc = await coll.find_one({"pair_code": code}, {"_id": 0})
+        if doc:
+            set_request_db(db_name)
+            break
     if not doc:
         raise HTTPException(status_code=404, detail="Pairing code not found")
     await _expire_stale_pairing(doc)

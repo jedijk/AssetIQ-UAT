@@ -4,6 +4,7 @@ import os
 os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
 
 import pytest
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -11,6 +12,23 @@ from fastapi import HTTPException
 
 from services import visual_display_pairing_service as pairing_svc
 from services.visual_display_token import PAIR_CODE_CHARS, generate_pair_code
+
+MOCK_DBS = {"production": {"name": "assetiq"}, "uat": {"name": "assetiq-UAT"}}
+
+
+@contextmanager
+def patch_pairing_db(mock_db, *, db_map=None):
+    db_map = db_map or {"assetiq": mock_db, "assetiq-UAT": mock_db}
+
+    def get_db(name):
+        return db_map.get(name, mock_db)
+
+    with patch("services.visual_display_pairing_service.get_current_db_name", return_value="assetiq"), patch(
+        "services.visual_display_pairing_service.AVAILABLE_DATABASES", MOCK_DBS
+    ), patch("services.visual_display_pairing_service.get_database", side_effect=get_db), patch(
+        "services.visual_display_pairing_service.set_request_db"
+    ), patch("services.visual_display_pairing_service.db", mock_db):
+        yield
 
 
 class FakeDB:
@@ -56,7 +74,7 @@ async def test_request_pairing_creates_code(mock_db):
     pairings.find_one = AsyncMock(return_value=None)
     events = mock_db["visual_display_events"]
 
-    with patch("services.visual_display_pairing_service.db", mock_db):
+    with patch_pairing_db(mock_db):
         result = await pairing_svc.request_pairing(
             device_fingerprint="fp_test_12345678",
             user_agent="TestAgent",
@@ -91,7 +109,7 @@ async def test_complete_pairing_assigns_board(mock_user, mock_db):
     devices = mock_db["visual_display_devices"]
     events = mock_db["visual_display_events"]
 
-    with patch("services.visual_display_pairing_service.db", mock_db):
+    with patch_pairing_db(mock_db):
         result = await pairing_svc.complete_pairing(
             pair_code="ABCDEF",
             board_id="board_1",
@@ -132,12 +150,34 @@ async def test_poll_pairing_delivers_token_once(mock_db):
     devices = mock_db["visual_display_devices"]
     devices.find_one = AsyncMock(return_value=device_doc)
 
-    with patch("services.visual_display_pairing_service.db", mock_db):
+    with patch_pairing_db(mock_db):
         status = await pairing_svc.poll_pairing_status("ABCDEF", device_fingerprint="fp_test_12345678")
 
     assert status.status == "paired"
     assert status.device_token.startswith("dvc_")
     pairings.update_one.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_get_pairing_by_code_searches_all_databases(mock_db):
+    uat_db = FakeDB()
+    uat_pairings = uat_db["visual_display_pairings"]
+    uat_pairings.find_one = AsyncMock(
+        return_value={
+            "id": "pair_uat",
+            "pair_code": "ABCDEF",
+            "status": "pending",
+            "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat(),
+        }
+    )
+
+    with patch_pairing_db(mock_db, db_map={"assetiq": mock_db, "assetiq-UAT": uat_db}), patch(
+        "services.visual_display_pairing_service.set_request_db"
+    ) as set_db:
+        doc = await pairing_svc._get_pairing_by_code("abcdef")
+
+    assert doc["id"] == "pair_uat"
+    set_db.assert_called_once_with("assetiq-UAT")
 
 
 @pytest.mark.asyncio
@@ -153,7 +193,7 @@ async def test_preview_expired_pairing(mock_db):
         }
     )
 
-    with patch("services.visual_display_pairing_service.db", mock_db):
+    with patch_pairing_db(mock_db):
         with pytest.raises(HTTPException) as exc:
             await pairing_svc.get_pairing_preview("ABCDEF")
     assert exc.value.status_code == 400

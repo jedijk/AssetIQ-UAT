@@ -440,6 +440,17 @@ except Exception as e:
 # Database Context Middleware (for multi-database support)
 # =============================================================================
 
+_PUBLIC_DB_ENV_PREFIXES = (
+    "/api/display/request-pairing",
+    "/api/display/pairing/",
+    "/api/vmb/",
+)
+
+
+def _allows_public_db_env(path: str) -> bool:
+    return any(path.startswith(prefix) for prefix in _PUBLIC_DB_ENV_PREFIXES)
+
+
 @app.middleware("http")
 async def set_database_context(request, call_next):
     """
@@ -488,7 +499,7 @@ async def set_database_context(request, call_next):
         role = user.get("role") if user else None
         user_email = user.get("email") if user else "none"
         if explicit_env == "uat":
-            if _role_can_switch_database(role):
+            if _role_can_switch_database(role) or _allows_public_db_env(request.url.path or ""):
                 db_env = "uat"
             else:
                 logger.warning(
