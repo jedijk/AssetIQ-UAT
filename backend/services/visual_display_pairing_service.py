@@ -165,6 +165,13 @@ async def request_pairing(
     )
 
 
+def _db_env_for_db_name(db_name: str) -> Optional[str]:
+    for env_key, meta in AVAILABLE_DATABASES.items():
+        if meta["name"] == db_name:
+            return env_key
+    return None
+
+
 async def _get_pairing_by_code(pair_code: str) -> dict:
     code = _normalize_pair_code(pair_code)
     doc = None
@@ -201,7 +208,28 @@ async def get_pairing_preview(pair_code: str) -> PairingPreviewResponse:
         screen_width=width,
         screen_height=height,
         resolution=resolution,
+        database_environment=_db_env_for_db_name(get_current_db_name()),
     )
+
+
+async def list_pairing_boards(user: dict) -> Dict[str, Any]:
+    """List boards from all configured databases for display pairing."""
+    items: list[Dict[str, Any]] = []
+    filt = merge_tenant_filter({}, user)
+    for env_key, meta in AVAILABLE_DATABASES.items():
+        coll = get_database(meta["name"])[BOARDS_COLLECTION]
+        docs = await coll.find(filt, {"_id": 0, "id": 1, "name": 1, "status": 1}).sort("name", 1).to_list(500)
+        for doc in docs:
+            items.append(
+                {
+                    "id": doc["id"],
+                    "name": doc.get("name", ""),
+                    "database_environment": env_key,
+                    "status": doc.get("status"),
+                }
+            )
+    items.sort(key=lambda b: (b.get("name") or "").lower())
+    return {"items": items, "total": len(items)}
 
 
 async def complete_pairing(
@@ -212,6 +240,7 @@ async def complete_pairing(
     location: Optional[str],
     area: Optional[str],
     user: dict,
+    database_environment: Optional[str] = None,
 ) -> CompletePairingResponse:
     doc = await _get_pairing_by_code(pair_code)
     if doc.get("status") != "pending":
@@ -219,16 +248,23 @@ async def complete_pairing(
     if _expires_in_seconds(doc.get("expires_at")) <= 0:
         raise HTTPException(status_code=400, detail="Pairing code expired")
 
-    board = await db[BOARDS_COLLECTION].find_one(
+    pairing_db_name = get_current_db_name()
+    board_db_name = pairing_db_name
+    if database_environment and database_environment in AVAILABLE_DATABASES:
+        board_db_name = AVAILABLE_DATABASES[database_environment]["name"]
+
+    board_coll = get_database(board_db_name)[BOARDS_COLLECTION]
+    board = await board_coll.find_one(
         merge_tenant_filter({"id": board_id}, user),
         {"_id": 0, "id": 1, "name": 1, "status": 1},
     )
     if not board:
         raise HTTPException(
             status_code=404,
-            detail="Board not found in the pairing database — ensure the board exists in the same environment as the display",
+            detail="Board not found — select a board from the list or create one under Boards",
         )
 
+    pairing_db = get_database(pairing_db_name)
     raw_token, token_hash = generate_device_token()
     now = now_iso()
     device_id = new_id("device")
@@ -254,9 +290,9 @@ async def complete_pairing(
         },
         user,
     )
-    await db[DEVICES_COLLECTION].insert_one(device_doc)
+    await pairing_db[DEVICES_COLLECTION].insert_one(device_doc)
 
-    await db[PAIRINGS_COLLECTION].update_one(
+    await pairing_db[PAIRINGS_COLLECTION].update_one(
         {"id": doc["id"]},
         {
             "$set": {

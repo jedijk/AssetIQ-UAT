@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Monitor, Loader2, RefreshCw, Trash2, Link2, Search } from "lucide-react";
 import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
 import { displayDeviceAPI } from "../../lib/apis/displayDeviceAPI";
+import { getDatabaseEnvironment } from "../../lib/databaseEnv";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
@@ -22,25 +23,29 @@ const STATUS_VARIANT = {
   pending: "secondary",
 };
 
+const ENV_LABEL = { production: "Production", uat: "UAT" };
+
 const VisualBoardScreensPage = () => {
   const queryClient = useQueryClient();
+  const dbEnv = getDatabaseEnvironment();
   const [pairCodeInput, setPairCodeInput] = useState("");
   const [pairPreview, setPairPreview] = useState(null);
-  const [pairForm, setPairForm] = useState({ board_id: "", screen_name: "", location: "", area: "" });
+  const [pairForm, setPairForm] = useState({ board_id: "", board_db_env: "", screen_name: "", location: "", area: "" });
   const [previewLoading, setPreviewLoading] = useState(false);
 
-  const { data: boardsData } = useQuery({
-    queryKey: ["visual-boards"],
-    queryFn: () => visualBoardAPI.listBoards(),
+  const { data: pairingBoardsData, isLoading: pairingBoardsLoading } = useQuery({
+    queryKey: ["display-pairing-boards", dbEnv],
+    queryFn: () => displayDeviceAPI.listBoardsForPairing(),
+    enabled: !!pairPreview,
   });
 
   const { data: legacyScreens, isLoading: legacyLoading, refetch: refetchLegacy } = useQuery({
-    queryKey: ["visual-board-screens"],
+    queryKey: ["visual-board-screens", dbEnv],
     queryFn: () => visualBoardAPI.listAllScreens(),
   });
 
   const { data: devicesData, isLoading: devicesLoading, refetch: refetchDevices } = useQuery({
-    queryKey: ["display-devices"],
+    queryKey: ["display-devices", dbEnv],
     queryFn: () => displayDeviceAPI.listDevices(),
   });
 
@@ -54,19 +59,27 @@ const VisualBoardScreensPage = () => {
   });
 
   const completePairMutation = useMutation({
-    mutationFn: () =>
-      displayDeviceAPI.completePairing({
+    mutationFn: () => {
+      const payload = {
         pair_code: pairPreview.pair_code,
         board_id: pairForm.board_id,
         screen_name: pairForm.screen_name,
         location: pairForm.location || undefined,
         area: pairForm.area || undefined,
-      }),
+      };
+      if (
+        pairForm.board_db_env &&
+        pairForm.board_db_env !== pairPreview.database_environment
+      ) {
+        payload.database_environment = pairForm.board_db_env;
+      }
+      return displayDeviceAPI.completePairing(payload);
+    },
     onSuccess: (result) => {
       toast.success(`Paired "${result.screen_name}"`);
       setPairPreview(null);
       setPairCodeInput("");
-      setPairForm({ board_id: "", screen_name: "", location: "", area: "" });
+      setPairForm({ board_id: "", board_db_env: "", screen_name: "", location: "", area: "" });
       queryClient.invalidateQueries({ queryKey: ["display-devices"] });
     },
     onError: (err) => toast.error(err.response?.data?.detail || err.message || "Pairing failed"),
@@ -93,7 +106,7 @@ const VisualBoardScreensPage = () => {
     }
   };
 
-  const boards = boardsData?.items || [];
+  const boards = pairingBoardsData?.items || [];
   const legacyItems = legacyScreens?.items || [];
   const devices = devicesData?.items || [];
   const isLoading = legacyLoading || devicesLoading;
@@ -176,13 +189,33 @@ const VisualBoardScreensPage = () => {
                   <select
                     className="w-full border rounded-md h-9 px-2 text-sm"
                     value={pairForm.board_id}
-                    onChange={(e) => setPairForm((f) => ({ ...f, board_id: e.target.value }))}
+                    onChange={(e) => {
+                      const boardId = e.target.value;
+                      const board = boards.find((b) => b.id === boardId);
+                      setPairForm((f) => ({
+                        ...f,
+                        board_id: boardId,
+                        board_db_env: board?.database_environment || "",
+                      }));
+                    }}
+                    disabled={pairingBoardsLoading}
                   >
                     <option value="">Select board…</option>
                     {boards.map((b) => (
-                      <option key={b.id} value={b.id}>{b.name}</option>
+                      <option key={`${b.database_environment}:${b.id}`} value={b.id}>
+                        {b.name}
+                        {b.database_environment ? ` (${ENV_LABEL[b.database_environment] || b.database_environment})` : ""}
+                      </option>
                     ))}
                   </select>
+                  {!pairingBoardsLoading && boards.length === 0 && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      No boards in this environment — create one under{" "}
+                      <Link to="/visual-management/boards" className="text-blue-600 underline">
+                        Boards
+                      </Link>
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label>Screen name</Label>

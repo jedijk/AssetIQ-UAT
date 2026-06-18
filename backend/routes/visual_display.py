@@ -64,8 +64,15 @@ async def complete_pairing(
         screen_name=request.screen_name,
         location=request.location,
         area=request.area,
+        database_environment=request.database_environment,
         user=current_user,
     )
+
+
+@router.get("/pairing-boards")
+async def list_pairing_boards(current_user: dict = Depends(_vmb_admin)):
+    """List boards from all database environments for display pairing."""
+    return await pairing_svc.list_pairing_boards(current_user)
 
 
 @router.get("/devices")

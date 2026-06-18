@@ -1,29 +1,28 @@
 import { api } from "../apiClient";
 import { getBackendUrl } from "../apiConfig";
-import { isUatHostname } from "../databaseEnv";
+import { getDatabaseEnvironment } from "../databaseEnv";
 
 const publicBase = () => getBackendUrl();
 
-/** UAT kiosk pages should write/read pairing codes in the UAT database. */
+/** Display kiosk DB env: URL override, else same as admin UI preference. */
 export function getDisplayDbEnv() {
   if (typeof window === "undefined") return null;
   try {
     const fromUrl = new URLSearchParams(window.location.search).get("db_env");
     if (fromUrl === "uat" || fromUrl === "production") return fromUrl;
   } catch (_e) {}
-  if (isUatHostname()) return "uat";
-  return null;
+  return getDatabaseEnvironment();
 }
 
 function adminDbParams() {
-  const dbEnv = getDisplayDbEnv();
-  return dbEnv && dbEnv !== "production" ? { db_env: dbEnv } : undefined;
+  const dbEnv = getDatabaseEnvironment();
+  return dbEnv ? { db_env: dbEnv } : undefined;
 }
 
 function publicDisplayQuery(extraParams) {
   const params = extraParams instanceof URLSearchParams ? extraParams : new URLSearchParams();
   const dbEnv = getDisplayDbEnv();
-  if (dbEnv && dbEnv !== "production") {
+  if (dbEnv) {
     params.set("db_env", dbEnv);
   }
   const qs = params.toString();
@@ -90,6 +89,11 @@ export const displayDeviceAPI = {
 
   listDevices: async () => {
     const response = await api.get("/display/devices", { params: adminDbParams() });
+    return response.data;
+  },
+
+  listBoardsForPairing: async () => {
+    const response = await api.get("/display/pairing-boards", { params: adminDbParams() });
     return response.data;
   },
 };

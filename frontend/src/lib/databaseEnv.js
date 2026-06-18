@@ -28,8 +28,7 @@ export function enforceDatabaseEnvironmentForRole(role) {
   }
 }
 
-/** Effective DB env for API calls and UI (UAT host always uses UAT). */
+/** Effective DB env for API calls and UI (stored preference, else inferred default). */
 export function getDatabaseEnvironment() {
-  if (isUatHostname()) return "uat";
   return getStoredDatabaseEnvironment() || getInferredDatabaseEnvironment();
 }

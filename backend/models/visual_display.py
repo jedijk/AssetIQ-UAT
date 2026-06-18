@@ -28,6 +28,14 @@ class PairingPreviewResponse(BaseModel):
     screen_width: Optional[int] = None
     screen_height: Optional[int] = None
     resolution: Optional[str] = None
+    database_environment: Optional[str] = None
+
+
+class PairingBoardSummary(BaseModel):
+    id: str
+    name: str
+    database_environment: str
+    status: Optional[str] = None
 
 
 class CompletePairingRequest(BaseModel):
@@ -36,6 +44,7 @@ class CompletePairingRequest(BaseModel):
     screen_name: str = Field(..., min_length=1, max_length=120)
     location: Optional[str] = None
     area: Optional[str] = None
+    database_environment: Optional[str] = None
 
 
 class CompletePairingResponse(BaseModel):
