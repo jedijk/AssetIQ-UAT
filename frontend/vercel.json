@@ -9,7 +9,11 @@
       "destination": "/index.html"
     },
     {
-      "source": "/((?!api/|static/|service-worker\\.js|manifest\\.json|favicon|logo|.*\\.(png|jpg|svg|ico|webp|json|txt|map)).*)",
+      "source": "/display",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
