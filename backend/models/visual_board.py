@@ -75,6 +75,13 @@ class VisualBoardLayout(BaseModel):
     rows: int = 16
 
 
+class VisualBoardHeaderConfig(BaseModel):
+    assetiq_logo_height: int = 56
+    tyromer_logo_height: int = 32
+    title_font_size: int = 16
+    transparent_logo_background: bool = True
+
+
 def default_tyromer_operations_layout() -> VisualBoardLayout:
     return VisualBoardLayout(columns=24, rows=24)
 
@@ -99,6 +106,7 @@ class UpdateBoardRequest(BaseModel):
     area: Optional[str] = None
     widgets: Optional[List[VisualBoardWidget]] = None
     layout: Optional[VisualBoardLayout] = None
+    header: Optional[VisualBoardHeaderConfig] = None
 
 
 class PublishBoardRequest(BaseModel):
@@ -222,6 +230,7 @@ class VisualBoardResponse(BaseModel):
     refresh_interval_seconds: int = 30
     plant: Optional[str] = None
     area: Optional[str] = None
+    header: VisualBoardHeaderConfig = Field(default_factory=VisualBoardHeaderConfig)
     created_by: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
@@ -238,6 +247,7 @@ class PublicLayoutResponse(BaseModel):
     refresh_interval_seconds: int = 30
     theme: str = "dark"
     board_type: BoardType = BoardType.RELIABILITY
+    header: VisualBoardHeaderConfig = Field(default_factory=VisualBoardHeaderConfig)
 
 
 class StatusIndicatorPayload(BaseModel):
@@ -455,7 +465,7 @@ def default_tyromer_operations_widgets() -> List[VisualBoardWidget]:
         VisualBoardWidget(
             id="w_top_risk",
             type=WidgetType.RISK_OBSERVATION_LIST,
-            title="Top 10 Highest Risk Observations",
+            title="High Risk Observations",
             config=WidgetConfig(limit=10),
             position=WidgetPosition(x=16, y=16, w=8, h=8),
         ),

@@ -21,6 +21,7 @@ from models.visual_board import (
     RotateTokenRequest,
     TokenSummary,
     UpdateBoardRequest,
+    VisualBoardHeaderConfig,
     VisualBoardLayout,
     VisualBoardResponse,
     VisualBoardWidget,
@@ -41,6 +42,14 @@ from services.visual_board_token import generate_token, hash_token
 logger = logging.getLogger(__name__)
 
 
+def _parse_header(raw) -> VisualBoardHeaderConfig:
+    if isinstance(raw, VisualBoardHeaderConfig):
+        return raw
+    if isinstance(raw, dict) and raw:
+        return VisualBoardHeaderConfig(**raw)
+    return VisualBoardHeaderConfig()
+
+
 def _serialize_board(doc: dict, *, has_active_token: bool = False) -> VisualBoardResponse:
     widgets_raw = doc.get("widgets") or []
     widgets = [VisualBoardWidget(**w) if isinstance(w, dict) else w for w in widgets_raw]
@@ -59,6 +68,7 @@ def _serialize_board(doc: dict, *, has_active_token: bool = False) -> VisualBoar
         refresh_interval_seconds=int(doc.get("refresh_interval_seconds") or 30),
         plant=doc.get("plant"),
         area=doc.get("area"),
+        header=_parse_header(doc.get("header")),
         created_by=doc.get("created_by"),
         created_at=doc.get("created_at"),
         updated_at=doc.get("updated_at"),
@@ -159,6 +169,9 @@ async def update_board(board_id: str, request: UpdateBoardRequest, user: dict) -
     if "layout" in data and data["layout"] is not None:
         layout = data["layout"]
         updates["layout"] = layout.model_dump() if hasattr(layout, "model_dump") else layout
+    if "header" in data and data["header"] is not None:
+        header = data["header"]
+        updates["header"] = header.model_dump() if hasattr(header, "model_dump") else header
     for key in ("name", "description", "theme", "refresh_interval_seconds", "plant", "area"):
         if key in data and data[key] is not None:
             updates[key] = data[key]
@@ -250,6 +263,7 @@ async def publish_board(
             "version": new_version,
             "layout": doc.get("layout") or {},
             "widgets": doc.get("widgets") or [],
+            "header": doc.get("header") or VisualBoardHeaderConfig().model_dump(),
             "filters": {"plant": doc.get("plant"), "area": doc.get("area")},
             "created_at": now,
             "created_by": user.get("id"),
@@ -430,6 +444,7 @@ async def rollback_board_version(
             "$set": {
                 "widgets": version_doc.get("widgets") or [],
                 "layout": version_doc.get("layout") or {},
+                "header": version_doc.get("header") or VisualBoardHeaderConfig().model_dump(),
                 "version": request.version,
                 "updated_at": now,
                 "plant": (version_doc.get("filters") or {}).get("plant"),
@@ -489,6 +504,7 @@ async def resolve_token(raw_token: str) -> Dict[str, Any]:
         version = {
             "layout": board.get("layout") or {},
             "widgets": board.get("widgets") or [],
+            "header": board.get("header") or VisualBoardHeaderConfig().model_dump(),
             "version": version_num,
         }
 

@@ -134,6 +134,33 @@ async def build_information_panel(
     return {"type": "information_panel", "items": items, "total": len(entries)}
 
 
+def _serialize_datetime(dt: Any) -> Optional[str]:
+    if dt is None:
+        return None
+    if hasattr(dt, "isoformat"):
+        iso_str = dt.isoformat()
+        if not iso_str.endswith("Z") and "+" not in iso_str and "-" not in iso_str[-6:]:
+            iso_str += "+00:00"
+        return iso_str
+    return str(dt)
+
+
+async def _lookup_submitters(user_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+    if not user_ids:
+        return {}
+    users = await db.users.find(
+        {"id": {"$in": list(user_ids)}},
+        {"_id": 0, "id": 1, "name": 1, "email": 1, "avatar_path": 1, "avatar_data": 1},
+    ).to_list(length=len(user_ids) + 10)
+    return {
+        u["id"]: {
+            "name": u.get("name") or u.get("email") or "Unknown",
+            "has_avatar": bool(u.get("avatar_path") or u.get("avatar_data")),
+        }
+        for u in users
+    }
+
+
 async def build_form_submissions_list(user: dict, limit: int = 8) -> Dict[str, Any]:
     filt = merge_tenant_filter({}, user)
     cursor = db.form_submissions.find(
@@ -143,21 +170,48 @@ async def build_form_submissions_list(user: dict, limit: int = 8) -> Dict[str, A
             "id": 1,
             "template_name": 1,
             "form_name": 1,
+            "form_template_name": 1,
             "submitted_at": 1,
             "submitted_by": 1,
             "submitted_by_name": 1,
             "status": 1,
         },
     ).sort("submitted_at", -1).limit(limit)
-    items = []
+    rows: List[Dict[str, Any]] = []
     async for row in cursor:
-        name = row.get("template_name") or row.get("form_name") or "Form"
+        rows.append(row)
+
+    user_ids = {r["submitted_by"] for r in rows if r.get("submitted_by")}
+    user_map = await _lookup_submitters(list(user_ids))
+
+    items = []
+    for row in rows:
+        name = (
+            row.get("form_template_name")
+            or row.get("template_name")
+            or row.get("form_name")
+            or "Form"
+        )
+        submitted_by_id = row.get("submitted_by")
+        submitter_name = row.get("submitted_by_name") or "—"
+        submitted_by_photo = None
+        if submitted_by_id:
+            user_data = user_map.get(submitted_by_id)
+            if user_data:
+                if submitter_name == "—":
+                    submitter_name = user_data.get("name") or "—"
+                if user_data.get("has_avatar"):
+                    submitted_by_photo = f"/api/users/{submitted_by_id}/avatar"
+
         items.append(
             {
                 "id": row.get("id"),
                 "title": name,
-                "submitted_at": row.get("submitted_at"),
-                "submitted_by": row.get("submitted_by_name") or row.get("submitted_by") or "—",
+                "form_name": name,
+                "submitted_at": _serialize_datetime(row.get("submitted_at")),
+                "submitted_by": submitter_name,
+                "submitted_by_id": submitted_by_id,
+                "submitted_by_photo": submitted_by_photo,
                 "status": row.get("status") or "completed",
             }
         )
@@ -167,7 +221,7 @@ async def build_form_submissions_list(user: dict, limit: int = 8) -> Dict[str, A
 async def build_risk_observation_list(user: dict, limit: int = 10) -> Dict[str, Any]:
     from services.threat_service import list_top_threats
 
-    threats = await list_top_threats(user, limit=limit)
+    threats = await list_top_threats(user, limit=limit, exclude_mitigated=True)
     items = []
     for row in threats:
         rpn = row.get("fmea_rpn") or row.get("rpn") or row.get("risk_score")

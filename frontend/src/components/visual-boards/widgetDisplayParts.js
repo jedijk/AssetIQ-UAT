@@ -35,7 +35,9 @@ export const WIDGET_DISPLAY_PARTS = {
   ],
   form_submissions_list: [
     { key: "title", label: "Title" },
-    { key: "submitter", label: "Submitted by" },
+    { key: "avatar", label: "Submitter avatar" },
+    { key: "form_name", label: "Form name" },
+    { key: "timestamp", label: "Submitted at" },
     { key: "status", label: "Status badge" },
   ],
   risk_observation_list: [

@@ -48,6 +48,7 @@ const VisualBoardPreviewPage = () => {
         layout: draft.layout,
         widgets: draft.widgets,
         theme: draft.theme,
+        header: draft.header,
       });
     }
     return normalizeBoardForCanvas(board);
@@ -94,6 +95,7 @@ const VisualBoardPreviewPage = () => {
           widgets={canvasBoard.widgets}
           theme={canvasBoard.theme}
           boardType={board?.board_type}
+          header={canvasBoard.header}
           data={{
             widgets: previewData?.widgets,
             status: previewData?.status,
