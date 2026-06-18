@@ -71,6 +71,8 @@ export function clearChunkRecoveryFlags() {
 export async function ensureFreshBuild() {
   try {
     if (sessionStorage.getItem(STALE_BUILD_KEY) === "1") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("_cb")) return;
     const res = await fetch(`${window.location.origin}/index.html?_=${Date.now()}`, {
       cache: "no-store",
       headers: { "Cache-Control": "no-cache" },

@@ -298,10 +298,10 @@ const queryClient = new QueryClient({
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
-  const { canAccessRoute, loading: permissionsLoading } = usePermissions();
+  const { canAccessRoute, permissions, loading: permissionsLoading } = usePermissions();
   const location = useLocation();
   
-  if (loading || permissionsLoading) {
+  if (loading || (permissionsLoading && permissions === null)) {
     return (
       <AppShell />
     );

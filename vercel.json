@@ -7,6 +7,10 @@
     {
       "source": "/vmb/:path*",
       "destination": "/index.html"
+    },
+    {
+      "source": "/((?!api/|static/|service-worker\\.js|manifest\\.json|favicon|logo|.*\\.(png|jpg|svg|ico|webp|json|txt|map)).*)",
+      "destination": "/index.html"
     }
   ],
   "headers": [

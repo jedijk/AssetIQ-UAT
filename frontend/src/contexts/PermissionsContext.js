@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "./AuthContext";
 import { useEffectiveRole } from "./RolePreviewContext";
 import { permissionsAPI } from "../lib/api";
@@ -81,10 +81,13 @@ export const PermissionsProvider = ({ children }) => {
   const { effectiveRole, isPreviewing } = useEffectiveRole();
   const [permissions, setPermissions] = useState(null);
   const [loading, setLoading] = useState(true);
+  const hasLoadedOnce = useRef(false);
 
   const fetchPermissions = useCallback(async () => {
     try {
-      setLoading(true);
+      if (!hasLoadedOnce.current) {
+        setLoading(true);
+      }
       if (isPreviewing) {
         const data = await permissionsAPI.getByRole(effectiveRole);
         setPermissions({
@@ -103,6 +106,7 @@ export const PermissionsProvider = ({ children }) => {
       });
     } finally {
       setLoading(false);
+      hasLoadedOnce.current = true;
     }
   }, [effectiveRole, isPreviewing]);
 
@@ -115,6 +119,7 @@ export const PermissionsProvider = ({ children }) => {
     } else {
       setPermissions(null);
       setLoading(false);
+      hasLoadedOnce.current = false;
     }
   }, [user, token, fetchPermissions, isPreviewing, effectiveRole]);
 
