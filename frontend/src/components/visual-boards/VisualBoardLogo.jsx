@@ -11,7 +11,7 @@ export default function VisualBoardLogo({ theme = "light", className = "" }) {
   if (useText) {
     return (
       <div
-        className={`font-bold text-xl sm:text-2xl tracking-tight select-none ${className}`}
+        className={`font-bold text-4xl sm:text-5xl tracking-tight select-none ${className}`}
         aria-label="AssetIQ"
       >
         <span className={theme === "light" ? "text-slate-900" : "text-white"}>Asset</span>
@@ -24,7 +24,7 @@ export default function VisualBoardLogo({ theme = "light", className = "" }) {
     <img
       src={publicAssetUrl("/assetiq-wordmark.png")}
       alt="AssetIQ"
-      className={`h-7 sm:h-8 w-auto object-contain select-none ${className}`}
+      className={`h-14 sm:h-16 w-auto object-contain select-none ${className}`}
       onError={() => setImageFailed(true)}
     />
   );

@@ -197,6 +197,10 @@ const VisualBoardCanvas = ({
   );
 
   const showTyromerLogo = boardType === "operations";
+  const headerTitleClass =
+    theme === "light"
+      ? "text-slate-800"
+      : "text-slate-100";
 
   return (
     <div
@@ -204,9 +208,18 @@ const VisualBoardCanvas = ({
         previewSize === "fullscreen" ? "rounded-none shadow-none" : ""
       }`}
     >
-      <div className="shrink-0 px-4 pt-3 pb-1 flex items-center justify-between gap-3 min-h-[2.25rem]">
-        <VisualBoardLogo theme={theme} />
-        {showTyromerLogo ? <TyromerBoardLogo /> : <span className="w-0" aria-hidden />}
+      <div className="shrink-0 relative px-4 pt-3 pb-2 flex items-center justify-between gap-3 min-h-[4.5rem]">
+        <VisualBoardLogo theme={theme} className="relative z-10" />
+        <h1
+          className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center font-semibold text-sm sm:text-base tracking-wide whitespace-nowrap px-2 ${headerTitleClass}`}
+        >
+          Visual Management Board
+        </h1>
+        {showTyromerLogo ? (
+          <TyromerBoardLogo className="relative z-10" />
+        ) : (
+          <span className="w-0" aria-hidden />
+        )}
       </div>
       <div className="flex-1 min-h-0">
         {editable ? (
