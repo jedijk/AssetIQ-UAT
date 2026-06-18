@@ -341,6 +341,19 @@ async def publish_board(
     except Exception:
         logger.debug("WS broadcast skipped on publish", exc_info=True)
 
+    try:
+        from services.visual_display_notify import notify_devices_for_board
+
+        tenant_id = user.get("company_id") or user.get("tenant_id")
+        await notify_devices_for_board(
+            board_id,
+            tenant_id,
+            "board_updated",
+            {"board_id": board_id, "version": new_version},
+        )
+    except Exception:
+        logger.debug("Display notify skipped on publish", exc_info=True)
+
     return result.model_copy(update={"version": new_version})
 
 
@@ -361,6 +374,20 @@ async def unpublish_board(board_id: str, user: dict) -> Dict[str, Any]:
         merge_tenant_filter({"id": board_id}, user),
         {"$set": {"status": BoardStatus.ARCHIVED.value, "updated_at": now}},
     )
+
+    try:
+        from services.visual_display_notify import notify_devices_for_board
+
+        tenant_id = user.get("company_id") or user.get("tenant_id")
+        await notify_devices_for_board(
+            board_id,
+            tenant_id,
+            "board_unpublished",
+            {"board_id": board_id},
+        )
+    except Exception:
+        logger.debug("Display notify skipped on unpublish", exc_info=True)
+
     return {"board_id": board_id, "status": BoardStatus.ARCHIVED.value}
 
 

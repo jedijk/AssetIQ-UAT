@@ -1,10 +1,11 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
-import { LayoutTemplate, Monitor, Tv, BarChart3 } from "lucide-react";
+import { LayoutTemplate, Monitor, Tv, BarChart3, Link2 } from "lucide-react";
 
 const TABS = [
   { path: "/visual-management/boards", label: "Boards", icon: Monitor, end: true },
-  { path: "/visual-management/screens", label: "Pair Displays", icon: Tv, end: true },
+  { path: "/visual-management/screens", label: "Screens", icon: Tv, end: false },
+  { path: "/visual-management/pair-displays", label: "Pair Displays", icon: Link2, end: true },
   { path: "/visual-management/templates", label: "Templates", icon: LayoutTemplate, end: true },
   { path: "/visual-management/analytics", label: "Analytics", icon: BarChart3, end: true },
 ];

@@ -9,7 +9,7 @@
       "destination": "/index.html"
     },
     {
-      "source": "/tv",
+      "source": "/tv/:path*",
       "destination": "/index.html"
     },
     {

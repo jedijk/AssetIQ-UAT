@@ -10,7 +10,6 @@ from fastapi import HTTPException
 from database import db, get_database, get_current_db_name, set_request_db, AVAILABLE_DATABASES
 from models.visual_display import (
     CompletePairingResponse,
-    DisplayDeviceSummary,
     PairingPreviewResponse,
     PairingStatusResponse,
     RequestPairingResponse,
@@ -285,6 +284,7 @@ async def complete_pairing(
             "device_fingerprint": doc.get("device_fingerprint"),
             "pairing_id": doc["id"],
             "last_seen": None,
+            "token_issued_at": now,
             "created_at": now,
             "paired_at": now,
         },
@@ -397,36 +397,6 @@ async def poll_pairing_status(
 
 
 async def list_display_devices(user: dict) -> Dict[str, Any]:
-    devices = await db[DEVICES_COLLECTION].find(
-        merge_tenant_filter({}, user),
-        {"_id": 0, "token_hash": 0},
-    ).sort("created_at", -1).to_list(500)
+    from services import visual_display_admin_service as admin_svc
 
-    board_ids = list({d.get("board_id") for d in devices if d.get("board_id")})
-    board_names: Dict[str, str] = {}
-    if board_ids:
-        boards = await db[BOARDS_COLLECTION].find(
-            merge_tenant_filter({"id": {"$in": board_ids}}, user),
-            {"_id": 0, "id": 1, "name": 1},
-        ).to_list(len(board_ids))
-        board_names = {b["id"]: b.get("name", "") for b in boards}
-
-    items = [
-        DisplayDeviceSummary(
-            id=d["id"],
-            screen_name=d.get("screen_name", ""),
-            board_id=d.get("board_id"),
-            board_name=board_names.get(d.get("board_id", "")),
-            location=d.get("location") or None,
-            area=d.get("area") or None,
-            status=d.get("status", "active"),
-            last_seen=d.get("last_seen"),
-            user_agent=d.get("user_agent"),
-            screen_width=d.get("screen_width"),
-            screen_height=d.get("screen_height"),
-            created_at=d.get("created_at"),
-            paired_at=d.get("paired_at"),
-        ).model_dump()
-        for d in devices
-    ]
-    return {"items": items, "total": len(items)}
+    return await admin_svc.list_display_devices_enhanced(user)

@@ -33,6 +33,7 @@ const FEATURE_PATHS = {
     "/visual-management/boards",
     "/visual-management/templates",
     "/visual-management/screens",
+    "/visual-management/pair-displays",
     "/visual-management/analytics",
   ],
   reliability_intelligence: ["/reliability"],

@@ -253,6 +253,8 @@ try:
     app.include_router(api_router)
     from routes.visual_board_ws import router as visual_board_ws_router
     app.include_router(visual_board_ws_router)
+    from routes.visual_display_ws import router as visual_display_ws_router
+    app.include_router(visual_display_ws_router)
     logger.info("Loaded %s route modules — all API routes mounted", len(all_routers))
 except Exception as e:
     import traceback
@@ -443,6 +445,10 @@ except Exception as e:
 _PUBLIC_DB_ENV_PREFIXES = (
     "/api/display/request-pairing",
     "/api/display/pairing/",
+    "/api/display/connect",
+    "/api/display/heartbeat",
+    "/api/display/config",
+    "/api/display/board/",
     "/api/vmb/",
 )
 
@@ -672,6 +678,8 @@ async def csrf_protect_cookie_auth(request: Request, call_next):
             "/api/auth/reset-password",
             "/api/auth/verify-reset-token",
             "/api/display/request-pairing",
+            "/api/display/connect",
+            "/api/display/heartbeat",
             "/health",
             "/api/health",
         )

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Loader2, Monitor, RefreshCw } from "lucide-react";
 import {
   displayDeviceAPI,
@@ -16,6 +17,7 @@ function formatCountdown(seconds) {
 }
 
 const DisplayPairingPage = () => {
+  const navigate = useNavigate();
   const fingerprintRef = useRef(getOrCreateDeviceFingerprint());
   const [pairCode, setPairCode] = useState("");
   const [expiresIn, setExpiresIn] = useState(0);
@@ -49,6 +51,16 @@ const DisplayPairingPage = () => {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (paired) return;
+    try {
+      const existingToken = localStorage.getItem(DISPLAY_DEVICE_TOKEN_KEY);
+      if (existingToken) {
+        navigate("/tv/board?fullscreen=true", { replace: true });
+      }
+    } catch (_e) {}
+  }, [paired, navigate]);
 
   useEffect(() => {
     if (!paired) {
@@ -90,6 +102,7 @@ const DisplayPairingPage = () => {
           localStorage.setItem(DISPLAY_DEVICE_ID_KEY, status.device_id || "");
           setPairedInfo(status);
           setPaired(true);
+          navigate("/tv/board?fullscreen=true", { replace: true });
         }
 
         if (status.status === "expired") {
@@ -106,7 +119,7 @@ const DisplayPairingPage = () => {
       cancelled = true;
       clearInterval(id);
     };
-  }, [paired, pairCode, requestCode]);
+  }, [paired, pairCode, requestCode, navigate]);
 
   if (paired) {
     return (
@@ -114,11 +127,9 @@ const DisplayPairingPage = () => {
         <Monitor className="w-16 h-16 text-green-400 mb-6" />
         <h1 className="text-3xl font-bold mb-2">Device Paired</h1>
         <p className="text-slate-400 max-w-md mb-2">
-          {pairedInfo?.screen_name ? `"${pairedInfo.screen_name}" is ready.` : "This display is registered with AssetIQ."}
+          {pairedInfo?.screen_name ? `"${pairedInfo.screen_name}" is ready.` : "Loading your board…"}
         </p>
-        <p className="text-sm text-slate-500 max-w-lg">
-          Board display mode ships in Phase 4b. Keep this browser open — the device token is stored locally.
-        </p>
+        <Loader2 className="w-8 h-8 animate-spin text-slate-500 mt-4" />
       </div>
     );
   }

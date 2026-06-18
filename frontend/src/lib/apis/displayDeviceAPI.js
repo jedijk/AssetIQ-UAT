@@ -45,6 +45,47 @@ export function getOrCreateDeviceFingerprint() {
   }
 }
 
+export function getStoredDeviceToken() {
+  try {
+    return localStorage.getItem(DISPLAY_DEVICE_TOKEN_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+export function getStoredDeviceId() {
+  try {
+    return localStorage.getItem(DISPLAY_DEVICE_ID_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function deviceAuthHeaders(deviceToken) {
+  const token = deviceToken || getStoredDeviceToken();
+  if (!token) return {};
+  return { Authorization: `DeviceToken ${token}` };
+}
+
+async function deviceFetch(path, { method = "GET", body, deviceToken, queryParams } = {}) {
+  const params = queryParams instanceof URLSearchParams ? queryParams : new URLSearchParams(queryParams || {});
+  const response = await fetch(`${publicBase()}/api/display${path}${publicDisplayQuery(params)}`, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      ...deviceAuthHeaders(deviceToken),
+    },
+    credentials: "omit",
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || `Display API failed (${response.status})`);
+  }
+  if (response.status === 204) return null;
+  return response.json();
+}
+
 export const displayDeviceAPI = {
   requestPairing: async (payload) => {
     const response = await fetch(`${publicBase()}/api/display/request-pairing${publicDisplayQuery()}`, {
@@ -92,8 +133,88 @@ export const displayDeviceAPI = {
     return response.data;
   },
 
+  getDevice: async (deviceId) => {
+    const response = await api.get(`/display/devices/${encodeURIComponent(deviceId)}`, { params: adminDbParams() });
+    return response.data;
+  },
+
+  updateDevice: async (deviceId, payload) => {
+    const response = await api.patch(`/display/devices/${encodeURIComponent(deviceId)}`, payload, {
+      params: adminDbParams(),
+    });
+    return response.data;
+  },
+
+  reassignBoard: async (deviceId, payload) => {
+    const response = await api.post(`/display/devices/${encodeURIComponent(deviceId)}/reassign-board`, payload, {
+      params: adminDbParams(),
+    });
+    return response.data;
+  },
+
+  disableDevice: async (deviceId) => {
+    const response = await api.post(`/display/devices/${encodeURIComponent(deviceId)}/disable`, null, {
+      params: adminDbParams(),
+    });
+    return response.data;
+  },
+
+  enableDevice: async (deviceId) => {
+    const response = await api.post(`/display/devices/${encodeURIComponent(deviceId)}/enable`, null, {
+      params: adminDbParams(),
+    });
+    return response.data;
+  },
+
+  rotateDeviceToken: async (deviceId) => {
+    const response = await api.post(`/display/devices/${encodeURIComponent(deviceId)}/rotate-token`, null, {
+      params: adminDbParams(),
+    });
+    return response.data;
+  },
+
+  deleteDevice: async (deviceId) => {
+    await api.delete(`/display/devices/${encodeURIComponent(deviceId)}`, { params: adminDbParams() });
+  },
+
+  listDeviceEvents: async (deviceId, limit = 50) => {
+    const response = await api.get(`/display/devices/${encodeURIComponent(deviceId)}/events`, {
+      params: { ...adminDbParams(), limit },
+    });
+    return response.data;
+  },
+
+  acceptTokenRotation: async (deviceToken) =>
+    deviceFetch("/accept-token-rotation", { method: "POST", deviceToken }),
+
   listBoardsForPairing: async () => {
     const response = await api.get("/display/pairing-boards", { params: adminDbParams() });
     return response.data;
+  },
+
+  connect: async (deviceToken) => {
+    return deviceFetch("/connect", {
+      method: "POST",
+      deviceToken,
+      body: { device_token: deviceToken || getStoredDeviceToken() },
+    });
+  },
+
+  getConfig: async (deviceToken) => deviceFetch("/config", { deviceToken }),
+
+  getBoardLayout: async (deviceToken) => deviceFetch("/board/layout", { deviceToken }),
+
+  getBoardData: async (deviceToken, periodDays = 30) => {
+    const params = new URLSearchParams();
+    if (periodDays != null) params.set("period_days", String(periodDays));
+    return deviceFetch("/board/data", { deviceToken, queryParams: params });
+  },
+
+  sendHeartbeat: async (deviceId, deviceToken) => {
+    return deviceFetch("/heartbeat", {
+      method: "POST",
+      deviceToken,
+      body: { device_id: deviceId || getStoredDeviceId() },
+    });
   },
 };

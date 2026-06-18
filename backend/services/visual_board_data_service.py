@@ -35,8 +35,10 @@ _OPEN_OBSERVATION_STATUSES = {"open", "active", "in_progress", "new", "identifie
 
 async def get_public_layout(raw_token: str) -> PublicLayoutResponse:
     ctx = await resolve_token(raw_token)
-    board = ctx["board"]
-    version = ctx["version"]
+    return await get_public_layout_from_context(ctx["board"], ctx["version"])
+
+
+async def get_public_layout_from_context(board: dict, version: dict) -> PublicLayoutResponse:
     widgets_raw = version.get("widgets") or board.get("widgets") or []
     widgets = [VisualBoardWidget(**w) for w in widgets_raw]
     layout_raw = version.get("layout") or board.get("layout") or {}
@@ -402,9 +404,21 @@ async def build_widget_data(
 
 async def get_public_data(raw_token: str, *, period_days: int = 30) -> PublicBoardDataResponse:
     ctx = await resolve_token(raw_token)
-    board = ctx["board"]
-    version = ctx["version"]
-    tenant_id = ctx.get("tenant_id")
+    return await get_public_data_from_context(
+        ctx["board"],
+        ctx["version"],
+        ctx.get("tenant_id"),
+        period_days=period_days,
+    )
+
+
+async def get_public_data_from_context(
+    board: dict,
+    version: dict,
+    tenant_id: Optional[str],
+    *,
+    period_days: int = 30,
+) -> PublicBoardDataResponse:
     user = tenant_display_user(tenant_id)
 
     widgets_raw = version.get("widgets") or board.get("widgets") or []

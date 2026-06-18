@@ -1,22 +1,44 @@
 """
 Visual display device pairing routes — public kiosk + admin registration.
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 
 from auth import require_permission
 from models.visual_display import (
+    AcceptTokenRotationResponse,
     CompletePairingRequest,
     CompletePairingResponse,
+    ConnectDeviceRequest,
+    ConnectDeviceResponse,
+    DeviceConfigResponse,
+    DeviceEventsResponse,
+    DeviceHeartbeatRequest,
+    DeviceHeartbeatResponse,
+    DisplayDeviceDetail,
     PairingPreviewResponse,
     PairingStatusResponse,
+    ReassignBoardRequest,
     RequestPairingRequest,
     RequestPairingResponse,
+    RotateTokenResponse,
+    UpdateDeviceRequest,
 )
+from services import visual_display_admin_service as admin_svc
+from services import visual_display_device_service as device_svc
 from services import visual_display_pairing_service as pairing_svc
 
 router = APIRouter(prefix="/display", tags=["Visual Display Devices"])
 
 _vmb_admin = require_permission("vmb:admin")
+
+
+async def _require_device_token(request: Request) -> str:
+    token = device_svc.extract_device_token(request)
+    if not token:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=401, detail="Device token required")
+    return token
 
 
 @router.post("/request-pairing", response_model=RequestPairingResponse)
@@ -79,3 +101,133 @@ async def list_pairing_boards(current_user: dict = Depends(_vmb_admin)):
 async def list_devices(current_user: dict = Depends(_vmb_admin)):
     """List paired display devices for the tenant."""
     return await pairing_svc.list_display_devices(current_user)
+
+
+# --- Phase 4c: device admin ---
+
+
+@router.get("/devices/{device_id}", response_model=DisplayDeviceDetail)
+async def get_device(device_id: str, current_user: dict = Depends(_vmb_admin)):
+    return await admin_svc.get_device_detail(device_id, current_user)
+
+
+@router.patch("/devices/{device_id}", response_model=DisplayDeviceDetail)
+async def patch_device(
+    device_id: str,
+    request: UpdateDeviceRequest,
+    current_user: dict = Depends(_vmb_admin),
+):
+    return await admin_svc.update_device(
+        device_id,
+        current_user,
+        screen_name=request.screen_name,
+        location=request.location,
+        area=request.area,
+    )
+
+
+@router.post("/devices/{device_id}/reassign-board", response_model=DisplayDeviceDetail)
+async def reassign_device_board(
+    device_id: str,
+    request: ReassignBoardRequest,
+    current_user: dict = Depends(_vmb_admin),
+):
+    return await admin_svc.reassign_board(
+        device_id,
+        current_user,
+        board_id=request.board_id,
+        database_environment=request.database_environment,
+    )
+
+
+@router.post("/devices/{device_id}/disable", response_model=DisplayDeviceDetail)
+async def disable_device(device_id: str, current_user: dict = Depends(_vmb_admin)):
+    return await admin_svc.disable_device(device_id, current_user)
+
+
+@router.post("/devices/{device_id}/enable", response_model=DisplayDeviceDetail)
+async def enable_device(device_id: str, current_user: dict = Depends(_vmb_admin)):
+    return await admin_svc.enable_device(device_id, current_user)
+
+
+@router.post("/devices/{device_id}/rotate-token", response_model=RotateTokenResponse)
+async def rotate_device_token(device_id: str, current_user: dict = Depends(_vmb_admin)):
+    result = await admin_svc.rotate_device_token(device_id, current_user)
+    return RotateTokenResponse(**result)
+
+
+@router.delete("/devices/{device_id}", status_code=204)
+async def delete_device(device_id: str, current_user: dict = Depends(_vmb_admin)):
+    await admin_svc.delete_device(device_id, current_user)
+
+
+@router.get("/devices/{device_id}/events", response_model=DeviceEventsResponse)
+async def device_events(
+    device_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    current_user: dict = Depends(_vmb_admin),
+):
+    result = await admin_svc.list_device_events(device_id, current_user, limit=limit)
+    return DeviceEventsResponse(**result)
+
+
+@router.post("/accept-token-rotation", response_model=AcceptTokenRotationResponse)
+async def accept_token_rotation(http_request: Request):
+    """Display device accepts a pending token rotation (old token auth)."""
+    token = device_svc.extract_device_token(http_request)
+    if not token:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=401, detail="Device token required")
+    result = await admin_svc.accept_token_rotation(token)
+    return AcceptTokenRotationResponse(**result)
+
+
+# --- Phase 4b: device runtime (token auth) ---
+
+
+@router.post("/connect", response_model=ConnectDeviceResponse)
+async def connect_device(request: ConnectDeviceRequest, http_request: Request):
+    """Validate device token and return assigned board."""
+    token = device_svc.extract_device_token(http_request) or request.device_token
+    if not token:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=401, detail="Device token required")
+    result = await device_svc.connect_device(token)
+    return ConnectDeviceResponse(**result)
+
+
+@router.get("/config", response_model=DeviceConfigResponse)
+async def device_config(device_token: str = Depends(_require_device_token)):
+    """Return device configuration for kiosk clients."""
+    result = await device_svc.get_device_config(device_token)
+    return DeviceConfigResponse(**result)
+
+
+@router.get("/board/layout")
+async def device_board_layout(device_token: str = Depends(_require_device_token)):
+    """Return published board layout for the assigned board."""
+    return await device_svc.get_device_layout(device_token)
+
+
+@router.get("/board/data")
+async def device_board_data(
+    device_token: str = Depends(_require_device_token),
+    period_days: int = Query(30, ge=1, le=365),
+):
+    """Return aggregated widget data for the assigned board."""
+    return await device_svc.get_device_data(device_token, period_days=period_days)
+
+
+@router.post("/heartbeat", response_model=DeviceHeartbeatResponse)
+async def device_heartbeat(
+    request: DeviceHeartbeatRequest,
+    device_token: str = Depends(_require_device_token),
+):
+    """Record device heartbeat and online status."""
+    result = await device_svc.record_device_heartbeat(
+        device_id=request.device_id,
+        raw_token=device_token,
+    )
+    return DeviceHeartbeatResponse(**result)

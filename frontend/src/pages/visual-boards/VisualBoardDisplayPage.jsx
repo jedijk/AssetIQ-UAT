@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
 import VisualBoardCanvas from "../../components/visual-boards/VisualBoardCanvas";
+import { BoardSyncStatus, useBoardSyncState } from "../../components/visual-boards/BoardSyncStatus";
 import { boardSurfaceClass } from "../../components/visual-boards/boardTheme";
 import { normalizeBoardForCanvas } from "../../components/visual-boards/boardLayoutUtils";
 import { useVisualBoardRealtime } from "../../hooks/useVisualBoardRealtime";
@@ -76,6 +77,8 @@ const VisualBoardDisplayPage = () => {
   const displayData = liveData || boardData;
   const isLoading = layoutLoading || dataLoading;
   const error = layoutError;
+  const refreshSec = refreshSeconds || layout?.refresh_interval_seconds || 30;
+  const { lastSyncedAt } = useBoardSyncState(displayData, { refreshIntervalSec: refreshSec });
 
   const canvasBoard = useMemo(() => normalizeBoardForCanvas(layout), [layout]);
   const boardTheme = canvasBoard.theme;
@@ -119,7 +122,7 @@ const VisualBoardDisplayPage = () => {
             v{layout?.version || 1}
           </span>
         </div>
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 relative">
           <VisualBoardCanvas
             layout={canvasBoard.layout}
             widgets={canvasBoard.widgets}
@@ -131,6 +134,12 @@ const VisualBoardDisplayPage = () => {
               status: displayData?.status,
             }}
             previewSize="fullscreen"
+          />
+          <BoardSyncStatus
+            lastSyncedAt={lastSyncedAt}
+            refreshIntervalSec={refreshSec}
+            theme={boardTheme}
+            isRealtime={!!liveData}
           />
         </div>
       </div>

@@ -149,6 +149,23 @@ export const getApiUrl = () => {
   return fullApiUrl;
 };
 
+/** WebSocket base URL — Vercel rewrites /api only; WS must hit the backend host directly. */
+export function getWebSocketBaseUrl() {
+  const backendUrl = process.env.REACT_APP_BACKEND_URL;
+  if (backendUrl && backendUrl.startsWith("http")) {
+    let url = backendUrl.replace(/\/$/, "");
+    if (url.endsWith("/api")) url = url.slice(0, -4);
+    return url.replace(/^http/, "ws");
+  }
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname.toLowerCase();
+    if (host.includes("-uat") || host.includes("uat.")) {
+      return "wss://assetiq-uat-production.up.railway.app";
+    }
+  }
+  return getBackendUrl().replace(/^http/, "ws");
+}
+
 // Export as default for convenience
 export default getBackendUrl;
 

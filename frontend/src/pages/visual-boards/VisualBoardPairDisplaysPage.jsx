@@ -25,7 +25,7 @@ const STATUS_VARIANT = {
 
 const ENV_LABEL = { production: "Production", uat: "UAT" };
 
-const VisualBoardScreensPage = () => {
+const VisualBoardPairDisplaysPage = () => {
   const queryClient = useQueryClient();
   const dbEnv = getDatabaseEnvironment();
   const [pairCodeInput, setPairCodeInput] = useState("");
@@ -42,11 +42,6 @@ const VisualBoardScreensPage = () => {
   const { data: legacyScreens, isLoading: legacyLoading, refetch: refetchLegacy } = useQuery({
     queryKey: ["visual-board-screens", dbEnv],
     queryFn: () => visualBoardAPI.listAllScreens(),
-  });
-
-  const { data: devicesData, isLoading: devicesLoading, refetch: refetchDevices } = useQuery({
-    queryKey: ["display-devices", dbEnv],
-    queryFn: () => displayDeviceAPI.listDevices(),
   });
 
   const deleteMutation = useMutation({
@@ -67,10 +62,7 @@ const VisualBoardScreensPage = () => {
         location: pairForm.location || undefined,
         area: pairForm.area || undefined,
       };
-      if (
-        pairForm.board_db_env &&
-        pairForm.board_db_env !== pairPreview.database_environment
-      ) {
+      if (pairForm.board_db_env && pairForm.board_db_env !== pairPreview.database_environment) {
         payload.database_environment = pairForm.board_db_env;
       }
       return displayDeviceAPI.completePairing(payload);
@@ -108,13 +100,6 @@ const VisualBoardScreensPage = () => {
 
   const boards = pairingBoardsData?.items || [];
   const legacyItems = legacyScreens?.items || [];
-  const devices = devicesData?.items || [];
-  const isLoading = legacyLoading || devicesLoading;
-
-  const refetchAll = () => {
-    refetchLegacy();
-    refetchDevices();
-  };
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -130,12 +115,15 @@ const VisualBoardScreensPage = () => {
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline" size="sm">
+            <Link to="/visual-management/screens">View screens</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
             <Link to="/tv" target="_blank" rel="noopener noreferrer">
               <Link2 className="w-4 h-4 mr-1" />
               Open display pairing
             </Link>
           </Button>
-          <Button variant="outline" size="sm" onClick={refetchAll}>
+          <Button variant="outline" size="sm" onClick={() => refetchLegacy()}>
             <RefreshCw className="w-4 h-4 mr-1" />
             Refresh
           </Button>
@@ -149,12 +137,7 @@ const VisualBoardScreensPage = () => {
           <CardTitle className="text-base">Register Screen — Enter Pairing Code</CardTitle>
           <p className="text-sm text-slate-500 font-normal mt-1">
             Display URL for TVs:{" "}
-            <a
-              href={getDisplayPairingUrl()}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-mono text-blue-600 hover:underline"
-            >
+            <a href={getDisplayPairingUrl()} target="_blank" rel="noopener noreferrer" className="font-mono text-blue-600 hover:underline">
               {getDisplayPairingUrl()}
             </a>
           </p>
@@ -208,45 +191,22 @@ const VisualBoardScreensPage = () => {
                       </option>
                     ))}
                   </select>
-                  {!pairingBoardsLoading && boards.length === 0 && (
-                    <p className="text-xs text-slate-500 mt-1">
-                      No boards in this environment — create one under{" "}
-                      <Link to="/visual-management/boards" className="text-blue-600 underline">
-                        Boards
-                      </Link>
-                    </p>
-                  )}
                 </div>
                 <div className="space-y-1">
                   <Label>Screen name</Label>
-                  <Input
-                    value={pairForm.screen_name}
-                    onChange={(e) => setPairForm((f) => ({ ...f, screen_name: e.target.value }))}
-                    placeholder="Control Room TV"
-                  />
+                  <Input value={pairForm.screen_name} onChange={(e) => setPairForm((f) => ({ ...f, screen_name: e.target.value }))} placeholder="Control Room TV" />
                 </div>
                 <div className="space-y-1">
                   <Label>Location</Label>
-                  <Input
-                    value={pairForm.location}
-                    onChange={(e) => setPairForm((f) => ({ ...f, location: e.target.value }))}
-                    placeholder="Plant A"
-                  />
+                  <Input value={pairForm.location} onChange={(e) => setPairForm((f) => ({ ...f, location: e.target.value }))} placeholder="Plant A" />
                 </div>
                 <div className="space-y-1">
                   <Label>Area</Label>
-                  <Input
-                    value={pairForm.area}
-                    onChange={(e) => setPairForm((f) => ({ ...f, area: e.target.value }))}
-                    placeholder="Extrusion"
-                  />
+                  <Input value={pairForm.area} onChange={(e) => setPairForm((f) => ({ ...f, area: e.target.value }))} placeholder="Extrusion" />
                 </div>
               </div>
 
-              <Button
-                onClick={() => completePairMutation.mutate()}
-                disabled={!pairForm.board_id || !pairForm.screen_name || completePairMutation.isPending}
-              >
+              <Button onClick={() => completePairMutation.mutate()} disabled={!pairForm.board_id || !pairForm.screen_name || completePairMutation.isPending}>
                 {completePairMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                 Pair Device
               </Button>
@@ -255,69 +215,35 @@ const VisualBoardScreensPage = () => {
         </CardContent>
       </Card>
 
-      <div>
-        <h2 className="text-lg font-semibold text-slate-900 mb-3">Paired Devices</h2>
-        {isLoading ? (
-          <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div>
-        ) : devices.length === 0 ? (
-          <Card><CardContent className="py-10 text-center text-slate-500">No paired devices yet. Open <Link to="/tv" className="text-blue-600 underline" target="_blank" rel="noreferrer">/tv</Link> on a TV to get a code.</CardContent></Card>
-        ) : (
-          <div className="space-y-3">
-            {devices.map((device) => (
-              <Card key={device.id}>
-                <CardContent className="py-4 flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="font-medium">{device.screen_name}</div>
-                    <div className="text-xs text-slate-500">
-                      {device.board_name || device.board_id || "No board"}
-                      {device.location ? ` · ${device.location}` : ""}
-                      {device.area ? ` · ${device.area}` : ""}
-                    </div>
-                    <div className="text-xs text-slate-400 mt-1">
-                      {device.resolution || (device.screen_width && device.screen_height ? `${device.screen_width}×${device.screen_height}` : null)}
-                      {device.paired_at ? ` · Paired ${new Date(device.paired_at).toLocaleString()}` : ""}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={STATUS_VARIANT[device.status] || "secondary"}>{device.status}</Badge>
-                    {device.board_id && (
-                      <Button asChild size="sm" variant="outline">
-                        <Link to={`/visual-management/boards/${device.board_id}/edit`}>Board</Link>
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-
       {legacyItems.length > 0 && (
         <div>
           <h2 className="text-lg font-semibold text-slate-900 mb-3">Legacy heartbeat screens</h2>
-          <div className="space-y-3">
-            {legacyItems.map((screen) => (
-              <Card key={screen.id}>
-                <CardContent className="py-4 flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="font-medium">{screen.screen_name}</div>
-                    <div className="text-xs text-slate-500">{screen.board_name || screen.board_id}</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={STATUS_VARIANT[screen.status] || "secondary"}>{screen.status}</Badge>
-                    <Button size="sm" variant="ghost" onClick={() => deleteMutation.mutate(screen.id)}>
-                      <Trash2 className="w-4 h-4 text-red-500" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          {legacyLoading ? (
+            <div className="flex justify-center py-8"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div>
+          ) : (
+            <div className="space-y-3">
+              {legacyItems.map((screen) => (
+                <Card key={screen.id}>
+                  <CardContent className="py-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="font-medium">{screen.screen_name}</div>
+                      <div className="text-xs text-slate-500">{screen.board_name || screen.board_id}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={STATUS_VARIANT[screen.status] || "secondary"}>{screen.status}</Badge>
+                      <Button size="sm" variant="ghost" onClick={() => deleteMutation.mutate(screen.id)}>
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 };
 
-export default VisualBoardScreensPage;
+export default VisualBoardPairDisplaysPage;

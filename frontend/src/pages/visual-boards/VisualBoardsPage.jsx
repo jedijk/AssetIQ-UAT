@@ -56,7 +56,7 @@ const VisualBoardsPage = () => {
         </div>
         <div className="flex gap-2">
           <Button asChild variant="outline" size="sm">
-            <Link to="/visual-management/screens">
+            <Link to="/visual-management/pair-displays">
               <Tv className="w-4 h-4 mr-1" />
               Pair a TV
             </Link>

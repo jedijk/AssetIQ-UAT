@@ -88,10 +88,13 @@ const VisualBoardsPage = lazy(() => import("./pages/visual-boards/VisualBoardsPa
 const VisualBoardEditorPage = lazy(() => import("./pages/visual-boards/VisualBoardEditorPage"));
 const VisualBoardPreviewPage = lazy(() => import("./pages/visual-boards/VisualBoardPreviewPage"));
 const VisualBoardDisplayPage = lazy(() => import("./pages/visual-boards/VisualBoardDisplayPage"));
-const VisualBoardScreensPage = lazy(() => import("./pages/visual-boards/VisualBoardScreensPage"));
+const VisualBoardPairDisplaysPage = lazy(() => import("./pages/visual-boards/VisualBoardPairDisplaysPage"));
+const VisualBoardDevicesListPage = lazy(() => import("./pages/visual-boards/VisualBoardDevicesListPage"));
+const VisualBoardDeviceDetailPage = lazy(() => import("./pages/visual-boards/VisualBoardDeviceDetailPage"));
 const VisualBoardTemplatesPage = lazy(() => import("./pages/visual-boards/VisualBoardTemplatesPage"));
 const VisualBoardAnalyticsPage = lazy(() => import("./pages/visual-boards/VisualBoardAnalyticsPage"));
 const DisplayPairingPage = lazy(() => import("./pages/display/DisplayPairingPage"));
+const DisplayBoardPage = lazy(() => import("./pages/display/DisplayBoardPage"));
 
 function RouteFallback() {
   return (
@@ -456,6 +459,11 @@ function App() {
                   <DisplayPairingPage />
                 </Suspense>
               } />
+              <Route path="/tv/board" element={
+                <Suspense fallback={<RouteFallback />}>
+                  <DisplayBoardPage />
+                </Suspense>
+              } />
               <Route path="/display" element={<Navigate to="/tv" replace />} />
               <Route path="/" element={
                 <ProtectedRoute>
@@ -499,7 +507,9 @@ function App() {
                 <Route path="visual-management/boards/:boardId/edit" element={<Suspense fallback={<RouteFallback />}><VisualBoardEditorPage /></Suspense>} />
                 <Route path="visual-management/boards/:boardId/preview" element={<Suspense fallback={<RouteFallback />}><VisualBoardPreviewPage /></Suspense>} />
                 <Route path="visual-management/templates" element={<Suspense fallback={<RouteFallback />}><VisualBoardTemplatesPage /></Suspense>} />
-                <Route path="visual-management/screens" element={<Suspense fallback={<RouteFallback />}><VisualBoardScreensPage /></Suspense>} />
+                <Route path="visual-management/pair-displays" element={<Suspense fallback={<RouteFallback />}><VisualBoardPairDisplaysPage /></Suspense>} />
+                <Route path="visual-management/screens" element={<Suspense fallback={<RouteFallback />}><VisualBoardDevicesListPage /></Suspense>} />
+                <Route path="visual-management/screens/:deviceId" element={<Suspense fallback={<RouteFallback />}><VisualBoardDeviceDetailPage /></Suspense>} />
                 <Route path="visual-management/analytics" element={<Suspense fallback={<RouteFallback />}><VisualBoardAnalyticsPage /></Suspense>} />
                 
                 {/* Settings Layout with nested routes */}
