@@ -293,7 +293,24 @@
     });
   }
 
+  function ensureKioskPath() {
+    var p = window.location.pathname || "/";
+    var isKiosk =
+      p === "/tv" ||
+      p.indexOf("/tv/") === 0 ||
+      p === "/display" ||
+      p.indexOf("/display/") === 0 ||
+      p.indexOf("/vmb/") === 0;
+    if (!isKiosk) {
+      window.location.replace("/tv");
+      return false;
+    }
+    return true;
+  }
+
   function boot() {
+    if (!ensureKioskPath()) return;
+
     try {
       document.documentElement.className += " display-kiosk vmb-legacy-tv";
     } catch (e) {}
