@@ -23,7 +23,7 @@ function clearDisplayStorage() {
 /**
  * Kiosk TV view — single full-screen image, refreshed every 30s. No widgets or React canvas.
  */
-const DisplayBoardImagePage = () => {
+const DisplayBoardImagePage = ({ onFallbackToCanvas }) => {
   const navigate = useNavigate();
   const deviceToken = getStoredDeviceToken();
   const deviceId = getStoredDeviceId();
@@ -31,6 +31,13 @@ const DisplayBoardImagePage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const urlRef = useRef("");
+  const fallbackTriggered = useRef(false);
+
+  const triggerCanvasFallback = useCallback(() => {
+    if (fallbackTriggered.current) return;
+    fallbackTriggered.current = true;
+    onFallbackToCanvas?.();
+  }, [onFallbackToCanvas]);
 
   const revokeUrl = useCallback(() => {
     if (urlRef.current) {
@@ -40,7 +47,7 @@ const DisplayBoardImagePage = () => {
   }, []);
 
   const loadSnapshot = useCallback(async () => {
-    if (!deviceToken) return;
+    if (!deviceToken || fallbackTriggered.current) return;
     try {
       const { blob } = await displayDeviceAPI.fetchBoardSnapshot(deviceToken, {
         cacheBust: Date.now(),
@@ -51,11 +58,24 @@ const DisplayBoardImagePage = () => {
       setImageUrl(nextUrl);
       setError("");
     } catch (err) {
+      const status = err?.status;
+      if (status === 401) {
+        clearDisplayStorage();
+        navigate("/tv", { replace: true });
+        return;
+      }
+      // No snapshot yet or API unavailable — use live board instead of blocking the TV.
+      if (!imageUrl && !urlRef.current) {
+        triggerCanvasFallback();
+        return;
+      }
       setError(err.message || "Could not load board image");
     } finally {
-      setLoading(false);
+      if (!fallbackTriggered.current) {
+        setLoading(false);
+      }
     }
-  }, [deviceToken, revokeUrl]);
+  }, [deviceToken, navigate, revokeUrl, triggerCanvasFallback]);
 
   useEffect(() => {
     if (!deviceToken) {

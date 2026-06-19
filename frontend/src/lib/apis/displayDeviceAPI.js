@@ -245,7 +245,15 @@ export const displayDeviceAPI = {
     );
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
-      throw new Error(err.detail || `Snapshot unavailable (${response.status})`);
+      let detail = err.detail;
+      if (Array.isArray(detail)) {
+        detail = detail.map((item) => item?.msg || item).join(", ");
+      } else if (detail && typeof detail !== "string") {
+        detail = String(detail);
+      }
+      const error = new Error(detail || `Snapshot unavailable (${response.status})`);
+      error.status = response.status;
+      throw error;
     }
     return {
       blob: await response.blob(),

@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import KioskErrorBoundary from "../components/KioskErrorBoundary";
 import KioskRouteFallback from "../components/KioskRouteFallback";
 import DisplayPairingPage from "../pages/display/DisplayPairingPage";
-import DisplayBoardImagePage from "../pages/display/DisplayBoardImagePage";
+import DisplayBoardKioskPage from "../pages/display/DisplayBoardKioskPage";
 import VisualBoardDisplayPage from "../pages/visual-boards/VisualBoardDisplayPage";
 import "../index.css";
 
@@ -40,7 +40,7 @@ export default function KioskApp() {
               path="/tv/board"
               element={
                 <KioskRoute>
-                  <DisplayBoardImagePage />
+                  <DisplayBoardKioskPage />
                 </KioskRoute>
               }
             />
