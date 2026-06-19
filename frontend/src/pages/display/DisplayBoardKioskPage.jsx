@@ -6,11 +6,11 @@ import { displayDeviceAPI, getStoredDeviceToken } from "../../lib/apis/displayDe
 const SNAPSHOT_PROBE_MS = 30_000;
 
 /**
- * TV kiosk board route — static snapshot image when available; live canvas fallback.
+ * TV kiosk board route — live canvas by default; upgrades to static snapshot when published.
  * Periodically re-probes for snapshots so publish updates switch back to image mode.
  */
 export default function DisplayBoardKioskPage() {
-  const [mode, setMode] = useState("snapshot");
+  const [mode, setMode] = useState("canvas");
   const probing = useRef(false);
 
   const probeSnapshot = useCallback(async () => {
@@ -28,8 +28,11 @@ export default function DisplayBoardKioskPage() {
   }, []);
 
   useEffect(() => {
-    if (mode !== "canvas") return undefined;
     probeSnapshot();
+  }, [probeSnapshot]);
+
+  useEffect(() => {
+    if (mode !== "canvas") return undefined;
     const id = setInterval(probeSnapshot, SNAPSHOT_PROBE_MS);
     return () => clearInterval(id);
   }, [mode, probeSnapshot]);

@@ -42,6 +42,16 @@ const ADMIN_STEPS = [
 
 const DISPLAY_STEPS = [
   {
+    title: "Open the TV kiosk URL",
+    body: (url) => (
+      <>
+        Use{" "}
+        <span className="font-mono text-blue-300">{url}</span> — not the main AssetIQ homepage. Hide the browser
+        toolbar if your TV browser allows it, and set zoom to 100%.
+      </>
+    ),
+  },
+  {
     title: "Keep this screen open",
     body: () => "Leave this browser on the TV or kiosk. Do not close or refresh after pairing.",
   },

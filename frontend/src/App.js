@@ -25,7 +25,7 @@ import "./App.css";
 import { AppShell } from "./components/AppShell";
 import KioskErrorBoundary from "./components/KioskErrorBoundary";
 import DisplayPairingPage from "./pages/display/DisplayPairingPage";
-import DisplayBoardPage from "./pages/display/DisplayBoardPage";
+import DisplayBoardKioskPage from "./pages/display/DisplayBoardKioskPage";
 import { CapabilitiesProvider, useCapabilities } from "./core/performance";
 import { ProductionReleaseToast } from "./components/ProductionReleaseToast";
 
@@ -489,7 +489,7 @@ function App() {
               } />
               <Route path="/tv/board" element={
                 <KioskRoute>
-                  <DisplayBoardPage />
+                  <DisplayBoardKioskPage />
                 </KioskRoute>
               } />
               <Route path="/display" element={<Navigate to="/tv" replace />} />

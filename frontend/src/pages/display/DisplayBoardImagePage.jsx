@@ -55,12 +55,16 @@ const DisplayBoardImagePage = ({ onFallbackToCanvas }) => {
       const { blob } = await displayDeviceAPI.fetchBoardSnapshot(deviceToken, {
         cacheBust: Date.now(),
       });
+      if (!blob || blob.size === 0) {
+        throw new Error("Empty snapshot");
+      }
       retryAttempt.current = 0;
       revokeUrl();
       const nextUrl = URL.createObjectURL(blob);
       urlRef.current = nextUrl;
       setImageUrl(nextUrl);
       setError("");
+      setLoading(false);
     } catch (err) {
       const status = err?.status;
       if (status === 401) {
@@ -80,10 +84,7 @@ const DisplayBoardImagePage = ({ onFallbackToCanvas }) => {
         return;
       }
       setError(err.message || "Could not load board image");
-    } finally {
-      if (!fallbackTriggered.current && (urlRef.current || retryAttempt.current >= SNAPSHOT_RETRY_ATTEMPTS)) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
   }, [deviceToken, navigate, revokeUrl, triggerCanvasFallback]);
 
@@ -168,6 +169,11 @@ const DisplayBoardImagePage = ({ onFallbackToCanvas }) => {
     return () => clearInterval(id);
   }, [deviceToken, deviceId]);
 
+  useEffect(() => {
+    if (!deviceToken || imageUrl || loading || error || fallbackTriggered.current) return;
+    triggerCanvasFallback();
+  }, [deviceToken, imageUrl, loading, error, triggerCanvasFallback]);
+
   if (!deviceToken) {
     return (
       <div className="fixed inset-0 bg-black text-white flex flex-col items-center justify-center">
@@ -207,17 +213,29 @@ const DisplayBoardImagePage = ({ onFallbackToCanvas }) => {
     );
   }
 
+  if (!imageUrl) {
+    return (
+      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-12 h-12 animate-spin text-slate-500" />
+        <p className="text-sm text-slate-500">Switching to live board…</p>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black overflow-hidden">
-      {imageUrl ? (
-        <img
-          key={imageUrl}
-          src={imageUrl}
-          alt="Visual management board"
-          className="w-full h-full object-cover select-none"
-          draggable={false}
-        />
-      ) : null}
+      <img
+        key={imageUrl}
+        src={imageUrl}
+        alt="Visual management board"
+        className="w-full h-full object-contain bg-black select-none"
+        draggable={false}
+        onError={() => {
+          revokeUrl();
+          setImageUrl("");
+          triggerCanvasFallback();
+        }}
+      />
     </div>
   );
 };
