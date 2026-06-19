@@ -26,7 +26,8 @@ def patch_admin_db(mock_db, *, db_map=None):
     with patch("services.visual_display_admin_service.get_current_db_name", return_value="assetiq"), patch(
         "services.visual_display_admin_service.AVAILABLE_DATABASES", MOCK_DBS
     ), patch("services.visual_display_admin_service.get_database", side_effect=get_db), patch(
-        "services.visual_display_admin_service.db", mock_db
+        "services.visual_display_admin_service.set_request_db"
+    ), patch("services.visual_display_admin_service.db", mock_db
     ), patch(
         "services.visual_display_admin_service.notify_device", new_callable=AsyncMock
     ):
@@ -244,3 +245,42 @@ async def test_get_device_not_found(mock_user, mock_db):
         with pytest.raises(HTTPException) as exc:
             await admin_svc.get_device_detail("missing", mock_user)
     assert exc.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_list_display_devices_across_databases(mock_user):
+    prod_db = FakeDB()
+    uat_db = FakeDB()
+    prod_devices = prod_db["visual_display_devices"]
+    uat_devices = uat_db["visual_display_devices"]
+    prod_devices.find = MagicMock(
+        return_value=MagicMock(
+            sort=MagicMock(
+                return_value=MagicMock(
+                    to_list=AsyncMock(
+                        return_value=[_device_doc(id="device_prod", screen_name="Prod TV")]
+                    )
+                )
+            )
+        )
+    )
+    uat_devices.find = MagicMock(
+        return_value=MagicMock(
+            sort=MagicMock(
+                return_value=MagicMock(
+                    to_list=AsyncMock(
+                        return_value=[_device_doc(id="device_uat", screen_name="UAT TV")]
+                    )
+                )
+            )
+        )
+    )
+    for boards in (prod_db["visual_boards"], uat_db["visual_boards"]):
+        boards.find = MagicMock(return_value=MagicMock(to_list=AsyncMock(return_value=[])))
+
+    with patch_admin_db(prod_db, db_map={"assetiq": prod_db, "assetiq-UAT": uat_db}):
+        result = await admin_svc.list_display_devices_enhanced(mock_user)
+
+    assert result["total"] == 2
+    names = {item["screen_name"] for item in result["items"]}
+    assert names == {"Prod TV", "UAT TV"}

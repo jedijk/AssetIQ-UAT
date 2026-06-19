@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Monitor, Loader2, RefreshCw, Trash2, Link2, Search } from "lucide-react";
+import { Monitor, Loader2, RefreshCw, Trash2, Link2, Search, ChevronRight } from "lucide-react";
 import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
 import { displayDeviceAPI } from "../../lib/apis/displayDeviceAPI";
 import { getDatabaseEnvironment } from "../../lib/databaseEnv";
@@ -48,6 +48,11 @@ const VisualBoardPairDisplaysPage = () => {
   const { data: legacyScreens, isLoading: legacyLoading, refetch: refetchLegacy } = useQuery({
     queryKey: ["visual-board-screens", dbEnv],
     queryFn: () => visualBoardAPI.listAllScreens(),
+  });
+
+  const { data: pairedDevicesData, isLoading: pairedDevicesLoading, refetch: refetchPairedDevices } = useQuery({
+    queryKey: ["display-devices", dbEnv],
+    queryFn: () => displayDeviceAPI.listDevices(),
   });
 
   const deleteMutation = useMutation({
@@ -106,6 +111,7 @@ const VisualBoardPairDisplaysPage = () => {
 
   const boards = pairingBoardsData?.items || [];
   const legacyItems = legacyScreens?.items || [];
+  const pairedDevices = pairedDevicesData?.items || [];
 
   return (
     <VisualManagementPageLayout>
@@ -129,7 +135,7 @@ const VisualBoardPairDisplaysPage = () => {
               Open display pairing
             </Link>
           </Button>
-          <Button variant="outline" size="sm" onClick={() => refetchLegacy()}>
+          <Button variant="outline" size="sm" onClick={() => { refetchLegacy(); refetchPairedDevices(); }}>
             <RefreshCw className="w-4 h-4 mr-1" />
             Refresh
           </Button>
@@ -220,6 +226,46 @@ const VisualBoardPairDisplaysPage = () => {
           )}
         </CardContent>
       </Card>
+
+      <div>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h2 className="text-lg font-semibold text-slate-900">Paired screens</h2>
+          <Button asChild variant="ghost" size="sm">
+            <Link to="/visual-management/screens">Manage all</Link>
+          </Button>
+        </div>
+        {pairedDevicesLoading ? (
+          <div className="flex justify-center py-8"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div>
+        ) : pairedDevices.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-slate-500">
+              No paired screens yet. Pair a TV using the code above or wait for the nearby display prompt.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="rounded-lg border border-slate-200 overflow-hidden bg-white divide-y divide-slate-100">
+            {pairedDevices.map((device) => (
+              <Link
+                key={device.id}
+                to={`/visual-management/screens/${device.id}`}
+                className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 transition-colors"
+              >
+                <div className="min-w-0">
+                  <div className="font-medium text-slate-900 break-words">{device.screen_name}</div>
+                  <div className="text-xs text-slate-500 break-words">
+                    {device.board_name || device.board_id || "Unassigned"}
+                    {device.location ? ` · ${device.location}` : ""}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge variant={STATUS_VARIANT[device.status] || "secondary"}>{device.status}</Badge>
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
 
       {legacyItems.length > 0 && (
         <div>

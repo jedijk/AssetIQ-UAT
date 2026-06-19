@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
 
-from database import AVAILABLE_DATABASES, db, get_current_db_name, get_database
+from database import AVAILABLE_DATABASES, db, get_current_db_name, get_database, set_request_db
 from models.visual_display import DeviceEventItem, DisplayDeviceDetail, DisplayDeviceSummary
 from services.tenant_schema import merge_tenant_filter
 from services.visual_board_helpers import BOARDS_COLLECTION
@@ -69,14 +69,27 @@ def _uptime_seconds(device: dict) -> Optional[int]:
     return max(0, int((datetime.now(timezone.utc) - dt).total_seconds()))
 
 
+def _device_lookup_db_names() -> list[str]:
+    names: list[str] = []
+    for candidate in (get_current_db_name(), *[m["name"] for m in AVAILABLE_DATABASES.values()]):
+        if candidate and candidate not in names:
+            names.append(candidate)
+    return names
+
+
+async def _find_device_with_db(device_id: str, user: dict) -> tuple[dict, str]:
+    filt = merge_tenant_filter({"id": device_id}, user)
+    for db_name in _device_lookup_db_names():
+        doc = await get_database(db_name)[DEVICES_COLLECTION].find_one(filt, {"_id": 0})
+        if doc:
+            return doc, db_name
+    raise HTTPException(status_code=404, detail="Device not found")
+
+
 async def _get_device_for_user(device_id: str, user: dict) -> dict:
-    doc = await db[DEVICES_COLLECTION].find_one(
-        merge_tenant_filter({"id": device_id}, user),
-        {"_id": 0},
-    )
-    if not doc:
-        raise HTTPException(status_code=404, detail="Device not found")
-    return doc
+    device, db_name = await _find_device_with_db(device_id, user)
+    set_request_db(db_name)
+    return device
 
 
 async def _record_event(
@@ -123,14 +136,17 @@ async def _fetch_board_meta(
     names: Dict[str, str] = {}
     versions: Dict[str, int] = {}
     filt = merge_tenant_filter({"id": {"$in": board_ids}}, user)
-    boards = await db[BOARDS_COLLECTION].find(
-        filt,
-        {"_id": 0, "id": 1, "name": 1, "version": 1},
-    ).to_list(len(board_ids))
-    for board in boards:
-        bid = board["id"]
-        names[bid] = board.get("name", "")
-        versions[bid] = int(board.get("version") or 1)
+    for meta in AVAILABLE_DATABASES.values():
+        boards = await get_database(meta["name"])[BOARDS_COLLECTION].find(
+            filt,
+            {"_id": 0, "id": 1, "name": 1, "version": 1},
+        ).to_list(len(board_ids))
+        for board in boards:
+            bid = board["id"]
+            if bid in names:
+                continue
+            names[bid] = board.get("name", "")
+            versions[bid] = int(board.get("version") or 1)
     return names, versions
 
 
@@ -390,10 +406,24 @@ async def list_device_events(device_id: str, user: dict, *, limit: int = 50) -> 
 
 async def list_display_devices_enhanced(user: dict) -> Dict[str, Any]:
     """List paired display devices with board version, resolution, uptime, token age."""
-    devices = await db[DEVICES_COLLECTION].find(
-        merge_tenant_filter({}, user),
-        {"_id": 0, "token_hash": 0, "pending_delivery_token": 0, "pending_token_hash": 0},
-    ).sort("created_at", -1).to_list(500)
+    filt = merge_tenant_filter({}, user)
+    projection = {"_id": 0, "token_hash": 0, "pending_delivery_token": 0, "pending_token_hash": 0}
+    seen_ids: set[str] = set()
+    devices: list[dict] = []
+
+    for db_name in _device_lookup_db_names():
+        docs = await get_database(db_name)[DEVICES_COLLECTION].find(
+            filt,
+            projection,
+        ).sort("created_at", -1).to_list(500)
+        for doc in docs:
+            device_id = doc.get("id")
+            if not device_id or device_id in seen_ids:
+                continue
+            seen_ids.add(device_id)
+            devices.append(doc)
+
+    devices.sort(key=lambda d: d.get("created_at") or "", reverse=True)
 
     board_ids = list({d.get("board_id") for d in devices if d.get("board_id")})
     board_names, board_versions = await _fetch_board_meta(board_ids, user)
