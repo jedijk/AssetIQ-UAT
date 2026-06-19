@@ -17,6 +17,13 @@ from services.threat_score_propagation import propagate_risk_to_linked_entities
 logger = logging.getLogger(__name__)
 
 
+def _round_half_up(value: float) -> int:
+    """Round like JavaScript Math.round (half away from zero), not Python banker's round."""
+    if value >= 0:
+        return int(value + 0.5)
+    return int(value - 0.5)
+
+
 def fmea_score_from_failure_mode(failure_mode: Optional[dict]) -> Optional[int]:
     """
     FMEA contribution (0–100) from severity × occurrence × detectability / 10,
@@ -31,14 +38,19 @@ def fmea_score_from_failure_mode(failure_mode: Optional[dict]) -> Optional[int]:
         try:
             return min(
                 100,
-                max(0, round((float(severity) * float(occurrence) * float(detectability)) / 10)),
+                max(
+                    0,
+                    _round_half_up(
+                        (float(severity) * float(occurrence) * float(detectability)) / 10
+                    ),
+                ),
             )
         except (TypeError, ValueError):
             pass
     rpn = failure_mode.get("rpn")
     if rpn is not None:
         try:
-            return min(100, max(0, round(float(rpn) / 10)))
+            return min(100, max(0, _round_half_up(float(rpn) / 10)))
         except (TypeError, ValueError):
             pass
     return None
