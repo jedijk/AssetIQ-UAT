@@ -22,6 +22,15 @@
             })();
         </script>
         <style>
+            html,
+            body,
+            #root {
+                margin: 0;
+                padding: 0;
+                width: 100%;
+                height: 100%;
+                background: #020617;
+            }
             #root:empty::before {
                 content: "Loading display…";
                 display: flex;
@@ -37,5 +46,6 @@
     <body>
         <noscript>Enable JavaScript to use the AssetIQ display.</noscript>
         <div id="root"></div>
+        <script src="%PUBLIC_URL%/tv-fallback.js"></script>
     </body>
 </html>

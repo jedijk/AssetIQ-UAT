@@ -65,10 +65,9 @@ let webpackConfig = {
 
         webpackConfig.plugins.push(
           new HtmlWebpackPlugin({
-            inject: true,
+            inject: false,
             template: path.resolve(__dirname, "public/tv.html"),
             filename: "tv.html",
-            chunks: ["kiosk"],
           }),
         );
       }
