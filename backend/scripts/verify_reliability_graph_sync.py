@@ -111,11 +111,26 @@ def _static_path_checks() -> list[str]:
     return failures
 
 
+def _should_skip_db_sampling() -> str | None:
+    """Return skip reason, or None when DB sampling should run."""
+    if not os.environ.get("MONGO_URL"):
+        return "MONGO_URL not set"
+    env = os.environ.get("ENVIRONMENT", "").lower()
+    if env in ("test", "testing"):
+        return "ENVIRONMENT=test (CI uses mocked graph sync)"
+    if os.environ.get("GRAPH_AUDIT_SKIP_DB", "").lower() in ("1", "true", "yes"):
+        return "GRAPH_AUDIT_SKIP_DB set"
+    return None
+
+
 async def _db_sample_audit() -> tuple[bool, list[str]]:
-    mongo_url = os.environ.get("MONGO_URL")
-    if not mongo_url:
-        print("SKIP db sampling: MONGO_URL not set")
+    skip = _should_skip_db_sampling()
+    if skip:
+        print(f"SKIP db sampling: {skip}")
         return True, []
+
+    mongo_url = os.environ.get("MONGO_URL")
+    assert mongo_url
 
     db_name = os.environ.get("DB_NAME", "assetiq-UAT").strip('"')
     from motor.motor_asyncio import AsyncIOMotorClient
