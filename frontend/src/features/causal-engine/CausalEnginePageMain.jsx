@@ -838,7 +838,7 @@ export default function CausalEnginePageMain() {
   }
 
   return (
-    <div className="h-[calc(100vh-64px)] flex flex-col" data-testid="causal-engine-page">
+    <div className="app-page-shell" data-testid="causal-engine-page">
       {/* Back Button - shown when navigated from another page */}
       {location.state?.from && (
         <div className="px-4 py-2 bg-white border-b border-slate-200">
@@ -846,7 +846,7 @@ export default function CausalEnginePageMain() {
         </div>
       )}
       
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 min-h-0 flex overflow-hidden">
       <InvestigationListSidebar
         investigations={filteredInvestigations}
         loading={loadingInvestigations}
@@ -875,7 +875,7 @@ export default function CausalEnginePageMain() {
       ) : loadingInvestigation ? (
         <div className="flex-1 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /></div>
       ) : investigation ? (
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           {/* Tabs - same style as other pages */}
           <div className="flex items-center gap-1 px-4 py-2 bg-white border-b border-slate-200">
             {tabs.map(tab => {
@@ -891,7 +891,7 @@ export default function CausalEnginePageMain() {
           </div>
           
           {/* Tab content */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="app-page-scroll mobile-scroll-pane flex-1 min-h-0 p-4">
             {activeTab === "overview" && (
               <InvestigationOverviewTab
                 isEditingInvestigation={isEditingInvestigation}

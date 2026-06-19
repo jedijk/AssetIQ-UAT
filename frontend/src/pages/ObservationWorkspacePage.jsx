@@ -380,9 +380,9 @@ const ObservationWorkspacePage = () => {
   const { observation, exposure, timeline, reliability_intelligence, recommended_actions, action_plan, process_journey } = workspace;
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-12" data-testid="observation-workspace-page">
-      {/* Hero header — pinned at top below the 48px app header; does not move when scrolling */}
-      <div className="sticky-below-app-header bg-white border-b border-slate-200 shadow-sm">
+    <div className="app-page-shell bg-slate-50" data-testid="observation-workspace-page">
+      {/* Hero header — fixed at top of the flex panel; scroll lives in the pane below */}
+      <div className="flex-shrink-0 bg-white border-b border-slate-200 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 max-w-7xl">
           {/* Mobile: title row (with ⋯ menu pinned right) + action bar row stack vertically.
               Desktop: everything inline on a single row. */}
@@ -423,6 +423,10 @@ const ObservationWorkspacePage = () => {
         </div>
       </div>
 
+      <div
+        className="app-page-scroll mobile-scroll-pane flex-1 min-h-0 pb-20 sm:pb-12"
+        data-testid="observation-workspace-scroll"
+      >
       {/* Content */}
       <div className="container mx-auto px-3 sm:px-4 max-w-7xl py-3 space-y-3">
         
@@ -580,6 +584,7 @@ const ObservationWorkspacePage = () => {
         {/* Row 4: Process Journey */}
         <ProcessJourney stages={process_journey} />
 
+      </div>
       </div>
 
       {/* Full Analysis Dialog — Causal Intelligence + AI Risk Analysis (without recommended actions) */}

@@ -35,7 +35,7 @@ export default function ActionsPageMain() {
   };
 
   return (
-    <div className="h-[calc(100vh-64px)] flex flex-col" data-testid="actions-page">
+    <div className="app-page-shell" data-testid="actions-page">
       <ActionsPageToolbar
         location={location}
         t={page.t}

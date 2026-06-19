@@ -192,6 +192,23 @@ html, body {
     z-index: 30;
 }
 
+/* Viewport-bounded page shell: header + internal scroll pane (below app header + breadcrumb row) */
+.app-page-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    height: calc(100dvh - var(--app-header-offset) - 2.75rem);
+    overflow: hidden;
+}
+
+.app-page-scroll {
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
 /* Header text colors for dark mode */
 .theme-dark .app-header,
 .theme-assetiq .app-header,

@@ -515,7 +515,7 @@ const ThreatsPage = () => {
   ];
 
   return (
-    <div className="h-[calc(100vh-64px)] flex flex-col" data-testid="threats-page">
+    <div className="app-page-shell" data-testid="threats-page">
       {/* Fixed Header Section */}
       <div className="flex-shrink-0 px-4 pt-4 pb-2 max-w-7xl mx-auto w-full">
         {/* Back Button - shown when navigated from another page */}
@@ -819,8 +819,13 @@ const ThreatsPage = () => {
       </div>
 
       {/* Scrollable Content Area */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
-        <div className="max-w-7xl mx-auto">
+      <div
+        className={`flex-1 min-h-0 px-4 pb-4 ${
+          useVirtualThreatList ? "flex flex-col overflow-hidden" : "app-page-scroll mobile-scroll-pane"
+        }`}
+        data-testid="observations-list-scroll"
+      >
+        <div className={`max-w-7xl mx-auto w-full ${useVirtualThreatList ? "flex-1 min-h-0 flex flex-col" : ""}`}>
           {threatsError && !isLoading && (
             <div
               className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
@@ -881,7 +886,7 @@ const ThreatsPage = () => {
           )}
         </div>
       ) : (
-        <div className="priority-list" data-testid="threats-list">
+        <div className={`priority-list ${useVirtualThreatList ? "flex-1 min-h-0 flex flex-col" : ""}`} data-testid="threats-list">
           {threatsTruncated && (
             <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
               {t("observations.listTruncated", { count: caps.maxListItems })}
@@ -890,7 +895,7 @@ const ThreatsPage = () => {
           )}
           {useVirtualThreatList ? (
             <VirtualList
-              className="h-[calc(100vh-220px)]"
+              className="flex-1 min-h-0"
               data={displayThreats}
               itemContent={(idx, threat) => {
                 const EquipmentIcon = getEquipmentIcon(threat.equipment_type, threat.asset);

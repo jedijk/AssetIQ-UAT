@@ -1153,7 +1153,7 @@ export default function EquipmentManagerPage() {
     return nodes.filter(n => n.level === "installation");
   }, [nodes]);
 
-  if (isLoading) return <div className="flex items-center justify-center h-[calc(100vh-64px)]"><div className="loading-dots"><span></span><span></span><span></span></div></div>;
+  if (isLoading) return <div className="app-page-shell flex items-center justify-center"><div className="loading-dots"><span></span><span></span><span></span></div></div>;
 
   // Filter rows - show matching nodes and their parents (for tree structure)
   const filteredRows = searchQuery 
@@ -1166,7 +1166,7 @@ export default function EquipmentManagerPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-64px)] bg-slate-50" data-testid="equipment-manager-page">
+    <div className="app-page-shell bg-slate-50" data-testid="equipment-manager-page">
       {/* Back Button - shown when navigated from another page */}
       {location.state?.from && (
         <div className="px-4 py-2 bg-white border-b border-slate-200">
@@ -1174,7 +1174,7 @@ export default function EquipmentManagerPage() {
         </div>
       )}
       
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
       {/* Main Panel - Hierarchy */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Search Section - Prominent at Top */}

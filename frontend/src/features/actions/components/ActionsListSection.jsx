@@ -33,7 +33,7 @@ export function ActionsListSection({
   formatDate,
 }) {
   return (
-    <div className="flex-1 overflow-y-auto px-4 pb-4">
+    <div className="app-page-scroll mobile-scroll-pane flex-1 min-h-0 px-4 pb-4">
       <div className="max-w-7xl mx-auto">
           {isLoading ? (
         <div className="py-6 space-y-3" data-testid="actions-skeleton">
@@ -68,7 +68,7 @@ export function ActionsListSection({
         <div className="priority-list" data-testid="actions-list">
           {isMobile && !isIOSLike ? (
             <VirtualList
-              className="h-[calc(100vh-220px)]"
+              className="min-h-0"
               data={sortedActions}
               itemContent={(idx, action) => {
                 const StatusIcon = statusConfig[action.status]?.icon || Clock;

@@ -445,7 +445,7 @@ export default function DashboardPageMain({ initialTab }) {
   // Show minimal loading state while permissions are being fetched to prevent flickering
   if (permissionsLoading && !tabInitialized) {
     return (
-      <div className="h-[calc(100vh-64px)] flex flex-col overflow-x-hidden" data-testid="dashboard-page">
+      <div className="app-page-shell overflow-x-hidden" data-testid="dashboard-page">
         <div className="flex-shrink-0 px-4 sm:px-6 pt-4 pb-2 max-w-7xl mx-auto w-full">
           <div className="flex items-center justify-between mb-2">
             <div>
@@ -455,7 +455,7 @@ export default function DashboardPageMain({ initialTab }) {
           </div>
           <div className="h-10 bg-slate-100 rounded-lg animate-pulse" />
         </div>
-        <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pb-6">
+        <div className="app-page-scroll mobile-scroll-pane flex-1 min-h-0 px-4 sm:px-6 pb-6">
           <div className="max-w-7xl mx-auto">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               {[1, 2, 3, 4].map((i) => (
@@ -522,7 +522,7 @@ export default function DashboardPageMain({ initialTab }) {
   const mitigatedObservations = observationsByStatus["Mitigated"] || 0;
 
   return (
-    <div className="h-[calc(100vh-64px)] flex flex-col overflow-x-hidden" data-testid="dashboard-page">
+    <div className="app-page-shell overflow-x-hidden" data-testid="dashboard-page">
       {/* Fixed Header with Tabs - Condensed */}
       <div className="flex-shrink-0 px-4 sm:px-6 pt-4 pb-2 max-w-7xl mx-auto w-full">
         <div className="flex items-center justify-between mb-2">
@@ -733,7 +733,7 @@ export default function DashboardPageMain({ initialTab }) {
       </div>
       
       {/* Scrollable Tab Content */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pb-6">
+      <div className="app-page-scroll mobile-scroll-pane flex-1 min-h-0 px-4 sm:px-6 pb-6">
         <div className="max-w-7xl mx-auto">
           {/* Operational Dashboard Tab */}
           {activeTab === "operational" && canShowOperational && (
@@ -1299,7 +1299,7 @@ export default function DashboardPageMain({ initialTab }) {
           {/* Scrollable content */}
           {quickViewSubmission && (
           <>
-          <div className="flex-1 overflow-y-auto px-5 py-5">
+          <div className="app-page-scroll flex-1 min-h-0 px-5 py-5">
             <div className="space-y-5">
               {/* Form Title and Status */}
               <div className="flex items-start justify-between gap-4">

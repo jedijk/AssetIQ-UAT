@@ -905,7 +905,7 @@ export default function MyTasksPage() {
   
   // Default: Task List View
   return (
-    <div className="h-[calc(100vh-64px)] flex flex-col">
+    <div className="app-page-shell">
       <MyTasksOfflineBanner offlineStatus={offlineStatus} isSyncing={isSyncing} onSync={handleManualSync} />
 
       <MyTasksPageHeader

@@ -1060,7 +1060,7 @@ export default function FormSubmissionsPage() {
           {selectedSubmission && (
             <>
               {/* Scrollable content */}
-              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 mobile-scroll-pane min-h-0">
                 {/* Title and Status */}
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">

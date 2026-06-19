@@ -53,7 +53,7 @@ export function InvestigationListSidebar({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto scrollbar-thin">
+      <div className="app-page-scroll mobile-scroll-pane flex-1 min-h-0 scrollbar-thin">
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-slate-400" />

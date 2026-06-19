@@ -612,7 +612,7 @@ const Layout = () => {
 
 
       {/* Main Layout with Sidebar */}
-      <div className={`flex min-h-[calc(100vh-48px)] ${isResizing ? 'select-none cursor-col-resize' : ''}`}>
+      <div className={`flex min-h-[calc(100dvh-var(--app-header-offset))] ${isResizing ? 'select-none cursor-col-resize' : ''}`}>
         {/* Equipment Hierarchy Sidebar - Desktop */}
         {hierarchyOpen && (
           <>
@@ -658,7 +658,7 @@ const Layout = () => {
         {/* Main Content with Page Transitions */}
         <main 
           ref={mainContentRef}
-          className={`flex-1 min-w-0 relative transition-[padding] duration-200 ease-out ${
+          className={`flex-1 min-w-0 min-h-0 flex flex-col relative transition-[padding] duration-200 ease-out ${
             chatOpen ? "sm:pr-[400px]" : ""
           }`}
         >
@@ -690,7 +690,7 @@ const Layout = () => {
           
           {skipPageTransitions ? (
             <div
-              className="h-full"
+              className="flex-1 min-h-0 w-full flex flex-col"
               style={{
                 paddingTop: isRefreshing ? 48 : pullDistance,
                 transition: "padding-top 0.2s ease",
@@ -701,8 +701,8 @@ const Layout = () => {
                 title="This page crashed"
                 subtitle="Something went wrong while rendering this screen. Tap reload to recover."
               >
-                <NavigationBreadcrumb className="px-4 sm:px-6 pt-4" />
-                <div className="sm:mt-0">
+                <NavigationBreadcrumb className="flex-shrink-0 px-4 sm:px-6 pt-4" />
+                <div className="flex-1 min-h-0 flex flex-col sm:mt-0">
                   <Outlet />
                 </div>
               </AppErrorBoundary>
@@ -716,7 +716,7 @@ const Layout = () => {
                 animate="animate"
                 exit="exit"
                 transition={pageTransition}
-                className="h-full"
+                className="flex-1 min-h-0 w-full flex flex-col"
                 style={{
                   paddingTop: isRefreshing ? 48 : pullDistance,
                   transition: "padding-top 0.2s ease",
@@ -727,8 +727,8 @@ const Layout = () => {
                   title="This page crashed"
                   subtitle="Something went wrong while rendering this screen. Tap reload to recover."
                 >
-                  <NavigationBreadcrumb className="px-4 sm:px-6 pt-4" />
-                  <div className="sm:mt-0">
+                  <NavigationBreadcrumb className="flex-shrink-0 px-4 sm:px-6 pt-4" />
+                  <div className="flex-1 min-h-0 flex flex-col sm:mt-0">
                     <Outlet />
                   </div>
                 </AppErrorBoundary>

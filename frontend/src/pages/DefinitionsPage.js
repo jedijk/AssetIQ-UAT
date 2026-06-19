@@ -844,7 +844,7 @@ export default function DefinitionsPage() {
   const isCustom = definitionsData?.is_custom || false;
 
   return (
-    <div className={`${isMobile ? 'h-[calc(100vh-64px)] flex flex-col' : ''}`}>
+    <div className={isMobile ? "app-page-shell" : ""}>
       {/* Fixed Header Section */}
       <div className={`${isMobile ? 'flex-shrink-0 px-4 pt-4 pb-2' : 'p-6 max-w-7xl mx-auto'}`}>
         {/* Header */}
@@ -1030,7 +1030,7 @@ export default function DefinitionsPage() {
       </div>
 
       {/* Scrollable Content Area */}
-      <div className={`${isMobile ? 'flex-1 overflow-y-auto px-4 pb-4' : 'px-6 pb-6 max-w-7xl mx-auto'}`}>
+      <div className={`${isMobile ? 'app-page-scroll mobile-scroll-pane flex-1 min-h-0 px-4 pb-4' : 'px-6 pb-6 max-w-7xl mx-auto'}`}>
         {/* Loading Spinner */}
         {loadingDefinitions && selectedInstallation ? (
           <div className="flex items-center justify-center py-12">

@@ -31,7 +31,7 @@ export function DashboardQuickViewModal(props) {
           {/* Scrollable content */}
           {quickViewSubmission && (
           <>
-          <div className="flex-1 overflow-y-auto px-5 py-5">
+          <div className="app-page-scroll flex-1 min-h-0 px-5 py-5">
             <div className="space-y-5">
               {/* Form Title and Status */}
               <div className="flex items-start justify-between gap-4">
