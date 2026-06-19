@@ -80,7 +80,6 @@ import {
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../components/ui/tooltip";
-import BackButton from "../components/BackButton";
 import { DISCIPLINES, getDisciplineColor } from "../constants/disciplines";
 import { DocumentViewer } from "../components/DocumentViewer";
 import { formatDateTime as formatDateTimeUtil } from "../lib/dateUtils";
@@ -669,24 +668,13 @@ export default function FormSubmissionsPage() {
   return (
     <>
     <div className="app-page-shell bg-slate-50">
-      {/* Header */}
-      <div className="flex-shrink-0 sticky-below-app-header bg-white border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
-          <div className="flex items-center justify-between gap-2 sm:gap-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <BackButton />
-              <div>
-                <h1 className="text-lg sm:text-2xl font-bold text-slate-800 flex items-center gap-1.5 sm:gap-2">
-                  <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
-                  <span className="hidden xs:inline">{t("reports.titleShort")} </span>{t("reports.submissions")}
-                </h1>
-                <p className="text-xs sm:text-sm text-slate-500 hidden sm:block">
-                  {t("reports.subtitle")}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Mobile title — desktop uses breadcrumb trail for page name */}
+      <div className="flex-shrink-0 px-3 sm:px-6 pb-2 sm:hidden border-b border-slate-200/80">
+        <h1 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+          <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+          {t("reports.submissions")}
+        </h1>
+        <p className="text-xs text-slate-500 mt-0.5">{t("reports.subtitle")}</p>
       </div>
 
       <div className="app-page-scroll mobile-scroll-pane flex-1 min-h-0">

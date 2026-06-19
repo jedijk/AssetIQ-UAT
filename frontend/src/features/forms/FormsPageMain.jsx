@@ -19,7 +19,10 @@ export default function FormsPageMain({ embedded = false }) {
   const page = useFormsPage({ activeTab });
 
   return (
-    <div className={`${embedded ? "p-4" : "p-6"} max-w-7xl mx-auto`} data-testid="forms-page">
+    <div
+      className={`${embedded ? "min-h-0" : "p-6 max-w-7xl mx-auto"}`}
+      data-testid="forms-page"
+    >
       <FormsPageHeader
         embedded={embedded}
         t={t}

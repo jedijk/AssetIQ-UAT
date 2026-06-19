@@ -542,7 +542,9 @@ const TaskSchedulerPage = () => {
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto" data-testid="task-scheduler-page">
+    <>
+    <div className="app-page-shell max-w-7xl mx-auto w-full" data-testid="task-scheduler-page">
+      <div className="flex-shrink-0 px-4 sm:px-6 pt-4 sm:pt-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <div className="flex items-center gap-3">
@@ -635,10 +637,11 @@ const TaskSchedulerPage = () => {
           </CardContent>
         </Card>
       </div>
+      </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 min-h-0 flex flex-col px-4 sm:px-6 pb-4 sm:pb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 flex-shrink-0">
           <TabsList>
             <TabsTrigger value="instances" className="gap-2">
               <ClipboardList className="w-4 h-4" />
@@ -701,7 +704,8 @@ const TaskSchedulerPage = () => {
         </div>
 
         {/* Schedule Tab - Calendar View */}
-        <TabsContent value="instances">
+        <TabsContent value="instances" className="flex-1 min-h-0 mt-0 focus-visible:outline-none">
+          <div className="h-full overflow-y-auto mobile-scroll-pane min-h-0 pb-4">
           {/* View Toggle */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
@@ -969,10 +973,12 @@ const TaskSchedulerPage = () => {
               })()}
             </div>
           )}
+          </div>
         </TabsContent>
 
         {/* Task Library Tab (merged Templates + Plans) */}
-        <TabsContent value="templates">
+        <TabsContent value="templates" className="flex-1 min-h-0 mt-0 focus-visible:outline-none">
+          <div className="h-full overflow-y-auto mobile-scroll-pane min-h-0 pb-4">
           <div className="flex justify-end mb-4 gap-2">
             <Button size="sm" onClick={() => setShowTemplateDialog(true)} className="gap-2">
               <Plus className="w-4 h-4" />
@@ -1096,13 +1102,17 @@ const TaskSchedulerPage = () => {
               })}
             </div>
           )}
+          </div>
         </TabsContent>
 
         {/* Forms Tab - Embedded Form Designer */}
-        <TabsContent value="forms" className="-mx-6 -mb-6">
-          <FormsPageContent embedded={true} />
+        <TabsContent value="forms" className="flex-1 min-h-0 mt-0 focus-visible:outline-none">
+          <div className="h-full overflow-y-auto mobile-scroll-pane min-h-0 pb-4">
+            <FormsPageContent embedded={true} />
+          </div>
         </TabsContent>
       </Tabs>
+    </div>
 
       {/* Create/Edit Template Dialog */}
       <TemplateDialog
@@ -1160,7 +1170,7 @@ const TaskSchedulerPage = () => {
         isPending={createPlanMutation.isPending || updatePlanMutation.isPending}
         editingPlan={editingPlan}
       />
-    </div>
+    </>
   );
 };
 
