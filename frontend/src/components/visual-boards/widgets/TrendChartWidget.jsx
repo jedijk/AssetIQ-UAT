@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { boardCardClass, boardMutedText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
+import { boardCardClass, boardMutedText, vmbText, vmbTitleGapClass, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
 import { useVmbContainerFont } from "../useVmbContainerFont";
 import { isWidgetPartEnabled } from "../widgetDisplayParts";
 import { useLegacyChartFallback } from "../../../lib/kioskCompat";
@@ -22,7 +22,7 @@ const TrendChartWidget = ({ widget, data, theme = "dark" }) => {
   return (
     <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)}`}>
       {showTitle ? (
-        <div className={`shrink-0 ${vmbText("title")} ${titleClass} mb-1`}>{widget?.title || "Trend"}</div>
+        <div className={`${vmbTitleGapClass()} ${vmbText("title")} ${titleClass}`}>{widget?.title || "Trend"}</div>
       ) : null}
       <div ref={chartRef} className="flex-1 min-h-0 w-full relative">
         {points.length === 0 ? (

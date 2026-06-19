@@ -62,6 +62,10 @@ const FONT_BASE_PX = { xs: 10, sm: 11, md: 12, lg: 14, xl: 16 };
 export function legacyWidgetFontVars(config) {
   const key = config?.font_size || "md";
   const base = FONT_BASE_PX[key] ?? FONT_BASE_PX.md;
+  const pad = Math.max(10, Math.round(base * 0.95));
+  const gap = Math.max(4, Math.round(base * 0.4));
+  const stackGap = Math.max(6, Math.round(base * 0.55));
+  const insetPad = Math.max(8, Math.round(base * 0.65));
   return {
     "--vmb-fs": `${base}px`,
     "--vmb-fs-title": `${Math.round(base * 1.15)}px`,
@@ -69,7 +73,10 @@ export function legacyWidgetFontVars(config) {
     "--vmb-fs-small": `${Math.max(9, Math.round(base * 0.9))}px`,
     "--vmb-fs-status": `${Math.round(base * 1.25)}px`,
     "--vmb-chart-fs": `${Math.max(9, Math.round(base * 0.9))}px`,
-    "--vmb-pad": "8px",
+    "--vmb-pad": `${pad}px`,
+    "--vmb-gap": `${gap}px`,
+    "--vmb-stack-gap": `${stackGap}px`,
+    "--vmb-inset-pad": `${insetPad}px`,
     "--vmb-radius": "10px",
     fontSize: `${base}px`,
   };

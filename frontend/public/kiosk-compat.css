@@ -39,21 +39,58 @@ html.vmb-legacy-tv .vmb-board-grid {
 /* Legacy grid: keep CSS grid when supported but force explicit gaps */
 html.vmb-legacy-tv .vmb-board-grid.vmb-board-grid--css {
   display: grid;
-  grid-gap: 8px;
-  gap: 8px;
+  grid-gap: var(--vmb-grid-gap, 12px);
+  gap: var(--vmb-grid-gap, 12px);
+  padding: var(--vmb-grid-pad, 12px);
+  box-sizing: border-box;
 }
 
 html.vmb-legacy-tv .vmb-widget-cell {
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
-  border-radius: 10px;
+  overflow: visible;
   height: 100%;
 }
 
-html.vmb-legacy-tv .vmb-card {
+html.vmb-legacy-tv .vmb-card,
+html.vmb-legacy-tv .vmb-card-elevated {
   border-radius: 10px;
-  padding: 8px;
+  overflow: hidden;
+  box-sizing: border-box;
+  height: 100%;
+}
+
+html.vmb-theme-light .vmb-card,
+html.vmb-theme-light .vmb-card-elevated {
+  -webkit-box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.06), 0 4px 16px 0 rgba(15, 23, 42, 0.1);
+  box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.06), 0 4px 16px 0 rgba(15, 23, 42, 0.1);
+}
+
+html.vmb-theme-dark .vmb-card,
+html.vmb-theme-dark .vmb-card-elevated {
+  -webkit-box-shadow: 0 2px 6px 0 rgba(0, 0, 0, 0.45), 0 10px 24px 0 rgba(0, 0, 0, 0.32);
+  box-shadow: 0 2px 6px 0 rgba(0, 0, 0, 0.45), 0 10px 24px 0 rgba(0, 0, 0, 0.32);
+}
+
+html.vmb-theme-light .vmb-inset-card {
+  -webkit-box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
+  box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
+}
+
+html.vmb-theme-dark .vmb-inset-card {
+  -webkit-box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.25);
+}
+
+html.vmb-legacy-tv .vmb-widget-pad {
+  padding: var(--vmb-pad, 12px);
+  box-sizing: border-box;
+}
+
+html.vmb-legacy-tv .vmb-inset-card {
+  border-radius: 8px;
+  overflow: hidden;
+  padding: var(--vmb-inset-pad, 8px);
   box-sizing: border-box;
 }
 
@@ -69,6 +106,28 @@ html.vmb-legacy-tv .vmb-widget-shell {
   -webkit-box-direction: normal;
   -ms-flex-direction: column;
   flex-direction: column;
+  gap: var(--vmb-gap, 6px);
+  box-sizing: border-box;
+}
+
+html.vmb-legacy-tv .vmb-title-gap {
+  margin-bottom: var(--vmb-gap, 6px);
+}
+
+html.vmb-legacy-tv .vmb-widget-stack > * + * {
+  margin-top: var(--vmb-stack-gap, 8px);
+}
+
+html.vmb-legacy-tv .vmb-widget-stack-tight > * + * {
+  margin-top: calc(var(--vmb-stack-gap, 8px) * 0.65);
+}
+
+html.vmb-legacy-tv .vmb-flex-gap-sm {
+  gap: var(--vmb-gap, 6px);
+}
+
+html.vmb-legacy-tv .vmb-flex-gap-md {
+  gap: calc(var(--vmb-gap, 6px) * 1.35);
 }
 
 html.vmb-legacy-tv .vmb-text-title {

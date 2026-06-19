@@ -1,5 +1,5 @@
 import React from "react";
-import { boardCardClass, boardMutedText, boardSubtleText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
+import { boardCardClass, boardMutedText, boardSubtleText, vmbFlexGapClass, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
 import { isWidgetPartEnabled } from "../widgetDisplayParts";
 
 export default function ProductionKpiWidget({ widget, data, theme = "dark" }) {
@@ -15,11 +15,11 @@ export default function ProductionKpiWidget({ widget, data, theme = "dark" }) {
   const showDetail = isWidgetPartEnabled(config, "detail");
 
   return (
-    <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)} justify-center gap-0.5`}>
+    <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)} justify-center ${vmbFlexGapClass("sm")}`}>
       {showTitle ? (
         <div className={`shrink-0 ${vmbText("label")} ${boardMutedText(theme)}`}>{label}</div>
       ) : null}
-      <div className="flex items-baseline gap-1 min-w-0 overflow-hidden">
+      <div className={`flex items-baseline min-w-0 overflow-hidden ${vmbFlexGapClass("sm")}`}>
         <span className={`${vmbText("value")} min-w-0`}>{value}</span>
         {showUnit && unit ? (
           <span className={`shrink-0 ${vmbText("small")} ${boardMutedText(theme)}`}>{unit}</span>

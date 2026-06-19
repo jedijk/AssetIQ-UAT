@@ -1,5 +1,5 @@
 import React from "react";
-import { boardCardClass, boardMutedText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
+import { boardCardClass, boardMutedText, vmbFlexGapClass, vmbStackClass, vmbText, vmbTitleGapClass, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
 import { isWidgetPartEnabled } from "../widgetDisplayParts";
 
 function statusClass(status) {
@@ -24,16 +24,16 @@ export default function RiskObservationListWidget({ widget, data, theme = "dark"
   return (
     <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)}`}>
       {showTitle ? (
-        <h3 className={`shrink-0 ${vmbText("title")} mb-1 ${theme === "light" ? "text-slate-700" : "text-slate-200"}`}>
+        <h3 className={`${vmbTitleGapClass()} ${vmbText("title")} ${theme === "light" ? "text-slate-700" : "text-slate-200"}`}>
           {title}
         </h3>
       ) : null}
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
+      <div className={vmbStackClass()}>
         {items.length === 0 ? (
           <p className={`${vmbText("body")} ${boardMutedText(theme)}`}>No observations</p>
         ) : (
           items.map((item, idx) => (
-            <div key={item.id || idx} className={`flex items-start gap-2 ${vmbText("small")} border-b border-slate-100 pb-2`}>
+            <div key={item.id || idx} className={`flex items-start ${vmbFlexGapClass("md")} ${vmbText("small")} border-b border-slate-100 pb-2`}>
               {showRank ? (
                 <span className={`shrink-0 w-5 text-center font-semibold ${boardMutedText(theme)}`}>{idx + 1}</span>
               ) : null}

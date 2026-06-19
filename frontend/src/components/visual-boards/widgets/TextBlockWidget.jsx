@@ -1,5 +1,5 @@
 import React from "react";
-import { boardCardClass, boardMutedText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
+import { boardCardClass, boardMutedText, vmbText, vmbTitleGapClass, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
 import { isWidgetPartEnabled } from "../widgetDisplayParts";
 
 const ALIGN_CLASS = {
@@ -21,7 +21,7 @@ export default function TextBlockWidget({ widget, theme = "dark" }) {
     <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)}`}>
       <div className={`flex-1 min-h-0 flex flex-col justify-center ${align}`}>
         {showTitle ? (
-          <div className={`shrink-0 w-full ${vmbText("title")} ${titleClass} mb-1`}>
+          <div className={`${vmbTitleGapClass()} w-full ${vmbText("title")} ${titleClass}`}>
             {widget.title}
           </div>
         ) : null}

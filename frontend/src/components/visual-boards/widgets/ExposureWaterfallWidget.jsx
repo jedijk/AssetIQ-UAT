@@ -1,5 +1,5 @@
 import React from "react";
-import { boardCardClass, boardMutedText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
+import { boardCardClass, boardMutedText, vmbFlexGapClass, vmbStackClass, vmbText, vmbTitleGapClass, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
 import { isWidgetPartEnabled } from "../widgetDisplayParts";
 
 const ExposureWaterfallWidget = ({ widget, data, theme = "dark" }) => {
@@ -23,13 +23,13 @@ const ExposureWaterfallWidget = ({ widget, data, theme = "dark" }) => {
   return (
     <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)}`}>
       {showTitle ? (
-        <div className={`shrink-0 ${vmbText("title")} ${titleClass} mb-1`}>
+        <div className={`${vmbTitleGapClass()} ${vmbText("title")} ${titleClass}`}>
           {widget?.title || "Exposure Waterfall"}
         </div>
       ) : null}
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
+      <div className={vmbStackClass({ tight: true })}>
         {rows.map((row) => (
-          <div key={row.label || row.key} className={`flex justify-between gap-2 min-w-0 ${vmbText("small")}`}>
+          <div key={row.label || row.key} className={`flex justify-between min-w-0 ${vmbFlexGapClass("md")} ${vmbText("small")}`}>
             <span className={`truncate ${boardMutedText(theme)}`}>{row.label}</span>
             <span className={`shrink-0 font-medium tabular-nums ${valueClass}`}>
               {typeof row.value === "object"

@@ -1,5 +1,7 @@
 import { useLayoutEffect, useState } from "react";
 import { applyKioskCompatClasses } from "../lib/kioskCompat";
+import "../styles/kiosk-compat.css";
+import "../styles/tv-kiosk.css";
 
 const THEME_CLASS_PREFIX = "vmb-theme-";
 

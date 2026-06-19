@@ -9,7 +9,7 @@ import {
   Tooltip,
   Line,
 } from "recharts";
-import { boardCardClass, boardMutedText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
+import { boardCardClass, boardMutedText, vmbText, vmbTitleGapClass, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
 import { useVmbContainerFont } from "../useVmbContainerFont";
 import { isWidgetPartEnabled } from "../widgetDisplayParts";
 import { useLegacyChartFallback } from "../../../lib/kioskCompat";
@@ -46,7 +46,7 @@ export default function MooneyChartWidget({ widget, data, theme = "dark" }) {
   return (
     <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)}`}>
       {showTitle ? (
-        <h3 className={`shrink-0 ${vmbText("title")} mb-1 ${theme === "light" ? "text-slate-700" : "text-slate-200"}`}>
+        <h3 className={`${vmbTitleGapClass()} ${vmbText("title")} ${theme === "light" ? "text-slate-700" : "text-slate-200"}`}>
           {title}
         </h3>
       ) : null}

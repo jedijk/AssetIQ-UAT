@@ -96,7 +96,6 @@ function DraggableWidgetCell({
     transform: editable ? CSS.Translate.toString(transform) : undefined,
     opacity: isDragging ? 0.6 : 1,
     zIndex: isDragging || selected ? 10 : 1,
-    ...(legacy ? { borderRadius: "10px" } : {}),
     ...widgetFontVars(widget.config),
   };
 
@@ -123,7 +122,7 @@ function DraggableWidgetCell({
     <div
       ref={editable ? setNodeRef : undefined}
       style={style}
-      className={`vmb-widget-cell relative min-h-0 min-w-0 h-full overflow-hidden ${legacy ? "" : "@container rounded-[length:var(--vmb-radius,1rem)]"} ${editable ? "cursor-grab active:cursor-grabbing" : ""} ${
+      className={`vmb-widget-cell relative min-h-0 min-w-0 h-full overflow-visible ${legacy ? "" : "@container rounded-[length:var(--vmb-radius,1rem)]"} ${editable ? "cursor-grab active:cursor-grabbing" : ""} ${
         selected ? "ring-2 ring-blue-500 ring-offset-1 ring-offset-transparent" : ""
       }`}
       onClick={editable ? () => onSelect?.(widget.id) : undefined}
@@ -180,7 +179,7 @@ const VisualBoardCanvas = ({
   const grid = (
     <div
       ref={gridRef}
-      className={`vmb-board-grid grid h-full w-full ${legacy ? "vmb-board-grid--css" : "gap-2"} p-3`}
+      className={`vmb-board-grid grid h-full w-full ${legacy ? "vmb-board-grid--css" : "gap-2 p-3"}`}
       style={{
         gridTemplateColumns: legacy
           ? `repeat(${cols}, 1fr)`
@@ -188,7 +187,17 @@ const VisualBoardCanvas = ({
         gridTemplateRows: legacy
           ? `repeat(${rows}, 1fr)`
           : `repeat(${rows}, minmax(0, 1fr))`,
-        ...(legacy ? { gridGap: "8px", WebkitGridGap: "8px" } : {}),
+        ...(legacy
+          ? {
+              gridGap: "var(--vmb-grid-gap, 12px)",
+              WebkitGridGap: "var(--vmb-grid-gap, 12px)",
+              gap: "var(--vmb-grid-gap, 12px)",
+              padding: "var(--vmb-grid-pad, 12px)",
+              boxSizing: "border-box",
+              "--vmb-grid-gap": "12px",
+              "--vmb-grid-pad": "12px",
+            }
+          : {}),
       }}
     >
       {widgets.map((widget) => (
@@ -233,19 +242,12 @@ const VisualBoardCanvas = ({
           transparentBackground={headerConfig.transparent_logo_background !== false}
         />
         <h1
-          className={`vmb-board-header-title ${legacy ? "" : "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center font-semibold tracking-wide max-w-[38%] sm:max-w-md leading-tight text-balance px-1 sm:px-2 text-[10px] sm:text-sm md:text-base"} ${headerTitleClass}`}
-          style={legacy ? { fontSize: `${headerConfig.title_font_size}px` } : undefined}
+          className={`vmb-board-header-title absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center font-semibold tracking-wide leading-tight text-balance px-1 sm:px-2 ${
+            legacy ? "max-w-[50%]" : "max-w-[38%] sm:max-w-md text-[10px] sm:text-sm md:text-base"
+          } ${headerTitleClass}`}
+          style={{ fontSize: `${headerConfig.title_font_size}px` }}
         >
-          {legacy ? (
-            headerTitle
-          ) : (
-            <>
-              <span className="hidden sm:inline" style={{ fontSize: `${headerConfig.title_font_size}px` }}>
-                {headerTitle}
-              </span>
-              <span className="sm:hidden">{headerTitle}</span>
-            </>
-          )}
+          {headerTitle}
         </h1>
         {showTyromerLogo ? (
           <TyromerBoardLogo

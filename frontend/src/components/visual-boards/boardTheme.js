@@ -6,17 +6,31 @@ export function boardSurfaceClass(theme) {
     : "bg-slate-950 text-white";
 }
 
+export function vmbCardRadiusClass() {
+  return isLegacyDisplayBrowser() ? "rounded-[10px]" : "rounded-[length:var(--vmb-radius,1rem)]";
+}
+
+export function vmbInsetRadiusClass() {
+  return isLegacyDisplayBrowser() ? "rounded-[8px]" : "rounded-lg";
+}
+
+export function vmbCardShadowClass() {
+  return isLegacyDisplayBrowser() ? "vmb-card-elevated" : "shadow-md";
+}
+
 export function boardCardClass(theme) {
+  const radius = vmbCardRadiusClass();
+  const shadow = vmbCardShadowClass();
   if (isLegacyDisplayBrowser()) {
     return theme === "light"
-      ? "vmb-card bg-white border border-slate-200 text-slate-900"
-      : "vmb-card bg-slate-900 border border-slate-600 text-white";
+      ? `vmb-card ${radius} ${shadow} overflow-hidden bg-white border border-slate-200 text-slate-900`
+      : `vmb-card ${radius} ${shadow} overflow-hidden bg-slate-900 border border-slate-600 text-white`;
   }
   const palette =
     theme === "light"
       ? "bg-white border border-slate-200 text-slate-900"
       : "bg-slate-900/80 border border-slate-700/50 text-white";
-  return `${palette} rounded-[length:var(--vmb-radius,1rem)] shadow-sm`;
+  return `${palette} ${radius} ${shadow}`;
 }
 
 export function boardMutedText(theme) {
@@ -46,8 +60,31 @@ export function vmbWidgetShell() {
 
 export function vmbWidgetPad() {
   return isLegacyDisplayBrowser()
-    ? "vmb-widget-pad"
-    : "p-[length:var(--vmb-pad,0.5rem)]";
+    ? "vmb-widget-pad box-border"
+    : "p-[length:var(--vmb-pad,0.5rem)] box-border";
+}
+
+export function vmbTitleGapClass() {
+  return isLegacyDisplayBrowser() ? "vmb-title-gap shrink-0" : "shrink-0 mb-1";
+}
+
+export function vmbStackClass({ tight = false } = {}) {
+  const base = "flex-1 min-h-0 overflow-y-auto";
+  if (isLegacyDisplayBrowser()) {
+    return `${base} ${tight ? "vmb-widget-stack-tight" : "vmb-widget-stack"}`;
+  }
+  return `${base} ${tight ? "space-y-1" : "space-y-1.5"}`;
+}
+
+export function vmbFlexGapClass(size = "sm") {
+  if (!isLegacyDisplayBrowser()) {
+    return size === "md" ? "gap-2" : "gap-1";
+  }
+  return size === "md" ? "vmb-flex-gap-md" : "vmb-flex-gap-sm";
+}
+
+export function vmbInsetPadClass() {
+  return isLegacyDisplayBrowser() ? "" : "p-2";
 }
 
 /**

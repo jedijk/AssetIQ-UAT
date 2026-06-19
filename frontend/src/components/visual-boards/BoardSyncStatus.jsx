@@ -53,7 +53,7 @@ export function BoardSyncStatus({
   if (legacy) {
     return (
       <div
-        className={`vmb-sync-status pointer-events-none ${className}`}
+        className={`vmb-sync-status pointer-events-none absolute bottom-2 right-2 left-auto z-30 max-w-[90%] text-right text-[11px] tabular-nums ${className}`}
         aria-live="polite"
         data-testid="board-sync-status"
         style={{ color: isLight ? "#475569" : "#94a3b8" }}
@@ -62,7 +62,8 @@ export function BoardSyncStatus({
           {isLive ? "Live" : "Sync delayed"}
         </span>
         <span style={{ color: isLight ? "#334155" : "#cbd5e1" }}>
-          Synced {formatSyncTime(syncDate)}
+          {" · Synced "}
+          {formatSyncTime(syncDate)}
         </span>
       </div>
     );

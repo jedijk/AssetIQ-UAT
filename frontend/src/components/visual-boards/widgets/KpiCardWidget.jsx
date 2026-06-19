@@ -1,5 +1,5 @@
 import React from "react";
-import { boardCardClass, boardMutedText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
+import { boardCardClass, boardMutedText, vmbFlexGapClass, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
 import { isWidgetPartEnabled } from "../widgetDisplayParts";
 
 function accentClass(metric, theme) {
@@ -32,12 +32,12 @@ const KpiCardWidget = ({ widget, data, theme = "dark" }) => {
 
   return (
     <div
-      className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)} justify-center gap-0.5 ${accentClass(metric, theme)}`}
+      className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)} justify-center ${vmbFlexGapClass("sm")} ${accentClass(metric, theme)}`}
     >
       {showTitle ? (
         <div className={`shrink-0 ${vmbText("label")} ${boardMutedText(theme)}`}>{label}</div>
       ) : null}
-      <div className="flex items-baseline gap-1 min-w-0 overflow-hidden">
+      <div className={`flex items-baseline min-w-0 overflow-hidden ${vmbFlexGapClass("sm")}`}>
         <span className={`${vmbText("value")} min-w-0`}>{value}</span>
         {showChange && change ? (
           <span

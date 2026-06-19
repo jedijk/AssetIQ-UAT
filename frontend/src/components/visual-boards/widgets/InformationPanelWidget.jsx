@@ -1,7 +1,7 @@
 import React from "react";
 import { Pin } from "lucide-react";
 import { formatDateTimeCompact } from "../../../lib/dateUtils";
-import { boardCardClass, boardMutedText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
+import { boardCardClass, boardMutedText, vmbFlexGapClass, vmbInsetPadClass, vmbInsetRadiusClass, vmbStackClass, vmbText, vmbTitleGapClass, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
 import { isWidgetPartEnabled } from "../widgetDisplayParts";
 
 function entryCardClass(theme, pinned, showHighlight) {
@@ -37,8 +37,8 @@ export default function InformationPanelWidget({ widget, data, theme = "dark" })
   return (
     <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)}`}>
       {(showTitle || showSubtitle || showCount) ? (
-        <div className="shrink-0 mb-1">
-          <div className="flex items-start justify-between gap-2">
+        <div className={vmbTitleGapClass()}>
+          <div className={`flex items-start justify-between ${vmbFlexGapClass("md")}`}>
             <div className="min-w-0">
               {showTitle ? (
                 <h3 className={`${vmbText("title")} ${titleClass}`}>{title}</h3>
@@ -67,7 +67,7 @@ export default function InformationPanelWidget({ widget, data, theme = "dark" })
             No information submitted
           </p>
         ) : (
-          <div className="space-y-1.5">
+          <div className={vmbStackClass()}>
             {items.map((row, i) => {
               const pinned = Boolean(row.pinned);
               const when = row.submitted_at || row.datetime
@@ -76,7 +76,7 @@ export default function InformationPanelWidget({ widget, data, theme = "dark" })
               return (
                 <div
                   key={row.submission_id || i}
-                  className={`p-2 rounded-lg border ${vmbText("small")} ${entryCardClass(theme, pinned, showPinnedHighlight)}`}
+                  className={`vmb-inset-card border ${vmbInsetPadClass()} ${vmbInsetRadiusClass()} ${vmbText("small")} ${entryCardClass(theme, pinned, showPinnedHighlight)}`}
                 >
                   <p className={`${bodyClass} break-words leading-normal`}>
                     {row.text || "—"}

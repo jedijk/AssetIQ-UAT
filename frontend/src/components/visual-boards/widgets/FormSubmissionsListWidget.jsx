@@ -2,7 +2,7 @@ import React from "react";
 import { formatDateTimeCompact } from "../../../lib/dateUtils";
 import { getApiUrl } from "../../../lib/apiConfig";
 import { Avatar, AvatarFallback, AvatarImage } from "../../ui/avatar";
-import { boardCardClass, boardMutedText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
+import { boardCardClass, boardMutedText, vmbFlexGapClass, vmbStackClass, vmbText, vmbTitleGapClass, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
 import { isWidgetPartEnabled } from "../widgetDisplayParts";
 
 function statusClass(status) {
@@ -69,11 +69,11 @@ export default function FormSubmissionsListWidget({ widget, data, theme = "dark"
   return (
     <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)}`}>
       {showTitle ? (
-        <h3 className={`shrink-0 ${vmbText("title")} mb-1 ${titleClass}`}>
+        <h3 className={`${vmbTitleGapClass()} ${vmbText("title")} ${titleClass}`}>
           {title}
         </h3>
       ) : null}
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
+      <div className={vmbStackClass()}>
         {items.length === 0 ? (
           <p className={`${vmbText("body")} ${boardMutedText(theme)}`}>No recent submissions</p>
         ) : (
@@ -86,7 +86,7 @@ export default function FormSubmissionsListWidget({ widget, data, theme = "dark"
             return (
               <div
                 key={item.id}
-                className={`flex items-start gap-2 ${vmbText("small")} border-b ${dividerClass} pb-2 last:border-b-0 last:pb-0`}
+                className={`flex items-start ${vmbFlexGapClass("md")} ${vmbText("small")} border-b ${dividerClass} pb-2 last:border-b-0 last:pb-0`}
               >
                 {showAvatar ? (
                   <SubmitterAvatar
