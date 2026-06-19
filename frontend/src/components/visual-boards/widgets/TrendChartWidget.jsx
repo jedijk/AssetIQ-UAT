@@ -3,7 +3,7 @@ import { boardCardClass, boardMutedText, vmbText, vmbTitleGapClass, vmbWidgetPad
 import { useVmbContainerFont } from "../useVmbContainerFont";
 import { isWidgetPartEnabled } from "../widgetDisplayParts";
 import { useLegacyChartFallback } from "../../../lib/kioskCompat";
-import LegacyChartTable from "./LegacyChartTable";
+import LegacySvgLineChart from "./LegacySvgLineChart";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const CHART_MARGIN = { top: 4, right: 6, bottom: 2, left: 2 };
@@ -24,13 +24,13 @@ const TrendChartWidget = ({ widget, data, theme = "dark" }) => {
       {showTitle ? (
         <div className={`${vmbTitleGapClass()} ${vmbText("title")} ${titleClass}`}>{widget?.title || "Trend"}</div>
       ) : null}
-      <div ref={chartRef} className="flex-1 min-h-0 w-full relative">
+      <div ref={chartRef} className="flex-1 min-h-0 w-full relative vmb-chart-wrap">
         {points.length === 0 ? (
           <div className={`${vmbText("body")} ${boardMutedText(theme)} h-full flex items-center justify-center`}>
             No trend data
           </div>
         ) : legacy ? (
-          <LegacyChartTable points={points} theme={theme} />
+          <LegacySvgLineChart points={points} theme={theme} stroke="#38bdf8" emptyLabel="No trend data" />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={points} margin={CHART_MARGIN}>

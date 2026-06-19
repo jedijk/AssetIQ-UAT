@@ -668,15 +668,6 @@ export default function FormSubmissionsPage() {
   return (
     <>
     <div className="app-page-shell bg-slate-50">
-      {/* Mobile title — desktop uses breadcrumb trail for page name */}
-      <div className="flex-shrink-0 px-3 sm:px-6 pb-2 sm:hidden border-b border-slate-200/80">
-        <h1 className="text-base font-semibold text-slate-900 flex items-center gap-2">
-          <FileText className="w-4 h-4 text-blue-600 shrink-0" />
-          {t("reports.submissions")}
-        </h1>
-        <p className="text-xs text-slate-500 mt-0.5">{t("reports.subtitle")}</p>
-      </div>
-
       <div className="app-page-scroll mobile-scroll-pane flex-1 min-h-0">
       {/* Stats Cards */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4">

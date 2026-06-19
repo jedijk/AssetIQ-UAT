@@ -841,7 +841,7 @@ export default function CausalEnginePageMain() {
     <div className="app-page-shell" data-testid="causal-engine-page">
       {/* Back Button - shown when navigated from another page */}
       {location.state?.from && (
-        <div className="px-4 py-2 bg-white border-b border-slate-200">
+        <div className="px-4 py-2 bg-white border-b border-slate-200 hidden sm:block">
           <BackButton />
         </div>
       )}

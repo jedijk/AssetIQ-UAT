@@ -1169,7 +1169,7 @@ export default function EquipmentManagerPage() {
     <div className="app-page-shell bg-slate-50" data-testid="equipment-manager-page">
       {/* Back Button - shown when navigated from another page */}
       {location.state?.from && (
-        <div className="px-4 py-2 bg-white border-b border-slate-200">
+        <div className="px-4 py-2 bg-white border-b border-slate-200 hidden sm:block">
           <BackButton />
         </div>
       )}

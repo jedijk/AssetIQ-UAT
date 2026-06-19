@@ -361,6 +361,17 @@ html.vmb-theme-dark .vmb-inset-card {
   overflow: auto;
 }
 
+html.vmb-legacy-tv .vmb-chart-wrap {
+  min-height: 72px;
+  overflow: hidden;
+}
+
+html.vmb-legacy-tv .vmb-chart-wrap svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .vmb-empty {
   display: flex;
   align-items: center;

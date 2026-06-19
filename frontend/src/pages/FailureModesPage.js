@@ -876,7 +876,7 @@ const FailureModesPage = () => {
     <div className="container mx-auto px-4 py-4 max-w-7xl" data-testid="failure-modes-page">
       {/* Back Button - shown when navigated from another page */}
       {location.state?.from && (
-        <div className="mb-3">
+        <div className="mb-3 hidden sm:block">
           <BackButton />
         </div>
       )}

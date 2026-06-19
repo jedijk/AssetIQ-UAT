@@ -13,7 +13,7 @@ import { boardCardClass, boardMutedText, vmbText, vmbTitleGapClass, vmbWidgetPad
 import { useVmbContainerFont } from "../useVmbContainerFont";
 import { isWidgetPartEnabled } from "../widgetDisplayParts";
 import { useLegacyChartFallback } from "../../../lib/kioskCompat";
-import LegacyChartTable from "./LegacyChartTable";
+import LegacySvgLineChart from "./LegacySvgLineChart";
 
 const CHART_MARGIN = { top: 4, right: 6, bottom: 2, left: 2 };
 
@@ -50,12 +50,34 @@ export default function MooneyChartWidget({ widget, data, theme = "dark" }) {
           {title}
         </h3>
       ) : null}
-      <div ref={chartRef} className="flex-1 min-h-0 w-full relative">
+      <div ref={chartRef} className="flex-1 min-h-0 w-full relative vmb-chart-wrap">
         {points.length > 0 ? (
           legacy ? (
-            <LegacyChartTable
+            <LegacySvgLineChart
               points={points.map((p) => ({ date: p.time, value: p.viscosity ?? p.value }))}
               theme={theme}
+              xKey="date"
+              yKey="value"
+              stroke="#8b5cf6"
+              emptyLabel="No viscosity samples for today"
+              bands={
+                showBands
+                  ? [
+                      {
+                        y1: payload.band_min ?? 50,
+                        y2: payload.band_max ?? 70,
+                        fill: "#f97316",
+                        opacity: 0.12,
+                      },
+                      {
+                        y1: payload.target_min ?? 55,
+                        y2: payload.target_max ?? 65,
+                        fill: "#22c55e",
+                        opacity: 0.15,
+                      },
+                    ]
+                  : []
+              }
             />
           ) : (
           <ResponsiveContainer width="100%" height="100%">

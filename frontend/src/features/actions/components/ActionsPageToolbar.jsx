@@ -42,14 +42,14 @@ export function ActionsPageToolbar({
   return (
     <div className="flex-shrink-0 px-4 pt-4 pb-2 max-w-7xl mx-auto w-full">
       {location.state?.from && (
-        <div className="mb-3">
+        <div className="mb-3 hidden sm:block">
           <BackButton />
         </div>
       )}
 
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h1 className="text-lg sm:text-xl font-bold text-slate-900">{t("actionsPage.title") || "Actions"}</h1>
+          <h1 className="hidden sm:block text-lg sm:text-xl font-bold text-slate-900">{t("actionsPage.title") || "Actions"}</h1>
           <p className="text-xs text-slate-500 hidden sm:block">{t("actionsPage.subtitle") || "Track and manage corrective actions"}</p>
         </div>
         <div className="flex sm:hidden items-center gap-2 text-xs">

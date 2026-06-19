@@ -520,7 +520,7 @@ const ThreatsPage = () => {
       <div className="flex-shrink-0 px-4 pt-4 pb-2 max-w-7xl mx-auto w-full">
         {/* Back Button - shown when navigated from another page */}
         {location.state?.from && (
-          <div className="mb-3">
+          <div className="mb-3 hidden sm:block">
             <BackButton />
           </div>
         )}
@@ -528,7 +528,7 @@ const ThreatsPage = () => {
         {/* Header - Mobile Optimized */}
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h1 className="text-lg sm:text-xl font-bold text-slate-900">{t("observations.title")}</h1>
+            <h1 className="hidden sm:block text-lg sm:text-xl font-bold text-slate-900">{t("observations.title")}</h1>
             <p className="text-xs text-slate-500 hidden sm:block">{t("observations.subtitle")}</p>
           </div>
           <div className="flex items-center gap-2">

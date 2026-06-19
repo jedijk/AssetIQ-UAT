@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowLeft, ChevronRight, Home } from 'lucide-react';
 import { useBreadcrumb } from '../contexts/BreadcrumbContext';
+import { isActionDetailPath, isObservationWorkspacePath } from '../lib/routeLabels';
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -22,9 +23,15 @@ const NavigationBreadcrumb = ({ className = '' }) => {
     canGoBack,
     getDisplayLabel,
     isHomeBreadcrumbPath,
+    currentPath,
   } = useBreadcrumb();
   const breadcrumbs = history || [];
   const showTrail = breadcrumbs.length > 1;
+  const currentEntry = breadcrumbs[breadcrumbs.length - 1];
+  const currentLabel = currentEntry ? getDisplayLabel(currentEntry) : null;
+  const hideMobileTitle =
+    isObservationWorkspacePath(currentPath) || isActionDetailPath(currentPath);
+  const useMobileDetailHeader = hideMobileTitle;
 
   if (!canGoBack && !showTrail) {
     return null;
@@ -32,8 +39,12 @@ const NavigationBreadcrumb = ({ className = '' }) => {
 
   return (
     <div
-      className={`sticky top-[var(--app-header-offset)] z-[35] bg-slate-50 items-center gap-2 mb-0.5 sm:mb-4 pointer-events-auto ${
-        canGoBack ? 'flex' : 'hidden sm:flex'
+      className={`sticky top-[var(--app-header-offset)] z-[35] bg-slate-50 items-center gap-2 min-w-0 mb-0 sm:mb-4 pointer-events-auto border-b border-slate-200/80 sm:border-b-0 pb-2 sm:pb-0 ${
+        useMobileDetailHeader
+          ? 'hidden sm:flex'
+          : canGoBack || showTrail
+            ? 'flex'
+            : 'hidden sm:flex'
       } ${className}`}
     >
       {canGoBack && (
@@ -48,6 +59,12 @@ const NavigationBreadcrumb = ({ className = '' }) => {
           <span className="hidden sm:inline text-sm font-medium">Back</span>
         </button>
       )}
+
+      {canGoBack && currentLabel && !hideMobileTitle ? (
+        <h1 className="sm:hidden text-base font-semibold text-slate-900 truncate min-w-0 flex-1 leading-tight">
+          {currentLabel}
+        </h1>
+      ) : null}
 
       {showTrail && (
           <Breadcrumb className="hidden sm:block min-w-0">

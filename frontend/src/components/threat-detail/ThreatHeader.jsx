@@ -94,21 +94,21 @@ export const ThreatHeader = ({
       animate={{ opacity: 1, y: 0 }}
       className="mb-4 sm:mb-6"
     >
-      {/* Mobile Header - Compact single row */}
+      {/* Mobile Header - back beside title */}
       <div className="sm:hidden">
-        {/* Back button row */}
-        <Button
-          variant="ghost"
-          onClick={() => navigate("/threats")}
-          className="mb-2 -ml-2 text-slate-500 hover:text-slate-700 text-xs h-7 px-2"
-          data-testid="back-to-threats-button"
-        >
-          <ArrowLeft className="w-3 h-3 mr-1" />
-          {t("threatDetail.back")}
-        </Button>
+        <div className="flex items-start gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/threats")}
+            className="h-8 w-8 shrink-0 -ml-1 text-slate-500 hover:text-slate-700"
+            data-testid="back-to-threats-button"
+            aria-label={t("threatDetail.back")}
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
 
-        {/* Title and actions row */}
-        <div className="flex items-start gap-2">
+          <div className="flex items-start gap-2 flex-1 min-w-0">
           {/* Title section - takes most space */}
           <div className="flex-1 min-w-0">
             {isEditing ? (
@@ -249,6 +249,7 @@ export const ThreatHeader = ({
                 </DropdownMenu>
               </>
             )}
+          </div>
           </div>
         </div>
       </div>
