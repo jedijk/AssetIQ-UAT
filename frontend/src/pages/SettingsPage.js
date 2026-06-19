@@ -408,7 +408,7 @@ export default function SettingsPage() {
                         searchQuery
                       )}
                     </p>
-                    <p className="text-xs text-slate-500 truncate hidden xl:block">
+                    <p className="text-xs text-slate-500 line-clamp-2 sm:truncate hidden sm:block">
                       {highlightMatch(
                         t(`settings.sections.${section.sectionKey}.description`),
                         searchQuery
@@ -454,7 +454,7 @@ export default function SettingsPage() {
             >
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            <span className="font-medium text-slate-900">
+            <span className="font-medium text-slate-900 min-w-0 flex-1 break-words line-clamp-2">
               {visibleSections.find(s => s.id === activeSection)
                 ? t(`settings.sections.${visibleSections.find(s => s.id === activeSection).sectionKey}.label`)
                 : t("settings.title")}

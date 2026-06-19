@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/ca
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { VisualManagementNav } from "../../components/visual-boards/VisualManagementNav";
+import { VMB_PAGE_CLASS } from "../../components/visual-boards/visualManagementLayout";
 
 const STATUS_VARIANT = {
   online: "default",
@@ -137,7 +138,7 @@ const VisualBoardDeviceDetailPage = () => {
   const boards = boardsData?.items || [];
 
   return (
-    <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-4 sm:space-y-6">
+    <div className={`${VMB_PAGE_CLASS} max-w-4xl`}>
       <VisualManagementNav />
 
       <div className="flex items-center gap-3">

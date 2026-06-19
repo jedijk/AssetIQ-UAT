@@ -8,6 +8,12 @@ import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Card, CardContent } from "../../components/ui/card";
 import { VisualManagementNav } from "../../components/visual-boards/VisualManagementNav";
+import {
+  VMB_PAGE_ACTIONS_CLASS,
+  VMB_PAGE_CLASS,
+  VMB_PAGE_HEADER_CLASS,
+  VMB_PAGE_TITLE_CLASS,
+} from "../../components/visual-boards/visualManagementLayout";
 
 const STATUS_VARIANT = {
   online: "default",
@@ -36,18 +42,18 @@ const VisualBoardDevicesListPage = () => {
   const devices = data?.items || [];
 
   return (
-    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4 sm:space-y-6">
+    <div className={VMB_PAGE_CLASS}>
       <VisualManagementNav />
 
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Tv className="w-7 h-7 text-blue-600" />
+      <div className={VMB_PAGE_HEADER_CLASS}>
+        <div className="min-w-0">
+          <h1 className={VMB_PAGE_TITLE_CLASS}>
+            <Tv className="w-6 h-6 sm:w-7 sm:h-7 text-blue-600 shrink-0" />
             Screens
           </h1>
-          <p className="text-sm text-slate-500 mt-1">Manage paired display devices, status, and assignments.</p>
+          <p className="text-sm text-slate-500 mt-1 break-words">Manage paired display devices, status, and assignments.</p>
         </div>
-        <div className="flex gap-2">
+        <div className={VMB_PAGE_ACTIONS_CLASS}>
           <Button asChild variant="outline" size="sm">
             <Link to="/visual-management/pair-displays">Pair a display</Link>
           </Button>
@@ -85,15 +91,15 @@ const VisualBoardDevicesListPage = () => {
                 to={`/visual-management/screens/${device.id}`}
                 className="block hover:bg-slate-50 transition-colors"
               >
-                <div className="grid md:grid-cols-[1.5fr_1fr_100px_120px_100px_32px] gap-3 px-4 py-3 items-center">
-                  <div>
-                    <div className="font-medium text-slate-900">{device.screen_name}</div>
-                    <div className="text-xs text-slate-500">
+                <div className="flex flex-col gap-2 px-4 py-3 md:grid md:grid-cols-[1.5fr_1fr_100px_120px_100px_32px] md:gap-3 md:items-center min-w-0">
+                  <div className="min-w-0">
+                    <div className="font-medium text-slate-900 break-words">{device.screen_name}</div>
+                    <div className="text-xs text-slate-500 break-words">
                       {[device.location, device.area].filter(Boolean).join(" · ") || device.resolution || "—"}
                     </div>
                   </div>
-                  <div className="text-sm text-slate-600 truncate">{device.board_name || device.board_id || "Unassigned"}</div>
-                  <div>
+                  <div className="text-sm text-slate-600 break-words md:truncate">{device.board_name || device.board_id || "Unassigned"}</div>
+                  <div className="flex flex-wrap items-center gap-2 md:block">
                     <Badge variant={STATUS_VARIANT[device.status] || "secondary"}>{device.status}</Badge>
                   </div>
                   <div className="text-xs text-slate-500">{formatRelativeTime(device.last_seen)}</div>

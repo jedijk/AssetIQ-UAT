@@ -6,6 +6,12 @@ import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { VisualManagementNav } from "../../components/visual-boards/VisualManagementNav";
+import {
+  VMB_PAGE_ACTIONS_CLASS,
+  VMB_PAGE_CLASS,
+  VMB_PAGE_HEADER_CLASS,
+  VMB_PAGE_TITLE_CLASS,
+} from "../../components/visual-boards/visualManagementLayout";
 
 const VisualBoardAnalyticsPage = () => {
   const { data, isLoading, refetch } = useQuery({
@@ -14,21 +20,23 @@ const VisualBoardAnalyticsPage = () => {
   });
 
   return (
-    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4 sm:space-y-6">
+    <div className={VMB_PAGE_CLASS}>
       <VisualManagementNav />
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <BarChart3 className="w-7 h-7 text-blue-600" />
+      <div className={VMB_PAGE_HEADER_CLASS}>
+        <div className="min-w-0">
+          <h1 className={VMB_PAGE_TITLE_CLASS}>
+            <BarChart3 className="w-6 h-6 sm:w-7 sm:h-7 text-blue-600 shrink-0" />
             Analytics
           </h1>
-          <p className="text-sm text-slate-500 mt-1">Board views, screen uptime, and display health (last 30 days).</p>
+          <p className="text-sm text-slate-500 mt-1 break-words">Board views, screen uptime, and display health (last 30 days).</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>
-          <RefreshCw className="w-4 h-4 mr-1" />
-          Refresh
-        </Button>
+        <div className={VMB_PAGE_ACTIONS_CLASS}>
+          <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => refetch()}>
+            <RefreshCw className="w-4 h-4 mr-1" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (

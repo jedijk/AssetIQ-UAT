@@ -9,6 +9,12 @@ import { Badge } from "../../components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { getDisplayPairingUrl } from "../../components/visual-boards/DisplayPairingInstructions";
 import { VisualManagementNav } from "../../components/visual-boards/VisualManagementNav";
+import {
+  VMB_PAGE_ACTIONS_CLASS,
+  VMB_PAGE_CLASS,
+  VMB_PAGE_HEADER_CLASS,
+  VMB_PAGE_TITLE_CLASS,
+} from "../../components/visual-boards/visualManagementLayout";
 
 const STATUS_VARIANT = {
   draft: "secondary",
@@ -41,20 +47,20 @@ const VisualBoardsPage = () => {
   const boards = data?.items || data?.boards || [];
 
   return (
-    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4 sm:space-y-6">
+    <div className={VMB_PAGE_CLASS}>
       <VisualManagementNav />
 
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Monitor className="w-7 h-7 text-blue-600" />
+      <div className={VMB_PAGE_HEADER_CLASS}>
+        <div className="min-w-0">
+          <h1 className={VMB_PAGE_TITLE_CLASS}>
+            <Monitor className="w-6 h-6 sm:w-7 sm:h-7 text-blue-600 shrink-0" />
             Boards
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-slate-500 mt-1 break-words">
             Create, preview, and publish shop-floor display boards.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className={VMB_PAGE_ACTIONS_CLASS}>
           <Button asChild variant="outline" size="sm">
             <Link to="/visual-management/pair-displays">
               <Tv className="w-4 h-4 mr-1" />
@@ -76,19 +82,19 @@ const VisualBoardsPage = () => {
         </div>
       </div>
 
-      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm text-slate-700 flex flex-wrap items-center justify-between gap-3">
-        <div>
+      <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm text-slate-700 flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3">
+        <div className="min-w-0">
           <p className="font-semibold text-slate-900">Connect a shop-floor TV</p>
-          <p className="mt-1 text-slate-600">
+          <p className="mt-1 text-slate-600 break-words">
             Open{" "}
-            <a href={getDisplayPairingUrl()} target="_blank" rel="noopener noreferrer" className="font-mono text-blue-700 hover:underline">
+            <a href={getDisplayPairingUrl()} target="_blank" rel="noopener noreferrer" className="font-mono text-blue-700 hover:underline break-all">
               {getDisplayPairingUrl()}
             </a>{" "}
             on the display, then enter the code under{" "}
             <span className="font-medium">Pair Displays</span>.
           </p>
         </div>
-        <Button asChild size="sm">
+        <Button asChild size="sm" className="w-full sm:w-auto shrink-0">
           <Link to="/visual-management/screens">
             <Tv className="w-4 h-4 mr-1" />
             Pair Displays
@@ -111,8 +117,8 @@ const VisualBoardsPage = () => {
           {boards.map((board) => (
             <Card key={board.id} className="hover:shadow-md transition-shadow">
               <CardHeader className="pb-2">
-                <div className="flex items-start justify-between gap-2">
-                  <CardTitle className="text-lg">{board.name}</CardTitle>
+                <div className="flex items-start justify-between gap-2 min-w-0">
+                  <CardTitle className="text-lg break-words min-w-0">{board.name}</CardTitle>
                   <Badge variant={STATUS_VARIANT[board.status] || "secondary"}>
                     {board.status || "draft"}
                   </Badge>

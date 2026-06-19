@@ -2,6 +2,8 @@ import React, { useRef } from "react";
 import { boardCardClass, boardMutedText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
 import { useVmbContainerFont } from "../useVmbContainerFont";
 import { isWidgetPartEnabled } from "../widgetDisplayParts";
+import { isLegacyDisplayBrowser } from "../../../lib/kioskCompat";
+import LegacyChartTable from "./LegacyChartTable";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 const CHART_MARGIN = { top: 4, right: 6, bottom: 2, left: 2 };
@@ -15,6 +17,7 @@ const TrendChartWidget = ({ widget, data, theme = "dark" }) => {
   const titleClass = theme === "light" ? "text-slate-700" : "text-white";
   const showTitle = isWidgetPartEnabled(config, "title");
   const showGrid = isWidgetPartEnabled(config, "grid");
+  const legacy = isLegacyDisplayBrowser();
 
   return (
     <div className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)}`}>
@@ -26,6 +29,8 @@ const TrendChartWidget = ({ widget, data, theme = "dark" }) => {
           <div className={`${vmbText.body} ${boardMutedText(theme)} h-full flex items-center justify-center`}>
             No trend data
           </div>
+        ) : legacy ? (
+          <LegacyChartTable points={points} theme={theme} />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={points} margin={CHART_MARGIN}>

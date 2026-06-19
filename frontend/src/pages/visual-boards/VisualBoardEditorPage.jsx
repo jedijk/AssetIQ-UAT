@@ -253,31 +253,31 @@ const VisualBoardEditorPage = () => {
 
   return (
     <div className="h-[calc(100vh-48px)] flex flex-col">
-      <div className="border-b bg-white px-4 py-3 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Button asChild variant="ghost" size="sm">
+      <div className="border-b bg-white px-3 sm:px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <Button asChild variant="ghost" size="sm" className="shrink-0">
             <Link to="/visual-management/boards">
               <ArrowLeft className="w-4 h-4" />
             </Link>
           </Button>
-          <h1 className="font-semibold text-slate-900">Board Designer</h1>
+          <h1 className="font-semibold text-slate-900 text-sm sm:text-base break-words">Board Designer</h1>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setShowVersions(true)}>
-            <History className="w-4 h-4 mr-1" />
-            Versions
+        <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+          <Button variant="outline" size="sm" onClick={() => setShowVersions(true)} className="flex-1 sm:flex-none">
+            <History className="w-4 h-4 sm:mr-1" />
+            <span className="hidden sm:inline">Versions</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={openPreview}>
-            <Eye className="w-4 h-4 mr-1" />
-            Preview
+          <Button variant="outline" size="sm" onClick={openPreview} className="flex-1 sm:flex-none">
+            <Eye className="w-4 h-4 sm:mr-1" />
+            <span className="hidden sm:inline">Preview</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-            <Save className="w-4 h-4 mr-1" />
-            Save
+          <Button variant="outline" size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="flex-1 sm:flex-none">
+            <Save className="w-4 h-4 sm:mr-1" />
+            <span className="hidden sm:inline">Save</span>
           </Button>
-          <Button size="sm" onClick={() => publishMutation.mutate()} disabled={publishMutation.isPending}>
-            <Rocket className="w-4 h-4 mr-1" />
-            Publish
+          <Button size="sm" onClick={() => publishMutation.mutate()} disabled={publishMutation.isPending} className="flex-1 sm:flex-none">
+            <Rocket className="w-4 h-4 sm:mr-1" />
+            <span className="hidden sm:inline">Publish</span>
           </Button>
         </div>
       </div>

@@ -12,6 +12,8 @@ import {
 import { boardCardClass, boardMutedText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
 import { useVmbContainerFont } from "../useVmbContainerFont";
 import { isWidgetPartEnabled } from "../widgetDisplayParts";
+import { isLegacyDisplayBrowser } from "../../../lib/kioskCompat";
+import LegacyChartTable from "./LegacyChartTable";
 
 const CHART_MARGIN = { top: 4, right: 6, bottom: 2, left: 2 };
 
@@ -25,6 +27,7 @@ export default function MooneyChartWidget({ widget, data, theme = "dark" }) {
   const showTitle = isWidgetPartEnabled(config, "title");
   const showBands = isWidgetPartEnabled(config, "target_bands");
   const showGrid = isWidgetPartEnabled(config, "grid");
+  const legacy = isLegacyDisplayBrowser();
 
   return (
     <div className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)}`}>
@@ -35,6 +38,12 @@ export default function MooneyChartWidget({ widget, data, theme = "dark" }) {
       ) : null}
       <div ref={chartRef} className="flex-1 min-h-0 w-full relative">
         {points.length > 0 ? (
+          legacy ? (
+            <LegacyChartTable
+              points={points.map((p) => ({ date: p.time, value: p.viscosity ?? p.value }))}
+              theme={theme}
+            />
+          ) : (
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={points} margin={CHART_MARGIN}>
               {showGrid ? <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" /> : null}
@@ -72,6 +81,7 @@ export default function MooneyChartWidget({ widget, data, theme = "dark" }) {
               />
             </ComposedChart>
           </ResponsiveContainer>
+          )
         ) : (
           <div className={`h-full flex items-center justify-center ${vmbText.body} ${boardMutedText(theme)}`}>
             No viscosity samples for today

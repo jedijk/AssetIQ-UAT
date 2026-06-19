@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import {
   CheckCircle2, Clock, AlertCircle, Search, Calendar, User, Briefcase,
   MoreVertical, Edit2, Trash2, Target, FileText, GitBranch, CheckCircle, Brain,
-  ExternalLink, AlertTriangle, Eye, MessageSquare, Paperclip, Repeat, ChevronDown, Check,
+  ExternalLink, AlertTriangle, Eye, MessageSquare, Paperclip, Repeat, Check,
 } from "lucide-react";
 import { Button } from "../../../components/ui/button";
 import { Badge } from "../../../components/ui/badge";
@@ -104,7 +104,7 @@ export function ActionsListSection({
                       </div>
                     )}
 
-                    <div className="grid grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_auto_1fr_4rem_4rem_auto] items-center gap-2 sm:gap-4">
+                    <div className="flex gap-2 sm:grid sm:grid-cols-[auto_auto_1fr_4rem_4rem_auto] sm:items-center sm:gap-4">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -125,25 +125,31 @@ export function ActionsListSection({
                         {action.action_number}
                       </div>
 
-                      <div className="min-w-0 overflow-hidden">
-                        <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
-                          <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-2 sm:line-clamp-1">
-                            {action.title}
-                          </h3>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${priority.color}`}>
+                      <div className="min-w-0 flex-1 overflow-hidden">
+                        <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-3 sm:line-clamp-1 break-words">
+                          {action.title}
+                        </h3>
+                        {(action.equipment_tag || action.source_name) && (
+                          <div className="text-[10px] sm:text-xs text-slate-500 mt-0.5 break-words">
+                            {action.equipment_tag && (
+                              <span className="font-mono text-slate-400">{action.equipment_tag}</span>
+                            )}
+                            {action.equipment_tag && action.source_name && (
+                              <span className="text-slate-300 mx-1">|</span>
+                            )}
+                            {action.source_name && <span>{action.source_name}</span>}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mt-1 text-xs text-slate-500">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-xs ${priority.color}`}>
                             {priority.label}
                           </span>
                           <span className="inline-flex items-center gap-1 text-slate-400">
-                            <SourceIcon className="w-3.5 h-3.5" />
+                            <SourceIcon className="w-3.5 h-3.5 shrink-0" />
                             {sourceConfig[action.source_type]?.label || "Action"}
                           </span>
                         </div>
                       </div>
-
-                      <ChevronDown className="w-5 h-5 text-slate-300 group-hover:text-slate-400 transition-colors sm:hidden" />
-                      <ChevronDown className="w-5 h-5 text-slate-300 group-hover:text-slate-400 transition-colors hidden sm:block" />
                     </div>
                   </motion.div>
                 );
@@ -185,8 +191,8 @@ export function ActionsListSection({
                   </div>
                 )}
                 
-                {/* Grid layout for perfect column alignment - Score and RPN as separate fixed columns */}
-                <div className="grid grid-cols-[auto_1fr_auto_auto] sm:grid-cols-[auto_auto_1fr_4rem_4rem_auto] items-center gap-2 sm:gap-4">
+                {/* Mobile: flex row; desktop: aligned grid columns */}
+                <div className="flex gap-2 sm:grid sm:grid-cols-[auto_auto_1fr_4rem_4rem_auto] sm:items-center sm:gap-4">
                   {/* Status Icon */}
                   <button
                     onClick={(e) => {
@@ -209,16 +215,13 @@ export function ActionsListSection({
                     {action.action_number}
                   </div>
 
-                  {/* Content - Takes remaining space but doesn't push columns */}
-                  <div className="min-w-0 overflow-hidden">
-                    <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
-                      <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-2 sm:line-clamp-1">
-                        {action.title}
-                      </h3>
-                    </div>
-                    {/* Equipment tag and linked observation — same row */}
+                  {/* Content */}
+                  <div className="min-w-0 flex-1 overflow-hidden">
+                    <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-3 sm:line-clamp-1 break-words">
+                      {action.title}
+                    </h3>
                     {(action.equipment_tag || action.source_name) && (
-                      <div className="text-[10px] sm:text-xs text-slate-500 mb-0.5 sm:mb-1 truncate">
+                      <div className="text-[10px] sm:text-xs text-slate-500 mt-0.5 break-words">
                         {action.equipment_tag && (
                           <span className="font-mono text-slate-400">{action.equipment_tag}</span>
                         )}
@@ -228,12 +231,10 @@ export function ActionsListSection({
                         {action.source_name && <span>{action.source_name}</span>}
                       </div>
                     )}
-                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                      {/* Priority Badge - Always show */}
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mt-1">
                       <Badge className={`${priority.color} text-[10px] sm:text-xs px-1.5 py-0`}>
                         {priority.label}
                       </Badge>
-                      {/* Action Type Badge - Hidden on mobile */}
                       {action.action_type && (
                         <Badge className={`hidden sm:inline-flex text-xs ${
                           action.action_type === 'PM' ? 'bg-blue-100 text-blue-700' :
@@ -244,7 +245,6 @@ export function ActionsListSection({
                           {action.action_type}
                         </Badge>
                       )}
-                      {/* Discipline Badge - Hidden on mobile */}
                       {action.discipline && (
                         <Badge className="hidden sm:inline-flex bg-slate-100 text-slate-600 text-xs">
                           {action.discipline}
@@ -253,7 +253,6 @@ export function ActionsListSection({
                       {overdue && (
                         <Badge className="bg-red-100 text-red-700 text-[10px] sm:text-xs px-1.5 py-0">{t("taskScheduler.overdue")}</Badge>
                       )}
-                      {/* Attachment indicator */}
                       {action.attachments?.length > 0 && (
                         <span className="inline-flex items-center gap-0.5 text-slate-400" title={`${action.attachments.length} attachment(s)`}>
                           <Paperclip className="w-3 h-3" />
@@ -261,33 +260,31 @@ export function ActionsListSection({
                         </span>
                       )}
                     </div>
+                    <div className="sm:hidden flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[10px] text-slate-500">
+                      <span>
+                        {t("observations.riskScore")}{" "}
+                        <span className={`font-bold tabular-nums ${
+                          action.threat_risk_score >= 70 ? "text-red-600" :
+                          action.threat_risk_score >= 50 ? "text-orange-500" :
+                          action.threat_risk_score >= 30 ? "text-yellow-500" :
+                          action.threat_risk_score ? "text-green-500" : "text-slate-300"
+                        }`}>
+                          {action.threat_risk_score ?? "—"}
+                        </span>
+                      </span>
+                      <span>
+                        RPN{" "}
+                        <span className={`font-bold tabular-nums ${
+                          action.threat_rpn >= 200 ? "text-red-600" :
+                          action.threat_rpn >= 100 ? "text-orange-500" :
+                          action.threat_rpn ? "text-blue-500" : "text-slate-300"
+                        }`}>
+                          {action.threat_rpn ?? "—"}
+                        </span>
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Score & RPN - Stacked on mobile (single grid cell), separate columns on desktop */}
-                  {/* Mobile: stacked view */}
-                  <div className="sm:hidden flex flex-col items-end gap-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-slate-400 font-medium">{t("observations.riskScore")}</span>
-                      <span className={`text-sm font-bold tabular-nums ${
-                        action.threat_risk_score >= 70 ? "text-red-600" :
-                        action.threat_risk_score >= 50 ? "text-orange-500" :
-                        action.threat_risk_score >= 30 ? "text-yellow-500" :
-                        action.threat_risk_score ? "text-green-500" : "text-slate-300"
-                      }`}>
-                        {action.threat_risk_score ?? "—"}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-slate-400 font-medium">RPN</span>
-                      <span className={`text-sm font-bold tabular-nums ${
-                        action.threat_rpn >= 200 ? "text-red-600" :
-                        action.threat_rpn >= 100 ? "text-orange-500" :
-                        action.threat_rpn ? "text-blue-500" : "text-slate-300"
-                      }`}>
-                        {action.threat_rpn ?? "—"}
-                      </span>
-                    </div>
-                  </div>
                   {/* Desktop: Score column */}
                   <div className="hidden sm:flex flex-col items-end w-16">
                     <span className="text-xs text-slate-400 font-medium">{t("observations.riskScore")}</span>
@@ -312,8 +309,8 @@ export function ActionsListSection({
                     </span>
                   </div>
 
-                  {/* Right side - Due date & Status - Hidden on mobile except status */}
-                  <div className="flex items-center gap-1.5 sm:gap-3">
+                  {/* Right side - Due date, status (desktop), menu */}
+                  <div className="flex shrink-0 items-start sm:items-center gap-1.5 sm:gap-3">
                   {/* Due date - Hidden on mobile */}
                   <div className="hidden sm:block text-right">
                     <div className={`text-xs sm:text-sm font-medium ${overdue ? "text-red-600" : "text-slate-700"}`}>

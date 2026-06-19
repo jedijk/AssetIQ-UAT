@@ -395,7 +395,7 @@ function bootstrapApp() {
   } catch (_e) {}
 }
 
-if (typeof window !== "undefined" && isPublicKioskPath(window.location.pathname)) {
+if (typeof window !== "undefined" && (isPublicKioskPath(window.location.pathname) || IS_DISPLAY_KIOSK)) {
   bootstrapApp();
 } else {
   ensureFreshBuild().finally(bootstrapApp);

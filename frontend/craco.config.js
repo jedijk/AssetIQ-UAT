@@ -1,5 +1,6 @@
 // craco.config.js
 const path = require("path");
+const HtmlWebpackPlugin = require("html-webpack-plugin");
 require("dotenv").config();
 
 // Check if we're in development/preview mode (not production build)
@@ -43,6 +44,33 @@ let webpackConfig = {
       // like "blob://nullhttps//...worker.js.map" on iOS/Chromium.
       if (process.env.NODE_ENV === "production") {
         webpackConfig.devtool = false;
+
+        // Lightweight kiosk bundle for Samsung TV / display routes (tv.html).
+        const mainEntry = webpackConfig.entry;
+        webpackConfig.entry = {
+          main: mainEntry,
+          kiosk: path.resolve(__dirname, "src/kiosk/index.js"),
+        };
+
+        webpackConfig.plugins = webpackConfig.plugins.map((plugin) => {
+          if (plugin instanceof HtmlWebpackPlugin) {
+            return new HtmlWebpackPlugin({
+              ...plugin.options,
+              chunks: ["main"],
+              filename: "index.html",
+            });
+          }
+          return plugin;
+        });
+
+        webpackConfig.plugins.push(
+          new HtmlWebpackPlugin({
+            inject: true,
+            template: path.resolve(__dirname, "public/tv.html"),
+            filename: "tv.html",
+            chunks: ["kiosk"],
+          }),
+        );
       }
 
       // Add ignored patterns to reduce watched directories

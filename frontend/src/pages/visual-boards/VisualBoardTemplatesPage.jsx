@@ -8,6 +8,7 @@ import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { VisualManagementNav } from "../../components/visual-boards/VisualManagementNav";
+import { VMB_PAGE_CLASS, VMB_PAGE_TITLE_CLASS } from "../../components/visual-boards/visualManagementLayout";
 
 const VisualBoardTemplatesPage = () => {
   const navigate = useNavigate();
@@ -43,15 +44,15 @@ const VisualBoardTemplatesPage = () => {
   const templates = data?.items || [];
 
   return (
-    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4 sm:space-y-6">
+    <div className={VMB_PAGE_CLASS}>
       <VisualManagementNav />
 
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-          <LayoutTemplate className="w-7 h-7 text-blue-600" />
+      <div className="min-w-0">
+        <h1 className={VMB_PAGE_TITLE_CLASS}>
+          <LayoutTemplate className="w-6 h-6 sm:w-7 sm:h-7 text-blue-600 shrink-0" />
           Templates
         </h1>
-        <p className="text-sm text-slate-500 mt-1">Start new boards from reusable layouts.</p>
+        <p className="text-sm text-slate-500 mt-1 break-words">Start new boards from reusable layouts.</p>
       </div>
 
       {isLoading ? (

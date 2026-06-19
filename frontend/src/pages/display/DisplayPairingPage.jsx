@@ -142,7 +142,7 @@ const DisplayPairingPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6">
+    <div className="display-pair-page min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6">
       <div className="max-w-xl w-full space-y-6">
         <div className="text-center">
           <p className="text-blue-400 text-sm font-semibold tracking-wide uppercase mb-2">AssetIQ Display</p>
@@ -156,9 +156,9 @@ const DisplayPairingPage = () => {
           <Loader2 className="w-10 h-10 animate-spin text-slate-500 mx-auto" />
         ) : (
           <>
-            <div className="bg-slate-900 border border-slate-700 rounded-2xl py-10 px-6">
+            <div className="display-pair-code-box bg-slate-900 border border-slate-700 rounded-2xl py-10 px-6">
               <p className="text-slate-400 text-sm mb-3">Code</p>
-              <p className="text-5xl sm:text-6xl font-mono font-bold tracking-[0.35em] text-white" data-testid="display-pair-code">
+              <p className="display-pair-code text-5xl sm:text-6xl font-mono font-bold tracking-[0.35em] text-white" data-testid="display-pair-code">
                 {pairCode || "------"}
               </p>
               <p className="text-slate-500 text-sm mt-6">

@@ -13,6 +13,12 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { DisplayPairingInstructions, getDisplayPairingUrl } from "../../components/visual-boards/DisplayPairingInstructions";
 import { VisualManagementNav } from "../../components/visual-boards/VisualManagementNav";
+import {
+  VMB_PAGE_ACTIONS_CLASS,
+  VMB_PAGE_CLASS,
+  VMB_PAGE_HEADER_CLASS,
+  VMB_PAGE_TITLE_CLASS,
+} from "../../components/visual-boards/visualManagementLayout";
 
 const STATUS_VARIANT = {
   online: "default",
@@ -102,18 +108,18 @@ const VisualBoardPairDisplaysPage = () => {
   const legacyItems = legacyScreens?.items || [];
 
   return (
-    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4 sm:space-y-6">
+    <div className={VMB_PAGE_CLASS}>
       <VisualManagementNav />
 
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Monitor className="w-7 h-7 text-blue-600" />
+      <div className={VMB_PAGE_HEADER_CLASS}>
+        <div className="min-w-0">
+          <h1 className={VMB_PAGE_TITLE_CLASS}>
+            <Monitor className="w-6 h-6 sm:w-7 sm:h-7 text-blue-600 shrink-0" />
             Pair Displays
           </h1>
-          <p className="text-sm text-slate-500 mt-1">Connect shop-floor TVs and tablets, then assign a board to each screen.</p>
+          <p className="text-sm text-slate-500 mt-1 break-words">Connect shop-floor TVs and tablets, then assign a board to each screen.</p>
         </div>
-        <div className="flex gap-2">
+        <div className={VMB_PAGE_ACTIONS_CLASS}>
           <Button asChild variant="outline" size="sm">
             <Link to="/visual-management/screens">View screens</Link>
           </Button>

@@ -24,6 +24,7 @@ import VisualBoardLogo from "./VisualBoardLogo";
 import TyromerBoardLogo from "./TyromerBoardLogo";
 import { computeGridCellSize, getCanvasSizeClass } from "./boardLayoutUtils";
 import { headerMinHeightPx, normalizeBoardHeader } from "./boardHeaderConfig";
+import { isLegacyDisplayBrowser } from "../../lib/kioskCompat";
 
 const WIDGET_RENDERERS = {
   kpi_card: KpiCardWidget,
@@ -88,12 +89,14 @@ function DraggableWidgetCell({
   });
   const Renderer = WIDGET_RENDERERS[widget.type] || KpiCardWidget;
   const pos = widget.position || {};
+  const legacy = isLegacyDisplayBrowser();
   const style = {
     gridColumn: `${(pos.x || 0) + 1} / span ${pos.w || 3}`,
     gridRow: `${(pos.y || 0) + 1} / span ${pos.h || 2}`,
     transform: editable ? CSS.Translate.toString(transform) : undefined,
     opacity: isDragging ? 0.6 : 1,
     zIndex: isDragging || selected ? 10 : 1,
+    ...(legacy ? { borderRadius: "10px" } : {}),
     ...widgetFontVars(widget.config),
   };
 
@@ -120,7 +123,7 @@ function DraggableWidgetCell({
     <div
       ref={editable ? setNodeRef : undefined}
       style={style}
-      className={`relative min-h-0 min-w-0 h-full overflow-hidden @container rounded-[length:var(--vmb-radius,1rem)] ${editable ? "cursor-grab active:cursor-grabbing" : ""} ${
+      className={`vmb-widget-cell relative min-h-0 min-w-0 h-full overflow-hidden ${legacy ? "" : "@container rounded-[length:var(--vmb-radius,1rem)]"} ${editable ? "cursor-grab active:cursor-grabbing" : ""} ${
         selected ? "ring-2 ring-blue-500 ring-offset-1 ring-offset-transparent" : ""
       }`}
       onClick={editable ? () => onSelect?.(widget.id) : undefined}
@@ -171,14 +174,20 @@ const VisualBoardCanvas = ({
 
   const cols = layout?.columns || 24;
   const rows = layout?.rows || 16;
+  const legacy = isLegacyDisplayBrowser();
 
   const grid = (
     <div
       ref={gridRef}
-      className={`grid h-full w-full gap-2 p-3`}
+      className={`vmb-board-grid grid h-full w-full ${legacy ? "vmb-board-grid--css" : "gap-2"} p-3`}
       style={{
-        gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-        gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
+        gridTemplateColumns: legacy
+          ? `repeat(${cols}, 1fr)`
+          : `repeat(${cols}, minmax(0, 1fr))`,
+        gridTemplateRows: legacy
+          ? `repeat(${rows}, 1fr)`
+          : `repeat(${rows}, minmax(0, 1fr))`,
+        ...(legacy ? { gridGap: "8px", WebkitGridGap: "8px" } : {}),
       }}
     >
       {widgets.map((widget) => (
@@ -207,35 +216,44 @@ const VisualBoardCanvas = ({
 
   return (
     <div
-      className={`relative mx-auto ${sizeClass} ${boardSurfaceClass(theme)} rounded-lg overflow-hidden shadow-2xl flex flex-col ${
+      className={`vmb-board-canvas relative mx-auto ${sizeClass} ${boardSurfaceClass(theme)} overflow-hidden ${legacy ? "" : "rounded-lg shadow-2xl"} flex flex-col ${
         previewSize === "fullscreen" ? "rounded-none shadow-none" : ""
       }`}
     >
       <div
-        className="shrink-0 relative px-4 pt-3 pb-2 flex items-center justify-between gap-3"
+        className={`vmb-board-header shrink-0 relative px-2 sm:px-4 pt-2 sm:pt-3 pb-2 flex items-center justify-between gap-2 sm:gap-3 min-h-0`}
         style={{ minHeight: `${headerMinHeightPx(headerConfig)}px` }}
       >
         <VisualBoardLogo
           theme={theme}
-          className="relative z-10"
+          className="relative z-10 shrink-0 max-w-[28%] sm:max-w-none"
           heightPx={headerConfig.assetiq_logo_height}
           transparentBackground={headerConfig.transparent_logo_background !== false}
         />
         <h1
-          className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center font-semibold tracking-wide whitespace-nowrap px-2 ${headerTitleClass}`}
-          style={{ fontSize: `${headerConfig.title_font_size}px` }}
+          className={`vmb-board-header-title ${legacy ? "" : "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center font-semibold tracking-wide max-w-[38%] sm:max-w-md leading-tight text-balance px-1 sm:px-2 text-[10px] sm:text-sm md:text-base"} ${headerTitleClass}`}
+          style={legacy ? undefined : { fontSize: undefined }}
         >
-          Visual Management Board
+          {legacy ? (
+            "Visual Management Board"
+          ) : (
+            <>
+              <span className="hidden sm:inline" style={{ fontSize: `${headerConfig.title_font_size}px` }}>
+                Visual Management Board
+              </span>
+              <span className="sm:hidden">Visual Board</span>
+            </>
+          )}
         </h1>
         {showTyromerLogo ? (
           <TyromerBoardLogo
-            className="relative z-10"
+            className="relative z-10 shrink-0 max-w-[28%] sm:max-w-none ml-auto"
             theme={theme}
             heightPx={headerConfig.tyromer_logo_height}
             transparentBackground={headerConfig.transparent_logo_background !== false}
           />
         ) : (
-          <span className="w-0" aria-hidden />
+          <span className="w-0 shrink-0" aria-hidden />
         )}
       </div>
       <div className="flex-1 min-h-0">

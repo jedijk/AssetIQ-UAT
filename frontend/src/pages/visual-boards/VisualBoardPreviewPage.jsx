@@ -64,20 +64,20 @@ const VisualBoardPreviewPage = () => {
 
   return (
     <div className="min-h-[calc(100vh-48px)] bg-slate-900 flex flex-col">
-      <div className="px-4 py-3 flex items-center justify-between border-b border-slate-800">
-        <div className="flex items-center gap-3">
-          <Button asChild variant="ghost" size="sm" className="text-slate-300">
+      <div className="px-3 sm:px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 min-w-0">
+        <div className="flex items-start gap-2 sm:gap-3 min-w-0">
+          <Button asChild variant="ghost" size="sm" className="text-slate-300 shrink-0">
             <Link to={`/visual-management/boards/${boardId}/edit`}>
               <ArrowLeft className="w-4 h-4" />
             </Link>
           </Button>
-          <span className="text-white font-medium">
+          <span className="text-white font-medium text-sm sm:text-base break-words min-w-0">
             {draft?.name || board?.name} — Preview
             {draft ? " (unsaved draft)" : " (saved version)"}
           </span>
         </div>
         <Select value={previewSize} onValueChange={setPreviewSize}>
-          <SelectTrigger className="w-40 bg-slate-800 border-slate-700 text-white">
+          <SelectTrigger className="w-full sm:w-40 bg-slate-800 border-slate-700 text-white">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

@@ -1,6 +1,7 @@
 import React from "react";
 import { boardCardClass, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
 import { isWidgetPartEnabled } from "../widgetDisplayParts";
+import { isLegacyDisplayBrowser } from "../../../lib/kioskCompat";
 
 const STATUS_STYLES = {
   GREEN: { bg: "bg-emerald-500", ring: "ring-emerald-400/30", text: "text-emerald-100" },
@@ -16,10 +17,13 @@ const StatusIndicatorWidget = ({ widget, data, theme = "dark" }) => {
   const reason = payload.reason || data?.status?.reason;
   const showLabel = isWidgetPartEnabled(config, "status_label");
   const showReason = isWidgetPartEnabled(config, "reason");
+  const legacy = isLegacyDisplayBrowser();
 
   return (
     <div className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)} items-center justify-center gap-2`}>
-      <div className={`shrink-0 min-w-0 max-w-full aspect-square w-[min(35cqmin,70%)] max-h-[40%] rounded-full ${style.bg} ring-4 ${style.ring} shadow-lg`} />
+      <div
+        className={`shrink-0 min-w-0 max-w-full rounded-full ${legacy ? "vmb-status-dot border-4 border-slate-500" : "aspect-square w-[min(35cqmin,70%)] max-h-[40%] ring-4"} ${style.bg} ${legacy ? "" : style.ring} shadow-lg`}
+      />
       {showLabel ? (
         <div className={`shrink-0 ${vmbText.status} ${style.text}`}>{status}</div>
       ) : null}

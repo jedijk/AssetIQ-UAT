@@ -243,6 +243,50 @@ if (typeof AbortController === 'undefined') {
   };
 }
 
+// Promise.prototype.finally
+if (typeof Promise !== "undefined" && !Promise.prototype.finally) {
+  Promise.prototype.finally = function (onFinally) {
+    const P = this.constructor;
+    return this.then(
+      (value) => P.resolve(onFinally && onFinally()).then(() => value),
+      (reason) =>
+        P.resolve(onFinally && onFinally()).then(() => {
+          throw reason;
+        }),
+    );
+  };
+}
+
+// Object.fromEntries
+if (!Object.fromEntries) {
+  Object.fromEntries = function fromEntries(iterable) {
+    const obj = {};
+    if (iterable && typeof iterable[Symbol.iterator] === "function") {
+      for (const [key, value] of iterable) {
+        obj[key] = value;
+      }
+    }
+    return obj;
+  };
+}
+
+// Array.prototype.flat
+if (!Array.prototype.flat) {
+  Array.prototype.flat = function flat(depth) {
+    const d = depth === undefined ? 1 : Number(depth) || 0;
+    const flatten = (arr, currentDepth) =>
+      arr.reduce((acc, val) => {
+        if (Array.isArray(val) && currentDepth > 0) {
+          acc.push.apply(acc, flatten(val, currentDepth - 1));
+        } else {
+          acc.push(val);
+        }
+        return acc;
+      }, []);
+    return flatten(this, d);
+  };
+}
+
 // Log that polyfills were loaded
 try {
   if (typeof console !== 'undefined' && console.log) {

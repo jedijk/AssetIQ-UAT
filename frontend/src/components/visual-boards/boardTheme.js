@@ -1,3 +1,5 @@
+import { isLegacyDisplayBrowser, legacyWidgetFontVars } from "../../lib/kioskCompat";
+
 export function boardSurfaceClass(theme) {
   return theme === "light"
     ? "bg-slate-100 text-slate-900"
@@ -5,6 +7,11 @@ export function boardSurfaceClass(theme) {
 }
 
 export function boardCardClass(theme) {
+  if (isLegacyDisplayBrowser()) {
+    return theme === "light"
+      ? "vmb-card bg-white border border-slate-200 text-slate-900"
+      : "vmb-card bg-slate-900 border border-slate-600 text-white";
+  }
   const palette =
     theme === "light"
       ? "bg-white border border-slate-200 text-slate-900"
@@ -30,17 +37,24 @@ export const FONT_SIZE_OPTIONS = [
 
 const FONT_BASE_PX = { xs: 10, sm: 11, md: 12, lg: 14, xl: 16 };
 
-/** Shared layout shell — clips content to the grid cell; parent cell is the @container. */
-export const vmbWidgetShell =
-  "h-full min-h-0 min-w-0 overflow-hidden flex flex-col";
+/** Shared layout shell — clips content to the grid cell. */
+export const vmbWidgetShell = isLegacyDisplayBrowser()
+  ? "vmb-widget-shell h-full min-h-0 min-w-0 overflow-hidden flex flex-col"
+  : "h-full min-h-0 min-w-0 overflow-hidden flex flex-col";
 
-export const vmbWidgetPad = "p-[length:var(--vmb-pad,0.5rem)]";
+export const vmbWidgetPad = isLegacyDisplayBrowser()
+  ? "vmb-widget-pad"
+  : "p-[length:var(--vmb-pad,0.5rem)]";
 
 /**
  * Typography + chrome scale with card size (cqmin) and user font_size preference.
- * Applied on the grid cell so all descendants inherit variables.
+ * Legacy TV browsers get fixed px variables (no clamp/cqmin).
  */
 export function widgetFontVars(config) {
+  if (isLegacyDisplayBrowser()) {
+    return legacyWidgetFontVars(config);
+  }
+
   const key = config?.font_size || "md";
   const base = FONT_BASE_PX[key] ?? FONT_BASE_PX.md;
   const scale = base / 12;
@@ -70,7 +84,16 @@ export function widgetChartFontSize(config) {
   return Math.max(8, Math.round(base * 0.85));
 }
 
-export const vmbText = {
+const LEGACY_VMB_TEXT = {
+  title: "vmb-text-title truncate",
+  value: "vmb-text-value truncate",
+  body: "vmb-text-body",
+  small: "vmb-text-small",
+  status: "vmb-text-status",
+  label: "vmb-text-label truncate",
+};
+
+const MODERN_VMB_TEXT = {
   title: "text-[length:var(--vmb-fs-title)] font-semibold leading-tight truncate",
   value: "text-[length:var(--vmb-fs-value)] font-bold tabular-nums leading-none truncate",
   body: "text-[length:var(--vmb-fs)] leading-snug",
@@ -78,3 +101,5 @@ export const vmbText = {
   status: "text-[length:var(--vmb-fs-status)] font-bold leading-none",
   label: "text-[length:var(--vmb-fs-small)] uppercase tracking-wide leading-tight truncate",
 };
+
+export const vmbText = isLegacyDisplayBrowser() ? LEGACY_VMB_TEXT : MODERN_VMB_TEXT;
