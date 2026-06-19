@@ -243,8 +243,13 @@ async def device_board_data(
 
 
 @router.get("/board/snapshot")
-async def device_board_snapshot(device_token: str = Depends(_require_device_token)):
+async def device_board_snapshot(request: Request):
     """Return a high-quality static PNG/JPEG snapshot for kiosk TVs (no React rendering)."""
+    device_token = device_svc.extract_device_token(request, allow_query=True)
+    if not device_token:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=401, detail="Device token required")
     device = await device_svc.lookup_device_by_token(device_token)
     data, content_type, updated_at = await snapshot_svc.get_device_snapshot_from_device_doc(device)
     headers = {

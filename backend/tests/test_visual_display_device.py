@@ -56,8 +56,18 @@ def mock_db():
 def test_extract_device_token_from_authorization_header():
     class Req:
         headers = {"authorization": "DeviceToken dvc_abc123"}
+        query_params = {}
 
     assert device_svc.extract_device_token(Req()) == "dvc_abc123"
+
+
+def test_extract_device_token_from_query_when_allowed():
+    class Req:
+        headers = {}
+        query_params = {"device_token": "dvc_query123"}
+
+    assert device_svc.extract_device_token(Req(), allow_query=True) == "dvc_query123"
+    assert device_svc.extract_device_token(Req()) is None
 
 
 @pytest.mark.asyncio

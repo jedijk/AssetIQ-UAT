@@ -102,6 +102,17 @@ async function deviceFetch(path, { method = "GET", body, deviceToken, queryParam
   return response.json();
 }
 
+export function buildBoardSnapshotUrl(deviceToken, { cacheBust } = {}) {
+  const token = deviceToken || getStoredDeviceToken();
+  const params = new URLSearchParams();
+  if (token) params.set("device_token", token);
+  if (cacheBust != null) params.set("t", String(cacheBust));
+  const dbEnv = getDisplayDbEnv();
+  if (dbEnv) params.set("db_env", dbEnv);
+  const qs = params.toString();
+  return `${publicBase()}/api/display/board/snapshot${qs ? `?${qs}` : ""}`;
+}
+
 export const displayDeviceAPI = {
   requestPairing: async (payload) => {
     const response = await fetch(`${publicBase()}/api/display/request-pairing${publicDisplayQuery()}`, {

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import {
+  buildBoardSnapshotUrl,
   displayDeviceAPI,
   DISPLAY_DEVICE_ID_KEY,
   DISPLAY_DEVICE_TOKEN_KEY,
@@ -15,11 +16,23 @@ const REFRESH_MS = 30_000;
 const SNAPSHOT_RETRY_ATTEMPTS = 8;
 const SNAPSHOT_RETRY_DELAY_MS = 4_000;
 
+const useKioskDirectSnapshotUrl =
+  typeof window !== "undefined" && window.__ASSETIQ_REACT_KIOSK__;
+
 function clearDisplayStorage() {
   try {
     localStorage.removeItem(DISPLAY_DEVICE_TOKEN_KEY);
     localStorage.removeItem(DISPLAY_DEVICE_ID_KEY);
   } catch (_e) {}
+}
+
+async function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 }
 
 /**
@@ -35,6 +48,7 @@ const DisplayBoardImagePage = ({ onFallbackToCanvas }) => {
   const urlRef = useRef("");
   const fallbackTriggered = useRef(false);
   const retryAttempt = useRef(0);
+  const imgRetryAttempt = useRef(0);
 
   const triggerCanvasFallback = useCallback(() => {
     if (fallbackTriggered.current) return;
@@ -43,14 +57,31 @@ const DisplayBoardImagePage = ({ onFallbackToCanvas }) => {
   }, [onFallbackToCanvas]);
 
   const revokeUrl = useCallback(() => {
-    if (urlRef.current) {
+    if (urlRef.current && urlRef.current.startsWith("blob:")) {
       URL.revokeObjectURL(urlRef.current);
-      urlRef.current = "";
     }
+    urlRef.current = "";
   }, []);
+
+  const applySnapshotUrl = useCallback(
+    (nextUrl) => {
+      revokeUrl();
+      urlRef.current = nextUrl;
+      setImageUrl(nextUrl);
+      setError("");
+      setLoading(false);
+    },
+    [revokeUrl],
+  );
 
   const loadSnapshot = useCallback(async () => {
     if (!deviceToken || fallbackTriggered.current) return;
+
+    if (useKioskDirectSnapshotUrl) {
+      applySnapshotUrl(buildBoardSnapshotUrl(deviceToken, { cacheBust: Date.now() }));
+      return;
+    }
+
     try {
       const { blob } = await displayDeviceAPI.fetchBoardSnapshot(deviceToken, {
         cacheBust: Date.now(),
@@ -60,11 +91,8 @@ const DisplayBoardImagePage = ({ onFallbackToCanvas }) => {
       }
       retryAttempt.current = 0;
       revokeUrl();
-      const nextUrl = URL.createObjectURL(blob);
-      urlRef.current = nextUrl;
-      setImageUrl(nextUrl);
-      setError("");
-      setLoading(false);
+      const nextUrl = await blobToDataUrl(blob);
+      applySnapshotUrl(nextUrl);
     } catch (err) {
       const status = err?.status;
       if (status === 401) {
@@ -86,7 +114,7 @@ const DisplayBoardImagePage = ({ onFallbackToCanvas }) => {
       setError(err.message || "Could not load board image");
       setLoading(false);
     }
-  }, [deviceToken, navigate, revokeUrl, triggerCanvasFallback]);
+  }, [deviceToken, navigate, revokeUrl, triggerCanvasFallback, applySnapshotUrl]);
 
   useEffect(() => {
     if (!deviceToken) {
@@ -174,6 +202,17 @@ const DisplayBoardImagePage = ({ onFallbackToCanvas }) => {
     triggerCanvasFallback();
   }, [deviceToken, imageUrl, loading, error, triggerCanvasFallback]);
 
+  const handleImageError = useCallback(() => {
+    if (useKioskDirectSnapshotUrl && imgRetryAttempt.current < 2) {
+      imgRetryAttempt.current += 1;
+      applySnapshotUrl(buildBoardSnapshotUrl(deviceToken, { cacheBust: Date.now() }));
+      return;
+    }
+    revokeUrl();
+    setImageUrl("");
+    triggerCanvasFallback();
+  }, [applySnapshotUrl, deviceToken, revokeUrl, triggerCanvasFallback]);
+
   if (!deviceToken) {
     return (
       <div className="fixed inset-0 bg-black text-white flex flex-col items-center justify-center">
@@ -228,13 +267,11 @@ const DisplayBoardImagePage = ({ onFallbackToCanvas }) => {
         key={imageUrl}
         src={imageUrl}
         alt="Visual management board"
-        className="w-full h-full object-contain bg-black select-none"
+        className={`w-full h-full bg-black select-none ${
+          useKioskDirectSnapshotUrl ? "object-cover" : "object-contain"
+        }`}
         draggable={false}
-        onError={() => {
-          revokeUrl();
-          setImageUrl("");
-          triggerCanvasFallback();
-        }}
+        onError={handleImageError}
       />
     </div>
   );

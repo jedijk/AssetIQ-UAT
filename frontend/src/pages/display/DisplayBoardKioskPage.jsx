@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import DisplayBoardImagePage from "./DisplayBoardImagePage";
 import DisplayBoardPage from "./DisplayBoardPage";
-import { displayDeviceAPI, getStoredDeviceToken } from "../../lib/apis/displayDeviceAPI";
+import { buildBoardSnapshotUrl, getStoredDeviceToken } from "../../lib/apis/displayDeviceAPI";
 
 const SNAPSHOT_PROBE_MS = 30_000;
 
@@ -18,7 +18,19 @@ export default function DisplayBoardKioskPage() {
     if (!deviceToken || probing.current) return;
     probing.current = true;
     try {
-      await displayDeviceAPI.fetchBoardSnapshot(deviceToken, { cacheBust: Date.now() });
+      const url = buildBoardSnapshotUrl(deviceToken, { cacheBust: Date.now() });
+      const response = await fetch(url, {
+        method: "GET",
+        cache: "no-store",
+        credentials: "omit",
+        headers: {
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+        },
+      });
+      if (!response.ok) return;
+      const blob = await response.blob();
+      if (!blob || blob.size === 0) return;
       setMode("snapshot");
     } catch {
       /* stay on canvas */

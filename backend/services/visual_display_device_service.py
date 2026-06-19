@@ -28,12 +28,18 @@ logger = logging.getLogger(__name__)
 DEVICE_TOKEN_SCHEME = "devicetoken"
 
 
-def extract_device_token(request: Request) -> Optional[str]:
+def extract_device_token(request: Request, *, allow_query: bool = False) -> Optional[str]:
     auth = (request.headers.get("authorization") or "").strip()
     if auth.lower().startswith(f"{DEVICE_TOKEN_SCHEME} "):
         return auth[len(DEVICE_TOKEN_SCHEME) + 1 :].strip()
     header_token = (request.headers.get("x-device-token") or "").strip()
-    return header_token or None
+    if header_token:
+        return header_token
+    if allow_query:
+        query_token = (request.query_params.get("device_token") or "").strip()
+        if query_token:
+            return query_token
+    return None
 
 
 def _device_lookup_db_names() -> list[str]:
