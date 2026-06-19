@@ -1,5 +1,5 @@
-import React, { useMemo, useEffect, useRef } from "react";
-import { useParams, Link, useSearchParams } from "react-router-dom";
+import React, { useMemo, useRef, useCallback } from "react";
+import { useParams, Link, useSearchParams, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
@@ -30,11 +30,15 @@ const TV_PREVIEW_SIZES = new Set(["tv-exact", "tv-55", "tv-75", "tv-98"]);
 
 const VisualBoardPreviewPage = () => {
   const { boardId } = useParams();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const snapshotMode = searchParams.get("snapshot") === "1";
-  const [previewSize, setPreviewSize] = React.useState(
-    snapshotMode ? "tv-exact" : "desktop",
-  );
+  const isSnapshotCaptureRoute = location.pathname.endsWith("/snapshot-capture");
+  const snapshotMode = isSnapshotCaptureRoute || searchParams.get("snapshot") === "1";
+  const [previewSize, setPreviewSize] = React.useState(() => {
+    if (snapshotMode) return "tv-exact";
+    if (searchParams.has("tv-exact") || searchParams.get("size") === "tv-exact") return "tv-exact";
+    return "desktop";
+  });
   const snapshotSignalled = useRef(false);
 
   const { data: board, isLoading } = useQuery({
@@ -42,6 +46,22 @@ const VisualBoardPreviewPage = () => {
     queryFn: () => visualBoardAPI.getBoard(boardId),
     enabled: !!boardId,
   });
+
+  const signalSnapshotReady = useCallback(() => {
+    if (!snapshotMode || snapshotSignalled.current) return;
+    snapshotSignalled.current = true;
+    window.parent.postMessage({ type: "vmb-snapshot-ready", boardId }, "*");
+  }, [snapshotMode, boardId]);
+
+  const snapshotRootRef = useCallback(
+    (node) => {
+      if (!node || !snapshotMode || snapshotSignalled.current || isLoading || !board) return;
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(signalSnapshotReady);
+      });
+    },
+    [snapshotMode, isLoading, board, signalSnapshotReady],
+  );
 
   const refreshSeconds = board?.refresh_interval_seconds || 30;
 
@@ -87,15 +107,6 @@ const VisualBoardPreviewPage = () => {
 
   const { lastSyncedAt } = useBoardSyncState(canvasData, { refreshIntervalSec: refreshSeconds });
 
-  useEffect(() => {
-    if (!snapshotMode || snapshotSignalled.current || !previewData || isLoading) return undefined;
-    snapshotSignalled.current = true;
-    const id = window.setTimeout(() => {
-      window.parent.postMessage({ type: "vmb-snapshot-ready", boardId }, "*");
-    }, 1200);
-    return () => window.clearTimeout(id);
-  }, [snapshotMode, previewData, isLoading, boardId]);
-
   if (isLoading) {
     return (
       <div className="flex justify-center py-24">
@@ -112,7 +123,11 @@ const VisualBoardPreviewPage = () => {
   const hideChrome = snapshotMode && isTvExact;
 
   return (
-    <div className={pageClass} data-vmb-snapshot-root={hideChrome ? "1" : undefined}>
+    <div
+      ref={snapshotRootRef}
+      className={pageClass}
+      data-vmb-snapshot-root={hideChrome ? "1" : undefined}
+    >
       {!isTvExact && !hideChrome ? (
         <div className="px-3 sm:px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800 min-w-0">
           <div className="flex items-start gap-2 sm:gap-3 min-w-0">

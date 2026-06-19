@@ -481,6 +481,14 @@ function App() {
                   <VisualBoardDisplayPage />
                 </Suspense>
               } />
+              {/* Off-screen TV snapshot capture — auth required, no app chrome */}
+              <Route path="/visual-management/boards/:boardId/snapshot-capture" element={
+                <ProtectedRoute>
+                  <Suspense fallback={<RouteFallback />}>
+                    <VisualBoardPreviewPage />
+                  </Suspense>
+                </ProtectedRoute>
+              } />
               {/* Display device pairing — no login (Phase 4a) */}
               <Route path="/tv" element={
                 <KioskRoute>

@@ -3,30 +3,47 @@ import { visualBoardAPI } from "./apis/visualBoardAPI";
 
 const CAPTURE_WIDTH = 1920;
 const CAPTURE_HEIGHT = 1080;
+const READY_TIMEOUT_MS = 45_000;
+const DOM_POLL_MS = 200;
 
 function waitForSnapshotReady(iframe, timeoutMs) {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("TV snapshot capture timed out")), timeoutMs);
-
-    const finish = () => {
-      window.removeEventListener("message", onMessage);
-      clearTimeout(timer);
-      setTimeout(resolve, 400);
-    };
+    const timer = setTimeout(
+      () => reject(new Error("TV snapshot capture timed out waiting for board render")),
+      timeoutMs,
+    );
 
     const onMessage = (evt) => {
       if (evt.data?.type === "vmb-snapshot-ready" && evt.source === iframe.contentWindow) {
-        finish();
+        window.removeEventListener("message", onMessage);
+        clearTimeout(timer);
+        resolve();
       }
     };
 
     window.addEventListener("message", onMessage);
-    iframe.onload = () => {
-      setTimeout(() => {
-        if (timer) finish();
-      }, 10_000);
-    };
   });
+}
+
+async function waitForSnapshotTarget(doc, timeoutMs) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const target =
+      doc?.querySelector("[data-vmb-snapshot-root]") ||
+      doc?.querySelector(".vmb-board-canvas");
+    if (target) return target;
+    await new Promise((resolve) => setTimeout(resolve, DOM_POLL_MS));
+  }
+  return null;
+}
+
+function describeIframeDocument(doc) {
+  if (!doc) return "iframe document unavailable (check CSP frame-ancestors and login state)";
+  const title = doc.title || "";
+  const path = doc.location?.pathname || "";
+  if (path.includes("/login")) return "iframe redirected to login — session not available in capture frame";
+  if (title) return `iframe loaded "${title}" at ${path || "unknown path"}`;
+  return `iframe at ${path || "unknown path"} has no snapshot root`;
 }
 
 /**
@@ -45,17 +62,23 @@ export async function captureAndUploadTvSnapshot(boardId) {
     "border:0",
     "visibility:hidden",
   ].join(";");
-  iframe.src = `/visual-management/boards/${encodeURIComponent(boardId)}/preview?tv-exact&snapshot=1`;
+  iframe.src = `/visual-management/boards/${encodeURIComponent(boardId)}/snapshot-capture`;
   document.body.appendChild(iframe);
 
   try {
-    await waitForSnapshotReady(iframe, 25_000);
-    const doc = iframe.contentDocument;
-    const target =
-      doc?.querySelector("[data-vmb-snapshot-root]") ||
-      doc?.querySelector(".vmb-board-canvas")?.parentElement;
+    await waitForSnapshotReady(iframe, READY_TIMEOUT_MS);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    let doc;
+    try {
+      doc = iframe.contentDocument;
+    } catch (err) {
+      throw new Error(`Cannot read snapshot iframe: ${err?.message || err}`);
+    }
+
+    const target = await waitForSnapshotTarget(doc, 10_000);
     if (!target) {
-      throw new Error("Board canvas not found for snapshot");
+      throw new Error(`Board canvas not found for snapshot — ${describeIframeDocument(doc)}`);
     }
 
     const canvas = await html2canvas(target, {
