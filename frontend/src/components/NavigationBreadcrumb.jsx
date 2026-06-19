@@ -24,6 +24,7 @@ const NavigationBreadcrumb = ({ className = '' }) => {
     getDisplayLabel,
     isHomeBreadcrumbPath,
     currentPath,
+    mobileBadge,
   } = useBreadcrumb();
   const breadcrumbs = history || [];
   const showTrail = breadcrumbs.length > 1;
@@ -61,9 +62,14 @@ const NavigationBreadcrumb = ({ className = '' }) => {
       )}
 
       {canGoBack && currentLabel && !hideMobileTitle ? (
-        <h1 className="sm:hidden text-base font-semibold text-slate-900 truncate min-w-0 flex-1 leading-tight">
-          {currentLabel}
-        </h1>
+        <div className="sm:hidden flex items-center gap-2 min-w-0 flex-1">
+          <h1 className="text-base font-semibold text-slate-900 truncate min-w-0 leading-tight">
+            {currentLabel}
+          </h1>
+          {mobileBadge ? (
+            <div className="flex items-center gap-1.5 flex-shrink-0">{mobileBadge}</div>
+          ) : null}
+        </div>
       ) : null}
 
       {showTrail && (

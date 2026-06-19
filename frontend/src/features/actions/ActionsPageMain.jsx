@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { isIOSLikeDevice } from "../../lib/deviceUtils";
+import { useMobilePageBadge } from "../../contexts/BreadcrumbContext";
 import { useActionsPage } from "./useActionsPage";
 import { ActionsPageToolbar } from "./components/ActionsPageToolbar";
 import { ActionsListSection } from "./components/ActionsListSection";
@@ -15,6 +17,21 @@ export default function ActionsPageMain() {
   const isMobile = useIsMobile();
   const isIOSLike = isIOSLikeDevice();
   const page = useActionsPage();
+
+  const mobileListBadge = useMemo(
+    () => (
+      <>
+        <span className="bg-slate-100 px-2 py-0.5 rounded-full text-xs font-medium">{page.stats.total}</span>
+        {page.stats.overdue > 0 && (
+          <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-xs font-medium">
+            {page.stats.overdue}
+          </span>
+        )}
+      </>
+    ),
+    [page.stats.total, page.stats.overdue],
+  );
+  useMobilePageBadge(mobileListBadge);
 
   const editProps = {
     open: page.isEditDialogOpen,

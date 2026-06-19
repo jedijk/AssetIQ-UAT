@@ -32,9 +32,15 @@ export function ActionsListSection({
   isOverdue,
   formatDate,
 }) {
+  const useMobileScroll = isMobile;
+
   return (
-    <div className="app-page-scroll mobile-scroll-pane flex-1 min-h-0 px-4 pb-4">
-      <div className="max-w-7xl mx-auto">
+    <div
+      className={`flex-1 min-h-0 px-4 pb-4 ${
+        useMobileScroll ? "flex flex-col overflow-hidden" : "app-page-scroll mobile-scroll-pane"
+      }`}
+    >
+      <div className={`max-w-7xl mx-auto ${useMobileScroll ? "flex-1 min-h-0 flex flex-col w-full" : ""}`}>
           {isLoading ? (
         <div className="py-6 space-y-3" data-testid="actions-skeleton">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -65,10 +71,13 @@ export function ActionsListSection({
           </p>
         </div>
       ) : (
-        <div className="priority-list" data-testid="actions-list">
+        <div
+          className={`priority-list ${useMobileScroll ? "flex-1 min-h-0 flex flex-col" : ""}`}
+          data-testid="actions-list"
+        >
           {isMobile && !isIOSLike ? (
             <VirtualList
-              className="min-h-0"
+              className={useMobileScroll ? "flex-1 min-h-0" : "min-h-0"}
               data={sortedActions}
               itemContent={(idx, action) => {
                 const StatusIcon = statusConfig[action.status]?.icon || Clock;
@@ -156,7 +165,9 @@ export function ActionsListSection({
               }}
             />
           ) : (
-          sortedActions.map((action, idx) => {
+          <div className={useMobileScroll ? "flex-1 min-h-0 overflow-y-auto mobile-scroll-pane" : undefined}>
+          <div className="space-y-3">
+          {sortedActions.map((action, idx) => {
             const StatusIcon = statusConfig[action.status]?.icon || Clock;
             const SourceIcon = sourceConfig[action.source_type]?.icon || FileText;
             const priority = priorityConfig[action.priority] || priorityConfig.medium;
@@ -359,7 +370,9 @@ export function ActionsListSection({
                 </div>{/* Close grid */}
               </motion.div>
             );
-          })
+          })}
+          </div>
+          </div>
           )}
         </div>
       )}

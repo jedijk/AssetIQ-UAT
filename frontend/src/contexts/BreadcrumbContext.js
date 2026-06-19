@@ -122,6 +122,8 @@ export function BreadcrumbProvider({ children }) {
     [isSimpleModeHome, t],
   );
 
+  const [mobileBadge, setMobileBadge] = useState(null);
+
   const [history, setHistory] = useState(() => {
     try {
       const stored = sessionStorage.getItem(STORAGE_KEY);
@@ -329,6 +331,8 @@ export function BreadcrumbProvider({ children }) {
     getDisplayLabel,
     isHomeBreadcrumbPath,
     currentPath: location.pathname,
+    mobileBadge,
+    setMobileBadge,
   };
 
   return (
@@ -344,6 +348,15 @@ export function useBreadcrumb() {
     throw new Error('useBreadcrumb must be used within a BreadcrumbProvider');
   }
   return context;
+}
+
+/** Renders a count badge beside the mobile breadcrumb title (list pages). */
+export function useMobilePageBadge(badge) {
+  const { setMobileBadge } = useBreadcrumb();
+  useEffect(() => {
+    setMobileBadge(badge ?? null);
+    return () => setMobileBadge(null);
+  }, [badge, setMobileBadge]);
 }
 
 export default BreadcrumbContext;

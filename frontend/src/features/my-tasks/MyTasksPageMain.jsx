@@ -125,6 +125,7 @@ import TaskCard, { SortableTaskCard } from "../../components/task-execution/Task
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { AppErrorBoundary } from "../../components/AppErrorBoundary";
+import { useMobilePageBadge } from "../../contexts/BreadcrumbContext";
 import { motion } from "framer-motion";
 import { pageTransition, pageVariants } from "../../components/animations/constants";
 import { isTouchMobileDevice } from "../../lib/deviceUtils";
@@ -857,6 +858,19 @@ export default function MyTasksPage() {
             (t.source_type === "task" && t.status === "in_progress")
         ).length,
   };
+
+  const mobileListBadge = useMemo(
+    () => (
+      <>
+        <span className="bg-slate-100 px-2 py-0.5 rounded-full text-xs font-medium">{stats.total}</span>
+        {stats.overdue > 0 && (
+          <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-xs font-medium">{stats.overdue}</span>
+        )}
+      </>
+    ),
+    [stats.total, stats.overdue],
+  );
+  useMobilePageBadge(mobileListBadge);
   
   // Handle back from execution frame
   const handleBackFromExecution = () => {

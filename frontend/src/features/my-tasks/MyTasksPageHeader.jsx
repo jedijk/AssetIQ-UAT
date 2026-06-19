@@ -11,10 +11,8 @@ import {
   Search,
   Wifi,
   WifiOff,
-  X,
   Zap,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Calendar } from "../../components/ui/calendar";
@@ -45,38 +43,20 @@ export function MyTasksPageHeader({
   tabCounts,
   t,
 }) {
-  const navigate = useNavigate();
-
   return (
       <div className="flex-shrink-0">
-        <div className="px-4 sm:px-6 pt-3 pb-3 max-w-7xl mx-auto w-full">
-          {/* Title Row - Compact on mobile */}
-          <div className="flex items-center justify-between mb-2">
+        <div className="px-4 sm:px-6 pt-2 sm:pt-3 pb-3 max-w-7xl mx-auto w-full">
+          {/* Title row — desktop only; mobile title + badge live in NavigationBreadcrumb */}
+          <div className="hidden sm:flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <h1 className="text-lg sm:text-xl font-bold text-slate-900">My Tasks</h1>
-              {/* Mobile: Inline stats next to title */}
-              <div className="flex sm:hidden items-center gap-1.5">
-                <span className="bg-slate-100 px-2 py-0.5 rounded-full text-xs font-medium">{stats.total}</span>
-                {stats.overdue > 0 && (
-                  <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-xs font-medium">{stats.overdue}</span>
-                )}
-              </div>
-              {/* Online/Offline indicator - small */}
               {offlineStatus.isOnline ? (
-                <Wifi className="w-4 h-4 text-green-500 hidden sm:block" />
+                <Wifi className="w-4 h-4 text-green-500" />
               ) : (
                 <WifiOff className="w-4 h-4 text-amber-500" />
               )}
             </div>
-            <p className="text-xs text-slate-500 hidden sm:block">Execute and complete your assigned tasks</p>
-            {/* Mobile: Close button */}
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="sm:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-              data-testid="my-tasks-close-btn"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <p className="text-xs text-slate-500">Execute and complete your assigned tasks</p>
           </div>
         
           {/* Filters Row - Aligned single row */}
