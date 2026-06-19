@@ -48,7 +48,14 @@ const VisualBoardPreviewPage = () => {
   });
 
   const draft = useMemo(() => readBoardDraft(boardId), [boardId]);
+  const isTvExact = previewSize === "tv-exact";
+  const simulateTv = TV_PREVIEW_SIZES.has(previewSize);
+  const useSavedBoardCanvas = simulateTv;
+
   const canvasBoard = useMemo(() => {
+    if (useSavedBoardCanvas) {
+      return normalizeBoardForCanvas(board);
+    }
     if (draft) {
       return normalizeBoardForCanvas({
         layout: draft.layout,
@@ -58,11 +65,10 @@ const VisualBoardPreviewPage = () => {
       });
     }
     return normalizeBoardForCanvas(board);
-  }, [board, draft]);
+  }, [board, draft, useSavedBoardCanvas]);
 
-  const boardName = draft?.name || board?.name;
-  const isTvExact = previewSize === "tv-exact";
-  const simulateTv = TV_PREVIEW_SIZES.has(previewSize);
+  const boardName = useSavedBoardCanvas ? board?.name : draft?.name || board?.name;
+  const hasUnsavedTvDraft = Boolean(draft && useSavedBoardCanvas && board);
 
   useKioskDocumentTheme(canvasBoard.theme, {
     enabled: simulateTv,
@@ -120,7 +126,13 @@ const VisualBoardPreviewPage = () => {
         </div>
       ) : null}
       {isTvExact ? (
-        <div className="absolute top-3 right-3 z-50 flex items-center gap-2">
+        <div className="absolute top-3 right-3 z-50 flex flex-col items-end gap-2">
+          {hasUnsavedTvDraft ? (
+            <div className="rounded-md bg-amber-500/90 text-slate-950 text-[11px] px-2 py-1 max-w-xs text-right">
+              TV shows the saved board. Save in the editor to publish title and layout changes.
+            </div>
+          ) : null}
+          <div className="flex items-center gap-2">
           <Select value={previewSize} onValueChange={setPreviewSize}>
             <SelectTrigger className="w-52 bg-slate-900/90 border-slate-700 text-white text-xs h-8">
               <SelectValue />
@@ -139,6 +151,7 @@ const VisualBoardPreviewPage = () => {
               Editor
             </Link>
           </Button>
+          </div>
         </div>
       ) : null}
       <div

@@ -38,6 +38,15 @@ export default function BoardHeaderSettings({ header, onChange, showTyromerContr
         </div>
       ) : null}
       <div className="space-y-2">
+        <Label className="text-xs">Display title</Label>
+        <Input
+          value={config.display_title || ""}
+          onChange={(e) => update({ display_title: e.target.value })}
+          placeholder={config.display_title ? undefined : "Uses board name when empty"}
+        />
+        <p className="text-[11px] text-slate-500">Shown centered in the board header on preview and TV.</p>
+      </div>
+      <div className="space-y-2">
         <Label className="text-xs">Title font size (px)</Label>
         <Input
           type="number"

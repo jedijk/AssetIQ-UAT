@@ -23,7 +23,7 @@ import { boardSurfaceClass, widgetFontVars } from "./boardTheme";
 import VisualBoardLogo from "./VisualBoardLogo";
 import TyromerBoardLogo from "./TyromerBoardLogo";
 import { computeGridCellSize, getCanvasSizeClass } from "./boardLayoutUtils";
-import { headerMinHeightPx, normalizeBoardHeader } from "./boardHeaderConfig";
+import { headerMinHeightPx, normalizeBoardHeader, resolveBoardHeaderTitle } from "./boardHeaderConfig";
 import { isLegacyDisplayBrowser } from "../../lib/kioskCompat";
 
 const WIDGET_RENDERERS = {
@@ -210,7 +210,7 @@ const VisualBoardCanvas = ({
 
   const showTyromerLogo = boardType === "operations";
   const headerConfig = normalizeBoardHeader(header);
-  const headerTitle = boardName || "Visual Management Board";
+  const headerTitle = resolveBoardHeaderTitle(boardName, header);
   const headerTitleClass =
     theme === "light"
       ? "text-slate-800"

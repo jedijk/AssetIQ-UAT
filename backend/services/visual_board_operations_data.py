@@ -101,13 +101,34 @@ async def build_mooney_chart(user: dict, period: str = "today") -> Dict[str, Any
             visc = row.get("viscosity")
             if visc is not None:
                 points.append({"time": time_label, "viscosity": float(visc)})
+    kpis = data.get("kpis") or {}
+    visc_range = kpis.get("viscosity_range") or ""
+    target_min, target_max, band_min, band_max = 55.0, 65.0, 50.0, 70.0
+    if isinstance(visc_range, str) and "-" in visc_range:
+        try:
+            parts = [float(p.strip()) for p in visc_range.split("-", 1)]
+            if len(parts) == 2:
+                target_min, target_max = min(parts), max(parts)
+                span = target_max - target_min
+                pad = max(1.0, span * 0.15)
+                band_min = target_min - pad
+                band_max = target_max + pad
+        except (TypeError, ValueError):
+            pass
+    elif points:
+        values = [p["viscosity"] for p in points]
+        target_min = min(values)
+        target_max = max(values)
+        pad = max(1.0, (target_max - target_min) * 0.15)
+        band_min = target_min - pad
+        band_max = target_max + pad
     return {
         "type": "mooney_chart",
         "points": points,
-        "target_min": 55,
-        "target_max": 65,
-        "band_min": 50,
-        "band_max": 70,
+        "target_min": target_min,
+        "target_max": target_max,
+        "band_min": band_min,
+        "band_max": band_max,
     }
 
 

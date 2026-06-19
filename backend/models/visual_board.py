@@ -80,6 +80,7 @@ class VisualBoardHeaderConfig(BaseModel):
     tyromer_logo_height: int = 32
     title_font_size: int = 16
     transparent_logo_background: bool = True
+    display_title: Optional[str] = None
 
 
 def default_tyromer_operations_layout() -> VisualBoardLayout:

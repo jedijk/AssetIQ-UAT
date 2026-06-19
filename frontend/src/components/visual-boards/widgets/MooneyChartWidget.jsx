@@ -17,6 +17,19 @@ import LegacyChartTable from "./LegacyChartTable";
 
 const CHART_MARGIN = { top: 4, right: 6, bottom: 2, left: 2 };
 
+function mooneyYDomain(points, payload) {
+  const values = points.map((p) => p.viscosity).filter((v) => v != null && !Number.isNaN(Number(v)));
+  const bandMin = payload.band_min ?? 50;
+  const bandMax = payload.band_max ?? 70;
+  const targetMin = payload.target_min ?? 55;
+  const targetMax = payload.target_max ?? 65;
+  const dataMin = values.length ? Math.min(...values) : targetMin;
+  const dataMax = values.length ? Math.max(...values) : targetMax;
+  const min = Math.floor(Math.min(bandMin, targetMin, dataMin) - 1);
+  const max = Math.ceil(Math.max(bandMax, targetMax, dataMax) + 1);
+  return [min, max];
+}
+
 export default function MooneyChartWidget({ widget, data, theme = "dark" }) {
   const config = widget?.config || {};
   const chartRef = useRef(null);
@@ -28,6 +41,7 @@ export default function MooneyChartWidget({ widget, data, theme = "dark" }) {
   const showBands = isWidgetPartEnabled(config, "target_bands");
   const showGrid = isWidgetPartEnabled(config, "grid");
   const legacy = useLegacyChartFallback();
+  const yDomain = mooneyYDomain(points, payload);
 
   return (
     <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)}`}>
@@ -64,7 +78,7 @@ export default function MooneyChartWidget({ widget, data, theme = "dark" }) {
                 yAxisId="left"
                 tick={{ fontSize: chartFs }}
                 stroke="#94a3b8"
-                domain={[48, 72]}
+                domain={yDomain}
                 width={28}
                 tickCount={5}
               />
