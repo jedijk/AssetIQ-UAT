@@ -233,6 +233,26 @@ export const displayDeviceAPI = {
     return deviceFetch("/board/data", { deviceToken, queryParams: params });
   },
 
+  fetchBoardSnapshot: async (deviceToken, { cacheBust } = {}) => {
+    const params = new URLSearchParams();
+    if (cacheBust != null) params.set("t", String(cacheBust));
+    const response = await fetch(
+      `${publicBase()}/api/display/board/snapshot${publicDisplayQuery(params)}`,
+      {
+        headers: deviceAuthHeaders(deviceToken),
+        credentials: "omit",
+      },
+    );
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.detail || `Snapshot unavailable (${response.status})`);
+    }
+    return {
+      blob: await response.blob(),
+      updatedAt: response.headers.get("X-Snapshot-Updated-At"),
+    };
+  },
+
   sendHeartbeat: async (deviceId, deviceToken) => {
     return deviceFetch("/heartbeat", {
       method: "POST",

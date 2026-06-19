@@ -53,6 +53,15 @@ export const visualBoardAPI = {
     return response.data;
   },
 
+  uploadDisplaySnapshot: async (boardId, blob) => {
+    const form = new FormData();
+    form.append("file", blob, "display-snapshot.jpg");
+    const response = await api.post(`/boards/${boardId}/display-snapshot`, form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return response.data;
+  },
+
   unpublishBoard: async (boardId) => {
     const response = await api.post(`/boards/${boardId}/unpublish`);
     return response.data;

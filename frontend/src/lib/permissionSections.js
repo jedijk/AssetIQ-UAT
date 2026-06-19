@@ -9,7 +9,6 @@ export const PERMISSION_SECTIONS = [
       "supervisor_command_center",
       "dashboard_production",
       "dashboard_executive",
-      "dashboard_builder",
       "reliability_intelligence",
     ],
   },

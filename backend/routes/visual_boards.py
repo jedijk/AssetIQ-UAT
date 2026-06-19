@@ -3,7 +3,7 @@ Visual Management Board routes — authenticated CRUD and lifecycle.
 """
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from pydantic import BaseModel
 
 from auth import require_permission
@@ -22,6 +22,7 @@ from models.visual_board import (
 )
 from services import visual_board_data_service as data_svc
 from services import visual_board_service as svc
+from services import visual_board_snapshot_service as snapshot_svc
 from services.visual_board_qr import generate_qr_data_url
 from services.visual_board_service import _frontend_base_url
 
@@ -116,6 +117,35 @@ async def publish_board(
     current_user: dict = Depends(_vmb_publish),
 ):
     return await svc.publish_board(board_id, current_user, request)
+
+
+@router.post("/{board_id}/display-snapshot")
+async def upload_display_snapshot(
+    board_id: str,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(_vmb_publish),
+):
+    """Upload a TV-exact preview capture for paired display devices."""
+    content = await file.read()
+    result = await snapshot_svc.store_board_snapshot(
+        board_id,
+        current_user,
+        content,
+        file.content_type or "image/png",
+    )
+    try:
+        from services.visual_display_notify import notify_devices_for_board
+
+        tenant_id = current_user.get("company_id") or current_user.get("tenant_id")
+        await notify_devices_for_board(
+            board_id,
+            tenant_id,
+            "board_updated",
+            {"board_id": board_id, "snapshot": True},
+        )
+    except Exception:
+        pass
+    return result
 
 
 @router.post("/{board_id}/unpublish")

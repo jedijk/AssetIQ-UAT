@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft, Save, Eye, Rocket, Loader2, History, Plus, QrCode, Copy, Share2 } from "lucide-react";
 import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
+import { captureAndUploadTvSnapshot } from "../../lib/visualBoardSnapshotCapture";
 import VisualBoardCanvas from "../../components/visual-boards/VisualBoardCanvas";
 import WidgetConfigPanel from "../../components/visual-boards/WidgetConfigPanel";
 import BoardHeaderSettings from "../../components/visual-boards/BoardHeaderSettings";
@@ -156,11 +157,17 @@ const VisualBoardEditorPage = () => {
 
   const publishMutation = useMutation({
     mutationFn: () => visualBoardAPI.publishBoard(boardId, { screen_name: name || "Display" }),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       toast.success("Board published");
       setPublishResult(data);
       queryClient.invalidateQueries({ queryKey: ["visual-board", boardId] });
       queryClient.invalidateQueries({ queryKey: ["visual-boards"] });
+      try {
+        await captureAndUploadTvSnapshot(boardId);
+        toast.success("TV image updated");
+      } catch (err) {
+        toast.error(err?.message || "Published, but TV image capture failed — try publishing again");
+      }
     },
     onError: (err) => toast.error(err.response?.data?.detail || "Failed to publish board"),
   });

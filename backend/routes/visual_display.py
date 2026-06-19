@@ -3,7 +3,8 @@ Visual display device pairing routes — public kiosk + admin registration.
 """
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
+from fastapi.responses import Response
 
 from auth import require_permission
 from models.visual_display import (
@@ -29,6 +30,7 @@ from models.visual_display import (
 from services import visual_display_admin_service as admin_svc
 from services import visual_display_device_service as device_svc
 from services import visual_display_pairing_service as pairing_svc
+from services import visual_board_snapshot_service as snapshot_svc
 from services.visual_display_network import extract_client_ip, normalize_local_subnet
 
 router = APIRouter(prefix="/display", tags=["Visual Display Devices"])
@@ -238,6 +240,20 @@ async def device_board_data(
 ):
     """Return aggregated widget data for the assigned board."""
     return await device_svc.get_device_data(device_token, period_days=period_days)
+
+
+@router.get("/board/snapshot")
+async def device_board_snapshot(device_token: str = Depends(_require_device_token)):
+    """Return a high-quality static PNG/JPEG snapshot for kiosk TVs (no React rendering)."""
+    device = await device_svc.lookup_device_by_token(device_token)
+    data, content_type, updated_at = await snapshot_svc.get_device_snapshot_from_device_doc(device)
+    headers = {
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+        "Pragma": "no-cache",
+    }
+    if updated_at:
+        headers["X-Snapshot-Updated-At"] = updated_at
+    return Response(content=data, media_type=content_type, headers=headers)
 
 
 @router.post("/heartbeat", response_model=DeviceHeartbeatResponse)

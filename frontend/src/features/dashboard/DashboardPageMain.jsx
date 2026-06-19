@@ -122,8 +122,8 @@ export default function DashboardPageMain({ initialTab }) {
   const { hasPermission, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
   const isFetchingAny = useIsFetching() > 0;
-  // ON by default; disable explicitly with REACT_APP_ENABLE_SMART_DASHBOARD_BUILDER=false
-  const manualBuilderEnabled = process.env.REACT_APP_ENABLE_SMART_DASHBOARD_BUILDER !== "false";
+  // Hidden by default; enable with REACT_APP_ENABLE_SMART_DASHBOARD_BUILDER=true
+  const manualBuilderEnabled = process.env.REACT_APP_ENABLE_SMART_DASHBOARD_BUILDER === "true";
 
   // Operator view: shown on mobile when role is operator or owner has toggled it
   const initialIsMobileViewport = window.innerWidth < 768;
@@ -175,11 +175,8 @@ export default function DashboardPageMain({ initialTab }) {
     
     // Check if current tab is allowed, if not switch to first allowed
     if (!isDashboardTabAllowed(activeTab, dashboardTabFlags)) {
-      const newTab = pickFirstAllowedDashboardTab({ preferBuilder: canShowBuilder, ...dashboardTabFlags });
+      const newTab = pickFirstAllowedDashboardTab({ preferBuilder: false, ...dashboardTabFlags });
       setActiveTab(newTab);
-    } else if (canShowBuilder && activeTab === "operational" && !initialTab && !location.state?.activeTab) {
-      // If builder is available and we defaulted to operational, switch to builder
-      setActiveTab("builder");
     }
     setTabInitialized(true);
   }, [permissionsLoading, tabInitialized, activeTab, dashboardTabFlags, canShowBuilder, initialTab, location.state?.activeTab]);
