@@ -10,6 +10,7 @@ from typing import Dict, List, Optional
 
 from database import db
 from services.production_exposure import PRODUCTION_DOWNTIME_RANGES, production_exposure_monetary_value
+from services.threat_score_service import fmea_score_from_failure_mode
 
 _prod_loss_config_cache: Dict[str, tuple] = {}
 _PROD_LOSS_CACHE_TTL_SEC = 300
@@ -310,14 +311,10 @@ def _fmea_score_from_sources(
     observation: dict,
     failure_mode_data: Optional[dict],
 ) -> int:
-    """Resolve FMEA contribution (0–100) from failure mode RPN or stored threat fields."""
-    if failure_mode_data:
-        rpn = failure_mode_data.get("rpn")
-        if rpn is not None:
-            try:
-                return min(100, int(float(rpn) / 10))
-            except (TypeError, ValueError):
-                pass
+    """Resolve FMEA contribution (0–100) from linked failure mode S×O×D or stored threat fields."""
+    from_fm = fmea_score_from_failure_mode(failure_mode_data)
+    if from_fm is not None:
+        return from_fm
     for key in ("fmea_score", "base_risk_score"):
         raw = observation.get(key)
         if raw is not None:

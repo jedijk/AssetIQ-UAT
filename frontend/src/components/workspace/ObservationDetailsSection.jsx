@@ -68,6 +68,7 @@ import {
 } from "../../hooks/useTranslatedEntities";
 import { formatDateTime } from "../../lib/dateUtils";
 import { computeCriticalityScore } from "../../lib/criticalityScore";
+import { computeWeightedRiskScore, fmeaScoreFromFailureMode } from "../../lib/riskScore";
 import { useDisciplines } from "../../hooks/useDisciplines";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -156,6 +157,10 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
         title: workspaceObservation.title || threatData.title,
         description: workspaceObservation.description || threatData.description,
         user_context: workspaceObservation.user_context || threatData.user_context,
+        risk_score: workspaceObservation.risk_score ?? threatData.risk_score,
+        risk_level: workspaceObservation.risk_level ?? threatData.risk_level,
+        criticality_score: workspaceObservation.criticality_score ?? threatData.criticality_score,
+        fmea_score: workspaceObservation.fmea_score ?? threatData.fmea_score,
       };
     }
     if (workspaceObservation) {
@@ -800,9 +805,16 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
       {/* Score calculation popup — triggered by right-clicking the Risk KPI card (Row 1) via window event. */}
       {scoreCalcPopup.show && (() => {
         const fmBaseScore = linkedFmData
-          ? Math.round((linkedFmData.severity * linkedFmData.occurrence * linkedFmData.detectability) / 10)
+          ? (fmeaScoreFromFailureMode(linkedFmData) ??
+            Math.round((linkedFmData.severity * linkedFmData.occurrence * linkedFmData.detectability) / 10))
           : (threat.fmea_score || threat.base_risk_score || 50);
         const criticalityScore = computeCriticalityScore(linkedCriticalityData) ?? threat.criticality_score ?? 0;
+        const critWeight = threat.risk_settings_used?.criticality_weight ?? 0.75;
+        const fmeaWeight = threat.risk_settings_used?.fmea_weight ?? 0.25;
+        const computedRiskScore = computeWeightedRiskScore(criticalityScore, fmBaseScore, {
+          criticality_weight: critWeight,
+          fmea_weight: fmeaWeight,
+        });
         return (
           <div
             ref={scorePopupRef}
@@ -826,13 +838,13 @@ const ObservationDetailsSection = ({ threatId, workspaceObservation }) => {
                 <div className="font-mono text-sm text-center">
                   <span className="text-purple-600 font-semibold">{criticalityScore}</span>
                   <span className="text-slate-400 mx-1">×</span>
-                  <span className="text-purple-400 text-xs">{threat.risk_settings_used?.criticality_weight || 0.75}</span>
+                  <span className="text-purple-400 text-xs">{critWeight}</span>
                   <span className="text-slate-400 mx-2">+</span>
                   <span className="text-blue-600 font-semibold">{fmBaseScore}</span>
                   <span className="text-slate-400 mx-1">×</span>
-                  <span className="text-blue-400 text-xs">{threat.risk_settings_used?.fmea_weight || 0.25}</span>
+                  <span className="text-blue-400 text-xs">{fmeaWeight}</span>
                   <span className="text-slate-400 mx-2">=</span>
-                  <span className="text-xl font-bold">{threat.risk_score}</span>
+                  <span className="text-xl font-bold">{computedRiskScore}</span>
                 </div>
               </div>
               <div className="bg-slate-50 rounded p-2 mb-2">

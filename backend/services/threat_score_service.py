@@ -17,6 +17,33 @@ from services.threat_score_propagation import propagate_risk_to_linked_entities
 logger = logging.getLogger(__name__)
 
 
+def fmea_score_from_failure_mode(failure_mode: Optional[dict]) -> Optional[int]:
+    """
+    FMEA contribution (0–100) from severity × occurrence × detectability / 10,
+    matching the observation workspace score calculation modal.
+    """
+    if not failure_mode or not isinstance(failure_mode, dict):
+        return None
+    severity = failure_mode.get("severity")
+    occurrence = failure_mode.get("occurrence")
+    detectability = failure_mode.get("detectability")
+    if severity is not None and occurrence is not None and detectability is not None:
+        try:
+            return min(
+                100,
+                max(0, round((float(severity) * float(occurrence) * float(detectability)) / 10)),
+            )
+        except (TypeError, ValueError):
+            pass
+    rpn = failure_mode.get("rpn")
+    if rpn is not None:
+        try:
+            return min(100, max(0, round(float(rpn) / 10)))
+        except (TypeError, ValueError):
+            pass
+    return None
+
+
 async def get_risk_settings_for_installation(installation_id: str) -> dict:
     """Get risk calculation settings for an installation, or defaults if not set."""
     if not installation_id:

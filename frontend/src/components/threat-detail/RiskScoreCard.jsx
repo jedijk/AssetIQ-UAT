@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { AlertTriangle, X } from "lucide-react";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { computeCriticalityScore } from "../../lib/criticalityScore";
+import { computeWeightedRiskScore } from "../../lib/riskScore";
 
 export const RiskScoreCard = ({ threat, rpnValue, linkedFMEAData, linkedCriticalityData }) => {
   const { t } = useLanguage();
@@ -59,7 +60,12 @@ export const RiskScoreCard = ({ threat, rpnValue, linkedFMEAData, linkedCritical
 
   const criticalityScore =
     computeCriticalityScore(critData ?? critFallback) ?? 0;
-  const finalScore = Math.round((criticalityScore * 0.75) + (likelihoodScore * 0.25));
+  const critWeight = threat.risk_settings_used?.criticality_weight ?? 0.75;
+  const fmeaWeight = threat.risk_settings_used?.fmea_weight ?? 0.25;
+  const finalScore = computeWeightedRiskScore(criticalityScore, likelihoodScore, {
+    criticality_weight: critWeight,
+    fmea_weight: fmeaWeight,
+  });
 
   return (
     <motion.div
@@ -83,7 +89,7 @@ export const RiskScoreCard = ({ threat, rpnValue, linkedFMEAData, linkedCritical
               {t("observations.riskScore")}
               <span className="text-xs text-slate-400 font-normal">({t("observations.rightClickForDetails")})</span>
             </div>
-            <div className="text-4xl font-bold text-slate-900">{threat.risk_score}</div>
+            <div className="text-4xl font-bold text-slate-900">{finalScore}</div>
           </div>
 
           {/* RPN Display */}
@@ -197,7 +203,7 @@ export const RiskScoreCard = ({ threat, rpnValue, linkedFMEAData, linkedCritical
           <div className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-lg p-3 text-white">
             <div className="text-xs opacity-75 mb-1">{t("threatDetail.finalScoreFormula")}</div>
             <div className="flex items-center justify-between">
-              <span className="text-sm">= ({criticalityScore} × 0.75) + ({likelihoodScore} × 0.25)</span>
+              <span className="text-sm">= ({criticalityScore} × {critWeight}) + ({likelihoodScore} × {fmeaWeight})</span>
               <span className="text-2xl font-bold">{finalScore}</span>
             </div>
           </div>

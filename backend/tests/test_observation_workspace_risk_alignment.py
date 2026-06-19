@@ -10,7 +10,8 @@ from services.observation_workspace_exposure import (
 
 
 def test_fmea_score_from_failure_mode_rpn():
-    assert _fmea_score_from_sources({}, {"rpn": 125}) == 12
+    assert _fmea_score_from_sources({}, {"severity": 5, "occurrence": 5, "detectability": 5}) == 13
+    assert _fmea_score_from_sources({}, {"rpn": 125}) == 13
 
 
 def test_resolve_observation_criticality_prefers_snapshot_over_equipment_node():
@@ -80,7 +81,7 @@ async def test_workspace_risk_summary_uses_equipment_criticality():
         {"rpn": 125},
     )
     assert summary["criticality_score"] == 20
-    assert summary["fmea_score"] == 12
+    assert summary["fmea_score"] == 13
     assert summary["risk_score"] == 18
     assert summary["risk_level"] == "Low"
     assert summary["rpn"] == 125

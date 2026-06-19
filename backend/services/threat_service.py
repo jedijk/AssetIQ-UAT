@@ -266,8 +266,11 @@ async def get_threat_detail(user: dict, threat_id: str, *, language: Optional[st
             fm = await get_failure_mode_by_name_or_id(failure_mode_name, failure_mode_id)
             
             if fm:
-                # Calculate current FMEA score from failure mode
-                current_fmea = min(100, int((fm["severity"] * fm["occurrence"] * fm["detectability"]) / 10))
+                from services.threat_score_service import fmea_score_from_failure_mode
+
+                current_fmea = fmea_score_from_failure_mode(fm)
+                if current_fmea is None:
+                    current_fmea = fmea_score
                 if current_fmea != fmea_score:
                     fmea_score = current_fmea
                     fmea_changed = True
@@ -314,22 +317,22 @@ async def get_threat_detail(user: dict, threat_id: str, *, language: Optional[st
                 "criticality_score": new_criticality_score
             }
         
-        # If either changed, recalculate risk score
-        if fmea_changed or criticality_changed:
+        # Reconcile stale risk_score with current criticality + FMEA (matches score modal).
+        from services.threat_score_service import calculate_risk_score, get_risk_settings_for_installation
+
+        installation_id = threat.get("installation_id") or (
+            equipment_node.get("installation_id") if equipment_node else None
+        )
+        risk_settings = await get_risk_settings_for_installation(installation_id or "")
+        expected_risk, expected_level = calculate_risk_score(
+            new_criticality_score, fmea_score, risk_settings
+        )
+        risk_stale = int(threat.get("risk_score") or 0) != expected_risk
+
+        if fmea_changed or criticality_changed or risk_stale:
+            new_risk_score = expected_risk
+            risk_level = expected_level
             # Calculate new risk score: (Criticality × 0.75) + (Likelihood Score × 0.25)
-            new_risk_score = int((new_criticality_score * 0.75) + (fmea_score * 0.25))
-            new_risk_score = min(100, max(0, new_risk_score))
-            
-            # Determine risk level
-            if new_risk_score >= 70:
-                risk_level = "Critical"
-            elif new_risk_score >= 50:
-                risk_level = "High"
-            elif new_risk_score >= 30:
-                risk_level = "Medium"
-            else:
-                risk_level = "Low"
-            
             # Update the threat in database
             update_data = {
                 "risk_score": new_risk_score,
@@ -791,8 +794,9 @@ async def link_threat_to_failure_mode(user: dict, threat_id: str, failure_mode_i
         "recommended_actions": matched_fm.get("recommended_actions", [])
     }
     
-    # Calculate FMEA score from RPN
-    fmea_score = min(100, int(matched_fm["rpn"] / 10))
+    from services.threat_score_service import fmea_score_from_failure_mode
+
+    fmea_score = fmea_score_from_failure_mode(matched_fm) or 0
     
     # Get criticality score from threat (or calculate from stored criticality data)
     criticality_score = threat.get("criticality_score", 0)
