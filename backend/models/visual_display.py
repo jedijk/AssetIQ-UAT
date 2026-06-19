@@ -10,6 +10,24 @@ class RequestPairingRequest(BaseModel):
     screen_width: Optional[int] = None
     screen_height: Optional[int] = None
     device_label: Optional[str] = None
+    local_subnet: Optional[str] = Field(None, max_length=32)
+
+
+class NearbyPairingItem(BaseModel):
+    pair_code: str
+    pairing_id: str
+    device_label: Optional[str] = None
+    user_agent: Optional[str] = None
+    screen_width: Optional[int] = None
+    screen_height: Optional[int] = None
+    resolution: Optional[str] = None
+    expires_in: int
+    database_environment: Optional[str] = None
+
+
+class NearbyPairingsResponse(BaseModel):
+    items: list[NearbyPairingItem]
+    viewer_ip: Optional[str] = None
 
 
 class RequestPairingResponse(BaseModel):

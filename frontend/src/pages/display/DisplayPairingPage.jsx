@@ -11,6 +11,7 @@ import {
 } from "../../lib/apis/displayDeviceAPI";
 import { Button } from "../../components/ui/button";
 import { DisplayPairingInstructions } from "../../components/visual-boards/DisplayPairingInstructions";
+import { detectLocalSubnet } from "../../lib/localNetwork";
 
 function formatCountdown(seconds) {
   const m = Math.floor(seconds / 60);
@@ -21,6 +22,7 @@ function formatCountdown(seconds) {
 const DisplayPairingPage = () => {
   const navigate = useNavigate();
   const fingerprintRef = useRef(getOrCreateDeviceFingerprint());
+  const localSubnetRef = useRef(null);
   const [pairCode, setPairCode] = useState("");
   const [expiresIn, setExpiresIn] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -44,6 +46,7 @@ const DisplayPairingPage = () => {
         screen_width: window.screen?.width,
         screen_height: window.screen?.height,
         device_label: navigator.platform || "Display",
+        local_subnet: localSubnetRef.current || undefined,
       });
       setPairCode(data.pair_code);
       setExpiresIn(data.expires_in ?? 600);
@@ -53,6 +56,18 @@ const DisplayPairingPage = () => {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    detectLocalSubnet().then((subnet) => {
+      if (cancelled || !subnet) return;
+      localSubnetRef.current = subnet;
+      if (!paired) requestCode();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [paired, requestCode]);
 
   useEffect(() => {
     try {

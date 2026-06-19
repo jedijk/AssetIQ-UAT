@@ -10,6 +10,8 @@ from fastapi import HTTPException
 from database import db, get_database, get_current_db_name, set_request_db, AVAILABLE_DATABASES
 from models.visual_display import (
     CompletePairingResponse,
+    NearbyPairingItem,
+    NearbyPairingsResponse,
     PairingPreviewResponse,
     PairingStatusResponse,
     RequestPairingResponse,
@@ -25,6 +27,7 @@ from services.visual_display_helpers import (
     now_iso,
 )
 from services.visual_display_token import generate_device_token, generate_pair_code
+from services.visual_display_network import normalize_local_subnet, pairing_on_same_network
 
 logger = logging.getLogger(__name__)
 
@@ -116,10 +119,15 @@ async def request_pairing(
     screen_width: Optional[int] = None,
     screen_height: Optional[int] = None,
     device_label: Optional[str] = None,
+    request_ip: Optional[str] = None,
+    local_subnet: Optional[str] = None,
 ) -> RequestPairingResponse:
     fingerprint = (device_fingerprint or "").strip()
     if not fingerprint:
         raise HTTPException(status_code=400, detail="device_fingerprint is required")
+
+    subnet = normalize_local_subnet(local_subnet)
+    ip = (request_ip or "").strip() or None
 
     existing = await db[PAIRINGS_COLLECTION].find_one(
         {"device_fingerprint": fingerprint, "status": "pending"},
@@ -128,6 +136,17 @@ async def request_pairing(
     if existing:
         await _expire_stale_pairing(existing)
         if existing.get("status") == "pending" and _expires_in_seconds(existing.get("expires_at")) > 0:
+            if ip or subnet:
+                await db[PAIRINGS_COLLECTION].update_one(
+                    {"id": existing["id"]},
+                    {
+                        "$set": {
+                            **({"request_ip": ip} if ip else {}),
+                            **({"local_subnet": subnet} if subnet else {}),
+                            "updated_at": now_iso(),
+                        }
+                    },
+                )
             return RequestPairingResponse(
                 pair_code=existing["pair_code"],
                 pairing_id=existing["id"],
@@ -147,6 +166,8 @@ async def request_pairing(
         "screen_width": screen_width,
         "screen_height": screen_height,
         "device_label": device_label,
+        "request_ip": ip,
+        "local_subnet": subnet,
         "status": "pending",
         "expires_at": expires_at,
         "device_id": None,
@@ -229,6 +250,66 @@ async def list_pairing_boards(user: dict) -> Dict[str, Any]:
             )
     items.sort(key=lambda b: (b.get("name") or "").lower())
     return {"items": items, "total": len(items)}
+
+
+async def list_nearby_pending_pairings(
+    *,
+    user: dict,
+    viewer_ip: str,
+    viewer_subnet: Optional[str] = None,
+) -> NearbyPairingsResponse:
+    """Pending TV pairings on the same network as the authenticated admin."""
+    _ = user  # tenant filter applied after pairing completes; LAN scope is physical proximity
+    viewer_subnet = normalize_local_subnet(viewer_subnet)
+    viewer_ip = (viewer_ip or "").strip()
+    seen_ids: set[str] = set()
+    items: list[NearbyPairingItem] = []
+
+    for db_name in _pairing_lookup_db_names():
+        coll = get_database(db_name)[PAIRINGS_COLLECTION]
+        cursor = coll.find({"status": "pending"}, {"_id": 0}).sort("created_at", -1).limit(50)
+        docs = await cursor.to_list(50)
+        db_env = _db_env_for_db_name(db_name)
+
+        for doc in docs:
+            pid = doc.get("id")
+            if not pid or pid in seen_ids:
+                continue
+            await _expire_stale_pairing(doc)
+            if doc.get("status") != "pending":
+                continue
+            remaining = _expires_in_seconds(doc.get("expires_at"))
+            if remaining <= 0:
+                continue
+
+            if not pairing_on_same_network(
+                viewer_ip=viewer_ip,
+                viewer_subnet=viewer_subnet,
+                pairing_ip=doc.get("request_ip"),
+                pairing_subnet=doc.get("local_subnet"),
+            ):
+                continue
+
+            seen_ids.add(pid)
+            width = doc.get("screen_width")
+            height = doc.get("screen_height")
+            resolution = f"{width}x{height}" if width and height else None
+            items.append(
+                NearbyPairingItem(
+                    pair_code=doc["pair_code"],
+                    pairing_id=pid,
+                    device_label=doc.get("device_label"),
+                    user_agent=doc.get("user_agent"),
+                    screen_width=width,
+                    screen_height=height,
+                    resolution=resolution,
+                    expires_in=remaining,
+                    database_environment=db_env,
+                )
+            )
+
+    items.sort(key=lambda i: i.expires_in, reverse=True)
+    return NearbyPairingsResponse(items=items, viewer_ip=viewer_ip or None)
 
 
 async def complete_pairing(

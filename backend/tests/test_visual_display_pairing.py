@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import HTTPException
 
 from services import visual_display_pairing_service as pairing_svc
+from services.visual_display_network import pairing_on_same_network
 from services.visual_display_token import PAIR_CODE_CHARS, generate_pair_code
 
 MOCK_DBS = {"production": {"name": "assetiq"}, "uat": {"name": "assetiq-UAT"}}
@@ -197,3 +198,66 @@ async def test_preview_expired_pairing(mock_db):
         with pytest.raises(HTTPException) as exc:
             await pairing_svc.get_pairing_preview("ABCDEF")
     assert exc.value.status_code == 400
+
+
+def test_pairing_on_same_network_matches_ip_and_subnet():
+    assert pairing_on_same_network(
+        viewer_ip="203.0.113.10",
+        viewer_subnet=None,
+        pairing_ip="203.0.113.10",
+        pairing_subnet=None,
+    )
+    assert pairing_on_same_network(
+        viewer_ip="10.0.0.5",
+        viewer_subnet="192.168.1",
+        pairing_ip="203.0.113.10",
+        pairing_subnet="192.168.1",
+    )
+    assert not pairing_on_same_network(
+        viewer_ip="8.8.8.8",
+        viewer_subnet="192.168.1",
+        pairing_ip="1.1.1.1",
+        pairing_subnet="192.168.50",
+    )
+
+
+@pytest.mark.asyncio
+async def test_list_nearby_pending_pairings(mock_user, mock_db):
+    now = datetime.now(timezone.utc)
+    expires = (now + timedelta(minutes=8)).isoformat()
+    pairings = mock_db["visual_display_pairings"]
+
+    async def find_one_side_effect(query, projection=None):
+        return None
+
+    find_cursor = MagicMock()
+    find_cursor.sort = MagicMock(return_value=find_cursor)
+    find_cursor.limit = MagicMock(return_value=find_cursor)
+    find_cursor.to_list = AsyncMock(
+        return_value=[
+            {
+                "id": "pair_near",
+                "pair_code": "ABCDEF",
+                "status": "pending",
+                "expires_at": expires,
+                "request_ip": "198.51.100.4",
+                "local_subnet": "192.168.4",
+                "screen_width": 3840,
+                "screen_height": 2160,
+                "device_label": "Samsung TV",
+            }
+        ]
+    )
+    pairings.find_one = AsyncMock(side_effect=find_one_side_effect)
+    pairings.find = MagicMock(return_value=find_cursor)
+
+    with patch_pairing_db(mock_db):
+        result = await pairing_svc.list_nearby_pending_pairings(
+            user=mock_user,
+            viewer_ip="198.51.100.4",
+            viewer_subnet="192.168.4",
+        )
+
+    assert len(result.items) == 1
+    assert result.items[0].pair_code == "ABCDEF"
+    assert result.items[0].resolution == "3840x2160"

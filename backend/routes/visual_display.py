@@ -1,6 +1,8 @@
 """
 Visual display device pairing routes — public kiosk + admin registration.
 """
+from typing import Optional
+
 from fastapi import APIRouter, Depends, Query, Request
 
 from auth import require_permission
@@ -15,6 +17,7 @@ from models.visual_display import (
     DeviceHeartbeatRequest,
     DeviceHeartbeatResponse,
     DisplayDeviceDetail,
+    NearbyPairingsResponse,
     PairingPreviewResponse,
     PairingStatusResponse,
     ReassignBoardRequest,
@@ -26,6 +29,7 @@ from models.visual_display import (
 from services import visual_display_admin_service as admin_svc
 from services import visual_display_device_service as device_svc
 from services import visual_display_pairing_service as pairing_svc
+from services.visual_display_network import extract_client_ip, normalize_local_subnet
 
 router = APIRouter(prefix="/display", tags=["Visual Display Devices"])
 
@@ -42,7 +46,7 @@ async def _require_device_token(request: Request) -> str:
 
 
 @router.post("/request-pairing", response_model=RequestPairingResponse)
-async def request_pairing(request: RequestPairingRequest):
+async def request_pairing(http_request: Request, request: RequestPairingRequest):
     """Display device requests a pairing code (no login)."""
     return await pairing_svc.request_pairing(
         device_fingerprint=request.device_fingerprint,
@@ -50,6 +54,8 @@ async def request_pairing(request: RequestPairingRequest):
         screen_width=request.screen_width,
         screen_height=request.screen_height,
         device_label=request.device_label,
+        request_ip=extract_client_ip(http_request),
+        local_subnet=normalize_local_subnet(request.local_subnet),
     )
 
 
@@ -62,6 +68,20 @@ async def pairing_status(
     return await pairing_svc.poll_pairing_status(
         pair_code,
         device_fingerprint=device_fingerprint,
+    )
+
+
+@router.get("/pairing/nearby", response_model=NearbyPairingsResponse)
+async def nearby_pairings(
+    http_request: Request,
+    local_subnet: Optional[str] = Query(None, max_length=32),
+    current_user: dict = Depends(_vmb_admin),
+):
+    """List pending display pairings on the same network as this admin session."""
+    return await pairing_svc.list_nearby_pending_pairings(
+        user=current_user,
+        viewer_ip=extract_client_ip(http_request),
+        viewer_subnet=normalize_local_subnet(local_subnet),
     )
 
 

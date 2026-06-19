@@ -137,6 +137,13 @@ export const displayDeviceAPI = {
     return response.data;
   },
 
+  listNearbyPairings: async (localSubnet) => {
+    const params = { ...adminDbParams() };
+    if (localSubnet) params.local_subnet = localSubnet;
+    const response = await api.get("/display/pairing/nearby", { params });
+    return response.data;
+  },
+
   completePairing: async (payload) => {
     const response = await api.post("/display/pairing/complete", payload, {
       params: adminDbParams(),

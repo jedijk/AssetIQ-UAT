@@ -57,6 +57,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
 import { Switch } from "./ui/switch";
 import { toast } from "sonner";
 import ChatSidebar from "./ChatSidebar";
+import NearbyDisplayPairingPrompt from "./visual-boards/NearbyDisplayPairingPrompt";
 import ImageEditor from "./ImageEditor";
 import EquipmentHierarchy from "./EquipmentHierarchy";
 import ObservationTour from "./ObservationTour";
@@ -752,6 +753,9 @@ const Layout = () => {
       >
         <Plus className="w-7 h-7" />
       </motion.button>
+
+      {/* Nearby TV pairing prompt (same WiFi) */}
+      <NearbyDisplayPairingPrompt />
 
       {/* Chat Sidebar */}
       <ChatSidebar 
