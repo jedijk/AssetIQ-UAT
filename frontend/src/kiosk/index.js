@@ -1,6 +1,13 @@
+import "core-js/stable";
+import "regenerator-runtime/runtime";
 import "../lib/polyfills";
 import "../lib/apiClient";
 import "../styles/kiosk-compat.css";
+import "../styles/tv-kiosk.css";
+
+if (typeof window !== "undefined") {
+  window.__ASSETIQ_REACT_KIOSK__ = true;
+}
 
 import React from "react";
 import ReactDOM from "react-dom/client";

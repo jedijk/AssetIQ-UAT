@@ -23,6 +23,52 @@ if (config.enableHealthCheck) {
   healthPluginInstance = new WebpackHealthPlugin();
 }
 
+/** Downlevel kiosk bundle syntax for Samsung Tizen / legacy TV Chromium (~56+). */
+function kioskLegacyDownlevelPlugin() {
+  let esbuild;
+  try {
+    esbuild = require("esbuild");
+  } catch (_err) {
+    console.warn("[kiosk] esbuild not installed — TV bundle will not be downleveled.");
+    return { apply() {} };
+  }
+
+  return {
+    apply(compiler) {
+      const { webpack } = compiler;
+      const { Compilation } = webpack;
+
+      compiler.hooks.thisCompilation.tap("KioskLegacyDownlevelPlugin", (compilation) => {
+        compilation.hooks.processAssets.tap(
+          {
+            name: "KioskLegacyDownlevelPlugin",
+            stage: Compilation.PROCESS_ASSETS_STAGE_OPTIMIZE_SIZE,
+          },
+          () => {
+            for (const name of Object.keys(compilation.assets)) {
+              if (!/^static\/js\/kiosk\.[^.]+\.js$/.test(name)) continue;
+
+              const asset = compilation.getAsset(name);
+              const source = asset.source.source().toString();
+              const { code } = esbuild.transformSync(source, {
+                target: "chrome56",
+                loader: "js",
+                legalComments: "none",
+              });
+
+              compilation.updateAsset(
+                name,
+                new webpack.sources.RawSource(code),
+                { minimized: true },
+              );
+            }
+          },
+        );
+      });
+    },
+  };
+}
+
 let webpackConfig = {
   eslint: {
     configure: {
@@ -65,10 +111,12 @@ let webpackConfig = {
 
         webpackConfig.plugins.push(
           new HtmlWebpackPlugin({
-            inject: false,
+            inject: true,
+            chunks: ["kiosk"],
             template: path.resolve(__dirname, "public/tv.html"),
             filename: "tv.html",
           }),
+          kioskLegacyDownlevelPlugin(),
         );
       }
 
