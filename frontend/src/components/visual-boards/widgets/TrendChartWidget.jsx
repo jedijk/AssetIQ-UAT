@@ -20,13 +20,13 @@ const TrendChartWidget = ({ widget, data, theme = "dark" }) => {
   const legacy = isLegacyDisplayBrowser();
 
   return (
-    <div className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)}`}>
+    <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)}`}>
       {showTitle ? (
-        <div className={`shrink-0 ${vmbText.title} ${titleClass} mb-1`}>{widget?.title || "Trend"}</div>
+        <div className={`shrink-0 ${vmbText("title")} ${titleClass} mb-1`}>{widget?.title || "Trend"}</div>
       ) : null}
       <div ref={chartRef} className="flex-1 min-h-0 w-full relative">
         {points.length === 0 ? (
-          <div className={`${vmbText.body} ${boardMutedText(theme)} h-full flex items-center justify-center`}>
+          <div className={`${vmbText("body")} ${boardMutedText(theme)} h-full flex items-center justify-center`}>
             No trend data
           </div>
         ) : legacy ? (

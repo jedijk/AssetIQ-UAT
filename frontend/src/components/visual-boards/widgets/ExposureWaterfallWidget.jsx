@@ -21,15 +21,15 @@ const ExposureWaterfallWidget = ({ widget, data, theme = "dark" }) => {
   const showTitle = isWidgetPartEnabled(config, "title");
 
   return (
-    <div className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)}`}>
+    <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)}`}>
       {showTitle ? (
-        <div className={`shrink-0 ${vmbText.title} ${titleClass} mb-1`}>
+        <div className={`shrink-0 ${vmbText("title")} ${titleClass} mb-1`}>
           {widget?.title || "Exposure Waterfall"}
         </div>
       ) : null}
       <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
         {rows.map((row) => (
-          <div key={row.label || row.key} className={`flex justify-between gap-2 min-w-0 ${vmbText.small}`}>
+          <div key={row.label || row.key} className={`flex justify-between gap-2 min-w-0 ${vmbText("small")}`}>
             <span className={`truncate ${boardMutedText(theme)}`}>{row.label}</span>
             <span className={`shrink-0 font-medium tabular-nums ${valueClass}`}>
               {typeof row.value === "object"

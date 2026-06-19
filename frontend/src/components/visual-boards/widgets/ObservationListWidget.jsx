@@ -12,20 +12,20 @@ const ObservationListWidget = ({ widget, data, theme = "dark" }) => {
   const showExposure = isWidgetPartEnabled(config, "exposure");
 
   return (
-    <div className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)}`}>
+    <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)}`}>
       {showTitle ? (
-        <div className={`shrink-0 ${vmbText.title} mb-1 ${theme === "light" ? "text-slate-700" : "text-white"}`}>
+        <div className={`shrink-0 ${vmbText("title")} mb-1 ${theme === "light" ? "text-slate-700" : "text-white"}`}>
           {widget?.title || "Observations"}
         </div>
       ) : null}
       <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
         {items.length === 0 ? (
-          <div className={`${vmbText.body} ${boardMutedText(theme)}`}>No active observations</div>
+          <div className={`${vmbText("body")} ${boardMutedText(theme)}`}>No active observations</div>
         ) : (
           items.map((item) => (
             <div
               key={item.id || item.observation_id}
-              className={`rounded-lg px-2 py-1.5 ${vmbText.small} ${
+              className={`rounded-lg px-2 py-1.5 ${vmbText("small")} ${
                 theme === "light" ? "border-b border-slate-100" : "bg-slate-800/80"
               }`}
             >

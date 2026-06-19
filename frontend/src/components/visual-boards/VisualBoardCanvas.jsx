@@ -143,6 +143,7 @@ const VisualBoardCanvas = ({
   data,
   theme = "dark",
   boardType,
+  boardName,
   header,
   previewSize = "tv-55",
   editable = false,
@@ -209,6 +210,7 @@ const VisualBoardCanvas = ({
 
   const showTyromerLogo = boardType === "operations";
   const headerConfig = normalizeBoardHeader(header);
+  const headerTitle = boardName || "Visual Management Board";
   const headerTitleClass =
     theme === "light"
       ? "text-slate-800"
@@ -232,16 +234,16 @@ const VisualBoardCanvas = ({
         />
         <h1
           className={`vmb-board-header-title ${legacy ? "" : "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none text-center font-semibold tracking-wide max-w-[38%] sm:max-w-md leading-tight text-balance px-1 sm:px-2 text-[10px] sm:text-sm md:text-base"} ${headerTitleClass}`}
-          style={legacy ? undefined : { fontSize: undefined }}
+          style={legacy ? { fontSize: `${headerConfig.title_font_size}px` } : undefined}
         >
           {legacy ? (
-            "Visual Management Board"
+            headerTitle
           ) : (
             <>
               <span className="hidden sm:inline" style={{ fontSize: `${headerConfig.title_font_size}px` }}>
-                Visual Management Board
+                {headerTitle}
               </span>
-              <span className="sm:hidden">Visual Board</span>
+              <span className="sm:hidden">{headerTitle}</span>
             </>
           )}
         </h1>

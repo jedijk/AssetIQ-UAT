@@ -8,6 +8,9 @@ let legacyDisplayBrowser = null;
  * clamp(), and modern grid gap. Use fixed px/rem layout when true.
  */
 export function isLegacyDisplayBrowser() {
+  if (typeof document !== "undefined" && document.documentElement.classList.contains("vmb-legacy-tv")) {
+    return true;
+  }
   if (legacyDisplayBrowser !== null) return legacyDisplayBrowser;
   if (typeof window === "undefined") return false;
 

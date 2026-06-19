@@ -1,0 +1,345 @@
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#root:empty::before {
+  content: "Loading display…";
+  display: flex;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5f9;
+  color: #64748b;
+  font: 500 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+html.display-kiosk,
+html.display-kiosk body,
+html.display-kiosk #root,
+html.vmb-legacy-tv,
+html.vmb-legacy-tv body,
+html.vmb-legacy-tv #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* —— Theme: light (operations boards) —— */
+html.vmb-theme-light,
+html.vmb-theme-light body,
+html.vmb-theme-light #root {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+html.vmb-theme-light .vmb-board-canvas {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+html.vmb-theme-light .vmb-board-header {
+  background: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+html.vmb-theme-light .vmb-board-header-title {
+  color: #1e293b;
+}
+
+html.vmb-theme-light .vmb-card-light {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+}
+
+html.vmb-theme-light .vmb-muted {
+  color: #64748b;
+}
+
+html.vmb-theme-light .vmb-subtle {
+  color: #94a3b8;
+}
+
+html.vmb-theme-light .vmb-list-divider {
+  border-color: #f1f5f9;
+}
+
+html.vmb-theme-light .vmb-info-entry {
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+}
+
+html.vmb-theme-light .vmb-info-entry--pinned {
+  background: #fffbeb;
+  border-color: #fde68a;
+  border-left: 3px solid #fbbf24;
+}
+
+html.vmb-theme-light .vmb-exposure-row {
+  color: #0f172a;
+}
+
+html.vmb-theme-light .vmb-status-badge {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+html.vmb-theme-light .vmb-legacy-chart-table th,
+html.vmb-theme-light .vmb-legacy-chart-table td {
+  border-color: #cbd5e1;
+}
+
+html.vmb-theme-light .vmb-legacy-chart-table th {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+html.vmb-theme-light .tv-wordmark-asset {
+  color: #0f172a;
+}
+
+html.vmb-theme-light .tv-wordmark-asset span {
+  color: #2563eb;
+}
+
+html.vmb-theme-light .tv-wordmark-tyromer {
+  color: #0f172a;
+}
+
+/* —— Theme: dark —— */
+html.vmb-theme-dark,
+html.vmb-theme-dark body,
+html.vmb-theme-dark #root {
+  background: #020617;
+  color: #f8fafc;
+}
+
+html.vmb-theme-dark .vmb-board-canvas {
+  background: #020617;
+  color: #f8fafc;
+}
+
+html.vmb-theme-dark .vmb-board-header {
+  background: #020617;
+  border-bottom: 1px solid #1e293b;
+}
+
+html.vmb-theme-dark .vmb-board-header-title {
+  color: #f1f5f9;
+}
+
+html.vmb-theme-dark .vmb-card-dark {
+  background: #0f172a;
+  border: 1px solid #475569;
+  color: #f8fafc;
+}
+
+html.vmb-theme-dark .vmb-muted {
+  color: #94a3b8;
+}
+
+html.vmb-theme-dark .vmb-subtle {
+  color: #64748b;
+}
+
+html.vmb-theme-dark .vmb-list-divider {
+  border-color: #334155;
+}
+
+html.vmb-theme-dark .vmb-info-entry {
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+html.vmb-theme-dark .vmb-info-entry--pinned {
+  background: rgba(120, 53, 15, 0.3);
+  border-color: rgba(180, 83, 9, 0.6);
+  border-left: 3px solid #f59e0b;
+}
+
+html.vmb-theme-dark .vmb-exposure-row {
+  color: #f8fafc;
+}
+
+html.vmb-theme-dark .vmb-status-badge {
+  background: #1e293b;
+  color: #cbd5e1;
+}
+
+html.vmb-theme-dark .tv-wordmark-asset {
+  color: #f8fafc;
+}
+
+html.vmb-theme-dark .tv-wordmark-asset span {
+  color: #60a5fa;
+}
+
+html.vmb-theme-dark .tv-wordmark-tyromer {
+  color: #f8fafc;
+}
+
+/* —— Board shell —— */
+.tv-board-shell,
+.tv-board-body {
+  width: 100%;
+  height: 100vh;
+  min-height: 100vh;
+}
+
+.vmb-board-canvas {
+  width: 100%;
+  height: 100vh;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.vmb-board-body-wrap {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.vmb-board-grid.vmb-board-grid--css {
+  height: 100%;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.vmb-card {
+  border-radius: 10px;
+  box-sizing: border-box;
+  height: 100%;
+}
+
+.vmb-widget-pad {
+  padding: 8px;
+}
+
+.tv-logo-img {
+  max-width: 28%;
+  height: auto;
+  object-fit: contain;
+}
+
+.tv-wordmark-asset,
+.tv-wordmark-tyromer {
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.tv-logo-spacer {
+  width: 28%;
+  flex-shrink: 0;
+}
+
+.vmb-sync-status {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  font-size: 11px;
+  z-index: 30;
+  text-align: right;
+}
+
+.vmb-sync-live {
+  color: #4ade80;
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+.vmb-widget-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.vmb-list-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid;
+}
+
+.vmb-list-row:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.vmb-exposure-rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.vmb-exposure-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: var(--vmb-fs-small, 11px);
+}
+
+.vmb-chart-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.vmb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+}
+
+.tv-loading,
+.tv-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  font-size: 16px;
+}
+
+.tv-error {
+  color: #fbbf24;
+}
+
+.vmb-status-dot {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  margin: 0 auto 8px;
+}
+
+.vmb-status-dot--green {
+  background: #10b981;
+}
+
+.vmb-status-dot--amber {
+  background: #f59e0b;
+}
+
+.vmb-status-dot--red {
+  background: #dc2626;
+}
+
+.vmb-status-center {
+  text-align: center;
+  justify-content: center;
+  align-items: center;
+}

@@ -30,20 +30,20 @@ const ActionQueueWidget = ({ widget, data, theme = "dark" }) => {
   const showStatus = isWidgetPartEnabled(config, "status");
 
   return (
-    <div className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)}`}>
+    <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)}`}>
       {showTitle ? (
-        <div className={`shrink-0 ${vmbText.title} mb-1 ${theme === "light" ? "text-slate-700" : "text-white"}`}>
+        <div className={`shrink-0 ${vmbText("title")} mb-1 ${theme === "light" ? "text-slate-700" : "text-white"}`}>
           {widget?.title || "Action Queue"}
         </div>
       ) : null}
       <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
         {items.length === 0 ? (
-          <div className={`${vmbText.body} ${boardMutedText(theme)}`}>No actions</div>
+          <div className={`${vmbText("body")} ${boardMutedText(theme)}`}>No actions</div>
         ) : (
           items.map((item) => (
             <div
               key={item.id}
-              className={`rounded-lg px-2 py-2 ${vmbText.small} ${
+              className={`rounded-lg px-2 py-2 ${vmbText("small")} ${
                 item.overdue && !isRecent
                   ? theme === "light"
                     ? "bg-red-50 border border-red-200"
@@ -68,11 +68,11 @@ const ActionQueueWidget = ({ widget, data, theme = "dark" }) => {
                   )}
                   {showStatus ? (
                     theme === "light" ? (
-                      <span className={`shrink-0 px-2 py-0.5 rounded-full ${vmbText.small} font-medium ${statusClass(item.status)}`}>
+                      <span className={`shrink-0 px-2 py-0.5 rounded-full ${vmbText("small")} font-medium ${statusClass(item.status)}`}>
                         {formatStatus(item.status)}
                       </span>
                     ) : (
-                      <span className={`${vmbText.small} capitalize ${boardMutedText(theme)}`}>{item.status}</span>
+                      <span className={`${vmbText("small")} capitalize ${boardMutedText(theme)}`}>{item.status}</span>
                     )
                   ) : null}
                 </div>

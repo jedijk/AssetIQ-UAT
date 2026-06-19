@@ -38,13 +38,17 @@ export const FONT_SIZE_OPTIONS = [
 const FONT_BASE_PX = { xs: 10, sm: 11, md: 12, lg: 14, xl: 16 };
 
 /** Shared layout shell — clips content to the grid cell. */
-export const vmbWidgetShell = isLegacyDisplayBrowser()
-  ? "vmb-widget-shell h-full min-h-0 min-w-0 overflow-hidden flex flex-col"
-  : "h-full min-h-0 min-w-0 overflow-hidden flex flex-col";
+export function vmbWidgetShell() {
+  return isLegacyDisplayBrowser()
+    ? "vmb-widget-shell h-full min-h-0 min-w-0 overflow-hidden flex flex-col"
+    : "h-full min-h-0 min-w-0 overflow-hidden flex flex-col";
+}
 
-export const vmbWidgetPad = isLegacyDisplayBrowser()
-  ? "vmb-widget-pad"
-  : "p-[length:var(--vmb-pad,0.5rem)]";
+export function vmbWidgetPad() {
+  return isLegacyDisplayBrowser()
+    ? "vmb-widget-pad"
+    : "p-[length:var(--vmb-pad,0.5rem)]";
+}
 
 /**
  * Typography + chrome scale with card size (cqmin) and user font_size preference.
@@ -102,4 +106,7 @@ const MODERN_VMB_TEXT = {
   label: "text-[length:var(--vmb-fs-small)] uppercase tracking-wide leading-tight truncate",
 };
 
-export const vmbText = isLegacyDisplayBrowser() ? LEGACY_VMB_TEXT : MODERN_VMB_TEXT;
+export function vmbText(role) {
+  const map = isLegacyDisplayBrowser() ? LEGACY_VMB_TEXT : MODERN_VMB_TEXT;
+  return map[role] || map.body;
+}

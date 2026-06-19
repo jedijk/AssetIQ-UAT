@@ -30,9 +30,9 @@ export default function MooneyChartWidget({ widget, data, theme = "dark" }) {
   const legacy = isLegacyDisplayBrowser();
 
   return (
-    <div className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)}`}>
+    <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)}`}>
       {showTitle ? (
-        <h3 className={`shrink-0 ${vmbText.title} mb-1 ${theme === "light" ? "text-slate-700" : "text-slate-200"}`}>
+        <h3 className={`shrink-0 ${vmbText("title")} mb-1 ${theme === "light" ? "text-slate-700" : "text-slate-200"}`}>
           {title}
         </h3>
       ) : null}
@@ -83,7 +83,7 @@ export default function MooneyChartWidget({ widget, data, theme = "dark" }) {
           </ResponsiveContainer>
           )
         ) : (
-          <div className={`h-full flex items-center justify-center ${vmbText.body} ${boardMutedText(theme)}`}>
+          <div className={`h-full flex items-center justify-center ${vmbText("body")} ${boardMutedText(theme)}`}>
             No viscosity samples for today
           </div>
         )}

@@ -35,23 +35,23 @@ export default function InformationPanelWidget({ widget, data, theme = "dark" })
   const showMeta = showTimestamp || showSubmitter || showPinIndicator;
 
   return (
-    <div className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)}`}>
+    <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)}`}>
       {(showTitle || showSubtitle || showCount) ? (
         <div className="shrink-0 mb-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               {showTitle ? (
-                <h3 className={`${vmbText.title} ${titleClass}`}>{title}</h3>
+                <h3 className={`${vmbText("title")} ${titleClass}`}>{title}</h3>
               ) : null}
               {showSubtitle ? (
-                <p className={`${vmbText.small} ${boardMutedText(theme)} mt-0.5`}>
+                <p className={`${vmbText("small")} ${boardMutedText(theme)} mt-0.5`}>
                   Line-90 — information forms · Pinned items stay on top
                 </p>
               ) : null}
             </div>
             {showCount && items.length > 0 ? (
               <span
-                className={`shrink-0 px-2 py-0.5 rounded-full ${vmbText.small} font-medium ${
+                className={`shrink-0 px-2 py-0.5 rounded-full ${vmbText("small")} font-medium ${
                   theme === "light" ? "bg-slate-100 text-slate-600" : "bg-slate-800 text-slate-300"
                 }`}
               >
@@ -63,7 +63,7 @@ export default function InformationPanelWidget({ widget, data, theme = "dark" })
       ) : null}
       <div className="flex-1 min-h-0 overflow-y-auto">
         {items.length === 0 ? (
-          <p className={`${vmbText.body} ${boardMutedText(theme)} py-4 text-center`}>
+          <p className={`${vmbText("body")} ${boardMutedText(theme)} py-4 text-center`}>
             No information submitted
           </p>
         ) : (
@@ -76,7 +76,7 @@ export default function InformationPanelWidget({ widget, data, theme = "dark" })
               return (
                 <div
                   key={row.submission_id || i}
-                  className={`p-2 rounded-lg border ${vmbText.small} ${entryCardClass(theme, pinned, showPinnedHighlight)}`}
+                  className={`p-2 rounded-lg border ${vmbText("small")} ${entryCardClass(theme, pinned, showPinnedHighlight)}`}
                 >
                   <p className={`${bodyClass} break-words leading-normal`}>
                     {row.text || "—"}

@@ -7,6 +7,7 @@ import VisualBoardCanvas from "../../components/visual-boards/VisualBoardCanvas"
 import { BoardSyncStatus, useBoardSyncState } from "../../components/visual-boards/BoardSyncStatus";
 import { boardSurfaceClass } from "../../components/visual-boards/boardTheme";
 import { normalizeBoardForCanvas } from "../../components/visual-boards/boardLayoutUtils";
+import { useKioskDocumentTheme } from "../../hooks/useKioskDocumentTheme";
 import { useVisualBoardRealtime } from "../../hooks/useVisualBoardRealtime";
 
 /**
@@ -66,13 +67,6 @@ const VisualBoardDisplayPage = () => {
     return () => clearInterval(id);
   }, [token, fullscreen, dbEnv]);
 
-  useEffect(() => {
-    if (fullscreen) {
-      document.documentElement.classList.add("vmb-kiosk");
-      return () => document.documentElement.classList.remove("vmb-kiosk");
-    }
-    return undefined;
-  }, [fullscreen]);
 
   const displayData = liveData || boardData;
   const isLoading = layoutLoading || dataLoading;
@@ -82,6 +76,8 @@ const VisualBoardDisplayPage = () => {
 
   const canvasBoard = useMemo(() => normalizeBoardForCanvas(layout), [layout]);
   const boardTheme = canvasBoard.theme;
+
+  useKioskDocumentTheme(boardTheme, { enabled: !!layout && fullscreen, fullscreen });
 
   const pageClass = useMemo(
     () =>
@@ -119,6 +115,7 @@ const VisualBoardDisplayPage = () => {
           widgets={canvasBoard.widgets}
           theme={boardTheme}
           boardType={layout?.board_type}
+          boardName={layout?.name}
           header={canvasBoard.header}
           data={{
             widgets: displayData?.widgets,

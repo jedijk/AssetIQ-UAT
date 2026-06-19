@@ -22,18 +22,18 @@ export default function RiskObservationListWidget({ widget, data, theme = "dark"
   const showStatus = isWidgetPartEnabled(config, "status");
 
   return (
-    <div className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)}`}>
+    <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)}`}>
       {showTitle ? (
-        <h3 className={`shrink-0 ${vmbText.title} mb-1 ${theme === "light" ? "text-slate-700" : "text-slate-200"}`}>
+        <h3 className={`shrink-0 ${vmbText("title")} mb-1 ${theme === "light" ? "text-slate-700" : "text-slate-200"}`}>
           {title}
         </h3>
       ) : null}
       <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
         {items.length === 0 ? (
-          <p className={`${vmbText.body} ${boardMutedText(theme)}`}>No observations</p>
+          <p className={`${vmbText("body")} ${boardMutedText(theme)}`}>No observations</p>
         ) : (
           items.map((item, idx) => (
-            <div key={item.id || idx} className={`flex items-start gap-2 ${vmbText.small} border-b border-slate-100 pb-2`}>
+            <div key={item.id || idx} className={`flex items-start gap-2 ${vmbText("small")} border-b border-slate-100 pb-2`}>
               {showRank ? (
                 <span className={`shrink-0 w-5 text-center font-semibold ${boardMutedText(theme)}`}>{idx + 1}</span>
               ) : null}
@@ -51,7 +51,7 @@ export default function RiskObservationListWidget({ widget, data, theme = "dark"
                       <span className={boardMutedText(theme)}>RPN {item.rpn}</span>
                     ) : null}
                     {showStatus ? (
-                      <span className={`shrink-0 px-1.5 py-0.5 rounded ${vmbText.small} truncate max-w-full ${statusClass(item.status)}`}>
+                      <span className={`shrink-0 px-1.5 py-0.5 rounded ${vmbText("small")} truncate max-w-full ${statusClass(item.status)}`}>
                         {item.status}
                       </span>
                     ) : null}

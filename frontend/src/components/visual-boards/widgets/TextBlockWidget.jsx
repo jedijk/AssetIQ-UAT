@@ -18,15 +18,15 @@ export default function TextBlockWidget({ widget, theme = "dark" }) {
   const bodyClass = theme === "light" ? "text-slate-700" : "text-slate-200";
 
   return (
-    <div className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)}`}>
+    <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)}`}>
       <div className={`flex-1 min-h-0 flex flex-col justify-center ${align}`}>
         {showTitle ? (
-          <div className={`shrink-0 w-full ${vmbText.title} ${titleClass} mb-1`}>
+          <div className={`shrink-0 w-full ${vmbText("title")} ${titleClass} mb-1`}>
             {widget.title}
           </div>
         ) : null}
         <div
-          className={`w-full min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words ${vmbText.body} ${bodyClass}`}
+          className={`w-full min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words ${vmbText("body")} ${bodyClass}`}
         >
           {showBody ? (
             body || (

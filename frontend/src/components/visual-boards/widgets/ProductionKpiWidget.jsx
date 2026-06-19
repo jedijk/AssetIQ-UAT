@@ -15,21 +15,21 @@ export default function ProductionKpiWidget({ widget, data, theme = "dark" }) {
   const showDetail = isWidgetPartEnabled(config, "detail");
 
   return (
-    <div className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)} justify-center gap-0.5`}>
+    <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)} justify-center gap-0.5`}>
       {showTitle ? (
-        <div className={`shrink-0 ${vmbText.label} ${boardMutedText(theme)}`}>{label}</div>
+        <div className={`shrink-0 ${vmbText("label")} ${boardMutedText(theme)}`}>{label}</div>
       ) : null}
       <div className="flex items-baseline gap-1 min-w-0 overflow-hidden">
-        <span className={`${vmbText.value} min-w-0`}>{value}</span>
+        <span className={`${vmbText("value")} min-w-0`}>{value}</span>
         {showUnit && unit ? (
-          <span className={`shrink-0 ${vmbText.small} ${boardMutedText(theme)}`}>{unit}</span>
+          <span className={`shrink-0 ${vmbText("small")} ${boardMutedText(theme)}`}>{unit}</span>
         ) : null}
       </div>
       {showSubtitle && payload.subtitle ? (
-        <div className={`shrink-0 ${vmbText.small} truncate ${boardMutedText(theme)}`}>{payload.subtitle}</div>
+        <div className={`shrink-0 ${vmbText("small")} truncate ${boardMutedText(theme)}`}>{payload.subtitle}</div>
       ) : null}
       {showDetail && payload.detail ? (
-        <div className={`shrink-0 ${vmbText.small} truncate ${boardSubtleText(theme)}`}>{payload.detail}</div>
+        <div className={`shrink-0 ${vmbText("small")} truncate ${boardSubtleText(theme)}`}>{payload.detail}</div>
       ) : null}
     </div>
   );

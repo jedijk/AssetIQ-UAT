@@ -32,16 +32,16 @@ const KpiCardWidget = ({ widget, data, theme = "dark" }) => {
 
   return (
     <div
-      className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)} justify-center gap-0.5 ${accentClass(metric, theme)}`}
+      className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)} justify-center gap-0.5 ${accentClass(metric, theme)}`}
     >
       {showTitle ? (
-        <div className={`shrink-0 ${vmbText.label} ${boardMutedText(theme)}`}>{label}</div>
+        <div className={`shrink-0 ${vmbText("label")} ${boardMutedText(theme)}`}>{label}</div>
       ) : null}
       <div className="flex items-baseline gap-1 min-w-0 overflow-hidden">
-        <span className={`${vmbText.value} min-w-0`}>{value}</span>
+        <span className={`${vmbText("value")} min-w-0`}>{value}</span>
         {showChange && change ? (
           <span
-            className={`shrink-0 ${vmbText.small} font-medium ${
+            className={`shrink-0 ${vmbText("small")} font-medium ${
               Number(payload.change_percent) >= 0 ? "text-orange-500" : "text-green-600"
             }`}
           >
@@ -50,7 +50,7 @@ const KpiCardWidget = ({ widget, data, theme = "dark" }) => {
         ) : null}
       </div>
       {showSubtitle && subtitle ? (
-        <div className={`shrink-0 ${vmbText.small} truncate ${boardMutedText(theme)}`}>{subtitle}</div>
+        <div className={`shrink-0 ${vmbText("small")} truncate ${boardMutedText(theme)}`}>{subtitle}</div>
       ) : null}
     </div>
   );

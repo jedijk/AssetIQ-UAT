@@ -20,15 +20,15 @@ const StatusIndicatorWidget = ({ widget, data, theme = "dark" }) => {
   const legacy = isLegacyDisplayBrowser();
 
   return (
-    <div className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)} items-center justify-center gap-2`}>
+    <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)} items-center justify-center gap-2`}>
       <div
         className={`shrink-0 min-w-0 max-w-full rounded-full ${legacy ? "vmb-status-dot border-4 border-slate-500" : "aspect-square w-[min(35cqmin,70%)] max-h-[40%] ring-4"} ${style.bg} ${legacy ? "" : style.ring} shadow-lg`}
       />
       {showLabel ? (
-        <div className={`shrink-0 ${vmbText.status} ${style.text}`}>{status}</div>
+        <div className={`shrink-0 ${vmbText("status")} ${style.text}`}>{status}</div>
       ) : null}
       {showReason && reason ? (
-        <div className={`shrink min-h-0 ${vmbText.small} text-slate-400 text-center line-clamp-2 px-1`}>
+        <div className={`shrink min-h-0 ${vmbText("small")} text-slate-400 text-center line-clamp-2 px-1`}>
           {reason}
         </div>
       ) : null}

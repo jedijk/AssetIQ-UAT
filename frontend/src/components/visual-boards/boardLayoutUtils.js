@@ -7,6 +7,7 @@ export const LEGACY_GRID_COLUMNS = 12;
 export const DEFAULT_FINE_LAYOUT = { columns: FINE_GRID_COLUMNS, rows: 16 };
 
 export const CANVAS_PREVIEW_SIZES = {
+  "tv-exact": "h-full w-full min-h-0",
   desktop: "w-full max-w-6xl aspect-video",
   tablet: "w-full max-w-3xl aspect-[4/3]",
   "tv-55": "w-full max-w-5xl aspect-video",

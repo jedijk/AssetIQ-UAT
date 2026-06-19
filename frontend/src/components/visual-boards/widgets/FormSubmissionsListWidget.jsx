@@ -67,15 +67,15 @@ export default function FormSubmissionsListWidget({ widget, data, theme = "dark"
   const showStatus = isWidgetPartEnabled(config, "status", false);
 
   return (
-    <div className={`${vmbWidgetShell} ${vmbWidgetPad} ${boardCardClass(theme)}`}>
+    <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)}`}>
       {showTitle ? (
-        <h3 className={`shrink-0 ${vmbText.title} mb-1 ${titleClass}`}>
+        <h3 className={`shrink-0 ${vmbText("title")} mb-1 ${titleClass}`}>
           {title}
         </h3>
       ) : null}
       <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
         {items.length === 0 ? (
-          <p className={`${vmbText.body} ${boardMutedText(theme)}`}>No recent submissions</p>
+          <p className={`${vmbText("body")} ${boardMutedText(theme)}`}>No recent submissions</p>
         ) : (
           items.map((item) => {
             const formName = item.form_name || item.title || "Form";
@@ -86,7 +86,7 @@ export default function FormSubmissionsListWidget({ widget, data, theme = "dark"
             return (
               <div
                 key={item.id}
-                className={`flex items-start gap-2 ${vmbText.small} border-b ${dividerClass} pb-2 last:border-b-0 last:pb-0`}
+                className={`flex items-start gap-2 ${vmbText("small")} border-b ${dividerClass} pb-2 last:border-b-0 last:pb-0`}
               >
                 {showAvatar ? (
                   <SubmitterAvatar
@@ -104,7 +104,7 @@ export default function FormSubmissionsListWidget({ widget, data, theme = "dark"
                   ) : null}
                 </div>
                 {showStatus ? (
-                  <span className={`shrink-0 px-2 py-0.5 rounded-full ${vmbText.small} font-medium ${statusClass(item.status)}`}>
+                  <span className={`shrink-0 px-2 py-0.5 rounded-full ${vmbText("small")} font-medium ${statusClass(item.status)}`}>
                     {item.status || "Completed"}
                   </span>
                 ) : null}
