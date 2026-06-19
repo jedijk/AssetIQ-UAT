@@ -116,7 +116,206 @@
     expiresIn: 0,
     pollTimer: null,
     boardTimer: null,
+    boardLayout: null,
   };
+
+  function escapeHtml(text) {
+    return String(text == null ? "" : text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function widgetPayload(data, widgetId) {
+    var widgets = (data && data.widgets) || {};
+    return widgets[widgetId] || {};
+  }
+
+  function formatWidgetValue(payload) {
+    if (payload.formatted_value != null && payload.formatted_value !== "") {
+      return payload.formatted_value;
+    }
+    if (payload.value != null && payload.value !== "") {
+      return payload.value;
+    }
+    return "—";
+  }
+
+  function renderMetricWidget(widget, payload) {
+    var label = widget.title || payload.label || payload.metric || widget.id || "KPI";
+    var value = formatWidgetValue(payload);
+    var unit = payload.unit || "";
+    var subtitle = payload.subtitle || "";
+    var html =
+      '<div class="tv-widget-card">' +
+      '<div class="tv-widget-label">' +
+      escapeHtml(label) +
+      "</div>" +
+      '<div class="tv-widget-value-row">' +
+      '<span class="tv-widget-value">' +
+      escapeHtml(value) +
+      "</span>";
+    if (unit) {
+      html += '<span class="tv-widget-unit">' + escapeHtml(unit) + "</span>";
+    }
+    html += "</div>";
+    if (subtitle) {
+      html += '<div class="tv-widget-subtitle">' + escapeHtml(subtitle) + "</div>";
+    }
+    html += "</div>";
+    return html;
+  }
+
+  function renderStatusWidget(widget, payload, data) {
+    var status = (payload.status || (data && data.status && data.status.status) || "GREEN").toUpperCase();
+    var reason = payload.reason || (data && data.status && data.status.reason) || "";
+    var dotClass = "tv-status-dot tv-status-dot--green";
+    if (status === "RED") dotClass = "tv-status-dot tv-status-dot--red";
+    else if (status === "AMBER") dotClass = "tv-status-dot tv-status-dot--amber";
+    return (
+      '<div class="tv-widget-card tv-widget-card--center">' +
+      '<div class="' +
+      dotClass +
+      '"></div>' +
+      '<div class="tv-widget-status">' +
+      escapeHtml(status) +
+      "</div>" +
+      (reason ? '<div class="tv-widget-subtitle">' + escapeHtml(reason) + "</div>" : "") +
+      "</div>"
+    );
+  }
+
+  function renderTextWidget(widget) {
+    var text = (widget.config && widget.config.text) || widget.title || "";
+    return (
+      '<div class="tv-widget-card">' +
+      '<div class="tv-widget-body">' +
+      escapeHtml(text) +
+      "</div></div>"
+    );
+  }
+
+  function renderListWidget(widget, payload) {
+    var items = payload.items || payload.observations || payload.actions || [];
+    var label = widget.title || widget.id || "List";
+    var html =
+      '<div class="tv-widget-card tv-widget-card--list">' +
+      '<div class="tv-widget-label">' +
+      escapeHtml(label) +
+      "</div>";
+    if (!items.length) {
+      html += '<div class="tv-widget-subtitle">No items</div>';
+    } else {
+      html += '<ul class="tv-widget-list">';
+      for (var i = 0; i < items.length && i < 8; i++) {
+        var item = items[i];
+        var line =
+          item.title ||
+          item.name ||
+          item.description ||
+          item.failure_mode ||
+          (item.risk_score != null ? "Risk " + item.risk_score : "") ||
+          "Item";
+        html += "<li>" + escapeHtml(line) + "</li>";
+      }
+      html += "</ul>";
+    }
+    html += "</div>";
+    return html;
+  }
+
+  function renderWidgetContent(widget, data) {
+    var payload = widgetPayload(data, widget.id);
+    var type = widget.type || "kpi_card";
+    if (type === "production_kpi" || type === "kpi_card") {
+      return renderMetricWidget(widget, payload);
+    }
+    if (type === "status_indicator") {
+      return renderStatusWidget(widget, payload, data);
+    }
+    if (type === "text_block") {
+      return renderTextWidget(widget);
+    }
+    if (
+      type === "observation_list" ||
+      type === "risk_observation_list" ||
+      type === "action_queue" ||
+      type === "form_submissions_list"
+    ) {
+      return renderListWidget(widget, payload);
+    }
+    if (payload.formatted_value != null || payload.value != null) {
+      return renderMetricWidget(widget, payload);
+    }
+    return renderMetricWidget(widget, { metric: widget.id, formatted_value: "—" });
+  }
+
+  function widgetsFromData(data) {
+    var map = (data && data.widgets) || {};
+    var keys = Object.keys(map);
+    var widgets = [];
+    for (var i = 0; i < keys.length; i++) {
+      widgets.push({
+        id: keys[i],
+        type: "production_kpi",
+        title: keys[i].replace(/^vi_/, "").replace(/_/g, " "),
+        position: { x: (i % 4) * 6, y: Math.floor(i / 4) * 3, w: 6, h: 3 },
+      });
+    }
+    return widgets;
+  }
+
+  function renderBoardCanvas(layout, data) {
+    var boardName = (layout && layout.name) || "Visual Board";
+    var gridLayout = (layout && layout.layout) || {};
+    var cols = gridLayout.columns || 24;
+    var rows = gridLayout.rows || 16;
+    var widgets = (layout && layout.widgets) || [];
+    if (!widgets.length && data) {
+      widgets = widgetsFromData(data);
+      cols = 24;
+      rows = Math.max(16, Math.ceil(widgets.length / 4) * 3);
+    }
+
+    var html =
+      '<div class="tv-board-canvas">' +
+      '<div class="tv-board-header">' +
+      '<div class="tv-board-title">' +
+      escapeHtml(boardName) +
+      "</div>" +
+      '<div class="tv-board-live">Live</div>' +
+      "</div>" +
+      '<div class="tv-board-grid" style="grid-template-columns:repeat(' +
+      cols +
+      ",1fr);grid-template-rows:repeat(" +
+      rows +
+      ',1fr)">';
+
+    for (var i = 0; i < widgets.length; i++) {
+      var w = widgets[i];
+      var pos = w.position || {};
+      var x = pos.x || 0;
+      var y = pos.y || 0;
+      var pw = pos.w || 3;
+      var ph = pos.h || 2;
+      html +=
+        '<div class="tv-widget-cell" style="grid-column:' +
+        (x + 1) +
+        " / span " +
+        pw +
+        ";grid-row:" +
+        (y + 1) +
+        " / span " +
+        ph +
+        '">' +
+        renderWidgetContent(w, data) +
+        "</div>";
+    }
+
+    html += "</div></div>";
+    return html;
+  }
 
   function renderPairing() {
     setHtml(
@@ -228,17 +427,27 @@
   }
 
   function renderBoard(config, layout) {
-    var title = (layout && layout.name) || (config && config.screen_name) || "Visual Board";
+    state.boardLayout = layout;
+    var title =
+      (layout && layout.name) ||
+      (config && config.screen_name) ||
+      "Visual Board";
     setHtml(
-      '<div style="min-height:100vh;background:#020617;color:#fff;font-family:sans-serif;display:flex;flex-direction:column">' +
-        '<div style="padding:16px 20px;border-bottom:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center">' +
-        '<div style="font-size:18px;font-weight:600">' +
-        title +
-        "</div>" +
-        '<div style="font-size:12px;color:#4ade80">Live</div></div>' +
-        '<div id="tv-board-body" style="flex:1;padding:16px;overflow:auto"><p style="color:#94a3b8">Loading board data…</p></div>' +
-        "</div>"
+      '<div class="tv-board-shell">' +
+        '<div id="tv-board-body" class="tv-board-body">' +
+        '<p class="tv-loading">Loading board data…</p>' +
+        "</div></div>"
     );
+  }
+
+  function paintBoardData(data) {
+    var body = $("tv-board-body");
+    if (!body) return;
+    if (!state.boardLayout && !data) {
+      body.innerHTML = '<p class="tv-loading">Loading board…</p>';
+      return;
+    }
+    body.innerHTML = renderBoardCanvas(state.boardLayout || {}, data || {});
   }
 
   function startBoardFlow() {
@@ -256,31 +465,23 @@
 
       authedXhr("GET", apiBase() + "/api/display/config" + apiQuery(), null, function (cfgErr, config) {
         authedXhr("GET", apiBase() + "/api/display/board/layout" + apiQuery(), null, function (layErr, layout) {
+          if (layErr) {
+            showError(layErr.message);
+            return;
+          }
+          state.boardLayout = layout;
           renderBoard(config, layout);
 
           function refreshData() {
             authedXhr("GET", apiBase() + "/api/display/board/data" + apiQuery(), null, function (dataErr, data) {
-              var body = $("tv-board-body");
-              if (!body) return;
               if (dataErr) {
-                body.innerHTML = '<p style="color:#fbbf24">' + dataErr.message + "</p>";
+                var body = $("tv-board-body");
+                if (body) {
+                  body.innerHTML = '<p class="tv-error">' + escapeHtml(dataErr.message) + "</p>";
+                }
                 return;
               }
-              var widgets = (data && data.widgets) || {};
-              var keys = Object.keys(widgets);
-              var html = "";
-              for (var i = 0; i < keys.length; i++) {
-                var w = widgets[keys[i]];
-                html +=
-                  '<div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:12px">' +
-                  '<div style="font-size:12px;color:#94a3b8;margin-bottom:6px">' +
-                  keys[i] +
-                  "</div>" +
-                  '<pre style="margin:0;font-size:11px;color:#e2e8f0;white-space:pre-wrap;word-break:break-word">' +
-                  JSON.stringify(w, null, 2) +
-                  "</pre></div>";
-              }
-              body.innerHTML = html || '<p style="color:#94a3b8">No widget data yet.</p>';
+              paintBoardData(data);
             });
           }
 
