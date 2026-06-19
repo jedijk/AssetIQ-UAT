@@ -44,9 +44,12 @@ export function isLegacyDisplayBrowser() {
   return detectLegacyHardwareBrowser();
 }
 
-/** Table chart fallback — only on Samsung/Tizen TV browsers. */
+/** Table chart fallback on TV kiosks and browsers missing ES2019 Array methods. */
 export function useLegacyChartFallback() {
-  return isSamsungTVBrowser();
+  if (typeof window !== "undefined" && window.__ASSETIQ_REACT_KIOSK__) return true;
+  if (isSamsungTVBrowser()) return true;
+  if (typeof Array.prototype.flatMap !== "function") return true;
+  return isLegacyDisplayBrowser();
 }
 
 export function applyKioskCompatClasses() {

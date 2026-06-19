@@ -287,6 +287,13 @@ if (!Array.prototype.flat) {
   };
 }
 
+// Array.prototype.flatMap (Recharts 3.x axis selectors on Samsung/Tizen TV browsers)
+if (!Array.prototype.flatMap) {
+  Array.prototype.flatMap = function flatMap(callback, thisArg) {
+    return this.map(callback, thisArg).flat(1);
+  };
+}
+
 // Log that polyfills were loaded
 try {
   if (typeof console !== 'undefined' && console.log) {
