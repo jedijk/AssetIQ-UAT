@@ -160,3 +160,42 @@ export function accumulateResizeSteps(pixelDx, pixelDy, metrics, accum) {
     },
   };
 }
+
+/** Stable key to match widget payloads when draft ids differ from saved board. */
+export function widgetDataSignature(widget) {
+  if (!widget) return "";
+  const config = widget.config || {};
+  const type = widget.type || "";
+  if (type === "kpi_card") return `kpi:${config.metric || ""}`;
+  if (type === "production_kpi") {
+    return `prod:${config.production_metric || ""}:${config.period || "today"}`;
+  }
+  if (type === "trend_chart") {
+    return `trend:${config.chart_metric || config.metric || ""}:${config.days || 30}`;
+  }
+  if (type === "mooney_chart") return `mooney:${config.period || "today"}`;
+  if (type === "exposure_waterfall") return "exposure_waterfall";
+  if (type === "form_submissions_list") return `forms:${config.limit || 10}`;
+  if (type === "risk_observation_list") return `risk:${config.limit || 10}`;
+  if (type === "observation_list") return `obs:${config.limit || 10}`;
+  if (type === "action_queue") return `queue:${config.queue_mode || "open"}:${config.limit || 10}`;
+  if (type === "information_panel") return "information_panel";
+  return `${type}:${widget.id || ""}`;
+}
+
+/** Map preview-data (keyed by saved widget ids) onto canvas widgets (draft or saved). */
+export function remapWidgetDataForCanvas(savedWidgets, canvasWidgets, serverData) {
+  if (!serverData?.widgets) return serverData;
+  const bySignature = {};
+  for (const widget of savedWidgets || []) {
+    const payload = serverData.widgets[widget.id];
+    if (payload) bySignature[widgetDataSignature(widget)] = payload;
+  }
+  const widgets = { ...serverData.widgets };
+  for (const widget of canvasWidgets || []) {
+    if (widgets[widget.id]) continue;
+    const payload = bySignature[widgetDataSignature(widget)];
+    if (payload) widgets[widget.id] = payload;
+  }
+  return { ...serverData, widgets };
+}

@@ -2,7 +2,7 @@ import React, { useRef } from "react";
 import { boardCardClass, boardMutedText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
 import { useVmbContainerFont } from "../useVmbContainerFont";
 import { isWidgetPartEnabled } from "../widgetDisplayParts";
-import { isLegacyDisplayBrowser } from "../../../lib/kioskCompat";
+import { useLegacyChartFallback } from "../../../lib/kioskCompat";
 import LegacyChartTable from "./LegacyChartTable";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
@@ -17,7 +17,7 @@ const TrendChartWidget = ({ widget, data, theme = "dark" }) => {
   const titleClass = theme === "light" ? "text-slate-700" : "text-white";
   const showTitle = isWidgetPartEnabled(config, "title");
   const showGrid = isWidgetPartEnabled(config, "grid");
-  const legacy = isLegacyDisplayBrowser();
+  const legacy = useLegacyChartFallback();
 
   return (
     <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)}`}>

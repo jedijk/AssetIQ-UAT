@@ -1,42 +1,52 @@
 import { isSamsungTVBrowser } from "./deviceUtils";
 
-/** Cached result — TV UA and CSS capabilities do not change at runtime. */
-let legacyDisplayBrowser = null;
+/** Cached hardware/CSS capability — does not change when preview adds vmb-legacy-tv. */
+let legacyHardwareBrowser = null;
 
-/**
- * Embedded TV browsers (Samsung Tizen, etc.) often lack container queries,
- * clamp(), and modern grid gap. Use fixed px/rem layout when true.
- */
-export function isLegacyDisplayBrowser() {
-  if (typeof document !== "undefined" && document.documentElement.classList.contains("vmb-legacy-tv")) {
-    return true;
-  }
-  if (legacyDisplayBrowser !== null) return legacyDisplayBrowser;
+function detectLegacyHardwareBrowser() {
+  if (legacyHardwareBrowser !== null) return legacyHardwareBrowser;
   if (typeof window === "undefined") return false;
 
   if (isSamsungTVBrowser()) {
-    legacyDisplayBrowser = true;
+    legacyHardwareBrowser = true;
     return true;
   }
 
   try {
     if (typeof CSS !== "undefined" && typeof CSS.supports === "function") {
       if (!CSS.supports("width", "clamp(1px, 2px, 3px)")) {
-        legacyDisplayBrowser = true;
+        legacyHardwareBrowser = true;
         return true;
       }
       if (!CSS.supports("container-type", "inline-size")) {
-        legacyDisplayBrowser = true;
+        legacyHardwareBrowser = true;
         return true;
       }
     }
   } catch (_e) {
-    legacyDisplayBrowser = true;
+    legacyHardwareBrowser = true;
     return true;
   }
 
-  legacyDisplayBrowser = false;
+  legacyHardwareBrowser = false;
   return false;
+}
+
+/**
+ * Embedded TV browsers (Samsung Tizen, etc.) often lack container queries,
+ * clamp(), and modern grid gap. Use fixed px/rem layout when true.
+ * Preview/TV parity adds vmb-legacy-tv on desktop too — that is layout-only.
+ */
+export function isLegacyDisplayBrowser() {
+  if (typeof document !== "undefined" && document.documentElement.classList.contains("vmb-legacy-tv")) {
+    return true;
+  }
+  return detectLegacyHardwareBrowser();
+}
+
+/** Table chart fallback — only on Samsung/Tizen TV browsers. */
+export function useLegacyChartFallback() {
+  return isSamsungTVBrowser();
 }
 
 export function applyKioskCompatClasses() {

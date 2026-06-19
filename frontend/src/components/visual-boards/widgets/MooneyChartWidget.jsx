@@ -12,7 +12,7 @@ import {
 import { boardCardClass, boardMutedText, vmbText, vmbWidgetPad, vmbWidgetShell } from "../boardTheme";
 import { useVmbContainerFont } from "../useVmbContainerFont";
 import { isWidgetPartEnabled } from "../widgetDisplayParts";
-import { isLegacyDisplayBrowser } from "../../../lib/kioskCompat";
+import { useLegacyChartFallback } from "../../../lib/kioskCompat";
 import LegacyChartTable from "./LegacyChartTable";
 
 const CHART_MARGIN = { top: 4, right: 6, bottom: 2, left: 2 };
@@ -27,7 +27,7 @@ export default function MooneyChartWidget({ widget, data, theme = "dark" }) {
   const showTitle = isWidgetPartEnabled(config, "title");
   const showBands = isWidgetPartEnabled(config, "target_bands");
   const showGrid = isWidgetPartEnabled(config, "grid");
-  const legacy = isLegacyDisplayBrowser();
+  const legacy = useLegacyChartFallback();
 
   return (
     <div className={`${vmbWidgetShell()} ${vmbWidgetPad()} ${boardCardClass(theme)}`}>

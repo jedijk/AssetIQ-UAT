@@ -6,7 +6,7 @@ import { visualBoardAPI } from "../../lib/apis/visualBoardAPI";
 import VisualBoardCanvas from "../../components/visual-boards/VisualBoardCanvas";
 import { BoardSyncStatus, useBoardSyncState } from "../../components/visual-boards/BoardSyncStatus";
 import { boardSurfaceClass } from "../../components/visual-boards/boardTheme";
-import { normalizeBoardForCanvas, readBoardDraft } from "../../components/visual-boards/boardLayoutUtils";
+import { normalizeBoardForCanvas, readBoardDraft, remapWidgetDataForCanvas } from "../../components/visual-boards/boardLayoutUtils";
 import { useKioskDocumentTheme } from "../../hooks/useKioskDocumentTheme";
 import { Button } from "../../components/ui/button";
 import {
@@ -30,7 +30,7 @@ const TV_PREVIEW_SIZES = new Set(["tv-exact", "tv-55", "tv-75", "tv-98"]);
 
 const VisualBoardPreviewPage = () => {
   const { boardId } = useParams();
-  const [previewSize, setPreviewSize] = React.useState("tv-exact");
+  const [previewSize, setPreviewSize] = React.useState("desktop");
 
   const { data: board, isLoading } = useQuery({
     queryKey: ["visual-board-preview", boardId],
@@ -69,7 +69,12 @@ const VisualBoardPreviewPage = () => {
     fullscreen: isTvExact,
   });
 
-  const { lastSyncedAt } = useBoardSyncState(previewData, { refreshIntervalSec: refreshSeconds });
+  const canvasData = useMemo(
+    () => remapWidgetDataForCanvas(board?.widgets, canvasBoard.widgets, previewData),
+    [board?.widgets, canvasBoard.widgets, previewData],
+  );
+
+  const { lastSyncedAt } = useBoardSyncState(canvasData, { refreshIntervalSec: refreshSeconds });
 
   if (isLoading) {
     return (
@@ -151,8 +156,8 @@ const VisualBoardPreviewPage = () => {
           boardName={boardName}
           header={canvasBoard.header}
           data={{
-            widgets: previewData?.widgets,
-            status: previewData?.status,
+            widgets: canvasData?.widgets,
+            status: canvasData?.status,
           }}
           previewSize={canvasPreviewSize}
         />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -17,6 +17,7 @@ import {
   pixelDeltaToGridSteps,
   writeBoardDraft,
   clearBoardDraft,
+  remapWidgetDataForCanvas,
 } from "../../components/visual-boards/boardLayoutUtils";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -107,6 +108,11 @@ const VisualBoardEditorPage = () => {
     queryFn: () => visualBoardAPI.getPreviewData(boardId),
     enabled: !!boardId,
   });
+
+  const canvasPreviewData = useMemo(
+    () => remapWidgetDataForCanvas(board?.widgets, widgets, previewData),
+    [board?.widgets, widgets, previewData],
+  );
 
   const { data: versionsData } = useQuery({
     queryKey: ["visual-board-versions", boardId],
@@ -381,8 +387,9 @@ const VisualBoardEditorPage = () => {
             widgets={widgets}
             theme={theme}
             boardType={boardType}
+            boardName={name}
             header={header}
-            data={{ widgets: previewData?.widgets, status: previewData?.status }}
+            data={{ widgets: canvasPreviewData?.widgets, status: canvasPreviewData?.status }}
             previewSize="desktop"
             editable
             selectedWidgetId={selectedWidgetId}
