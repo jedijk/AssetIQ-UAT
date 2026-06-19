@@ -14,7 +14,7 @@ import { getDisciplineColor } from "../../../constants/disciplines";
 import { Skeleton } from "../../../components/ui/skeleton";
 import { VirtualList } from "../../../components/ui/VirtualList";
 import {
-  statusConfig, priorityConfig, sourceConfig, actionSourceLabel,
+  statusConfig, priorityConfig, sourceConfig,
 } from "../actionsPageConstants";
 
 export function ActionsListSection({
@@ -216,9 +216,17 @@ export function ActionsListSection({
                         {action.title}
                       </h3>
                     </div>
-                    {/* Equipment Tag */}
-                    {action.equipment_tag && (
-                      <div className="text-xs text-slate-400 font-mono mb-0.5">{action.equipment_tag}</div>
+                    {/* Equipment tag and linked observation — same row */}
+                    {(action.equipment_tag || action.source_name) && (
+                      <div className="text-[10px] sm:text-xs text-slate-500 mb-0.5 sm:mb-1 truncate">
+                        {action.equipment_tag && (
+                          <span className="font-mono text-slate-400">{action.equipment_tag}</span>
+                        )}
+                        {action.equipment_tag && action.source_name && (
+                          <span className="text-slate-300 mx-1">|</span>
+                        )}
+                        {action.source_name && <span>{action.source_name}</span>}
+                      </div>
                     )}
                     <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                       {/* Priority Badge - Always show */}
@@ -252,10 +260,6 @@ export function ActionsListSection({
                           <span className="text-[10px]">{action.attachments.length}</span>
                         </span>
                       )}
-                    </div>
-                    {/* Source info - Simplified on mobile */}
-                    <div className="text-[10px] sm:text-xs text-slate-500 mt-0.5 sm:mt-1 truncate">
-                      {actionSourceLabel(action)}
                     </div>
                   </div>
 

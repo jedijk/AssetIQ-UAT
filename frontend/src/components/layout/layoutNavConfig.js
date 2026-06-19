@@ -30,13 +30,13 @@ export function buildNavItems(t) {
     { path: "/tasks", label: t("nav.taskScheduler"), icon: Calendar, desktopOnly: true, feature: "tasks", navTestId: "task-scheduler" },
     { path: "/form-submissions", label: t("nav.formSubmissions"), icon: FileText, feature: "forms", navTestId: "form-submissions" },
     { path: "/library", label: t("nav.library"), icon: BookOpen, desktopOnly: true, feature: "library", navTestId: "library" },
-    { path: "/visual-management/boards", label: t("nav.visualManagement"), icon: Monitor, desktopOnly: true, feature: "visual_boards", navTestId: "visual-management", activePrefix: "/visual-management" },
   ];
 }
 
 export function buildSettingsMenuItems(t) {
   return [
     { path: "/definitions", label: t("nav.criticalityDefinitions"), icon: Sliders, feature: "equipment" },
+    { path: "/visual-management/boards", label: t("nav.visualManagement"), icon: Monitor, feature: "visual_boards" },
     { path: "/equipment-manager", label: t("nav.equipmentManager"), icon: Building2, desktopOnly: true, feature: "equipment" },
     { path: "/settings/user-management", label: t("nav.userManagement"), icon: Users, feature: "users" },
     { path: "/settings/preferences", label: "Preferences", icon: Clock, desktopOnly: true },

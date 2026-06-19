@@ -288,7 +288,7 @@ export default function LayoutHeader({
                     <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuContent align="end" className="w-56 max-h-[min(70vh,24rem)] overflow-y-auto">
                   <DropdownMenuLabel className="text-xs">{t("nav.settings")}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   {settingsMenuItems.map((item) => (

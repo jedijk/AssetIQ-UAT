@@ -26,7 +26,8 @@ import {
   Wrench,
   CalendarClock,
   Languages,
-  ClipboardCheck
+  ClipboardCheck,
+  Monitor,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -118,6 +119,14 @@ const SETTINGS_SECTIONS = [
     path: "/definitions",
     roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"],
     feature: "equipment",
+  },
+  {
+    id: "visual-management",
+    sectionKey: "visualManagement",
+    icon: Monitor,
+    path: "/visual-management/boards",
+    roles: ["owner", "admin", "reliability_engineer", "maintenance", "operations", "viewer"],
+    feature: "visual_boards",
   },
   {
     id: "notifications",

@@ -223,10 +223,11 @@ async def get_device_data(raw_token: str, *, period_days: int = 30) -> Dict[str,
     board_db_name = ctx.get("board_db_name")
     if board_db_name:
         set_request_db(board_db_name)
+    tenant_id = ctx.get("tenant_id") or ctx["board"].get("tenant_id")
     data = await get_public_data_from_context(
         ctx["board"],
         ctx["version"],
-        ctx.get("tenant_id"),
+        tenant_id,
         period_days=period_days,
     )
     return data.model_dump()

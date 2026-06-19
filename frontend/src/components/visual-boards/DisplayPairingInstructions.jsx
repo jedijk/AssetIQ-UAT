@@ -50,11 +50,11 @@ const DISPLAY_STEPS = [
     body: () => "Use a laptop, phone, or tablet where you are already logged into AssetIQ.",
   },
   {
-    title: "Go to Visual Management → Pair Displays",
+    title: "Go to Settings → Visual Management → Pair Displays",
     body: () => (
       <>
-        In the app menu, open{" "}
-        <span className="text-slate-300 font-medium">Visual Management</span>, then click{" "}
+        Open the gear menu (<span className="text-slate-300 font-medium">Settings</span>), choose{" "}
+        <span className="text-slate-300 font-medium">Visual Management</span>, then{" "}
         <span className="text-slate-300 font-medium">Pair Displays</span>.
       </>
     ),
@@ -129,7 +129,7 @@ export function DisplayPairingInstructions({ variant = "admin", className = "" }
         <p className="text-xs text-slate-500 mt-4 pt-3 border-t border-blue-100">
           Tip: Publish your board first under{" "}
           <Link to="/visual-management/boards" className="text-blue-600 hover:underline">
-            Visual Management → Boards
+            Settings → Visual Management → Boards
           </Link>
           , then assign it when pairing.
         </p>

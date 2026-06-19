@@ -219,11 +219,33 @@ async def build_form_submissions_list(user: dict, limit: int = 8) -> Dict[str, A
 
 
 async def build_risk_observation_list(user: dict, limit: int = 10) -> Dict[str, Any]:
-    from services.threat_service import list_top_threats
-
-    threats = await list_top_threats(user, limit=limit, exclude_mitigated=True)
+    """Tenant-scoped high-risk observations for public display boards."""
+    status_filter = {
+        "status": {"$nin": ["Closed", "closed", "Mitigated", "mitigated"]},
+    }
+    cursor = db.threats.find(
+        merge_tenant_filter(status_filter, user),
+        {
+            "_id": 0,
+            "id": 1,
+            "title": 1,
+            "failure_mode": 1,
+            "asset_name": 1,
+            "asset": 1,
+            "equipment_name": 1,
+            "description": 1,
+            "symptom": 1,
+            "risk_score": 1,
+            "fmea_rpn": 1,
+            "rpn": 1,
+            "status": 1,
+            "lifecycle_stage": 1,
+            "created_at": 1,
+        },
+    ).sort("risk_score", -1).limit(limit)
+    rows = await cursor.to_list(limit)
     items = []
-    for row in threats:
+    for row in rows:
         rpn = row.get("fmea_rpn") or row.get("rpn") or row.get("risk_score")
         items.append(
             {

@@ -205,53 +205,36 @@ const DisplayBoardPage = () => {
 
   return (
     <div className={pageClass}>
-      <div className="h-full w-full p-2 md:p-4 flex flex-col">
-        <div className="flex items-center justify-between px-2 py-1 mb-2">
-          <div>
-            <h1 className={`text-lg font-semibold truncate ${boardTheme === "light" ? "text-slate-800" : "text-white"}`}>
-              {layout?.name || config?.screen_name}
-            </h1>
-            {config?.screen_name && layout?.name && config.screen_name !== layout.name && (
-              <p className={`text-xs truncate ${boardTheme === "light" ? "text-slate-500" : "text-slate-400"}`}>
-                {config.screen_name}
-              </p>
-            )}
+      <div className="h-full w-full flex flex-col relative">
+        <VisualBoardCanvas
+          layout={canvasBoard.layout}
+          widgets={canvasBoard.widgets}
+          theme={boardTheme}
+          boardType={layout?.board_type}
+          header={canvasBoard.header}
+          data={{
+            widgets: effectiveBoardData?.widgets,
+            status: effectiveBoardData?.status,
+          }}
+          previewSize="fullscreen"
+        />
+        <BoardSyncStatus
+          lastSyncedAt={lastSyncedAt}
+          refreshIntervalSec={refreshSeconds}
+          theme={boardTheme}
+          isRealtime={isWsLive || !!liveBoardData}
+        />
+        {(dataLoading || dataFetching) && !effectiveBoardData?.widgets && (
+          <div className="pointer-events-none absolute bottom-2 left-2 z-20 flex items-center gap-2 text-xs text-slate-400">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            Loading data…
           </div>
-          <span className={`text-xs ${boardTheme === "light" ? "text-slate-400" : "text-slate-500"}`}>
-            v{layout?.version || config?.board_version || 1}
-          </span>
-        </div>
-        <div className="flex-1 min-h-0 relative">
-          <VisualBoardCanvas
-            layout={canvasBoard.layout}
-            widgets={canvasBoard.widgets}
-            theme={boardTheme}
-            boardType={layout?.board_type}
-            header={canvasBoard.header}
-            data={{
-              widgets: effectiveBoardData?.widgets,
-              status: effectiveBoardData?.status,
-            }}
-            previewSize="fullscreen"
-          />
-          <BoardSyncStatus
-            lastSyncedAt={lastSyncedAt}
-            refreshIntervalSec={refreshSeconds}
-            theme={boardTheme}
-            isRealtime={isWsLive || !!liveBoardData}
-          />
-          {(dataLoading || dataFetching) && !effectiveBoardData?.widgets && (
-            <div className="pointer-events-none absolute bottom-2 left-2 z-20 flex items-center gap-2 text-xs text-slate-400">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              Loading data…
-            </div>
-          )}
-          {dataLoadError && (
-            <div className="pointer-events-none absolute bottom-10 left-2 z-20 max-w-xs text-xs text-amber-400/90">
-              Data refresh failed — layout is shown; retrying…
-            </div>
-          )}
-        </div>
+        )}
+        {dataLoadError && (
+          <div className="pointer-events-none absolute bottom-10 left-2 z-20 max-w-xs text-xs text-amber-400/90">
+            Data refresh failed — layout is shown; retrying…
+          </div>
+        )}
       </div>
     </div>
   );

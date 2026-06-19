@@ -50,24 +50,24 @@ export function BoardSyncStatus({
 
   return (
     <div
-      className={`pointer-events-none absolute bottom-2 right-2 z-20 flex flex-col items-end gap-0.5 text-right ${className}`}
+      className={`pointer-events-none absolute bottom-2 right-2 z-20 flex items-center justify-end gap-2 text-right ${className}`}
       aria-live="polite"
       data-testid="board-sync-status"
     >
-      <div className={`flex items-center gap-1.5 text-xs sm:text-sm font-medium tabular-nums ${labelClass}`}>
+      <div className={`flex items-center gap-1.5 text-[10px] sm:text-xs tabular-nums ${labelClass}`}>
         <span
           className={`inline-block h-2 w-2 shrink-0 rounded-full ${
             isLive ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)] animate-pulse" : "bg-amber-500/80"
           }`}
           aria-hidden
         />
-        <span className={isLive ? "text-emerald-400" : "text-amber-400/90"}>
+        <span className={isLive ? "text-emerald-400 font-medium" : "text-amber-400/90 font-medium"}>
           {isLive ? "Live" : "Sync delayed"}
         </span>
+        <span className={timeClass}>
+          · Synced {formatSyncTime(syncDate)}
+        </span>
       </div>
-      <p className={`text-[10px] sm:text-xs tabular-nums ${timeClass}`}>
-        Synced {formatSyncTime(syncDate)}
-      </p>
     </div>
   );
 }

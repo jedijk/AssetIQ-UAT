@@ -66,6 +66,10 @@
         "label": "Kriticiteitsdefinities",
         "description": "Definieer kriticiteitsimpactschalen"
       },
+      "visualManagement": {
+        "label": "Visual Management",
+        "description": "Shopfloor boards, TV-displays en koppelen"
+      },
       "notifications": {
         "label": "Meldingen",
         "description": "E-mail- en waarschuwingsvoorkeuren"

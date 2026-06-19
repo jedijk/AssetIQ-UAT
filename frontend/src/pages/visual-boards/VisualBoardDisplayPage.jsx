@@ -113,35 +113,25 @@ const VisualBoardDisplayPage = () => {
 
   return (
     <div className={pageClass}>
-      <div className="h-full w-full p-2 md:p-4 flex flex-col">
-        <div className="flex items-center justify-between px-2 py-1 mb-2">
-          <h1 className={`text-lg font-semibold truncate ${boardTheme === "light" ? "text-slate-800" : "text-white"}`}>
-            {layout?.name}
-          </h1>
-          <span className={`text-xs ${boardTheme === "light" ? "text-slate-400" : "text-slate-500"}`}>
-            v{layout?.version || 1}
-          </span>
-        </div>
-        <div className="flex-1 min-h-0 relative">
-          <VisualBoardCanvas
-            layout={canvasBoard.layout}
-            widgets={canvasBoard.widgets}
-            theme={boardTheme}
-            boardType={layout?.board_type}
-            header={canvasBoard.header}
-            data={{
-              widgets: displayData?.widgets,
-              status: displayData?.status,
-            }}
-            previewSize="fullscreen"
-          />
-          <BoardSyncStatus
-            lastSyncedAt={lastSyncedAt}
-            refreshIntervalSec={refreshSec}
-            theme={boardTheme}
-            isRealtime={!!liveData}
-          />
-        </div>
+      <div className="h-full w-full flex flex-col relative">
+        <VisualBoardCanvas
+          layout={canvasBoard.layout}
+          widgets={canvasBoard.widgets}
+          theme={boardTheme}
+          boardType={layout?.board_type}
+          header={canvasBoard.header}
+          data={{
+            widgets: displayData?.widgets,
+            status: displayData?.status,
+          }}
+          previewSize="fullscreen"
+        />
+        <BoardSyncStatus
+          lastSyncedAt={lastSyncedAt}
+          refreshIntervalSec={refreshSec}
+          theme={boardTheme}
+          isRealtime={!!liveData}
+        />
       </div>
     </div>
   );

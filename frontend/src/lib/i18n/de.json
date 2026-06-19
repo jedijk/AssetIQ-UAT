@@ -66,6 +66,10 @@
         "label": "Criticality Definitions",
         "description": "Define criticality impact scales"
       },
+      "visualManagement": {
+        "label": "Visual Management",
+        "description": "Shop-floor boards, TV displays, and pairing"
+      },
       "notifications": {
         "label": "Notifications",
         "description": "Email and alert preferences"
