@@ -667,9 +667,10 @@ export default function FormSubmissionsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <>
+    <div className="app-page-shell bg-slate-50">
       {/* Header */}
-      <div className="sticky-below-app-header bg-white border-b border-slate-200 shadow-sm">
+      <div className="flex-shrink-0 sticky-below-app-header bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-2 sm:gap-4">
             <div className="flex items-center gap-2 sm:gap-3">
@@ -688,6 +689,7 @@ export default function FormSubmissionsPage() {
         </div>
       </div>
 
+      <div className="app-page-scroll mobile-scroll-pane flex-1 min-h-0">
       {/* Stats Cards */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
         <div className="grid grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
@@ -978,6 +980,8 @@ export default function FormSubmissionsPage() {
           )}
         </div>
       </div>
+      </div>
+    </div>
 
       {/* Submission Detail Dialog */}
       {/* Quick View Modal - Matching Dashboard Design */}
@@ -1582,7 +1586,7 @@ export default function FormSubmissionsPage() {
         <LightboxPortal viewingImage={viewingImage} onClose={() => setViewingImage(null)} />,
         document.body
       )}
-    </div>
+    </>
   );
 }
 

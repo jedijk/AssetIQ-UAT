@@ -9,9 +9,9 @@ import { Badge } from "../../components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { getDisplayPairingUrl } from "../../components/visual-boards/DisplayPairingInstructions";
 import { VisualManagementNav } from "../../components/visual-boards/VisualManagementNav";
+import { VisualManagementPageLayout } from "../../components/visual-boards/VisualManagementPageLayout";
 import {
   VMB_PAGE_ACTIONS_CLASS,
-  VMB_PAGE_CLASS,
   VMB_PAGE_HEADER_CLASS,
   VMB_PAGE_TITLE_CLASS,
 } from "../../components/visual-boards/visualManagementLayout";
@@ -47,7 +47,7 @@ const VisualBoardsPage = () => {
   const boards = data?.items || data?.boards || [];
 
   return (
-    <div className={VMB_PAGE_CLASS}>
+    <VisualManagementPageLayout>
       <VisualManagementNav />
 
       <div className={VMB_PAGE_HEADER_CLASS}>
@@ -145,7 +145,7 @@ const VisualBoardsPage = () => {
           ))}
         </div>
       )}
-    </div>
+    </VisualManagementPageLayout>
   );
 };
 

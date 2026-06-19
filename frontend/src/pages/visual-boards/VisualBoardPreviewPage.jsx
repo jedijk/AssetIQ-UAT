@@ -106,7 +106,7 @@ const VisualBoardPreviewPage = () => {
 
   const pageClass = isTvExact
     ? `fixed inset-0 z-40 ${boardSurfaceClass(canvasBoard.theme)}`
-    : "min-h-[calc(100vh-48px)] bg-slate-900 flex flex-col";
+    : "app-page-shell bg-slate-900 flex flex-col";
 
   const canvasPreviewSize = isTvExact ? "fullscreen" : previewSize;
   const hideChrome = snapshotMode && isTvExact;
@@ -173,7 +173,7 @@ const VisualBoardPreviewPage = () => {
         className={
           isTvExact
             ? "h-full w-full flex flex-col relative"
-            : `flex-1 p-6 flex items-center justify-center ${simulateTv ? boardSurfaceClass(canvasBoard.theme) : ""}`
+            : `app-page-scroll mobile-scroll-pane flex-1 min-h-0 p-6 flex items-center justify-center ${simulateTv ? boardSurfaceClass(canvasBoard.theme) : ""}`
         }
       >
         <VisualBoardCanvas

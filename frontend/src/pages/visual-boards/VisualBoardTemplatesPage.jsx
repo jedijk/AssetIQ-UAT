@@ -8,7 +8,8 @@ import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { VisualManagementNav } from "../../components/visual-boards/VisualManagementNav";
-import { VMB_PAGE_CLASS, VMB_PAGE_TITLE_CLASS } from "../../components/visual-boards/visualManagementLayout";
+import { VisualManagementPageLayout } from "../../components/visual-boards/VisualManagementPageLayout";
+import { VMB_PAGE_TITLE_CLASS } from "../../components/visual-boards/visualManagementLayout";
 
 const VisualBoardTemplatesPage = () => {
   const navigate = useNavigate();
@@ -44,7 +45,7 @@ const VisualBoardTemplatesPage = () => {
   const templates = data?.items || [];
 
   return (
-    <div className={VMB_PAGE_CLASS}>
+    <VisualManagementPageLayout>
       <VisualManagementNav />
 
       <div className="min-w-0">
@@ -81,7 +82,7 @@ const VisualBoardTemplatesPage = () => {
           ))}
         </div>
       )}
-    </div>
+    </VisualManagementPageLayout>
   );
 };
 

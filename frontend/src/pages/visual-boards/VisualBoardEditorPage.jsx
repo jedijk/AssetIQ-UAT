@@ -265,7 +265,7 @@ const VisualBoardEditorPage = () => {
   }
 
   return (
-    <div className="h-[calc(100vh-48px)] flex flex-col">
+    <div className="app-page-shell flex flex-col">
       <div className="border-b bg-white px-3 sm:px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Button asChild variant="ghost" size="sm" className="shrink-0">

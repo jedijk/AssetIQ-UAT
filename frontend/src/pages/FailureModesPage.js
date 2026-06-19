@@ -1048,16 +1048,20 @@ const FailureModesPage = () => {
         </TabsContent>
         
         {/* Custom PM Import Tab */}
-        <TabsContent value="pm-import" className="space-y-4">
-          <CustomPMImportTab
-            onOpenImportWizard={() => setIsPMImportOpen(true)}
-            onOpenEquipmentTypeStrategy={openEquipmentTypeStrategy}
-          />
+        <TabsContent value="pm-import" className="h-[calc(100vh-200px)] min-h-0 mt-0">
+          <div className="h-full overflow-y-auto mobile-scroll-pane min-h-0 pb-4">
+            <CustomPMImportTab
+              onOpenImportWizard={() => setIsPMImportOpen(true)}
+              onOpenEquipmentTypeStrategy={openEquipmentTypeStrategy}
+            />
+          </div>
         </TabsContent>
 
         {/* Intelligence Map Tab */}
-        <TabsContent value="intelligence-map" className="space-y-4">
-          <IntelligenceMapTab />
+        <TabsContent value="intelligence-map" className="h-[calc(100vh-200px)] min-h-0 mt-0">
+          <div className="h-full overflow-y-auto mobile-scroll-pane min-h-0 pb-4">
+            <IntelligenceMapTab />
+          </div>
         </TabsContent>
       </Tabs>
 

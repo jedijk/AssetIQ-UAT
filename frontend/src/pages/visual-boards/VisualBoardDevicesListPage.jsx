@@ -8,9 +8,9 @@ import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Card, CardContent } from "../../components/ui/card";
 import { VisualManagementNav } from "../../components/visual-boards/VisualManagementNav";
+import { VisualManagementPageLayout } from "../../components/visual-boards/VisualManagementPageLayout";
 import {
   VMB_PAGE_ACTIONS_CLASS,
-  VMB_PAGE_CLASS,
   VMB_PAGE_HEADER_CLASS,
   VMB_PAGE_TITLE_CLASS,
 } from "../../components/visual-boards/visualManagementLayout";
@@ -42,7 +42,7 @@ const VisualBoardDevicesListPage = () => {
   const devices = data?.items || [];
 
   return (
-    <div className={VMB_PAGE_CLASS}>
+    <VisualManagementPageLayout>
       <VisualManagementNav />
 
       <div className={VMB_PAGE_HEADER_CLASS}>
@@ -111,7 +111,7 @@ const VisualBoardDevicesListPage = () => {
           </div>
         </div>
       )}
-    </div>
+    </VisualManagementPageLayout>
   );
 };
 

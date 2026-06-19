@@ -6,9 +6,9 @@ import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { VisualManagementNav } from "../../components/visual-boards/VisualManagementNav";
+import { VisualManagementPageLayout } from "../../components/visual-boards/VisualManagementPageLayout";
 import {
   VMB_PAGE_ACTIONS_CLASS,
-  VMB_PAGE_CLASS,
   VMB_PAGE_HEADER_CLASS,
   VMB_PAGE_TITLE_CLASS,
 } from "../../components/visual-boards/visualManagementLayout";
@@ -20,7 +20,7 @@ const VisualBoardAnalyticsPage = () => {
   });
 
   return (
-    <div className={VMB_PAGE_CLASS}>
+    <VisualManagementPageLayout>
       <VisualManagementNav />
 
       <div className={VMB_PAGE_HEADER_CLASS}>
@@ -79,7 +79,7 @@ const VisualBoardAnalyticsPage = () => {
           </Card>
         </>
       )}
-    </div>
+    </VisualManagementPageLayout>
   );
 };
 

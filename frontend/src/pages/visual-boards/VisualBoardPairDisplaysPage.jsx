@@ -13,9 +13,9 @@ import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { DisplayPairingInstructions, getDisplayPairingUrl } from "../../components/visual-boards/DisplayPairingInstructions";
 import { VisualManagementNav } from "../../components/visual-boards/VisualManagementNav";
+import { VisualManagementPageLayout } from "../../components/visual-boards/VisualManagementPageLayout";
 import {
   VMB_PAGE_ACTIONS_CLASS,
-  VMB_PAGE_CLASS,
   VMB_PAGE_HEADER_CLASS,
   VMB_PAGE_TITLE_CLASS,
 } from "../../components/visual-boards/visualManagementLayout";
@@ -108,7 +108,7 @@ const VisualBoardPairDisplaysPage = () => {
   const legacyItems = legacyScreens?.items || [];
 
   return (
-    <div className={VMB_PAGE_CLASS}>
+    <VisualManagementPageLayout>
       <VisualManagementNav />
 
       <div className={VMB_PAGE_HEADER_CLASS}>
@@ -248,7 +248,7 @@ const VisualBoardPairDisplaysPage = () => {
           )}
         </div>
       )}
-    </div>
+    </VisualManagementPageLayout>
   );
 };
 
