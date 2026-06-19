@@ -239,8 +239,14 @@ export const displayDeviceAPI = {
     const response = await fetch(
       `${publicBase()}/api/display/board/snapshot${publicDisplayQuery(params)}`,
       {
-        headers: deviceAuthHeaders(deviceToken),
+        method: "GET",
+        headers: {
+          ...deviceAuthHeaders(deviceToken),
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+        },
         credentials: "omit",
+        cache: "no-store",
       },
     );
     if (!response.ok) {

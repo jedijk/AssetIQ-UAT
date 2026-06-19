@@ -14,27 +14,13 @@ import ReactDOM from "react-dom/client";
 import KioskApp from "./KioskApp";
 import KioskErrorBoundary from "../components/KioskErrorBoundary";
 import { applyKioskCompatClasses } from "../lib/kioskCompat";
+import { prepareKioskBoot } from "../lib/kioskBootstrap";
+import { hardReloadWithCacheBust } from "../lib/chunkRecovery";
 
 if (typeof document !== "undefined") {
   try {
     document.documentElement.classList.add("display-kiosk");
     applyKioskCompatClasses();
-  } catch (_e) {}
-}
-
-if ("serviceWorker" in navigator) {
-  try {
-    navigator.serviceWorker.getRegistrations().then(async (regs) => {
-      const cacheRegs = (regs || []).filter((r) => {
-        const script = r.active?.scriptURL || r.installing?.scriptURL || "";
-        return !script.includes("push-sw.js");
-      });
-      await Promise.all(cacheRegs.map((r) => r.unregister()));
-      if ("caches" in window) {
-        const names = await caches.keys();
-        await Promise.all(names.map((n) => caches.delete(n)));
-      }
-    });
   } catch (_e) {}
 }
 
@@ -56,11 +42,11 @@ function showKioskBootError(message) {
     msg.style.cssText = "margin:0 0 16px;font-size:14px;line-height:1.5;color:#94a3b8";
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.textContent = "Reload";
+    btn.textContent = "Reload display";
     btn.style.cssText =
       "padding:12px 20px;border:none;border-radius:10px;background:#2563eb;color:#fff;font-size:14px;font-weight:600;cursor:pointer";
     btn.onclick = function () {
-      window.location.reload();
+      hardReloadWithCacheBust();
     };
     inner.appendChild(title);
     inner.appendChild(msg);
@@ -73,21 +59,28 @@ function showKioskBootError(message) {
 window.addEventListener("error", (e) => {
   const msg = String(e?.message || "");
   if (msg.includes("Loading chunk") || msg.includes("ChunkLoadError")) {
-    showKioskBootError("This TV browser cached an older version. Tap Reload.");
+    showKioskBootError("This TV browser cached an older version. Tap Reload display.");
   }
 });
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(
-  <KioskErrorBoundary>
-    <KioskApp />
-  </KioskErrorBoundary>,
-);
+async function bootKiosk() {
+  const shouldRender = await prepareKioskBoot();
+  if (!shouldRender) return;
 
-setTimeout(() => {
-  const el = document.getElementById("root");
-  const hasContent = !!(el && el.childNodes && el.childNodes.length > 0);
-  if (!hasContent) {
-    showKioskBootError("The display started but did not render. Tap Reload.");
-  }
-}, 5000);
+  const root = ReactDOM.createRoot(document.getElementById("root"));
+  root.render(
+    <KioskErrorBoundary>
+      <KioskApp />
+    </KioskErrorBoundary>,
+  );
+
+  setTimeout(() => {
+    const el = document.getElementById("root");
+    const hasContent = !!(el && el.childNodes && el.childNodes.length > 0);
+    if (!hasContent) {
+      showKioskBootError("The display started but did not render. Tap Reload display.");
+    }
+  }, 5000);
+}
+
+bootKiosk();

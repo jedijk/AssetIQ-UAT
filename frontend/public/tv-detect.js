@@ -1,5 +1,6 @@
 /**
  * ES5-safe Samsung / smart-TV redirect to the display kiosk (no inline script — CSP safe).
+ * Also forces a cache-bust query param so TVs fetch fresh tv.html + kiosk bundles.
  */
 (function () {
   var ua = navigator.userAgent || "";
@@ -13,7 +14,14 @@
     p === "/display" ||
     p.indexOf("/display/") === 0 ||
     p.indexOf("/vmb/") === 0;
+
+  if (isKiosk && location.search.indexOf("_cb=") === -1) {
+    var sep = location.search && location.search.length > 0 ? "&" : "?";
+    location.replace(location.pathname + location.search + sep + "_cb=" + Date.now());
+    return;
+  }
+
   if (isTV && !isKiosk) {
-    location.replace("/tv");
+    location.replace("/tv?_cb=" + Date.now());
   }
 })();

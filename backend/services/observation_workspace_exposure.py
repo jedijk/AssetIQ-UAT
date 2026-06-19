@@ -363,7 +363,22 @@ async def compute_workspace_risk_summary(
             except (TypeError, ValueError):
                 crit_score = 0
     else:
-        crit_score = int(observation.get("criticality_score") or 0)
+        snap = observation.get("equipment_criticality_data")
+        if snap and isinstance(snap, dict):
+            from services.criticality_score import get_criticality_dimensions
+
+            dims = get_criticality_dimensions(snap)
+            if any(dims.values()):
+                crit_score = compute_criticality_score(
+                    dims["safety"],
+                    dims["production"],
+                    dims["environmental"],
+                    dims["reputation"],
+                )
+            else:
+                crit_score = int(observation.get("criticality_score") or 0)
+        else:
+            crit_score = int(observation.get("criticality_score") or 0)
 
     risk_settings = await get_risk_settings_for_installation(installation_id or "")
     risk_score, risk_level = calculate_risk_score(crit_score, fmea_score, risk_settings)

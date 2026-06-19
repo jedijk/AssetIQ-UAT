@@ -82,8 +82,9 @@ def calculate_risk_score(criticality_score: int, fmea_score: int, settings: dict
     """Calculate final risk score and level based on settings."""
     crit_weight = settings.get("criticality_weight", 0.75)
     fmea_weight = settings.get("fmea_weight", 0.25)
-    
-    final_risk_score = int((criticality_score * crit_weight) + (fmea_score * fmea_weight))
+
+    weighted = (criticality_score * crit_weight) + (fmea_score * fmea_weight)
+    final_risk_score = _round_half_up(weighted)
     final_risk_score = min(100, max(0, final_risk_score))
     
     critical_threshold = settings.get("critical_threshold", 70)
@@ -178,13 +179,16 @@ async def recalculate_threat_scores_for_asset(asset_name: str, user_id: str, new
             # First check database for user-created failure modes
             db_fm = await db.failure_modes.find_one({"name": exact_case_insensitive(failure_mode_name)})
             if db_fm:
-                rpn = db_fm.get("rpn", 500)
-                fmea_score = min(100, int(rpn / 10))
+                from_fm = fmea_score_from_failure_mode(db_fm)
+                if from_fm is not None:
+                    fmea_score = from_fm
             else:
                 # Fall back to static library
                 for fm in FAILURE_MODES_LIBRARY:
                     if fm["failure_mode"].lower() == failure_mode_name.lower():
-                        fmea_score = min(100, int(fm["rpn"] / 10))
+                        from_fm = fmea_score_from_failure_mode(fm)
+                        if from_fm is not None:
+                            fmea_score = from_fm
                         break
 
         # Use installation-specific settings for calculation

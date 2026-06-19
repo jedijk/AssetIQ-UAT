@@ -23,6 +23,9 @@ from services.criticality_score import compute_criticality_score
 from services.tenant_schema import merge_tenant_filter, with_tenant_id
 from services.threat_enrichment import THREAT_LIST_PROJECTION, enrich_threat_list
 from services.threat_score_service import (
+    calculate_risk_score,
+    fmea_score_from_failure_mode,
+    get_risk_settings_for_installation,
     propagate_risk_to_linked_entities,
     recalculate_threat_scores_for_asset,
     recalculate_threat_scores_for_failure_mode,
@@ -567,8 +570,9 @@ async def recalculate_all_threat_scores(user: dict):
             # Check database first, then static library
             fm = await get_failure_mode_by_name_or_id(failure_mode_name, failure_mode_id)
             if fm:
-                # Calculate FMEA score from RPN
-                fmea_score = min(100, int(fm["rpn"] / 10))
+                from_fm = fmea_score_from_failure_mode(fm)
+                if from_fm is not None:
+                    fmea_score = from_fm
         
         # Get criticality data from asset (case-insensitive match)
         asset_name = threat.get("asset", "")
@@ -607,19 +611,11 @@ async def recalculate_all_threat_scores(user: dict):
                     "criticality_score": criticality_score
                 }
         
-        # NEW METHODOLOGY: Risk Score = (Criticality × 0.75) + (FMEA × 0.25)
-        final_risk_score = int((criticality_score * 0.75) + (fmea_score * 0.25))
-        final_risk_score = min(100, max(0, final_risk_score))
-        
-        # Determine risk level
-        if final_risk_score >= 70:
-            risk_level = "Critical"
-        elif final_risk_score >= 50:
-            risk_level = "High"
-        elif final_risk_score >= 30:
-            risk_level = "Medium"
-        else:
-            risk_level = "Low"
+        installation_id = threat.get("installation_id") or ""
+        risk_settings = await get_risk_settings_for_installation(installation_id)
+        final_risk_score, risk_level = calculate_risk_score(
+            criticality_score, fmea_score, risk_settings
+        )
         
         # Update threat with full criticality data
         update_fields = {
@@ -703,21 +699,19 @@ async def link_threat_to_equipment(user: dict, threat_id: str, equipment_node_id
     if failure_mode_name and failure_mode_name != "Unknown":
         fm = await get_failure_mode_by_name_or_id(failure_mode_name, failure_mode_id)
         if fm:
-            fmea_score = min(100, int(fm["rpn"] / 10))
-    
-    # NEW METHODOLOGY: Risk Score = (Criticality × 0.75) + (FMEA × 0.25)
-    final_risk_score = int((criticality_score * 0.75) + (fmea_score * 0.25))
-    final_risk_score = min(100, max(0, final_risk_score))
-    
-    # Determine risk level
-    if final_risk_score >= 70:
-        risk_level = "Critical"
-    elif final_risk_score >= 50:
-        risk_level = "High"
-    elif final_risk_score >= 30:
-        risk_level = "Medium"
-    else:
-        risk_level = "Low"
+            from_fm = fmea_score_from_failure_mode(fm)
+            if from_fm is not None:
+                fmea_score = from_fm
+
+    installation_id = (
+        threat.get("installation_id")
+        or node.get("installation_id")
+        or ""
+    )
+    risk_settings = await get_risk_settings_for_installation(installation_id)
+    final_risk_score, risk_level = calculate_risk_score(
+        criticality_score, fmea_score, risk_settings
+    )
     
     # Update threat with new asset link and recalculated score
     update_data = {
@@ -798,34 +792,26 @@ async def link_threat_to_failure_mode(user: dict, threat_id: str, failure_mode_i
 
     fmea_score = fmea_score_from_failure_mode(matched_fm) or 0
     
-    # Get criticality score from threat (or calculate from stored criticality data)
-    criticality_score = threat.get("criticality_score", 0)
+    # Get criticality score from stored dimension data (matches score modal)
     criticality_data = threat.get("equipment_criticality_data")
-    
-    if criticality_data and criticality_score == 0:
-        # Recalculate from stored data
+    criticality_score = threat.get("criticality_score", 0)
+
+    if criticality_data:
         safety_impact = criticality_data.get("safety_impact", 0) or 0
         production_impact = criticality_data.get("production_impact", 0) or 0
         environmental_impact = criticality_data.get("environmental_impact", 0) or 0
         reputation_impact = criticality_data.get("reputation_impact", 0) or 0
-        
-        criticality_score = compute_criticality_score(
-            safety_impact, production_impact, environmental_impact, reputation_impact
-        )
+
+        if safety_impact or production_impact or environmental_impact or reputation_impact:
+            criticality_score = compute_criticality_score(
+                safety_impact, production_impact, environmental_impact, reputation_impact
+            )
     
-    # NEW METHODOLOGY: Risk Score = (Criticality × 0.75) + (FMEA × 0.25)
-    final_risk_score = int((criticality_score * 0.75) + (fmea_score * 0.25))
-    final_risk_score = min(100, max(0, final_risk_score))
-    
-    # Determine risk level
-    if final_risk_score >= 70:
-        risk_level = "Critical"
-    elif final_risk_score >= 50:
-        risk_level = "High"
-    elif final_risk_score >= 30:
-        risk_level = "Medium"
-    else:
-        risk_level = "Low"
+    installation_id = threat.get("installation_id") or ""
+    risk_settings = await get_risk_settings_for_installation(installation_id)
+    final_risk_score, risk_level = calculate_risk_score(
+        criticality_score, fmea_score, risk_settings
+    )
     
     # Update threat with new failure mode link and recalculated score
     update_data = {

@@ -12,6 +12,7 @@ import {
 import { Button } from "../../components/ui/button";
 import { DisplayPairingInstructions } from "../../components/visual-boards/DisplayPairingInstructions";
 import { detectLocalSubnet } from "../../lib/localNetwork";
+import { kioskBoardUrl } from "../../lib/kioskBootstrap";
 
 function formatCountdown(seconds) {
   const m = Math.floor(seconds / 60);
@@ -73,7 +74,7 @@ const DisplayPairingPage = () => {
     try {
       const existingToken = localStorage.getItem(DISPLAY_DEVICE_TOKEN_KEY);
       if (existingToken) {
-        navigate("/tv/board?fullscreen=true", { replace: true });
+        navigate(kioskBoardUrl(), { replace: true });
       }
     } catch (_e) {}
   }, [navigate]);
@@ -124,7 +125,7 @@ const DisplayPairingPage = () => {
           }
           setPairedInfo(status);
           setPaired(true);
-          navigate("/tv/board?fullscreen=true", { replace: true });
+          navigate(kioskBoardUrl(), { replace: true });
         }
 
         if (status.status === "expired") {

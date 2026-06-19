@@ -248,8 +248,9 @@ async def device_board_snapshot(device_token: str = Depends(_require_device_toke
     device = await device_svc.lookup_device_by_token(device_token)
     data, content_type, updated_at = await snapshot_svc.get_device_snapshot_from_device_doc(device)
     headers = {
-        "Cache-Control": "no-store, no-cache, must-revalidate",
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
         "Pragma": "no-cache",
+        "Expires": "0",
     }
     if updated_at:
         headers["X-Snapshot-Updated-At"] = updated_at

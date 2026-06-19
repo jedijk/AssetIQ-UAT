@@ -12,6 +12,8 @@ import {
 import { getWebSocketBaseUrl } from "../../lib/apiConfig";
 
 const REFRESH_MS = 30_000;
+const SNAPSHOT_RETRY_ATTEMPTS = 8;
+const SNAPSHOT_RETRY_DELAY_MS = 4_000;
 
 function clearDisplayStorage() {
   try {
@@ -32,6 +34,7 @@ const DisplayBoardImagePage = ({ onFallbackToCanvas }) => {
   const [error, setError] = useState("");
   const urlRef = useRef("");
   const fallbackTriggered = useRef(false);
+  const retryAttempt = useRef(0);
 
   const triggerCanvasFallback = useCallback(() => {
     if (fallbackTriggered.current) return;
@@ -52,6 +55,7 @@ const DisplayBoardImagePage = ({ onFallbackToCanvas }) => {
       const { blob } = await displayDeviceAPI.fetchBoardSnapshot(deviceToken, {
         cacheBust: Date.now(),
       });
+      retryAttempt.current = 0;
       revokeUrl();
       const nextUrl = URL.createObjectURL(blob);
       urlRef.current = nextUrl;
@@ -64,14 +68,20 @@ const DisplayBoardImagePage = ({ onFallbackToCanvas }) => {
         navigate("/tv", { replace: true });
         return;
       }
-      // No snapshot yet or API unavailable — use live board instead of blocking the TV.
-      if (!imageUrl && !urlRef.current) {
+      if (!urlRef.current) {
+        if (retryAttempt.current < SNAPSHOT_RETRY_ATTEMPTS) {
+          retryAttempt.current += 1;
+          window.setTimeout(() => {
+            if (!fallbackTriggered.current) loadSnapshot();
+          }, SNAPSHOT_RETRY_DELAY_MS);
+          return;
+        }
         triggerCanvasFallback();
         return;
       }
       setError(err.message || "Could not load board image");
     } finally {
-      if (!fallbackTriggered.current) {
+      if (!fallbackTriggered.current && (urlRef.current || retryAttempt.current >= SNAPSHOT_RETRY_ATTEMPTS)) {
         setLoading(false);
       }
     }
@@ -169,8 +179,9 @@ const DisplayBoardImagePage = ({ onFallbackToCanvas }) => {
 
   if (loading && !imageUrl) {
     return (
-      <div className="fixed inset-0 bg-black flex items-center justify-center">
+      <div className="fixed inset-0 bg-black flex flex-col items-center justify-center gap-3">
         <Loader2 className="w-12 h-12 animate-spin text-slate-500" />
+        <p className="text-sm text-slate-500">Loading board image…</p>
       </div>
     );
   }
@@ -200,9 +211,10 @@ const DisplayBoardImagePage = ({ onFallbackToCanvas }) => {
     <div className="fixed inset-0 bg-black overflow-hidden">
       {imageUrl ? (
         <img
+          key={imageUrl}
           src={imageUrl}
           alt="Visual management board"
-          className="w-full h-full object-contain select-none"
+          className="w-full h-full object-cover select-none"
           draggable={false}
         />
       ) : null}
