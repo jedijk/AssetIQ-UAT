@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, Loader2, X } from "lucide-react";
@@ -54,6 +54,7 @@ export default function NearbyDisplayPairingPrompt() {
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState("intro");
+  const activePairingIdRef = useRef(null);
   const [pairForm, setPairForm] = useState({
     board_id: "",
     board_db_env: "",
@@ -62,14 +63,30 @@ export default function NearbyDisplayPairingPrompt() {
   });
 
   useEffect(() => {
-    setOpen(!!nearby);
-    if (nearby) {
-      setStep("intro");
-      setPairForm((prev) => ({
-        ...prev,
-        screen_name: prev.screen_name || nearby.device_label || "Shop Floor TV",
-      }));
+    if (!nearby?.pairing_id) {
+      setOpen(false);
+      activePairingIdRef.current = null;
+      return;
     }
+
+    setOpen(true);
+    const isNewPairing = activePairingIdRef.current !== nearby.pairing_id;
+    if (isNewPairing) {
+      activePairingIdRef.current = nearby.pairing_id;
+      setStep("intro");
+      setPairForm({
+        board_id: "",
+        board_db_env: "",
+        screen_name: nearby.device_label || "Shop Floor TV",
+        location: "",
+      });
+      return;
+    }
+
+    setPairForm((prev) => ({
+      ...prev,
+      screen_name: prev.screen_name || nearby.device_label || "Shop Floor TV",
+    }));
   }, [nearby]);
 
   const { data: boardsData, isLoading: boardsLoading } = useQuery({
@@ -108,6 +125,7 @@ export default function NearbyDisplayPairingPrompt() {
       rememberDismissedPairing(nearby.pairing_id);
       dismiss(nearby.pairing_id);
     }
+    activePairingIdRef.current = null;
     setOpen(false);
     setStep("intro");
   };
@@ -121,15 +139,15 @@ export default function NearbyDisplayPairingPrompt() {
     completeMutation.mutate();
   };
 
-  if (!canPair || !nearby) return null;
+  if (!canPair) return null;
 
   const boards = boardsData?.items || [];
-  const displayName = nearby.device_label || "Display";
+  const displayName = nearby?.device_label || "Display";
   const selectedBoard = boards.find((b) => b.id === pairForm.board_id);
 
   return (
-    <AnimatePresence>
-      {open ? (
+    <AnimatePresence mode="wait">
+      {open && nearby ? (
         <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-4 pb-8 sm:pb-4 pointer-events-none">
           <motion.button
             type="button"
