@@ -27,7 +27,11 @@ def test_scope_pipeline_prepends_tenant_match():
     ]
 
 
-@pytest.mark.asyncio
+@pytest.mark.skipif(
+    bool(os.environ.get("REACT_APP_BACKEND_URL")),
+    reason="Skip motor event-loop tests in HTTP integration CI mode",
+)
+@pytest.mark.asyncio(loop_scope="session")
 async def test_get_intelligence_map_stats_includes_reliability_edges(require_mongo):
     user = {"user_id": "ci-test", "company_id": "default", "email": "test@test.com"}
     result = await get_intelligence_map_stats(current_user=user)
