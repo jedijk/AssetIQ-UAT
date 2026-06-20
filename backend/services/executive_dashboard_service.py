@@ -137,6 +137,8 @@ async def _threat_ids_with_linked_actions(current_user: dict) -> Set[str]:
     ).to_list(10000)
     return {row["source_id"] for row in rows if row.get("source_id")}
 
+from services.pm_import_constants import PM_IMPORT_UNWOUND_ENABLED_TASK_MATCH
+
 # Equipment with accepted/imported PM Import tasks (Intelligence Map parity).
 PM_IMPORT_EQUIPMENT_LINKED_TASK_MATCH = {
     "tasks_extracted.equipment_match.equipment_id": {"$ne": None},
@@ -145,6 +147,11 @@ PM_IMPORT_EQUIPMENT_LINKED_TASK_MATCH = {
         {"tasks_extracted.import_status": {"$in": ["applied", "merged", "implemented"]}},
         {"tasks_extracted.review_status": {"$in": ["accepted", "edited", "implemented"]}},
     ],
+}
+
+PM_IMPORT_ACTIVE_EQUIPMENT_LINKED_TASK_MATCH = {
+    **PM_IMPORT_EQUIPMENT_LINKED_TASK_MATCH,
+    **PM_IMPORT_UNWOUND_ENABLED_TASK_MATCH,
 }
 
 
@@ -172,7 +179,7 @@ async def _equipment_ids_with_active_pm_import(
     *,
     created_before: Optional[str] = None,
 ) -> set:
-    """Equipment covered by an imported PM plan (even without a strategy-based v2 program)."""
+    """Equipment covered by an enabled imported PM task (even without a strategy-based v2 program)."""
     pre_stages: List[dict] = []
     if created_before:
         pre_stages.append({"$match": {"created_at": {"$lt": created_before}}})
@@ -181,7 +188,7 @@ async def _equipment_ids_with_active_pm_import(
         [
             *pre_stages,
             {"$unwind": "$tasks_extracted"},
-            {"$match": PM_IMPORT_EQUIPMENT_LINKED_TASK_MATCH},
+            {"$match": PM_IMPORT_ACTIVE_EQUIPMENT_LINKED_TASK_MATCH},
             {"$group": {"_id": "$tasks_extracted.equipment_match.equipment_id"}},
         ],
         current_user,

@@ -9,7 +9,7 @@ from services.cache_service import cache
 from services.equipment_type_registry import count_equipment_types, list_equipment_types
 from services.equipment_hierarchy_filters import apply_plant_system_filters
 from services.db_monitoring import timed_aggregate
-from services.tenant_schema import merge_tenant_filter, prepend_tenant_match, tenant_id_from_user
+from services.pm_import_constants import PM_IMPORT_UNWOUND_ENABLED_TASK_MATCH
 
 logger = logging.getLogger(__name__)
 
@@ -89,16 +89,29 @@ def _pm_import_imported_task_match(
     return match
 
 
-def _pm_import_equipment_linked_task_match(equipment_ids: Optional[list] = None) -> dict:
+def _pm_import_equipment_linked_task_match(
+    equipment_ids: Optional[list] = None,
+    *,
+    enabled_only: bool = False,
+) -> dict:
     """Match equipment-linked PM import tasks for schedule / lineage counts."""
     match = dict(PM_IMPORT_EQUIPMENT_LINKED_TASK_MATCH)
     if equipment_ids is not None:
         match["tasks_extracted.equipment_match.equipment_id"] = {"$in": equipment_ids}
+    if enabled_only:
+        match.update(PM_IMPORT_UNWOUND_ENABLED_TASK_MATCH)
     return match
 
 
-def _pm_import_task_match(equipment_ids: Optional[list] = None) -> dict:
-    return _pm_import_equipment_linked_task_match(equipment_ids)
+def _pm_import_task_match(
+    equipment_ids: Optional[list] = None,
+    *,
+    enabled_only: bool = True,
+) -> dict:
+    return _pm_import_equipment_linked_task_match(
+        equipment_ids,
+        enabled_only=enabled_only,
+    )
 
 
 async def _count_imported_pm_import_tasks(
@@ -164,7 +177,7 @@ async def _count_active_pm_import_tasks(
         db.pm_import_sessions,
         _scope_pipeline([
             {"$unwind": "$tasks_extracted"},
-            {"$match": _pm_import_equipment_linked_task_match(equipment_ids)},
+            {"$match": _pm_import_equipment_linked_task_match(equipment_ids, enabled_only=True)},
             {"$count": "c"},
         ], user),
     )
@@ -344,7 +357,10 @@ async def get_intelligence_map_stats(
         equipment_with_strategy_applied_count = len(equipment_ids_with_strategy_applied)
 
         # ========== EQUIPMENT WITH ACTIVE PM IMPORT TASKS ==========
-        pm_task_active_match = _pm_import_equipment_linked_task_match(pm_import_equipment_ids)
+        pm_task_active_match = _pm_import_equipment_linked_task_match(
+            pm_import_equipment_ids,
+            enabled_only=True,
+        )
         pm_equipment_pipeline = [
             {"$unwind": "$tasks_extracted"},
             {"$match": pm_task_active_match},
@@ -381,12 +397,26 @@ async def get_intelligence_map_stats(
             
         programs_count = await db.maintenance_programs_v2.count_documents(scope(program_query))
 
-        # Active programs include both strategy-applied programs and PM Import-driven ones.
-        # When a program comes from PM Import, the v2 row may not exist yet — so we count
-        # the distinct equipment with PM imports as additional "active programs".
-        # programs_active = strategy programs + PM import equipment not already counted.
-        pm_only_equipment = equipment_ids_with_pm_import - equipment_ids_with_strategy_applied
-        programs_active_count = programs_count + len(pm_only_equipment)
+        active_program_query = {
+            **program_query,
+            "status": {"$in": ["active", "draft"]},
+            "active_tasks": {"$gt": 0},
+        }
+        active_v2_program_count = await db.maintenance_programs_v2.count_documents(
+            scope(active_program_query),
+        )
+        equipment_ids_with_active_v2_program = {
+            eid
+            for eid in await db.maintenance_programs_v2.distinct(
+                "equipment_id",
+                scope(active_program_query),
+            )
+            if eid
+        }
+
+        # Active programs: v2 rows with active tasks + PM-import-only equipment (enabled tasks).
+        pm_only_equipment = equipment_ids_with_pm_import - equipment_ids_with_active_v2_program
+        programs_active_count = active_v2_program_count + len(pm_only_equipment)
         
         # Get program task statistics
         program_pipeline = [

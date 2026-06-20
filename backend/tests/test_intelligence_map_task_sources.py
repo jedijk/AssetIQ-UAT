@@ -53,6 +53,12 @@ def test_pm_import_equipment_linked_task_match_with_equipment_scope():
     assert "$or" in match
 
 
-def test_pm_import_task_match_alias_uses_equipment_linked():
-    assert _pm_import_task_match(None) == PM_IMPORT_ACTIVE_TASK_MATCH
-    assert PM_IMPORT_ACTIVE_TASK_MATCH == PM_IMPORT_EQUIPMENT_LINKED_TASK_MATCH
+def test_pm_import_equipment_linked_task_match_enabled_only():
+    match = _pm_import_equipment_linked_task_match(["eq-1"], enabled_only=True)
+    assert match["tasks_extracted.is_active"] == {"$ne": False}
+    assert match["tasks_extracted.equipment_match.equipment_id"] == {"$in": ["eq-1"]}
+
+
+def test_pm_import_task_match_alias_uses_enabled_equipment_linked():
+    assert _pm_import_task_match(None) == _pm_import_equipment_linked_task_match(None, enabled_only=True)
+    assert _pm_import_task_match(None)["tasks_extracted.is_active"] == {"$ne": False}

@@ -130,17 +130,12 @@ async def cleanup_orphan_tasks(
             if task.get("id"):
                 active_v2_task_ids.add(task["id"])
     
+    from services.intelligence_map_routes_service import _pm_import_equipment_linked_task_match
+    
     # ========== PM IMPORT EQUIPMENT (matches Intelligence Map logic) ==========
-    # Equipment with active PM Import tasks are treated as having an "active program"
-    # This matches the Intelligence Map's definition of "active programs"
-    pm_import_equipment_match = {
-        "tasks_extracted.equipment_match.equipment_id": {"$ne": None},
-        "tasks_extracted.review_status": {"$ne": "rejected"},
-        "$or": [
-            {"tasks_extracted.import_status": {"$in": ["applied", "merged", "implemented"]}},
-            {"tasks_extracted.review_status": {"$in": ["accepted", "edited", "implemented"]}},
-        ],
-    }
+    pm_import_equipment_match = _pm_import_equipment_linked_task_match(
+        enabled_only=True,
+    )
     
     pm_equipment_pipeline = [
         {"$unwind": "$tasks_extracted"},
@@ -150,20 +145,22 @@ async def cleanup_orphan_tasks(
     pm_equipment_result = await db.pm_import_sessions.aggregate(pm_equipment_pipeline).to_list(None)
     equipment_ids_with_pm_import = set(r["_id"] for r in pm_equipment_result if r.get("_id"))
     
-    # Equipment IDs that have actual v2 programs (strategy-based)
-    equipment_ids_with_strategy_program = set()
+    # Equipment IDs that have v2 programs with active tasks
+    equipment_ids_with_active_v2_program = set()
     async for prog in db.maintenance_programs_v2.find(
-        {"status": {"$in": ["active", "draft"]}},
+        {"status": {"$in": ["active", "draft"]}, "active_tasks": {"$gt": 0}},
         {"equipment_id": 1, "_id": 0}
     ):
         if prog.get("equipment_id"):
-            equipment_ids_with_strategy_program.add(prog["equipment_id"])
+            equipment_ids_with_active_v2_program.add(prog["equipment_id"])
     
-    # For display: count PM-only equipment (not already covered by strategy programs)
-    pm_only_equipment_count = len(equipment_ids_with_pm_import - equipment_ids_with_strategy_program)
+    # For display: count PM-only equipment (not already covered by active v2 programs)
+    pm_only_equipment_count = len(equipment_ids_with_pm_import - equipment_ids_with_active_v2_program)
     
-    # Total "active programs" count matches Intelligence Map: programs_count + pm_only_equipment
-    total_active_programs_count = len(active_program_ids) + pm_only_equipment_count
+    active_v2_program_count = await db.maintenance_programs_v2.count_documents(
+        {"status": {"$in": ["active", "draft"]}, "active_tasks": {"$gt": 0}},
+    )
+    total_active_programs_count = active_v2_program_count + pm_only_equipment_count
     
     # Build query for orphan scheduled_tasks
     # A task is orphan if:

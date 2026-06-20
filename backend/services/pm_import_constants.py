@@ -35,6 +35,10 @@ def is_pm_import_task_active(task: Dict[str, Any]) -> bool:
     return task.get("is_active", True) is not False
 
 
+# Mongo match for enabled PM import rows after $unwind on tasks_extracted.
+PM_IMPORT_UNWOUND_ENABLED_TASK_MATCH = {"tasks_extracted.is_active": {"$ne": False}}
+
+
 def _sanitize_for_json(value: Any) -> Any:
     """Recursively convert MongoDB / Python values to JSON-safe types."""
     if value is None or isinstance(value, bool):
