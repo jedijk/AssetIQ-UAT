@@ -9,8 +9,12 @@ from services.cache_service import cache
 from services.equipment_type_registry import count_equipment_types, list_equipment_types
 from services.equipment_hierarchy_filters import apply_plant_system_filters
 from services.db_monitoring import timed_aggregate
-from services.tenant_schema import merge_tenant_filter, prepend_tenant_match, tenant_id_from_user
 from services.pm_import_constants import PM_IMPORT_UNWOUND_ENABLED_TASK_MATCH
+from services.reliability_graph_query import (
+    count_active_reliability_edges,
+    count_edges_by_relation,
+)
+from services.tenant_schema import tenant_id_from_user
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +22,15 @@ logger = logging.getLogger(__name__)
 
 def _scope_query(base: dict, user: dict) -> dict:
     """Apply migration-safe tenant filter to intelligence map aggregations."""
-    return merge_tenant_filter(base or {}, user)
+    from services.tenant_schema import merge_tenant_filter as _merge_tenant_filter
+
+    return _merge_tenant_filter(base or {}, user)
 
 
 def _scope_pipeline(pipeline: list, user: dict) -> list:
-    return prepend_tenant_match(pipeline, user)
+    from services.tenant_schema import prepend_tenant_match as _prepend_tenant_match
+
+    return _prepend_tenant_match(pipeline, user)
 
 
 def _current_user_id(current_user: dict) -> str:
@@ -588,11 +596,6 @@ async def get_intelligence_map_stats(
         # Schedule Compliance: Schedules with valid frequency / Total schedules
         valid_schedules = schedules_count - schedules_missing_freq
         schedule_compliance = round((valid_schedules / schedules_count) * 100, 1) if schedules_count > 0 else 100
-
-        from services.reliability_graph_query import (
-            count_active_reliability_edges,
-            count_edges_by_relation,
-        )
 
         reliability_edges_total = await count_active_reliability_edges(current_user)
         edges_by_relation = await count_edges_by_relation(current_user, active_only=True)
