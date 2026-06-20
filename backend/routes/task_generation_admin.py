@@ -130,7 +130,10 @@ async def cleanup_orphan_tasks(
             if task.get("id"):
                 active_v2_task_ids.add(task["id"])
     
-    from services.intelligence_map_routes_service import _pm_import_equipment_linked_task_match
+    from services.intelligence_map_routes_service import (
+        _active_v2_program_match,
+        _pm_import_equipment_linked_task_match,
+    )
     
     # ========== PM IMPORT EQUIPMENT (matches Intelligence Map logic) ==========
     pm_import_equipment_match = _pm_import_equipment_linked_task_match(
@@ -148,8 +151,8 @@ async def cleanup_orphan_tasks(
     # Equipment IDs that have v2 programs with active tasks
     equipment_ids_with_active_v2_program = set()
     async for prog in db.maintenance_programs_v2.find(
-        {"status": {"$in": ["active", "draft"]}, "active_tasks": {"$gt": 0}},
-        {"equipment_id": 1, "_id": 0}
+        _active_v2_program_match(),
+        {"equipment_id": 1, "_id": 0},
     ):
         if prog.get("equipment_id"):
             equipment_ids_with_active_v2_program.add(prog["equipment_id"])
@@ -158,7 +161,7 @@ async def cleanup_orphan_tasks(
     pm_only_equipment_count = len(equipment_ids_with_pm_import - equipment_ids_with_active_v2_program)
     
     active_v2_program_count = await db.maintenance_programs_v2.count_documents(
-        {"status": {"$in": ["active", "draft"]}, "active_tasks": {"$gt": 0}},
+        _active_v2_program_match(),
     )
     total_active_programs_count = active_v2_program_count + pm_only_equipment_count
     

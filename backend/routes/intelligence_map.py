@@ -11,6 +11,7 @@ from services.intelligence_map_routes_service import (  # noqa: F401
     PM_IMPORT_ACTIVE_TASK_MATCH,
     PM_IMPORT_EQUIPMENT_LINKED_TASK_MATCH,
     PM_IMPORT_IMPORTED_TASK_MATCH,
+    _active_v2_program_match,
     _intelligence_map_schedule_query,
     _normalize_equipment_tags,
     _pm_import_equipment_linked_task_match,

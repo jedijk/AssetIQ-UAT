@@ -218,11 +218,19 @@ async def propagate_pm_import_task_active_state(
                         tasks[i] = {**task, "is_active": is_active}
                         changed = True
             if changed:
+                stored["tasks"] = tasks
+                recalculate_program_task_stats(stored)
                 await db.maintenance_programs_v2.update_one(
                     {"equipment_id": equipment_id},
                     {
                         "$set": {
                             "tasks": tasks,
+                            "total_tasks": stored.get("total_tasks", len(tasks)),
+                            "active_tasks": stored.get("active_tasks", 0),
+                            "strategy_tasks": stored.get("strategy_tasks", 0),
+                            "imported_tasks": stored.get("imported_tasks", 0),
+                            "ai_tasks": stored.get("ai_tasks", 0),
+                            "manual_tasks": stored.get("manual_tasks", 0),
                             "updated_at": datetime.utcnow().isoformat(),
                         }
                     },

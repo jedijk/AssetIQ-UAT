@@ -7,6 +7,7 @@ from routes.intelligence_map import (
     PM_IMPORT_ACTIVE_TASK_MATCH,
     PM_IMPORT_EQUIPMENT_LINKED_TASK_MATCH,
     PM_IMPORT_IMPORTED_TASK_MATCH,
+    _active_v2_program_match,
     _normalize_equipment_tags,
     _pm_import_equipment_linked_task_match,
     _pm_import_imported_task_match,
@@ -62,3 +63,11 @@ def test_pm_import_equipment_linked_task_match_enabled_only():
 def test_pm_import_task_match_alias_uses_enabled_equipment_linked():
     assert _pm_import_task_match(None) == _pm_import_equipment_linked_task_match(None, enabled_only=True)
     assert _pm_import_task_match(None)["tasks_extracted.is_active"] == {"$ne": False}
+
+
+def test_active_v2_program_match_requires_enabled_tasks():
+    match = _active_v2_program_match({"equipment_type_id": "et-1"})
+    assert match["equipment_type_id"] == "et-1"
+    assert match["status"] == {"$in": ["active", "draft"]}
+    assert "$or" in match
+    assert {"tasks": {"$elemMatch": {"is_active": {"$ne": False}}}} in match["$or"]

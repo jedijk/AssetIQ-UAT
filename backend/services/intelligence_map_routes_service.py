@@ -9,6 +9,7 @@ from services.cache_service import cache
 from services.equipment_type_registry import count_equipment_types, list_equipment_types
 from services.equipment_hierarchy_filters import apply_plant_system_filters
 from services.db_monitoring import timed_aggregate
+from services.tenant_schema import merge_tenant_filter, prepend_tenant_match, tenant_id_from_user
 from services.pm_import_constants import PM_IMPORT_UNWOUND_ENABLED_TASK_MATCH
 
 logger = logging.getLogger(__name__)
@@ -112,6 +113,27 @@ def _pm_import_task_match(
         equipment_ids,
         enabled_only=enabled_only,
     )
+
+
+def _active_v2_program_match(base_query: Optional[dict] = None) -> dict:
+    """V2 programs with at least one enabled task (not just a stale active_tasks counter)."""
+    query = dict(base_query or {})
+    query["status"] = {"$in": ["active", "draft"]}
+    query["$or"] = [
+        {"tasks": {"$elemMatch": {"is_active": {"$ne": False}}}},
+        {
+            "$and": [
+                {"active_tasks": {"$gt": 0}},
+                {
+                    "$or": [
+                        {"tasks": {"$exists": False}},
+                        {"tasks": []},
+                    ]
+                },
+            ]
+        },
+    ]
+    return query
 
 
 async def _count_imported_pm_import_tasks(
@@ -382,12 +404,6 @@ async def get_intelligence_map_stats(
             pm_import_equipment_tags,
         )
 
-        # Combined: equipment with any "active program" (strategy applied OR PM imported)
-        equipment_ids_with_active_program = (
-            equipment_ids_with_strategy_applied | equipment_ids_with_pm_import
-        )
-        equipment_with_active_program_count = len(equipment_ids_with_active_program)
-        
         # ========== MAINTENANCE PROGRAMS ==========
         program_query = {}
         if equipment_type_id:
@@ -397,11 +413,7 @@ async def get_intelligence_map_stats(
             
         programs_count = await db.maintenance_programs_v2.count_documents(scope(program_query))
 
-        active_program_query = {
-            **program_query,
-            "status": {"$in": ["active", "draft"]},
-            "active_tasks": {"$gt": 0},
-        }
+        active_program_query = _active_v2_program_match(program_query)
         active_v2_program_count = await db.maintenance_programs_v2.count_documents(
             scope(active_program_query),
         )
@@ -414,9 +426,14 @@ async def get_intelligence_map_stats(
             if eid
         }
 
-        # Active programs: v2 rows with active tasks + PM-import-only equipment (enabled tasks).
+        # Active programs: v2 rows with live active tasks + PM-import-only equipment (enabled tasks).
         pm_only_equipment = equipment_ids_with_pm_import - equipment_ids_with_active_v2_program
         programs_active_count = active_v2_program_count + len(pm_only_equipment)
+
+        equipment_ids_with_active_program = (
+            equipment_ids_with_active_v2_program | equipment_ids_with_pm_import
+        )
+        equipment_with_active_program_count = len(equipment_ids_with_active_program)
         
         # Get program task statistics
         program_pipeline = [
