@@ -35,8 +35,7 @@ from services.maintenance_strategy_propagation import (
     _bump_strategy_version,
     _toggle_programs_for_failure_mode,
     _cancel_open_scheduled_tasks_for_failure_mode,
-    _cancel_open_scheduled_tasks_for_strategy,
-    _deactivate_all_programs_for_strategy,
+    _apply_strategy_disable_to_programs_and_schedules,
     count_active_programs_for_strategy,
     count_open_scheduled_tasks_for_strategy,
     is_enable_only_fm_toggle,
@@ -413,6 +412,8 @@ async def update_equipment_type_strategy(
     
     if request.status is not None:
         update_data["status"] = request.status
+        from services.maintenance_scheduler_sync import invalidate_active_strategy_type_cache
+        invalidate_active_strategy_type_cache()
     
     # Increment version
     current_version = strategy.get("version", "1.0")
@@ -442,12 +443,8 @@ async def update_equipment_type_strategy(
     
     propagation: Dict[str, Any] = {}
     if disabling:
-        propagation["programs_deactivated"] = await _deactivate_all_programs_for_strategy(
-            equipment_type_id
-        )
-        propagation["scheduled_tasks_cancelled"] = await _cancel_open_scheduled_tasks_for_strategy(
-            equipment_type_id,
-            cancel_note="Auto-cancelled: maintenance strategy disabled",
+        propagation.update(
+            await _apply_strategy_disable_to_programs_and_schedules(equipment_type_id)
         )
         if status_only:
             await clear_strategy_needs_apply(

@@ -49,11 +49,12 @@ async def test_update_strategy_disabled_propagates():
     mock_db.equipment_type_strategies.update_one = AsyncMock()
 
     with patch("services.maintenance_strategy_v2_service.db", mock_db), patch(
-        "services.maintenance_strategy_v2_service._deactivate_all_programs_for_strategy",
-        new=AsyncMock(return_value=4),
-    ), patch(
-        "services.maintenance_strategy_v2_service._cancel_open_scheduled_tasks_for_strategy",
-        new=AsyncMock(return_value=7),
+        "services.maintenance_strategy_v2_service._apply_strategy_disable_to_programs_and_schedules",
+        new=AsyncMock(return_value={
+            "programs_deactivated": 4,
+            "program_counters_updated": 2,
+            "scheduled_tasks_removed": 7,
+        }),
     ), patch(
         "services.maintenance_strategy_v2_service.clear_strategy_needs_apply",
         new=AsyncMock(),
@@ -65,6 +66,7 @@ async def test_update_strategy_disabled_propagates():
         )
 
     assert result["programs_deactivated"] == 4
-    assert result["scheduled_tasks_cancelled"] == 7
+    assert result["program_counters_updated"] == 2
+    assert result["scheduled_tasks_removed"] == 7
     assert result["strategy_needs_apply"] is False
     mock_clear.assert_awaited_once()

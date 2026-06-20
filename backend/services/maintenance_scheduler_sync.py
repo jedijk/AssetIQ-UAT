@@ -32,8 +32,15 @@ from services.scheduler_helpers import (
 logger = logging.getLogger(__name__)
 
 OPEN_TASK_STATUSES = {"$nin": ["completed", "cancelled"]}
+_ACTIVE_STRATEGY_TYPE_QUERY = {"$nor": [{"status": "disabled"}]}
 _ACTIVE_STRATEGY_CACHE: Optional[Tuple[float, Set[str]]] = None
 _ACTIVE_STRATEGY_CACHE_TTL = 60.0
+
+
+def invalidate_active_strategy_type_cache() -> None:
+    """Clear cached active strategy type ids after enable/disable/delete."""
+    global _ACTIVE_STRATEGY_CACHE
+    _ACTIVE_STRATEGY_CACHE = None
 
 
 async def sync_strategy_programs_for_equipment(
@@ -569,9 +576,10 @@ async def _active_strategy_type_ids() -> Set[str]:
     ids = {
         doc["equipment_type_id"]
         async for doc in db.equipment_type_strategies.find(
-            {},
+            _ACTIVE_STRATEGY_TYPE_QUERY,
             {"equipment_type_id": 1, "_id": 0},
         )
+        if doc.get("equipment_type_id")
     }
     _ACTIVE_STRATEGY_CACHE = (now, ids)
     return ids

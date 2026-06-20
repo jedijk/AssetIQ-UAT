@@ -103,3 +103,78 @@ def test_is_status_only_strategy_update():
     assert not is_status_only_strategy_update(
         UpdateEquipmentTypeStrategyRequest(status="disabled", description="x")
     )
+
+
+@pytest.mark.asyncio
+async def test_resync_programs_with_strategy_disabled_deactivates_all_tasks():
+    from models.maintenance_program import TaskSource
+    from services.strategy_propagation import resync_programs_with_strategy
+
+    strategy = {
+        "equipment_type_id": "etype-1",
+        "status": "disabled",
+        "task_templates": [{"id": "tmpl-1", "task_type": "preventive", "is_mandatory": True}],
+        "failure_mode_strategies": [],
+    }
+    program = {
+        "_id": "mongo-1",
+        "equipment_type_id": "etype-1",
+        "tasks": [
+            {
+                "id": "pt-1",
+                "task_source": TaskSource.STRATEGY_GENERATED.value,
+                "is_active": True,
+                "traceability": {"task_template_id": "tmpl-1"},
+            }
+        ],
+    }
+
+    mock_db = MagicMock()
+    mock_db.equipment_type_strategies.find_one = AsyncMock(return_value=strategy)
+    mock_db.maintenance_programs_v2.find = MagicMock(
+        return_value=MagicMock(to_list=AsyncMock(return_value=[program]))
+    )
+    mock_db.maintenance_programs_v2.update_one = AsyncMock()
+    mock_db.scheduled_tasks.update_many = AsyncMock(
+        return_value=MagicMock(modified_count=2)
+    )
+
+    with patch("services.strategy_propagation.db", mock_db), patch(
+        "services.scheduler_config.should_sync_legacy_maintenance_programs",
+        return_value=False,
+    ):
+        result = await resync_programs_with_strategy("etype-1")
+
+    assert result["programs_deactivated"] == 1
+    mock_db.maintenance_programs_v2.update_one.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_get_active_strategy_type_ids_excludes_disabled():
+    from services.scheduler_program_source import get_active_strategy_type_ids
+
+    class _Cursor:
+        def __init__(self, docs):
+            self._docs = docs
+
+        def __aiter__(self):
+            self._iter = iter(self._docs)
+            return self
+
+        async def __anext__(self):
+            try:
+                return next(self._iter)
+            except StopIteration as exc:
+                raise StopAsyncIteration from exc
+
+    mock_db = MagicMock()
+    mock_db.equipment_type_strategies.find = MagicMock(
+        return_value=_Cursor([{"equipment_type_id": "active-type"}])
+    )
+
+    with patch("services.scheduler_program_source.db", mock_db):
+        ids = await get_active_strategy_type_ids()
+
+    assert ids == {"active-type"}
+    query = mock_db.equipment_type_strategies.find.call_args[0][0]
+    assert query == {"$nor": [{"status": "disabled"}]}

@@ -113,7 +113,10 @@ def expand_v2_program_to_scheduler_rows(
 
 async def get_active_strategy_type_ids() -> Set[str]:
     ids = set()
-    async for doc in db.equipment_type_strategies.find({}, {"equipment_type_id": 1, "_id": 0}):
+    async for doc in db.equipment_type_strategies.find(
+        {"$nor": [{"status": "disabled"}]},
+        {"equipment_type_id": 1, "_id": 0},
+    ):
         etid = doc.get("equipment_type_id")
         if etid:
             ids.add(etid)

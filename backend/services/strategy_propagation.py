@@ -24,11 +24,14 @@ async def resync_programs_with_strategy(equipment_type_id: str):
 
     tasks = strategy.get("task_templates", []) or []
     task_to_fms = build_task_to_failure_modes(strategy)
-    active_task_ids = {
-        t.get("id")
-        for t in tasks
-        if t.get("id") and is_strategy_task_active(t, task_to_fms=task_to_fms)
-    }
+    if (strategy.get("status") or "active") == "disabled":
+        active_task_ids: set = set()
+    else:
+        active_task_ids = {
+            t.get("id")
+            for t in tasks
+            if t.get("id") and is_strategy_task_active(t, task_to_fms=task_to_fms)
+        }
 
     now = datetime.now(timezone.utc).isoformat()
     activated = 0

@@ -349,6 +349,80 @@ async def _cancel_open_scheduled_tasks_for_strategy(
     return result.modified_count
 
 
+async def _recalculate_v2_program_counters_for_equipment_type(equipment_type_id: str) -> int:
+    """Refresh task count fields on v2 programs after bulk task activation changes."""
+    from models.maintenance_program import TaskSource
+
+    now = datetime.now(timezone.utc).isoformat()
+    updated = 0
+    async for prog in db.maintenance_programs_v2.find(
+        {"equipment_type_id": equipment_type_id},
+        {"_id": 1, "tasks": 1},
+    ):
+        tasks = prog.get("tasks") or []
+        await db.maintenance_programs_v2.update_one(
+            {"_id": prog["_id"]},
+            {
+                "$set": {
+                    "total_tasks": len(tasks),
+                    "active_tasks": sum(1 for t in tasks if t.get("is_active", True)),
+                    "strategy_tasks": sum(
+                        1
+                        for t in tasks
+                        if (t.get("task_source") or "").lower()
+                        == TaskSource.STRATEGY_GENERATED.value
+                    ),
+                    "imported_tasks": sum(
+                        1
+                        for t in tasks
+                        if (t.get("task_source") or "").lower()
+                        == TaskSource.CUSTOMER_IMPORTED.value
+                    ),
+                    "ai_tasks": sum(
+                        1
+                        for t in tasks
+                        if (t.get("task_source") or "").lower() == TaskSource.AI_GENERATED.value
+                    ),
+                    "manual_tasks": sum(
+                        1
+                        for t in tasks
+                        if (t.get("task_source") or "").lower() == TaskSource.MANUAL.value
+                    ),
+                    "updated_at": now,
+                }
+            },
+        )
+        updated += 1
+    return updated
+
+
+async def _apply_strategy_disable_to_programs_and_schedules(
+    equipment_type_id: str,
+) -> Dict[str, Any]:
+    """
+    Remove a disabled strategy from equipment programs and the maintenance schedule.
+
+    Deactivates strategy-generated program tasks, refreshes program counters, and
+    deletes open scheduled_tasks linked to the equipment type.
+    """
+    from services.maintenance_scheduler_sync import invalidate_active_strategy_type_cache
+    from services.strategy_propagation import resync_programs_with_strategy
+
+    invalidate_active_strategy_type_cache()
+    resync_result = await resync_programs_with_strategy(equipment_type_id)
+    counters_updated = await _recalculate_v2_program_counters_for_equipment_type(
+        equipment_type_id
+    )
+    scheduled_tasks_removed = await _delete_open_scheduled_tasks_for_strategy(
+        equipment_type_id
+    )
+    return {
+        "programs_deactivated": resync_result.get("programs_deactivated", 0),
+        "program_counters_updated": counters_updated,
+        "scheduled_tasks_removed": scheduled_tasks_removed,
+    }
+
+
 async def _deactivate_all_programs_for_strategy(equipment_type_id: str) -> int:
     """Deactivate all strategy-backed v2 program tasks for an equipment type."""
     now = datetime.now(timezone.utc).isoformat()
