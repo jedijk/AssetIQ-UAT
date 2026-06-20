@@ -4,10 +4,12 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from database import db
+from models.maintenance_program import TaskSource
 from services.program_task_resolution import (
     scheduler_program_ids_for_equipment_type,
     scheduler_program_ids_for_failure_mode,
     scheduler_program_ids_for_task_template,
+    strategy_program_task_ids_for_equipment_type,
 )
 from services.scheduler_config import should_sync_legacy_maintenance_programs
 from services.scheduler_helpers import (
@@ -206,6 +208,48 @@ async def _toggle_programs_for_failure_mode(
 
 OPEN_TASK_STATUSES_FILTER = {"$nin": ["completed", "cancelled"]}
 
+_NON_IMPORT_SCHEDULED_TASK_GUARD = {
+    "$and": [
+        {"$or": [{"pm_import_task_id": {"$exists": False}}, {"pm_import_task_id": None}]},
+        {
+            "$or": [
+                {"task_source": {"$exists": False}},
+                {"task_source": {"$nin": [TaskSource.CUSTOMER_IMPORTED.value]}},
+            ]
+        },
+    ]
+}
+
+
+def _open_strategy_scheduled_tasks_query(equipment_type_id: str, task_ids: List[str]) -> Dict[str, Any]:
+    """Match open strategy-backed scheduled rows for disable/delete (never PM import)."""
+    delete_filters: List[Dict[str, Any]] = []
+
+    if task_ids:
+        delete_filters.append(
+            {
+                "status": OPEN_TASK_STATUSES_FILTER,
+                **_NON_IMPORT_SCHEDULED_TASK_GUARD,
+                "$or": [
+                    {"maintenance_program_id": {"$in": task_ids}},
+                    {"v2_task_id": {"$in": task_ids}},
+                    {"program_task_id": {"$in": task_ids}},
+                ],
+            }
+        )
+
+    delete_filters.append(
+        {
+            "strategy_id": equipment_type_id,
+            "status": OPEN_TASK_STATUSES_FILTER,
+            **_NON_IMPORT_SCHEDULED_TASK_GUARD,
+        }
+    )
+
+    if len(delete_filters) == 1:
+        return delete_filters[0]
+    return {"$or": delete_filters}
+
 
 async def _sync_metadata_to_open_scheduled_tasks(
     equipment_type_id: str,
@@ -313,14 +357,10 @@ async def _cancel_open_scheduled_tasks_for_failure_mode(
 
 
 async def _delete_open_scheduled_tasks_for_strategy(equipment_type_id: str):
-    """Hard-delete every OPEN scheduled_task linked to the given equipment-type strategy."""
-    program_ids = await scheduler_program_ids_for_equipment_type(equipment_type_id)
-    if not program_ids:
-        return 0
-    result = await db.scheduled_tasks.delete_many({
-        "maintenance_program_id": {"$in": program_ids},
-        "status": OPEN_TASK_STATUSES_FILTER,
-    })
+    """Hard-delete every OPEN strategy-backed scheduled_task for the equipment type."""
+    task_ids = await strategy_program_task_ids_for_equipment_type(equipment_type_id)
+    query = _open_strategy_scheduled_tasks_query(equipment_type_id, task_ids)
+    result = await db.scheduled_tasks.delete_many(query)
     return result.deleted_count
 
 
@@ -495,13 +535,9 @@ async def count_active_programs_for_strategy(equipment_type_id: str) -> int:
 
 async def count_open_scheduled_tasks_for_strategy(equipment_type_id: str) -> int:
     """Count open scheduled tasks linked to strategy-backed programs."""
-    program_ids = await scheduler_program_ids_for_equipment_type(equipment_type_id)
-    if not program_ids:
-        return 0
-    return await db.scheduled_tasks.count_documents({
-        "maintenance_program_id": {"$in": program_ids},
-        "status": OPEN_TASK_STATUSES_FILTER,
-    })
+    task_ids = await strategy_program_task_ids_for_equipment_type(equipment_type_id)
+    query = _open_strategy_scheduled_tasks_query(equipment_type_id, task_ids)
+    return await db.scheduled_tasks.count_documents(query)
 
 
 # ---------- Comprehensive sync: derive active state from strategy truth ----------

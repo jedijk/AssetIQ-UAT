@@ -2,7 +2,7 @@
 import asyncio
 import logging
 import time
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 from services.tenant_schema import merge_tenant_filter
 from services.scheduler_helpers import (
@@ -88,27 +88,14 @@ async def scope_scheduled_tasks_query(
         rows = []
 
     program_ids = [row["id"] for row in rows if row.get("id")]
-    equipped_ids: List[str] = []
-    seen: Set[str] = set()
-    for row in rows:
-        equipment_id = row.get("equipment_id")
-        if equipment_id and equipment_id not in seen:
-            seen.add(equipment_id)
-            equipped_ids.append(equipment_id)
 
-    scope_clause: Dict = {}
-    if not program_ids and not equipped_ids:
-        scope_clause = {"_id": {"$exists": False}}
+    # Scope strictly by schedulable program ids. Do not OR-match equipment_id:
+    # equipment with both import and strategy tasks would otherwise show disabled
+    # strategy occurrences that were not removed from scheduled_tasks.
+    if not program_ids:
+        scope_clause: Dict = {"_id": {"$exists": False}}
     else:
-        or_parts: List[Dict] = []
-        if program_ids:
-            or_parts.append({"maintenance_program_id": {"$in": program_ids}})
-        if equipped_ids:
-            or_parts.append({"equipment_id": {"$in": equipped_ids}})
-        if len(or_parts) == 1:
-            scope_clause = or_parts[0]
-        else:
-            scope_clause = {"$or": or_parts}
+        scope_clause = {"maintenance_program_id": {"$in": program_ids}}
 
     query.clear()
     parts: List[Dict] = []

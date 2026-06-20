@@ -241,3 +241,39 @@ async def scheduler_program_ids_for_equipment_type(
     if include_legacy:
         ids.extend(await legacy_program_ids_for_equipment_type(equipment_type_id))
     return _dedupe(ids)
+
+
+async def strategy_program_task_ids_for_equipment_type(
+    equipment_type_id: str,
+    *,
+    include_legacy: bool = True,
+) -> List[str]:
+    """Scheduler row ids for strategy-generated tasks only (v2 task ids + legacy program ids)."""
+    from models.maintenance_program import TaskSource
+    from services.scheduler_config import should_read_legacy_maintenance_programs
+    from services.scheduler_helpers import program_is_strategy_backed
+
+    ids: List[str] = []
+    async for prog in db.maintenance_programs_v2.find(
+        {"equipment_type_id": equipment_type_id},
+        {"tasks": 1, "_id": 0},
+    ):
+        for task in prog.get("tasks") or []:
+            if (task.get("task_source") or "").lower() != TaskSource.STRATEGY_GENERATED.value:
+                continue
+            task_id = task.get("id")
+            if task_id:
+                ids.append(task_id)
+
+    if include_legacy and should_read_legacy_maintenance_programs():
+        async for prog in db.maintenance_programs.find(
+            {"equipment_type_id": equipment_type_id},
+            {"id": 1, "task_source": 1, "pm_import_task_id": 1, "_id": 0},
+        ):
+            if not program_is_strategy_backed(prog):
+                continue
+            prog_id = prog.get("id")
+            if prog_id:
+                ids.append(prog_id)
+
+    return _dedupe(ids)

@@ -84,7 +84,7 @@ async def test_count_active_programs_for_strategy():
 @pytest.mark.asyncio
 async def test_count_open_scheduled_tasks_for_strategy():
     with patch(
-        "services.maintenance_strategy_propagation.scheduler_program_ids_for_equipment_type",
+        "services.maintenance_strategy_propagation.strategy_program_task_ids_for_equipment_type",
         new=AsyncMock(return_value=["prog-1", "prog-2"]),
     ), patch(
         "services.maintenance_strategy_propagation.db",
@@ -94,6 +94,9 @@ async def test_count_open_scheduled_tasks_for_strategy():
 
     assert count == 3
     mock_db.scheduled_tasks.count_documents.assert_awaited_once()
+    query = mock_db.scheduled_tasks.count_documents.call_args[0][0]
+    assert "$or" in query
+    assert any(part.get("strategy_id") == "etype-1" for part in query["$or"])
 
 
 def test_is_status_only_strategy_update():
@@ -178,3 +181,54 @@ async def test_get_active_strategy_type_ids_excludes_disabled():
     assert ids == {"active-type"}
     query = mock_db.equipment_type_strategies.find.call_args[0][0]
     assert query == {"$nor": [{"status": "disabled"}]}
+
+
+@pytest.mark.asyncio
+async def test_delete_open_scheduled_tasks_for_strategy_matches_strategy_id_orphans():
+    from services.maintenance_strategy_propagation import (
+        _delete_open_scheduled_tasks_for_strategy,
+    )
+
+    with patch(
+        "services.maintenance_strategy_propagation.strategy_program_task_ids_for_equipment_type",
+        new=AsyncMock(return_value=["v2-task-1"]),
+    ), patch(
+        "services.maintenance_strategy_propagation.db",
+    ) as mock_db:
+        mock_db.scheduled_tasks.delete_many = AsyncMock(
+            return_value=MagicMock(deleted_count=4)
+        )
+        removed = await _delete_open_scheduled_tasks_for_strategy("etype-1")
+
+    assert removed == 4
+    query = mock_db.scheduled_tasks.delete_many.call_args[0][0]
+    assert "$or" in query
+    id_clause = next(part for part in query["$or"] if "$or" in part)
+    assert {"maintenance_program_id": {"$in": ["v2-task-1"]}} in id_clause["$or"]
+    assert {"v2_task_id": {"$in": ["v2-task-1"]}} in id_clause["$or"]
+    strategy_clause = next(
+        part for part in query["$or"] if part.get("strategy_id") == "etype-1"
+    )
+    assert strategy_clause["status"] == {"$nin": ["completed", "cancelled"]}
+
+
+@pytest.mark.asyncio
+async def test_scope_does_not_leak_strategy_tasks_via_equipment_id():
+    """Import schedulable rows must not expose unrelated strategy scheduled tasks."""
+    from services.maintenance_scheduler_scope import scope_scheduled_tasks_query
+
+    query = {
+        "due_date": {"$gte": "2026-01-01", "$lte": "2026-12-31"},
+        "status": {"$nin": ["cancelled"]},
+    }
+    rows = [{"id": "import-prog-1", "equipment_id": "eq-bearings"}]
+
+    with patch(
+        "services.maintenance_scheduler_scope.load_schedulable_program_rows",
+        new=AsyncMock(return_value=rows),
+    ):
+        await scope_scheduled_tasks_query(query, equipment_type_id="bearings-type")
+
+    scope = query["$and"][1]
+    assert scope == {"maintenance_program_id": {"$in": ["import-prog-1"]}}
+    assert "equipment_id" not in str(scope)

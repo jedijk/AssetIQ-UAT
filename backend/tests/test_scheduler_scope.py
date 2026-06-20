@@ -26,9 +26,7 @@ async def test_scope_preserves_due_date_filter():
   assert query["$and"][0]["due_date"]["$gte"] == "2026-01-01"
   assert query["$and"][0]["status"] == {"$nin": ["cancelled"]}
   scope = query["$and"][1]
-  assert "$or" in scope
-  assert {"maintenance_program_id": {"$in": ["prog-1"]}} in scope["$or"]
-  assert {"equipment_id": {"$in": ["eq-1"]}} in scope["$or"]
+  assert scope == {"maintenance_program_id": {"$in": ["prog-1"]}}
 
 
 @pytest.mark.asyncio
@@ -64,8 +62,7 @@ async def test_scope_applies_tenant_filter_not_user_fields():
   assert "user_id" not in scope_part
   # scope + tenant merged (nested $and), not the raw user dict
   inner = scope_part.get("$and", [scope_part])
-  scope_or = next((p for p in inner if "$or" in p), None)
-  assert scope_or is not None
-  assert {"maintenance_program_id": {"$in": ["prog-1"]}} in scope_or["$or"]
+  scope_prog = next((p for p in inner if "maintenance_program_id" in p), None)
+  assert scope_prog == {"maintenance_program_id": {"$in": ["prog-1"]}}
   tenant_part = next((p for p in inner if "tenant_id" in str(p)), None)
   assert tenant_part is not None
