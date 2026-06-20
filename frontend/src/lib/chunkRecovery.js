@@ -3,7 +3,9 @@ import { debugLog } from "./debug";
 const CHUNK_RELOAD_KEY = "assetiq_chunk_reload_attempted";
 const CHUNK_RELOAD_COUNT_KEY = "assetiq_chunk_reload_count";
 const STALE_BUILD_KEY = "assetiq_stale_build_reload";
+const HARD_RELOAD_THROTTLE_KEY = "assetiq_hard_reload_last_at";
 const MAX_CHUNK_RELOAD_ATTEMPTS = 2;
+const HARD_RELOAD_THROTTLE_MS = 10_000;
 
 export function isChunkLoadFailure(message) {
   const msg = String(message || "");
@@ -35,6 +37,18 @@ export async function clearAppCaches() {
 }
 
 export async function hardReloadWithCacheBust() {
+  try {
+    const lastAt = Number.parseInt(sessionStorage.getItem(HARD_RELOAD_THROTTLE_KEY) || "0", 10);
+    const now = Date.now();
+    if (now - lastAt < HARD_RELOAD_THROTTLE_MS) {
+      debugLog("hard_reload_throttled", { msSinceLast: now - lastAt });
+      return;
+    }
+    sessionStorage.setItem(HARD_RELOAD_THROTTLE_KEY, String(now));
+  } catch (_e) {
+    // continue with reload if sessionStorage is unavailable
+  }
+
   await clearAppCaches();
   const url = new URL(window.location.href);
   url.searchParams.delete("_cb");

@@ -353,14 +353,9 @@ const ThreatsPage = () => {
   useEffect(() => {
     if (threatsError && !errorShown) {
       console.error("Failed to fetch observations:", threatsError);
-      // Check if it's an auth error
-      if (threatsError.response?.status === 401) {
-        toast.error(t("observations.sessionExpired"));
-        // Redirect to login
-        window.location.href = "/login";
-      } else if (threatsError.response?.status === 503) {
+      if (threatsError.response?.status === 503) {
         toast.error(t("observations.serverUnavailableRetry"));
-      } else {
+      } else if (threatsError.response?.status !== 401) {
         toast.error(t("observations.loadFailedRefresh"));
       }
       setErrorShown(true);

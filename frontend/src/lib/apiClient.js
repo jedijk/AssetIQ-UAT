@@ -52,6 +52,31 @@ const sessionCheckClient = axios.create({
 });
 
 let sessionVerifyInFlight = null;
+let lastAuthExpiredDispatchAt = 0;
+let sessionExpiryConfirmed = false;
+const AUTH_EXPIRED_DEBOUNCE_MS = 3000;
+
+/** Reset after a fresh login so 401 handling works again. */
+export function resetSessionExpiryState() {
+  sessionExpiryConfirmed = false;
+  lastAuthExpiredDispatchAt = 0;
+  sessionVerifyInFlight = null;
+}
+
+function dispatchAuthExpiredEvent() {
+  const now = Date.now();
+  if (now - lastAuthExpiredDispatchAt < AUTH_EXPIRED_DEBOUNCE_MS) {
+    try {
+      debugLog("auth_expired_dispatch_debounced", { msSinceLast: now - lastAuthExpiredDispatchAt });
+    } catch (_e) {}
+    return;
+  }
+  lastAuthExpiredDispatchAt = now;
+  sessionExpiryConfirmed = true;
+  try {
+    window.dispatchEvent(new CustomEvent("assetiq:auth-expired"));
+  } catch (_e) {}
+}
 
 async function isSessionActuallyExpired() {
   if (sessionVerifyInFlight) return sessionVerifyInFlight;
@@ -73,6 +98,8 @@ async function isSessionActuallyExpired() {
 }
 
 function handleUnauthorizedResponse(error) {
+  if (sessionExpiryConfirmed) return;
+
   const url = `${error.config?.baseURL || ""}${error.config?.url || ""}`;
   if (isPreLoginAuthUrl(url)) return;
   if (typeof window !== "undefined") {
@@ -85,6 +112,7 @@ function handleUnauthorizedResponse(error) {
   } catch (_e) {}
 
   isSessionActuallyExpired().then((expired) => {
+    if (sessionExpiryConfirmed) return;
     if (!expired) {
       try {
         debugLog("api_401_ignored", { url, reason: "session_still_valid" });
@@ -94,9 +122,7 @@ function handleUnauthorizedResponse(error) {
     if (AUTH_MODE !== "cookie") {
       localStorage.removeItem("token");
     }
-    try {
-      window.dispatchEvent(new CustomEvent("assetiq:auth-expired"));
-    } catch (_e) {}
+    dispatchAuthExpiredEvent();
   });
 }
 

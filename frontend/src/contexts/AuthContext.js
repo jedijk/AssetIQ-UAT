@@ -6,6 +6,7 @@ import { clearRolePreviewStorage } from "./RolePreviewContext";
 import { enforceDatabaseEnvironmentForRole } from "../lib/databaseEnv";
 import { setCsrfToken, clearCsrfToken } from "../lib/apiConfig";
 import { isPublicKioskPath } from "../lib/publicRoutes";
+import { resetSessionExpiryState } from "../lib/apiClient";
 
 const AuthContext = createContext(null);
 const AUTH_MODE = process.env.REACT_APP_AUTH_MODE || "bearer"; // "bearer" | "cookie"
@@ -181,6 +182,7 @@ export const AuthProvider = ({ children }) => {
       }
     }
     setUser(userData);
+    resetSessionExpiryState();
     enforceDatabaseEnvironmentForRole(userData?.role);
     setLoading(false);
     setMustChangePassword(must_change_password || userData.must_change_password || false);
@@ -242,6 +244,7 @@ export const AuthProvider = ({ children }) => {
       }
 
       setUser(userData);
+      resetSessionExpiryState();
       enforceDatabaseEnvironmentForRole(userData?.role);
       setLoading(false);
       setMustChangePassword(userData.must_change_password || false);

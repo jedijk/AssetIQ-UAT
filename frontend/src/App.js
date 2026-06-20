@@ -16,7 +16,7 @@ import TermsAcceptanceDialog from "./components/TermsAcceptanceDialog";
 import FirstLoginFlow from "./components/FirstLoginFlow";
 import LandscapeBlocker from "./components/LandscapeBlocker";
 import NotificationPrompt from "./components/NotificationPrompt";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { getBackendUrl } from "./lib/apiConfig";
 import { api } from "./lib/apiClient";
 import { debugLog } from "./lib/debug";
@@ -115,19 +115,34 @@ function useIsKioskRoute() {
 
 function AuthExpiredListener() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
+  const handlingRef = useRef(false);
+
   useEffect(() => {
-    const handler = () => {
+    const handler = async () => {
+      if (handlingRef.current) return;
+      handlingRef.current = true;
+
       try {
         debugLog("auth_expired_event", { path: window.location.pathname });
       } catch (_e) {}
+
       const path = window.location.pathname;
-      if (!path.includes("/login") && !isPublicKioskPath(path)) {
-        navigate("/login", { replace: true });
+      if (path.includes("/login") || isPublicKioskPath(path)) {
+        handlingRef.current = false;
+        return;
       }
+
+      try {
+        await logout();
+      } catch (_e) {}
+
+      navigate("/login", { replace: true });
+      handlingRef.current = false;
     };
     window.addEventListener("assetiq:auth-expired", handler);
     return () => window.removeEventListener("assetiq:auth-expired", handler);
-  }, [navigate]);
+  }, [navigate, logout]);
   return null;
 }
 
