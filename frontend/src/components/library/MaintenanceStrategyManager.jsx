@@ -1535,26 +1535,58 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
     updateFMStrategyMutation.mutate({ failureModeId, data: updates });
   };
 
-  const getStrategyDisableImpactDescription = (impact) => {
+  const renderBoldCount = (value) => (
+    <strong className="font-semibold text-foreground">{value}</strong>
+  );
+
+  const renderStrategyDisableImpactDescription = (impact) => {
     const programCount = impact?.active_program_count ?? 0;
     const taskCount = impact?.open_scheduled_tasks_count ?? 0;
     if (programCount === 0 && taskCount === 0) {
       return t("maintenance.strategyDisableImpactDescriptionNoImpact");
     }
     if (programCount === 1 && taskCount === 1) {
-      return t("maintenance.strategyDisableImpactDescriptionBothOne");
+      return (
+        <>
+          {t("maintenance.strategyDisableImpactDescDeactivatePrefix")}
+          {renderBoldCount(1)}
+          {t("maintenance.strategyDisableImpactDescProgramSingularAndRemove")}
+          {renderBoldCount(1)}
+          {t("maintenance.strategyDisableImpactDescTaskSingularEnd")}
+        </>
+      );
     }
     if (programCount > 0 && taskCount === 0) {
-      return programCount === 1
-        ? t("maintenance.strategyDisableImpactDescriptionProgramsOnlyOne")
-        : t("maintenance.strategyDisableImpactDescriptionProgramsOnly", { programCount });
+      return (
+        <>
+          {t("maintenance.strategyDisableImpactDescDeactivatePrefix")}
+          {renderBoldCount(programCount)}
+          {programCount === 1
+            ? t("maintenance.strategyDisableImpactDescProgramSingularEnd")
+            : t("maintenance.strategyDisableImpactDescProgramsPluralEnd")}
+        </>
+      );
     }
     if (programCount === 0 && taskCount > 0) {
-      return taskCount === 1
-        ? t("maintenance.strategyDisableImpactDescriptionTasksOnlyOne")
-        : t("maintenance.strategyDisableImpactDescriptionTasksOnly", { taskCount });
+      return (
+        <>
+          {t("maintenance.strategyDisableImpactDescRemovePrefix")}
+          {renderBoldCount(taskCount)}
+          {taskCount === 1
+            ? t("maintenance.strategyDisableImpactDescTaskSingularEnd")
+            : t("maintenance.strategyDisableImpactDescTasksPluralEnd")}
+        </>
+      );
     }
-    return t("maintenance.strategyDisableImpactDescription", { programCount, taskCount });
+    return (
+      <>
+        {t("maintenance.strategyDisableImpactDescDeactivatePrefix")}
+        {renderBoldCount(programCount)}
+        {t("maintenance.strategyDisableImpactDescProgramsPluralAndRemove")}
+        {renderBoldCount(taskCount)}
+        {t("maintenance.strategyDisableImpactDescTasksPluralEnd")}
+      </>
+    );
   };
 
   const handleToggleStrategy = async (newStatus) => {
@@ -2164,7 +2196,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
           <AlertDialogHeader>
             <AlertDialogTitle>{t("maintenance.strategyDisableImpactTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {getStrategyDisableImpactDescription(strategyDisableConfirm)}
+              {renderStrategyDisableImpactDescription(strategyDisableConfirm)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
