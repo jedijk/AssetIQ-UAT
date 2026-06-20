@@ -108,6 +108,14 @@ async def get_strategy_audit_log(
     )
 
 
+@router.get("/{equipment_type_id}/disable-impact")
+async def get_strategy_disable_impact(
+    equipment_type_id: str,
+    current_user: dict = Depends(_library_read),
+):
+    return await svc.get_strategy_disable_impact(equipment_type_id, current_user)
+
+
 @router.get("/{equipment_type_id}/failure-modes")
 async def get_failure_mode_strategies(
     equipment_type_id: str,

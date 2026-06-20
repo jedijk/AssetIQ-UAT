@@ -112,6 +112,16 @@ export const maintenanceStrategyV2API = {
   },
 
   /**
+   * Preview impact of disabling a maintenance strategy.
+   */
+  getStrategyDisableImpact: async (equipmentTypeId) => {
+    const response = await api.get(
+      `/maintenance-strategies-v2/${equipmentTypeId}/disable-impact`
+    );
+    return response.data;
+  },
+
+  /**
    * Count active maintenance programs affected by editing a task template.
    */
   getTaskTemplateProgramImpact: async (equipmentTypeId, taskId) => {

@@ -1283,6 +1283,8 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
   const [showInactiveInMatrix, setShowInactiveInMatrix] = useState(false);
   const [syncingFmId, setSyncingFmId] = useState(null);
   const [taskImpactConfirm, setTaskImpactConfirm] = useState(null);
+  const [strategyDisableConfirm, setStrategyDisableConfirm] = useState(null);
+  const [strategyDisableImpactLoading, setStrategyDisableImpactLoading] = useState(false);
 
   const equipmentTypeId = equipmentType?.id;
   const equipmentTypeName = equipmentType?.name;
@@ -1332,8 +1334,13 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
 
   const updateStrategyMutation = useMutation({
     mutationFn: (data) => maintenanceStrategyV2API.updateStrategy(equipmentTypeId, data),
-    onSuccess: () => {
-      toast.success(t("maintenance.strategySavedApplyHint"));
+    onSuccess: (data, variables) => {
+      if (variables?.status === "disabled") {
+        toast.success(t("maintenance.strategyDisabledSuccess"));
+        refreshMaintenanceSchedulerQueries(queryClient);
+      } else {
+        toast.success(t("maintenance.strategySavedApplyHint"));
+      }
       queryClient.invalidateQueries(["maintenance-strategy-v2", equipmentTypeId]);
     },
     onError: (err) => {
@@ -1528,8 +1535,49 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
     updateFMStrategyMutation.mutate({ failureModeId, data: updates });
   };
 
-  const handleToggleStrategy = (newStatus) => {
+  const getStrategyDisableImpactDescription = (impact) => {
+    const programCount = impact?.active_program_count ?? 0;
+    const taskCount = impact?.open_scheduled_tasks_count ?? 0;
+    if (programCount === 0 && taskCount === 0) {
+      return t("maintenance.strategyDisableImpactDescriptionNoImpact");
+    }
+    if (programCount === 1 && taskCount === 1) {
+      return t("maintenance.strategyDisableImpactDescriptionBothOne");
+    }
+    if (programCount > 0 && taskCount === 0) {
+      return programCount === 1
+        ? t("maintenance.strategyDisableImpactDescriptionProgramsOnlyOne")
+        : t("maintenance.strategyDisableImpactDescriptionProgramsOnly", { programCount });
+    }
+    if (programCount === 0 && taskCount > 0) {
+      return taskCount === 1
+        ? t("maintenance.strategyDisableImpactDescriptionTasksOnlyOne")
+        : t("maintenance.strategyDisableImpactDescriptionTasksOnly", { taskCount });
+    }
+    return t("maintenance.strategyDisableImpactDescription", { programCount, taskCount });
+  };
+
+  const handleToggleStrategy = async (newStatus) => {
+    if (newStatus === "disabled") {
+      setStrategyDisableImpactLoading(true);
+      try {
+        const impact = await maintenanceStrategyV2API.getStrategyDisableImpact(equipmentTypeId);
+        setStrategyDisableConfirm(impact);
+      } catch (err) {
+        toast.error(
+          err.response?.data?.detail || t("maintenance.strategyDisableImpactCheckFailed"),
+        );
+      } finally {
+        setStrategyDisableImpactLoading(false);
+      }
+      return;
+    }
     updateStrategyMutation.mutate({ status: newStatus });
+  };
+
+  const handleConfirmStrategyDisable = () => {
+    updateStrategyMutation.mutate({ status: "disabled" });
+    setStrategyDisableConfirm(null);
   };
 
   const handleSaveTask = async (formData) => {
@@ -1821,7 +1869,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
       <StrategyOverviewCard 
         strategy={strategyData} 
         onToggleStrategy={handleToggleStrategy}
-        isUpdating={updateStrategyMutation.isPending}
+        isUpdating={updateStrategyMutation.isPending || strategyDisableImpactLoading}
         onShowAffectedEquipment={() => setAffectedEquipmentDialogOpen(true)}
         t={t}
       />
@@ -2105,6 +2153,31 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
         onSave={handleSaveTask}
         isLoading={addTaskMutation.isPending || updateTaskMutation.isPending}
       />
+
+      <AlertDialog
+        open={Boolean(strategyDisableConfirm)}
+        onOpenChange={(open) => {
+          if (!open) setStrategyDisableConfirm(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("maintenance.strategyDisableImpactTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {getStrategyDisableImpactDescription(strategyDisableConfirm)}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmStrategyDisable}
+              disabled={updateStrategyMutation.isPending}
+            >
+              {t("maintenance.strategyDisableConfirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={Boolean(taskImpactConfirm)}

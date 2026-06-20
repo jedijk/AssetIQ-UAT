@@ -324,7 +324,11 @@ async def _delete_open_scheduled_tasks_for_strategy(equipment_type_id: str):
     return result.deleted_count
 
 
-async def _cancel_open_scheduled_tasks_for_strategy(equipment_type_id: str):
+async def _cancel_open_scheduled_tasks_for_strategy(
+    equipment_type_id: str,
+    *,
+    cancel_note: str = "Auto-cancelled: maintenance strategy deleted",
+):
     """Cancel every OPEN scheduled_task linked to the given equipment-type strategy."""
     program_ids = await scheduler_program_ids_for_equipment_type(equipment_type_id)
     if not program_ids:
@@ -338,11 +342,92 @@ async def _cancel_open_scheduled_tasks_for_strategy(equipment_type_id: str):
         },
         {"$set": {
             "status": "cancelled",
-            "notes": "Auto-cancelled: maintenance strategy deleted",
+            "notes": cancel_note,
             "updated_at": now,
         }},
     )
     return result.modified_count
+
+
+async def _deactivate_all_programs_for_strategy(equipment_type_id: str) -> int:
+    """Deactivate all strategy-backed v2 program tasks for an equipment type."""
+    now = datetime.now(timezone.utc).isoformat()
+    v2_result = await db.maintenance_programs_v2.update_many(
+        {
+            "equipment_type_id": equipment_type_id,
+            "tasks.traceability.task_template_id": {"$exists": True},
+        },
+        {
+            "$set": {
+                "tasks.$[t].is_active": False,
+                "updated_at": now,
+            }
+        },
+        array_filters=[{"t.traceability.task_template_id": {"$exists": True}}],
+    )
+    modified = v2_result.modified_count
+
+    if should_sync_legacy_maintenance_programs():
+        legacy = await db.maintenance_programs.update_many(
+            {
+                "equipment_type_id": equipment_type_id,
+                "task_template_id": {"$exists": True, "$ne": None},
+            },
+            {"$set": {"is_active": False, "updated_at": now}},
+        )
+        modified += legacy.modified_count
+
+    return modified
+
+
+async def count_active_programs_for_strategy(equipment_type_id: str) -> int:
+    """Count distinct equipment with active strategy-backed program tasks."""
+    equipment_ids: set = set()
+    async for prog in db.maintenance_programs_v2.find(
+        {"equipment_type_id": equipment_type_id},
+        {"_id": 0, "equipment_id": 1, "status": 1, "tasks": 1},
+    ):
+        status = (prog.get("status") or "active").lower()
+        if status not in ("active", "draft"):
+            continue
+        equipment_id = prog.get("equipment_id")
+        if not equipment_id:
+            continue
+        for task in prog.get("tasks") or []:
+            trace = task.get("traceability") or {}
+            if not trace.get("task_template_id"):
+                continue
+            if not task.get("is_active", True):
+                continue
+            equipment_ids.add(equipment_id)
+            break
+
+    from services.scheduler_config import should_read_legacy_maintenance_programs
+
+    if should_read_legacy_maintenance_programs():
+        async for prog in db.maintenance_programs.find(
+            {
+                "equipment_type_id": equipment_type_id,
+                "task_template_id": {"$exists": True, "$ne": None},
+                "is_active": True,
+            },
+            {"equipment_id": 1, "_id": 0},
+        ):
+            if prog.get("equipment_id"):
+                equipment_ids.add(prog["equipment_id"])
+
+    return len(equipment_ids)
+
+
+async def count_open_scheduled_tasks_for_strategy(equipment_type_id: str) -> int:
+    """Count open scheduled tasks linked to strategy-backed programs."""
+    program_ids = await scheduler_program_ids_for_equipment_type(equipment_type_id)
+    if not program_ids:
+        return 0
+    return await db.scheduled_tasks.count_documents({
+        "maintenance_program_id": {"$in": program_ids},
+        "status": OPEN_TASK_STATUSES_FILTER,
+    })
 
 
 # ---------- Comprehensive sync: derive active state from strategy truth ----------
@@ -360,6 +445,17 @@ def is_enable_only_fm_toggle(request) -> bool:
         and request.detection_methods is None
         and request.task_ids is None
         and request.frequency_override is None
+    )
+
+
+def is_status_only_strategy_update(request) -> bool:
+    """True when the request only changes strategy active/disabled status."""
+    return (
+        request.status is not None
+        and request.description is None
+        and request.failure_mode_strategies is None
+        and request.task_templates is None
+        and request.default_frequency_matrix is None
     )
 
 

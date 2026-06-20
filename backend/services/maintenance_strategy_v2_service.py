@@ -35,7 +35,12 @@ from services.maintenance_strategy_propagation import (
     _bump_strategy_version,
     _toggle_programs_for_failure_mode,
     _cancel_open_scheduled_tasks_for_failure_mode,
+    _cancel_open_scheduled_tasks_for_strategy,
+    _deactivate_all_programs_for_strategy,
+    count_active_programs_for_strategy,
+    count_open_scheduled_tasks_for_strategy,
     is_enable_only_fm_toggle,
+    is_status_only_strategy_update,
 )
 from services.maintenance_strategy_v2_task_templates import (
     add_task_template,
@@ -383,6 +388,8 @@ async def update_equipment_type_strategy(
         raise HTTPException(status_code=404, detail="Strategy not found")
     
     update_data = {"updated_at": datetime.utcnow().isoformat()}
+    disabling = request.status == "disabled"
+    status_only = is_status_only_strategy_update(request)
     
     if request.description is not None:
         update_data["description"] = request.description
@@ -422,7 +429,8 @@ async def update_equipment_type_strategy(
         "updated_by": current_user.get("user_id"),
         "changes": list(update_data.keys())
     }
-    update_data["strategy_needs_apply"] = True
+    if not (disabling and status_only):
+        update_data["strategy_needs_apply"] = True
     
     await db.equipment_type_strategies.update_one(
         {"equipment_type_id": equipment_type_id},
@@ -432,14 +440,56 @@ async def update_equipment_type_strategy(
         }
     )
     
+    propagation: Dict[str, Any] = {}
+    if disabling:
+        propagation["programs_deactivated"] = await _deactivate_all_programs_for_strategy(
+            equipment_type_id
+        )
+        propagation["scheduled_tasks_cancelled"] = await _cancel_open_scheduled_tasks_for_strategy(
+            equipment_type_id,
+            cancel_note="Auto-cancelled: maintenance strategy disabled",
+        )
+        if status_only:
+            await clear_strategy_needs_apply(
+                equipment_type_id,
+                applied_version=update_data["version"],
+            )
+    
     updated = await db.equipment_type_strategies.find_one(
         {"equipment_type_id": equipment_type_id},
         {"_id": 0}
     )
     if updated is not None and isinstance(updated, dict):
-        updated["strategy_needs_apply"] = True
+        if disabling and status_only:
+            updated["strategy_needs_apply"] = False
+        elif not disabling:
+            updated["strategy_needs_apply"] = True
+        updated.update(propagation)
 
     return updated
+
+
+async def get_strategy_disable_impact(
+    equipment_type_id: str,
+    current_user: dict,
+):
+    """Preview impact of disabling a maintenance strategy."""
+    strategy = await db.equipment_type_strategies.find_one({
+        "equipment_type_id": equipment_type_id
+    })
+    if not strategy:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+
+    active_program_count = await count_active_programs_for_strategy(equipment_type_id)
+    open_scheduled_tasks_count = await count_open_scheduled_tasks_for_strategy(
+        equipment_type_id
+    )
+    return {
+        "equipment_type_id": equipment_type_id,
+        "active_program_count": active_program_count,
+        "open_scheduled_tasks_count": open_scheduled_tasks_count,
+        "has_impact": active_program_count > 0 or open_scheduled_tasks_count > 0,
+    }
 
 
 async def delete_equipment_type_strategy(
