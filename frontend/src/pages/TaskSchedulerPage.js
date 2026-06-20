@@ -544,7 +544,7 @@ const TaskSchedulerPage = () => {
   return (
     <>
     <div className="app-page-shell max-w-7xl mx-auto w-full" data-testid="task-scheduler-page">
-      <div className="flex-shrink-0 px-4 sm:px-6 pt-4 sm:pt-6">
+      <div className="app-page-header-band">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <div className="flex items-center gap-3">
@@ -640,7 +640,7 @@ const TaskSchedulerPage = () => {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 min-h-0 flex flex-col px-4 sm:px-6 pb-4 sm:pb-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 min-h-0 flex flex-col app-page-content-band pb-4 sm:pb-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4 flex-shrink-0">
           <TabsList>
             <TabsTrigger value="instances" className="gap-2">

@@ -45,7 +45,7 @@ export function MyTasksPageHeader({
 }) {
   return (
       <div className="flex-shrink-0">
-        <div className="px-4 sm:px-6 pt-2 sm:pt-3 pb-3 max-w-7xl mx-auto w-full">
+        <div className="app-page-header-band">
           {/* Title row — desktop only; mobile title + badge live in NavigationBreadcrumb */}
           <div className="hidden sm:flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">

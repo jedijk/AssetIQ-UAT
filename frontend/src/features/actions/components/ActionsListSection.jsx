@@ -36,7 +36,7 @@ export function ActionsListSection({
 
   return (
     <div
-      className={`flex-1 min-h-0 px-4 pb-4 ${
+      className={`flex-1 min-h-0 pb-4 app-page-content-band ${
         useMobileScroll ? "flex flex-col overflow-hidden" : "app-page-scroll mobile-scroll-pane"
       }`}
     >

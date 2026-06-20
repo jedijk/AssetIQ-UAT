@@ -446,7 +446,7 @@ export default function DashboardPageMain({ initialTab }) {
   if (permissionsLoading && !tabInitialized) {
     return (
       <div className="app-page-shell overflow-x-hidden" data-testid="dashboard-page">
-        <div className="flex-shrink-0 px-4 sm:px-6 pt-4 pb-2 max-w-7xl mx-auto w-full">
+        <div className="app-page-header-band">
           <div className="flex items-center justify-between mb-2">
             <div>
               <h1 className="text-xl font-bold text-slate-900">{t("dashboard.title") || "Dashboard"}</h1>
@@ -524,7 +524,7 @@ export default function DashboardPageMain({ initialTab }) {
   return (
     <div className="app-page-shell overflow-x-hidden" data-testid="dashboard-page">
       {/* Fixed Header with Tabs - Condensed */}
-      <div className="flex-shrink-0 px-4 sm:px-6 pt-4 pb-2 max-w-7xl mx-auto w-full">
+      <div className="app-page-header-band">
         <div className="flex items-center justify-between mb-2">
           <div>
             <h1 className="text-xl font-bold text-slate-900">{t("dashboard.title") || "Dashboard"}</h1>

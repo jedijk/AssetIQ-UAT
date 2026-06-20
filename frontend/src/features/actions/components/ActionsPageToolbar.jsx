@@ -40,21 +40,21 @@ export function ActionsPageToolbar({
   setSortDropdownOpen,
 }) {
   return (
-    <div className="flex-shrink-0 px-4 pt-2 sm:pt-4 pb-2 max-w-7xl mx-auto w-full">
+    <div className="app-page-header-band">
       {location.state?.from && (
         <div className="mb-3 hidden sm:block">
           <BackButton />
         </div>
       )}
 
-      <div className="hidden sm:flex items-center justify-between mb-3">
+      <div className="hidden sm:flex items-center justify-between mb-2">
         <div>
           <h1 className="text-lg sm:text-xl font-bold text-slate-900">{t("actionsPage.title") || "Actions"}</h1>
           <p className="text-xs text-slate-500">{t("actionsPage.subtitle") || "Track and manage corrective actions"}</p>
         </div>
       </div>
 
-      <div className="hidden sm:flex flex-wrap gap-3 mb-4">
+      <div className="hidden sm:flex flex-wrap gap-2 mb-3">
         {statCards.map((stat) => (
           <div
             key={stat.label}

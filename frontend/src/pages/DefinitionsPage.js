@@ -846,7 +846,7 @@ export default function DefinitionsPage() {
   return (
     <div className={isMobile ? "app-page-shell" : ""}>
       {/* Fixed Header Section */}
-      <div className={`${isMobile ? 'flex-shrink-0 px-4 pt-4 pb-2' : 'p-6 max-w-7xl mx-auto'}`}>
+      <div className={`${isMobile ? 'app-page-header-band' : 'app-page-content-band py-3 max-w-7xl mx-auto w-full'}`}>
         {/* Header */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">

@@ -20,7 +20,7 @@ export default function FormsPageMain({ embedded = false }) {
 
   return (
     <div
-      className={`${embedded ? "min-h-0" : "p-6 max-w-7xl mx-auto"}`}
+      className={`${embedded ? "min-h-0" : "app-page-content-band py-3 max-w-7xl mx-auto w-full"}`}
       data-testid="forms-page"
     >
       <FormsPageHeader

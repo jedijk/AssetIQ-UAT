@@ -536,7 +536,7 @@ const ThreatsPage = () => {
   return (
     <div className="app-page-shell" data-testid="threats-page">
       {/* Fixed Header Section */}
-      <div className="flex-shrink-0 px-4 pt-2 sm:pt-4 pb-2 max-w-7xl mx-auto w-full">
+      <div className="app-page-header-band">
         {/* Back Button - shown when navigated from another page */}
         {location.state?.from && (
           <div className="mb-3 hidden sm:block">
@@ -545,7 +545,7 @@ const ThreatsPage = () => {
         )}
         
         {/* Header - desktop only; mobile title + badge live in NavigationBreadcrumb */}
-        <div className="hidden sm:flex items-center justify-between mb-3">
+        <div className="hidden sm:flex items-center justify-between mb-2">
           <div>
             <h1 className="text-lg sm:text-xl font-bold text-slate-900">{t("observations.title")}</h1>
             <p className="text-xs text-slate-500">{t("observations.subtitle")}</p>
@@ -582,7 +582,7 @@ const ThreatsPage = () => {
         </div>
         
         {/* Compact Stats Row - Desktop only */}
-        <div className="hidden sm:flex flex-wrap gap-3 mb-4">
+        <div className="hidden sm:flex flex-wrap gap-2 mb-3">
           {statCards.map((stat, idx) => (
             <div
               key={stat.label}
@@ -829,7 +829,7 @@ const ThreatsPage = () => {
 
       {/* Scrollable Content Area */}
       <div
-        className={`flex-1 min-h-0 px-4 pb-4 ${
+        className={`flex-1 min-h-0 pb-4 app-page-content-band ${
           useVirtualThreatList ? "flex flex-col overflow-hidden" : "app-page-scroll mobile-scroll-pane"
         }`}
         data-testid="observations-list-scroll"

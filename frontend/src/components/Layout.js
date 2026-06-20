@@ -701,7 +701,7 @@ const Layout = () => {
                 title="This page crashed"
                 subtitle="Something went wrong while rendering this screen. Tap reload to recover."
               >
-                <NavigationBreadcrumb className="flex-shrink-0 px-4 sm:px-6 pt-4" />
+                <NavigationBreadcrumb className="app-page-breadcrumb-band flex-shrink-0 pt-1 sm:pt-1.5" />
                 <div className="flex-1 min-h-0 flex flex-col sm:mt-0">
                   <Outlet />
                 </div>
@@ -727,7 +727,7 @@ const Layout = () => {
                   title="This page crashed"
                   subtitle="Something went wrong while rendering this screen. Tap reload to recover."
                 >
-                  <NavigationBreadcrumb className="flex-shrink-0 px-4 sm:px-6 pt-4" />
+                  <NavigationBreadcrumb className="app-page-breadcrumb-band flex-shrink-0 pt-1 sm:pt-1.5" />
                   <div className="flex-1 min-h-0 flex flex-col sm:mt-0">
                     <Outlet />
                   </div>

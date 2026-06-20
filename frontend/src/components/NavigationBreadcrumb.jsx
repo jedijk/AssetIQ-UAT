@@ -40,7 +40,7 @@ const NavigationBreadcrumb = ({ className = '' }) => {
 
   return (
     <div
-      className={`sticky top-[var(--app-header-offset)] z-[35] bg-slate-50 items-center gap-2 min-w-0 mb-0 sm:mb-4 pointer-events-auto border-b border-slate-200/80 sm:border-b-0 pb-2 sm:pb-0 ${
+      className={`sticky top-[var(--app-header-offset)] z-[35] bg-slate-50 items-center gap-2 min-w-0 mb-0 pointer-events-auto border-b border-slate-200/80 sm:border-b-0 pb-2 sm:pb-0 ${
         useMobileDetailHeader
           ? 'hidden sm:flex'
           : canGoBack || showTrail

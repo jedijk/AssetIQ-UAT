@@ -670,7 +670,7 @@ export default function FormSubmissionsPage() {
     <div className="app-page-shell bg-slate-50">
       <div className="app-page-scroll mobile-scroll-pane flex-1 min-h-0">
       {/* Stats Cards */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
+      <div className="app-page-content-band py-2 sm:py-2">
         <div className="grid grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
           <div className="bg-white rounded-lg sm:rounded-xl border border-slate-200 p-2 sm:p-4 shadow-sm">
             <div className="flex flex-col sm:flex-row items-center sm:gap-3">
