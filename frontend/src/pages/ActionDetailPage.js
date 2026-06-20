@@ -366,9 +366,9 @@ export default function ActionDetailPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-6">
-      {/* Fixed Header - starts below main nav (top-12 = 48px) */}
-      <div className="sticky-below-app-header bg-white border-b border-slate-200 shadow-sm">
+    <div className="app-page-shell bg-slate-50" data-testid="action-detail-page">
+      {/* Header stays fixed; content scrolls in the pane below */}
+      <div className="flex-shrink-0 bg-white border-b border-slate-200 shadow-sm">
         <div className="container mx-auto px-3 sm:px-4 max-w-2xl">
           <div className="py-2.5 sm:py-3 space-y-2">
             <div className="flex items-center gap-2">
@@ -391,6 +391,7 @@ export default function ActionDetailPage() {
         </div>
       </div>
 
+      <div className="app-page-scroll mobile-scroll-pane flex-1 min-h-0 pb-6">
       {/* Scrollable Content */}
       <div className="container mx-auto px-3 sm:px-4 py-4 max-w-6xl">
         <motion.div
@@ -636,6 +637,7 @@ export default function ActionDetailPage() {
               </div>
           </div>
         </motion.div>
+      </div>
       </div>
 
       {/* Delete Confirmation */}
