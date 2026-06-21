@@ -261,7 +261,7 @@ const SourceBadge = ({ source }) => {
 };
 
 // Task row component
-const TaskRow = ({ task, onEdit, onDelete, onToggleActive, isExpanded, onToggleExpand, canToggle }) => {
+const TaskRow = ({ task, onEdit, onDelete, onToggleActive, isExpanded, onToggleExpand, canToggle, isTogglePending }) => {
   const { t } = useLanguage();
   const categoryConfig = CATEGORY_CONFIG[task.task_category] || CATEGORY_CONFIG.preventive_maintenance;
   const CategoryIcon = categoryConfig.icon;
@@ -336,6 +336,7 @@ const TaskRow = ({ task, onEdit, onDelete, onToggleActive, isExpanded, onToggleE
                         <div className="flex items-center">
                           <Switch
                             checked={isActive}
+                            disabled={isTogglePending}
                             onCheckedChange={() => onToggleActive(task, isActive)}
                             aria-label={isActive ? 'Disable task' : 'Enable task'}
                           />
@@ -982,12 +983,57 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
   const toggleActiveMutation = useMutation({
     mutationFn: ({ task, wasActive }) =>
       maintenanceProgramAPI.updateTask(equipmentId, task.id, { is_active: !wasActive }),
-    onSuccess: (_data, { wasActive }) => {
-      toast.success(wasActive ? 'Task disabled' : 'Task enabled');
-      queryClient.invalidateQueries({ queryKey: ['maintenance-program', equipmentId] });
-      refreshMaintenanceSchedulerQueries(queryClient);
+    onMutate: async ({ task, wasActive }) => {
+      await queryClient.cancelQueries({ queryKey: ['maintenance-program', equipmentId] });
+      const previous = queryClient.getQueryData(['maintenance-program', equipmentId]);
+      const nextActive = !wasActive;
+
+      queryClient.setQueryData(['maintenance-program', equipmentId], (old) => {
+        if (!old?.program?.tasks) return old;
+        const tasks = old.program.tasks.map((t) =>
+          t.id === task.id ? { ...t, is_active: nextActive } : t,
+        );
+        const active_tasks = tasks.filter((t) => t.is_active !== false).length;
+        return {
+          ...old,
+          program: {
+            ...old.program,
+            tasks,
+            active_tasks,
+          },
+        };
+      });
+
+      return { previous };
     },
-    onError: (error) => {
+    onSuccess: (data, { wasActive }) => {
+      toast.success(wasActive ? 'Task disabled' : 'Task enabled');
+
+      if (data?.task) {
+        queryClient.setQueryData(['maintenance-program', equipmentId], (old) => {
+          if (!old?.program?.tasks) return old;
+          const tasks = old.program.tasks.map((t) =>
+            t.id === data.task.id ? { ...t, ...data.task } : t,
+          );
+          const active_tasks = tasks.filter((t) => t.is_active !== false).length;
+          return {
+            ...old,
+            program: {
+              ...old.program,
+              tasks,
+              active_tasks,
+              version: data.version ?? old.program.version,
+            },
+          };
+        });
+      }
+
+      void refreshMaintenanceSchedulerQueries(queryClient);
+    },
+    onError: (error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['maintenance-program', equipmentId], context.previous);
+      }
       toast.error(error.response?.data?.detail || error.message || 'Failed to update task');
     },
   });
@@ -1361,6 +1407,10 @@ const MaintenanceProgramPanel = ({ equipmentId, equipmentName }) => {
                   onEdit={setEditingTask}
                   onDelete={handleDeleteTask}
                   canToggle={canMutateTasks && !task.is_pm_import_pending}
+                  isTogglePending={
+                    toggleActiveMutation.isPending &&
+                    toggleActiveMutation.variables?.task?.id === task.id
+                  }
                   onToggleActive={(t, wasActive) => toggleActiveMutation.mutate({ task: t, wasActive })}
                 />
               ))}

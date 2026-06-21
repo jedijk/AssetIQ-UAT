@@ -32,6 +32,7 @@ from services.maintenance_scheduler_sync import (
     clear_equipment_schedule_after_program_delete,
     refresh_equipment_schedule,
     refresh_equipment_type_schedules,
+    refresh_schedule_after_v2_task_active_toggle,
 )
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,32 @@ async def _refresh_equipment_schedule_after_change(
         )
     except Exception:
         logger.exception("Failed to refresh maintenance schedule for %s", equipment_id)
+        return None
+
+
+async def _refresh_equipment_schedule_after_active_toggle(
+    equipment_id: str,
+    *,
+    enable: bool,
+    v2_task_id: str,
+    template_id: Optional[str] = None,
+    current_user: dict,
+) -> Optional[Dict[str, Any]]:
+    """Sync schedule rows for a single v2 program task enable/disable."""
+    try:
+        return await refresh_schedule_after_v2_task_active_toggle(
+            equipment_id,
+            v2_task_id,
+            enable=enable,
+            template_id=template_id,
+            user_id=_current_user_id(current_user),
+        )
+    except Exception:
+        logger.exception(
+            "Failed to refresh schedule after active toggle for %s task %s",
+            equipment_id,
+            v2_task_id,
+        )
         return None
 
 
@@ -435,6 +462,8 @@ async def update_task(
     if not updates:
         raise HTTPException(status_code=400, detail="No updates provided")
     
+    is_active_only = set(updates.keys()) == {"is_active"}
+
     try:
         updated_task, new_version = await MaintenanceProgramService.update_task(
             equipment_id=equipment_id,
@@ -444,9 +473,19 @@ async def update_task(
             user_id=_current_user_id(current_user)
         )
         
-        schedule_refresh = await _refresh_equipment_schedule_after_change(
-            equipment_id, current_user
-        )
+        if is_active_only:
+            trace = (updated_task or {}).get("traceability") or {}
+            schedule_refresh = await _refresh_equipment_schedule_after_active_toggle(
+                equipment_id,
+                enable=bool(updates["is_active"]),
+                v2_task_id=task_id,
+                template_id=trace.get("task_template_id"),
+                current_user=current_user,
+            )
+        else:
+            schedule_refresh = await _refresh_equipment_schedule_after_change(
+                equipment_id, current_user
+            )
 
         return {
             "message": "Task updated",

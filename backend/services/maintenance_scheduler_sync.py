@@ -202,6 +202,113 @@ async def _cancel_open_scheduled_for_program_ids(program_ids: List[str]) -> int:
     return result.modified_count
 
 
+async def _cancel_open_scheduled_for_v2_task(
+    equipment_id: str,
+    v2_task_id: str,
+    *,
+    template_id: Optional[str] = None,
+) -> int:
+    """Cancel open schedule rows for a v2 program task (works with or without legacy sync)."""
+    program_ids: List[str] = [v2_task_id]
+    if template_id:
+        legacy = await db.maintenance_programs.find_one(
+            {"equipment_id": equipment_id, "task_template_id": template_id},
+            {"id": 1, "_id": 0},
+        )
+        legacy_id = legacy.get("id") if legacy else None
+        if legacy_id and legacy_id not in program_ids:
+            program_ids.append(legacy_id)
+
+    cancelled = await _cancel_open_scheduled_for_program_ids(program_ids)
+    extra = await db.scheduled_tasks.update_many(
+        {
+            "equipment_id": equipment_id,
+            "v2_task_id": v2_task_id,
+            "status": OPEN_TASK_STATUSES,
+        },
+        {
+            "$set": {
+                "status": "cancelled",
+                "notes": "Auto-cancelled: maintenance program task deactivated",
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+        },
+    )
+    return cancelled + extra.modified_count
+
+
+async def refresh_schedule_after_v2_task_active_toggle(
+    equipment_id: str,
+    v2_task_id: str,
+    *,
+    enable: bool,
+    template_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Sync the maintenance schedule when a v2 program task is enabled or disabled."""
+    from services.maintenance_scheduling import schedule_program, schedule_programs_for_equipment
+    from services.scheduler_program_source import load_schedulable_programs
+
+    result: Dict[str, Any] = {
+        "equipment_id": equipment_id,
+        "v2_task_id": v2_task_id,
+        "enable": enable,
+    }
+
+    if not enable:
+        result["scheduled_tasks_cancelled"] = await _cancel_open_scheduled_for_v2_task(
+            equipment_id,
+            v2_task_id,
+            template_id=template_id,
+        )
+        if should_sync_legacy_maintenance_programs():
+            equipment = await db.equipment_nodes.find_one({"id": equipment_id}, {"_id": 0})
+            if equipment:
+                strategy = None
+                et_id = equipment.get("equipment_type_id")
+                if et_id:
+                    strategy = await db.equipment_type_strategies.find_one(
+                        {"equipment_type_id": et_id},
+                        {"_id": 0},
+                    )
+                result["v2_tasks_synced"] = await sync_v2_program_tasks_to_scheduler(
+                    equipment, strategy=strategy
+                )
+        return result
+
+    if should_sync_legacy_maintenance_programs():
+        equipment = await db.equipment_nodes.find_one({"id": equipment_id}, {"_id": 0})
+        if equipment:
+            strategy = None
+            et_id = equipment.get("equipment_type_id")
+            if et_id:
+                strategy = await db.equipment_type_strategies.find_one(
+                    {"equipment_type_id": et_id},
+                    {"_id": 0},
+                )
+            result["v2_tasks_synced"] = await sync_v2_program_tasks_to_scheduler(
+                equipment, strategy=strategy
+            )
+
+    programs = await load_schedulable_programs(equipment_ids=[equipment_id])
+    target_programs = [
+        p
+        for p in programs
+        if p.get("id") == v2_task_id or p.get("v2_task_id") == v2_task_id
+    ]
+    if target_programs:
+        created = 0
+        for program in target_programs:
+            created += len(await schedule_program(program))
+        result["scheduled_tasks_created"] = created
+    else:
+        result["scheduled_tasks_created"] = await schedule_programs_for_equipment(
+            [equipment_id]
+        )
+
+    return result
+
+
 async def sync_v2_program_tasks_to_scheduler(
     equipment: Dict[str, Any],
     strategy: Optional[Dict[str, Any]] = None,
@@ -285,6 +392,12 @@ async def sync_v2_program_tasks_to_scheduler(
 
             active_v2_ids.add(v2_task_id)
 
+            legacy = legacy_by_template.get(template_id)
+            reactivate_fields: Dict[str, Any] = {
+                "is_active": True,
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+
             override_fields: Dict[str, Any] = {}
             if task.get("is_overridden"):
                 freq = task.get("frequency") or "monthly"
@@ -304,10 +417,10 @@ async def sync_v2_program_tasks_to_scheduler(
                     "updated_at": datetime.utcnow().isoformat(),
                 }
 
-            if override_fields:
+            if legacy:
                 await db.maintenance_programs.update_one(
                     {"equipment_id": equipment_id, "task_template_id": template_id},
-                    {"$set": override_fields},
+                    {"$set": {**reactivate_fields, **override_fields}},
                 )
                 synced += 1
             continue
