@@ -24,6 +24,11 @@ def normalize_pm_import_display_status(task: Dict[str, Any]) -> str:
     return "pending"
 
 
+def is_pm_import_incorporated_into_strategy(task: Dict[str, Any]) -> bool:
+    """True when a PM import task was merged or applied into the failure-mode strategy."""
+    return normalize_pm_import_display_status(task) in ("merged", "applied")
+
+
 def is_pm_import_review_accepted(task: Dict[str, Any]) -> bool:
     """Imported tasks are accepted by default unless explicitly rejected."""
     status = (task.get("review_status") or "pending").lower()

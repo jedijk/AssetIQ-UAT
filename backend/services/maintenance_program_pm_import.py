@@ -6,6 +6,10 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from database import db
+from services.pm_import_constants import (
+    is_pm_import_incorporated_into_strategy,
+    normalize_pm_import_display_status,
+)
 from models.maintenance_program import (
     MaintenanceProgramTask,
     ProgramStatus,
@@ -112,6 +116,18 @@ def parse_pm_import_ref(
     return session_id, extracted_task_id, pm_ref
 
 
+def is_incorporated_pm_program_task(task: Optional[Dict[str, Any]] = None) -> bool:
+    """Whether a program task row represents incorporated (merged/applied) PM import."""
+    if not task:
+        return False
+    display = task.get("pm_import_display_status")
+    if display in ("merged", "applied"):
+        return True
+    if task.get("pm_import_incorporated"):
+        return True
+    return False
+
+
 def is_pm_import_program_task(task: Optional[Dict[str, Any]] = None, task_id: Optional[str] = None) -> bool:
     if parse_pm_import_ref(task=task, task_id=task_id):
         return True
@@ -189,10 +205,12 @@ def pm_import_task_to_program_dict(
     program_task["pm_import_review_status"] = review_status
     program_task["task_type"] = task_type
     program_task["pm_import_task_type"] = str(raw_type).upper()
+    program_task["pm_import_display_status"] = normalize_pm_import_display_status(pm_task)
     return program_task
 
 
 PM_IMPORT_DISABLE_CANCEL_NOTE = "Auto-cancelled: PM import task disabled"
+PM_IMPORT_INCORPORATED_CANCEL_NOTE = "Auto-cancelled: PM import incorporated into strategy"
 
 
 async def reschedule_pm_import_task_occurrences(
@@ -338,6 +356,103 @@ async def propagate_pm_import_task_active_state(
     }
 
 
+async def load_incorporated_pm_refs_for_equipment(equipment_id: str) -> set:
+    """PM import refs merged/applied into strategy for one equipment node."""
+    equipment = await db.equipment_nodes.find_one(
+        {"id": equipment_id},
+        {"_id": 0, "tag": 1},
+    )
+    if not equipment:
+        return set()
+
+    equipment_tag = equipment.get("tag")
+    refs: set = set()
+    cursor = db.pm_import_sessions.find({}, {"_id": 0, "session_id": 1, "tasks_extracted": 1})
+    async for session in cursor:
+        session_id = session.get("session_id")
+        if not session_id:
+            continue
+        for pm_task in session.get("tasks_extracted") or []:
+            if not is_pm_import_incorporated_into_strategy(pm_task):
+                continue
+            if not pm_import_matches_equipment(pm_task, equipment_id, equipment_tag):
+                continue
+            task_id = pm_task.get("task_id") or pm_task.get("id")
+            if task_id:
+                refs.add(f"{session_id}:{task_id}")
+    return refs
+
+
+async def purge_standalone_pm_import_program_task(
+    equipment_id: str,
+    pm_ref: str,
+) -> Dict[str, Any]:
+    """Remove standalone CUSTOMER_IMPORTED program rows for an incorporated PM import task."""
+    removed_from_v2 = 0
+    stored = await db.maintenance_programs_v2.find_one(
+        {"equipment_id": equipment_id},
+        {"_id": 0, "tasks": 1},
+    )
+    if stored:
+        tasks = list(stored.get("tasks") or [])
+        kept: List[Dict[str, Any]] = []
+        for task in tasks:
+            trace = task.get("traceability") or {}
+            is_pm_row = (
+                trace.get("pm_import_task_id") == pm_ref
+                or task.get("id") == f"pm-import:{pm_ref}"
+            )
+            if is_pm_row and (task.get("task_source") or "").lower() == TaskSource.CUSTOMER_IMPORTED.value:
+                removed_from_v2 += 1
+                continue
+            kept.append(task)
+        if removed_from_v2:
+            stored["tasks"] = kept
+            recalculate_program_task_stats(stored)
+            await db.maintenance_programs_v2.update_one(
+                {"equipment_id": equipment_id},
+                {
+                    "$set": {
+                        "tasks": kept,
+                        "total_tasks": stored.get("total_tasks", len(kept)),
+                        "active_tasks": stored.get("active_tasks", 0),
+                        "strategy_tasks": stored.get("strategy_tasks", 0),
+                        "imported_tasks": stored.get("imported_tasks", 0),
+                        "ai_tasks": stored.get("ai_tasks", 0),
+                        "manual_tasks": stored.get("manual_tasks", 0),
+                        "updated_at": datetime.utcnow().isoformat(),
+                    }
+                },
+            )
+
+    legacy_result = await db.maintenance_programs.delete_many(
+        {"equipment_id": equipment_id, "pm_import_task_id": pm_ref},
+    )
+
+    cancel_result = await db.scheduled_tasks.update_many(
+        {
+            "equipment_id": equipment_id,
+            "pm_import_task_id": pm_ref,
+            "status": {"$nin": ["completed", "cancelled"]},
+        },
+        {
+            "$set": {
+                "status": "cancelled",
+                "notes": PM_IMPORT_INCORPORATED_CANCEL_NOTE,
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+        },
+    )
+
+    return {
+        "equipment_id": equipment_id,
+        "pm_import_task_id": pm_ref,
+        "v2_tasks_removed": removed_from_v2,
+        "legacy_programs_deleted": legacy_result.deleted_count,
+        "scheduled_tasks_cancelled": cancel_result.modified_count,
+    }
+
+
 async def fetch_pm_import_tasks_for_equipment(
     equipment_id: str,
     user_id: Optional[str] = None,
@@ -362,6 +477,8 @@ async def fetch_pm_import_tasks_for_equipment(
             if pm_task.get("review_status") == "rejected":
                 continue
             if not pm_import_matches_equipment(pm_task, equipment_id, equipment_tag):
+                continue
+            if is_pm_import_incorporated_into_strategy(pm_task):
                 continue
             matched.append(pm_import_task_to_program_dict(pm_task, session))
     return matched
@@ -395,7 +512,43 @@ async def enrich_program_response_with_pm_import(
     Returns (program_dict, has_stored_program, pm_tasks_added_count).
     """
     has_stored_program = program is not None
+    incorporated_refs = await load_incorporated_pm_refs_for_equipment(equipment_id)
     pm_tasks = await fetch_pm_import_tasks_for_equipment(equipment_id, user_id=user_id)
+
+    if program and incorporated_refs:
+        stored_tasks = list(program.get("tasks") or [])
+        filtered_tasks: List[Dict[str, Any]] = []
+        stripped = 0
+        for task in stored_tasks:
+            trace = task.get("traceability") or {}
+            pm_ref = trace.get("pm_import_task_id")
+            if (
+                pm_ref
+                and pm_ref in incorporated_refs
+                and (task.get("task_source") or "").lower() == TaskSource.CUSTOMER_IMPORTED.value
+            ):
+                stripped += 1
+                continue
+            filtered_tasks.append(task)
+        if stripped:
+            program["tasks"] = filtered_tasks
+            recalculate_program_task_stats(program)
+            if has_stored_program:
+                await db.maintenance_programs_v2.update_one(
+                    {"equipment_id": equipment_id},
+                    {
+                        "$set": {
+                            "tasks": filtered_tasks,
+                            "total_tasks": program.get("total_tasks", len(filtered_tasks)),
+                            "active_tasks": program.get("active_tasks", 0),
+                            "strategy_tasks": program.get("strategy_tasks", 0),
+                            "imported_tasks": program.get("imported_tasks", 0),
+                            "ai_tasks": program.get("ai_tasks", 0),
+                            "manual_tasks": program.get("manual_tasks", 0),
+                            "updated_at": datetime.utcnow().isoformat(),
+                        }
+                    },
+                )
 
     if not program and not pm_tasks:
         return None, False, 0

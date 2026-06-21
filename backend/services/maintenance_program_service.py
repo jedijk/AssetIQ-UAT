@@ -27,6 +27,8 @@ from services.scheduler_helpers import (
 from services.maintenance_program_pm_import import (
     enrich_program_response_with_pm_import as _enrich_program_response_with_pm_import,
     fetch_pm_import_tasks_for_equipment as _fetch_pm_import_tasks_for_equipment,
+    is_incorporated_pm_program_task,
+    load_incorporated_pm_refs_for_equipment,
     propagate_pm_import_task_active_state as _propagate_pm_import_task_active_state,
 )
 from services.scheduler_config import should_sync_legacy_maintenance_programs
@@ -751,6 +753,8 @@ class MaintenanceProgramService:
     @staticmethod
     def _is_scheduleable_imported_pm_task(task: Dict[str, Any]) -> bool:
         """Accepted Custom PM Import tasks that belong to a maintenance program."""
+        if is_incorporated_pm_program_task(task):
+            return False
         if task.get("task_source") != TaskSource.CUSTOMER_IMPORTED.value:
             return False
         if not task.get("is_active", True):
@@ -1069,6 +1073,8 @@ class MaintenanceProgramService:
             template_id = traceability.get("task_template_id")
             if template_id:
                 inactive_strategy_templates.add(template_id)
+
+        incorporated_pm_refs = await load_incorporated_pm_refs_for_equipment(equipment_id)
         
         # Collect preserved tasks
         preserved_tasks = []
@@ -1084,6 +1090,13 @@ class MaintenanceProgramService:
             
             # Preserve imported tasks
             elif preserve_imported_tasks and source == TaskSource.CUSTOMER_IMPORTED.value:
+                task_dict = task.model_dump() if hasattr(task, "model_dump") else task
+                traceability = task_dict.get("traceability") or {}
+                pm_ref = traceability.get("pm_import_task_id")
+                if pm_ref and pm_ref in incorporated_pm_refs:
+                    continue
+                if is_incorporated_pm_program_task(task_dict):
+                    continue
                 preserved_tasks.append(task)
             
             # Preserve AI tasks

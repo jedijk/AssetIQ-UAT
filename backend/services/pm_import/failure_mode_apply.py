@@ -25,6 +25,7 @@ from services.pm_import_constants import (
     TASK_TYPE_DEFAULTS,
     TASK_TYPES,
     _sanitize_for_json,
+    is_pm_import_incorporated_into_strategy,
     normalize_pm_import_display_status,
     normalize_pm_import_discipline,
     is_pm_import_review_accepted,
@@ -225,6 +226,41 @@ class PMImportMixin:
 
         await sync_pm_import_graph_edge(task, task_id, failure_mode_id, apply_mode)
 
+    async def _purge_incorporated_pm_from_program(
+        self,
+        session_id: str,
+        task_id: str,
+        task: Dict[str, Any],
+        user_id: Optional[str] = None,
+    ) -> None:
+        """Drop standalone PM import program rows once the task lives in strategy."""
+        if not is_pm_import_incorporated_into_strategy(task):
+            return
+
+        em = task.get("equipment_match") or {}
+        equipment_id = em.get("equipment_id")
+        if not equipment_id:
+            return
+
+        from services.maintenance_program_pm_import import purge_standalone_pm_import_program_task
+        from services.maintenance_program_service import MaintenanceProgramService
+
+        pm_ref = f"{session_id}:{task_id}"
+        await purge_standalone_pm_import_program_task(equipment_id, pm_ref)
+
+        program_doc = await self.db.maintenance_programs_v2.find_one(
+            {"equipment_id": equipment_id},
+            {"equipment_type_id": 1, "_id": 0},
+        )
+        if program_doc and program_doc.get("equipment_type_id"):
+            await MaintenanceProgramService.regenerate_program(
+                equipment_id,
+                preserve_overrides=True,
+                preserve_manual_tasks=True,
+                preserve_imported_tasks=True,
+                user_id=user_id,
+            )
+
     async def apply_task_to_failure_mode(
         self,
         session_id: str,
@@ -295,6 +331,14 @@ class PMImportMixin:
                 }
             },
         )
+
+        if apply_res.get("success"):
+            await self._purge_incorporated_pm_from_program(
+                session_id,
+                task_id,
+                task,
+                user_id=user_id,
+            )
 
         return result
 
@@ -540,5 +584,13 @@ class PMImportMixin:
                 "updated_at": datetime.now(timezone.utc)
             }}
         )
+
+        if result.get("success") and is_pm_import_incorporated_into_strategy(task):
+            await self._purge_incorporated_pm_from_program(
+                session_id,
+                task_id,
+                task,
+                user_id=session.get("created_by"),
+            )
         
         return result
