@@ -1,6 +1,17 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Eye, GitBranch, Search } from "lucide-react";
 import { useLanguage } from "../../../contexts/LanguageContext";
+
+function clampMenuPosition(x, y, menuWidth, menuHeight) {
+  const padding = 8;
+  const maxX = window.innerWidth - menuWidth - padding;
+  const maxY = window.innerHeight - menuHeight - padding;
+  return {
+    x: Math.min(Math.max(padding, x), Math.max(padding, maxX)),
+    y: Math.min(Math.max(padding, y), Math.max(padding, maxY)),
+  };
+}
 
 export function ScheduleTaskContextMenu({
   menu,
@@ -11,6 +22,18 @@ export function ScheduleTaskContextMenu({
 }) {
   const { t } = useLanguage();
   const menuRef = useRef(null);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+
+  useLayoutEffect(() => {
+    if (!menu?.open) return;
+    const el = menuRef.current;
+    if (!el) {
+      setPosition({ x: menu.x, y: menu.y });
+      return;
+    }
+    const rect = el.getBoundingClientRect();
+    setPosition(clampMenuPosition(menu.x, menu.y, rect.width, rect.height));
+  }, [menu?.open, menu?.x, menu?.y]);
 
   useEffect(() => {
     if (!menu?.open) return undefined;
@@ -38,11 +61,11 @@ export function ScheduleTaskContextMenu({
   const itemClass =
     "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-left hover:bg-accent hover:text-accent-foreground";
 
-  return (
+  const content = (
     <div
       ref={menuRef}
       className="fixed z-[1200] min-w-[11rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-      style={{ top: menu.y, left: menu.x }}
+      style={{ top: position.y, left: position.x }}
       role="menu"
       data-testid="schedule-task-context-menu"
     >
@@ -87,6 +110,8 @@ export function ScheduleTaskContextMenu({
       </button>
     </div>
   );
+
+  return createPortal(content, document.body);
 }
 
 export function openScheduleContextMenu(event, row, setMenu) {

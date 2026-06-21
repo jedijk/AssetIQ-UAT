@@ -288,6 +288,8 @@ async def create_equipment_type_strategy(
         
         # Generate tasks for this failure mode
         tasks = generate_default_tasks_for_failure_mode(fm, strategy_type, detection_methods)
+        for task in tasks:
+            task.is_mandatory = False
         all_tasks.extend(tasks)
         
         # Create failure mode strategy with RPN data
@@ -331,7 +333,7 @@ async def create_equipment_type_strategy(
             detectability=detectability,
             rpn=rpn,
             risk_if_unaddressed=risk_level,
-            enabled=True
+            enabled=False,
         )
         fm_strategies.append(fm_strategy)
     
@@ -345,11 +347,11 @@ async def create_equipment_type_strategy(
         task_templates=all_tasks,
         total_failure_modes=len(fm_strategies),
         total_tasks=len(all_tasks),
-        coverage_score=100.0 if fm_strategies else 0.0,  # All FMs are enabled by default
-        active_failure_modes=len(fm_strategies),  # Track active count
+        coverage_score=0.0,
+        active_failure_modes=0,
         created_by=current_user.get("user_id"),
         auto_generated=request.auto_generate,
-        status="active"
+        status="disabled",
     )
     
     strategy_dict = strategy.model_dump()

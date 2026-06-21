@@ -76,7 +76,7 @@ import { PlannerView } from "./PlannerView";
 import { TaskDetailsDialog } from "./TaskDetailsDialog";
 import { matchesMaintenanceSourceFilter } from "./taskSourceFilter";
 import {
-  buildEquipmentManagerUrl,
+  hierarchySearchQueryForScheduleRow,
   buildStrategyLibraryUrl,
   pickScheduledTaskForDialog,
 } from "../../../lib/maintenanceScheduleContext";
@@ -465,17 +465,16 @@ export function MaintenanceScheduleManager({ equipmentType }) {
   }, [equipmentTypeId, navigate, t]);
 
   const handleFindEquipmentFromContext = useCallback((row) => {
-    const task = pickScheduledTaskForDialog(row);
-    const equipmentId = row?.equipment_id || task?.equipment_id;
-    if (!equipmentId) {
+    const query = hierarchySearchQueryForScheduleRow(row);
+    if (!query?.trim()) {
       toast.error(t("maintenance.contextFindEquipmentUnavailable"));
       return;
     }
 
-    navigate(buildEquipmentManagerUrl(equipmentId), {
-      state: { from: "schedule", fromPage: t("maintenance.maintenanceScheduleTitle") },
-    });
-  }, [navigate, t]);
+    window.dispatchEvent(
+      new CustomEvent("open-hierarchy-with-search", { detail: { query: query.trim() } }),
+    );
+  }, [t]);
 
   // ============= Render =============
 

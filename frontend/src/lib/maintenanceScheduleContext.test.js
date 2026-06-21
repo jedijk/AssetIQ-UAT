@@ -1,5 +1,6 @@
 import {
   buildStrategyLibraryUrl,
+  hierarchySearchQueryForScheduleRow,
   pickScheduledTaskForDialog,
   taskNamesMatch,
 } from "./maintenanceScheduleContext";
@@ -17,6 +18,15 @@ describe("maintenanceScheduleContext", () => {
 
   test("taskNamesMatch ignores bracket suffix", () => {
     expect(taskNamesMatch("Ensure lubrication [Rotating]", "ensure lubrication")).toBe(true);
+  });
+
+  test("hierarchySearchQueryForScheduleRow prefers equipment tag", () => {
+    expect(
+      hierarchySearchQueryForScheduleRow({
+        _equipmentTag: "1F-3001-0129",
+        _equipmentName: "Motor TRF1",
+      }),
+    ).toBe("1F-3001-0129");
   });
 
   test("buildStrategyLibraryUrl encodes highlight params", () => {

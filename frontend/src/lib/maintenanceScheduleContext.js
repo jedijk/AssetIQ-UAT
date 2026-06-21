@@ -36,6 +36,15 @@ export function buildStrategyLibraryUrl({ equipmentTypeId, failureModeId, taskNa
   return `/library?${params.toString()}`;
 }
 
-export function buildEquipmentManagerUrl(equipmentId) {
-  return `/equipment-manager?edit=${encodeURIComponent(equipmentId)}`;
+/** Search query for the left equipment hierarchy (matches observation tag click). */
+export function hierarchySearchQueryForScheduleRow(row) {
+  if (!row) return "";
+  const task = pickScheduledTaskForDialog(row);
+  return (
+    row._equipmentTag ||
+    task?.equipment_tag ||
+    row._equipmentName ||
+    task?.equipment_name ||
+    ""
+  );
 }
