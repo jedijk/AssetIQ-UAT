@@ -89,7 +89,11 @@ import {
 } from "../../ui/select";
 
 const SCHEDULE_FILTER_TRIGGER_CLASS =
-  "h-9 w-full justify-between font-normal px-3 py-2 shadow-sm ring-offset-background";
+  "h-9 min-h-9 max-h-9 shrink-0 justify-between font-normal px-3 py-0 shadow-sm overflow-hidden";
+
+const SCHEDULE_FILTER_GROUP_CLASS = "flex h-9 shrink-0 items-center gap-2";
+const SCHEDULE_FILTER_LABEL_CLASS =
+  "text-sm font-medium leading-none text-slate-700 whitespace-nowrap";
 
 export function MaintenanceScheduleManager({ equipmentType }) {
   const { t } = useLanguage();
@@ -552,13 +556,13 @@ export function MaintenanceScheduleManager({ equipmentType }) {
       {/* Dashboard KPIs */}
       <DashboardCards dashboard={dashboard} isLoading={dashboardLoading} />
 
-      {/* Schedule filters — fixed-height triggers aligned with Select */}
+      {/* Schedule filters — single row, fixed 36px controls (no wrap jump) */}
       <div
-        className="flex flex-wrap items-center gap-x-4 gap-y-2"
+        className="flex h-9 min-h-9 flex-nowrap items-center gap-x-4 overflow-x-auto"
         data-testid="equipment-unit-filter-row"
       >
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-slate-700 whitespace-nowrap">
+        <div className={SCHEDULE_FILTER_GROUP_CLASS}>
+          <span className={SCHEDULE_FILTER_LABEL_CLASS}>
             {t("maintenance.equipmentUnit")}:
           </span>
           <Popover open={unitFilterOpen} onOpenChange={setUnitFilterOpen} modal={false}>
@@ -570,14 +574,17 @@ export function MaintenanceScheduleManager({ equipmentType }) {
                 className={cn(SCHEDULE_FILTER_TRIGGER_CLASS, "w-72")}
                 data-testid="equipment-unit-filter"
               >
-                <span className="truncate text-left flex-1 min-w-0">
+                <span className="flex min-h-0 min-w-0 flex-1 items-center truncate text-left">
                   {selectedUnitId ? (() => {
                     const sel = equipmentUnitNodes.find(n => n.id === selectedUnitId);
                     if (!sel) return t("maintenance.allEquipmentUnits");
                     return (
-                      <span className="flex items-center gap-2 truncate">
+                      <span className="flex min-w-0 items-center gap-2 truncate">
                         {sel.tag && (
-                          <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0 shrink-0">
+                          <Badge
+                            variant="outline"
+                            className="h-5 shrink-0 px-1.5 py-0 text-[10px] font-mono leading-none"
+                          >
                             {sel.tag}
                           </Badge>
                         )}
@@ -650,8 +657,8 @@ export function MaintenanceScheduleManager({ equipmentType }) {
           </Popover>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-slate-700 whitespace-nowrap">
+        <div className={SCHEDULE_FILTER_GROUP_CLASS}>
+          <span className={SCHEDULE_FILTER_LABEL_CLASS}>
             {t("maintenance.discipline")}:
           </span>
           <Popover open={disciplineFilterOpen} onOpenChange={setDisciplineFilterOpen} modal={false}>
@@ -665,7 +672,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
               >
                 <span
                   className={cn(
-                    "truncate text-left flex-1 min-w-0",
+                    "min-w-0 flex-1 truncate text-left leading-none",
                     selectedDisciplines.length > 0 ? "text-slate-900" : "text-muted-foreground",
                   )}
                 >
@@ -729,12 +736,15 @@ export function MaintenanceScheduleManager({ equipmentType }) {
           </Popover>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-slate-700 whitespace-nowrap">
+        <div className={SCHEDULE_FILTER_GROUP_CLASS}>
+          <span className={SCHEDULE_FILTER_LABEL_CLASS}>
             {t("maintenance.scheduleSourceFilter")}:
           </span>
           <Select value={sourceFilter} onValueChange={setSourceFilter}>
-            <SelectTrigger className="w-44 h-9" data-testid="task-source-filter">
+            <SelectTrigger
+              className={cn(SCHEDULE_FILTER_TRIGGER_CLASS, "w-44")}
+              data-testid="task-source-filter"
+            >
               <SelectValue placeholder={t("maintenance.scheduleSourceAll")} />
             </SelectTrigger>
             <SelectContent>
