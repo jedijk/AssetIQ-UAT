@@ -5,6 +5,7 @@ import { useSearchParams, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useUndo } from "../contexts/UndoContext";
 import { useLanguage } from "../contexts/LanguageContext";
+import { useBreadcrumbTab } from "../contexts/BreadcrumbContext";
 import { useAuth } from "../contexts/AuthContext";
 import { usePermissions } from "../contexts/PermissionsContext";
 import { formatDateTime } from "../lib/dateUtils";
@@ -179,6 +180,27 @@ const FailureModesPage = () => {
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, setSearchParams]);
+
+  const libraryTabBreadcrumbLabel = useMemo(() => {
+    switch (mainTab) {
+      case "intelligence-map":
+        return "Intelligence Map";
+      case "failure-modes":
+        return t("library.failureModes");
+      case "libraries":
+        return t("library.equipmentTypes");
+      case "maintenance":
+        return t("library.maintenance");
+      case "schedule":
+        return t("maintenance.maintenanceScheduleTitle");
+      case "pm-import":
+        return t("library.customPmImport") || "PM Import";
+      default:
+        return null;
+    }
+  }, [mainTab, t]);
+
+  useBreadcrumbTab(libraryTabBreadcrumbLabel);
 
   const openEquipmentTypeStrategy = useCallback((equipmentTypeId) => {
     if (!equipmentTypeId) return;

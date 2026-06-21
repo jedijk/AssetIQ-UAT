@@ -123,6 +123,50 @@ export function BreadcrumbProvider({ children }) {
   );
 
   const [mobileBadge, setMobileBadge] = useState(null);
+  const tabLabelsRef = useRef(new Map());
+
+  const syncTabLabelToHistory = useCallback((tabLabel) => {
+    const currentPath = normalizeBreadcrumbPath(location.pathname);
+    setHistory((prev) => {
+      if (!prev.length) return prev;
+      const last = prev[prev.length - 1];
+      if (last.path !== currentPath) return prev;
+      const baseLabel = isHomeBreadcrumbPath(currentPath)
+        ? getHomeLabel()
+        : getRouteLabel(currentPath);
+      const nextLabel = tabLabel
+        ? (tabLabel.startsWith(baseLabel) ? tabLabel : `${baseLabel} · ${tabLabel}`)
+        : baseLabel;
+      if (last.label === nextLabel) return prev;
+      return [...prev.slice(0, -1), { ...last, label: nextLabel }];
+    });
+  }, [getHomeLabel, location.pathname]);
+
+  const refreshActiveTabLabel = useCallback(() => {
+    const labels = tabLabelsRef.current;
+    if (!labels.size) {
+      syncTabLabelToHistory(null);
+      return;
+    }
+    const latestId = Math.max(...labels.keys());
+    syncTabLabelToHistory(labels.get(latestId) || null);
+  }, [syncTabLabelToHistory]);
+
+  const registerTabLabel = useCallback((ownerId, label) => {
+    if (!ownerId) return;
+    if (label) {
+      tabLabelsRef.current.set(ownerId, label);
+    } else {
+      tabLabelsRef.current.delete(ownerId);
+    }
+    refreshActiveTabLabel();
+  }, [refreshActiveTabLabel]);
+
+  const unregisterTabLabel = useCallback((ownerId) => {
+    if (!ownerId) return;
+    tabLabelsRef.current.delete(ownerId);
+    refreshActiveTabLabel();
+  }, [refreshActiveTabLabel]);
 
   const [history, setHistory] = useState(() => {
     try {
@@ -179,6 +223,7 @@ export function BreadcrumbProvider({ children }) {
       return;
     }
     lastPathRef.current = currentPath;
+    tabLabelsRef.current = new Map();
 
     const originPath = readBreadcrumbOrigin(location.state);
 
@@ -331,6 +376,8 @@ export function BreadcrumbProvider({ children }) {
     getDisplayLabel,
     isHomeBreadcrumbPath,
     currentPath: location.pathname,
+    registerTabLabel,
+    unregisterTabLabel,
     mobileBadge,
     setMobileBadge,
   };
@@ -348,6 +395,22 @@ export function useBreadcrumb() {
     throw new Error('useBreadcrumb must be used within a BreadcrumbProvider');
   }
   return context;
+}
+
+/** Update the current page breadcrumb label for an active tab (nested tabs use highest owner id). */
+let breadcrumbTabOwnerSeq = 0;
+
+export function useBreadcrumbTab(label) {
+  const ownerIdRef = useRef(null);
+  if (ownerIdRef.current === null) {
+    ownerIdRef.current = ++breadcrumbTabOwnerSeq;
+  }
+  const { registerTabLabel, unregisterTabLabel } = useBreadcrumb();
+
+  useEffect(() => {
+    registerTabLabel(ownerIdRef.current, label || null);
+    return () => unregisterTabLabel(ownerIdRef.current);
+  }, [label, registerTabLabel, unregisterTabLabel]);
 }
 
 /** Renders a count badge beside the mobile breadcrumb title (list pages). */

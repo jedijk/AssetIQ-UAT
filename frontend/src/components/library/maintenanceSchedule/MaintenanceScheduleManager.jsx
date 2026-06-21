@@ -68,6 +68,7 @@ import {
   equipmentHierarchyAPI,
 } from "../../../lib/api";
 import { useLanguage } from "../../../contexts/LanguageContext";
+import { useBreadcrumbTab } from "../../../contexts/BreadcrumbContext";
 import { DashboardCards } from "./DashboardCards";
 import { TimelineView } from "./TimelineView";
 import { TaskListView } from "./TaskListView";
@@ -111,6 +112,22 @@ export function MaintenanceScheduleManager({ equipmentType }) {
   const [selectedDisciplines, setSelectedDisciplines] = useState([]);
   const [disciplineFilterOpen, setDisciplineFilterOpen] = useState(false);
   const [sourceFilter, setSourceFilter] = useState("all");
+
+  const scheduleTabBreadcrumbLabel = useMemo(() => {
+    const viewLabels = {
+      timeline: t("maintenance.timeline"),
+      planner: t("maintenance.planner"),
+      tasks:
+        t("library.tasks") !== "library.tasks"
+          ? t("library.tasks")
+          : t("maintenance.taskTemplatesLabel"),
+      programs: t("maintenance.programs"),
+    };
+    const viewLabel = viewLabels[activeTab] || activeTab;
+    return `${t("maintenance.maintenanceScheduleTitle")} · ${viewLabel}`;
+  }, [activeTab, t]);
+
+  useBreadcrumbTab(scheduleTabBreadcrumbLabel);
 
   const equipmentTypeId = equipmentType?.id;
   const equipmentTypeName = equipmentType?.name || t("equipment.allEquipment");

@@ -303,7 +303,7 @@ const LoginPage = () => {
           </div>
           <div className="login-tagline">
             <h2><span style={{whiteSpace: 'nowrap'}}>Asset Management Intelligence</span><br/>Platform</h2>
-            <p>Unify asset, reliability, and workforce management in one intelligent platform. Turn data into action with AI-driven insights that reduce downtime and improve operational efficiency.</p>
+            <p>Helping the people who keep the world running make better decisions.</p>
           </div>
           <div className="login-features">
             <div className="login-feature">
