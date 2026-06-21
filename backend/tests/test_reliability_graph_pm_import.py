@@ -109,12 +109,13 @@ async def test_apply_task_to_failure_mode_syncs_graph_edge_on_success():
 
     with patch.object(service, "_apply_task_to_failure_mode", AsyncMock(return_value=apply_result)):
         with patch.object(service, "_sync_pm_import_graph_edge", mock_sync):
-            result = await service.apply_task_to_failure_mode(
-                session_id="sess-1",
-                task_id="task-1",
-                target_failure_mode_id="fm-1",
-                user_id="user-1",
-            )
+            with patch.object(service, "_purge_incorporated_pm_from_program", AsyncMock()):
+                result = await service.apply_task_to_failure_mode(
+                    session_id="sess-1",
+                    task_id="task-1",
+                    target_failure_mode_id="fm-1",
+                    user_id="user-1",
+                )
 
     mock_sync.assert_awaited_once_with(
         task,
