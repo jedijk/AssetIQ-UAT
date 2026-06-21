@@ -68,7 +68,6 @@ export function useActionsPage() {
   });
 
   const rawActions = data?.actions || [];
-  const stats = data?.stats || { total: 0, open: 0, in_progress: 0, completed: 0, overdue: 0 };
   const { actions: translatedActions } = useTranslatedActions(rawActions);
   const actions = translatedActions;
   const uniqueDisciplines = [...new Set(actions.map((a) => a.discipline).filter(Boolean))].sort();
@@ -230,6 +229,22 @@ export function useActionsPage() {
     ]
   );
 
+  const isOverdue = (action) => {
+    if (!action.due_date || action.status === "completed") return false;
+    return new Date(action.due_date) < new Date();
+  };
+
+  const stats = useMemo(() => {
+    const next = { total: filteredActions.length, open: 0, in_progress: 0, completed: 0, overdue: 0 };
+    for (const action of filteredActions) {
+      if (action.status === "open") next.open += 1;
+      else if (action.status === "in_progress") next.in_progress += 1;
+      else if (action.status === "completed") next.completed += 1;
+      if (isOverdue(action)) next.overdue += 1;
+    }
+    return next;
+  }, [filteredActions]);
+
   const sortedActions = useMemo(() => {
     return [...filteredActions].sort((a, b) => {
       if (sortBy === "rpn") return (b.threat_rpn || 0) - (a.threat_rpn || 0);
@@ -238,11 +253,6 @@ export function useActionsPage() {
       return (b.threat_risk_score || 0) - (a.threat_risk_score || 0);
     });
   }, [filteredActions, sortBy]);
-
-  const isOverdue = (action) => {
-    if (!action.due_date || action.status === "completed") return false;
-    return new Date(action.due_date) < new Date();
-  };
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "No due date";
