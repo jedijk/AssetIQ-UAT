@@ -64,6 +64,7 @@ async def load_inactive_program_task_keys(
 
     keys: Set[ProgramTaskKey] = set()
     id_set = set(equipment_ids)
+    v2_pm_active: Dict[ProgramTaskKey, bool] = {}
 
     async for doc in db.maintenance_programs_v2.find(
         {"equipment_id": {"$in": equipment_ids}},
@@ -73,13 +74,17 @@ async def load_inactive_program_task_keys(
         if not equipment_id:
             continue
         for program_task in doc.get("tasks") or []:
+            trace = program_task.get("traceability") or {}
+            pm_ref = trace.get("pm_import_task_id")
+            if pm_ref:
+                v2_pm_active[(equipment_id, str(pm_ref))] = bool(
+                    program_task.get("is_active", True)
+                )
             if program_task.get("is_active", True):
                 continue
             task_id = program_task.get("id")
             if task_id:
                 keys.add((equipment_id, str(task_id)))
-            trace = program_task.get("traceability") or {}
-            pm_ref = trace.get("pm_import_task_id")
             if pm_ref:
                 keys.add((equipment_id, str(pm_ref)))
 
@@ -91,8 +96,6 @@ async def load_inactive_program_task_keys(
         if not session_id:
             continue
         for pm_task in session.get("tasks_extracted") or []:
-            if pm_task.get("is_active", True):
-                continue
             if not is_pm_import_review_accepted(pm_task):
                 continue
             em = pm_task.get("equipment_match") or {}
@@ -100,7 +103,13 @@ async def load_inactive_program_task_keys(
             task_id = pm_task.get("task_id")
             if not equipment_id or equipment_id not in id_set or not task_id:
                 continue
-            keys.add((equipment_id, f"{session_id}:{task_id}"))
+            pm_ref = f"{session_id}:{task_id}"
+            v2_state = v2_pm_active.get((equipment_id, pm_ref))
+            if v2_state is not None:
+                continue
+            if pm_task.get("is_active", True):
+                continue
+            keys.add((equipment_id, pm_ref))
 
     return keys
 

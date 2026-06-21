@@ -17,9 +17,7 @@ import {
   Wrench,
   Sparkles,
   Info,
-  X,
   Check,
-  ChevronsUpDown,
   ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -44,7 +42,6 @@ import {
 } from "../../ui/tooltip";
 import {
   Popover,
-  PopoverAnchor,
   PopoverContent,
   PopoverTrigger,
 } from "../../ui/popover";
@@ -84,6 +81,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../ui/select";
+
+const SCHEDULE_FILTER_TRIGGER_CLASS =
+  "h-9 w-full justify-between font-normal px-3 py-2 shadow-sm ring-offset-background";
 
 export function MaintenanceScheduleManager({ equipmentType }) {
   const { t } = useLanguage();
@@ -169,7 +169,6 @@ export function MaintenanceScheduleManager({ equipmentType }) {
   const { data: nodesData } = useQuery({
     queryKey: ["equipment-hierarchy-nodes-for-schedule-filter"],
     queryFn: () => equipmentHierarchyAPI.getNodes(),
-    enabled: unitFilterOpen || !!selectedUnitId,
     staleTime: 1000 * 60 * 5,
   });
   const allNodes = useMemo(() => nodesData?.nodes || nodesData || [], [nodesData]);
@@ -497,233 +496,204 @@ export function MaintenanceScheduleManager({ equipmentType }) {
       {/* Dashboard KPIs */}
       <DashboardCards dashboard={dashboard} isLoading={dashboardLoading} />
 
-      {/* Equipment Unit Filter (searchable by name OR tag) */}
-      <div className="flex items-center gap-2 flex-wrap" data-testid="equipment-unit-filter-row">
-        <span className="text-sm font-medium text-slate-700">{t("maintenance.equipmentUnit")}:</span>
-        <Popover open={unitFilterOpen} onOpenChange={setUnitFilterOpen} modal={false}>
-          <PopoverAnchor asChild>
-            <div className="w-72">
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={unitFilterOpen}
-              className="w-full justify-between font-normal"
-              data-testid="equipment-unit-filter"
-            >
-              {selectedUnitId ? (() => {
-                const sel = equipmentUnitNodes.find(n => n.id === selectedUnitId);
-                if (!sel) return t("maintenance.allEquipmentUnits");
-                return (
-                  <span className="flex items-center gap-2 truncate">
-                    {sel.tag && (
-                      <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0">
-                        {sel.tag}
-                      </Badge>
-                    )}
-                    <span className="truncate">{sel.name}</span>
-                  </span>
-                );
-              })() : (
-                <span className="text-slate-500">{t("maintenance.allEquipmentUnits")}</span>
-              )}
-              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-            </div>
-          </PopoverAnchor>
-          <PopoverContent
-            className="w-[var(--radix-popover-trigger-width)] p-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[side=bottom]:slide-in-from-top-1 duration-150"
-            align="start"
-            side="bottom"
-            sideOffset={4}
-            avoidCollisions={false}
-            onOpenAutoFocus={(e) => e.preventDefault()}
-          >
-            <Command
-              filter={(value, search) => {
-                // value carries "name|tag" — match either substring
-                const lc = (value || "").toLowerCase();
-                return lc.includes((search || "").toLowerCase()) ? 1 : 0;
-              }}
-            >
-              <CommandInput
-                placeholder={t("maintenance.searchUnitByNameOrTag")}
-                data-testid="equipment-unit-filter-search"
-              />
-              <CommandList>
-                <CommandEmpty>{t("common.noResults")}</CommandEmpty>
-                <CommandGroup>
-                  <CommandItem
-                    value="__all"
-                    onSelect={() => {
-                      setSelectedUnitId("");
-                      setUnitFilterOpen(false);
-                    }}
-                    data-testid="equipment-unit-filter-option-all"
-                  >
-                    <Check className={cn("mr-2 h-4 w-4", !selectedUnitId ? "opacity-100" : "opacity-0")} />
-                    {t("maintenance.allEquipmentUnits")}
-                  </CommandItem>
-                  {equipmentUnitNodes.map(n => (
-                    <CommandItem
-                      key={n.id}
-                      value={`${n.name || ""}|${n.tag || ""}`}
-                      onSelect={() => {
-                        setSelectedUnitId(n.id);
-                        setUnitFilterOpen(false);
-                      }}
-                      data-testid={`equipment-unit-filter-option-${n.id}`}
-                    >
-                      <Check className={cn("mr-2 h-4 w-4", selectedUnitId === n.id ? "opacity-100" : "opacity-0")} />
-                      <span className="flex items-center gap-2 flex-1 min-w-0">
-                        {n.tag && (
+      {/* Schedule filters — fixed-height triggers aligned with Select */}
+      <div
+        className="flex flex-wrap items-center gap-x-4 gap-y-2"
+        data-testid="equipment-unit-filter-row"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-slate-700 whitespace-nowrap">
+            {t("maintenance.equipmentUnit")}:
+          </span>
+          <Popover open={unitFilterOpen} onOpenChange={setUnitFilterOpen} modal={false}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={unitFilterOpen}
+                className={cn(SCHEDULE_FILTER_TRIGGER_CLASS, "w-72")}
+                data-testid="equipment-unit-filter"
+              >
+                <span className="truncate text-left flex-1 min-w-0">
+                  {selectedUnitId ? (() => {
+                    const sel = equipmentUnitNodes.find(n => n.id === selectedUnitId);
+                    if (!sel) return t("maintenance.allEquipmentUnits");
+                    return (
+                      <span className="flex items-center gap-2 truncate">
+                        {sel.tag && (
                           <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0 shrink-0">
-                            {n.tag}
+                            {sel.tag}
                           </Badge>
                         )}
-                        <span className="truncate">{n.name}</span>
+                        <span className="truncate">{sel.name}</span>
                       </span>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-        {selectedUnitId && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setSelectedUnitId("")}
-            className="h-8 text-xs"
-            data-testid="clear-equipment-unit-filter"
-          >
-            <X className="w-3.5 h-3.5 mr-1" />
-            {t("common.clear")}
-          </Button>
-        )}
-
-        <span className="text-sm font-medium text-slate-700">{t("maintenance.discipline")}:</span>
-        <Popover open={disciplineFilterOpen} onOpenChange={setDisciplineFilterOpen} modal={false}>
-          <PopoverAnchor asChild>
-            <div className="w-56">
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              aria-expanded={disciplineFilterOpen}
-              className="w-full justify-between font-normal"
-              data-testid="discipline-filter"
-            >
-              <span
-                className={cn(
-                  "truncate",
-                  selectedDisciplines.length > 0 ? "text-slate-900" : "text-slate-500"
-                )}
-              >
-                {getDisciplineFilterLabel()}
-              </span>
-              <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-            </div>
-          </PopoverAnchor>
-          <PopoverContent
-            className="w-[var(--radix-popover-trigger-width)] p-0 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[side=bottom]:slide-in-from-top-1 duration-150"
-            align="start"
-            side="bottom"
-            sideOffset={4}
-            avoidCollisions={false}
-            onOpenAutoFocus={(e) => e.preventDefault()}
-          >
-            <div className="p-2 border-b border-slate-100">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start h-8 text-sm"
-                onClick={() => setSelectedDisciplines([])}
-                data-testid="discipline-filter-option-all"
-              >
-                {t("disciplines.allDisciplines")}
+                    );
+                  })() : (
+                    <span className="text-muted-foreground">{t("maintenance.allEquipmentUnits")}</span>
+                  )}
+                </span>
+                <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
-            </div>
-            <ScrollArea className="max-h-64">
-              <div className="p-1">
-                {DISCIPLINES.map((disc) => {
-                  const isSelected = selectedDisciplines.includes(disc.value);
-                  return (
-                    <button
-                      key={disc.value}
-                      type="button"
-                      onClick={() => toggleDiscipline(disc.value)}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 sm:py-2 rounded-md hover:bg-slate-50 text-left"
-                      data-testid={`discipline-filter-option-${disc.value}`}
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-72 p-0"
+              align="start"
+              side="bottom"
+              sideOffset={4}
+              onOpenAutoFocus={(e) => e.preventDefault()}
+            >
+              <Command
+                filter={(value, search) => {
+                  const lc = (value || "").toLowerCase();
+                  return lc.includes((search || "").toLowerCase()) ? 1 : 0;
+                }}
+              >
+                <CommandInput
+                  placeholder={t("maintenance.searchUnitByNameOrTag")}
+                  data-testid="equipment-unit-filter-search"
+                />
+                <CommandList>
+                  <CommandEmpty>{t("common.noResults")}</CommandEmpty>
+                  <CommandGroup>
+                    <CommandItem
+                      value="__all"
+                      onSelect={() => {
+                        setSelectedUnitId("");
+                        setUnitFilterOpen(false);
+                      }}
+                      data-testid="equipment-unit-filter-option-all"
                     >
-                      <span
-                        aria-hidden
-                        className={cn(
-                          "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-slate-300",
-                          isSelected && "border-primary bg-primary text-primary-foreground"
-                        )}
+                      <Check className={cn("mr-2 h-4 w-4", !selectedUnitId ? "opacity-100" : "opacity-0")} />
+                      {t("maintenance.allEquipmentUnits")}
+                    </CommandItem>
+                    {equipmentUnitNodes.map(n => (
+                      <CommandItem
+                        key={n.id}
+                        value={`${n.name || ""}|${n.tag || ""}`}
+                        onSelect={() => {
+                          setSelectedUnitId(n.id);
+                          setUnitFilterOpen(false);
+                        }}
+                        data-testid={`equipment-unit-filter-option-${n.id}`}
                       >
-                        {isSelected ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
-                      </span>
-                      <span className="text-sm text-slate-700 flex-1">
-                        {getDisciplineOptionLabel(disc.value)}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </ScrollArea>
-          </PopoverContent>
-        </Popover>
-        {selectedDisciplines.length > 0 && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setSelectedDisciplines([])}
-            className="h-8 text-xs"
-            data-testid="clear-discipline-filter"
-          >
-            <X className="w-3.5 h-3.5 mr-1" />
-            {t("common.clear")}
-          </Button>
-        )}
+                        <Check className={cn("mr-2 h-4 w-4", selectedUnitId === n.id ? "opacity-100" : "opacity-0")} />
+                        <span className="flex items-center gap-2 flex-1 min-w-0">
+                          {n.tag && (
+                            <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0 shrink-0">
+                              {n.tag}
+                            </Badge>
+                          )}
+                          <span className="truncate">{n.name}</span>
+                        </span>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
 
-        <span className="text-sm font-medium text-slate-700">
-          {t("maintenance.scheduleSourceFilter")}:
-        </span>
-        <Select value={sourceFilter} onValueChange={setSourceFilter}>
-          <SelectTrigger className="w-44 h-9" data-testid="task-source-filter">
-            <SelectValue placeholder={t("maintenance.scheduleSourceAll")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all" data-testid="task-source-filter-all">
-              {t("maintenance.scheduleSourceAll")}
-            </SelectItem>
-            <SelectItem value="import" data-testid="task-source-filter-import">
-              {t("maintenance.scheduleSourceImport")}
-            </SelectItem>
-            <SelectItem value="strategy" data-testid="task-source-filter-strategy">
-              {t("maintenance.scheduleSourceStrategy")}
-            </SelectItem>
-          </SelectContent>
-        </Select>
-        {sourceFilter !== "all" && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setSourceFilter("all")}
-            className="h-8 text-xs"
-            data-testid="clear-task-source-filter"
-          >
-            <X className="w-3.5 h-3.5 mr-1" />
-            {t("common.clear")}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-slate-700 whitespace-nowrap">
+            {t("maintenance.discipline")}:
+          </span>
+          <Popover open={disciplineFilterOpen} onOpenChange={setDisciplineFilterOpen} modal={false}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={disciplineFilterOpen}
+                className={cn(SCHEDULE_FILTER_TRIGGER_CLASS, "w-56")}
+                data-testid="discipline-filter"
+              >
+                <span
+                  className={cn(
+                    "truncate text-left flex-1 min-w-0",
+                    selectedDisciplines.length > 0 ? "text-slate-900" : "text-muted-foreground",
+                  )}
+                >
+                  {getDisciplineFilterLabel()}
+                </span>
+                <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-56 p-0"
+              align="start"
+              side="bottom"
+              sideOffset={4}
+              onOpenAutoFocus={(e) => e.preventDefault()}
+            >
+              <div className="p-2 border-b border-slate-100">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start h-8 text-sm"
+                  onClick={() => {
+                    setSelectedDisciplines([]);
+                    setDisciplineFilterOpen(false);
+                  }}
+                  data-testid="discipline-filter-option-all"
+                >
+                  {t("disciplines.allDisciplines")}
+                </Button>
+              </div>
+              <ScrollArea className="max-h-64">
+                <div className="p-1">
+                  {DISCIPLINES.map((disc) => {
+                    const isSelected = selectedDisciplines.includes(disc.value);
+                    return (
+                      <button
+                        key={disc.value}
+                        type="button"
+                        onClick={() => toggleDiscipline(disc.value)}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 sm:py-2 rounded-md hover:bg-slate-50 text-left"
+                        data-testid={`discipline-filter-option-${disc.value}`}
+                      >
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-slate-300",
+                            isSelected && "border-primary bg-primary text-primary-foreground",
+                          )}
+                        >
+                          {isSelected ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
+                        </span>
+                        <span className="text-sm text-slate-700 flex-1">
+                          {getDisciplineOptionLabel(disc.value)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-slate-700 whitespace-nowrap">
+            {t("maintenance.scheduleSourceFilter")}:
+          </span>
+          <Select value={sourceFilter} onValueChange={setSourceFilter}>
+            <SelectTrigger className="w-44 h-9" data-testid="task-source-filter">
+              <SelectValue placeholder={t("maintenance.scheduleSourceAll")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" data-testid="task-source-filter-all">
+                {t("maintenance.scheduleSourceAll")}
+              </SelectItem>
+              <SelectItem value="import" data-testid="task-source-filter-import">
+                {t("maintenance.scheduleSourceImport")}
+              </SelectItem>
+              <SelectItem value="strategy" data-testid="task-source-filter-strategy">
+                {t("maintenance.scheduleSourceStrategy")}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Programs Summary */}

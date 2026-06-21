@@ -666,6 +666,8 @@ async def create_technician(user: dict, technician: TechnicianCapacity) -> dict:
 
 
 async def get_programs_summary(user: dict, equipment_type_id: str) -> dict:
+    from services.maintenance_program_pm_import import count_active_tasks_for_equipment_program
+
     programs = await db.maintenance_programs_v2.find(
         scheduler_scoped(
             user,
@@ -674,19 +676,32 @@ async def get_programs_summary(user: dict, equipment_type_id: str) -> dict:
         {"_id": 0, "equipment_id": 1, "equipment_name": 1, "equipment_tag": 1, "tasks": 1},
     ).to_list(500)
 
+    programs_by_equipment = {prog["equipment_id"]: prog for prog in programs if prog.get("equipment_id")}
     equipment_summary = []
     total_tasks = 0
-    for prog in programs:
-        active_tasks = [
-            t for t in (prog.get("tasks") or [])
-            if t.get("is_active", True)
-        ]
-        total_tasks += len(active_tasks)
+
+    async for equip in db.equipment_nodes.find(
+        scheduler_scoped(user, {"equipment_type_id": equipment_type_id}),
+        {"_id": 0, "id": 1, "name": 1, "tag": 1},
+    ):
+        equipment_id = equip.get("id")
+        if not equipment_id:
+            continue
+        prog = programs_by_equipment.get(equipment_id)
+        v2_tasks = (prog or {}).get("tasks") or []
+        task_count = await count_active_tasks_for_equipment_program(
+            equipment_id,
+            v2_tasks,
+            user_id=user.get("id") or user.get("email"),
+        )
+        if task_count <= 0:
+            continue
+        total_tasks += task_count
         equipment_summary.append({
-            "_id": prog.get("equipment_id"),
-            "equipment_name": prog.get("equipment_name"),
-            "equipment_tag": prog.get("equipment_tag"),
-            "task_count": len(active_tasks),
+            "_id": equipment_id,
+            "equipment_name": (prog or {}).get("equipment_name") or equip.get("name"),
+            "equipment_tag": (prog or {}).get("equipment_tag") or equip.get("tag"),
+            "task_count": task_count,
         })
 
     today = datetime.utcnow().date().isoformat()

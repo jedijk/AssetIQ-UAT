@@ -85,6 +85,60 @@ def existing_pm_import_refs(program_tasks: List[Dict[str, Any]]) -> set:
     return refs
 
 
+def parse_pm_import_ref(
+    *,
+    task: Optional[Dict[str, Any]] = None,
+    task_id: Optional[str] = None,
+) -> Optional[Tuple[str, str, str]]:
+    """Return (session_id, task_id, pm_ref) when task is PM-import backed."""
+    pm_ref: Optional[str] = None
+    if task:
+        trace = task.get("traceability") or {}
+        pm_ref = trace.get("pm_import_task_id")
+        raw_id = str(task.get("id") or "")
+        if not pm_ref and raw_id.startswith("pm-import:"):
+            pm_ref = raw_id[len("pm-import:") :]
+        source = (task.get("task_source") or "").lower()
+        if not pm_ref and source == TaskSource.CUSTOMER_IMPORTED.value:
+            return None
+    if not pm_ref and task_id:
+        if str(task_id).startswith("pm-import:"):
+            pm_ref = str(task_id)[len("pm-import:") :]
+    if not pm_ref or ":" not in pm_ref:
+        return None
+    session_id, _, extracted_task_id = pm_ref.partition(":")
+    if not session_id or not extracted_task_id:
+        return None
+    return session_id, extracted_task_id, pm_ref
+
+
+def is_pm_import_program_task(task: Optional[Dict[str, Any]] = None, task_id: Optional[str] = None) -> bool:
+    if parse_pm_import_ref(task=task, task_id=task_id):
+        return True
+    if task:
+        if (task.get("task_source") or "").lower() == TaskSource.CUSTOMER_IMPORTED.value:
+            return bool((task.get("traceability") or {}).get("pm_import_task_id"))
+        if str(task.get("id") or "").startswith("pm-import:"):
+            return True
+    return bool(task_id and str(task_id).startswith("pm-import:"))
+
+
+async def set_pm_import_session_task_active(
+    session_id: str,
+    task_id: str,
+    is_active: bool,
+) -> bool:
+    """Persist enable/disable on the canonical PM import session row."""
+    from services.pm_import_service import PMImportService
+
+    result = await PMImportService(db).update_task(
+        session_id,
+        task_id,
+        {"is_active": is_active},
+    )
+    return result is not None
+
+
 def pm_import_task_to_program_dict(
     pm_task: Dict[str, Any],
     session: Dict[str, Any],
@@ -187,6 +241,8 @@ async def propagate_pm_import_task_active_state(
 ) -> Dict[str, Any]:
     """Mirror PM Import task enable/disable to programs and the maintenance schedule."""
     pm_ref = f"{session_id}:{task_id}"
+    await set_pm_import_session_task_active(session_id, task_id, is_active)
+
     session = await db.pm_import_sessions.find_one(
         {"session_id": session_id},
         {"_id": 0, "tasks_extracted": 1},
@@ -397,8 +453,8 @@ async def enrich_program_response_with_pm_import(
                     "estimated_duration_hours": pm_task_dict.get(
                         "estimated_duration_hours", existing.get("estimated_duration_hours")
                     ),
-                    "is_active": pm_task_dict.get(
-                        "is_active", existing.get("is_active", True)
+                    "is_active": existing.get(
+                        "is_active", pm_task_dict.get("is_active", True)
                     ),
                 }
             continue
@@ -415,3 +471,28 @@ async def enrich_program_response_with_pm_import(
     program["tasks"] = merged_tasks
     recalculate_program_task_stats(program)
     return program, has_stored_program, added
+
+
+async def count_active_tasks_for_equipment_program(
+    equipment_id: str,
+    v2_tasks: Optional[List[Dict[str, Any]]] = None,
+    *,
+    user_id: Optional[str] = None,
+) -> int:
+    """Active program tasks: v2 rows plus PM import rows not already represented in v2."""
+    tasks = list(v2_tasks or [])
+    active_count = sum(1 for task in tasks if task.get("is_active", True))
+    v2_pm_refs = {
+        (task.get("traceability") or {}).get("pm_import_task_id")
+        for task in tasks
+        if (task.get("traceability") or {}).get("pm_import_task_id")
+    }
+
+    for pm_task in await fetch_pm_import_tasks_for_equipment(equipment_id, user_id=user_id):
+        pm_ref = (pm_task.get("traceability") or {}).get("pm_import_task_id")
+        if pm_ref and pm_ref in v2_pm_refs:
+            continue
+        if pm_task.get("is_active", True):
+            active_count += 1
+
+    return active_count

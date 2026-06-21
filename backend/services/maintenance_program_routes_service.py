@@ -28,6 +28,9 @@ from models.maintenance_program import (
     frequency_to_days,
 )
 from services.maintenance_program_service import MaintenanceProgramService
+from services.maintenance_program_pm_import import (
+    parse_pm_import_ref,
+)
 from services.maintenance_scheduler_sync import (
     clear_equipment_schedule_after_program_delete,
     refresh_equipment_schedule,
@@ -472,8 +475,18 @@ async def update_task(
             override_reason=request.override_reason,
             user_id=_current_user_id(current_user)
         )
-        
-        if is_active_only:
+
+        schedule_refresh = None
+        pm_ref_parts = parse_pm_import_ref(task=updated_task, task_id=task_id)
+        if pm_ref_parts and updates.get("is_active") is not None:
+            session_id, pm_task_id, _pm_ref = pm_ref_parts
+            schedule_refresh = await MaintenanceProgramService.propagate_pm_import_task_active_state(
+                session_id,
+                pm_task_id,
+                bool(updates["is_active"]),
+                user_id=_current_user_id(current_user),
+            )
+        elif is_active_only:
             trace = (updated_task or {}).get("traceability") or {}
             schedule_refresh = await _refresh_equipment_schedule_after_active_toggle(
                 equipment_id,
