@@ -2,6 +2,7 @@
  * Maintenance Schedule Manager — orchestrates dashboard, timeline, planner, and task dialogs.
  */
 import React, { useState, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Calendar,
@@ -75,6 +76,11 @@ import { PlannerView } from "./PlannerView";
 import { TaskDetailsDialog } from "./TaskDetailsDialog";
 import { matchesMaintenanceSourceFilter } from "./taskSourceFilter";
 import {
+  buildEquipmentManagerUrl,
+  buildStrategyLibraryUrl,
+  pickScheduledTaskForDialog,
+} from "../../../lib/maintenanceScheduleContext";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -87,6 +93,7 @@ const SCHEDULE_FILTER_TRIGGER_CLASS =
 
 export function MaintenanceScheduleManager({ equipmentType }) {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("timeline");
   const [applyDialogOpen, setApplyDialogOpen] = useState(false);
@@ -419,6 +426,56 @@ export function MaintenanceScheduleManager({ equipmentType }) {
   const handleTaskClick = (task) => {
     setSelectedTask(task);
   };
+
+  const handleViewTaskFromContext = useCallback((row) => {
+    const task = pickScheduledTaskForDialog(row);
+    if (!task?.id) {
+      toast.error(t("maintenance.contextViewTaskUnavailable"));
+      return;
+    }
+    setSelectedTask(task);
+  }, [t]);
+
+  const handleParentStrategyFromContext = useCallback(async (row) => {
+    const task = pickScheduledTaskForDialog(row);
+    let resolvedEquipmentTypeId = equipmentTypeId || task?.strategy_id;
+
+    if (!resolvedEquipmentTypeId && (row?.equipment_id || task?.equipment_id)) {
+      try {
+        const node = await equipmentHierarchyAPI.getNode(row?.equipment_id || task?.equipment_id);
+        resolvedEquipmentTypeId = node?.equipment_type_id;
+      } catch {
+        resolvedEquipmentTypeId = null;
+      }
+    }
+
+    if (!resolvedEquipmentTypeId) {
+      toast.error(t("maintenance.contextParentStrategyUnavailable"));
+      return;
+    }
+
+    navigate(
+      buildStrategyLibraryUrl({
+        equipmentTypeId: resolvedEquipmentTypeId,
+        failureModeId: task?.failure_mode_id,
+        taskName: row?.task_name || task?.task_name,
+      }),
+      { state: { from: "schedule", fromPage: t("maintenance.maintenanceScheduleTitle") } },
+    );
+  }, [equipmentTypeId, navigate, t]);
+
+  const handleFindEquipmentFromContext = useCallback((row) => {
+    const task = pickScheduledTaskForDialog(row);
+    const equipmentId = row?.equipment_id || task?.equipment_id;
+    if (!equipmentId) {
+      toast.error(t("maintenance.contextFindEquipmentUnavailable"));
+      return;
+    }
+
+    navigate(buildEquipmentManagerUrl(equipmentId), {
+      state: { from: "schedule", fromPage: t("maintenance.maintenanceScheduleTitle") },
+    });
+  }, [navigate, t]);
 
   // ============= Render =============
 
@@ -762,6 +819,9 @@ export function MaintenanceScheduleManager({ equipmentType }) {
             onTaskReschedule={(taskId, newDate) =>
               updateTaskMutation.mutate({ taskId, data: { planned_date: newDate } })
             }
+            onViewTask={handleViewTaskFromContext}
+            onParentStrategy={handleParentStrategyFromContext}
+            onFindEquipment={handleFindEquipmentFromContext}
           />
         </TabsContent>
 

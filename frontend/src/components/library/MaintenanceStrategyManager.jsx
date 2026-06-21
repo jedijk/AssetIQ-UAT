@@ -109,6 +109,7 @@ import { refreshMaintenanceSchedulerQueries } from "../../lib/apis/maintenanceSc
 import { DISCIPLINES as FM_DISCIPLINES, DISCIPLINE_COLORS } from "./EquipmentTypeItem";
 import MaintenanceScheduleManager from "./MaintenanceScheduleManager";
 import { useLanguage } from "../../contexts/LanguageContext";
+import { isStrategyTaskHighlighted } from "../../lib/maintenanceScheduleContext";
 import { useFailureModeNameMap, useMaintenanceTaskTemplateMap } from "../../hooks/useTranslatedEntities";
 
 // ============= Constants =============
@@ -374,6 +375,7 @@ const FailureModeStrategyRow = ({
   onViewInFMEA,
   onSyncNewVersion,
   isSyncingFm,
+  highlightedTask,
 }) => {
   const { t } = useLanguage();
   const fmNameMap = useFailureModeNameMap();
@@ -616,11 +618,18 @@ const FailureModeStrategyRow = ({
                       {t("maintenance.noTasksLinkedToFailureMode")}
                     </p>
                   ) : (
-                    linkedTasks.map((task) => (
+                    linkedTasks.map((task) => {
+                      const highlighted = isStrategyTaskHighlighted(task, highlightedTask);
+                      return (
                       <div
                         key={task.id}
+                        data-strategy-task-highlight={highlighted ? "true" : undefined}
                         className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                          task.is_mandatory !== false ? "bg-white" : "bg-slate-50 border-slate-200"
+                          highlighted
+                            ? "bg-blue-50 border-blue-300 ring-2 ring-blue-300"
+                            : task.is_mandatory !== false
+                              ? "bg-white"
+                              : "bg-slate-50 border-slate-200"
                         }`}
                       >
                         {/* Task Toggle Switch */}
@@ -701,7 +710,8 @@ const FailureModeStrategyRow = ({
                           </Tooltip>
                         </TooltipProvider>
                       </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -1269,7 +1279,7 @@ const invalidateStrategyQueries = async (queryClient, equipmentTypeId) => {
   await queryClient.invalidateQueries({ queryKey: ["maintenance-strategy-v2-history", equipmentTypeId] });
 };
 
-const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
+const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighlight, onStrategyHighlightConsumed }) => {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
   const taskNameMap = useMaintenanceTaskTemplateMap();
@@ -1302,6 +1312,45 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
     strategyData?.exists === true &&
     strategyData?.equipment_type_id === equipmentTypeId &&
     !!strategy;
+
+  useEffect(() => {
+    if (!strategyHighlight || strategyLoading || !hasStrategy) return;
+
+    setMainView("strategy");
+    setActiveTab("overview");
+
+    if (strategyHighlight.failureModeId) {
+      setExpandedFMs((prev) => new Set([...prev, strategyHighlight.failureModeId]));
+    } else if (strategyHighlight.taskName && strategy?.failure_mode_strategies?.length) {
+      const normalizedTarget = strategyHighlight.taskName.replace(/\s*\[[^\]]+\]\s*$/g, "").trim().toLowerCase();
+      const matchingFm = strategy.failure_mode_strategies.find((fm) => {
+        const linked = (strategy.task_templates || []).filter((task) => {
+          const fmId = String(fm.failure_mode_id ?? "");
+          const ids = (fm.task_ids || []).map(String);
+          const linkedByFm = (task.failure_mode_ids || []).map(String).includes(fmId);
+          return ids.includes(String(task.id)) || linkedByFm;
+        });
+        return linked.some((task) =>
+          (task.name || "").replace(/\s*\[[^\]]+\]\s*$/g, "").trim().toLowerCase() === normalizedTarget,
+        );
+      });
+      if (matchingFm?.failure_mode_id) {
+        setExpandedFMs((prev) => new Set([...prev, matchingFm.failure_mode_id]));
+      }
+    }
+
+    if (strategyHighlight.taskName) {
+      setSearchQuery(strategyHighlight.taskName.slice(0, 80));
+    }
+
+    const timer = window.setTimeout(() => {
+      const el = document.querySelector('[data-strategy-task-highlight="true"]');
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+      onStrategyHighlightConsumed?.();
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [strategyHighlight, strategyLoading, hasStrategy, strategy, onStrategyHighlightConsumed]);
 
   // Affected equipment query
   const { data: affectedEquipmentData, isLoading: affectedEquipmentLoading } = useQuery({
@@ -1959,6 +2008,13 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA }) => {
                     onViewInFMEA={handleViewInFMEA}
                     onSyncNewVersion={() => syncFmMutation.mutate(fm.failure_mode_id)}
                     isSyncingFm={syncingFmId === fm.failure_mode_id && syncFmMutation.isPending}
+                    highlightedTask={
+                      strategyHighlight &&
+                      (!strategyHighlight.failureModeId ||
+                        strategyHighlight.failureModeId === fm.failure_mode_id)
+                        ? { taskName: strategyHighlight.taskName }
+                        : null
+                    }
                   />
                 ))
               )}

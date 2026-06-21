@@ -11,11 +11,25 @@ import {
   maintenanceTimelineRowKey,
   dedupeTimelineOccurrences,
 } from "../../../lib/maintenanceTimelineUtils";
+import { pickScheduledTaskForDialog } from "../../../lib/maintenanceScheduleContext";
 import { isMaintenanceImportTask } from "./taskSourceFilter";
+import {
+  openScheduleContextMenu,
+  ScheduleTaskContextMenu,
+} from "./ScheduleTaskContextMenu";
 
-export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedule }) {
+export function TimelineView({
+  timeline,
+  isLoading,
+  onTaskClick,
+  onTaskReschedule,
+  onViewTask,
+  onParentStrategy,
+  onFindEquipment,
+}) {
   const { t } = useLanguage();
   const [zoom, setZoom] = useState("week"); // "day" | "week" | "month"
+  const [contextMenu, setContextMenu] = useState({ open: false, x: 0, y: 0, row: null });
 
   const ZOOM_CONFIG = useMemo(
     () => ({
@@ -150,6 +164,10 @@ export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedul
   const viewStartIso = startDate.toISOString().split("T")[0];
   const viewEndIso = endDate.toISOString().split("T")[0];
 
+  const handleRowContextMenu = (event, row) => {
+    openScheduleContextMenu(event, row, setContextMenu);
+  };
+
   return (
     <div className="space-y-3" data-testid="timeline-gantt">
       {/* Controls */}
@@ -228,7 +246,8 @@ export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedul
                 <div
                   key={r.id}
                   className="h-10 border-b px-3 flex items-center text-xs cursor-pointer hover:bg-slate-100"
-                  onClick={() => onTaskClick?.(r)}
+                  onClick={() => onTaskClick?.(pickScheduledTaskForDialog(r))}
+                  onContextMenu={(event) => handleRowContextMenu(event, r)}
                   data-testid={`gantt-row-label-${r.id}`}
                 >
                   <div className="flex-1 min-w-0">
@@ -326,6 +345,7 @@ export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedul
                   <GanttRow
                     key={r.id}
                     rowKey={r.id}
+                    row={r}
                     taskName={r.task_name}
                     occurrences={r.occurrences}
                     startDate={startDate}
@@ -333,6 +353,7 @@ export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedul
                     totalDays={totalDays}
                     onClick={(occ) => onTaskClick?.(occ)}
                     onReschedule={onTaskReschedule}
+                    onContextMenu={handleRowContextMenu}
                   />
                 ))}
               </div>
@@ -340,6 +361,14 @@ export function TimelineView({ timeline, isLoading, onTaskClick, onTaskReschedul
           </ScrollArea>
         </div>
       </Card>
+
+      <ScheduleTaskContextMenu
+        menu={contextMenu}
+        onClose={() => setContextMenu({ open: false, x: 0, y: 0, row: null })}
+        onViewTask={onViewTask}
+        onParentStrategy={onParentStrategy}
+        onFindEquipment={onFindEquipment}
+      />
     </div>
   );
 }

@@ -131,6 +131,12 @@ const FailureModesPage = () => {
   const [strategyEquipmentTypeId, setStrategyEquipmentTypeId] = useState(
     () => searchParams.get("equipment_type_id") || null
   );
+  const [strategyHighlight, setStrategyHighlight] = useState(() => {
+    const failureModeId = searchParams.get("highlight_failure_mode_id");
+    const taskName = searchParams.get("highlight_task_name");
+    if (!failureModeId && !taskName) return null;
+    return { failureModeId, taskName };
+  });
   
   const FAILURE_MODE_TYPE_OPTIONS = useMemo(() => [
     { value: "all", label: t("library.fmTypeAll") },
@@ -1036,6 +1042,8 @@ const FailureModesPage = () => {
               inUseEquipmentTypeIds={inUseEquipmentTypeIds}
               initialEquipmentTypeId={strategyEquipmentTypeId}
               onInitialEquipmentTypeConsumed={() => setStrategyEquipmentTypeId(null)}
+              strategyHighlight={strategyHighlight}
+              onStrategyHighlightConsumed={() => setStrategyHighlight(null)}
             />
           </div>
         </TabsContent>

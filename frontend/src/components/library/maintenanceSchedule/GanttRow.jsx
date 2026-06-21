@@ -1,12 +1,24 @@
 import React from "react";
 import { GanttBar } from "./GanttBar";
 
-export function GanttRow({ rowKey, taskName, occurrences, startDate, dayPx, totalDays, onClick, onReschedule }) {
+export function GanttRow({
+  rowKey,
+  row,
+  taskName,
+  occurrences,
+  startDate,
+  dayPx,
+  totalDays,
+  onClick,
+  onReschedule,
+  onContextMenu,
+}) {
   return (
     <div
       className="h-10 border-b relative hover:bg-slate-50/50 transition-colors"
       style={{ width: totalDays * dayPx }}
       data-testid={`gantt-row-${rowKey}`}
+      onContextMenu={(event) => onContextMenu?.(event, row)}
     >
       {/* Background day grid */}
       {dayPx >= 16 && (

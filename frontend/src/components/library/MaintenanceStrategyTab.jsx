@@ -98,6 +98,8 @@ const MaintenanceStrategyTab = ({
   inUseEquipmentTypeIds = new Set(),
   initialEquipmentTypeId = null,
   onInitialEquipmentTypeConsumed,
+  strategyHighlight = null,
+  onStrategyHighlightConsumed,
 }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -394,6 +396,8 @@ const MaintenanceStrategyTab = ({
                 <MaintenanceStrategyManager
                   equipmentType={selectedType}
                   onViewInFMEA={handleViewInFMEA}
+                  strategyHighlight={strategyHighlight}
+                  onStrategyHighlightConsumed={onStrategyHighlightConsumed}
                 />
               </motion.div>
             ) : (
