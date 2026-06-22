@@ -90,7 +90,13 @@ import {
 } from "../../ui/select";
 
 const SCHEDULE_FILTER_TRIGGER_CLASS =
-  "h-9 min-h-9 max-h-9 shrink-0 justify-between font-normal px-3 py-0 shadow-sm overflow-hidden";
+  "h-full w-full min-h-0 justify-between font-normal px-3 py-0 shadow-none overflow-hidden " +
+  "transition-colors active:scale-100 " +
+  "hover:border-input hover:bg-background " +
+  "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring focus-visible:ring-offset-0 " +
+  "data-[state=open]:ring-1 data-[state=open]:ring-inset data-[state=open]:ring-ring data-[state=open]:ring-offset-0";
+
+const SCHEDULE_FILTER_SHELL_CLASS = "relative h-9 shrink-0";
 
 const SCHEDULE_FILTER_GROUP_CLASS = "flex h-9 shrink-0 items-center gap-2";
 const SCHEDULE_FILTER_LABEL_CLASS =
@@ -575,20 +581,21 @@ export function MaintenanceScheduleManager({ equipmentType }) {
 
       {/* Schedule filters — single row, fixed 36px controls (no wrap jump) */}
       <div
-        className="flex h-9 min-h-9 flex-nowrap items-center gap-x-4 overflow-x-auto"
+        className="flex h-9 min-h-9 max-h-9 flex-nowrap items-center gap-x-4 overflow-x-auto overflow-y-hidden [scrollbar-gutter:stable]"
         data-testid="equipment-unit-filter-row"
       >
         <div className={SCHEDULE_FILTER_GROUP_CLASS}>
           <span className={SCHEDULE_FILTER_LABEL_CLASS}>
             {t("maintenance.equipmentUnit")}:
           </span>
+          <div className={cn(SCHEDULE_FILTER_SHELL_CLASS, "w-72")}>
           <Popover open={unitFilterOpen} onOpenChange={setUnitFilterOpen} modal={false}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 role="combobox"
                 aria-expanded={unitFilterOpen}
-                className={cn(SCHEDULE_FILTER_TRIGGER_CLASS, "w-72")}
+                className={SCHEDULE_FILTER_TRIGGER_CLASS}
                 data-testid="equipment-unit-filter"
               >
                 <span className="flex min-h-0 min-w-0 flex-1 items-center truncate text-left">
@@ -672,19 +679,21 @@ export function MaintenanceScheduleManager({ equipmentType }) {
               </Command>
             </PopoverContent>
           </Popover>
+          </div>
         </div>
 
         <div className={SCHEDULE_FILTER_GROUP_CLASS}>
           <span className={SCHEDULE_FILTER_LABEL_CLASS}>
             {t("maintenance.discipline")}:
           </span>
+          <div className={cn(SCHEDULE_FILTER_SHELL_CLASS, "w-56")}>
           <Popover open={disciplineFilterOpen} onOpenChange={setDisciplineFilterOpen} modal={false}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 role="combobox"
                 aria-expanded={disciplineFilterOpen}
-                className={cn(SCHEDULE_FILTER_TRIGGER_CLASS, "w-56")}
+                className={SCHEDULE_FILTER_TRIGGER_CLASS}
                 data-testid="discipline-filter"
               >
                 <span
@@ -751,15 +760,20 @@ export function MaintenanceScheduleManager({ equipmentType }) {
               </ScrollArea>
             </PopoverContent>
           </Popover>
+          </div>
         </div>
 
         <div className={SCHEDULE_FILTER_GROUP_CLASS}>
           <span className={SCHEDULE_FILTER_LABEL_CLASS}>
             {t("maintenance.scheduleSourceFilter")}:
           </span>
+          <div className={cn(SCHEDULE_FILTER_SHELL_CLASS, "w-44")}>
           <Select value={sourceFilter} onValueChange={setSourceFilter}>
             <SelectTrigger
-              className={cn(SCHEDULE_FILTER_TRIGGER_CLASS, "w-44")}
+              className={cn(
+                SCHEDULE_FILTER_TRIGGER_CLASS,
+                "focus:ring-inset focus:ring-1 focus:ring-offset-0",
+              )}
               data-testid="task-source-filter"
             >
               <SelectValue placeholder={t("maintenance.scheduleSourceAll")} />
@@ -776,6 +790,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
               </SelectItem>
             </SelectContent>
           </Select>
+          </div>
         </div>
       </div>
 
