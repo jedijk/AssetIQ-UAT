@@ -9,7 +9,9 @@ from services.ai_gateway import chat_completion_response
 
 logger = logging.getLogger(__name__)
 
+# FM-level checks may chunk; bulk review uses one OpenAI call per HTTP request.
 _CLASSIFY_CHUNK_SIZE = 4
+_REVIEW_BATCH_MAX = 8
 
 _SYSTEM_PROMPT = """You are a maintenance reliability engineer.
 For each maintenance action, decide whether performing it requires taking the equipment or process unit out of service (shutdown / isolation / downtime).
@@ -145,9 +147,9 @@ async def classify_recommended_actions_downtime_batch(
     """
     if not actions:
         return []
-    if len(actions) > _CLASSIFY_CHUNK_SIZE:
+    if len(actions) > _REVIEW_BATCH_MAX:
         raise ValueError(
-            f"Send at most {_CLASSIFY_CHUNK_SIZE} actions per batch (got {len(actions)})."
+            f"Send at most {_REVIEW_BATCH_MAX} actions per batch (got {len(actions)})."
         )
     return await _suggest_chunk(
         actions,

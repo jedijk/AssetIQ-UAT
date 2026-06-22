@@ -1956,8 +1956,8 @@ async def review_action_downtime(
     """Classify a batch of recommended actions for equipment downtime requirement."""
     if not request.actions:
         return ReviewActionDowntimeResponse(results=[])
-    if len(request.actions) > 4:
-        raise HTTPException(status_code=400, detail="Send at most 4 actions per batch.")
+    if len(request.actions) > 8:
+        raise HTTPException(status_code=400, detail="Send at most 8 actions per batch.")
 
     uid, cid = user_context(current_user)
     actions_in = [

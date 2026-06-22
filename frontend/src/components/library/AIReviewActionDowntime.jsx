@@ -32,26 +32,42 @@ import { failureModesAPI } from "../../lib/apis/failureModes";
 import { useLanguage } from "../../contexts/LanguageContext";
 import ActionDowntimeBadge from "../failure-modes/ActionDowntimeBadge";
 
-const BATCH_SIZE = 4; // One OpenAI call per batch — stay under Railway/Vercel ~60s proxy limit
+const BATCH_SIZE = 8; // Match review-action-disciplines; one OpenAI call per batch on backend
 
 const isGatewayTimeout = (err) => {
   const status = err?.response?.status;
   return status === 502 || status === 504;
 };
 
+const isBatchSizeRejected = (err) => {
+  const status = err?.response?.status;
+  const detail = String(err?.response?.data?.detail || "");
+  return status === 400 && /at most \d+ actions per batch/i.test(detail);
+};
+
 const reviewDowntimeBatch = async (batch) => {
+  if (!batch?.length) return { results: [] };
+
   const maxAttempts = 3;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       return await failureModesAPI.reviewActionDowntime(batch);
     } catch (err) {
+      if (isBatchSizeRejected(err) && batch.length > 1) {
+        const mid = Math.ceil(batch.length / 2);
+        const left = await reviewDowntimeBatch(batch.slice(0, mid));
+        const right = await reviewDowntimeBatch(batch.slice(mid));
+        return {
+          results: [...(left?.results || []), ...(right?.results || [])],
+        };
+      }
       if (!isGatewayTimeout(err) || attempt === maxAttempts - 1) {
         throw err;
       }
       await new Promise((resolve) => setTimeout(resolve, 1200 * (attempt + 1)));
     }
   }
-  return null;
+  return { results: [] };
 };
 
 export default function AIReviewActionDowntime({

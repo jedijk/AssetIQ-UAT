@@ -120,9 +120,9 @@ async def test_classify_downtime_batch_rejects_oversized_batch():
         classify_recommended_actions_downtime_batch,
     )
 
-    with pytest.raises(ValueError, match="at most 4"):
+    with pytest.raises(ValueError, match="at most 8"):
         await classify_recommended_actions_downtime_batch(
-            [{"action_index": i, "description": f"Action {i}"} for i in range(5)],
+            [{"action_index": i, "description": f"Action {i}"} for i in range(9)],
             user_id="u1",
             company_id="c1",
         )
