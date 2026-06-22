@@ -1829,8 +1829,8 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
 
   return wrapWithIntelligencePanel(
     <div className="space-y-4">
-      {/* View Toggle */}
-      <div className="flex items-center gap-2 mb-2">
+      {/* View Toggle + Intelligence Context */}
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <Tabs value={mainView} onValueChange={setMainView} className="w-auto">
           <TabsList className="h-9">
             <TabsTrigger value="strategy" className="text-xs px-4">
@@ -1843,6 +1843,11 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
             </TabsTrigger>
           </TabsList>
         </Tabs>
+        <IntelligenceContextToggle
+          open={intelPanelOpen}
+          onToggle={() => setIntelPanelOpen((prev) => !prev)}
+          disabled={!equipmentTypeId}
+        />
       </div>
 
       {hasStrategy && strategy?.strategy_needs_apply && (
@@ -1866,11 +1871,6 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          <IntelligenceContextToggle
-            open={intelPanelOpen}
-            onToggle={() => setIntelPanelOpen((prev) => !prev)}
-            disabled={!equipmentTypeId}
-          />
           {hasStrategy ? (
             <>
               <Button size="sm" variant="outline" onClick={() => refetchStrategy()}>

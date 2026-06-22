@@ -2306,6 +2306,7 @@
   },
   "intelligenceContext": {
     "toggleLabel": "Intelligence Context",
+    "toggleShort": "Context",
     "title": "Intelligence Context",
     "loading": "Loading intelligence context…",
     "loadFailed": "Could not load intelligence context.",

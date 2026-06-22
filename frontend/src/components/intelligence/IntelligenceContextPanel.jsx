@@ -360,18 +360,25 @@ export default function IntelligenceContextPanel({
 
 export function IntelligenceContextToggle({ open, onToggle, disabled }) {
   const { t } = useLanguage();
+  const label = t("intelligenceContext.toggleLabel");
   return (
     <Button
       type="button"
       size="sm"
       variant={open ? "default" : "outline"}
-      className={open ? "bg-violet-600 hover:bg-violet-700" : "text-violet-700 border-violet-200 hover:bg-violet-50"}
+      className={`shrink-0 ${
+        open
+          ? "bg-violet-600 hover:bg-violet-700 text-white"
+          : "text-violet-700 border-violet-300 bg-violet-50 hover:bg-violet-100"
+      }`}
       onClick={onToggle}
       disabled={disabled}
       data-testid="intelligence-context-toggle"
+      aria-label={label}
     >
       <Brain className="h-3.5 w-3.5 mr-1.5" />
-      {t("intelligenceContext.toggleLabel")}
+      <span className="hidden sm:inline">{label}</span>
+      <span className="sm:hidden">{t("intelligenceContext.toggleShort")}</span>
     </Button>
   );
 }
