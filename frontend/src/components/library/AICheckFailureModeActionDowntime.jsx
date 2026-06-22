@@ -20,6 +20,7 @@ import { Checkbox } from "../ui/checkbox";
 import { toast } from "sonner";
 import { failureModesAPI } from "../../lib/apis/failureModes";
 import { useLanguage } from "../../contexts/LanguageContext";
+import ActionDowntimeBadge from "../failure-modes/ActionDowntimeBadge";
 
 export default function AICheckFailureModeActionDowntime({
   isOpen,
@@ -230,9 +231,15 @@ export default function AICheckFailureModeActionDowntime({
                             {actionLabel(r.action_index)}
                           </p>
                           <div className="flex flex-wrap items-center gap-2 mt-2">
-                            <Badge variant="outline" className="text-[10px]">
-                              {downtimeLabel(r.current_requires_downtime)}
-                            </Badge>
+                            <ActionDowntimeBadge
+                              requiresDowntime={r.current_requires_downtime}
+                              showLabel
+                            />
+                            {!r.current_requires_downtime && (
+                              <span className="text-xs text-slate-500">
+                                {downtimeLabel(false)}
+                              </span>
+                            )}
                             {r.changed && (
                               <>
                                 <ArrowRight className="w-3 h-3 text-slate-400" />
@@ -257,7 +264,10 @@ export default function AICheckFailureModeActionDowntime({
                                         : "bg-green-100 text-green-800 border-green-200"
                                     }`}
                                   >
-                                    {downtimeLabel(suggested)}
+                                    <span className="inline-flex items-center gap-1">
+                                      {suggested && <Clock className="w-3 h-3" />}
+                                      {downtimeLabel(suggested)}
+                                    </span>
                                   </Badge>
                                 </button>
                               </>

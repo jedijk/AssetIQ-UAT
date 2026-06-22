@@ -223,6 +223,7 @@ const FailureModesPage = () => {
   const [isAIImproveOpen, setIsAIImproveOpen] = useState(false); // AI improve a single failure mode
   const [isBulkImproveOpen, setIsBulkImproveOpen] = useState(false); // Bulk improve all visible
   const [isReviewDisciplinesOpen, setIsReviewDisciplinesOpen] = useState(false); // AI review action disciplines
+  const [isReviewActionDowntimeOpen, setIsReviewActionDowntimeOpen] = useState(false);
   const [isFindSimilarOpen, setIsFindSimilarOpen] = useState(false); // AI find similar failure modes
   const [isFindDuplicateActionsOpen, setIsFindDuplicateActionsOpen] = useState(false);
   const [isConsolidateActionsOpen, setIsConsolidateActionsOpen] = useState(false);
@@ -962,6 +963,7 @@ const FailureModesPage = () => {
               onOpenAINewFm={() => setIsAINewFmOpen(true)}
               onOpenBulkImprove={() => setIsBulkImproveOpen(true)}
               onOpenReviewDisciplines={() => setIsReviewDisciplinesOpen(true)}
+              onOpenReviewActionDowntime={() => setIsReviewActionDowntimeOpen(true)}
               onOpenFindSimilar={() => setIsFindSimilarOpen(true)}
               onOpenFindDuplicateActions={() => setIsFindDuplicateActionsOpen(true)}
             />
@@ -1186,6 +1188,8 @@ const FailureModesPage = () => {
         setIsBulkImproveOpen={setIsBulkImproveOpen}
         isReviewDisciplinesOpen={isReviewDisciplinesOpen}
         setIsReviewDisciplinesOpen={setIsReviewDisciplinesOpen}
+        isReviewActionDowntimeOpen={isReviewActionDowntimeOpen}
+        setIsReviewActionDowntimeOpen={setIsReviewActionDowntimeOpen}
         isFindSimilarOpen={isFindSimilarOpen}
         setIsFindSimilarOpen={setIsFindSimilarOpen}
         isFindDuplicateActionsOpen={isFindDuplicateActionsOpen}

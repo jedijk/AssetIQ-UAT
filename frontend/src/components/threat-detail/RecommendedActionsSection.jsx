@@ -31,6 +31,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useDisciplines } from "../../hooks/useDisciplines";
+import ActionDowntimeBadge, { actionRequiresDowntime } from "../failure-modes/ActionDowntimeBadge";
 import { queryKeys } from "../../lib/queryKeys";
 
 const ACTION_TYPE_KEYS = {
@@ -559,11 +560,14 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
 
                 {/* Content - Smaller text */}
                 <div className="flex-1 min-w-0">
-                  {discipline && (
+                  {(discipline || actionRequiresDowntime(action)) && (
                     <div className="flex items-center gap-1.5 mb-1">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium">
-                        {getLabel(discipline)}
-                      </span>
+                      {discipline && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium">
+                          {getLabel(discipline)}
+                        </span>
+                      )}
+                      <ActionDowntimeBadge action={action} />
                       {actionType && (
                         <span className="text-[10px] text-slate-400">
                           {typeStyle?.fullLabel}
@@ -1218,6 +1222,7 @@ export const RecommendedActionsSection = ({ threat, threatId }) => {
                             {action.estimated_minutes} min
                           </Badge>
                         )}
+                        <ActionDowntimeBadge action={action} />
                       </div>
                       <Button
                         variant="ghost"

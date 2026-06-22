@@ -10,6 +10,7 @@ import {
   ClipboardList,
   Plus,
   ChevronDown,
+  Clock,
 } from "lucide-react";
 import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
@@ -59,6 +60,7 @@ export function FailureModesListPanel({
   onOpenAINewFm,
   onOpenBulkImprove,
   onOpenReviewDisciplines,
+  onOpenReviewActionDowntime,
   onOpenFindSimilar,
   onOpenFindDuplicateActions,
 }) {
@@ -237,6 +239,15 @@ export function FailureModesListPanel({
                     >
                       <Sparkles className="w-4 h-4 mr-2" />
                       Review Disciplines
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={onOpenReviewActionDowntime}
+                      disabled={failureModes.length === 0}
+                      className="cursor-pointer"
+                      data-testid="review-action-downtime-btn"
+                    >
+                      <Clock className="w-4 h-4 mr-2" />
+                      {t("library.reviewActionDowntime")}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={onOpenFindSimilar}

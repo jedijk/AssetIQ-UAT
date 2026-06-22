@@ -4,6 +4,7 @@ import AINewFailureModeSuggestions from "../library/AINewFailureModeSuggestions"
 import AIImproveFailureMode from "../library/AIImproveFailureMode";
 import BulkImproveFailureModes from "../library/BulkImproveFailureModes";
 import AIReviewActionDisciplines from "../library/AIReviewActionDisciplines";
+import AIReviewActionDowntime from "../library/AIReviewActionDowntime";
 import AIFindSimilarFailureModes from "../library/AIFindSimilarFailureModes";
 import FindDuplicateActionsDialog from "../library/FindDuplicateActionsDialog";
 import AIConsolidateFailureModeActions from "../library/AIConsolidateFailureModeActions";
@@ -25,6 +26,8 @@ export function FailureModesAIPanel({
   setIsBulkImproveOpen,
   isReviewDisciplinesOpen,
   setIsReviewDisciplinesOpen,
+  isReviewActionDowntimeOpen,
+  setIsReviewActionDowntimeOpen,
   isFindSimilarOpen,
   setIsFindSimilarOpen,
   isFindDuplicateActionsOpen,
@@ -96,6 +99,13 @@ export function FailureModesAIPanel({
       <AIReviewActionDisciplines
         open={isReviewDisciplinesOpen}
         onClose={() => setIsReviewDisciplinesOpen(false)}
+        failureModes={failureModes}
+        onApplied={onInvalidateFailureModes}
+      />
+
+      <AIReviewActionDowntime
+        open={isReviewActionDowntimeOpen}
+        onClose={() => setIsReviewActionDowntimeOpen(false)}
         failureModes={failureModes}
         onApplied={onInvalidateFailureModes}
       />

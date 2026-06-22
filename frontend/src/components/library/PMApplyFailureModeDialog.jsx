@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../ui/dialog';
+import ActionDowntimeBadge from '../failure-modes/ActionDowntimeBadge';
 
 const actionLabel = (action, idx) => {
   if (typeof action === 'string') return action;
@@ -242,6 +243,7 @@ const PMApplyFailureModeDialog = ({ task, onClose, onSuccess }) => {
                         >
                           <span className="text-xs text-gray-400 mr-2">#{idx + 1}</span>
                           {actionLabel(action, idx)}
+                          <ActionDowntimeBadge action={action} className="ml-2 align-middle" />
                         </button>
                       ))}
                     </ScrollArea>

@@ -21,6 +21,7 @@ import {
 } from "../ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../ui/dialog";
 import { Checkbox } from "../ui/checkbox";
+import ActionDowntimeBadge from "../failure-modes/ActionDowntimeBadge";
 
 function translateDiscipline(name, t) {
   if (!name) return name;
@@ -875,11 +876,7 @@ export function FailureModeViewPanel({
                         {autoCreate && (
                           <span className="text-xs text-green-600 font-medium">Auto-create</span>
                         )}
-                        {requiresDowntime && (
-                          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-800">
-                            {t("library.downtimeRequired")}
-                          </span>
-                        )}
+                        <ActionDowntimeBadge action={action} />
                       </div>
                     )}
                     <span className="text-sm text-slate-700">{description}</span>

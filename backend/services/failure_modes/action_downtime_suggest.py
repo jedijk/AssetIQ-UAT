@@ -88,16 +88,19 @@ Return JSON: {{"results": [{{"i": 0, "requires_downtime": false, "reasoning": ".
         r = by_index.get(idx, {})
         suggested = bool(r.get("requires_downtime"))
         current = bool(a.get("current_requires_downtime"))
-        results.append(
-            {
-                "action_index": a.get("action_index"),
-                "current_requires_downtime": current,
-                "suggested_requires_downtime": suggested,
-                "reasoning": (r.get("reasoning") or "").strip()[:300]
-                or "Classified by AI reliability engineer.",
-                "changed": suggested != current,
-            }
-        )
+        entry: Dict[str, Any] = {
+            "action_index": a.get("action_index"),
+            "current_requires_downtime": current,
+            "suggested_requires_downtime": suggested,
+            "reasoning": (r.get("reasoning") or "").strip()[:300]
+            or "Classified by AI reliability engineer.",
+            "changed": suggested != current,
+        }
+        if a.get("fm_id"):
+            entry["fm_id"] = a["fm_id"]
+        if a.get("failure_mode"):
+            entry["failure_mode"] = a["failure_mode"]
+        results.append(entry)
     return results
 
 

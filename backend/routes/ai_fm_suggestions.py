@@ -1920,6 +1920,81 @@ async def check_failure_mode_action_downtime(
     )
 
 
+class ActionDowntimeInput(BaseModel):
+    fm_id: str
+    action_index: int
+    description: str
+    action_type: Optional[str] = None
+    current_requires_downtime: bool = False
+    failure_mode: Optional[str] = None
+    equipment: Optional[str] = None
+
+
+class ActionDowntimeBulkResult(ActionDowntimeResult):
+    fm_id: str
+    failure_mode: Optional[str] = None
+
+
+class ReviewActionDowntimeRequest(BaseModel):
+    actions: List[ActionDowntimeInput]
+
+
+class ReviewActionDowntimeResponse(BaseModel):
+    results: List[ActionDowntimeBulkResult]
+
+
+@router.post("/review-action-downtime", response_model=ReviewActionDowntimeResponse)
+async def review_action_downtime(
+    request: ReviewActionDowntimeRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Classify a batch of recommended actions for equipment downtime requirement."""
+    if not request.actions:
+        return ReviewActionDowntimeResponse(results=[])
+    if len(request.actions) > 16:
+        raise HTTPException(status_code=400, detail="Send at most 16 actions per batch.")
+
+    uid, cid = user_context(current_user)
+    actions_in = [
+        {
+            "fm_id": a.fm_id,
+            "action_index": a.action_index,
+            "description": a.description,
+            "action_type": a.action_type or "",
+            "current_requires_downtime": a.current_requires_downtime,
+            "failure_mode": a.failure_mode or "",
+            "equipment": a.equipment or "",
+        }
+        for a in request.actions
+    ]
+    try:
+        raw_results = await suggest_action_downtime_requirements(
+            actions_in,
+            user_id=uid,
+            company_id=cid,
+            endpoint="ai_fm_suggestions.review_action_downtime",
+        )
+    except RateLimitError as e:
+        raise HTTPException(status_code=429, detail="OpenAI rate limit — try again in a moment.") from e
+    except Exception as e:
+        logger.error("review-action-downtime error: %s", e)
+        raise HTTPException(status_code=500, detail=f"AI service error: {e}") from e
+
+    results = [
+        ActionDowntimeBulkResult(
+            fm_id=r.get("fm_id") or inp["fm_id"],
+            action_index=r["action_index"],
+            failure_mode=r.get("failure_mode") or inp.get("failure_mode"),
+            current_requires_downtime=r.get("current_requires_downtime", False),
+            suggested_requires_downtime=r["suggested_requires_downtime"],
+            reasoning=r.get("reasoning") or "",
+            changed=r.get("changed", False),
+        )
+        for inp, r in zip(actions_in, raw_results)
+    ]
+    return ReviewActionDowntimeResponse(results=results)
+
+
 @router.post(
     "/suggest-action-downtime",
     response_model=SuggestActionDowntimeResponse,

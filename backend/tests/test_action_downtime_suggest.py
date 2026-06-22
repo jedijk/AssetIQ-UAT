@@ -81,6 +81,85 @@ async def test_suggest_action_downtime_requirements_parses_llm_response():
 
 
 @pytest.mark.asyncio
+async def test_suggest_action_downtime_includes_fm_id_in_results():
+    mock_response = MagicMock()
+    mock_response.choices = [
+        MagicMock(
+            message=MagicMock(
+                content='{"results": [{"i": 0, "requires_downtime": false, "reasoning": "Visual round while running."}]}'
+            )
+        )
+    ]
+
+    with patch(
+        "services.failure_modes.action_downtime_suggest.chat_completion_response",
+        new_callable=AsyncMock,
+        return_value=mock_response,
+    ):
+        results = await suggest_action_downtime_requirements(
+            [
+                {
+                    "fm_id": "fm-9",
+                    "action_index": 0,
+                    "description": "Operator round",
+                    "failure_mode": "Leak",
+                    "current_requires_downtime": False,
+                }
+            ],
+            user_id="u1",
+            company_id="c1",
+        )
+
+    assert results[0]["fm_id"] == "fm-9"
+    assert results[0]["failure_mode"] == "Leak"
+
+
+@pytest.mark.asyncio
+async def test_review_action_downtime_endpoint():
+    from routes.ai_fm_suggestions import (
+        ActionDowntimeInput,
+        ReviewActionDowntimeRequest,
+        review_action_downtime,
+    )
+
+    async def _fake_suggest(actions, **kwargs):
+        return [
+            {
+                "fm_id": actions[0]["fm_id"],
+                "action_index": actions[0]["action_index"],
+                "failure_mode": actions[0]["failure_mode"],
+                "current_requires_downtime": False,
+                "suggested_requires_downtime": True,
+                "reasoning": "Needs isolation.",
+                "changed": True,
+            }
+        ]
+
+    with patch(
+        "routes.ai_fm_suggestions.suggest_action_downtime_requirements",
+        new_callable=AsyncMock,
+        side_effect=_fake_suggest,
+    ):
+        response = await review_action_downtime(
+            ReviewActionDowntimeRequest(
+                actions=[
+                    ActionDowntimeInput(
+                        fm_id="fm-1",
+                        action_index=0,
+                        description="Replace seal",
+                        failure_mode="Seal leak",
+                    )
+                ]
+            ),
+            current_user={"id": "user-1", "company_id": "co-1"},
+        )
+
+    assert len(response.results) == 1
+    assert response.results[0].fm_id == "fm-1"
+    assert response.results[0].suggested_requires_downtime is True
+
+
+@pytest.mark.asyncio
 async def test_check_failure_mode_action_downtime_endpoint(monkeypatch):
     from routes.ai_fm_suggestions import check_failure_mode_action_downtime
     from routes.ai_fm_suggestions import CheckActionDowntimeRequest

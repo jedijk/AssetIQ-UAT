@@ -126,6 +126,16 @@ export const failureModesAPI = {
     return response.data;
   },
 
+  /** Batch-classify downtime requirements (library-wide AI review). */
+  reviewActionDowntime: async (actions) => {
+    const response = await api.post(
+      "/ai-suggestions/review-action-downtime",
+      { actions },
+      { timeout: 120000 },
+    );
+    return response.data;
+  },
+
   /** Map recommended-action disciplines to Settings taxonomy for one failure mode. */
   mapFailureModeActionDisciplines: async (body = {}) => {
     const response = await api.post(

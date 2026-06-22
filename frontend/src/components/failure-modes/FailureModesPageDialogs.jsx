@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import ActionDowntimeBadge from "./ActionDowntimeBadge";
 import { Textarea } from "../ui/textarea";
 import {
   Select,
@@ -491,6 +492,7 @@ export function FailureModeFormDialog(props) {
                         {estMin} min
                       </span>
                     )}
+                    <ActionDowntimeBadge action={action} />
                   </div>
                   <span className="text-sm">{i + 1}. {description}</span>
                 </div>
