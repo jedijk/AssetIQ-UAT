@@ -1787,6 +1787,185 @@ async def map_failure_mode_action_disciplines(
     )
 
 
+# ============= Action Downtime Requirement (AI) =============
+
+from services.failure_modes.action_downtime_suggest import suggest_action_downtime_requirements
+
+
+class CheckActionDowntimeRequest(BaseModel):
+    failure_mode_id: str
+    apply: bool = False
+
+
+class ActionDowntimeResult(BaseModel):
+    action_index: int
+    current_requires_downtime: bool = False
+    suggested_requires_downtime: bool
+    reasoning: str
+    changed: bool
+
+
+class CheckActionDowntimeResponse(BaseModel):
+    failure_mode_id: str
+    failure_mode: str
+    actions_before: int
+    changes_suggested: int
+    results: List[ActionDowntimeResult]
+    applied: bool = False
+
+
+class SuggestActionDowntimeRequest(BaseModel):
+    description: str
+    action_type: Optional[str] = None
+    failure_mode: Optional[str] = None
+    equipment: Optional[str] = None
+
+
+class SuggestActionDowntimeResponse(BaseModel):
+    requires_downtime: bool
+    reasoning: str
+
+
+@router.post(
+    "/check-failure-mode-action-downtime",
+    response_model=CheckActionDowntimeResponse,
+)
+async def check_failure_mode_action_downtime(
+    request: CheckActionDowntimeRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Use AI to suggest whether each recommended action requires equipment downtime."""
+    from database import failure_modes_service
+
+    fm_id = (request.failure_mode_id or "").strip()
+    if not fm_id:
+        raise HTTPException(status_code=400, detail="failure_mode_id is required")
+
+    fm = await failure_modes_service.get_by_id(fm_id)
+    if not fm:
+        raise HTTPException(status_code=404, detail="Failure mode not found")
+
+    actions_in = []
+    for idx, act in enumerate(fm.get("recommended_actions") or []):
+        if not act:
+            continue
+        if isinstance(act, str):
+            description = act
+            action_type = ""
+            current_downtime = False
+        else:
+            description = act.get("action") or act.get("description") or ""
+            action_type = act.get("action_type") or ""
+            current_downtime = bool(act.get("requires_downtime"))
+        if not description:
+            continue
+        actions_in.append(
+            {
+                "action_index": idx,
+                "description": description,
+                "action_type": action_type,
+                "current_requires_downtime": current_downtime,
+                "failure_mode": fm.get("failure_mode") or "",
+                "equipment": fm.get("equipment") or "",
+            }
+        )
+
+    if not actions_in:
+        raise HTTPException(status_code=400, detail="No recommended actions to classify.")
+
+    uid, cid = user_context(current_user)
+    try:
+        raw_results = await suggest_action_downtime_requirements(
+            actions_in,
+            user_id=uid,
+            company_id=cid,
+            endpoint="ai_fm_suggestions.check_failure_mode_action_downtime",
+        )
+    except RateLimitError as e:
+        raise HTTPException(status_code=429, detail="OpenAI rate limit — try again in a moment.") from e
+    except Exception as e:
+        logger.error("check-failure-mode-action-downtime error: %s", e)
+        raise HTTPException(status_code=500, detail=f"AI service error: {e}") from e
+
+    results = [ActionDowntimeResult(**r) for r in raw_results]
+    changes = [r for r in results if r.changed]
+
+    applied = False
+    if request.apply and changes:
+        next_actions = [
+            dict(a) if isinstance(a, dict) else {"action": a}
+            for a in (fm.get("recommended_actions") or [])
+        ]
+        for r in changes:
+            if 0 <= r.action_index < len(next_actions):
+                next_actions[r.action_index] = {
+                    **next_actions[r.action_index],
+                    "requires_downtime": r.suggested_requires_downtime,
+                }
+        await failure_modes_service.update(
+            fm_id,
+            {"recommended_actions": next_actions},
+            updated_by=current_user.get("email") or current_user.get("id") or "AI",
+            change_reason="AI classified action downtime requirements",
+        )
+        applied = True
+
+    return CheckActionDowntimeResponse(
+        failure_mode_id=fm_id,
+        failure_mode=fm.get("failure_mode") or "",
+        actions_before=len(actions_in),
+        changes_suggested=len(changes),
+        results=results,
+        applied=applied,
+    )
+
+
+@router.post(
+    "/suggest-action-downtime",
+    response_model=SuggestActionDowntimeResponse,
+)
+async def suggest_action_downtime(
+    request: SuggestActionDowntimeRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Suggest downtime requirement for a single action description."""
+    description = (request.description or "").strip()
+    if not description:
+        raise HTTPException(status_code=400, detail="description is required")
+
+    uid, cid = user_context(current_user)
+    try:
+        raw_results = await suggest_action_downtime_requirements(
+            [
+                {
+                    "action_index": 0,
+                    "description": description,
+                    "action_type": request.action_type or "",
+                    "current_requires_downtime": False,
+                    "failure_mode": request.failure_mode or "",
+                    "equipment": request.equipment or "",
+                }
+            ],
+            user_id=uid,
+            company_id=cid,
+            endpoint="ai_fm_suggestions.suggest_action_downtime",
+        )
+    except RateLimitError as e:
+        raise HTTPException(status_code=429, detail="OpenAI rate limit — try again in a moment.") from e
+    except Exception as e:
+        logger.error("suggest-action-downtime error: %s", e)
+        raise HTTPException(status_code=500, detail=f"AI service error: {e}") from e
+
+    if not raw_results:
+        raise HTTPException(status_code=500, detail="AI returned no result")
+
+    first = raw_results[0]
+    return SuggestActionDowntimeResponse(
+        requires_downtime=bool(first.get("suggested_requires_downtime")),
+        reasoning=first.get("reasoning") or "",
+    )
+
+
 # ============= Find Similar Failure Modes (semantic dedupe) =============
 #
 # For ONE equipment type at a time, accepts the list of failure modes attached

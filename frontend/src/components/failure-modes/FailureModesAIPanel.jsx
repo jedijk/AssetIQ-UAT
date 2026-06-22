@@ -8,6 +8,7 @@ import AIFindSimilarFailureModes from "../library/AIFindSimilarFailureModes";
 import FindDuplicateActionsDialog from "../library/FindDuplicateActionsDialog";
 import AIConsolidateFailureModeActions from "../library/AIConsolidateFailureModeActions";
 import AIMapFailureModeActionDisciplines from "../library/AIMapFailureModeActionDisciplines";
+import AICheckFailureModeActionDowntime from "../library/AICheckFailureModeActionDowntime";
 
 export function FailureModesAIPanel({
   t,
@@ -32,6 +33,8 @@ export function FailureModesAIPanel({
   setIsConsolidateActionsOpen,
   isMapActionDisciplinesOpen,
   setIsMapActionDisciplinesOpen,
+  isCheckActionDowntimeOpen,
+  setIsCheckActionDowntimeOpen,
   equipmentTypes,
   failureModes,
   displayedFailureModes,
@@ -125,6 +128,13 @@ export function FailureModesAIPanel({
       <AIMapFailureModeActionDisciplines
         isOpen={isMapActionDisciplinesOpen}
         onClose={() => setIsMapActionDisciplinesOpen(false)}
+        failureMode={selectedFm}
+        onApplied={onInvalidateFailureModes}
+      />
+
+      <AICheckFailureModeActionDowntime
+        isOpen={isCheckActionDowntimeOpen}
+        onClose={() => setIsCheckActionDowntimeOpen(false)}
         failureMode={selectedFm}
         onApplied={onInvalidateFailureModes}
       />

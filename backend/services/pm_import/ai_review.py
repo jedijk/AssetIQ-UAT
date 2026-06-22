@@ -688,6 +688,7 @@ Respond with a JSON object:
             "task_type": action_type,
             "discipline": discipline,
             "source": source,
+            "requires_downtime": False,
         }
         if frequency:
             action["frequency"] = frequency

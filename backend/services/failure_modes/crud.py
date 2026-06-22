@@ -14,6 +14,7 @@ import time
 from utils.mongo_regex import escape_regex, exact_case_insensitive
 from services.ai_gateway import chat as ai_gateway_chat
 from services.failure_modes.cache import _cache, _invalidate_cache
+from services.failure_modes.recommended_action_schema import normalize_recommended_actions
 from services.tenant_schema import merge_tenant_filter, with_tenant_id
 
 logger = logging.getLogger(__name__)
@@ -267,7 +268,9 @@ class FailureModesMixin:
             "occurrence": data["occurrence"],
             "detectability": data["detectability"],
             "rpn": rpn,
-            "recommended_actions": data.get("recommended_actions", []),
+            "recommended_actions": normalize_recommended_actions(
+                data.get("recommended_actions", [])
+            ),
             "equipment_type_ids": data.get("equipment_type_ids", []),
             "mechanism": data.get("mechanism", "UNK - Unknown"),
             "failure_mode_type": data.get("failure_mode_type", "generic"),
@@ -332,7 +335,10 @@ class FailureModesMixin:
         
         for field in allowed_fields:
             if field in data and data[field] is not None:
-                update_fields[field] = data[field]
+                if field == "recommended_actions":
+                    update_fields[field] = normalize_recommended_actions(data[field])
+                else:
+                    update_fields[field] = data[field]
         
         # Recalculate RPN if FMEA scores changed
         severity = data.get("severity", existing["severity"])

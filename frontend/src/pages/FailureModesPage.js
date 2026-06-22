@@ -227,6 +227,7 @@ const FailureModesPage = () => {
   const [isFindDuplicateActionsOpen, setIsFindDuplicateActionsOpen] = useState(false);
   const [isConsolidateActionsOpen, setIsConsolidateActionsOpen] = useState(false);
   const [isMapActionDisciplinesOpen, setIsMapActionDisciplinesOpen] = useState(false);
+  const [isCheckActionDowntimeOpen, setIsCheckActionDowntimeOpen] = useState(false);
   
   // Failure mode dialog state
   const [isFmDialogOpen, setIsFmDialogOpen] = useState(false);
@@ -986,6 +987,9 @@ const FailureModesPage = () => {
                 onMapActionDisciplines={
                   canUseAITools ? () => setIsMapActionDisciplinesOpen(true) : undefined
                 }
+                onCheckActionDowntime={
+                  canUseAITools ? () => setIsCheckActionDowntimeOpen(true) : undefined
+                }
                 equipmentTypes={equipmentTypes}
                 categories={categories}
                 currentUser={user}
@@ -1015,6 +1019,9 @@ const FailureModesPage = () => {
               }
               onMapActionDisciplines={
                 canUseAITools ? () => setIsMapActionDisciplinesOpen(true) : undefined
+              }
+              onCheckActionDowntime={
+                canUseAITools ? () => setIsCheckActionDowntimeOpen(true) : undefined
               }
               equipmentTypes={equipmentTypes}
               categories={categories}
@@ -1187,6 +1194,8 @@ const FailureModesPage = () => {
         setIsConsolidateActionsOpen={setIsConsolidateActionsOpen}
         isMapActionDisciplinesOpen={isMapActionDisciplinesOpen}
         setIsMapActionDisciplinesOpen={setIsMapActionDisciplinesOpen}
+        isCheckActionDowntimeOpen={isCheckActionDowntimeOpen}
+        setIsCheckActionDowntimeOpen={setIsCheckActionDowntimeOpen}
         equipmentTypes={equipmentTypes}
         failureModes={failureModes}
         displayedFailureModes={displayedFailureModes}

@@ -136,6 +136,26 @@ export const failureModesAPI = {
     return response.data;
   },
 
+  /** AI suggests whether recommended actions require equipment downtime. */
+  checkFailureModeActionDowntime: async (body = {}) => {
+    const response = await api.post(
+      "/ai-suggestions/check-failure-mode-action-downtime",
+      body,
+      { timeout: 120000 },
+    );
+    return response.data;
+  },
+
+  /** AI suggests downtime requirement for a single action description. */
+  suggestActionDowntime: async (body = {}) => {
+    const response = await api.post(
+      "/ai-suggestions/suggest-action-downtime",
+      body,
+      { timeout: 120000 },
+    );
+    return response.data;
+  },
+
   /**
    * Merge losers into winner. Pass dry_run: true to preview.
    * Supports winner_id + loser_ids or primary_id + merge_id.

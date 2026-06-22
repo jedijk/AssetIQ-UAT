@@ -7,6 +7,7 @@ import {
   Cog, Thermometer, Activity, Zap, Shield, Leaf, Maximize2, Minimize2, Image, Search,
   Wand2,
   Tags,
+  Clock,
 } from "lucide-react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -20,6 +21,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../ui/dialog";
+import { Checkbox } from "../ui/checkbox";
 
 function translateDiscipline(name, t) {
   if (!name) return name;
@@ -84,6 +86,7 @@ export function FailureModeViewPanel({
   onImproveWithAI,
   onConsolidateActions,
   onMapActionDisciplines,
+  onCheckActionDowntime,
   equipmentTypes,
   categories,
   currentUser,
@@ -229,7 +232,8 @@ export function FailureModeViewPanel({
         discipline: actionDiscipline,
         action_type: actionType,
         estimated_minutes: Number.isFinite(minutes) && minutes >= 0 ? minutes : null,
-        auto_create: false  // Default to false, user can enable it
+        auto_create: false,
+        requires_downtime: false,
       };
       setFormData({ ...formData, recommended_actions: [...(formData.recommended_actions || []), newAction] });
       setActionInput("");
@@ -270,6 +274,20 @@ export function FailureModeViewPanel({
       return {
         ...base,
         estimated_minutes: Number.isFinite(minutes) && minutes >= 0 ? minutes : null,
+      };
+    });
+    setFormData({ ...formData, recommended_actions: next });
+  };
+
+  const toggleActionRequiresDowntime = (idx) => {
+    if (!formData?.recommended_actions) return;
+    const next = formData.recommended_actions.map((action, i) => {
+      if (i !== idx) return action;
+      const isObject = typeof action === "object" && action !== null;
+      const base = isObject ? action : { description: action };
+      return {
+        ...base,
+        requires_downtime: !base.requires_downtime,
       };
     });
     setFormData({ ...formData, recommended_actions: next });
@@ -764,6 +782,18 @@ export function FailureModeViewPanel({
                   Map Disciplines (AI)
                 </Button>
               )}
+              {!isEditing && onCheckActionDowntime && (fm.recommended_actions?.length || 0) > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={onCheckActionDowntime}
+                  className="h-7 text-xs border-purple-200 text-purple-700 hover:bg-purple-50"
+                  data-testid="view-panel-check-downtime-btn"
+                >
+                  <Clock className="w-3 h-3 mr-1" />
+                  {t("library.checkDowntimeRequirement")}
+                </Button>
+              )}
               {!isEditing && onConsolidateActions && (fm.recommended_actions?.length || 0) >= 4 && (
                 <Button
                   size="sm"
@@ -791,6 +821,7 @@ export function FailureModeViewPanel({
               const discipline = isObject ? action.discipline : null;
               const actType = isObject ? action.action_type : null;
               const autoCreate = isObject ? action.auto_create : false;
+              const requiresDowntime = isObject ? !!action.requires_downtime : false;
               const estMin = isObject ? action.estimated_minutes : null;
               
               const typeColors = {
@@ -845,22 +876,44 @@ export function FailureModeViewPanel({
                         {autoCreate && (
                           <span className="text-xs text-green-600 font-medium">Auto-create</span>
                         )}
+                        {requiresDowntime && (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-800">
+                            {t("library.downtimeRequired")}
+                          </span>
+                        )}
                       </div>
                     )}
                     <span className="text-sm text-slate-700">{description}</span>
                     {isEditing && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <Label className="text-xs text-slate-500 whitespace-nowrap">Est. time (min)</Label>
-                        <Input
-                          type="number"
-                          min={0}
-                          step={1}
-                          value={String(isObject && action.estimated_minutes !== undefined && action.estimated_minutes !== null ? action.estimated_minutes : "")}
-                          onChange={(e) => setActionEstimatedMinutes(idx, e.target.value)}
-                          className="w-24 h-8 text-xs"
-                          placeholder="—"
-                          data-testid={`view-panel-action-est-minutes-${idx}`}
-                        />
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id={`action-downtime-${idx}`}
+                            checked={requiresDowntime}
+                            onCheckedChange={() => toggleActionRequiresDowntime(idx)}
+                            data-testid={`action-requires-downtime-${idx}`}
+                          />
+                          <Label
+                            htmlFor={`action-downtime-${idx}`}
+                            className="text-xs text-slate-600 cursor-pointer"
+                            title={t("library.requiresDowntimeHint")}
+                          >
+                            {t("library.requiresDowntime")}
+                          </Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs text-slate-500 whitespace-nowrap">Est. time (min)</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            step={1}
+                            value={String(isObject && action.estimated_minutes !== undefined && action.estimated_minutes !== null ? action.estimated_minutes : "")}
+                            onChange={(e) => setActionEstimatedMinutes(idx, e.target.value)}
+                            className="w-24 h-8 text-xs"
+                            placeholder="—"
+                            data-testid={`view-panel-action-est-minutes-${idx}`}
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
