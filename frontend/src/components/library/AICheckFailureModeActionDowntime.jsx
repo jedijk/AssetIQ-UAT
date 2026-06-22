@@ -19,7 +19,7 @@ import {
 import { Checkbox } from "../ui/checkbox";
 import { toast } from "sonner";
 import { failureModesAPI } from "../../lib/apis/failureModes";
-import { useTranslation } from "react-i18next";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 export default function AICheckFailureModeActionDowntime({
   isOpen,
@@ -27,7 +27,7 @@ export default function AICheckFailureModeActionDowntime({
   failureMode,
   onApplied,
 }) {
-  const { t } = useTranslation();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
   const [preview, setPreview] = useState(null);

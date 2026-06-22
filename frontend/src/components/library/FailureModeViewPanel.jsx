@@ -7,7 +7,6 @@ import {
   Cog, Thermometer, Activity, Zap, Shield, Leaf, Maximize2, Minimize2, Image, Search,
   Wand2,
   Tags,
-  Clock,
 } from "lucide-react";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
