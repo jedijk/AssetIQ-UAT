@@ -2438,7 +2438,8 @@
     "plannedWorkGenerated": "Gepland werk gegenereerd",
     "estimatedLabor": "Geschatte arbeid",
     "failureModesControlled": "Storingsmodi onder controle",
-    "riskReduction": "Risicoverlaging"
+    "riskReduction": "Risicoverlaging",
+    "requiresEquipmentType": "Een equipmenttype is vereist om intelligence context te bekijken."
   },
   "taskScheduler": {
     "title": "Taakplanner",

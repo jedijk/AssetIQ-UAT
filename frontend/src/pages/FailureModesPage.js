@@ -1082,7 +1082,11 @@ const FailureModesPage = () => {
         {/* Schedule Tab */}
         <TabsContent value="schedule" className="h-[calc(100vh-200px)]">
           <div className="card h-full overflow-auto p-4">
-            <MaintenanceScheduleManager equipmentType={null} />
+            <MaintenanceScheduleManager
+              equipmentType={null}
+              embedIntelligenceContext
+              contextEquipmentTypes={equipmentTypes}
+            />
           </div>
         </TabsContent>
         

@@ -2330,7 +2330,8 @@
     "plannedWorkGenerated": "Planned Work Generated",
     "estimatedLabor": "Estimated Labor",
     "failureModesControlled": "Failure Modes Controlled",
-    "riskReduction": "Risk Reduction"
+    "riskReduction": "Risk Reduction",
+    "requiresEquipmentType": "An equipment type is required to view intelligence context."
   },
   "taskScheduler": {
     "title": "Task Planner",

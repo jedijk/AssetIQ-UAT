@@ -2437,7 +2437,8 @@
     "plannedWorkGenerated": "Generierte geplante Arbeit",
     "estimatedLabor": "Geschätzter Arbeitsaufwand",
     "failureModesControlled": "Kontrollierte Fehlermodi",
-    "riskReduction": "Risikoreduktion"
+    "riskReduction": "Risikoreduktion",
+    "requiresEquipmentType": "Ein Equipmenttyp ist erforderlich, um den Intelligence-Kontext anzuzeigen."
   },
   "taskScheduler": {
     "title": "Aufgabenplaner",

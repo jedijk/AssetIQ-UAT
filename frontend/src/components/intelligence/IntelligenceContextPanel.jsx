@@ -106,7 +106,7 @@ export default function IntelligenceContextPanel({
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["intelligence-context", objectType, objectId],
     queryFn: () => intelligenceContextAPI.getStrategyContext(objectId),
-    enabled: open && objectType === "strategy" && !!objectId,
+    enabled: open && !!objectId,
     staleTime: 30_000,
   });
 
@@ -358,7 +358,7 @@ export default function IntelligenceContextPanel({
   );
 }
 
-export function IntelligenceContextToggle({ open, onToggle, disabled }) {
+export function IntelligenceContextToggle({ open, onToggle, disabled, title }) {
   const { t } = useLanguage();
   const label = t("intelligenceContext.toggleLabel");
   return (
@@ -373,6 +373,7 @@ export function IntelligenceContextToggle({ open, onToggle, disabled }) {
       }`}
       onClick={onToggle}
       disabled={disabled}
+      title={title}
       data-testid="intelligence-context-toggle"
       aria-label={label}
     >

@@ -88,6 +88,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../ui/select";
+import IntelligenceContextPanel, {
+  IntelligenceContextToggle,
+} from "../../intelligence/IntelligenceContextPanel";
+import { useIntelligenceContextPanel } from "../../../hooks/useIntelligenceContextPanel";
 
 const SCHEDULE_FILTER_TRIGGER_CLASS =
   "h-full w-full min-h-0 justify-between font-normal px-3 py-0 shadow-none overflow-hidden " +
@@ -102,7 +106,11 @@ const SCHEDULE_FILTER_GROUP_CLASS = "flex h-9 shrink-0 items-center gap-2";
 const SCHEDULE_FILTER_LABEL_CLASS =
   "text-sm font-medium leading-none text-slate-700 whitespace-nowrap";
 
-export function MaintenanceScheduleManager({ equipmentType }) {
+export function MaintenanceScheduleManager({
+  equipmentType,
+  embedIntelligenceContext = false,
+  contextEquipmentTypes = [],
+}) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -112,6 +120,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
   const [aiPlanOpen, setAiPlanOpen] = useState(false);
   const [aiPlanResult, setAiPlanResult] = useState(null);
   const [selectedAiRecs, setSelectedAiRecs] = useState(new Set());
+  const [contextEquipmentTypeId, setContextEquipmentTypeId] = useState("");
   // Filter: Equipment Unit (ISO 14224 level). "" = all units.
   const [selectedUnitId, setSelectedUnitId] = useState("");
   const [unitFilterOpen, setUnitFilterOpen] = useState(false);
@@ -137,6 +146,18 @@ export function MaintenanceScheduleManager({ equipmentType }) {
 
   const equipmentTypeId = equipmentType?.id;
   const equipmentTypeName = equipmentType?.name || t("equipment.allEquipment");
+  const intelligenceContextTypeId = equipmentTypeId || contextEquipmentTypeId || null;
+  const intelligenceContextTypeName = equipmentTypeId
+    ? equipmentTypeName
+    : contextEquipmentTypes.find((type) => type.id === contextEquipmentTypeId)?.name || null;
+  const intelPanelStorageKey = intelligenceContextTypeId
+    ? `assetiq:intel-context:schedule:${intelligenceContextTypeId}`
+    : embedIntelligenceContext
+      ? "assetiq:intel-context:schedule:global"
+      : null;
+  const [intelPanelOpen, setIntelPanelOpen] = useIntelligenceContextPanel(
+    embedIntelligenceContext ? intelPanelStorageKey : null,
+  );
   const schedulerStaleTime = 60_000;
 
   // ============= Queries =============
@@ -507,7 +528,7 @@ export function MaintenanceScheduleManager({ equipmentType }) {
 
   const hasPrograms = programsSummary?.total_programs > 0;
 
-  return (
+  const scheduleContent = (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -518,6 +539,40 @@ export function MaintenanceScheduleManager({ equipmentType }) {
           </h1>
         </div>
         <div className="flex items-center gap-2">
+          {embedIntelligenceContext && !equipmentTypeId && (
+            <Select
+              value={contextEquipmentTypeId || "__none__"}
+              onValueChange={(value) =>
+                setContextEquipmentTypeId(value === "__none__" ? "" : value)
+              }
+            >
+              <SelectTrigger className="h-8 w-56 text-xs">
+                <SelectValue placeholder={t("maintenance.selectEquipmentType")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__" className="text-xs text-slate-500">
+                  {t("maintenance.selectEquipmentType")}
+                </SelectItem>
+                {contextEquipmentTypes.map((type) => (
+                  <SelectItem key={type.id} value={type.id} className="text-xs">
+                    {type.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {embedIntelligenceContext && (
+            <IntelligenceContextToggle
+              open={intelPanelOpen}
+              onToggle={() => setIntelPanelOpen((prev) => !prev)}
+              disabled={!intelligenceContextTypeId}
+              title={
+                !intelligenceContextTypeId
+                  ? t("intelligenceContext.requiresEquipmentType")
+                  : undefined
+              }
+            />
+          )}
           <Button 
             size="sm" 
             variant="outline" 
@@ -1092,6 +1147,23 @@ export function MaintenanceScheduleManager({ equipmentType }) {
           isDeferring={deferTaskMutation.isPending}
         />
       )}
+    </div>
+  );
+
+  if (!embedIntelligenceContext) {
+    return scheduleContent;
+  }
+
+  return (
+    <div className="flex items-start gap-0 min-h-0">
+      <div className="flex-1 min-w-0">{scheduleContent}</div>
+      <IntelligenceContextPanel
+        open={intelPanelOpen && !!intelligenceContextTypeId}
+        onOpenChange={setIntelPanelOpen}
+        objectType="strategy"
+        objectId={intelligenceContextTypeId}
+        equipmentTypeName={intelligenceContextTypeName}
+      />
     </div>
   );
 }
