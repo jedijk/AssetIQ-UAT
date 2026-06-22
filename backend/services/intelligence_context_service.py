@@ -141,9 +141,45 @@ async def _estimate_annual_planned_work_and_labor(
     return int(round(annual_tasks)), int(round(labor_hours))
 
 
-async def _get_equipment_type(equipment_type_id: str) -> Optional[dict]:
+async def _resolve_equipment_type(
+    equipment_type_id: str,
+    *,
+    strategy: Optional[dict] = None,
+) -> Optional[dict]:
+    """Resolve equipment type metadata from registry, ISO library, or strategy doc."""
     types = await list_equipment_types(db, {"id": equipment_type_id}, limit=1)
-    return types[0] if types else None
+    if types:
+        return types[0]
+
+    try:
+        from iso14224_models import EQUIPMENT_TYPES
+
+        iso_type = next(
+            (t for t in EQUIPMENT_TYPES if t.get("id") == equipment_type_id),
+            None,
+        )
+        if iso_type:
+            return iso_type
+    except Exception as exc:
+        logger.debug("ISO equipment type lookup failed for %s: %s", equipment_type_id, exc)
+
+    if strategy:
+        return {
+            "id": equipment_type_id,
+            "name": strategy.get("equipment_type_name") or equipment_type_id,
+        }
+
+    exists = await db.equipment_nodes.find_one(
+        {"equipment_type_id": equipment_type_id},
+        {"_id": 1},
+    )
+    if exists:
+        return {
+            "id": equipment_type_id,
+            "name": equipment_type_id.replace("_", " ").title(),
+        }
+
+    return None
 
 
 async def get_strategy_intelligence_context(
@@ -164,14 +200,17 @@ async def get_strategy_intelligence_context(
 
     scope = lambda q: _scope_query(q, current_user)
 
-    equipment_type = await _get_equipment_type(equipment_type_id)
-    if not equipment_type:
-        raise HTTPException(status_code=404, detail="Equipment type not found")
-
     strategy = await db.equipment_type_strategies.find_one(
         scope({"equipment_type_id": equipment_type_id}),
         {"_id": 0},
     )
+
+    equipment_type = await _resolve_equipment_type(
+        equipment_type_id,
+        strategy=strategy,
+    )
+    if not equipment_type:
+        raise HTTPException(status_code=404, detail="Equipment type not found")
 
     fm_strategies = (strategy or {}).get("failure_mode_strategies") or []
     fm_ids = [
