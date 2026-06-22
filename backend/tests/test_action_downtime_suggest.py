@@ -115,6 +115,50 @@ async def test_suggest_action_downtime_includes_fm_id_in_results():
 
 
 @pytest.mark.asyncio
+async def test_classify_downtime_batch_rejects_oversized_batch():
+    from services.failure_modes.action_downtime_suggest import (
+        classify_recommended_actions_downtime_batch,
+    )
+
+    with pytest.raises(ValueError, match="at most 4"):
+        await classify_recommended_actions_downtime_batch(
+            [{"action_index": i, "description": f"Action {i}"} for i in range(5)],
+            user_id="u1",
+            company_id="c1",
+        )
+
+
+@pytest.mark.asyncio
+async def test_suggest_chunk_json_parse_fallback():
+    mock_response = MagicMock()
+    mock_response.choices = [MagicMock(message=MagicMock(content="not-json"))]
+
+    with patch(
+        "services.failure_modes.action_downtime_suggest.chat_completion_response",
+        new_callable=AsyncMock,
+        return_value=mock_response,
+    ):
+        from services.failure_modes.action_downtime_suggest import _suggest_chunk
+
+        results = await _suggest_chunk(
+            [
+                {
+                    "action_index": 0,
+                    "description": "Inspect seal",
+                    "current_requires_downtime": False,
+                }
+            ],
+            user_id="u1",
+            company_id="c1",
+            endpoint="test",
+        )
+
+    assert len(results) == 1
+    assert results[0]["suggested_requires_downtime"] is False
+    assert results[0]["changed"] is False
+
+
+@pytest.mark.asyncio
 async def test_review_action_downtime_endpoint():
     from routes.ai_fm_suggestions import (
         ActionDowntimeInput,
@@ -136,7 +180,7 @@ async def test_review_action_downtime_endpoint():
         ]
 
     with patch(
-        "routes.ai_fm_suggestions.suggest_action_downtime_requirements",
+        "routes.ai_fm_suggestions.classify_recommended_actions_downtime_batch",
         new_callable=AsyncMock,
         side_effect=_fake_suggest,
     ):

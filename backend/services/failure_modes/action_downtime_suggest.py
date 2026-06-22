@@ -9,7 +9,7 @@ from services.ai_gateway import chat_completion_response
 
 logger = logging.getLogger(__name__)
 
-_CLASSIFY_CHUNK_SIZE = 8
+_CLASSIFY_CHUNK_SIZE = 4
 
 _SYSTEM_PROMPT = """You are a maintenance reliability engineer.
 For each maintenance action, decide whether performing it requires taking the equipment or process unit out of service (shutdown / isolation / downtime).
@@ -71,7 +71,13 @@ Return JSON: {{"results": [{{"i": 0, "requires_downtime": false, "reasoning": ".
         seed=42,
         response_format={"type": "json_object"},
     )
-    data = json.loads(response.choices[0].message.content.strip())
+    try:
+        content = (response.choices[0].message.content or "").strip()
+        data = json.loads(content)
+    except (json.JSONDecodeError, AttributeError, IndexError, TypeError) as exc:
+        logger.error("Downtime classifier JSON parse failed: %s", exc)
+        return _fallback_results(actions)
+
     raw_results = data.get("results") or []
 
     by_index: Dict[int, Dict[str, Any]] = {}
@@ -102,6 +108,53 @@ Return JSON: {{"results": [{{"i": 0, "requires_downtime": false, "reasoning": ".
             entry["failure_mode"] = a["failure_mode"]
         results.append(entry)
     return results
+
+
+def _fallback_results(actions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Safe defaults when the LLM response cannot be parsed."""
+    out: List[Dict[str, Any]] = []
+    for a in actions:
+        current = bool(a.get("current_requires_downtime"))
+        entry: Dict[str, Any] = {
+            "action_index": a.get("action_index"),
+            "current_requires_downtime": current,
+            "suggested_requires_downtime": current,
+            "reasoning": "AI response could not be parsed; kept current value.",
+            "changed": False,
+        }
+        if a.get("fm_id"):
+            entry["fm_id"] = a["fm_id"]
+        if a.get("failure_mode"):
+            entry["failure_mode"] = a["failure_mode"]
+        out.append(entry)
+    return out
+
+
+async def classify_recommended_actions_downtime_batch(
+    actions: List[Dict[str, Any]],
+    *,
+    user_id: str,
+    company_id: str,
+    endpoint: str = "ai_fm_suggestions.review_action_downtime",
+) -> List[Dict[str, Any]]:
+    """
+    Classify one proxy-safe batch in a single OpenAI call.
+
+    Railway/Vercel proxies time out around 60s; do not chain multiple LLM calls
+    per HTTP request for library-wide bulk review.
+    """
+    if not actions:
+        return []
+    if len(actions) > _CLASSIFY_CHUNK_SIZE:
+        raise ValueError(
+            f"Send at most {_CLASSIFY_CHUNK_SIZE} actions per batch (got {len(actions)})."
+        )
+    return await _suggest_chunk(
+        actions,
+        user_id=user_id,
+        company_id=company_id,
+        endpoint=endpoint,
+    )
 
 
 async def suggest_action_downtime_requirements(
