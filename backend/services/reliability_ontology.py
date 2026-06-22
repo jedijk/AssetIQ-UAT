@@ -5,6 +5,68 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+# Finding, threat, and observation are the same reactive signal — one canonical node in the ontology UI.
+OBSERVATION_NODE_TYPES = frozenset({"finding", "observation", "threat"})
+# Relations between observation aliases — omitted after canonical merge.
+INTERNAL_OBSERVATION_RELATIONS = frozenset({
+    "raised_observation",
+    "escalated_to",
+    "linked_to_threat",
+})
+
+
+def _canonical_node_type(node_type: str) -> str:
+    if node_type in OBSERVATION_NODE_TYPES:
+        return "observation"
+    return node_type
+
+
+def _merge_observation_topology(topology: Dict[str, Any]) -> Dict[str, Any]:
+    """Roll finding/threat counts and arcs into observation for visualization."""
+    outgoing = topology.get("outgoing_by_node") or {}
+    incoming = topology.get("incoming_by_node") or {}
+
+    def _merge_by_node(by_node: Dict[str, Dict[str, int]]) -> Dict[str, Dict[str, int]]:
+        merged: Dict[str, Dict[str, int]] = {}
+        for node_type, relations in by_node.items():
+            canonical = _canonical_node_type(node_type)
+            bucket = merged.setdefault(canonical, {})
+            for relation, count in relations.items():
+                if relation in INTERNAL_OBSERVATION_RELATIONS:
+                    continue
+                bucket[relation] = bucket.get(relation, 0) + count
+        return merged
+
+    merged_arcs: Dict[str, Dict[str, Any]] = {}
+    for arc in topology.get("relation_arcs") or []:
+        source = _canonical_node_type(arc.get("source") or "")
+        target = _canonical_node_type(arc.get("target") or "")
+        relation = arc.get("relation")
+        if not relation or not source or not target:
+            continue
+        if relation in INTERNAL_OBSERVATION_RELATIONS:
+            continue
+        if source == target == "observation":
+            continue
+        key = f"{relation}:{source}:{target}"
+        if key in merged_arcs:
+            merged_arcs[key]["edge_count"] += arc.get("edge_count", 0)
+        else:
+            merged_arcs[key] = {
+                "id": key,
+                "relation": relation,
+                "source": source,
+                "target": target,
+                "edge_count": arc.get("edge_count", 0),
+            }
+
+    return {
+        **topology,
+        "outgoing_by_node": _merge_by_node(outgoing),
+        "incoming_by_node": _merge_by_node(incoming),
+        "relation_arcs": list(merged_arcs.values()),
+    }
+
 NODE_TYPES: List[Dict[str, Any]] = [
     {"id": "equipment", "label": "Equipment", "domain": "shared", "color": "#3B82F6"},
     {"id": "failure_mode", "label": "Failure Mode", "domain": "maintenance", "color": "#EF4444"},
@@ -16,9 +78,7 @@ NODE_TYPES: List[Dict[str, Any]] = [
     {"id": "task_instance", "label": "Task Instance", "domain": "maintenance", "color": "#0D9488"},
     {"id": "task_completion", "label": "Task Completion", "domain": "reactive", "color": "#64748B"},
     {"id": "pm_import_task", "label": "PM Import", "domain": "maintenance", "color": "#A855F7"},
-    {"id": "finding", "label": "Finding", "domain": "reactive", "color": "#F59E0B"},
     {"id": "observation", "label": "Observation", "domain": "reactive", "color": "#F97316"},
-    {"id": "threat", "label": "Threat", "domain": "reactive", "color": "#DC2626"},
     {"id": "investigation", "label": "Investigation", "domain": "reactive", "color": "#7C3AED"},
     {"id": "cause", "label": "Cause", "domain": "reactive", "color": "#9333EA"},
     {"id": "action", "label": "Action", "domain": "reactive", "color": "#2563EB"},
@@ -42,15 +102,12 @@ RELATIONS: List[Dict[str, Any]] = [
     {"id": "executed_on", "label": "executed on", "source": "task_instance", "target": "equipment", "domain": "maintenance"},
     {"id": "completed_on", "label": "completed on", "source": "scheduled_task", "target": "equipment", "domain": "maintenance"},
     {"id": "cancelled_for", "label": "cancelled for", "source": "scheduled_task", "target": "program_task", "domain": "maintenance"},
-    {"id": "yielded_finding", "label": "yielded finding", "source": "task_completion", "target": "finding", "domain": "reactive"},
-    {"id": "found_on", "label": "found on", "source": "finding", "target": "equipment", "domain": "reactive"},
-    {"id": "raised_observation", "label": "raised observation", "source": "finding", "target": "observation", "domain": "reactive"},
+    {"id": "yielded_finding", "label": "yielded observation", "source": "task_completion", "target": "observation", "domain": "reactive"},
+    {"id": "found_on", "label": "found on", "source": "observation", "target": "equipment", "domain": "reactive"},
     {"id": "observed_on", "label": "observed on", "source": "observation", "target": "equipment", "domain": "reactive"},
     {"id": "indicates_failure_mode", "label": "indicates failure mode", "source": "observation", "target": "failure_mode", "domain": "reactive"},
-    {"id": "escalated_to", "label": "escalated to", "source": "observation", "target": "threat", "domain": "reactive"},
-    {"id": "linked_to_threat", "label": "linked to threat", "source": "observation", "target": "threat", "domain": "reactive"},
-    {"id": "linked_to_equipment", "label": "linked to equipment", "source": "threat", "target": "equipment", "domain": "reactive"},
-    {"id": "triggered_investigation", "label": "triggered investigation", "source": "threat", "target": "investigation", "domain": "reactive"},
+    {"id": "linked_to_equipment", "label": "linked to equipment", "source": "observation", "target": "equipment", "domain": "reactive"},
+    {"id": "triggered_investigation", "label": "triggered investigation", "source": "observation", "target": "investigation", "domain": "reactive"},
     {"id": "identified_cause", "label": "identified cause", "source": "investigation", "target": "cause", "domain": "reactive"},
     {"id": "generated_action", "label": "generated action", "source": "investigation", "target": "action", "domain": "reactive"},
     {"id": "assigned_to_equipment", "label": "assigned to equipment", "source": "action", "target": "equipment", "domain": "reactive"},
@@ -102,6 +159,7 @@ async def get_reliability_ontology_payload(user=None) -> Dict[str, Any]:
     from services.reliability_graph_query import get_graph_topology_stats
 
     topology = await get_graph_topology_stats(user, active_only=True)
+    topology = _merge_observation_topology(topology)
     edges_by_relation = topology["edges_by_relation"]
     relation_arcs = _enrich_relation_arcs(topology["relation_arcs"])
     node_types = _enrich_node_types(

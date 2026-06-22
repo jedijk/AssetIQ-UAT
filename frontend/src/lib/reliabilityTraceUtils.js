@@ -19,7 +19,7 @@ export function formatNodeTypeLabel(type) {
     failure_mode: "Failure mode",
     observation: "Observation",
     threat: "Observation",
-    finding: "Finding",
+    finding: "Observation",
     investigation: "Investigation",
     cause: "Root cause",
     action: "Action",

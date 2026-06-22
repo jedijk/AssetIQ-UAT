@@ -9,6 +9,7 @@ os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
 from services.reliability_ontology import (
     NODE_TYPES,
     RELATIONS,
+    _merge_observation_topology,
     get_reliability_ontology_payload,
 )
 
@@ -62,3 +63,87 @@ async def test_get_reliability_ontology_payload_includes_schema_and_counts():
 
     assert len(payload["relation_arcs"]) == 2
     assert payload["relation_arcs"][0]["label"] == "has program"
+
+
+def test_merge_observation_topology_rolls_finding_and_threat_into_observation():
+    topology = {
+        "edges_by_relation": {
+            "linked_to_equipment": 20,
+            "observed_on": 5,
+            "escalated_to": 3,
+        },
+        "relation_arcs": [
+            {
+                "id": "linked_to_equipment:threat:equipment",
+                "relation": "linked_to_equipment",
+                "source": "threat",
+                "target": "equipment",
+                "edge_count": 20,
+            },
+            {
+                "id": "observed_on:observation:equipment",
+                "relation": "observed_on",
+                "source": "observation",
+                "target": "equipment",
+                "edge_count": 5,
+            },
+            {
+                "id": "escalated_to:observation:threat",
+                "relation": "escalated_to",
+                "source": "observation",
+                "target": "threat",
+                "edge_count": 3,
+            },
+        ],
+        "outgoing_by_node": {
+            "threat": {"linked_to_equipment": 20},
+            "observation": {"observed_on": 5, "escalated_to": 3},
+            "finding": {"found_on": 2},
+        },
+        "incoming_by_node": {
+            "equipment": {"linked_to_equipment": 20, "observed_on": 5, "found_on": 2},
+        },
+    }
+
+    merged = _merge_observation_topology(topology)
+
+    assert "finding" not in merged["outgoing_by_node"]
+    assert "threat" not in merged["outgoing_by_node"]
+    obs_out = merged["outgoing_by_node"]["observation"]
+    assert obs_out["linked_to_equipment"] == 20
+    assert obs_out["observed_on"] == 5
+    assert obs_out["found_on"] == 2
+    assert "escalated_to" not in obs_out
+
+    arc_ids = {arc["id"] for arc in merged["relation_arcs"]}
+    assert "linked_to_equipment:observation:equipment" in arc_ids
+    assert "observed_on:observation:equipment" in arc_ids
+    assert "escalated_to:observation:observation" not in arc_ids
+
+
+@pytest.mark.asyncio
+async def test_get_reliability_ontology_payload_merges_observation_aliases():
+    topology = {
+        "edges_by_relation": {"linked_to_equipment": 10},
+        "relation_arcs": [
+            {
+                "id": "linked_to_equipment:threat:equipment",
+                "relation": "linked_to_equipment",
+                "source": "threat",
+                "target": "equipment",
+                "edge_count": 10,
+            },
+        ],
+        "outgoing_by_node": {"threat": {"linked_to_equipment": 10}},
+        "incoming_by_node": {"equipment": {"linked_to_equipment": 10}},
+    }
+    with patch(
+        "services.reliability_graph_query.get_graph_topology_stats",
+        AsyncMock(return_value=topology),
+    ):
+        payload = await get_reliability_ontology_payload({"tenant_id": "t1"})
+
+    observation = next(n for n in payload["node_types"] if n["id"] == "observation")
+    assert observation["edge_count_outgoing"] == 10
+    assert "finding" not in {n["id"] for n in payload["node_types"]}
+    assert "threat" not in {n["id"] for n in payload["node_types"]}
