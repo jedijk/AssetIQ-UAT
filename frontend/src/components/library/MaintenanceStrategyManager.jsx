@@ -48,6 +48,7 @@ import {
   History,
   GitBranch,
   User,
+  Brain,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -111,6 +112,10 @@ import MaintenanceScheduleManager from "./MaintenanceScheduleManager";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { isStrategyTaskHighlighted } from "../../lib/maintenanceScheduleContext";
 import { useFailureModeNameMap, useMaintenanceTaskTemplateMap } from "../../hooks/useTranslatedEntities";
+import IntelligenceContextPanel, {
+  IntelligenceContextToggle,
+} from "../intelligence/IntelligenceContextPanel";
+import { useIntelligenceContextPanel } from "../../hooks/useIntelligenceContextPanel";
 
 // ============= Constants =============
 
@@ -1298,6 +1303,23 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
 
   const equipmentTypeId = equipmentType?.id;
   const equipmentTypeName = equipmentType?.name;
+  const intelPanelStorageKey = equipmentTypeId
+    ? `assetiq:intel-context:strategy:${equipmentTypeId}`
+    : null;
+  const [intelPanelOpen, setIntelPanelOpen] = useIntelligenceContextPanel(intelPanelStorageKey);
+
+  const wrapWithIntelligencePanel = (content) => (
+    <div className="flex items-start gap-0 min-h-0">
+      <div className="flex-1 min-w-0">{content}</div>
+      <IntelligenceContextPanel
+        open={intelPanelOpen && !!equipmentTypeId}
+        onOpenChange={setIntelPanelOpen}
+        objectType="strategy"
+        objectId={equipmentTypeId}
+        equipmentTypeName={equipmentTypeName}
+      />
+    </div>
+  );
 
   // ============= Queries =============
 
@@ -1764,7 +1786,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
 
   // Main View Toggle between Strategy and Schedule
   if (mainView === "schedule") {
-    return (
+    return wrapWithIntelligencePanel(
       <div className="space-y-4">
         {/* View Toggle */}
         <div className="flex items-center justify-between">
@@ -1782,6 +1804,11 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
               </TabsList>
             </Tabs>
           </div>
+          <IntelligenceContextToggle
+            open={intelPanelOpen}
+            onToggle={() => setIntelPanelOpen((prev) => !prev)}
+            disabled={!equipmentTypeId}
+          />
         </div>
         
         {hasStrategy && strategy?.strategy_needs_apply && (
@@ -1796,11 +1823,11 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
 
         {/* Schedule Manager */}
         <MaintenanceScheduleManager equipmentType={equipmentType} />
-      </div>
+      </div>,
     );
   }
 
-  return (
+  return wrapWithIntelligencePanel(
     <div className="space-y-4">
       {/* View Toggle */}
       <div className="flex items-center gap-2 mb-2">
@@ -1839,6 +1866,11 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
           </h1>
         </div>
         <div className="flex items-center gap-2">
+          <IntelligenceContextToggle
+            open={intelPanelOpen}
+            onToggle={() => setIntelPanelOpen((prev) => !prev)}
+            disabled={!equipmentTypeId}
+          />
           {hasStrategy ? (
             <>
               <Button size="sm" variant="outline" onClick={() => refetchStrategy()}>
@@ -2388,7 +2420,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </div>,
   );
 };
 
