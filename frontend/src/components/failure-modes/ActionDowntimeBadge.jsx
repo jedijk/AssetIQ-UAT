@@ -4,6 +4,7 @@ import { useLanguage } from "../../contexts/LanguageContext";
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "../ui/tooltip";
 
@@ -43,9 +44,11 @@ export default function ActionDowntimeBadge({
   if (showLabel) return badge;
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>{badge}</TooltipTrigger>
-      <TooltipContent>{t("library.downtimeRequired")}</TooltipContent>
-    </Tooltip>
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>{badge}</TooltipTrigger>
+        <TooltipContent>{t("library.downtimeRequired")}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
