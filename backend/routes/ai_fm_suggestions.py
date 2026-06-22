@@ -19,7 +19,7 @@ load_dotenv()
 
 from iso14224_models import EQUIPMENT_TYPES
 from auth import require_permission, get_current_user
-from services.ai_gateway import RateLimitError, chat_completion_response, user_context
+from services.ai_gateway import chat_completion_response, user_context, RateLimitError
 from services import ai_fm_queries as fmq
 
 logger = logging.getLogger(__name__)
