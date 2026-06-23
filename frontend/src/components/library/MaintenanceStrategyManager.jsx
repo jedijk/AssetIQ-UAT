@@ -111,6 +111,7 @@ import MaintenanceScheduleManager from "./MaintenanceScheduleManager";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { isStrategyTaskHighlighted } from "../../lib/maintenanceScheduleContext";
 import { useFailureModeNameMap, useMaintenanceTaskTemplateMap } from "../../hooks/useTranslatedEntities";
+import StrategyIntelligenceFlowBar from "../intelligence/StrategyIntelligenceFlowBar";
 
 // ============= Constants =============
 
@@ -1298,6 +1299,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
 
   const equipmentTypeId = equipmentType?.id;
   const equipmentTypeName = equipmentType?.name;
+  const fmNameMap = useFailureModeNameMap();
 
   // ============= Queries =============
 
@@ -1312,6 +1314,41 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
     strategyData?.exists === true &&
     strategyData?.equipment_type_id === equipmentTypeId &&
     !!strategy;
+
+  const flowFailureModeItems = useMemo(
+    () =>
+      (strategy?.failure_mode_strategies || []).map((fm) => ({
+        id: fm.failure_mode_id,
+        name: fm.failure_mode_name || fmNameMap[fm.failure_mode_id] || fm.failure_mode_id,
+      })),
+    [strategy, fmNameMap],
+  );
+
+  const flowSelectedFailureModeId = useMemo(() => {
+    if (expandedFMs.size !== 1) return null;
+    return [...expandedFMs][0];
+  }, [expandedFMs]);
+
+  const flowActiveStep = useMemo(() => {
+    if (mainView === "schedule") return "schedules";
+    if (activeTab === "overview") {
+      return expandedFMs.size > 0 ? "failure_modes" : "strategies";
+    }
+    if (activeTab === "matrix") return "programs";
+    return "strategies";
+  }, [mainView, activeTab, expandedFMs]);
+
+  const intelligenceFlowBar = (
+    <StrategyIntelligenceFlowBar
+      activeStep={flowActiveStep}
+      equipmentTypeId={equipmentTypeId}
+      equipmentTypeName={equipmentTypeName}
+      strategy={strategy}
+      failureModeItems={flowFailureModeItems}
+      selectedFailureModeId={flowSelectedFailureModeId}
+      enabled={!!equipmentTypeId}
+    />
+  );
 
   useEffect(() => {
     if (!strategyHighlight || strategyLoading || !hasStrategy) return;
@@ -1794,6 +1831,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
 
         {/* Schedule Manager */}
         <MaintenanceScheduleManager equipmentType={equipmentType} />
+        {intelligenceFlowBar}
       </div>
     );
   }
@@ -2386,6 +2424,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {intelligenceFlowBar}
     </div>
   );
 };

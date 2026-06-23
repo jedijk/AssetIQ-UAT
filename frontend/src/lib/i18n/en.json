@@ -2304,6 +2304,14 @@
     "crit": "Crit",
     "maint": "Maint"
   },
+  "strategyIntelligenceFlow": {
+    "title": "Intelligence Thread",
+    "failureModes": "Failure Modes",
+    "equipmentTypes": "Equipment Types",
+    "strategies": "Strategies",
+    "programs": "Programs",
+    "schedules": "Tasks & Schedules"
+  },
   "taskScheduler": {
     "title": "Task Planner",
     "subtitle": "Manage task templates, plans, and schedules",

@@ -88,6 +88,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../ui/select";
+import StrategyIntelligenceFlowBar from "../../intelligence/StrategyIntelligenceFlowBar";
 
 const SCHEDULE_FILTER_TRIGGER_CLASS =
   "h-full w-full min-h-0 justify-between font-normal px-3 py-0 shadow-none overflow-hidden " +
@@ -102,7 +103,7 @@ const SCHEDULE_FILTER_GROUP_CLASS = "flex h-9 shrink-0 items-center gap-2";
 const SCHEDULE_FILTER_LABEL_CLASS =
   "text-sm font-medium leading-none text-slate-700 whitespace-nowrap";
 
-export function MaintenanceScheduleManager({ equipmentType }) {
+export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow = false }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -318,6 +319,26 @@ export function MaintenanceScheduleManager({ equipmentType }) {
     () => applyTaskListFilter(tasksData?.tasks),
     [tasksData, applyTaskListFilter]
   );
+
+  const scheduleFlowTaskItems = useMemo(() => {
+    const fromList = (filteredTasksList || []).map((task) => ({
+      id: task.id,
+      name: task.task_name || task.name || "Scheduled task",
+    }));
+    if (fromList.length > 0) return fromList;
+
+    const fromTimeline = [];
+    const rows = filteredTimeline?.timeline || filteredTimeline?.equipment || [];
+    rows.forEach((row) => {
+      (row.tasks || []).forEach((task) => {
+        fromTimeline.push({
+          id: task.id,
+          name: task.task_name || task.name || "Scheduled task",
+        });
+      });
+    });
+    return fromTimeline;
+  }, [filteredTasksList, filteredTimeline]);
 
   // ============= Mutations =============
 
@@ -1095,7 +1116,21 @@ export function MaintenanceScheduleManager({ equipmentType }) {
     </div>
   );
 
-  return scheduleContent;
+  return (
+    <>
+      {scheduleContent}
+      {showIntelligenceFlow && (
+        <StrategyIntelligenceFlowBar
+          activeStep="schedules"
+          equipmentTypeId={equipmentTypeId}
+          equipmentTypeName={equipmentTypeName}
+          selectedTask={selectedTask}
+          scheduleTaskItems={scheduleFlowTaskItems}
+          enabled
+        />
+      )}
+    </>
+  );
 }
 
 export default MaintenanceScheduleManager;

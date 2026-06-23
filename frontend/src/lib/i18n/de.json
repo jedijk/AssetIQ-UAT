@@ -2411,6 +2411,14 @@
     "crit": "Crit",
     "maint": "Maint"
   },
+  "strategyIntelligenceFlow": {
+    "title": "Intelligence Thread",
+    "failureModes": "Fehlermodi",
+    "equipmentTypes": "Equipmenttypen",
+    "strategies": "Strategien",
+    "programs": "Programme",
+    "schedules": "Aufgaben & Pläne"
+  },
   "taskScheduler": {
     "title": "Aufgabenplaner",
     "subtitle": "Aufgabenvorlagen, Pläne und Zeitpläne verwalten",

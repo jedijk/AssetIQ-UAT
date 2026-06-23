@@ -104,6 +104,7 @@ import {
   FailureModeVersionHistoryDialog,
   FailureModeDeleteDialog,
 } from "../components/failure-modes/FailureModesPageDialogs";
+import StrategyIntelligenceFlowBar from "../components/intelligence/StrategyIntelligenceFlowBar";
 
 
 const FailureModesPage = () => {
@@ -396,6 +397,23 @@ const FailureModesPage = () => {
     () => failureModes.filter(isFailureModeLinkedToEquipment).length,
     [failureModes, isFailureModeLinkedToEquipment],
   );
+
+  const flowFailureModeItems = useMemo(
+    () =>
+      displayedFailureModes.map((fm) => ({
+        id: fm.id,
+        name: fm.failure_mode,
+      })),
+    [displayedFailureModes],
+  );
+
+  const flowEquipmentTypeItems = useMemo(() => {
+    const typeIds = selectedFm?.equipment_type_ids || [];
+    return typeIds.map((typeId) => ({
+      id: typeId,
+      name: equipmentTypes.find((et) => et.id === typeId)?.name || typeId,
+    }));
+  }, [selectedFm, equipmentTypes]);
   
   // Calculate connected failure modes count for each equipment type
   const getConnectedFmCount = useCallback(
@@ -932,8 +950,8 @@ const FailureModesPage = () => {
         </TabsList>
 
         {/* Failure Modes Tab */}
-        <TabsContent value="failure-modes" className="h-[calc(100vh-200px)]">
-          <div className="flex gap-4 h-full min-h-0">
+        <TabsContent value="failure-modes" className="h-[calc(100vh-200px)] flex flex-col">
+          <div className="flex flex-1 gap-4 min-h-0">
             <FailureModesListPanel
               t={t}
               displayedTotal={displayedTotal}
@@ -1032,6 +1050,13 @@ const FailureModesPage = () => {
               onToggleFullscreen={() => setIsViewPanelFullscreen(false)}
             />
           )}
+          <StrategyIntelligenceFlowBar
+            activeStep="failure_modes"
+            failureModeItems={flowFailureModeItems}
+            selectedFailureModeId={selectedFm?.id}
+            equipmentTypeItems={flowEquipmentTypeItems}
+            enabled
+          />
         </TabsContent>
 
         <FailureModesEquipmentTypesTab
@@ -1082,7 +1107,7 @@ const FailureModesPage = () => {
         {/* Schedule Tab */}
         <TabsContent value="schedule" className="h-[calc(100vh-200px)]">
           <div className="card h-full overflow-auto p-4">
-            <MaintenanceScheduleManager equipmentType={null} />
+            <MaintenanceScheduleManager equipmentType={null} showIntelligenceFlow />
           </div>
         </TabsContent>
         

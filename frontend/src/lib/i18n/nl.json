@@ -2412,6 +2412,14 @@
     "crit": "Krit",
     "maint": "Onderh"
   },
+  "strategyIntelligenceFlow": {
+    "title": "Intelligence Thread",
+    "failureModes": "Storingsmodi",
+    "equipmentTypes": "Equipmenttypes",
+    "strategies": "Strategieën",
+    "programs": "Programma's",
+    "schedules": "Taken & schema's"
+  },
   "taskScheduler": {
     "title": "Taakplanner",
     "subtitle": "Beheer taaksjablonen, plannen en schema's",
