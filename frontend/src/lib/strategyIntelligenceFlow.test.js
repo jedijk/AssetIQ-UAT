@@ -46,6 +46,10 @@ describe("buildStrategyFlowNodes", () => {
         { id: "bearing_radial", name: "Radial Bearing" },
         { id: "pump_centrifugal", name: "Centrifugal Pump" },
       ],
+      strategiesList: [
+        { equipment_type_id: "bearing_radial", status: "active" },
+        { equipment_type_id: "pump_centrifugal", status: "disabled" },
+      ],
       failureModeItems: [{ id: "fm-1", name: "Seal leak" }],
       selectedFailureModeIds: ["fm-1"],
       strategy: baseStrategy,
@@ -61,9 +65,45 @@ describe("buildStrategyFlowNodes", () => {
       },
     });
 
-    expect(nodes.find((node) => node.key === "strategies").count).toBe(2);
+    expect(nodes.find((node) => node.key === "strategies").count).toBe(1);
     expect(nodes.find((node) => node.key === "programs").count).toBe(1);
     expect(nodes.find((node) => node.key === "schedules").count).toBe(1);
     expect(nodes.find((node) => node.key === "schedules").items[0].name).toBe("Inspect seal");
+  });
+
+  it("excludes disabled strategies, inactive programs, and completed schedules", () => {
+    const nodes = buildStrategyFlowNodes({
+      activeStep: "programs",
+      strategy: {
+        status: "disabled",
+        failure_mode_strategies: [
+          { failure_mode_id: "fm-1", task_ids: ["t1"], enabled: true },
+        ],
+        task_templates: [
+          { id: "t1", name: "Inspect seal", is_mandatory: true },
+          { id: "t2", name: "Disabled task", is_mandatory: false },
+        ],
+      },
+      equipmentTypeId: "pump_centrifugal",
+      equipmentTypeName: "Centrifugal Pump",
+      scheduleTaskItems: [
+        { id: "s1", task_name: "Open task", status: "scheduled" },
+        { id: "s2", task_name: "Done task", status: "completed" },
+      ],
+      strategiesList: [
+        { equipment_type_id: "pump_centrifugal", status: "disabled" },
+        { equipment_type_id: "motor_electric", status: "active" },
+      ],
+      stats: {
+        strategies: { count: 2 },
+        maintenance_programs: { active: 3, count: 5, active_tasks: 2 },
+        planned_work: { for_applied: 4 },
+      },
+    });
+
+    expect(nodes.find((node) => node.key === "strategies").count).toBe(0);
+    expect(nodes.find((node) => node.key === "programs").count).toBe(0);
+    expect(nodes.find((node) => node.key === "schedules").count).toBe(1);
+    expect(nodes.find((node) => node.key === "schedules").items[0].name).toBe("Open task");
   });
 });

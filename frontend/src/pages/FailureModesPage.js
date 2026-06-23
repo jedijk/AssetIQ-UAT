@@ -425,7 +425,8 @@ const FailureModesPage = () => {
     const typeIds = selectedFm?.equipment_type_ids || [];
     if (!typeIds.length) return [];
     const strategies = strategiesListData?.strategies || [];
-    const typeIdsWithStrategy = new Set(strategies.map((row) => row.equipment_type_id));
+    const activeStrategies = strategies.filter((row) => row.status !== "disabled");
+    const typeIdsWithStrategy = new Set(activeStrategies.map((row) => row.equipment_type_id));
     return typeIds
       .filter((typeId) => typeIdsWithStrategy.has(typeId))
       .map((typeId) => ({
@@ -454,9 +455,23 @@ const FailureModesPage = () => {
   });
 
   const flowMergedStrategy = useMemo(() => {
+    const activeTypeIds = new Set(
+      (strategiesListData?.strategies || [])
+        .filter((row) => row.status !== "disabled")
+        .map((row) => String(row.equipment_type_id)),
+    );
     const strategies = linkedStrategyQueries
-      .map((query) => query.data?.strategy)
-      .filter(Boolean);
+      .map((query, index) => ({
+        equipmentTypeId: flowStrategyItems[index]?.id,
+        strategy: query.data?.strategy,
+      }))
+      .filter(
+        (row) =>
+          row.strategy &&
+          activeTypeIds.has(String(row.equipmentTypeId)) &&
+          row.strategy.status !== "disabled",
+      )
+      .map((row) => row.strategy);
     if (!strategies.length) return null;
 
     const failureModeStrategies = [];
@@ -474,7 +489,7 @@ const FailureModesPage = () => {
       failure_mode_strategies: failureModeStrategies,
       task_templates: [...taskTemplates.values()],
     };
-  }, [linkedStrategyQueries]);
+  }, [linkedStrategyQueries, flowStrategyItems, strategiesListData]);
   
   // Calculate connected failure modes count for each equipment type
   const getConnectedFmCount = useCallback(

@@ -104,6 +104,13 @@ export default function StrategyIntelligenceFlowBar({
     staleTime: 30_000,
   });
 
+  const { data: strategiesListData } = useQuery({
+    queryKey: ["maintenance-strategies-v2-list"],
+    queryFn: () => maintenanceStrategyV2API.listStrategies(),
+    enabled,
+    staleTime: 60_000,
+  });
+
   const resolvedStrategy = strategy || fetchedStrategyData?.strategy;
 
   const { data: stats, isLoading } = useQuery({
@@ -132,6 +139,7 @@ export default function StrategyIntelligenceFlowBar({
         selectedFailureModeIds,
         selectedTask,
         scheduleTaskItems,
+        strategiesList: strategiesListData?.strategies || [],
       }),
     [
       stats,
@@ -146,6 +154,7 @@ export default function StrategyIntelligenceFlowBar({
       selectedFailureModeIds,
       selectedTask,
       scheduleTaskItems,
+      strategiesListData?.strategies,
     ],
   );
 

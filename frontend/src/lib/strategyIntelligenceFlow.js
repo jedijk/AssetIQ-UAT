@@ -83,11 +83,74 @@ function filterScheduleTasks(scheduleTaskItems, failureModeIds, linkedTasks) {
   );
 }
 
+function mapScheduleItems(tasks) {
+  return (tasks || []).map((task) => ({
+    id: task.id,
+    name: task.task_name || task.name || "Scheduled task",
+  }));
+}
+
 function mapTaskItems(tasks) {
   return tasks.map((task) => ({
     id: task.id,
     name: task.name || task.task_name || "Task template",
   }));
+}
+
+/** Strategy is active when not explicitly disabled. */
+export function isStrategyActive(strategy) {
+  if (!strategy) return false;
+  return strategy.status !== "disabled";
+}
+
+/**
+ * Program task is active when mandatory and linked to at least one enabled FM (if linked).
+ * Mirrors MaintenanceStrategyManager task toggle rules.
+ */
+export function isStrategyProgramTaskActive(task, failureModeStrategies = []) {
+  if (!task?.id) return true;
+  if (task.is_mandatory === false) return false;
+  const linkedFms = failureModeStrategies.filter((fm) =>
+    (fm?.task_ids || []).includes(task.id),
+  );
+  if (!linkedFms.length) return true;
+  return linkedFms.some((fm) => fm?.enabled !== false);
+}
+
+export function filterActiveProgramTasks(tasks, failureModeStrategies = []) {
+  return (tasks || []).filter((task) =>
+    isStrategyProgramTaskActive(task, failureModeStrategies),
+  );
+}
+
+const INACTIVE_SCHEDULE_STATUSES = new Set(["completed", "cancelled"]);
+
+export function isActiveScheduleTask(task) {
+  const status = task?.status;
+  if (!status) return true;
+  return !INACTIVE_SCHEDULE_STATUSES.has(status);
+}
+
+export function filterActiveScheduleTasks(tasks) {
+  return (tasks || []).filter(isActiveScheduleTask);
+}
+
+function filterActiveStrategyItems(items, strategiesList = []) {
+  if (!items?.length) return [];
+  if (!strategiesList.length) return items;
+  const activeTypeIds = new Set(
+    strategiesList
+      .filter((row) => row.status !== "disabled")
+      .map((row) => String(row.equipment_type_id)),
+  );
+  return items.filter((item) => activeTypeIds.has(String(item.id)));
+}
+
+function countActiveStrategies(strategiesList, stats) {
+  if (strategiesList?.length) {
+    return strategiesList.filter((row) => row.status !== "disabled").length;
+  }
+  return stats?.strategies?.count || 0;
 }
 
 export function buildStrategyFlowNodes({
@@ -103,6 +166,7 @@ export function buildStrategyFlowNodes({
   selectedFailureModeIds = [],
   selectedTask,
   scheduleTaskItems = [],
+  strategiesList = [],
 }) {
   const failureModeIds = resolveSelectedFailureModeIds(
     selectedFailureModeId,
@@ -127,18 +191,27 @@ export function buildStrategyFlowNodes({
   }
   const etCount = etItems.length || (equipmentTypeId ? 1 : stats?.equipment_types?.in_use || 0);
 
+  const failureModeStrategies = strategy?.failure_mode_strategies || [];
+  const strategyIsActive = isStrategyActive(strategy);
   const linkedTasks = hasSelection
     ? linkedTasksForFailureModes(strategy, failureModeIds)
     : strategy?.task_templates || [];
+  const activeLinkedTasks = strategyIsActive
+    ? filterActiveProgramTasks(linkedTasks, failureModeStrategies)
+    : [];
+  const activeProgramTasks = strategyIsActive
+    ? filterActiveProgramTasks(strategy?.task_templates || [], failureModeStrategies)
+    : [];
+  const activeScheduleTaskItems = filterActiveScheduleTasks(scheduleTaskItems);
 
   let strategyItems = [];
   let strategyCount = 0;
   if (strategyItemsOverride?.length) {
-    strategyItems = strategyItemsOverride;
-    strategyCount = strategyItemsOverride.length;
+    strategyItems = filterActiveStrategyItems(strategyItemsOverride, strategiesList);
+    strategyCount = strategyItems.length;
   } else if (hasSelection) {
-    if (equipmentTypeId && strategy) {
-      const fmInStrategy = (strategy.failure_mode_strategies || []).some((fm) =>
+    if (equipmentTypeId && strategy && isStrategyActive(strategy)) {
+      const fmInStrategy = failureModeStrategies.some((fm) =>
         failureModeIds.includes(String(fm.failure_mode_id)),
       );
       if (fmInStrategy) {
@@ -147,58 +220,66 @@ export function buildStrategyFlowNodes({
       }
     }
   } else if (equipmentTypeId) {
-    strategyCount = stats?.strategies?.count > 0 || strategy ? 1 : 0;
-    if (strategyCount > 0) {
+    if (isStrategyActive(strategy)) {
+      strategyCount = 1;
       strategyItems = [{ id: equipmentTypeId, name: equipmentTypeName || "Strategy" }];
     }
   } else {
-    strategyCount = stats?.strategies?.count || 0;
+    strategyCount = countActiveStrategies(strategiesList, stats);
   }
 
   const programItems = hasSelection
-    ? mapTaskItems(linkedTasks)
-    : (strategy?.task_templates || []).length
-      ? mapTaskItems(strategy.task_templates)
+    ? mapTaskItems(activeLinkedTasks)
+    : activeProgramTasks.length
+      ? mapTaskItems(activeProgramTasks)
       : [];
   const programCount = hasSelection
-    ? linkedTasks.length
-    : stats?.maintenance_programs?.active ?? stats?.maintenance_programs?.count ?? programItems.length ?? 0;
+    ? activeLinkedTasks.length
+    : equipmentTypeId || strategy
+      ? activeProgramTasks.length
+      : stats?.maintenance_programs?.active_tasks
+        ?? stats?.maintenance_programs?.active
+        ?? programItems.length
+        ?? 0;
 
-  let scheduleItems = scheduleTaskItems;
-  if (selectedTask) {
+  let scheduleItems = activeScheduleTaskItems;
+  if (selectedTask && isActiveScheduleTask(selectedTask)) {
     scheduleItems = [
       {
         id: selectedTask.id,
         name: selectedTask.task_name || selectedTask.name || "Scheduled task",
       },
     ];
+  } else if (selectedTask) {
+    scheduleItems = [];
   } else if (hasSelection) {
-    const filteredSchedules = filterScheduleTasks(
-      scheduleTaskItems,
-      failureModeIds,
-      linkedTasks,
+    const filteredSchedules = filterActiveScheduleTasks(
+      filterScheduleTasks(activeScheduleTaskItems, failureModeIds, activeLinkedTasks),
     );
     if (filteredSchedules.length) {
       scheduleItems = filteredSchedules.map((task) => ({
         id: task.id,
         name: task.task_name || task.name || "Scheduled task",
       }));
-    } else if (linkedTasks.length) {
-      scheduleItems = mapTaskItems(linkedTasks);
+    } else if (activeLinkedTasks.length) {
+      scheduleItems = mapTaskItems(activeLinkedTasks);
     } else {
       scheduleItems = [];
     }
+  } else {
+    scheduleItems = mapScheduleItems(activeScheduleTaskItems);
   }
 
   const scheduleCount = selectedTask
-    ? 1
+    ? (isActiveScheduleTask(selectedTask) ? 1 : 0)
     : hasSelection
       ? scheduleItems.length
-      : stats?.planned_work?.for_applied
-        ?? stats?.schedules?.for_applied
-        ?? stats?.schedules?.count
-        ?? scheduleTaskItems.length
-        ?? 0;
+      : equipmentTypeId || strategy
+        ? activeScheduleTaskItems.length
+        : stats?.planned_work?.for_applied
+          ?? stats?.schedules?.for_applied
+          ?? activeScheduleTaskItems.length
+          ?? 0;
 
   const nodes = {
     failure_modes: {
