@@ -120,14 +120,27 @@ describe("buildStrategyFlowNodes", () => {
     expect(nodes.find((node) => node.key === "schedules").count).toBe(0);
   });
 
-  it("falls back to global stats when no local schedule tasks are provided", () => {
+  it("falls back to global open-task stats when no local schedule tasks are provided", () => {
     const nodes = buildStrategyFlowNodes({
       activeStep: "failure_modes",
       stats: {
-        planned_work: { for_applied: 230 },
+        planned_work: { for_applied: 12 },
+        schedules: { for_applied: 230 },
       },
     });
 
-    expect(nodes.find((node) => node.key === "schedules").count).toBe(230);
+    expect(nodes.find((node) => node.key === "schedules").count).toBe(12);
+  });
+
+  it("shows zero when global stats report no open scheduled tasks", () => {
+    const nodes = buildStrategyFlowNodes({
+      activeStep: "failure_modes",
+      stats: {
+        planned_work: { for_applied: 0 },
+        schedules: { for_applied: 230 },
+      },
+    });
+
+    expect(nodes.find((node) => node.key === "schedules").count).toBe(0);
   });
 });

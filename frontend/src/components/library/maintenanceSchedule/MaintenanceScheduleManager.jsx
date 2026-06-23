@@ -321,20 +321,23 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
   );
 
   const scheduleFlowTaskItems = useMemo(() => {
-    const fromList = (filteredTasksList || []).map((task) => ({
+    const mapTask = (task) => ({
       id: task.id,
       name: task.task_name || task.name || "Scheduled task",
-    }));
+      status: task.status,
+      failure_mode_id: task.failure_mode_id,
+      template_id: task.template_id,
+      strategy_task_id: task.strategy_task_id,
+      task_name: task.task_name,
+    });
+    const fromList = (filteredTasksList || []).map(mapTask);
     if (fromList.length > 0) return fromList;
 
     const fromTimeline = [];
     const rows = filteredTimeline?.timeline || filteredTimeline?.equipment || [];
     rows.forEach((row) => {
       (row.tasks || []).forEach((task) => {
-        fromTimeline.push({
-          id: task.id,
-          name: task.task_name || task.name || "Scheduled task",
-        });
+        fromTimeline.push(mapTask(task));
       });
     });
     return fromTimeline;

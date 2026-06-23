@@ -20,11 +20,11 @@ import {
 } from "../ui/hover-card";
 
 const STEP_META = {
-  failure_modes: { icon: AlertTriangle, color: "text-blue-600", ring: "ring-blue-400" },
-  equipment_types: { icon: Layers, color: "text-green-600", ring: "ring-green-400" },
-  strategies: { icon: Wrench, color: "text-violet-600", ring: "ring-violet-400" },
-  programs: { icon: ClipboardList, color: "text-indigo-600", ring: "ring-indigo-400" },
-  schedules: { icon: Calendar, color: "text-teal-600", ring: "ring-teal-400" },
+  failure_modes: { icon: AlertTriangle, color: "text-blue-600" },
+  equipment_types: { icon: Layers, color: "text-green-600" },
+  strategies: { icon: Wrench, color: "text-violet-600" },
+  programs: { icon: ClipboardList, color: "text-indigo-600" },
+  schedules: { icon: Calendar, color: "text-teal-600" },
 };
 
 function FlowNode({ node, label, isLoading }) {
@@ -33,20 +33,28 @@ function FlowNode({ node, label, isLoading }) {
 
   const trigger = (
     <div
-      className={`flex min-w-[3rem] flex-col items-center gap-px rounded-md border px-1 py-0.5 transition-colors ${
+      className={`flex min-w-[3.6rem] flex-col items-center gap-0.5 rounded-md border px-1.5 py-1 transition-colors ${
         node.active
-          ? `border-violet-300 bg-violet-50 shadow-sm ring-1 ${meta.ring}`
+          ? "border-blue-400 bg-blue-50 shadow-sm ring-2 ring-blue-400"
           : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
       }`}
       data-testid={`strategy-flow-node-${node.key}`}
       data-active={node.active ? "true" : "false"}
       title={label}
     >
-      <Icon className={`h-2.5 w-2.5 ${meta.color}`} />
-      <span className="max-w-[3.5rem] truncate text-[8px] font-medium leading-none text-slate-600 text-center">
+      <Icon className={`h-3 w-3 ${node.active ? "text-blue-600" : meta.color}`} />
+      <span
+        className={`max-w-[4.25rem] truncate text-[10px] font-medium leading-none text-center ${
+          node.active ? "text-blue-700" : "text-slate-600"
+        }`}
+      >
         {label}
       </span>
-      <span className="text-[11px] font-semibold leading-none tabular-nums text-slate-900">
+      <span
+        className={`text-[13px] font-semibold leading-none tabular-nums ${
+          node.active ? "text-blue-900" : "text-slate-900"
+        }`}
+      >
         {isLoading ? "…" : (node.count ?? 0).toLocaleString()}
       </span>
     </div>
@@ -63,9 +71,9 @@ function FlowNode({ node, label, isLoading }) {
           {trigger}
         </button>
       </HoverCardTrigger>
-      <HoverCardContent side="top" className="w-52 p-2">
-        <p className="mb-1 text-[10px] font-semibold text-slate-700">{label}</p>
-        <ul className="max-h-32 space-y-0.5 overflow-y-auto text-[10px] text-slate-600">
+      <HoverCardContent side="top" className="w-60 p-2.5">
+        <p className="mb-1 text-xs font-semibold text-slate-700">{label}</p>
+        <ul className="max-h-36 space-y-0.5 overflow-y-auto text-xs text-slate-600">
           {node.items.map((item) => (
             <li key={`${node.key}-${item.id}`} className="truncate">
               {item.name}
@@ -170,22 +178,22 @@ export default function StrategyIntelligenceFlowBar({
 
   return (
     <div
-      className={`mt-2 shrink-0 rounded-md border border-slate-200 bg-white px-2 py-1 ${className}`}
+      className={`mt-2 shrink-0 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 ${className}`}
       data-testid="strategy-intelligence-flow-bar"
     >
-      <div className="flex items-center gap-1.5">
-        <div className="flex shrink-0 items-center gap-1">
+      <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5">
           {isLoading ? (
-            <Loader2 className="h-2.5 w-2.5 animate-spin text-slate-400" />
+            <Loader2 className="h-3 w-3 animate-spin text-slate-400" />
           ) : (
-            <GitBranch className="h-2.5 w-2.5 text-slate-500" />
+            <GitBranch className="h-3 w-3 text-slate-500" />
           )}
-          <span className="whitespace-nowrap text-[9px] font-medium text-slate-600">
+          <span className="whitespace-nowrap text-[11px] font-medium text-slate-600">
             {t("strategyIntelligenceFlow.title")}
           </span>
         </div>
 
-        <div className="flex min-w-0 flex-1 items-center justify-between gap-0.5 overflow-x-auto">
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-1 overflow-x-auto">
           {nodes.map((node, index) => (
             <div key={node.key} className="flex min-w-fit flex-1 items-center">
               <FlowNode
@@ -195,8 +203,10 @@ export default function StrategyIntelligenceFlowBar({
               />
               {index < nodes.length - 1 && (
                 <div
-                  className={`mx-0.5 h-px min-w-[4px] flex-1 ${
-                    node.active ? "bg-violet-200" : "bg-slate-200"
+                  className={`mx-1 h-0.5 min-w-[5px] flex-1 ${
+                    node.active || nodes[index + 1]?.active
+                      ? "bg-blue-200"
+                      : "bg-slate-200"
                   }`}
                 />
               )}

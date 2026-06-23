@@ -370,12 +370,6 @@ const FailureModesPage = () => {
   const failureModes = translatedFailureModes;
   const equipmentTypes = translatedEquipmentTypes;
   
-  // Calculate dynamic stats
-  // Prefer the server's total (real Mongo count) over the page length so the
-  // counter is always accurate even if the page was capped.
-  const totalModes = modesData?.total ?? failureModes.length;
-  const totalCategories = DISCIPLINES.length;
-
   // Client-side "High severity only" filter (severity >= 8 on SAE J1739 scale).
   // Sort by severity desc, then RPN desc, so the most critical FMs surface first.
   const displayedFailureModes = useMemo(() => {
@@ -394,7 +388,6 @@ const FailureModesPage = () => {
     }
     return list;
   }, [failureModes, highSeverityOnly, filterLinkedToEquipment, isFailureModeLinkedToEquipment]);
-  const displayedTotal = highSeverityOnly || filterLinkedToEquipment ? displayedFailureModes.length : totalModes;
   const linkedFailureModeCount = useMemo(
     () => failureModes.filter(isFailureModeLinkedToEquipment).length,
     [failureModes, isFailureModeLinkedToEquipment],
@@ -1032,8 +1025,6 @@ const FailureModesPage = () => {
           <div className="flex flex-1 gap-4 min-h-0">
             <FailureModesListPanel
               t={t}
-              displayedTotal={displayedTotal}
-              totalCategories={totalCategories}
               highSeverityOnly={highSeverityOnly}
               setHighSeverityOnly={setHighSeverityOnly}
               filterLinkedToEquipment={filterLinkedToEquipment}

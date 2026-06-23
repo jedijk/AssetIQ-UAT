@@ -111,6 +111,74 @@ def _schedules_missing_frequency_filter(schedule_query: dict) -> dict:
     }
 
 
+_OPEN_SCHEDULED_TASK_STATUSES = ["completed", "cancelled"]
+_CORRECTIVE_SCHEDULED_TASK_TYPES = ["reactive", "corrective"]
+
+
+async def _count_scheduler_scoped_open_tasks(
+    user: dict,
+    *,
+    equipment_type_id: Optional[str] = None,
+    equipment_id: Optional[str] = None,
+    equipment_ids: Optional[list] = None,
+) -> int:
+    """Count open scheduled_tasks using the same scoping as the maintenance scheduler."""
+    from services.maintenance_scheduler_scope import scope_scheduled_tasks_query
+
+    query: dict = {
+        "status": {"$nin": _OPEN_SCHEDULED_TASK_STATUSES},
+        "task_type": {"$nin": _CORRECTIVE_SCHEDULED_TASK_TYPES},
+    }
+    await scope_scheduled_tasks_query(query, equipment_type_id, user=user)
+
+    if query.get("_id") == {"$exists": False}:
+        return 0
+
+    if equipment_id:
+        query = {"$and": [query, {"equipment_id": equipment_id}]}
+    elif equipment_ids is not None:
+        if not equipment_ids:
+            return 0
+        query = {"$and": [query, {"equipment_id": {"$in": equipment_ids}}]}
+
+    return await db.scheduled_tasks.count_documents(_scope_query(query, user))
+
+
+async def _count_schedulable_program_tasks(
+    *,
+    equipment_type_id: Optional[str] = None,
+    equipment_id: Optional[str] = None,
+    equipment_ids: Optional[list] = None,
+) -> tuple[int, int, int]:
+    """Return (total, from_strategy, from_pm_import) schedulable task templates."""
+    from models.maintenance_program import TaskSource
+    from services.scheduler_program_source import load_schedulable_programs
+
+    eq_ids = [equipment_id] if equipment_id else equipment_ids
+    rows = await load_schedulable_programs(
+        equipment_type_id=equipment_type_id,
+        equipment_ids=eq_ids,
+    )
+
+    if equipment_ids is not None and not equipment_id:
+        eq_set = set(equipment_ids)
+        rows = [row for row in rows if row.get("equipment_id") in eq_set]
+
+    from_strategy = 0
+    from_pm_import = 0
+    for row in rows:
+        source = (row.get("task_source") or "").lower()
+        if (
+            row.get("program_source") == "pm_import"
+            or source == TaskSource.CUSTOMER_IMPORTED.value
+        ):
+            from_pm_import += 1
+        else:
+            from_strategy += 1
+
+    return len(rows), from_strategy, from_pm_import
+
+
 def _serialize_scheduled_task_missing_frequency(doc: dict) -> dict:
     return {
         "id": doc.get("id"),
@@ -328,10 +396,6 @@ async def get_intelligence_map_stats(
         )
         equipment_ids_with_pm_import = set(r["_id"] for r in pm_equipment_result if r.get("_id"))
 
-        pm_tasks_active_count = await _count_active_pm_import_tasks(
-            current_user,
-            pm_import_equipment_ids,
-        )
         pm_imported_tasks_count = await _count_imported_pm_import_tasks(
             current_user,
             pm_import_equipment_ids,
@@ -390,29 +454,28 @@ async def get_intelligence_map_stats(
         
         # ========== SCHEDULES (Scheduled Tasks) ==========
         schedule_query = _intelligence_map_schedule_query(equipment_type_id, equipment_id)
+
+        scoped_equipment_ids = None
+        if equipment_id:
+            scoped_equipment_ids = [equipment_id]
+        elif plant_id or system_id or equipment_type_id:
+            scoped_equipment_ids = await db.equipment_nodes.distinct(
+                "id",
+                scope(equipment_query),
+            )
             
         schedules_count = await db.scheduled_tasks.count_documents(scope(schedule_query))
 
-        # Scoped count: number of TASKS (program task templates) that have a schedule
-        # — strategy-driven active tasks PLUS accepted PM import tasks
-        # (each PM import accepted task contributes one task with a schedule frequency).
-        if equipment_ids_with_strategy_applied:
-            applied_programs_agg = await timed_aggregate(
-                db.maintenance_programs_v2,
-                _scope_pipeline([
-                    {"$match": {"equipment_id": {"$in": list(equipment_ids_with_strategy_applied)}}},
-                    {"$group": {
-                        "_id": None,
-                        "active_tasks": {"$sum": {"$ifNull": ["$active_tasks", 0]}},
-                    }},
-                ], current_user),
-            )
-            strategy_active_tasks_total = (
-                applied_programs_agg[0]["active_tasks"] if applied_programs_agg else 0
-            )
-        else:
-            strategy_active_tasks_total = 0
-        schedules_for_applied_count = strategy_active_tasks_total + pm_tasks_active_count
+        # Active frequencies: schedulable program task templates (matches maintenance scheduler).
+        (
+            schedules_for_applied_count,
+            strategy_active_tasks_total,
+            pm_tasks_active_count,
+        ) = await _count_schedulable_program_tasks(
+            equipment_type_id=equipment_type_id,
+            equipment_id=equipment_id,
+            equipment_ids=scoped_equipment_ids,
+        )
         
         # Count schedules by status
         schedule_status_pipeline = [
@@ -439,23 +502,14 @@ async def get_intelligence_map_stats(
         else:
             schedules_actual_for_applied = 0
         
-        # ========== PLANNED WORK (Future Tasks) ==========
-        # today can be used for filtering due_date > today if needed
-        planned_work_query = {
-            **schedule_query,
-            "status": {"$nin": ["completed", "cancelled"]},
-        }
-        planned_work_count = await db.scheduled_tasks.count_documents(scope(planned_work_query))
-
-        # Scoped count: planned work for equipment with an active program
-        # (strategy applied OR PM imported).
-        if equipment_ids_with_active_program:
-            planned_work_for_applied_count = await db.scheduled_tasks.count_documents(scope({
-                **planned_work_query,
-                "equipment_id": {"$in": list(equipment_ids_with_active_program)},
-            }))
-        else:
-            planned_work_for_applied_count = 0
+        # ========== PLANNED WORK (Open scheduled task instances) ==========
+        planned_work_count = await _count_scheduler_scoped_open_tasks(
+            current_user,
+            equipment_type_id=equipment_type_id,
+            equipment_id=equipment_id,
+            equipment_ids=scoped_equipment_ids,
+        )
+        planned_work_for_applied_count = planned_work_count
         
         # ========== PM IMPORTS (Accepted tasks without failure mode linkage) ==========
         # Count accepted tasks from pm_import_sessions.tasks_extracted that don't have failure_mode_id

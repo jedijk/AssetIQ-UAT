@@ -279,9 +279,7 @@ export function buildStrategyFlowNodes({
         ? activeScheduleTaskItems.length
         : equipmentTypeId || strategy
           ? activeScheduleTaskItems.length
-          : stats?.planned_work?.for_applied
-            ?? stats?.schedules?.for_applied
-            ?? 0;
+          : stats?.planned_work?.for_applied ?? 0;
 
   const nodes = {
     failure_modes: {
