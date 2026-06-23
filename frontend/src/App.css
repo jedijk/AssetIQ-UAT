@@ -241,8 +241,8 @@ html, body {
 }
 
 /* Fix Radix Tabs inside app-page-shell to properly fill height */
-/* Target the Tabs root to ensure it expands */
-.app-page-shell [data-orientation] {
+/* Target the Tabs root to ensure it expands - but NOT the TabsList */
+.app-page-shell > [data-orientation="horizontal"] {
     flex: 1 1 0%;
     min-height: 0;
     display: flex;
@@ -250,7 +250,7 @@ html, body {
 }
 
 /* Target TabsContent when active to fill remaining space */
-.app-page-shell [data-state="active"]:not(button) {
+.app-page-shell [data-state="active"]:not(button):not([role="tablist"] *) {
     flex: 1 1 0%;
     min-height: 0;
     display: flex;
@@ -258,7 +258,7 @@ html, body {
 }
 
 /* Hide inactive TabsContent */
-.app-page-shell [data-state="inactive"]:not(button) {
+.app-page-shell [data-state="inactive"]:not(button):not([role="tablist"] *) {
     display: none;
 }
 
