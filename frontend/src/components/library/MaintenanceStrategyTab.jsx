@@ -243,7 +243,7 @@ const MaintenanceStrategyTab = ({
   };
 
   return (
-    <div className="flex h-full">
+    <div className="flex flex-1 min-h-0 h-full">
       {/* Collapsed rail - shows a button to reopen the sidebar */}
       {sidebarCollapsed && (
         <div className="w-10 border-r bg-slate-50 flex flex-col items-center pt-3 gap-2 flex-shrink-0">
@@ -382,7 +382,7 @@ const MaintenanceStrategyTab = ({
       )}
 
       {/* Right Panel - Strategy Manager */}
-      <div className="flex-1 overflow-auto bg-slate-50">
+      <div className="flex-1 min-h-0 overflow-auto bg-slate-50">
         <div className="p-4">
           <AnimatePresence mode="wait">
             {selectedType ? (
@@ -404,7 +404,7 @@ const MaintenanceStrategyTab = ({
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex flex-col items-center justify-center h-[calc(100vh-300px)]"
+                className="flex flex-col items-center justify-center min-h-[240px] py-12"
               >
                 <Wrench className="w-16 h-16 text-slate-200 mb-4" />
                 <h3 className="text-lg font-medium text-slate-600 mb-2">

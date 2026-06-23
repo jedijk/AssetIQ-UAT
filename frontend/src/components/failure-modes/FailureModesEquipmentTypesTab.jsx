@@ -42,8 +42,8 @@ export function FailureModesEquipmentTypesTab({
   setIsTypeDialogOpen,
 }) {
   return (
-    <TabsContent value="libraries" className="space-y-6">
-      <div className="flex gap-4 h-[calc(100vh-180px)]">
+    <TabsContent value="libraries" className="flex-1 min-h-0 mt-0 flex flex-col overflow-hidden">
+      <div className="flex flex-1 gap-4 min-h-0">
     {/* Left Panel: Equipment Types List */}
     <div className={`${selectedEquipmentType ? 'w-1/2 lg:w-2/5' : 'w-full'} transition-all duration-300 min-w-0`}>
       <div className="card h-full flex flex-col overflow-hidden">

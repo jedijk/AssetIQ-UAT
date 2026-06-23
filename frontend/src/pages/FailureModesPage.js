@@ -982,17 +982,17 @@ const FailureModesPage = () => {
   }
 
   return (
-    <div className="app-page-content-band py-2 max-w-7xl mx-auto w-full" data-testid="failure-modes-page">
+    <div className="app-page-shell app-page-content-band py-2 max-w-7xl mx-auto w-full" data-testid="failure-modes-page">
       {/* Back Button - shown when navigated from another page */}
       {location.state?.from && (
-        <div className="mb-3 hidden sm:block">
+        <div className="mb-3 hidden sm:block flex-shrink-0">
           <BackButton />
         </div>
       )}
       
       {/* Main Tabs */}
-      <Tabs value={mainTab} onValueChange={setMainTab} className="space-y-4">
-        <TabsList className="inline-flex w-auto max-w-full overflow-x-auto">
+      <Tabs value={mainTab} onValueChange={setMainTab} className="flex-1 min-h-0 flex flex-col">
+        <TabsList className="inline-flex w-auto max-w-full overflow-x-auto flex-shrink-0 mb-2">
           <TabsTrigger value="intelligence-map" data-testid="intelligence-map-tab" className="flex items-center gap-1.5 whitespace-nowrap">
             <Network className="w-3.5 h-3.5" />
             Intelligence Map
@@ -1011,7 +1011,7 @@ const FailureModesPage = () => {
         </TabsList>
 
         {/* Failure Modes Tab */}
-        <TabsContent value="failure-modes" className="h-[calc(100vh-200px)] flex flex-col">
+        <TabsContent value="failure-modes" className="flex-1 min-h-0 mt-0 flex flex-col">
           <div className="flex flex-1 gap-4 min-h-0">
             <FailureModesListPanel
               t={t}
@@ -1155,8 +1155,8 @@ const FailureModesPage = () => {
         />
         
         {/* Maintenance Strategies Tab */}
-        <TabsContent value="maintenance" className="h-[calc(100vh-200px)]">
-          <div className="card h-full overflow-hidden">
+        <TabsContent value="maintenance" className="flex-1 min-h-0 mt-0 flex flex-col">
+          <div className="card flex-1 min-h-0 overflow-hidden flex flex-col">
             <MaintenanceStrategyTab
               filterLinkedToEquipment={filterLinkedToEquipment}
               onFilterLinkedToEquipmentChange={setFilterLinkedToEquipment}
@@ -1170,15 +1170,17 @@ const FailureModesPage = () => {
         </TabsContent>
 
         {/* Schedule Tab */}
-        <TabsContent value="schedule" className="h-[calc(100vh-200px)]">
-          <div className="card h-full overflow-auto p-4">
-            <MaintenanceScheduleManager equipmentType={null} showIntelligenceFlow />
+        <TabsContent value="schedule" className="flex-1 min-h-0 mt-0 flex flex-col">
+          <div className="card flex-1 min-h-0 overflow-hidden flex flex-col">
+            <div className="flex-1 min-h-0 overflow-auto p-4">
+              <MaintenanceScheduleManager equipmentType={null} showIntelligenceFlow />
+            </div>
           </div>
         </TabsContent>
         
         {/* Custom PM Import Tab */}
-        <TabsContent value="pm-import" className="h-[calc(100vh-200px)] min-h-0 mt-0">
-          <div className="h-full overflow-y-auto mobile-scroll-pane min-h-0 pb-4">
+        <TabsContent value="pm-import" className="flex-1 min-h-0 mt-0 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto mobile-scroll-pane pb-4">
             <CustomPMImportTab
               onOpenImportWizard={() => setIsPMImportOpen(true)}
               onOpenEquipmentTypeStrategy={openEquipmentTypeStrategy}
@@ -1187,8 +1189,8 @@ const FailureModesPage = () => {
         </TabsContent>
 
         {/* Intelligence Map Tab */}
-        <TabsContent value="intelligence-map" className="h-[calc(100vh-200px)] min-h-0 mt-0">
-          <div className="h-full overflow-y-auto mobile-scroll-pane min-h-0 pb-4">
+        <TabsContent value="intelligence-map" className="flex-1 min-h-0 mt-0 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto mobile-scroll-pane pb-4">
             <IntelligenceMapTab />
           </div>
         </TabsContent>
