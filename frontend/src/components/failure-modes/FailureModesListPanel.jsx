@@ -68,29 +68,8 @@ export function FailureModesListPanel({
         selectedFm ? "w-1/2 lg:w-2/5" : "w-full"
       } transition-all duration-300 flex flex-col flex-1 h-full min-h-0 min-w-0`}
     >
-      <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3 mb-4">
-        <label
-          className="flex items-center gap-2 text-sm cursor-pointer bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors shrink-0"
-          title={t("library.filterLinkedToEquipmentHint")}
-        >
-          <input
-            type="checkbox"
-            checked={filterLinkedToEquipment}
-            onChange={(e) => setFilterLinkedToEquipment(e.target.checked)}
-            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-            data-testid="linked-to-equipment-toggle-fm"
-          />
-          <span className="text-slate-600 whitespace-nowrap">{t("library.filterLinkedToEquipment")}</span>
-          {filterLinkedToEquipment && (
-            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">
-              {linkedFailureModeCount}
-            </span>
-          )}
-        </label>
-      </div>
-
-      <div className="mb-6 flex flex-wrap items-center gap-2" data-testid="filters">
-          <div className="relative w-[148px] sm:w-[168px] shrink-0">
+      <div className="mb-4 flex flex-nowrap items-center gap-2 overflow-x-auto" data-testid="filters">
+          <div className="relative w-[222px] sm:w-[252px] shrink-0">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <Input
               placeholder={t("library.searchPlaceholder")}
@@ -250,12 +229,30 @@ export function FailureModesListPanel({
               </DropdownMenuContent>
             </DropdownMenu>
           )}
+          <label
+            className="flex items-center gap-2 text-sm cursor-pointer bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors shrink-0 ml-auto"
+            title={t("library.filterLinkedToEquipmentHint")}
+          >
+            <input
+              type="checkbox"
+              checked={filterLinkedToEquipment}
+              onChange={(e) => setFilterLinkedToEquipment(e.target.checked)}
+              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              data-testid="linked-to-equipment-toggle-fm"
+            />
+            <span className="text-slate-600 whitespace-nowrap">{t("library.filterLinkedToEquipment")}</span>
+            {filterLinkedToEquipment && (
+              <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">
+                {linkedFailureModeCount}
+              </span>
+            )}
+          </label>
           <Button
             onClick={onOpenNewFm}
-            className="h-9 px-2.5 text-sm bg-blue-600 hover:bg-blue-700 shrink-0 ml-auto"
+            className="h-9 px-2.5 text-sm bg-blue-600 hover:bg-blue-700 shrink-0"
             data-testid="add-failure-mode-btn"
           >
-            <Plus className="w-3.5 h-3.5 mr-1" /> {t("library.addFailureMode")}
+            <Plus className="w-3.5 h-3.5 mr-1" /> Add
           </Button>
       </div>
 
