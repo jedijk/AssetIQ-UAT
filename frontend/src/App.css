@@ -240,6 +240,15 @@ html, body {
     -webkit-overflow-scrolling: touch;
 }
 
+/* Fix Radix Tabs inside app-page-shell to properly fill height */
+.app-page-shell [data-radix-tabs-content][data-state="inactive"] {
+    display: none;
+}
+.app-page-shell [data-radix-tabs-content][data-state="active"] {
+    display: flex;
+    flex-direction: column;
+}
+
 /* Header text colors for dark mode */
 .theme-dark .app-header,
 .theme-assetiq .app-header,

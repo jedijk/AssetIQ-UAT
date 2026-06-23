@@ -612,7 +612,7 @@ const Layout = () => {
 
 
       {/* Main Layout with Sidebar */}
-      <div className={`flex min-h-[calc(100dvh-var(--app-header-offset))] ${isResizing ? 'select-none cursor-col-resize' : ''}`}>
+      <div className={`flex h-[calc(100dvh-var(--app-header-offset))] ${isResizing ? 'select-none cursor-col-resize' : ''}`}>
         {/* Equipment Hierarchy Sidebar - Desktop */}
         {hierarchyOpen && (
           <>
