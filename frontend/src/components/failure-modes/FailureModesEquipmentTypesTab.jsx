@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Search, Sparkles, Plus, X } from "lucide-react";
 import { Input } from "../ui/input";
@@ -11,6 +12,7 @@ import {
 } from "../ui/select";
 import { TabsContent } from "../ui/tabs";
 import { EquipmentTypeItem, EquipmentTypeFailureModesPanel, DISCIPLINES, DISCIPLINE_COLORS } from "../library";
+import StrategyIntelligenceFlowBar from "../intelligence/StrategyIntelligenceFlowBar";
 
 export function FailureModesEquipmentTypesTab({
   t,
@@ -41,6 +43,51 @@ export function FailureModesEquipmentTypesTab({
   resetTypeForm,
   setIsTypeDialogOpen,
 }) {
+  const visibleEquipmentTypes = useMemo(() => {
+    const search = equipmentTypeSearch.trim().toLowerCase();
+    return equipmentTypes.filter((type) => {
+      if (!matchesActiveEquipmentTypeFilters(type)) return false;
+      if (typeFilterDiscipline !== "all" && type.discipline !== typeFilterDiscipline) return false;
+      if (typeFilterNoFailureModes) {
+        const connected = getConnectedFmCount(type.id);
+        if (connected > 0) return false;
+      }
+      if (!search) return true;
+      return (
+        type.name?.toLowerCase().includes(search) ||
+        type.id?.toLowerCase().includes(search) ||
+        type.discipline?.toLowerCase().includes(search)
+      );
+    });
+  }, [
+    equipmentTypes,
+    matchesActiveEquipmentTypeFilters,
+    typeFilterDiscipline,
+    typeFilterNoFailureModes,
+    equipmentTypeSearch,
+    getConnectedFmCount,
+  ]);
+
+  const flowEquipmentTypeItems = useMemo(() => {
+    if (selectedEquipmentType) {
+      return [{ id: selectedEquipmentType.id, name: selectedEquipmentType.name }];
+    }
+    return visibleEquipmentTypes.map((type) => ({
+      id: type.id,
+      name: type.name || type.id,
+    }));
+  }, [selectedEquipmentType, visibleEquipmentTypes]);
+
+  const flowFailureModeItems = useMemo(() => {
+    if (!selectedEquipmentType) return [];
+    return failureModes
+      .filter((fm) => (fm.equipment_type_ids || []).includes(selectedEquipmentType.id))
+      .map((fm) => ({
+        id: fm.id,
+        name: fm.failure_mode,
+      }));
+  }, [selectedEquipmentType, failureModes]);
+
   return (
     <TabsContent value="libraries" className="flex-1 min-h-0 mt-0 flex flex-col overflow-hidden">
       <div className="flex flex-1 gap-4 min-h-0">
@@ -199,6 +246,14 @@ export function FailureModesEquipmentTypesTab({
       </motion.div>
       )}
       </div>
+      <StrategyIntelligenceFlowBar
+        activeStep="equipment_types"
+        equipmentTypeId={selectedEquipmentType?.id}
+        equipmentTypeName={selectedEquipmentType?.name}
+        equipmentTypeItems={flowEquipmentTypeItems}
+        failureModeItems={flowFailureModeItems}
+        enabled
+      />
     </TabsContent>
   );
 }

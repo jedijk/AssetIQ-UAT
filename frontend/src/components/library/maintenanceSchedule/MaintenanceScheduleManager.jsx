@@ -1,7 +1,7 @@
 /**
  * Maintenance Schedule Manager — orchestrates dashboard, timeline, planner, and task dialogs.
  */
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -103,7 +103,7 @@ const SCHEDULE_FILTER_GROUP_CLASS = "flex h-9 shrink-0 items-center gap-2";
 const SCHEDULE_FILTER_LABEL_CLASS =
   "text-sm font-medium leading-none text-slate-700 whitespace-nowrap";
 
-export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow = false }) {
+export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow = false, onIntelligenceFlowChange }) {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -339,6 +339,24 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
     });
     return fromTimeline;
   }, [filteredTasksList, filteredTimeline]);
+
+  const flowBarProps = useMemo(
+    () => ({
+      activeStep: "schedules",
+      equipmentTypeId,
+      equipmentTypeName,
+      selectedTask,
+      scheduleTaskItems: scheduleFlowTaskItems,
+      enabled: true,
+    }),
+    [equipmentTypeId, equipmentTypeName, selectedTask, scheduleFlowTaskItems],
+  );
+
+  useEffect(() => {
+    if (!onIntelligenceFlowChange) return;
+    onIntelligenceFlowChange(flowBarProps);
+    return () => onIntelligenceFlowChange(null);
+  }, [onIntelligenceFlowChange, flowBarProps]);
 
   // ============= Mutations =============
 
@@ -1119,15 +1137,8 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
   return (
     <>
       {scheduleContent}
-      {showIntelligenceFlow && (
-        <StrategyIntelligenceFlowBar
-          activeStep="schedules"
-          equipmentTypeId={equipmentTypeId}
-          equipmentTypeName={equipmentTypeName}
-          selectedTask={selectedTask}
-          scheduleTaskItems={scheduleFlowTaskItems}
-          enabled
-        />
+      {showIntelligenceFlow && !onIntelligenceFlowChange && (
+        <StrategyIntelligenceFlowBar {...flowBarProps} />
       )}
     </>
   );

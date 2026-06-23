@@ -100,6 +100,7 @@ const MaintenanceStrategyTab = ({
   onInitialEquipmentTypeConsumed,
   strategyHighlight = null,
   onStrategyHighlightConsumed,
+  onIntelligenceFlowChange,
 }) => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -398,6 +399,7 @@ const MaintenanceStrategyTab = ({
                   onViewInFMEA={handleViewInFMEA}
                   strategyHighlight={strategyHighlight}
                   onStrategyHighlightConsumed={onStrategyHighlightConsumed}
+                  onIntelligenceFlowChange={onIntelligenceFlowChange}
                 />
               </motion.div>
             ) : (

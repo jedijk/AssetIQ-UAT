@@ -1280,7 +1280,7 @@ const invalidateStrategyQueries = async (queryClient, equipmentTypeId) => {
   await queryClient.invalidateQueries({ queryKey: ["maintenance-strategy-v2-history", equipmentTypeId] });
 };
 
-const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighlight, onStrategyHighlightConsumed }) => {
+const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighlight, onStrategyHighlightConsumed, onIntelligenceFlowChange }) => {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
   const taskNameMap = useMaintenanceTaskTemplateMap();
@@ -1335,17 +1335,35 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
     return "strategies";
   }, [mainView, activeTab, expandedFMs]);
 
-  const intelligenceFlowBar = (
-    <StrategyIntelligenceFlowBar
-      activeStep={flowActiveStep}
-      equipmentTypeId={equipmentTypeId}
-      equipmentTypeName={equipmentTypeName}
-      strategy={strategy}
-      failureModeItems={flowFailureModeItems}
-      selectedFailureModeIds={flowSelectedFailureModeIds}
-      enabled={!!equipmentTypeId}
-    />
+  const flowBarProps = useMemo(
+    () => ({
+      activeStep: flowActiveStep,
+      equipmentTypeId,
+      equipmentTypeName,
+      strategy,
+      failureModeItems: flowFailureModeItems,
+      selectedFailureModeIds: flowSelectedFailureModeIds,
+      enabled: !!equipmentTypeId,
+    }),
+    [
+      flowActiveStep,
+      equipmentTypeId,
+      equipmentTypeName,
+      strategy,
+      flowFailureModeItems,
+      flowSelectedFailureModeIds,
+    ],
   );
+
+  useEffect(() => {
+    if (!onIntelligenceFlowChange) return;
+    onIntelligenceFlowChange(equipmentTypeId ? flowBarProps : null);
+    return () => onIntelligenceFlowChange(null);
+  }, [onIntelligenceFlowChange, equipmentTypeId, flowBarProps]);
+
+  const intelligenceFlowBar = !onIntelligenceFlowChange ? (
+    <StrategyIntelligenceFlowBar {...flowBarProps} />
+  ) : null;
 
   useEffect(() => {
     if (!strategyHighlight || strategyLoading || !hasStrategy) return;

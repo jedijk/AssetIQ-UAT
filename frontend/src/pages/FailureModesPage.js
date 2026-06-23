@@ -218,6 +218,8 @@ const FailureModesPage = () => {
   const [typeFilterNoFailureModes, setTypeFilterNoFailureModes] = useState(false); // Filter to show only types without failure modes
   const [filterLinkedToEquipment, setFilterLinkedToEquipment] = useState(true);
   const [selectedEquipmentType, setSelectedEquipmentType] = useState(null); // For viewing connected failure modes
+  const [maintenanceFlowProps, setMaintenanceFlowProps] = useState(null);
+  const [scheduleFlowProps, setScheduleFlowProps] = useState(null);
   const [isAISuggestionsOpen, setIsAISuggestionsOpen] = useState(false); // AI suggestions dialog
   const [isAINewTypesOpen, setIsAINewTypesOpen] = useState(false); // AI suggest NEW equipment types
   const [isAINewFmOpen, setIsAINewFmOpen] = useState(false); // AI suggest NEW failure modes
@@ -1180,17 +1182,27 @@ const FailureModesPage = () => {
               onInitialEquipmentTypeConsumed={() => setStrategyEquipmentTypeId(null)}
               strategyHighlight={strategyHighlight}
               onStrategyHighlightConsumed={() => setStrategyHighlight(null)}
+              onIntelligenceFlowChange={setMaintenanceFlowProps}
             />
           </div>
+          {maintenanceFlowProps && (
+            <StrategyIntelligenceFlowBar {...maintenanceFlowProps} />
+          )}
         </TabsContent>
 
         {/* Schedule Tab */}
         <TabsContent value="schedule" className="flex-1 min-h-0 mt-0 flex flex-col">
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-white rounded-xl border border-slate-200">
             <div className="flex-1 min-h-0 overflow-auto p-4">
-              <MaintenanceScheduleManager equipmentType={null} showIntelligenceFlow />
+              <MaintenanceScheduleManager
+                equipmentType={null}
+                onIntelligenceFlowChange={setScheduleFlowProps}
+              />
             </div>
           </div>
+          {scheduleFlowProps && (
+            <StrategyIntelligenceFlowBar {...scheduleFlowProps} />
+          )}
         </TabsContent>
         
         {/* Custom PM Import Tab */}
