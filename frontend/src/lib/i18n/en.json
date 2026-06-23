@@ -1163,6 +1163,8 @@
   "library": {
     "title": "Library",
     "failureModes": "Failure Modes",
+    "intelligenceThread": "Intelligence Thread",
+    "intelligenceThreadTitle": "Maintenance Intelligence Thread",
     "equipmentTypes": "Equipment Types",
     "maintenance": "Maintenance Strategy",
     "totalModes": "Total Modes",

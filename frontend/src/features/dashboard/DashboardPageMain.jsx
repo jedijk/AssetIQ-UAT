@@ -196,7 +196,7 @@ export default function DashboardPageMain({ initialTab }) {
 
   const isOperatorMode = user?.role === "operator" || operatorToggle;
 
-  // Q1 plan: Intelligence Map is the default home for reliability engineers (desktop).
+  // Q1 plan: Intelligence Thread is the default home for reliability engineers (desktop).
   useEffect(() => {
     if (effectiveRole === "reliability_engineer" && !isOperatorMode && !isMobileViewport) {
       navigate("/library?tab=intelligence-map", { replace: true });

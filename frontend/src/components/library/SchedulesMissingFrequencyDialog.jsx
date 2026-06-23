@@ -1,5 +1,5 @@
 /**
- * Drill-down dialog for Intelligence Map "Schedules Missing Frequency" insight.
+ * Drill-down dialog for Intelligence Thread "Schedules Missing Frequency" insight.
  */
 import React, { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";

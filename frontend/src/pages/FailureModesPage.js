@@ -185,7 +185,7 @@ const FailureModesPage = () => {
   const libraryTabBreadcrumbLabel = useMemo(() => {
     switch (mainTab) {
       case "intelligence-map":
-        return "Intelligence Map";
+        return t("library.intelligenceThread");
       case "failure-modes":
         return t("library.failureModes");
       case "libraries":
@@ -1005,7 +1005,7 @@ const FailureModesPage = () => {
         <TabsList className="inline-flex w-auto max-w-full overflow-x-auto flex-shrink-0 mb-2">
           <TabsTrigger value="intelligence-map" data-testid="intelligence-map-tab" className="flex items-center gap-1.5 whitespace-nowrap">
             <Network className="w-3.5 h-3.5" />
-            Intelligence Map
+            {t("library.intelligenceThread")}
           </TabsTrigger>
           <TabsTrigger value="failure-modes">{t("library.failureModes")}</TabsTrigger>
           <TabsTrigger value="libraries">{t("library.equipmentTypes")}</TabsTrigger>
@@ -1206,7 +1206,7 @@ const FailureModesPage = () => {
           </div>
         </TabsContent>
 
-        {/* Intelligence Map Tab */}
+        {/* Intelligence Thread Tab */}
         <TabsContent value="intelligence-map" className="flex-1 min-h-0 mt-0 flex flex-col">
           <div className="flex-1 min-h-0 overflow-y-auto mobile-scroll-pane pb-4">
             <IntelligenceMapTab />

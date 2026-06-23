@@ -1,5 +1,5 @@
 /**
- * Maintenance Intelligence Map Dashboard
+ * Maintenance Intelligence Thread dashboard
  * 
  * Provides a visual representation of how AssetIQ transforms reliability
  * knowledge into maintenance execution.
@@ -539,7 +539,7 @@ const IntelligenceMapTab = () => {
         <div>
           <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <Network className="w-5 h-5 text-blue-600" />
-            Maintenance Intelligence Map
+            {t("library.intelligenceThreadTitle")}
           </h2>
           <p className="text-sm text-slate-500 mt-1">
             Understand how reliability knowledge creates maintenance work in your plant

@@ -1255,6 +1255,8 @@
   "library": {
     "title": "Bibliothek",
     "failureModes": "Fehlermodi",
+    "intelligenceThread": "Intelligence Thread",
+    "intelligenceThreadTitle": "Maintenance Intelligence Thread",
     "equipmentTypes": "Anlagentypen",
     "maintenance": "Wartungsstrategie",
     "totalModes": "Gesamte Modi",

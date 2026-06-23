@@ -1255,6 +1255,8 @@
   "library": {
     "title": "Bibliotheek",
     "failureModes": "Faalmodi",
+    "intelligenceThread": "Intelligence Thread",
+    "intelligenceThreadTitle": "Maintenance Intelligence Thread",
     "equipmentTypes": "Apparatuurtypen",
     "maintenance": "Onderhoudsstrategie",
     "totalModes": "Totaal modi",
