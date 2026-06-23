@@ -829,15 +829,3 @@ async def get_intelligence_map_filters(*, current_user: dict):
     except Exception:
         logger.exception("Error getting intelligence map filters")
         raise
-
-
-async def get_strategy_intelligence_context(
-    equipment_type_id: str,
-    *,
-    current_user: dict,
-):
-    from services.intelligence_context_service import (
-        get_strategy_intelligence_context as _get_strategy_context,
-    )
-
-    return await _get_strategy_context(equipment_type_id, current_user=current_user)

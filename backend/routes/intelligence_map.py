@@ -71,14 +71,3 @@ async def get_intelligence_map_filters(
     current_user: dict = Depends(_library_read),
 ):
     return await svc.get_intelligence_map_filters(current_user=current_user)
-
-
-@router.get("/context/strategy/{equipment_type_id}")
-async def get_strategy_intelligence_context(
-    equipment_type_id: str,
-    current_user: dict = Depends(_library_read),
-):
-    return await svc.get_strategy_intelligence_context(
-        equipment_type_id,
-        current_user=current_user,
-    )

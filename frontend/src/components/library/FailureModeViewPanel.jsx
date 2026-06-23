@@ -93,7 +93,6 @@ export function FailureModeViewPanel({
   t,
   isFullscreen = false,
   onToggleFullscreen,
-  intelligenceContextToggle,
 }) {
   const Icon = disciplineIcons[fm?.discipline] || AlertTriangle;
   const colors = disciplineColors[fm?.discipline] || "bg-slate-100 text-slate-700 border-slate-200";
@@ -342,7 +341,6 @@ export function FailureModeViewPanel({
           )}
         </div>
         <div className="flex items-center gap-2">
-          {intelligenceContextToggle}
           {!isEditing ? (
             <>
               <Button 

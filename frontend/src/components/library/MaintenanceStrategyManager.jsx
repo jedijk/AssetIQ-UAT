@@ -48,7 +48,6 @@ import {
   History,
   GitBranch,
   User,
-  Brain,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -112,10 +111,6 @@ import MaintenanceScheduleManager from "./MaintenanceScheduleManager";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { isStrategyTaskHighlighted } from "../../lib/maintenanceScheduleContext";
 import { useFailureModeNameMap, useMaintenanceTaskTemplateMap } from "../../hooks/useTranslatedEntities";
-import IntelligenceContextPanel, {
-  IntelligenceContextToggle,
-} from "../intelligence/IntelligenceContextPanel";
-import { useIntelligenceContextPanel } from "../../hooks/useIntelligenceContextPanel";
 
 // ============= Constants =============
 
@@ -1303,23 +1298,6 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
 
   const equipmentTypeId = equipmentType?.id;
   const equipmentTypeName = equipmentType?.name;
-  const intelPanelStorageKey = equipmentTypeId
-    ? `assetiq:intel-context:strategy:${equipmentTypeId}`
-    : null;
-  const [intelPanelOpen, setIntelPanelOpen] = useIntelligenceContextPanel(intelPanelStorageKey);
-
-  const wrapWithIntelligencePanel = (content) => (
-    <div className="flex items-start gap-0 min-h-0">
-      <div className="flex-1 min-w-0">{content}</div>
-      <IntelligenceContextPanel
-        open={intelPanelOpen && !!equipmentTypeId}
-        onOpenChange={setIntelPanelOpen}
-        objectType="strategy"
-        objectId={equipmentTypeId}
-        equipmentTypeName={equipmentTypeName}
-      />
-    </div>
-  );
 
   // ============= Queries =============
 
@@ -1786,29 +1764,22 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
 
   // Main View Toggle between Strategy and Schedule
   if (mainView === "schedule") {
-    return wrapWithIntelligencePanel(
+    return (
       <div className="space-y-4">
         {/* View Toggle */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Tabs value={mainView} onValueChange={setMainView} className="w-auto">
-              <TabsList className="h-9">
-                <TabsTrigger value="strategy" className="text-xs px-4">
-                  <Wrench className="w-3.5 h-3.5 mr-1.5" />
-                  {t("maintenance.maintenanceStrategy")}
-                </TabsTrigger>
-                <TabsTrigger value="schedule" className="text-xs px-4">
-                  <Calendar className="w-3.5 h-3.5 mr-1.5" />
-                  {t("maintenance.maintenanceSchedule")}
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-          <IntelligenceContextToggle
-            open={intelPanelOpen}
-            onToggle={() => setIntelPanelOpen((prev) => !prev)}
-            disabled={!equipmentTypeId}
-          />
+        <div className="flex items-center gap-2">
+          <Tabs value={mainView} onValueChange={setMainView} className="w-auto">
+            <TabsList className="h-9">
+              <TabsTrigger value="strategy" className="text-xs px-4">
+                <Wrench className="w-3.5 h-3.5 mr-1.5" />
+                {t("maintenance.maintenanceStrategy")}
+              </TabsTrigger>
+              <TabsTrigger value="schedule" className="text-xs px-4">
+                <Calendar className="w-3.5 h-3.5 mr-1.5" />
+                {t("maintenance.maintenanceSchedule")}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
         
         {hasStrategy && strategy?.strategy_needs_apply && (
@@ -1823,14 +1794,14 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
 
         {/* Schedule Manager */}
         <MaintenanceScheduleManager equipmentType={equipmentType} />
-      </div>,
+      </div>
     );
   }
 
-  return wrapWithIntelligencePanel(
+  return (
     <div className="space-y-4">
-      {/* View Toggle + Intelligence Context */}
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+      {/* View Toggle */}
+      <div className="flex flex-wrap items-center gap-2 mb-2">
         <Tabs value={mainView} onValueChange={setMainView} className="w-auto">
           <TabsList className="h-9">
             <TabsTrigger value="strategy" className="text-xs px-4">
@@ -1843,11 +1814,6 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        <IntelligenceContextToggle
-          open={intelPanelOpen}
-          onToggle={() => setIntelPanelOpen((prev) => !prev)}
-          disabled={!equipmentTypeId}
-        />
       </div>
 
       {hasStrategy && strategy?.strategy_needs_apply && (
@@ -2420,7 +2386,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>,
+    </div>
   );
 };
 

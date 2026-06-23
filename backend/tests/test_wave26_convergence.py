@@ -26,7 +26,6 @@ def test_service_exists():
     assert callable(svc.get_intelligence_map_stats)
     assert callable(svc.get_schedules_missing_frequency)
     assert callable(svc.get_intelligence_map_filters)
-    assert callable(svc.get_strategy_intelligence_context)
 
 
 def test_routes_reexport_helpers():
