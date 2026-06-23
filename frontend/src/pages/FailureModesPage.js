@@ -1156,7 +1156,7 @@ const FailureModesPage = () => {
         
         {/* Maintenance Strategies Tab */}
         <TabsContent value="maintenance" className="flex-1 min-h-0 mt-0 flex flex-col">
-          <div className="card flex-1 min-h-0 overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-white rounded-xl border border-slate-200">
             <MaintenanceStrategyTab
               filterLinkedToEquipment={filterLinkedToEquipment}
               onFilterLinkedToEquipmentChange={setFilterLinkedToEquipment}
@@ -1171,7 +1171,7 @@ const FailureModesPage = () => {
 
         {/* Schedule Tab */}
         <TabsContent value="schedule" className="flex-1 min-h-0 mt-0 flex flex-col">
-          <div className="card flex-1 min-h-0 overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col bg-white rounded-xl border border-slate-200">
             <div className="flex-1 min-h-0 overflow-auto p-4">
               <MaintenanceScheduleManager equipmentType={null} showIntelligenceFlow />
             </div>
