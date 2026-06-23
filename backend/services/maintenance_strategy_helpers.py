@@ -355,6 +355,7 @@ def generate_default_tasks_for_failure_mode(
             continue
         stored_action_type = action.get("action_type", "PM") if isinstance(action, dict) else "PM"
         discipline = action.get("discipline", None) if isinstance(action, dict) else None
+        requires_downtime = bool(action.get("requires_downtime")) if isinstance(action, dict) else False
         
         # Use AI-enhanced logic to determine correct action type
         determined_action_type = determine_action_type_from_text(action_text, stored_action_type)
@@ -403,6 +404,7 @@ def generate_default_tasks_for_failure_mode(
             detection_methods=[DetectionMethod(m) for m in detection_methods if m in [e.value for e in DetectionMethod]],
             failure_mode_ids=[fm_id],
             discipline=discipline,
+            requires_downtime=requires_downtime,
             source="template"
         )
         tasks.append(task)
@@ -518,6 +520,7 @@ def refresh_failure_mode_strategy_from_library(
                 "discipline",
                 "detection_methods",
                 "failure_mode_ids",
+                "requires_downtime",
             ):
                 if gen.get(key) is not None:
                     existing[key] = gen[key]

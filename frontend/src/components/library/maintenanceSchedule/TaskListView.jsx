@@ -4,8 +4,9 @@ import { Badge } from "../../ui/badge";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import { useTaskStatusConfig, usePriorityConfig } from "./constants";
 import { isMaintenanceImportTask } from "./taskSourceFilter";
+import ActionDowntimeBadge from "../../failure-modes/ActionDowntimeBadge";
 
-export function TaskListView({ tasks, isLoading, onTaskClick, onStatusChange }) {
+export function TaskListView({ tasks, isLoading, onTaskClick, onStatusChange, resolveTaskDowntime }) {
   const { t } = useLanguage();
   const statusConfigMap = useTaskStatusConfig();
   const priorityConfigMap = usePriorityConfig();
@@ -52,6 +53,9 @@ export function TaskListView({ tasks, isLoading, onTaskClick, onStatusChange }) 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm truncate">{task.task_name}</span>
+                    {resolveTaskDowntime?.(task) && (
+                      <ActionDowntimeBadge requiresDowntime />
+                    )}
                     {isOverdue && task.status !== "completed" && (
                       <Badge className="text-[10px] bg-red-500 text-white">{t("maintenance.overdue")}</Badge>
                     )}

@@ -118,6 +118,7 @@ async def sync_strategy_programs_for_equipment(
             "failure_mode_name": fm_name,
             "discipline": task.get("discipline"),
             "skills_required": task.get("skills_required") or [],
+            "requires_downtime": bool(task.get("requires_downtime")),
             "task_source": TaskSource.STRATEGY_GENERATED.value,
             "is_active": True,
             "updated_at": now_iso,
@@ -149,6 +150,7 @@ async def sync_strategy_programs_for_equipment(
                 failure_mode_name=fm_name,
                 discipline=task.get("discipline"),
                 skills_required=task.get("skills_required") or [],
+                requires_downtime=bool(task.get("requires_downtime")),
             )
             doc = program.model_dump()
             doc["task_source"] = TaskSource.STRATEGY_GENERATED.value

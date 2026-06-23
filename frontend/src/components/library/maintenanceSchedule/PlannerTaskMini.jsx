@@ -2,8 +2,9 @@ import React from "react";
 import { Badge } from "../../ui/badge";
 import { usePriorityConfig } from "./constants";
 import { isMaintenanceImportTask } from "./taskSourceFilter";
+import ActionDowntimeBadge from "../../failure-modes/ActionDowntimeBadge";
 
-export function PlannerTaskMini({ task, compact = false, onClick }) {
+export function PlannerTaskMini({ task, compact = false, onClick, resolveTaskDowntime }) {
   const priorityConfigMap = usePriorityConfig();
   const priorityCfg = priorityConfigMap[task.priority] || priorityConfigMap.medium;
   return (
@@ -13,7 +14,10 @@ export function PlannerTaskMini({ task, compact = false, onClick }) {
       data-testid={`planner-task-${task.id}`}
     >
       <div className="flex items-center justify-between gap-1">
-        <span className="truncate font-medium text-[11px]">{task.task_name}</span>
+        <span className="truncate font-medium text-[11px] flex items-center gap-1 min-w-0">
+          <span className="truncate">{task.task_name}</span>
+          {resolveTaskDowntime?.(task) && <ActionDowntimeBadge requiresDowntime />}
+        </span>
         <div className="flex items-center gap-1 shrink-0">
           {isMaintenanceImportTask(task) && (
             <Badge variant="outline" className="text-[8px] px-1 py-0 bg-purple-50 text-purple-700 border-purple-200">

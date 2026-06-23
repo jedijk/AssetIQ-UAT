@@ -30,6 +30,7 @@ import {
 } from "../../ui/select";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import { useTaskStatusConfig, usePriorityConfig } from "./constants";
+import ActionDowntimeBadge from "../../failure-modes/ActionDowntimeBadge";
 
 export function TaskDetailsDialog({
   task,
@@ -41,6 +42,7 @@ export function TaskDetailsDialog({
   isUpdating,
   isCompleting,
   isDeferring,
+  resolveTaskDowntime,
 }) {
   const { t } = useLanguage();
   const statusConfigMap = useTaskStatusConfig();
@@ -114,7 +116,8 @@ export function TaskDetailsDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Wrench className="w-5 h-5 text-blue-600" />
-            {task.task_name}
+            <span className="truncate">{task.task_name}</span>
+            {resolveTaskDowntime?.(task) && <ActionDowntimeBadge requiresDowntime />}
           </DialogTitle>
           <DialogDescription className="flex items-center gap-2 flex-wrap pt-1">
             <Badge variant="outline" className="text-xs">{task.equipment_name}</Badge>

@@ -12,6 +12,79 @@ export function actionRequiresDowntime(action) {
   return typeof action === "object" && action != null && !!action.requires_downtime;
 }
 
+export function taskRequiresDowntime(task) {
+  return task != null && !!task.requires_downtime;
+}
+
+function actionDescription(action) {
+  if (typeof action === "string") return action.trim();
+  if (action == null || typeof action !== "object") return "";
+  return String(action.description || action.text || "").trim();
+}
+
+/** Resolve downtime from task field or linked library failure-mode recommended actions. */
+export function resolveTaskRequiresDowntime(task, libraryFmsById) {
+  if (taskRequiresDowntime(task)) return true;
+  if (!task?.name || !libraryFmsById) return false;
+
+  const taskName = task.name.trim().toLowerCase();
+  const fmIds = (task.failure_mode_ids || []).map(String);
+
+  for (const fmId of fmIds) {
+    const fm = libraryFmsById[fmId];
+    for (const action of fm?.recommended_actions || []) {
+      const text = actionDescription(action).toLowerCase();
+      if (!text) continue;
+      if (
+        text.startsWith(taskName)
+        || taskName.startsWith(text.slice(0, 100))
+        || text.slice(0, 100) === taskName
+      ) {
+        if (actionRequiresDowntime(action)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** Resolve downtime for a scheduled task (field, strategy template, or library FM actions). */
+export function resolveScheduledTaskRequiresDowntime(
+  task,
+  { libraryFmsById, strategyTemplatesById } = {},
+) {
+  if (task?.requires_downtime) return true;
+
+  const templateIds = [
+    task?.strategy_task_id,
+    task?.template_id,
+    task?.task_template_id,
+    task?.v2_task_id,
+  ]
+    .filter(Boolean)
+    .map(String);
+
+  for (const tid of templateIds) {
+    const template = strategyTemplatesById?.[tid];
+    if (template && resolveTaskRequiresDowntime(template, libraryFmsById)) {
+      return true;
+    }
+  }
+
+  if (task?.task_name) {
+    const fmIds = task.failure_mode_id ? [String(task.failure_mode_id)] : [];
+    if (
+      resolveTaskRequiresDowntime(
+        { name: task.task_name, failure_mode_ids: fmIds },
+        libraryFmsById,
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export default function ActionDowntimeBadge({
   action,
   requiresDowntime,

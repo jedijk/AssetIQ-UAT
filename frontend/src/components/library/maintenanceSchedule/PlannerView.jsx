@@ -9,7 +9,7 @@ import { FourteenDayGrid } from "./FourteenDayGrid";
 import { NinetyDayGrid } from "./NinetyDayGrid";
 import { useLanguage } from "../../../contexts/LanguageContext";
 
-export function PlannerView({ equipmentTypeId, onTaskClick, filteredEquipmentIds, filterTask }) {
+export function PlannerView({ equipmentTypeId, onTaskClick, filteredEquipmentIds, filterTask, resolveTaskDowntime }) {
   const { t } = useLanguage();
   const [horizon, setHorizon] = useState("daily"); // daily | weekly | "14" | "90"
 
@@ -206,6 +206,7 @@ export function PlannerView({ equipmentTypeId, onTaskClick, filteredEquipmentIds
                   : dailyData
               }
               onTaskClick={onTaskClick}
+              resolveTaskDowntime={resolveTaskDowntime}
             />
           )}
           {horizon === "weekly" && (
@@ -224,6 +225,7 @@ export function PlannerView({ equipmentTypeId, onTaskClick, filteredEquipmentIds
               }
               capacityHours={totalDailyCapacityHours}
               onTaskClick={onTaskClick}
+              resolveTaskDowntime={resolveTaskDowntime}
             />
           )}
           {horizon === "14" && (

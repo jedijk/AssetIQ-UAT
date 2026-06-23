@@ -77,6 +77,7 @@ class EquipmentMaintenanceProgram(BaseModel):
     # Discipline/Skills
     discipline: Optional[str] = None
     skills_required: List[str] = []
+    requires_downtime: bool = False
     
     # Status
     is_active: bool = True
@@ -124,6 +125,7 @@ class ScheduledTask(BaseModel):
     strategy_version: str
     failure_mode_id: Optional[str] = None
     failure_mode_name: Optional[str] = None
+    requires_downtime: bool = False
     task_source: Optional[str] = None
     pm_import_task_id: Optional[str] = None
     

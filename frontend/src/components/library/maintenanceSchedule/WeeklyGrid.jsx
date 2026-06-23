@@ -4,7 +4,7 @@ import { ScrollArea } from "../../ui/scroll-area";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import { PlannerTaskMini } from "./PlannerTaskMini";
 
-export function WeeklyGrid({ days, capacityHours, onTaskClick }) {
+export function WeeklyGrid({ days, capacityHours, onTaskClick, resolveTaskDowntime }) {
   const { t } = useLanguage();
   if (!days?.length) {
     return <div className="text-center py-12 text-sm text-slate-500">{t("maintenance.noScheduledTasksThisWeek")}</div>;
@@ -39,7 +39,7 @@ export function WeeklyGrid({ days, capacityHours, onTaskClick }) {
                     <p className="text-[10px] text-slate-300 text-center py-2">—</p>
                   ) : (
                     d.tasks.map((t) => (
-                      <PlannerTaskMini key={t.id} task={t} compact onClick={onTaskClick} />
+                      <PlannerTaskMini key={t.id} task={t} compact onClick={onTaskClick} resolveTaskDowntime={resolveTaskDowntime} />
                     ))
                   )}
                 </div>

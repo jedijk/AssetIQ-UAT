@@ -6,7 +6,7 @@ import { ScrollArea } from "../../ui/scroll-area";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import { PlannerTaskMini } from "./PlannerTaskMini";
 
-export function DailyPlanner({ data, onTaskClick }) {
+export function DailyPlanner({ data, onTaskClick, resolveTaskDowntime }) {
   const { t } = useLanguage();
   if (!data) return null;
   const buckets = [
@@ -56,7 +56,7 @@ export function DailyPlanner({ data, onTaskClick }) {
                   <p className="text-xs text-slate-400 py-4 text-center">{t("maintenance.noTasksInBucket")}</p>
                 ) : (
                   bucket.tasks.map((task) => (
-                    <PlannerTaskMini key={task.id} task={task} onClick={onTaskClick} />
+                    <PlannerTaskMini key={task.id} task={task} onClick={onTaskClick} resolveTaskDowntime={resolveTaskDowntime} />
                   ))
                 )}
               </div>

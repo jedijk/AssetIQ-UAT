@@ -99,6 +99,7 @@ async def schedule_program(program: dict, horizon_days: int = DEFAULT_HORIZON_DA
             failure_mode_name=program.get("failure_mode_name"),
             task_source=program.get("task_source"),
             pm_import_task_id=coerce_optional_str_id(program.get("pm_import_task_id")),
+            requires_downtime=bool(program.get("requires_downtime")),
         )
         new_tasks.append(task.model_dump())
         created_ids.append(task.id)

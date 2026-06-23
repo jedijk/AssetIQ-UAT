@@ -104,14 +104,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../ui/alert-dialog";
-import { maintenanceStrategyV2API } from "../../lib/api";
+import { maintenanceStrategyV2API, failureModesAPI } from "../../lib/api";
 import { refreshMaintenanceSchedulerQueries } from "../../lib/apis/maintenanceScheduler";
+import { queryKeys } from "../../lib/queryKeys";
 import { DISCIPLINES as FM_DISCIPLINES, DISCIPLINE_COLORS } from "./EquipmentTypeItem";
 import MaintenanceScheduleManager from "./MaintenanceScheduleManager";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { isStrategyTaskHighlighted } from "../../lib/maintenanceScheduleContext";
 import { useFailureModeNameMap, useMaintenanceTaskTemplateMap } from "../../hooks/useTranslatedEntities";
 import StrategyIntelligenceFlowBar from "../intelligence/StrategyIntelligenceFlowBar";
+import ActionDowntimeBadge, { resolveTaskRequiresDowntime } from "../failure-modes/ActionDowntimeBadge";
 
 // ============= Constants =============
 
@@ -377,6 +379,7 @@ const FailureModeStrategyRow = ({
   onSyncNewVersion,
   isSyncingFm,
   highlightedTask,
+  libraryFmsById,
 }) => {
   const { t } = useLanguage();
   const fmNameMap = useFailureModeNameMap();
@@ -649,6 +652,7 @@ const FailureModeStrategyRow = ({
                             <span className={`text-sm truncate ${task.is_mandatory !== false ? "text-slate-900" : "text-slate-400"}`}>
                               {taskNameMap[task.id]?.name || task.name}
                             </span>
+                            <ActionDowntimeBadge requiresDowntime={resolveTaskRequiresDowntime(task, libraryFmsById)} />
                           </div>
                           <div className="flex items-center gap-2 mt-1 flex-wrap">
                             <Badge variant="outline" className="text-[10px]">
@@ -767,7 +771,7 @@ const CriticalityMatrixEditor = ({ task, onUpdate }) => {
 /**
  * Task Template Card
  */
-const TaskTemplateCard = ({ task, onEdit, onDelete, failureModes }) => {
+const TaskTemplateCard = ({ task, onEdit, onDelete, failureModes, libraryFmsById }) => {
   const { t } = useLanguage();
   const [isExpanded, setIsExpanded] = useState(false);
   const strategyConfig = getTaskTypeConfig(task.task_type);
@@ -792,6 +796,7 @@ const TaskTemplateCard = ({ task, onEdit, onDelete, failureModes }) => {
             <div className="flex items-center gap-2">
               <StrategyIcon className={`w-4 h-4 ${strategyConfig.color.replace('bg-', 'text-').replace('-100', '-600')}`} />
               <span className="font-medium text-sm truncate">{translatedTaskName}</span>
+              <ActionDowntimeBadge requiresDowntime={resolveTaskRequiresDowntime(task, libraryFmsById)} />
             </div>
             {translatedTaskDescription && (
               <p className="text-xs text-slate-500 mt-1 line-clamp-1">{translatedTaskDescription}</p>
@@ -1308,6 +1313,21 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
     queryFn: () => maintenanceStrategyV2API.getStrategy(equipmentTypeId),
     enabled: !!equipmentTypeId,
   });
+
+  const { data: libraryFailureModes } = useQuery({
+    queryKey: queryKeys.failureModes.list(),
+    queryFn: () => failureModesAPI.getAll(),
+    enabled: !!equipmentTypeId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const libraryFmsById = useMemo(() => {
+    const map = {};
+    for (const fm of libraryFailureModes?.failure_modes || []) {
+      if (fm?.id) map[String(fm.id)] = fm;
+    }
+    return map;
+  }, [libraryFailureModes]);
 
   const strategy = strategyData?.strategy;
   const hasStrategy =
@@ -2066,6 +2086,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
                         ? { taskName: strategyHighlight.taskName }
                         : null
                     }
+                    libraryFmsById={libraryFmsById}
                   />
                 ))
               )}
@@ -2149,6 +2170,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
                                   <td className="py-2 px-3 max-w-xs">
                                     <div className="flex items-center gap-2">
                                       <span className="truncate">{taskNameMap[task.id]?.name || task.name}</span>
+                                      <ActionDowntimeBadge requiresDowntime={resolveTaskRequiresDowntime(task, libraryFmsById)} />
                                       {!active && (
                                         <Badge variant="outline" className="text-[10px] py-0 px-1 bg-slate-100 text-slate-500 border-slate-300">
                                           {t("maintenance.inactiveLabel")}

@@ -39,7 +39,7 @@ describe("buildStrategyFlowNodes", () => {
     expect(nodes.find((node) => node.key === "schedules").count).toBe(1);
   });
 
-  it("uses strategy overrides and filters scheduled tasks by failure mode", () => {
+  it("uses schedule program items and filters by failure mode", () => {
     const nodes = buildStrategyFlowNodes({
       activeStep: "failure_modes",
       strategyItemsOverride: [
@@ -53,7 +53,7 @@ describe("buildStrategyFlowNodes", () => {
       failureModeItems: [{ id: "fm-1", name: "Seal leak" }],
       selectedFailureModeIds: ["fm-1"],
       strategy: baseStrategy,
-      scheduleTaskItems: [
+      scheduleProgramItems: [
         { id: "s1", task_name: "Inspect seal", failure_mode_id: "fm-1" },
         { id: "s2", task_name: "Lubricate bearing", failure_mode_id: "fm-2" },
         { id: "s3", task_name: "Other task" },
@@ -62,6 +62,7 @@ describe("buildStrategyFlowNodes", () => {
         strategies: { count: 3 },
         maintenance_programs: { active: 8 },
         schedules: { for_applied: 230 },
+        planned_work: { for_applied: 230 },
       },
     });
 
@@ -71,7 +72,7 @@ describe("buildStrategyFlowNodes", () => {
     expect(nodes.find((node) => node.key === "schedules").items[0].name).toBe("Inspect seal");
   });
 
-  it("excludes disabled strategies, inactive programs, and completed schedules", () => {
+  it("excludes disabled strategies and inactive programs from upstream nodes", () => {
     const nodes = buildStrategyFlowNodes({
       activeStep: "programs",
       strategy: {
@@ -86,9 +87,9 @@ describe("buildStrategyFlowNodes", () => {
       },
       equipmentTypeId: "pump_centrifugal",
       equipmentTypeName: "Centrifugal Pump",
-      scheduleTaskItems: [
-        { id: "s1", task_name: "Open task", status: "scheduled" },
-        { id: "s2", task_name: "Done task", status: "completed" },
+      scheduleProgramItems: [
+        { id: "s1", task_name: "Inspect seal", failure_mode_id: "fm-1" },
+        { id: "s2", task_name: "Lubricate bearing", failure_mode_id: "fm-2" },
       ],
       strategiesList: [
         { equipment_type_id: "pump_centrifugal", status: "disabled" },
@@ -97,47 +98,47 @@ describe("buildStrategyFlowNodes", () => {
       stats: {
         strategies: { count: 2 },
         maintenance_programs: { active: 3, count: 5, active_tasks: 2 },
-        planned_work: { for_applied: 4 },
+        schedules: { for_applied: 4 },
+        planned_work: { for_applied: 12 },
       },
     });
 
     expect(nodes.find((node) => node.key === "strategies").count).toBe(0);
     expect(nodes.find((node) => node.key === "programs").count).toBe(0);
-    expect(nodes.find((node) => node.key === "schedules").count).toBe(1);
-    expect(nodes.find((node) => node.key === "schedules").items[0].name).toBe("Open task");
+    expect(nodes.find((node) => node.key === "schedules").count).toBe(2);
   });
 
-  it("uses local schedule tasks on the schedule page instead of global stats", () => {
+  it("uses local active schedule programs on the schedule page instead of open tasks", () => {
     const nodes = buildStrategyFlowNodes({
       activeStep: "schedules",
-      scheduleTaskItems: [],
+      scheduleProgramItems: [],
       stats: {
         planned_work: { for_applied: 230 },
-        schedules: { for_applied: 230 },
+        schedules: { for_applied: 12 },
       },
     });
 
     expect(nodes.find((node) => node.key === "schedules").count).toBe(0);
   });
 
-  it("falls back to global open-task stats when no local schedule tasks are provided", () => {
+  it("falls back to active schedule stats when no local program items are provided", () => {
     const nodes = buildStrategyFlowNodes({
       activeStep: "failure_modes",
       stats: {
         planned_work: { for_applied: 12 },
-        schedules: { for_applied: 230 },
+        schedules: { for_applied: 8 },
       },
     });
 
-    expect(nodes.find((node) => node.key === "schedules").count).toBe(12);
+    expect(nodes.find((node) => node.key === "schedules").count).toBe(8);
   });
 
-  it("shows zero when global stats report no open scheduled tasks", () => {
+  it("shows zero when global stats report no active schedules", () => {
     const nodes = buildStrategyFlowNodes({
       activeStep: "failure_modes",
       stats: {
-        planned_work: { for_applied: 0 },
-        schedules: { for_applied: 230 },
+        planned_work: { for_applied: 230 },
+        schedules: { for_applied: 0 },
       },
     });
 

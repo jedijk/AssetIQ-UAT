@@ -116,6 +116,9 @@ class MaintenanceTaskTemplate(BaseModel):
     # Cost estimates
     estimated_cost_eur: Optional[float] = None
     
+    # Operational constraints
+    requires_downtime: bool = False
+
     # Metadata
     is_mandatory: bool = True
     source: str = "template"  # template, ai_generated, manual

@@ -18,6 +18,8 @@ import {
   ScheduleTaskContextMenu,
 } from "./ScheduleTaskContextMenu";
 
+import ActionDowntimeBadge from "../../failure-modes/ActionDowntimeBadge";
+
 export function TimelineView({
   timeline,
   isLoading,
@@ -26,6 +28,7 @@ export function TimelineView({
   onViewTask,
   onParentStrategy,
   onFindEquipment,
+  resolveTaskDowntime,
 }) {
   const { t } = useLanguage();
   const [zoom, setZoom] = useState("week"); // "day" | "week" | "month"
@@ -251,8 +254,11 @@ export function TimelineView({
                   data-testid={`gantt-row-label-${r.id}`}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className={`truncate font-medium ${r._disabledInProgram ? "text-slate-400" : "text-slate-900"}`}>
-                      {r.task_name}
+                    <div className={`truncate font-medium flex items-center gap-1 ${r._disabledInProgram ? "text-slate-400" : "text-slate-900"}`}>
+                      <span className="truncate">{r.task_name}</span>
+                      {resolveTaskDowntime?.(r.occurrences?.[0] || { task_name: r.task_name, failure_mode_id: r.occurrences?.[0]?.failure_mode_id }) && (
+                        <ActionDowntimeBadge requiresDowntime />
+                      )}
                     </div>
                     <div className="truncate text-[10px] text-slate-500 flex items-center gap-1">
                       <span className="truncate">

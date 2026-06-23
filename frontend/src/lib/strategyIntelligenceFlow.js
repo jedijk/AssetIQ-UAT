@@ -76,17 +76,17 @@ function taskMatchesFailureModeSelection(task, failureModeIds, linkedTasks) {
   return Boolean(taskName && templateNames.has(taskName));
 }
 
-function filterScheduleTasks(scheduleTaskItems, failureModeIds, linkedTasks) {
-  if (!failureModeIds.length) return scheduleTaskItems || [];
-  return (scheduleTaskItems || []).filter((task) =>
-    taskMatchesFailureModeSelection(task, failureModeIds, linkedTasks),
+function filterScheduleProgramItems(scheduleProgramItems, failureModeIds, linkedTasks) {
+  if (!failureModeIds.length) return scheduleProgramItems || [];
+  return (scheduleProgramItems || []).filter((row) =>
+    taskMatchesFailureModeSelection(row, failureModeIds, linkedTasks),
   );
 }
 
-function mapScheduleItems(tasks) {
-  return (tasks || []).map((task) => ({
-    id: task.id,
-    name: task.task_name || task.name || "Scheduled task",
+function mapScheduleProgramItems(programs) {
+  return (programs || []).map((row) => ({
+    id: row.id || row.v2_task_id,
+    name: row.task_name || row.name || "Schedule",
   }));
 }
 
@@ -165,6 +165,7 @@ export function buildStrategyFlowNodes({
   selectedFailureModeId,
   selectedFailureModeIds = [],
   selectedTask,
+  scheduleProgramItems,
   scheduleTaskItems,
   strategiesList = [],
 }) {
@@ -202,8 +203,8 @@ export function buildStrategyFlowNodes({
   const activeProgramTasks = strategyIsActive
     ? filterActiveProgramTasks(strategy?.task_templates || [], failureModeStrategies)
     : [];
-  const hasLocalScheduleTasks = scheduleTaskItems !== undefined;
-  const activeScheduleTaskItems = filterActiveScheduleTasks(scheduleTaskItems ?? []);
+  const hasLocalSchedulePrograms = scheduleProgramItems !== undefined;
+  const activeSchedulePrograms = scheduleProgramItems ?? [];
 
   let strategyItems = [];
   let strategyCount = 0;
@@ -243,43 +244,36 @@ export function buildStrategyFlowNodes({
         ?? programItems.length
         ?? 0;
 
-  let scheduleItems = activeScheduleTaskItems;
-  if (selectedTask && isActiveScheduleTask(selectedTask)) {
-    scheduleItems = [
-      {
-        id: selectedTask.id,
-        name: selectedTask.task_name || selectedTask.name || "Scheduled task",
-      },
-    ];
-  } else if (selectedTask) {
-    scheduleItems = [];
-  } else if (hasSelection) {
-    const filteredSchedules = filterActiveScheduleTasks(
-      filterScheduleTasks(activeScheduleTaskItems, failureModeIds, activeLinkedTasks),
+  let scheduleItems = [];
+  let scheduleCount = 0;
+
+  if (hasSelection) {
+    const filteredSchedules = filterScheduleProgramItems(
+      activeSchedulePrograms,
+      failureModeIds,
+      activeLinkedTasks,
     );
     if (filteredSchedules.length) {
-      scheduleItems = filteredSchedules.map((task) => ({
-        id: task.id,
-        name: task.task_name || task.name || "Scheduled task",
-      }));
+      scheduleItems = mapScheduleProgramItems(filteredSchedules);
+      scheduleCount = filteredSchedules.length;
     } else if (activeLinkedTasks.length) {
       scheduleItems = mapTaskItems(activeLinkedTasks);
-    } else {
-      scheduleItems = [];
+      scheduleCount = activeLinkedTasks.length;
     }
+  } else if (hasLocalSchedulePrograms) {
+    scheduleItems = mapScheduleProgramItems(activeSchedulePrograms);
+    scheduleCount = activeSchedulePrograms.length;
   } else {
-    scheduleItems = mapScheduleItems(activeScheduleTaskItems);
+    scheduleCount = stats?.schedules?.for_applied ?? 0;
+    if (scheduleTaskItems?.length) {
+      scheduleItems = (scheduleTaskItems || [])
+        .filter(isActiveScheduleTask)
+        .map((task) => ({
+          id: task.id,
+          name: task.task_name || task.name || "Schedule",
+        }));
+    }
   }
-
-  const scheduleCount = selectedTask
-    ? (isActiveScheduleTask(selectedTask) ? 1 : 0)
-    : hasSelection
-      ? scheduleItems.length
-      : hasLocalScheduleTasks
-        ? activeScheduleTaskItems.length
-        : equipmentTypeId || strategy
-          ? activeScheduleTaskItems.length
-          : stats?.planned_work?.for_applied ?? 0;
 
   const nodes = {
     failure_modes: {

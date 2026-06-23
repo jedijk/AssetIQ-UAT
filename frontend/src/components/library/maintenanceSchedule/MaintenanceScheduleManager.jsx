@@ -66,7 +66,10 @@ import {
   refreshMaintenanceSchedulerQueries,
   maintenanceStrategyV2API,
   equipmentHierarchyAPI,
+  failureModesAPI,
 } from "../../../lib/api";
+import { queryKeys } from "../../../lib/queryKeys";
+import { resolveScheduledTaskRequiresDowntime } from "../../failure-modes/ActionDowntimeBadge";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import { useBreadcrumbTab } from "../../../contexts/BreadcrumbContext";
 import { DashboardCards } from "./DashboardCards";
@@ -199,6 +202,36 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
   });
   const technicians = techniciansData?.technicians || [];
 
+  const { data: libraryFailureModes } = useQuery({
+    queryKey: queryKeys.failureModes.list(),
+    queryFn: () => failureModesAPI.getAll(),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: strategyData } = useQuery({
+    queryKey: ["maintenance-strategy-v2", equipmentTypeId],
+    queryFn: () => maintenanceStrategyV2API.getStrategy(equipmentTypeId),
+    enabled: !!equipmentTypeId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const downtimeContext = useMemo(() => {
+    const libraryFmsById = {};
+    for (const fm of libraryFailureModes?.failure_modes || []) {
+      if (fm?.id) libraryFmsById[String(fm.id)] = fm;
+    }
+    const strategyTemplatesById = {};
+    for (const task of strategyData?.strategy?.task_templates || []) {
+      if (task?.id) strategyTemplatesById[String(task.id)] = task;
+    }
+    return { libraryFmsById, strategyTemplatesById };
+  }, [libraryFailureModes, strategyData]);
+
+  const resolveTaskDowntime = useCallback(
+    (task) => resolveScheduledTaskRequiresDowntime(task, downtimeContext),
+    [downtimeContext],
+  );
+
   // Equipment hierarchy nodes — used to build the Equipment Unit filter
   // and resolve a unit's descendant equipment_ids for client-side filtering.
   const { data: nodesData } = useQuery({
@@ -320,39 +353,37 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
     [tasksData, applyTaskListFilter]
   );
 
-  const scheduleFlowTaskItems = useMemo(() => {
-    const mapTask = (task) => ({
-      id: task.id,
-      name: task.task_name || task.name || "Scheduled task",
-      status: task.status,
-      failure_mode_id: task.failure_mode_id,
-      template_id: task.template_id,
-      strategy_task_id: task.strategy_task_id,
-      task_name: task.task_name,
-    });
-    const fromList = (filteredTasksList || []).map(mapTask);
-    if (fromList.length > 0) return fromList;
+  const { data: schedulableProgramsData } = useQuery({
+    queryKey: ["maintenance-scheduler-programs", equipmentTypeId || "all"],
+    queryFn: () =>
+      maintenanceSchedulerAPI.getPrograms(
+        equipmentTypeId ? { equipment_type_id: equipmentTypeId } : {},
+      ),
+    staleTime: schedulerStaleTime,
+  });
 
-    const fromTimeline = [];
-    const rows = filteredTimeline?.timeline || filteredTimeline?.equipment || [];
-    rows.forEach((row) => {
-      (row.tasks || []).forEach((task) => {
-        fromTimeline.push(mapTask(task));
-      });
-    });
-    return fromTimeline;
-  }, [filteredTasksList, filteredTimeline]);
+  const scheduleFlowProgramItems = useMemo(
+    () =>
+      (schedulableProgramsData?.programs || []).map((row) => ({
+        id: row.id || row.v2_task_id,
+        name: row.task_name,
+        task_name: row.task_name,
+        failure_mode_id: row.failure_mode_id,
+        template_id: row.v2_task_id,
+        strategy_task_id: row.v2_task_id,
+      })),
+    [schedulableProgramsData],
+  );
 
   const flowBarProps = useMemo(
     () => ({
       activeStep: "schedules",
       equipmentTypeId,
       equipmentTypeName,
-      selectedTask,
-      scheduleTaskItems: scheduleFlowTaskItems,
+      scheduleProgramItems: scheduleFlowProgramItems,
       enabled: true,
     }),
-    [equipmentTypeId, equipmentTypeName, selectedTask, scheduleFlowTaskItems],
+    [equipmentTypeId, equipmentTypeName, scheduleFlowProgramItems],
   );
 
   useEffect(() => {
@@ -905,6 +936,7 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
             onViewTask={handleViewTaskFromContext}
             onParentStrategy={handleParentStrategyFromContext}
             onFindEquipment={handleFindEquipmentFromContext}
+            resolveTaskDowntime={resolveTaskDowntime}
           />
         </TabsContent>
 
@@ -914,6 +946,7 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
             equipmentTypeId={equipmentTypeId}
             onTaskClick={handleTaskClick}
             filterTask={filterTask}
+            resolveTaskDowntime={resolveTaskDowntime}
           />
         </TabsContent>
 
@@ -923,6 +956,7 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
             tasks={filteredTasksList} 
             isLoading={tasksLoading}
             onTaskClick={handleTaskClick}
+            resolveTaskDowntime={resolveTaskDowntime}
           />
         </TabsContent>
 
@@ -1132,6 +1166,7 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
           isUpdating={updateTaskMutation.isPending}
           isCompleting={completeTaskMutation.isPending}
           isDeferring={deferTaskMutation.isPending}
+          resolveTaskDowntime={resolveTaskDowntime}
         />
       )}
     </div>
