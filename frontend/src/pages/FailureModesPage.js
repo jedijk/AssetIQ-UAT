@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useIsMobile } from "../hooks/useIsMobile";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueries, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useUndo } from "../contexts/UndoContext";
@@ -84,7 +84,7 @@ import {
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
 import { toast } from "sonner";
-import api, { equipmentHierarchyAPI, failureModesAPI, getErrorMessage } from "../lib/api";
+import api, { equipmentHierarchyAPI, failureModesAPI, getErrorMessage, maintenanceStrategyV2API } from "../lib/api";
 import MaintenanceStrategyTab from "../components/library/MaintenanceStrategyTab";
 import BackButton from "../components/BackButton";
 
@@ -414,6 +414,67 @@ const FailureModesPage = () => {
       name: equipmentTypes.find((et) => et.id === typeId)?.name || typeId,
     }));
   }, [selectedFm, equipmentTypes]);
+
+  const { data: strategiesListData } = useQuery({
+    queryKey: ["maintenance-strategies-v2-list"],
+    queryFn: () => maintenanceStrategyV2API.listStrategies(),
+    staleTime: 60_000,
+  });
+
+  const flowStrategyItems = useMemo(() => {
+    const typeIds = selectedFm?.equipment_type_ids || [];
+    if (!typeIds.length) return [];
+    const strategies = strategiesListData?.strategies || [];
+    const typeIdsWithStrategy = new Set(strategies.map((row) => row.equipment_type_id));
+    return typeIds
+      .filter((typeId) => typeIdsWithStrategy.has(typeId))
+      .map((typeId) => ({
+        id: typeId,
+        name: equipmentTypes.find((et) => et.id === typeId)?.name || typeId,
+      }));
+  }, [selectedFm, strategiesListData, equipmentTypes]);
+
+  const flowContextEquipmentTypeId = useMemo(() => {
+    const typeIds = selectedFm?.equipment_type_ids || [];
+    return typeIds.length === 1 ? typeIds[0] : null;
+  }, [selectedFm]);
+
+  const flowContextEquipmentTypeName = useMemo(() => {
+    if (!flowContextEquipmentTypeId) return null;
+    return equipmentTypes.find((et) => et.id === flowContextEquipmentTypeId)?.name || null;
+  }, [flowContextEquipmentTypeId, equipmentTypes]);
+
+  const linkedStrategyQueries = useQueries({
+    queries: flowStrategyItems.map((item) => ({
+      queryKey: ["maintenance-strategy-v2", item.id],
+      queryFn: () => maintenanceStrategyV2API.getStrategy(item.id),
+      enabled: !!selectedFm && flowStrategyItems.length > 0,
+      staleTime: 30_000,
+    })),
+  });
+
+  const flowMergedStrategy = useMemo(() => {
+    const strategies = linkedStrategyQueries
+      .map((query) => query.data?.strategy)
+      .filter(Boolean);
+    if (!strategies.length) return null;
+
+    const failureModeStrategies = [];
+    const taskTemplates = new Map();
+    strategies.forEach((row) => {
+      (row.failure_mode_strategies || []).forEach((fm) => {
+        failureModeStrategies.push(fm);
+      });
+      (row.task_templates || []).forEach((task) => {
+        taskTemplates.set(String(task.id), task);
+      });
+    });
+
+    return {
+      failure_mode_strategies: failureModeStrategies,
+      task_templates: [...taskTemplates.values()],
+    };
+  }, [linkedStrategyQueries]);
   
   // Calculate connected failure modes count for each equipment type
   const getConnectedFmCount = useCallback(
@@ -1053,8 +1114,12 @@ const FailureModesPage = () => {
           <StrategyIntelligenceFlowBar
             activeStep="failure_modes"
             failureModeItems={flowFailureModeItems}
-            selectedFailureModeId={selectedFm?.id}
+            selectedFailureModeIds={selectedFm ? [selectedFm.id] : []}
             equipmentTypeItems={flowEquipmentTypeItems}
+            equipmentTypeId={flowContextEquipmentTypeId}
+            equipmentTypeName={flowContextEquipmentTypeName}
+            strategyItemsOverride={flowStrategyItems}
+            strategy={flowMergedStrategy}
             enabled
           />
         </TabsContent>

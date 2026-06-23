@@ -1324,10 +1324,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
     [strategy, fmNameMap],
   );
 
-  const flowSelectedFailureModeId = useMemo(() => {
-    if (expandedFMs.size !== 1) return null;
-    return [...expandedFMs][0];
-  }, [expandedFMs]);
+  const flowSelectedFailureModeIds = useMemo(() => [...expandedFMs], [expandedFMs]);
 
   const flowActiveStep = useMemo(() => {
     if (mainView === "schedule") return "schedules";
@@ -1345,7 +1342,7 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
       equipmentTypeName={equipmentTypeName}
       strategy={strategy}
       failureModeItems={flowFailureModeItems}
-      selectedFailureModeId={flowSelectedFailureModeId}
+      selectedFailureModeIds={flowSelectedFailureModeIds}
       enabled={!!equipmentTypeId}
     />
   );
