@@ -30,6 +30,7 @@ import {
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
 import api from "../lib/api";
+import { getDatabaseEnvironment, markDatabaseEnvironmentExplicit } from "../lib/databaseEnv";
 
 export default function SettingsDatabasePage() {
   const { user } = useAuth();
@@ -75,6 +76,7 @@ export default function SettingsDatabasePage() {
       queryClient.invalidateQueries({ queryKey: ["stats"] });
       // Store the preference in localStorage for the frontend
       localStorage.setItem("database_environment", data.environment);
+      markDatabaseEnvironmentExplicit();
       // Reload the page to apply the new database context
       setTimeout(() => {
         window.location.reload();
@@ -102,7 +104,7 @@ export default function SettingsDatabasePage() {
     );
   }
   
-  const currentEnv = localStorage.getItem("database_environment") || databasesData?.current || "production";
+  const currentEnv = getDatabaseEnvironment() || databasesData?.current || "production";
   
   const getEnvIcon = (key) => {
     if (key === "production") return <Shield className="w-5 h-5" />;

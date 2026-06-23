@@ -20,7 +20,7 @@ import {
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 import api from "../lib/api";
-import { getDatabaseEnvironment } from "../lib/databaseEnv";
+import { getDatabaseEnvironment, markDatabaseEnvironmentExplicit } from "../lib/databaseEnv";
 
 const ENV_META = {
   production: { label: "Prod", name: "Production", color: "emerald", icon: Shield },
@@ -51,6 +51,7 @@ export default function DatabaseEnvSwitcher() {
     try {
       await api.post("/system/databases/switch", { environment: target });
       localStorage.setItem("database_environment", target);
+      markDatabaseEnvironmentExplicit();
       setCurrent(target);
       toast.success(`Switched to ${ENV_META[target].name}`, {
         description: "Reloading with new database…",

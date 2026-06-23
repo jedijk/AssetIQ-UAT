@@ -3,7 +3,7 @@ import axios from "axios";
 import { getApiUrl } from "../lib/apiConfig";
 import { updateCachedPreferences, clearCachedPreferences } from "../lib/dateUtils";
 import { clearRolePreviewStorage } from "./RolePreviewContext";
-import { enforceDatabaseEnvironmentForRole } from "../lib/databaseEnv";
+import { enforceDatabaseEnvironmentForRole, getDatabaseEnvironment } from "../lib/databaseEnv";
 import { setCsrfToken, clearCsrfToken } from "../lib/apiConfig";
 import { isPublicKioskPath } from "../lib/publicRoutes";
 import { resetSessionExpiryState } from "../lib/apiClient";
@@ -18,7 +18,7 @@ function getDbEnvHeaders() {
   // Keep auth-related calls consistent with the main API client, which uses this header
   // to select the active database environment (production vs UAT).
   try {
-    const dbEnv = localStorage.getItem("database_environment");
+    const dbEnv = getDatabaseEnvironment();
     return dbEnv ? { "X-Database-Environment": dbEnv } : {};
   } catch (_e) {
     return {};

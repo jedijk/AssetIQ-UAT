@@ -13,6 +13,8 @@
  * You must rebuild after changing env vars in Vercel.
  */
 
+import { getDatabaseEnvironment } from "./databaseEnv";
+
 // Debug flag - set to true to enable console logging
 const DEBUG_API_CONFIG = false;
 
@@ -193,7 +195,7 @@ export const getAuthHeaders = (additionalHeaders = {}, method = "GET") => {
     }
   }
 
-  const dbEnv = localStorage.getItem("database_environment");
+  const dbEnv = getDatabaseEnvironment();
   if (dbEnv) {
     headers["X-Database-Environment"] = dbEnv;
   }
