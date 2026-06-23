@@ -21,7 +21,10 @@ export function getInferredDatabaseEnvironment() {
 /** Clear invalid UAT preference for non-owners after auth (not on UAT deployments). */
 export function enforceDatabaseEnvironmentForRole(role) {
   if (typeof window === "undefined") return;
-  if (isUatHostname()) return;
+  if (isUatHostname()) {
+    localStorage.setItem(DATABASE_ENV_STORAGE_KEY, "uat");
+    return;
+  }
   const stored = getStoredDatabaseEnvironment();
   if (stored === "uat" && role !== "owner") {
     localStorage.setItem(DATABASE_ENV_STORAGE_KEY, "production");
@@ -30,5 +33,8 @@ export function enforceDatabaseEnvironmentForRole(role) {
 
 /** Effective DB env for API calls and UI (stored preference, else inferred default). */
 export function getDatabaseEnvironment() {
+  // UAT deployments must always use the UAT database — a production preference
+  // left in localStorage from the prod site breaks auth after login on UAT.
+  if (isUatHostname()) return "uat";
   return getStoredDatabaseEnvironment() || getInferredDatabaseEnvironment();
 }

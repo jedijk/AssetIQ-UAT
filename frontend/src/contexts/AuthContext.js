@@ -166,7 +166,14 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticating(true);
     
     try {
-      const response = await axios.post(loginUrl, { email, password }, { withCredentials: AUTH_MODE === "cookie" });
+      const response = await axios.post(
+        loginUrl,
+        { email, password },
+        {
+          withCredentials: AUTH_MODE === "cookie",
+          headers: getDbEnvHeaders(),
+        },
+      );
       const { token: newToken, user: userData, must_change_password, csrf_token: csrfToken } = response.data;
 
     if (AUTH_MODE === "bearer") {
