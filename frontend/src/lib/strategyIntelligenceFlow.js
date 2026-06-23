@@ -165,7 +165,7 @@ export function buildStrategyFlowNodes({
   selectedFailureModeId,
   selectedFailureModeIds = [],
   selectedTask,
-  scheduleTaskItems = [],
+  scheduleTaskItems,
   strategiesList = [],
 }) {
   const failureModeIds = resolveSelectedFailureModeIds(
@@ -202,7 +202,8 @@ export function buildStrategyFlowNodes({
   const activeProgramTasks = strategyIsActive
     ? filterActiveProgramTasks(strategy?.task_templates || [], failureModeStrategies)
     : [];
-  const activeScheduleTaskItems = filterActiveScheduleTasks(scheduleTaskItems);
+  const hasLocalScheduleTasks = scheduleTaskItems !== undefined;
+  const activeScheduleTaskItems = filterActiveScheduleTasks(scheduleTaskItems ?? []);
 
   let strategyItems = [];
   let strategyCount = 0;
@@ -274,12 +275,13 @@ export function buildStrategyFlowNodes({
     ? (isActiveScheduleTask(selectedTask) ? 1 : 0)
     : hasSelection
       ? scheduleItems.length
-      : equipmentTypeId || strategy
+      : hasLocalScheduleTasks
         ? activeScheduleTaskItems.length
-        : stats?.planned_work?.for_applied
-          ?? stats?.schedules?.for_applied
-          ?? activeScheduleTaskItems.length
-          ?? 0;
+        : equipmentTypeId || strategy
+          ? activeScheduleTaskItems.length
+          : stats?.planned_work?.for_applied
+            ?? stats?.schedules?.for_applied
+            ?? 0;
 
   const nodes = {
     failure_modes: {

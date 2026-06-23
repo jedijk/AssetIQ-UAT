@@ -106,4 +106,28 @@ describe("buildStrategyFlowNodes", () => {
     expect(nodes.find((node) => node.key === "schedules").count).toBe(1);
     expect(nodes.find((node) => node.key === "schedules").items[0].name).toBe("Open task");
   });
+
+  it("uses local schedule tasks on the schedule page instead of global stats", () => {
+    const nodes = buildStrategyFlowNodes({
+      activeStep: "schedules",
+      scheduleTaskItems: [],
+      stats: {
+        planned_work: { for_applied: 230 },
+        schedules: { for_applied: 230 },
+      },
+    });
+
+    expect(nodes.find((node) => node.key === "schedules").count).toBe(0);
+  });
+
+  it("falls back to global stats when no local schedule tasks are provided", () => {
+    const nodes = buildStrategyFlowNodes({
+      activeStep: "failure_modes",
+      stats: {
+        planned_work: { for_applied: 230 },
+      },
+    });
+
+    expect(nodes.find((node) => node.key === "schedules").count).toBe(230);
+  });
 });

@@ -88,7 +88,7 @@ export default function StrategyIntelligenceFlowBar({
   selectedFailureModeId,
   selectedFailureModeIds = [],
   selectedTask,
-  scheduleTaskItems = [],
+  scheduleTaskItems,
   enabled = true,
   className = "",
 }) {
