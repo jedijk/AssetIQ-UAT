@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://reliability-graph-1.preview.emergentagent.com/api"
+BASE_URL = "https://strategy-fixes-1.preview.emergentagent.com/api"
 TEST_EMAIL = "jedijk@gmail.com"
 TEST_PASSWORD = "Jaap8019@"
 
