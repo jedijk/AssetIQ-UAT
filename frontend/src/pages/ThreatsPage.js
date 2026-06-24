@@ -9,6 +9,7 @@ import {
   prefetchTopObservationWhenIdle,
   schedulePrefetchObservationWorkspace,
 } from "../lib/prefetchObservationWorkspace";
+import { buildObservationDisplayTitle } from "../lib/observationDisplayTitle";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useMobilePageBadge } from "../contexts/BreadcrumbContext";
 import { usePermissions } from "../contexts/PermissionsContext";
@@ -316,6 +317,13 @@ const ThreatsPage = () => {
 
   const displayAssetName = (threat) => threat?.asset_display || threat?.asset || "";
   const displayFailureMode = (threat) => threat?.failure_mode_display || threat?.failure_mode || "";
+  const displayThreatTitle = (threat) =>
+    buildObservationDisplayTitle({
+      equipment:
+        displayAssetName(threat) || threat?.equipment_name || threat?.equipment_type || "",
+      failureMode: displayFailureMode(threat),
+      title: threat?.title || "",
+    });
   
   // Trigger push notifications for high-severity observations
   useNotificationTriggers({
@@ -960,8 +968,7 @@ const ThreatsPage = () => {
 
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-2 sm:line-clamp-1 mb-0.5">
-                        <span className="sm:hidden">{displayFailureMode(threat) || threat.title}</span>
-                        <span className="hidden sm:inline">{threat.title}</span>
+                        {displayThreatTitle(threat)}
                       </h3>
                       {threat.equipment_tag && (
                         <div className="text-xs text-slate-400 font-mono mb-1">{threat.equipment_tag}</div>
@@ -1069,8 +1076,7 @@ const ThreatsPage = () => {
               <div className="flex-1 min-w-0">
                 {/* Mobile: Show failure mode as header, Desktop: Show title */}
                 <h3 className="font-semibold text-slate-900 text-sm sm:text-base line-clamp-2 sm:line-clamp-1 mb-0.5">
-                  <span className="sm:hidden">{displayFailureMode(threat) || threat.title}</span>
-                  <span className="hidden sm:inline">{threat.title}</span>
+                  {displayThreatTitle(threat)}
                 </h3>
                 {/* Tag displayed under title */}
                 {threat.equipment_tag && (

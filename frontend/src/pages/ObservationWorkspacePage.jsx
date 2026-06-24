@@ -84,6 +84,7 @@ import RiskBadge from "../components/RiskBadge";
 import ObservationDetailsSection from "../components/workspace/ObservationDetailsSection";
 import { ALARPCard, ExposureCard, RiskSummaryCard } from "../components/workspace/ExposureCards";
 import { EquipmentReliabilityTimeline } from "../components/workspace/EquipmentReliabilityTimeline";
+import { buildObservationDisplayTitle } from "../lib/observationDisplayTitle";
 import { ReliabilityEvidencePanel } from "../components/reliability/ReliabilityEvidencePanel";
 import { ReliabilityIntelligencePanel } from "../components/workspace/ReliabilityIntelligencePanel";
 import { RecommendedActionsPanel } from "../components/workspace/RecommendedActionsPanel";
@@ -339,16 +340,11 @@ const ObservationWorkspacePage = () => {
   const displayTitle = useMemo(() => {
     const obs = workspace?.observation;
     if (!obs) return "";
-    const equipment = obs.asset || obs.equipment_type || "";
-    const failureMode = obs.failure_mode;
-    
-    // If failure mode is set and is not a generic placeholder, use it
-    if (failureMode && failureMode.trim() && 
-        !["unknown", "not specified", "n/a", "na", "none", "-"].includes(failureMode.toLowerCase().trim())) {
-      return equipment ? `${equipment} - ${failureMode}` : failureMode;
-    }
-    // Otherwise use "Problem" as placeholder
-    return equipment ? `${equipment} - Problem` : obs.title || "Problem";
+    return buildObservationDisplayTitle({
+      equipment: obs.asset || obs.equipment_type || "",
+      failureMode: obs.failure_mode,
+      title: obs.title,
+    });
   }, [workspace?.observation]);
 
   // Loading state

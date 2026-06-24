@@ -6,7 +6,6 @@ import { statsAPI, actionsAPI, investigationAPI, equipmentHierarchyAPI, threatsA
 import { queryKeys } from "../../lib/queryKeys";
 import { formAPI } from "../../components/forms";
 import { useAuth } from "../../contexts/AuthContext";
-import { useEffectiveRole } from "../../contexts/RolePreviewContext";
 import { usePermissions } from "../../contexts/PermissionsContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { getBackendUrl, getAuthHeaders } from "../../lib/apiConfig";
@@ -118,7 +117,6 @@ export default function DashboardPageMain({ initialTab }) {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
-  const { effectiveRole } = useEffectiveRole();
   const { hasPermission, loading: permissionsLoading } = usePermissions();
   const queryClient = useQueryClient();
   const isFetchingAny = useIsFetching() > 0;
@@ -195,13 +193,6 @@ export default function DashboardPageMain({ initialTab }) {
   }, []);
 
   const isOperatorMode = user?.role === "operator" || operatorToggle;
-
-  // Q1 plan: Intelligence Thread is the default home for reliability engineers (desktop).
-  useEffect(() => {
-    if (effectiveRole === "reliability_engineer" && !isOperatorMode && !isMobileViewport) {
-      navigate("/library?tab=intelligence-map", { replace: true });
-    }
-  }, [effectiveRole, isOperatorMode, isMobileViewport, navigate]);
 
   const refreshDashboard = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.stats.all() });
