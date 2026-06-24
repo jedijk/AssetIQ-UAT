@@ -92,6 +92,7 @@ import {
   SelectValue,
 } from "../../ui/select";
 import StrategyIntelligenceFlowBar from "../../intelligence/StrategyIntelligenceFlowBar";
+import { normalizeScheduleProgramRow, resolveThreadSelectionFromTask, matchesScheduleTaskToThreadSelection, matchesThreadSelectionRow } from "../../../lib/strategyIntelligenceFlow";
 
 const SCHEDULE_FILTER_TRIGGER_CLASS =
   "h-full w-full min-h-0 justify-between font-normal px-3 py-0 shadow-none overflow-hidden " +
@@ -113,6 +114,7 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
   const [activeTab, setActiveTab] = useState("timeline");
   const [applyDialogOpen, setApplyDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
+  const [threadSelection, setThreadSelection] = useState(null);
   const [aiPlanOpen, setAiPlanOpen] = useState(false);
   const [aiPlanResult, setAiPlanResult] = useState(null);
   const [selectedAiRecs, setSelectedAiRecs] = useState(new Set());
@@ -284,10 +286,11 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
 
   const filterTask = useCallback((task) => {
     if (!task) return false;
+    if (threadSelection && !matchesScheduleTaskToThreadSelection(task, threadSelection)) return false;
     if (filteredEquipmentIds && !filteredEquipmentIds.has(task.equipment_id)) return false;
     if (!matchesDisciplineFilter(task)) return false;
     return matchesMaintenanceSourceFilter(task, sourceFilter);
-  }, [filteredEquipmentIds, matchesDisciplineFilter, sourceFilter]);
+  }, [threadSelection, filteredEquipmentIds, matchesDisciplineFilter, sourceFilter]);
 
   const applyTaskListFilter = useCallback((items) => {
     if (!Array.isArray(items)) return items;
@@ -364,26 +367,74 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
 
   const scheduleFlowProgramItems = useMemo(
     () =>
-      (schedulableProgramsData?.programs || []).map((row) => ({
-        id: row.id || row.v2_task_id,
-        name: row.task_name,
-        task_name: row.task_name,
-        failure_mode_id: row.failure_mode_id,
-        template_id: row.v2_task_id,
-        strategy_task_id: row.v2_task_id,
-      })),
+      (schedulableProgramsData?.programs || [])
+        .map(normalizeScheduleProgramRow)
+        .filter(Boolean),
     [schedulableProgramsData],
   );
+
+  const scheduleFlowFailureModeItems = useMemo(() => {
+    const strategy = strategyData?.strategy;
+    if (!strategy?.failure_mode_strategies?.length) return [];
+
+    const libraryById = new Map(
+      (libraryFailureModes?.failure_modes || []).map((fm) => [String(fm.id), fm]),
+    );
+
+    return strategy.failure_mode_strategies.map((fm) => ({
+      id: fm.failure_mode_id,
+      name:
+        fm.failure_mode_name ||
+        libraryById.get(String(fm.failure_mode_id))?.failure_mode ||
+        fm.failure_mode_id,
+    }));
+  }, [strategyData, libraryFailureModes]);
+
+  const handleThreadItemSelect = useCallback(
+    (item) => {
+      const row =
+        scheduleFlowProgramItems.find(
+          (candidate) =>
+            String(candidate.id) === String(item.id) ||
+            String(candidate.v2_task_id) === String(item.id),
+        ) || item;
+      setThreadSelection((prev) =>
+        prev && matchesThreadSelectionRow(row, prev) ? null : row,
+      );
+    },
+    [scheduleFlowProgramItems],
+  );
+
+  const handleThreadSelectionClear = useCallback(() => {
+    setThreadSelection(null);
+  }, []);
 
   const flowBarProps = useMemo(
     () => ({
       activeStep: "schedules",
       equipmentTypeId,
       equipmentTypeName,
+      equipmentTypeItems: equipmentTypeId
+        ? [{ id: equipmentTypeId, name: equipmentTypeName || equipmentTypeId }]
+        : [],
+      strategy: strategyData?.strategy,
+      failureModeItems: scheduleFlowFailureModeItems,
       scheduleProgramItems: scheduleFlowProgramItems,
+      threadSelection,
+      onThreadItemSelect: handleThreadItemSelect,
+      onThreadSelectionClear: handleThreadSelectionClear,
       enabled: true,
     }),
-    [equipmentTypeId, equipmentTypeName, scheduleFlowProgramItems],
+    [
+      equipmentTypeId,
+      equipmentTypeName,
+      strategyData?.strategy,
+      scheduleFlowFailureModeItems,
+      scheduleFlowProgramItems,
+      threadSelection,
+      handleThreadItemSelect,
+      handleThreadSelectionClear,
+    ],
   );
 
   useEffect(() => {
@@ -524,7 +575,13 @@ export function MaintenanceScheduleManager({ equipmentType, showIntelligenceFlow
   };
 
   const handleTaskClick = (task) => {
-    setSelectedTask(task);
+    const selection = resolveThreadSelectionFromTask(task, scheduleFlowProgramItems, {
+      equipmentTypeId,
+      equipmentTypeName,
+    });
+    setThreadSelection((prev) =>
+      prev && matchesThreadSelectionRow(selection, prev) ? null : selection,
+    );
   };
 
   const handleViewTaskFromContext = useCallback((row) => {

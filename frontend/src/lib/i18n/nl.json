@@ -2420,7 +2420,16 @@
     "equipmentTypes": "Equipmenttypes",
     "strategies": "Strategieën",
     "programs": "Programma's",
-    "schedules": "Schema's"
+    "schedules": "Schema's",
+    "relationFailureMode": "Storingsmodus:",
+    "relationEquipmentType": "Equipmenttype:",
+    "relationStrategy": "Strategie:",
+    "relationProgram": "Programma:",
+    "relationEquipment": "Equipment:",
+    "linkedSchedules": "Schema's",
+    "moreSchedules": "+{count} extra schema's",
+    "selectedSchedule": "Geselecteerd schema",
+    "clearSelection": "Selectie wissen"
   },
   "taskScheduler": {
     "title": "Taakplanner",

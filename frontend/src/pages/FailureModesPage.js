@@ -404,11 +404,19 @@ const FailureModesPage = () => {
 
   const flowEquipmentTypeItems = useMemo(() => {
     const typeIds = selectedFm?.equipment_type_ids || [];
-    return typeIds.map((typeId) => ({
-      id: typeId,
-      name: equipmentTypes.find((et) => et.id === typeId)?.name || typeId,
-    }));
-  }, [selectedFm, equipmentTypes]);
+    if (typeIds.length) {
+      return typeIds.map((typeId) => ({
+        id: typeId,
+        name: equipmentTypes.find((et) => et.id === typeId)?.name || typeId,
+      }));
+    }
+    return equipmentTypes
+      .filter((et) => inUseEquipmentTypeIds.has(et.id))
+      .map((et) => ({
+        id: et.id,
+        name: et.name || et.id,
+      }));
+  }, [selectedFm, equipmentTypes, inUseEquipmentTypeIds]);
 
   const { data: strategiesListData } = useQuery({
     queryKey: ["maintenance-strategies-v2-list"],

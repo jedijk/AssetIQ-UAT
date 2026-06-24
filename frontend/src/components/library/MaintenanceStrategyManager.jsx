@@ -105,7 +105,10 @@ import {
   AlertDialogTrigger,
 } from "../ui/alert-dialog";
 import { maintenanceStrategyV2API, failureModesAPI } from "../../lib/api";
-import { refreshMaintenanceSchedulerQueries } from "../../lib/apis/maintenanceScheduler";
+import {
+  maintenanceSchedulerAPI,
+  refreshMaintenanceSchedulerQueries,
+} from "../../lib/apis/maintenanceScheduler";
 import { queryKeys } from "../../lib/queryKeys";
 import { DISCIPLINES as FM_DISCIPLINES, DISCIPLINE_COLORS } from "./EquipmentTypeItem";
 import MaintenanceScheduleManager from "./MaintenanceScheduleManager";
@@ -113,6 +116,7 @@ import { useLanguage } from "../../contexts/LanguageContext";
 import { isStrategyTaskHighlighted } from "../../lib/maintenanceScheduleContext";
 import { useFailureModeNameMap, useMaintenanceTaskTemplateMap } from "../../hooks/useTranslatedEntities";
 import StrategyIntelligenceFlowBar from "../intelligence/StrategyIntelligenceFlowBar";
+import { normalizeScheduleProgramRow } from "../../lib/strategyIntelligenceFlow";
 import ActionDowntimeBadge, { resolveTaskRequiresDowntime } from "../failure-modes/ActionDowntimeBadge";
 
 // ============= Constants =============
@@ -1346,6 +1350,24 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
 
   const flowSelectedFailureModeIds = useMemo(() => [...expandedFMs], [expandedFMs]);
 
+  const { data: schedulableProgramsData } = useQuery({
+    queryKey: ["maintenance-scheduler-programs", equipmentTypeId || "all"],
+    queryFn: () =>
+      maintenanceSchedulerAPI.getPrograms(
+        equipmentTypeId ? { equipment_type_id: equipmentTypeId } : {},
+      ),
+    enabled: !!equipmentTypeId,
+    staleTime: 30_000,
+  });
+
+  const scheduleFlowProgramItems = useMemo(
+    () =>
+      (schedulableProgramsData?.programs || [])
+        .map(normalizeScheduleProgramRow)
+        .filter(Boolean),
+    [schedulableProgramsData],
+  );
+
   const flowActiveStep = useMemo(() => {
     if (mainView === "schedule") return "schedules";
     if (activeTab === "overview") {
@@ -1363,6 +1385,8 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
       strategy,
       failureModeItems: flowFailureModeItems,
       selectedFailureModeIds: flowSelectedFailureModeIds,
+      scheduleProgramItems: scheduleFlowProgramItems,
+      preferStrategyScheduleProjection: mainView !== "schedule",
       enabled: !!equipmentTypeId,
     }),
     [
@@ -1372,6 +1396,8 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
       strategy,
       flowFailureModeItems,
       flowSelectedFailureModeIds,
+      scheduleFlowProgramItems,
+      mainView,
     ],
   );
 

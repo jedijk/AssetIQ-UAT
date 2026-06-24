@@ -79,14 +79,24 @@ export function FailureModesEquipmentTypesTab({
   }, [selectedEquipmentType, visibleEquipmentTypes]);
 
   const flowFailureModeItems = useMemo(() => {
-    if (!selectedEquipmentType) return [];
+    if (selectedEquipmentType) {
+      return failureModes
+        .filter((fm) => (fm.equipment_type_ids || []).includes(selectedEquipmentType.id))
+        .map((fm) => ({
+          id: fm.id,
+          name: fm.failure_mode,
+        }));
+    }
+    const visibleIds = new Set(visibleEquipmentTypes.map((type) => type.id));
     return failureModes
-      .filter((fm) => (fm.equipment_type_ids || []).includes(selectedEquipmentType.id))
+      .filter((fm) =>
+        (fm.equipment_type_ids || []).some((typeId) => visibleIds.has(typeId)),
+      )
       .map((fm) => ({
         id: fm.id,
         name: fm.failure_mode,
       }));
-  }, [selectedEquipmentType, failureModes]);
+  }, [selectedEquipmentType, failureModes, visibleEquipmentTypes]);
 
   return (
     <TabsContent value="libraries" className="flex-1 min-h-0 mt-0 flex flex-col overflow-hidden">

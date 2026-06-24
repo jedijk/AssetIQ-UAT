@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -8,11 +8,13 @@ import {
   Layers,
   Loader2,
   Wrench,
+  X,
 } from "lucide-react";
 import { intelligenceMapAPI } from "../../lib/apis/intelligenceMap";
+import { maintenanceSchedulerAPI } from "../../lib/apis/maintenanceScheduler";
 import { maintenanceStrategyV2API } from "../../lib/api";
 import { useLanguage } from "../../contexts/LanguageContext";
-import { buildStrategyFlowNodes } from "../../lib/strategyIntelligenceFlow";
+import { buildStrategyFlowNodes, buildScheduleUpstreamRelations, normalizeScheduleProgramRow } from "../../lib/strategyIntelligenceFlow";
 import {
   HoverCard,
   HoverCardContent,
@@ -27,9 +29,76 @@ const STEP_META = {
   schedules: { icon: Calendar, color: "text-teal-600" },
 };
 
-function FlowNode({ node, label, isLoading }) {
+function RelationRow({ label, value }) {
+  if (!value) return null;
+  return (
+    <div className="flex gap-1.5 text-[10px] leading-snug">
+      <span className="shrink-0 font-medium text-slate-500">{label}</span>
+      <span className="min-w-0 truncate text-slate-700">{value}</span>
+    </div>
+  );
+}
+
+function FlowItemRelations({ item, relationLabels }) {
+  const { relations, relationVariant } = item || {};
+  if (!relations) return null;
+
+  if (relationVariant === "upstream") {
+    return (
+      <div className="mt-1 space-y-0.5 border-t border-slate-100 pt-1">
+        <RelationRow label={relationLabels.failureMode} value={relations.failureMode} />
+        <RelationRow label={relationLabels.equipmentType} value={relations.equipmentType} />
+        <RelationRow label={relationLabels.strategy} value={relations.strategy} />
+        <RelationRow label={relationLabels.program} value={relations.program} />
+        <RelationRow label={relationLabels.equipment} value={relations.equipment} />
+      </div>
+    );
+  }
+
+  if (relationVariant === "downstream" && relations.schedules?.length) {
+    const visible = relations.schedules.slice(0, 4);
+    const remaining = relations.scheduleCount - visible.length;
+    return (
+      <div className="mt-1 border-t border-slate-100 pt-1">
+        <div className="mb-0.5 text-[10px] font-medium text-slate-500">
+          {relationLabels.linkedSchedules}
+        </div>
+        <ul className="space-y-0.5">
+          {visible.map((name) => (
+            <li key={name} className="truncate text-[10px] text-slate-600">
+              {name}
+            </li>
+          ))}
+          {remaining > 0 && (
+            <li className="text-[10px] text-slate-400">
+              {relationLabels.moreSchedules.replace("{count}", String(remaining))}
+            </li>
+          )}
+        </ul>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function FlowNode({
+  node,
+  label,
+  isLoading,
+  relationLabels,
+  showItemRelations,
+  onItemClick,
+  selectedItemId,
+}) {
   const meta = STEP_META[node.key] || STEP_META.failure_modes;
   const Icon = meta.icon;
+  const hoverItems =
+    node.items?.length > 0
+      ? node.items
+      : (node.count ?? 0) > 0
+        ? [{ id: "__summary__", name: `${(node.count ?? 0).toLocaleString()} ${label}` }]
+        : [];
 
   const trigger = (
     <div
@@ -60,7 +129,7 @@ function FlowNode({ node, label, isLoading }) {
     </div>
   );
 
-  if (!node.items?.length) {
+  if (!hoverItems.length) {
     return trigger;
   }
 
@@ -71,14 +140,53 @@ function FlowNode({ node, label, isLoading }) {
           {trigger}
         </button>
       </HoverCardTrigger>
-      <HoverCardContent side="top" className="w-60 p-2.5">
+      <HoverCardContent side="top" className={showItemRelations ? "w-72 p-2.5" : "w-60 p-2.5"}>
         <p className="mb-1 text-xs font-semibold text-slate-700">{label}</p>
-        <ul className="max-h-36 space-y-0.5 overflow-y-auto text-xs text-slate-600">
-          {node.items.map((item) => (
-            <li key={`${node.key}-${item.id}`} className="truncate">
-              {item.name}
-            </li>
-          ))}
+        <ul className="max-h-48 space-y-1 overflow-y-auto text-xs text-slate-600">
+          {hoverItems.map((item) => {
+            const isSummary = item.id === "__summary__";
+            const isSelected =
+              selectedItemId &&
+              item.id &&
+              String(item.id) === String(selectedItemId);
+            const isClickable = !!onItemClick && !isSummary;
+
+            const content = (
+              <>
+                <div className="truncate font-medium text-slate-800">{item.name}</div>
+                {showItemRelations && (
+                  <FlowItemRelations item={item} relationLabels={relationLabels} />
+                )}
+              </>
+            );
+
+            if (!isClickable) {
+              return (
+                <li
+                  key={`${node.key}-${item.id}`}
+                  className={`rounded-md px-2 py-1.5 ${
+                    isSelected ? "bg-blue-50 ring-1 ring-blue-200" : "bg-slate-50"
+                  }`}
+                >
+                  {content}
+                </li>
+              );
+            }
+
+            return (
+              <li key={`${node.key}-${item.id}`}>
+                <button
+                  type="button"
+                  className={`w-full rounded-md px-2 py-1.5 text-left transition-colors hover:bg-blue-50 ${
+                    isSelected ? "bg-blue-50 ring-1 ring-blue-200" : "bg-slate-50"
+                  }`}
+                  onClick={() => onItemClick(item, node.key)}
+                >
+                  {content}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       </HoverCardContent>
     </HoverCard>
@@ -99,6 +207,10 @@ export default function StrategyIntelligenceFlowBar({
   scheduleProgramItems,
   scheduleTaskItems,
   enabled = true,
+  preferStrategyScheduleProjection = false,
+  threadSelection = null,
+  onThreadItemSelect,
+  onThreadSelectionClear,
   className = "",
 }) {
   const { t } = useLanguage();
@@ -133,6 +245,26 @@ export default function StrategyIntelligenceFlowBar({
     staleTime: 30_000,
   });
 
+  const shouldFetchSchedulePrograms = enabled && scheduleProgramItems === undefined;
+
+  const { data: schedulableProgramsData } = useQuery({
+    queryKey: ["maintenance-scheduler-programs", equipmentTypeId || "all"],
+    queryFn: () =>
+      maintenanceSchedulerAPI.getPrograms(
+        equipmentTypeId ? { equipment_type_id: equipmentTypeId } : {},
+      ),
+    enabled: shouldFetchSchedulePrograms,
+    staleTime: 30_000,
+  });
+
+  const resolvedScheduleProgramItems = useMemo(() => {
+    if (scheduleProgramItems !== undefined) return scheduleProgramItems;
+    const fetched = (schedulableProgramsData?.programs || [])
+      .map(normalizeScheduleProgramRow)
+      .filter(Boolean);
+    return fetched.length ? fetched : undefined;
+  }, [scheduleProgramItems, schedulableProgramsData]);
+
   const nodes = useMemo(
     () =>
       buildStrategyFlowNodes({
@@ -147,9 +279,11 @@ export default function StrategyIntelligenceFlowBar({
         selectedFailureModeId,
         selectedFailureModeIds,
         selectedTask,
-        scheduleProgramItems,
+        scheduleProgramItems: resolvedScheduleProgramItems,
         scheduleTaskItems,
         strategiesList: strategiesListData?.strategies || [],
+        preferStrategyScheduleProjection,
+        threadSelection,
       }),
     [
       stats,
@@ -163,10 +297,36 @@ export default function StrategyIntelligenceFlowBar({
       selectedFailureModeId,
       selectedFailureModeIds,
       selectedTask,
-      scheduleProgramItems,
+      resolvedScheduleProgramItems,
       scheduleTaskItems,
       strategiesListData?.strategies,
+      preferStrategyScheduleProjection,
+      threadSelection,
     ],
+  );
+
+  const threadSelectionRelations = useMemo(() => {
+    if (!threadSelection) return null;
+    return (
+      buildScheduleUpstreamRelations(threadSelection) || {
+        failureMode: threadSelection.failure_mode_name || threadSelection.failure_mode_id,
+        equipmentType: threadSelection.equipment_type_name || threadSelection.equipment_type_id,
+        strategy: threadSelection.strategy_id,
+        program: threadSelection.equipment_name || threadSelection.equipment_tag,
+        equipment: threadSelection.equipment_name || threadSelection.equipment_tag,
+      }
+    );
+  }, [threadSelection]);
+
+  const selectedScheduleItemId =
+    threadSelection?.id || threadSelection?.v2_task_id || null;
+
+  const handleFlowItemClick = useCallback(
+    (item, nodeKey) => {
+      if (!onThreadItemSelect || nodeKey !== "schedules") return;
+      onThreadItemSelect(item);
+    },
+    [onThreadItemSelect],
   );
 
   const labels = {
@@ -176,6 +336,18 @@ export default function StrategyIntelligenceFlowBar({
     programs: t("strategyIntelligenceFlow.programs"),
     schedules: t("strategyIntelligenceFlow.schedules"),
   };
+
+  const relationLabels = {
+    failureMode: t("strategyIntelligenceFlow.relationFailureMode"),
+    equipmentType: t("strategyIntelligenceFlow.relationEquipmentType"),
+    strategy: t("strategyIntelligenceFlow.relationStrategy"),
+    program: t("strategyIntelligenceFlow.relationProgram"),
+    equipment: t("strategyIntelligenceFlow.relationEquipment"),
+    linkedSchedules: t("strategyIntelligenceFlow.linkedSchedules"),
+    moreSchedules: t("strategyIntelligenceFlow.moreSchedules"),
+  };
+
+  const showItemRelations = activeStep === "schedules";
 
   if (!enabled) return null;
 
@@ -203,6 +375,10 @@ export default function StrategyIntelligenceFlowBar({
                 node={node}
                 label={labels[node.key]}
                 isLoading={isLoading}
+                relationLabels={relationLabels}
+                showItemRelations={showItemRelations}
+                onItemClick={activeStep === "schedules" ? handleFlowItemClick : undefined}
+                selectedItemId={node.key === "schedules" ? selectedScheduleItemId : null}
               />
               {index < nodes.length - 1 && (
                 <div
@@ -217,6 +393,42 @@ export default function StrategyIntelligenceFlowBar({
           ))}
         </div>
       </div>
+
+      {threadSelection && threadSelectionRelations && (
+        <div
+          className="mt-1.5 rounded-md border border-blue-100 bg-blue-50/60 px-2.5 py-2"
+          data-testid="thread-selection-details"
+        >
+          <div className="mb-1 flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-xs font-semibold text-blue-900">
+                {threadSelection.task_name || threadSelection.name || t("strategyIntelligenceFlow.selectedSchedule")}
+              </p>
+              {threadSelection.equipment_tag && (
+                <p className="truncate text-[10px] text-blue-700/80">{threadSelection.equipment_tag}</p>
+              )}
+            </div>
+            {onThreadSelectionClear && (
+              <button
+                type="button"
+                className="shrink-0 rounded p-0.5 text-blue-600 hover:bg-blue-100"
+                onClick={onThreadSelectionClear}
+                title={t("strategyIntelligenceFlow.clearSelection")}
+                data-testid="thread-selection-clear"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="space-y-0.5">
+            <RelationRow label={relationLabels.failureMode} value={threadSelectionRelations.failureMode} />
+            <RelationRow label={relationLabels.equipmentType} value={threadSelectionRelations.equipmentType} />
+            <RelationRow label={relationLabels.strategy} value={threadSelectionRelations.strategy} />
+            <RelationRow label={relationLabels.program} value={threadSelectionRelations.program} />
+            <RelationRow label={relationLabels.equipment} value={threadSelectionRelations.equipment} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

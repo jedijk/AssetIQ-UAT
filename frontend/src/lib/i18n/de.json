@@ -2419,7 +2419,16 @@
     "equipmentTypes": "Equipmenttypen",
     "strategies": "Strategien",
     "programs": "Programme",
-    "schedules": "Pläne"
+    "schedules": "Pläne",
+    "relationFailureMode": "Fehlermodus:",
+    "relationEquipmentType": "Equipmenttyp:",
+    "relationStrategy": "Strategie:",
+    "relationProgram": "Programm:",
+    "relationEquipment": "Equipment:",
+    "linkedSchedules": "Pläne",
+    "moreSchedules": "+{count} weitere Pläne",
+    "selectedSchedule": "Ausgewählter Plan",
+    "clearSelection": "Auswahl aufheben"
   },
   "taskScheduler": {
     "title": "Aufgabenplaner",
