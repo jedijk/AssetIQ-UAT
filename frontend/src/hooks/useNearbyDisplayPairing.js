@@ -38,8 +38,10 @@ export function useNearbyDisplayPairing({ enabled }) {
     }
 
     let cancelled = false;
+    let endpointUnavailable = false;
 
     const poll = async () => {
+      if (endpointUnavailable) return;
       try {
         if (!subnetRef.current) {
           subnetRef.current = await detectLocalSubnet();
@@ -58,7 +60,11 @@ export function useNearbyDisplayPairing({ enabled }) {
         if (emptyPollStreakRef.current >= EMPTY_CLEAR_POLLS) {
           setNearby(null);
         }
-      } catch {
+      } catch (err) {
+        if (err?.response?.status === 404) {
+          endpointUnavailable = true;
+          return;
+        }
         /* Keep last known pairing — transient network/API errors should not hide the prompt. */
       }
     };

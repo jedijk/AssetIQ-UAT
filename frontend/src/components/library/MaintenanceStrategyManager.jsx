@@ -1715,8 +1715,16 @@ const MaintenanceStrategyManager = ({ equipmentType, onViewInFMEA, strategyHighl
       setStrategyDisableImpactLoading(true);
       try {
         const impact = await maintenanceStrategyV2API.getStrategyDisableImpact(equipmentTypeId);
+        if (!impact?.has_impact) {
+          updateStrategyMutation.mutate({ status: "disabled" });
+          return;
+        }
         setStrategyDisableConfirm(impact);
       } catch (err) {
+        if (err.response?.status === 404) {
+          updateStrategyMutation.mutate({ status: "disabled" });
+          return;
+        }
         toast.error(
           err.response?.data?.detail || t("maintenance.strategyDisableImpactCheckFailed"),
         );

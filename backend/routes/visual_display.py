@@ -61,18 +61,6 @@ async def request_pairing(http_request: Request, request: RequestPairingRequest)
     )
 
 
-@router.get("/pairing/{pair_code}/status", response_model=PairingStatusResponse)
-async def pairing_status(
-    pair_code: str,
-    device_fingerprint: str = Query(..., min_length=8),
-):
-    """Device polls until administrator completes pairing."""
-    return await pairing_svc.poll_pairing_status(
-        pair_code,
-        device_fingerprint=device_fingerprint,
-    )
-
-
 @router.get("/pairing/nearby", response_model=NearbyPairingsResponse)
 async def nearby_pairings(
     http_request: Request,
@@ -85,15 +73,6 @@ async def nearby_pairings(
         viewer_ip=extract_client_ip(http_request),
         viewer_subnet=normalize_local_subnet(local_subnet),
     )
-
-
-@router.get("/pairing/{pair_code}", response_model=PairingPreviewResponse)
-async def preview_pairing(
-    pair_code: str,
-    current_user: dict = Depends(_vmb_admin),
-):
-    """Admin preview of a pending pairing request."""
-    return await pairing_svc.get_pairing_preview(pair_code)
 
 
 @router.post("/pairing/complete", response_model=CompletePairingResponse)
@@ -111,6 +90,27 @@ async def complete_pairing(
         database_environment=request.database_environment,
         user=current_user,
     )
+
+
+@router.get("/pairing/{pair_code}/status", response_model=PairingStatusResponse)
+async def pairing_status(
+    pair_code: str,
+    device_fingerprint: str = Query(..., min_length=8),
+):
+    """Device polls until administrator completes pairing."""
+    return await pairing_svc.poll_pairing_status(
+        pair_code,
+        device_fingerprint=device_fingerprint,
+    )
+
+
+@router.get("/pairing/{pair_code}", response_model=PairingPreviewResponse)
+async def preview_pairing(
+    pair_code: str,
+    current_user: dict = Depends(_vmb_admin),
+):
+    """Admin preview of a pending pairing request."""
+    return await pairing_svc.get_pairing_preview(pair_code)
 
 
 @router.get("/pairing-boards")

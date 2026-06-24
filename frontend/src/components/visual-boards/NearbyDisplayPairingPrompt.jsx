@@ -47,7 +47,7 @@ function TvHero({ pairCode, resolution }) {
 export default function NearbyDisplayPairingPrompt() {
   const { user } = useAuth();
   const { hasPermission } = usePermissions();
-  const canPair = !!user && hasPermission("visual_boards", "admin");
+  const canPair = !!user && (hasPermission("visual_boards", "write") || hasPermission("visual_boards", "delete"));
   const { nearby, dismiss } = useNearbyDisplayPairing({ enabled: canPair });
   const queryClient = useQueryClient();
   const dbEnv = getDatabaseEnvironment();

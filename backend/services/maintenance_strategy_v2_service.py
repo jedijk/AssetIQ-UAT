@@ -477,7 +477,12 @@ async def get_strategy_disable_impact(
         "equipment_type_id": equipment_type_id
     })
     if not strategy:
-        raise HTTPException(status_code=404, detail="Strategy not found")
+        return {
+            "equipment_type_id": equipment_type_id,
+            "active_program_count": 0,
+            "open_scheduled_tasks_count": 0,
+            "has_impact": False,
+        }
 
     active_program_count = await count_active_programs_for_strategy(equipment_type_id)
     open_scheduled_tasks_count = await count_open_scheduled_tasks_for_strategy(
