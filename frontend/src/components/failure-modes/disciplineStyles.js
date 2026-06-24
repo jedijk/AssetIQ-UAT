@@ -1,23 +1,25 @@
 import {
-  AlertTriangle,
+  Box,
   Cog,
-  Zap,
-  Thermometer,
-  Activity,
-  Shield,
+  FlaskConical,
+  Gauge,
   Leaf,
+  Minimize2,
+  Pipette,
+  Shield,
+  Zap,
 } from "lucide-react";
 
 export const disciplineIcons = {
   Rotating: Cog,
-  Static: Thermometer,
-  Piping: Activity,
-  Instrumentation: Zap,
+  Static: Box,
+  Piping: Pipette,
+  Instrumentation: Gauge,
   Electrical: Zap,
-  Process: Activity,
+  Process: FlaskConical,
   Safety: Shield,
   Environment: Leaf,
-  Extruder: Cog,
+  Extruder: Minimize2,
 };
 
 export const disciplineColors = {

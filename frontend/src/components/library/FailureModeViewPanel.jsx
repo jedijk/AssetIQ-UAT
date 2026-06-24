@@ -4,10 +4,12 @@ import { formatDate } from "../../lib/dateUtils";
 import { 
   AlertTriangle, Edit, Trash2, X, Plus, Link, CheckCircle, 
   User, Briefcase, Calendar, History, RotateCcw, Clock, ShieldCheck,
-  Cog, Thermometer, Activity, Zap, Shield, Leaf, Maximize2, Minimize2, Image, Search,
+  Maximize2, Minimize2, Image, Search,
   Wand2,
   Tags,
 } from "lucide-react";
+import { disciplineColors } from "../failure-modes/disciplineStyles";
+import { getFailureModeCategory, getFailureModeIcon } from "../failure-modes/failureModeIcons";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Badge } from "../ui/badge";
@@ -29,31 +31,6 @@ function translateDiscipline(name, t) {
   if (translated && translated !== `disciplines.${name}`) return translated;
   return name;
 }
-
-const disciplineIcons = {
-  Rotating: Cog,
-  Static: Thermometer,
-  Piping: Activity,
-  Instrumentation: Zap,
-  Electrical: Zap,
-  Process: Activity,
-  Safety: Shield,
-  Environment: Leaf,
-  Extruder: Cog,
-};
-
-const disciplineColors = {
-  Rotating: "bg-blue-100 text-blue-700 border-blue-200",
-  Static: "bg-purple-100 text-purple-700 border-purple-200",
-  Piping: "bg-orange-100 text-orange-700 border-orange-200",
-  Instrumentation: "bg-cyan-100 text-cyan-700 border-cyan-200",
-  Electrical: "bg-yellow-100 text-yellow-700 border-yellow-200",
-  Process: "bg-slate-100 text-slate-700 border-slate-200",
-  Safety: "bg-red-100 text-red-700 border-red-200",
-  Environment: "bg-green-100 text-green-700 border-green-200",
-  Extruder: "bg-indigo-100 text-indigo-700 border-indigo-200",
-};
-
 const DISCIPLINE_OPTIONS = [
   { value: "mechanical", label: "Mechanical" },
   { value: "electrical", label: "Electrical" },
@@ -94,8 +71,9 @@ export function FailureModeViewPanel({
   isFullscreen = false,
   onToggleFullscreen,
 }) {
-  const Icon = disciplineIcons[fm?.discipline] || AlertTriangle;
-  const colors = disciplineColors[fm?.discipline] || "bg-slate-100 text-slate-700 border-slate-200";
+  const category = getFailureModeCategory(fm);
+  const Icon = getFailureModeIcon(fm);
+  const colors = disciplineColors[category] || "bg-slate-100 text-slate-700 border-slate-200";
   
   // Local state for adding keywords/actions in edit mode
   const [keywordInput, setKeywordInput] = useState("");
@@ -330,7 +308,7 @@ export function FailureModeViewPanel({
             <>
               <h2 className="font-semibold text-slate-900 text-lg truncate">{fm.failure_mode}</h2>
               <div className="flex items-center gap-2 text-sm text-slate-500">
-                <span>{translateDiscipline(fm.discipline, t)}</span>
+                <span>{translateDiscipline(category, t)}</span>
                 {fm.version && (
                   <Badge variant="outline" className="text-xs py-0 px-1.5">
                     v{fm.version}

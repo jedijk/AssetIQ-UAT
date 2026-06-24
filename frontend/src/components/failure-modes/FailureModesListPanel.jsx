@@ -29,7 +29,8 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { DISCIPLINES } from "../library";
-import { disciplineIcons, disciplineColors } from "./disciplineStyles";
+import { disciplineColors } from "./disciplineStyles";
+import { getFailureModeCategory, getFailureModeIcon } from "./failureModeIcons";
 
 export function FailureModesListPanel({
   t,
@@ -280,8 +281,9 @@ export function FailureModesListPanel({
         ) : (
           <div className="flex-1 min-h-0 space-y-2 overflow-y-auto pr-2" data-testid="failure-modes-list">
             {displayedFailureModes.map((fm, idx) => {
-              const Icon = disciplineIcons[fm.discipline] || AlertTriangle;
-              const colors = disciplineColors[fm.discipline] || "bg-slate-100 text-slate-700";
+              const category = getFailureModeCategory(fm);
+              const Icon = getFailureModeIcon(fm);
+              const colors = disciplineColors[category] || "bg-slate-100 text-slate-700";
               const isSelected = selectedFm?.id === fm.id;
 
               return (
@@ -304,9 +306,9 @@ export function FailureModesListPanel({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
                       <Badge className={`${colors} text-xs px-1.5 py-0`}>
-                        {t(`disciplines.${fm.discipline}`) !== `disciplines.${fm.discipline}`
-                          ? t(`disciplines.${fm.discipline}`)
-                          : fm.discipline}
+                        {t(`disciplines.${category}`) !== `disciplines.${category}`
+                          ? t(`disciplines.${category}`)
+                          : category}
                       </Badge>
                       {fm.failure_mode_type === "customer_specific" && (
                         <Badge className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0">
