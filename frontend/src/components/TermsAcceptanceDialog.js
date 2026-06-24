@@ -20,6 +20,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  dialogSizeClass,
 } from "./ui/dialog";
 import {
   Accordion,
@@ -97,7 +98,7 @@ export default function TermsAcceptanceDialog({
   return (
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent
-        className="w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] max-w-3xl max-h-[95dvh] sm:max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden rounded-xl"
+        className={`${dialogSizeClass.lg} max-h-[95dvh] sm:max-h-[90vh] p-0 gap-0 flex flex-col overflow-hidden rounded-xl`}
         data-testid="terms-acceptance-dialog"
       >
         <DialogHeader className="px-4 sm:px-6 pt-5 pb-3 flex-shrink-0 border-b">

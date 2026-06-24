@@ -1680,7 +1680,7 @@ export default function EquipmentManagerPage() {
       
       {/* Maintenance Program Dialog */}
       <Dialog open={maintenanceProgramDialog.open} onOpenChange={(open) => setMaintenanceProgramDialog({ open, node: open ? maintenanceProgramDialog.node : null })}>
-        <DialogContent className="max-w-4xl w-[calc(100%-0.5rem)] max-h-[min(92dvh,100%)] sm:max-h-[85vh] overflow-hidden overflow-x-hidden flex flex-col gap-1 sm:gap-4 p-2 sm:p-6">
+        <DialogContent className="max-w-4xl max-h-[min(92dvh,100%)] sm:max-h-[85vh] overflow-hidden overflow-x-hidden flex flex-col gap-1 sm:gap-4 p-2 sm:p-6">
           <DialogHeader className="flex-shrink-0 pr-8 max-sm:space-y-0.5">
             <DialogTitle className="flex items-center gap-1.5 text-sm sm:text-lg">
               <ClipboardList className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />

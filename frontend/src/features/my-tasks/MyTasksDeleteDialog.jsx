@@ -12,7 +12,7 @@ import { Loader2, Trash2 } from "lucide-react";
 export function MyTasksDeleteDialog({ deleteTaskData, deleteMutation, setDeleteTaskData }) {
   return (
     <Dialog open={!!deleteTaskData} onOpenChange={(open) => !open && setDeleteTaskData(null)}>
-      <DialogContent className="sm:max-w-md max-w-[calc(100vw-2rem)] mx-4">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-base sm:text-lg">
             Delete {deleteTaskData?.source_type === "action" ? "Action" : "Task"}

@@ -724,21 +724,7 @@ button:active:not(:disabled), [role="button"]:active:not(:disabled), .btn:active
     }
 }
 
-/* Dialog/Modal Animation */
-[data-state="open"][role="dialog"] {
-    animation: dialogIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes dialogIn {
-    from {
-        opacity: 0;
-        transform: translate(-50%, -48%) scale(0.96);
-    }
-    to {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1);
-    }
-}
+/* Dialog zoom/fade handled by Tailwind animate-in on ui/dialog components. */
 
 /* Dropdown Menu Animation */
 [data-state="open"][data-radix-popper-content-wrapper] {

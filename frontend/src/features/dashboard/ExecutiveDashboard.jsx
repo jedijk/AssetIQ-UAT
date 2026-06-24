@@ -43,6 +43,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  dialogSizeClass,
 } from "../../components/ui/dialog";
 import {
   HoverCard,
@@ -578,7 +579,7 @@ const EvidencePanel = ({ isOpen, onClose, title, evidence, evidenceType }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[calc(100vw-1.5rem)] max-w-2xl max-h-[85vh] overflow-y-auto p-4 sm:p-6">
+      <DialogContent className={`${dialogSizeClass.md} max-h-[85vh] overflow-y-auto p-4 sm:p-6`}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-orange-500" />

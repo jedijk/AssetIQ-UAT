@@ -7,7 +7,7 @@ export function DashboardQuickViewModal(props) {
       <Dialog open={!!quickViewSubmission || loadingQuickView} onOpenChange={() => { setQuickViewSubmission(null); setLoadingQuickView(false); }}>
         <DialogContent
           showCloseButton={false}
-          className="w-[95vw] max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl"
+          className={`${dialogSizeClass.md} max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden rounded-2xl`}
         >
           {/* Header */}
           <div className="flex items-center border-b border-slate-100 px-3 py-2.5 sm:px-4 sm:py-3 flex-shrink-0">

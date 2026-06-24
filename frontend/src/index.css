@@ -356,10 +356,10 @@
         border-radius: 0.75rem;
     }
     
-    /* Dialog full width on mobile */
-    [role="dialog"] {
-        max-width: calc(100vw - 2rem) !important;
-        margin: 1rem;
+    /* Dialogs: never add margin on fixed modals — it breaks horizontal centering. */
+    [role="dialog"]:not([data-dialog-layout="fullscreen"]),
+    [role="alertdialog"] {
+        margin: 0 !important;
     }
     
     /* Touch-friendly tap targets (tour progress dots use their own compact hit areas) */

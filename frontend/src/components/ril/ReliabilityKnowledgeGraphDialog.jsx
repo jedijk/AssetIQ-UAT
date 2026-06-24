@@ -320,6 +320,7 @@ export default function ReliabilityKnowledgeGraphDialog({
     >
       <DialogContent
         className="fixed inset-0 left-0 top-0 z-[100] !flex h-[100dvh] w-screen max-h-none max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-x-hidden overflow-y-auto overscroll-y-contain touch-pan-y rounded-none border-0 p-0"
+        data-dialog-layout="fullscreen"
         data-testid="reliability-knowledge-graph-dialog"
       >
         <div className="sticky top-0 z-10 shrink-0 border-b border-slate-200 bg-background px-4 py-4 sm:px-6">

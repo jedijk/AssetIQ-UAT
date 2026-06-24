@@ -7,7 +7,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "../../../components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle, dialogSizeClass,
 } from "../../../components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -103,7 +103,7 @@ export function ProductionDashboardModals({
 
       {/* ── Edit Log Entry Dialog ── */}
       <Dialog open={!!editEntry} onOpenChange={(open) => { if (!open) setEditEntry(null); }}>
-        <DialogContent className="max-w-lg w-[95vw] max-h-[90vh] overflow-hidden flex flex-col" data-testid="edit-entry-dialog">
+        <DialogContent className={`${dialogSizeClass.sm} max-h-[90vh] overflow-hidden flex flex-col`} data-testid="edit-entry-dialog">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>{editEntry?._viscosity_only ? `Edit Viscosity — ${editEntry?.time}` : `Edit Log Entry — ${editEntry?.time}`}</DialogTitle>
           </DialogHeader>
