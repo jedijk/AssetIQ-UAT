@@ -27,7 +27,7 @@ import {
 } from "./layout/layoutNavConfig";
 
 // App version - automatically read from package.json via REACT_APP_VERSION
-const APP_VERSION = process.env.REACT_APP_VERSION || "3.7.6";
+const APP_VERSION = process.env.REACT_APP_VERSION || "3.7.7";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,

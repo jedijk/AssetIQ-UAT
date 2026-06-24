@@ -68,7 +68,7 @@ function sectionMatchesQuery(section, query, t) {
   );
 }
 
-const APP_VERSION = process.env.REACT_APP_VERSION || "3.7.6";
+const APP_VERSION = process.env.REACT_APP_VERSION || "3.7.7";
 
 // Settings sections configuration
 const SETTINGS_SECTIONS = [

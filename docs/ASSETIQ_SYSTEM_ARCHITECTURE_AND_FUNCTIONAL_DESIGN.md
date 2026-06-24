@@ -322,7 +322,7 @@ Features grouped by module. **Implemented** = routable UI + backend handler pres
 | Charts | Recharts, D3 (sankey) | `package.json` |
 | Motion | Framer Motion (reduced on iOS) | `App.js` `MotionWithCapabilities` |
 | i18n | Dot-key JSON (en/nl/de) | `LanguageContext` |
-| Version | 3.7.6 (synced with API) | `package.json`, `server.py` `APP_VERSION` |
+| Version | 3.7.7 (synced with API) | `package.json`, `server.py` `APP_VERSION` |
 
 ### Folder structure
 
@@ -1010,7 +1010,7 @@ AssetIQ is a **multi-tenant industrial reliability platform** that unifies:
 | Scalability | Monolith + Mongo; snapshot materialization; separate outbox/worker deployables (`railway.worker.toml`, `railway.outbox.toml`) |
 | Security | RBAC, CSRF, audit, GDPR routes; tenant wave in progress |
 | Maintainability | Architecture convergence CI; repository pattern for core domains |
-| Versioning | App 3.7.6; FM versioning; API version in health endpoint |
+| Versioning | App 3.7.7; FM versioning; API version in health endpoint |
 
 ### Rebuild checklist (for a new team)
 
