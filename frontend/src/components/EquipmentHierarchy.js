@@ -471,7 +471,7 @@ function EquipmentDetailsDialog({ open, onClose, node, config, critColor, t, get
   return (
     <>
     <Dialog open={open && !previewFile} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="!left-0 !right-0 !translate-x-0 mx-auto w-[calc(100%-2rem)] max-w-sm sm:max-w-md max-h-[85vh] flex flex-col p-0 overflow-hidden" data-testid="equipment-details-dialog">
+      <DialogContent className="max-w-sm sm:max-w-md max-h-[85vh] flex flex-col p-0 overflow-hidden" data-testid="equipment-details-dialog">
         <DialogHeader className="px-4 pt-4 sm:px-6 sm:pt-6 pb-2">
           <div className="flex items-start gap-3">
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
