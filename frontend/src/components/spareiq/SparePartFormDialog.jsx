@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLanguage } from "../../contexts/LanguageContext";
 
-import { equipmentAPI } from "../../lib/apis/equipment";
+import { equipmentHierarchyAPI } from "../../lib/apis/equipment";
 import { Button } from "../ui/button";
 import {
   Dialog,
@@ -47,7 +47,7 @@ export default function SparePartFormDialog({
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    equipmentAPI.getNodes().then((res) => {
+    equipmentHierarchyAPI.getNodes().then((res) => {
       if (!cancelled) {
         const nodes = Array.isArray(res) ? res : res?.nodes || [];
         setEquipmentNodes(
