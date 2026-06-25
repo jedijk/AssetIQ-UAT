@@ -115,6 +115,8 @@ export const usePageTracking = () => {
   const { user } = useAuth();
   const lastPathRef = useRef(null);
   const pageStartTimeRef = useRef(null);
+  const userRef = useRef(user);
+  userRef.current = user;
   
   useEffect(() => {
     if (!user) return;
@@ -155,9 +157,10 @@ export const usePageTracking = () => {
     
   }, [location.pathname, user]);
   
-  // Track page duration on unmount
+  // Track page duration on unmount (skip when logged out — avoids 401 noise after logout)
   useEffect(() => {
     return () => {
+      if (!userRef.current) return;
       if (lastPathRef.current && pageStartTimeRef.current) {
         const duration = Math.round((Date.now() - pageStartTimeRef.current) / 1000);
         if (duration > 1) {

@@ -1373,10 +1373,7 @@ export const PMImportWizard = ({ isOpen, onClose, onImportComplete }) => {
                   variant="ghost"
                   size="sm"
                   className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                  onClick={() => {
-                    const backendUrl = import.meta.env.REACT_APP_BACKEND_URL || process.env.REACT_APP_BACKEND_URL || '';
-                    window.open(`${backendUrl}/api/pm-import/template`, '_blank');
-                  }}
+                  onClick={() => pmImportAPI.downloadTemplate().catch(() => toast.error(t("library.pmImportUploadFailed")))}
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Download Excel Template

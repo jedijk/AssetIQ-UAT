@@ -26,6 +26,19 @@ function toApiPath(url) {
   return path;
 }
 
+/** Trigger a browser download for a Blob (authenticated API responses). */
+export function triggerBlobDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 export async function fetchDocumentBlob(url) {
   const path = toApiPath(url);
   if (!path) {

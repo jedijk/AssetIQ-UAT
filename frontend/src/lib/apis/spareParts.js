@@ -1,5 +1,5 @@
 import { api } from "../apiClient";
-import { getBackendUrl } from "../apiConfig";
+import { triggerBlobDownload } from "../documentFetch";
 
 export const sparePartsAPI = {
   list: async (params = {}) => {
@@ -51,9 +51,9 @@ export const sparePartsAPI = {
   fileViewUrl: (fileId) => `/api/spare-part-files/${fileId}/view`,
   fileDownloadUrl: (fileId) => `/api/spare-part-files/${fileId}/download`,
 
-  downloadImportTemplate: () => {
-    const backendUrl = getBackendUrl();
-    window.open(`${backendUrl}/api/spare-parts-import/template`, "_blank");
+  downloadImportTemplate: async () => {
+    const response = await api.get("/spare-parts-import/template", { responseType: "blob" });
+    triggerBlobDownload(response.data, "spare_parts_import_template.xlsx");
   },
 
   validateImport: async (file) => {

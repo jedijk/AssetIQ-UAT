@@ -1,4 +1,5 @@
 import { api } from "../apiClient";
+import { triggerBlobDownload } from "../documentFetch";
 
 /** How often we poll a background job while waiting for completion. */
 const JOB_POLL_INTERVAL_MS = 2000;
@@ -91,6 +92,12 @@ export const getPmImportStatusDisplay = (task) => {
  * Handles uploading maintenance plans and converting them to failure mode intelligence.
  */
 export const pmImportAPI = {
+  /** Download empty PM import Excel template (requires library:read). */
+  downloadTemplate: async () => {
+    const response = await api.get("/pm-import/template", { responseType: "blob" });
+    triggerBlobDownload(response.data, "pm_import_template.xlsx");
+  },
+
   /**
    * Upload a maintenance plan file for processing
    * @param {File} file - The file to upload (Excel, PDF, or Image)
