@@ -14,11 +14,21 @@ from services.tenant_schema import (
     WAVE3_COLLECTIONS,
     WAVE4_COLLECTIONS,
     WAVE5_COLLECTIONS,
+    WAVE6_COLLECTIONS,
+    WAVE7_COLLECTIONS,
+    WAVE8_COLLECTIONS,
+    WAVE9_COLLECTIONS,
+    WAVE10_COLLECTIONS,
+    WAVE11_COLLECTIONS,
     WAVE_COLLECTIONS,
 )
 
 # Collections without tenant wave assignment (review backlog).
-UNSCOPED_BACKLOG = frozenset()
+UNSCOPED_BACKLOG = frozenset({
+    "definitions",
+    "permissions",
+    "app_settings",
+})
 
 
 def wave_for_collection(name: str) -> Optional[str]:
@@ -34,14 +44,32 @@ def wave_for_collection(name: str) -> Optional[str]:
         return "wave4"
     if name in WAVE5_COLLECTIONS:
         return "wave5"
+    if name in WAVE6_COLLECTIONS:
+        return "wave6"
+    if name in WAVE7_COLLECTIONS:
+        return "wave7"
+    if name in WAVE8_COLLECTIONS:
+        return "wave8"
+    if name in WAVE9_COLLECTIONS:
+        return "wave9"
+    if name in WAVE10_COLLECTIONS:
+        return "wave10"
+    if name in WAVE11_COLLECTIONS:
+        return "wave11"
     if name in UNSCOPED_BACKLOG:
         return "backlog"
     return None
 
 
+_TENANT_SCOPED_WAVES = frozenset({
+    "pilot", "wave1", "wave2", "wave3", "wave4", "wave5",
+    "wave6", "wave7", "wave8", "wave9", "wave10", "wave11",
+})
+
+
 def collection_audit_entry(name: str) -> Dict[str, Any]:
     wave = wave_for_collection(name)
-    tenant_scoped = wave in ("pilot", "wave1", "wave2", "wave3", "wave4", "wave5")
+    tenant_scoped = wave in _TENANT_SCOPED_WAVES
     return {
         "collection": name,
         "wave": wave or "unknown",

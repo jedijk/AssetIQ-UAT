@@ -29,10 +29,30 @@ from services.tenant_schema import (  # noqa: E402
     WAVE3_COLLECTIONS,
     WAVE4_COLLECTIONS,
     WAVE5_COLLECTIONS,
+    WAVE6_COLLECTIONS,
+    WAVE7_COLLECTIONS,
+    WAVE8_COLLECTIONS,
+    WAVE9_COLLECTIONS,
+    WAVE10_COLLECTIONS,
+    WAVE11_COLLECTIONS,
     WAVE_COLLECTIONS,
     ensure_tenant_indexes,
     tenant_id_from_user,
 )
+
+WAVE_FLAGS = {
+    "wave1": WAVE1_COLLECTIONS,
+    "wave2": WAVE2_COLLECTIONS,
+    "wave3": WAVE3_COLLECTIONS,
+    "wave4": WAVE4_COLLECTIONS,
+    "wave5": WAVE5_COLLECTIONS,
+    "wave6": WAVE6_COLLECTIONS,
+    "wave7": WAVE7_COLLECTIONS,
+    "wave8": WAVE8_COLLECTIONS,
+    "wave9": WAVE9_COLLECTIONS,
+    "wave10": WAVE10_COLLECTIONS,
+    "wave11": WAVE11_COLLECTIONS,
+}
 
 USER_LOOKUP_FIELDS = ("created_by", "user_id", "owner_id", "created_by_id")
 
@@ -126,6 +146,12 @@ async def main() -> int:
         action="store_true",
         help="Only Wave 5 collections (user_preferences, reliability_impacts, granulometry_records)",
     )
+    for wave in ("wave6", "wave7", "wave8", "wave9", "wave10", "wave11"):
+        parser.add_argument(
+            f"--{wave}",
+            action="store_true",
+            help=f"Only {wave} collections",
+        )
     parser.add_argument(
         "--collections",
         default="",
@@ -144,16 +170,9 @@ async def main() -> int:
     db_name = os.environ.get("DB_NAME", DEFAULT_DB_NAME)
     db = client[db_name]
 
-    if args.wave2:
-        names = set(WAVE2_COLLECTIONS)
-    elif args.wave1:
-        names = set(WAVE1_COLLECTIONS)
-    elif args.wave3:
-        names = set(WAVE3_COLLECTIONS)
-    elif args.wave4:
-        names = set(WAVE4_COLLECTIONS)
-    elif args.wave5:
-        names = set(WAVE5_COLLECTIONS)
+    selected_wave = next((wave for wave in WAVE_FLAGS if getattr(args, wave)), None)
+    if selected_wave:
+        names = set(WAVE_FLAGS[selected_wave])
     elif args.collections.strip():
         names: Set[str] = {c.strip() for c in args.collections.split(",") if c.strip()}
         unknown = names - set(WAVE_COLLECTIONS)

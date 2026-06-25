@@ -23,7 +23,7 @@ from services.tenant_schema import (  # noqa: E402
 
 
 async def main() -> int:
-    print("=== Strict Mode Cutover Check (Wave 6) ===\n")
+    print("=== Strict Mode Cutover Check (Waves 1–11) ===\n")
     print(f"Current TENANT_STRICT_MODE env: {TENANT_STRICT_MODE}")
 
     mongo_url = os.environ.get("MONGO_URL")

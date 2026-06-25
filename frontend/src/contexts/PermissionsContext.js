@@ -19,7 +19,7 @@ const FEATURE_PATHS = {
   observations: ["/threats", "/observations"],
   investigations: ["/investigations", "/causal-engine", "/decision-engine"],
   actions: ["/actions"],
-  tasks: ["/my-tasks"],
+  tasks: ["/my-tasks", "/mobile"],
   dashboard_operational: ["/dashboard"],
   supervisor_command_center: ["/supervisor"],
   dashboard_production: ["/production"],

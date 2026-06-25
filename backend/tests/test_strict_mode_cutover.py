@@ -36,17 +36,18 @@ async def test_collection_tenant_coverage_marks_incomplete_rows():
 @pytest.mark.asyncio
 async def test_strict_mode_ready_reports_wave_gaps(monkeypatch):
     mock_db = MagicMock()
+    call_count = {"n": 0}
 
     async def _coverage(db, collections):
         del db, collections
-        return False, [{"collection": "threats", "total": 1, "complete": False}]
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            return False, [{"collection": "threats", "total": 1, "complete": False}]
+        return True, []
 
-    monkeypatch.setattr("services.tenant_readiness.phase2_exit_ready", AsyncMock(return_value=(False, ["wave1 gap"])))
     monkeypatch.setattr("services.tenant_readiness.wave_coverage", AsyncMock(side_effect=_coverage))
-    monkeypatch.setattr("services.tenant_readiness.wave4_exit_ready", AsyncMock(return_value=(True, [])))
-    monkeypatch.setattr("services.tenant_readiness.wave5_exit_ready", AsyncMock(return_value=(True, [])))
 
     ready, gaps = await strict_mode_ready(mock_db)
 
     assert ready is False
-    assert any("wave1 gap" in gap for gap in gaps)
+    assert any("Wave 1" in gap for gap in gaps)

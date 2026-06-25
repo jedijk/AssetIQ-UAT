@@ -14,6 +14,13 @@ from services.tenant_schema import (
     WAVE3_COLLECTIONS,
     WAVE4_COLLECTIONS,
     WAVE5_COLLECTIONS,
+    WAVE6_COLLECTIONS,
+    WAVE7_COLLECTIONS,
+    WAVE8_COLLECTIONS,
+    WAVE9_COLLECTIONS,
+    WAVE10_COLLECTIONS,
+    WAVE11_COLLECTIONS,
+    WAVE_COLLECTIONS,
 )
 
 
@@ -84,17 +91,33 @@ async def wave5_exit_ready(db) -> Tuple[bool, List[str]]:
 
 
 async def strict_mode_ready(db) -> Tuple[bool, List[str]]:
-    """Full strict-mode readiness across waves 1–5."""
-    w12_ok, w12_gaps = await phase2_exit_ready(db)
-    w3_ok, _ = await wave_coverage(db, WAVE3_COLLECTIONS)
-    w4_ok, w4_gaps = await wave4_exit_ready(db)
-    w5_ok, w5_gaps = await wave5_exit_ready(db)
-    gaps = list(w12_gaps)
-    if not w3_ok:
-        gaps.append("Wave 3 collections missing tenant_id — run backfill_tenant_id.py --wave3")
-    gaps.extend(w4_gaps)
-    gaps.extend(w5_gaps)
-    return w12_ok and w3_ok and w4_ok and w5_ok, gaps
+    """Full strict-mode readiness across all tenant wave collections (1–11)."""
+    gaps: List[str] = []
+    all_ok = True
+    wave_sets = [
+        ("Wave 1", WAVE1_COLLECTIONS, "--wave1"),
+        ("Wave 2", WAVE2_COLLECTIONS, "--wave2"),
+        ("Wave 3", WAVE3_COLLECTIONS, "--wave3"),
+        ("Wave 4", WAVE4_COLLECTIONS, "--wave4"),
+        ("Wave 5", WAVE5_COLLECTIONS, "--wave5"),
+        ("Wave 6", WAVE6_COLLECTIONS, "--wave6"),
+        ("Wave 7", WAVE7_COLLECTIONS, "--wave7"),
+        ("Wave 8", WAVE8_COLLECTIONS, "--wave8"),
+        ("Wave 9", WAVE9_COLLECTIONS, "--wave9"),
+        ("Wave 10", WAVE10_COLLECTIONS, "--wave10"),
+        ("Wave 11", WAVE11_COLLECTIONS, "--wave11"),
+    ]
+    for label, collections, flag in wave_sets:
+        ok, _ = await wave_coverage(db, collections)
+        if not ok:
+            all_ok = False
+            gaps.append(f"{label} collections missing tenant_id — run backfill_tenant_id.py {flag}")
+    return all_ok, gaps
+
+
+async def all_waves_coverage(db) -> Tuple[bool, List[Dict[str, Any]]]:
+    """Return coverage for every collection in WAVE_COLLECTIONS."""
+    return await wave_coverage(db, WAVE_COLLECTIONS)
 
 
 def format_coverage_lines(rows: List[Dict[str, Any]]) -> str:

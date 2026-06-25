@@ -45,6 +45,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements-dev.txt
 
+      - name: AI entry point gate
+        run: |
+          cd backend && python scripts/ai_entry_point_report.py
+
+      - name: Route auth inventory (informational)
+        continue-on-error: true
+        run: |
+          cd backend && python scripts/route_auth_inventory.py --public-only > /tmp/public_routes.txt
+          cat /tmp/public_routes.txt
+
       - name: Bootstrap CI test users
         env:
           MONGO_URL: mongodb://localhost:27017/test

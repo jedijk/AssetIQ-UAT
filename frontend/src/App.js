@@ -383,9 +383,10 @@ const PublicRoute = ({ children }) => {
   return children;
 };
 
-// Mobile Layout wrapper with auth
+// Mobile Layout wrapper with auth + RBAC
 const MobileLayout = () => {
   const { user, loading } = useAuth();
+  const { canAccessRoute } = usePermissions();
   const location = useLocation();
   
   if (loading) {
@@ -405,6 +406,10 @@ const MobileLayout = () => {
   
   if (!user) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  }
+
+  if (!canAccessRoute("/mobile")) {
+    return <Navigate to="/dashboard" replace />;
   }
   
   return <MobileApp />;
