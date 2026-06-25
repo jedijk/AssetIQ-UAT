@@ -49,6 +49,13 @@ jobs:
         run: |
           cd backend && python scripts/ai_entry_point_report.py
 
+      - name: Tenant isolation unit tests
+        env:
+          MONGO_URL: mongodb://localhost:27017/test
+          DB_NAME: test
+        run: |
+          cd backend && python -m pytest tests/test_tenant_isolation_audit_waves.py tests/test_strict_mode_cutover.py -q
+
       - name: Route auth inventory (informational)
         continue-on-error: true
         run: |

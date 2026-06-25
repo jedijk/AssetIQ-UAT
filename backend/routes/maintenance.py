@@ -108,10 +108,14 @@ async def increment_strategy_version(
 
 
 @router.get("/download/documentation")
-async def download_documentation():
+async def download_documentation(
+    current_user: dict = Depends(_scheduler_read),
+):
     return await svc.download_documentation()
 
 
 @router.get("/download/functional-spec")
-async def download_functional_spec():
+async def download_functional_spec(
+    current_user: dict = Depends(_scheduler_read),
+):
     return await svc.download_functional_spec()

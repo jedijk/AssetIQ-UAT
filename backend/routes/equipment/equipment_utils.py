@@ -8,7 +8,7 @@ router = APIRouter()
 
 
 @router.get("/equipment-hierarchy/disciplines")
-async def get_disciplines():
+async def get_disciplines(current_user: dict = Depends(get_current_user)):
     """Get all disciplines."""
     return svc.get_disciplines()
 
@@ -24,12 +24,12 @@ async def search_equipment(
 
 
 @router.get("/equipment-hierarchy/criticality-profiles")
-async def get_criticality_profiles():
+async def get_criticality_profiles(current_user: dict = Depends(get_current_user)):
     """Get all criticality profiles."""
     return svc.get_criticality_profiles()
 
 
 @router.get("/equipment-hierarchy/iso-levels")
-async def get_iso_levels():
+async def get_iso_levels(current_user: dict = Depends(get_current_user)):
     """Get ISO 14224 hierarchy levels with labels."""
     return svc.get_iso_levels()

@@ -26,6 +26,7 @@ from services.background_jobs import background_job_service, JobStatus, tenant_i
 from services.worker_config import use_external_background_worker
 
 _library_write = require_permission("library:write")
+_library_read = require_permission("library:read")
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +126,9 @@ async def process_pm_file_background(
 # ============== ROUTES ==============
 
 @router.get("/template")
-async def download_pm_template():
+async def download_pm_template(
+    current_user: dict = Depends(_library_read),
+):
     """
     Download an empty PM Import Excel template.
     

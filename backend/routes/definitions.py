@@ -234,7 +234,7 @@ DEFAULT_CRITICALITY = [
 # ============= API ENDPOINTS =============
 
 @router.get("/definitions/defaults")
-async def get_default_definitions():
+async def get_default_definitions(current_user: dict = Depends(get_current_user)):
     """Get the default FMEA SOD definitions."""
     return {
         "severity": DEFAULT_SEVERITY,

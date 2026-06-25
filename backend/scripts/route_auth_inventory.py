@@ -151,9 +151,169 @@ def build_inventory() -> List[RouteAuthRow]:
     return rows
 
 
+# Router-level dependencies not visible on handler signatures (AST limitation).
+ROUTER_LEVEL_AUTH = {
+    "routes/ai_fm_suggestions.py": ("permission", "library:write (router-level)"),
+}
+
+
+def _classify(row: RouteAuthRow) -> str:
+    if row.auth != "none":
+        if row.auth == "authenticated":
+            return "authenticated"
+        if row.auth in ("permission", "any_permission", "role"):
+            return "permission"
+        return row.auth
+    if row.file in ROUTER_LEVEL_AUTH:
+        return ROUTER_LEVEL_AUTH[row.file][0]
+    return "public"
+
+
+def _public_intentional(row: RouteAuthRow) -> bool:
+    path = row.path
+    file = row.file
+    if path in ("/health", "/system/health", "/"):
+        return True
+    if file.startswith("routes/auth") and path.startswith("/auth/"):
+        return True
+    if file == "routes/auth_oidc.py":
+        return True
+    if file == "routes/gdpr.py":
+        return True
+    if file == "routes/visual_board_public.py":
+        return True
+    if file == "routes/visual_display.py":
+        return True
+    if file == "routes/assets.py" and "video" in path:
+        return True
+    if file == "routes/users.py" and row.handler == "get_user_avatar":
+        return True  # manual JWT validation in handler body
+    if file == "routes/users.py" and row.path == "/timezones":
+        return True  # static IANA timezone list
+    return False
+
+
+def write_markdown_report(rows: List[RouteAuthRow], out: Path) -> None:
+    from datetime import datetime, timezone
+
+    public = [r for r in rows if _classify(r) == "public"]
+    intentional = [r for r in public if _public_intentional(r)]
+    unsafe = [r for r in public if not _public_intentional(r)]
+    permission = [r for r in rows if _classify(r) == "permission"]
+    authenticated = [r for r in rows if _classify(r) == "authenticated"]
+
+    lines = [
+        "# Route Auth Inventory",
+        "",
+        f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
+        "",
+        "Regenerate:",
+        "```bash",
+        "cd backend && python scripts/route_auth_inventory.py --markdown ../docs/platform/ROUTE_AUTH_INVENTORY.md",
+        "```",
+        "",
+        "## Summary",
+        "",
+        f"| Classification | Count |",
+        f"|----------------|------:|",
+        f"| Permission protected | {len(permission)} |",
+        f"| Authenticated only | {len(authenticated)} |",
+        f"| Public (intentional) | {len(intentional)} |",
+        f"| Public (review / fixed in Phase 0) | {len(unsafe)} |",
+        f"| **Total handlers** | **{len(rows)}** |",
+        "",
+        "> Note: `ai_fm_suggestions` routes inherit `library:write` via router-level `dependencies`.",
+        "> `GET /users/{{user_id}}/avatar` validates JWT manually (cookie, bearer, or query token).",
+        "",
+        "## Intentionally public routes",
+        "",
+        "| Method | Path | Handler | File | Reason |",
+        "|--------|------|---------|------|--------|",
+    ]
+    for row in sorted(intentional, key=lambda r: (r.path, r.method)):
+        reason = "health / auth / kiosk / GDPR"
+        if "health" in row.path:
+            reason = "Health probe"
+        elif row.file.startswith("routes/auth"):
+            reason = "Authentication flow"
+        elif row.file == "routes/visual_board_public.py":
+            reason = "Kiosk token URL"
+        elif row.file == "routes/visual_display.py":
+            reason = "Display device pairing (token-based)"
+        elif row.file == "routes/gdpr.py":
+            reason = "Legal / GDPR pages"
+        elif "video" in row.path:
+            reason = "Static marketing asset"
+        lines.append(
+            f"| {row.method} | `{row.path}` | `{row.handler}` | `{row.file}` | {reason} |"
+        )
+
+    lines.extend([
+        "",
+        "## Phase 0 fixes (formerly public, now protected)",
+        "",
+        "| Method | Path | Protection added |",
+        "|--------|------|------------------|",
+        "| GET | `/download/documentation` | `scheduler:read` |",
+        "| GET | `/download/functional-spec` | `scheduler:read` |",
+        "| GET | `/spare-parts-import/template` | `spareiq:read` |",
+        "| GET | `/template` (PM import) | `library:read` |",
+        "| GET | `/equipment-hierarchy/disciplines` | authenticated |",
+        "| GET | `/equipment-hierarchy/criticality-profiles` | authenticated |",
+        "| GET | `/equipment-hierarchy/iso-levels` | authenticated |",
+        "| GET | `/definitions/defaults` | authenticated |",
+        "",
+        "## Remaining public routes requiring review",
+        "",
+    ])
+    if unsafe:
+        lines.append("| Method | Path | Handler | File |")
+        lines.append("|--------|------|---------|------|")
+        for row in sorted(unsafe, key=lambda r: (r.path, r.method)):
+            lines.append(
+                f"| {row.method} | `{row.path}` | `{row.handler}` | `{row.file}:{row.line}` |"
+            )
+    else:
+        lines.append("_None beyond intentionally public routes._")
+
+    lines.extend([
+        "",
+        "## Special attention areas",
+        "",
+        "### Maintenance & import templates",
+        "- PM import template: `library:read` (Phase 0 fix)",
+        "- SpareIQ import template: `spareiq:read` (Phase 0 fix)",
+        "- Maintenance doc downloads: `scheduler:read` (Phase 0 fix)",
+        "",
+        "### SpareIQ",
+        "All mutating SpareIQ routes use `spareiq:read|write|delete` permissions.",
+        "",
+        "### Mobile",
+        "Backend mobile task routes use existing task permissions. Frontend `/mobile` shell gated via `canAccessRoute('/mobile')` → `tasks:read`.",
+        "",
+        "### Visual boards",
+        "- Authenticated admin routes: `visual_boards.py`, `visual_display_admin.py`",
+        "- Public kiosk: `visual_board_public.py` token URLs (intentional)",
+        "- Display pairing: `visual_display.py` (device token flow)",
+        "",
+        "## Full public handler list (AST scan)",
+        "",
+        "```",
+    ])
+    for row in sorted(public, key=lambda r: (r.path, r.method)):
+        tag = "intentional" if _public_intentional(row) else "review"
+        lines.append(f"{row.method:6} {row.path:40} {row.file}:{row.line}  [{tag}]")
+    lines.append("```")
+    lines.append("")
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("\n".join(lines), encoding="utf-8")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Route auth inventory")
     parser.add_argument("--json", help="Write JSON report to path")
+    parser.add_argument("--markdown", help="Write markdown report to path")
     parser.add_argument("--public-only", action="store_true", help="Only print unauthenticated routes")
     args = parser.parse_args()
 
@@ -185,6 +345,11 @@ def main() -> int:
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps([asdict(r) for r in rows], indent=2), encoding="utf-8")
         print(f"\nWrote {out}")
+
+    if args.markdown:
+        md_out = Path(args.markdown)
+        write_markdown_report(rows, md_out)
+        print(f"\nWrote {md_out}")
 
     return 0
 

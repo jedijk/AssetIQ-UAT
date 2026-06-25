@@ -34,7 +34,9 @@ class ImportRowsRequest(BaseModel):
 
 
 @router.get("/spare-parts-import/template")
-async def download_spare_parts_import_template():
+async def download_spare_parts_import_template(
+    current_user: dict = Depends(_spareiq_read),
+):
     content = import_svc.build_import_template_bytes()
     return Response(
         content=content,

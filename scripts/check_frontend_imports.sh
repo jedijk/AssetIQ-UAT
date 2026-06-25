@@ -23,4 +23,17 @@ if [[ "$fail" -ne 0 ]]; then
   exit 1
 fi
 
+# Resolve lib/apis/* import targets (catches missing modules like equipmentAPI).
+while IFS= read -r mod; do
+  mod="${mod#lib/apis/}"
+  if [[ ! -f "$SRC/lib/apis/${mod}.js" && ! -f "$SRC/lib/apis/${mod}.ts" ]]; then
+    echo "FAIL: lib/apis/${mod} is imported but no .js/.ts file exists"
+    fail=1
+  fi
+done < <(rg --no-filename -o "lib/apis/[A-Za-z0-9_]+" "$SRC" 2>/dev/null | sort -u || true)
+
+if [[ "$fail" -ne 0 ]]; then
+  exit 1
+fi
+
 echo "Frontend import checks passed."
