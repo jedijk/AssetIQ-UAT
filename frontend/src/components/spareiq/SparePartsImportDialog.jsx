@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Download, FileSpreadsheet, Loader2, Upload } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import { useLanguage } from "../../contexts/LanguageContext";
 import { toast } from "sonner";
 
 import { sparePartsAPI } from "../../lib/apis/spareParts";
@@ -21,7 +21,7 @@ const STATUS_STYLES = {
 };
 
 export default function SparePartsImportDialog({ open, onOpenChange }) {
-  const { t } = useTranslation();
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const fileRef = useRef(null);
   const [step, setStep] = useState("upload");

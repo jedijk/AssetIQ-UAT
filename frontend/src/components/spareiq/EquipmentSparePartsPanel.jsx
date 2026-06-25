@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Package, Plus, Unlink } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import { useLanguage } from "../../contexts/LanguageContext";
 import { toast } from "sonner";
 
 import { sparePartsAPI } from "../../lib/apis/spareParts";
@@ -11,7 +11,7 @@ import { Button } from "../ui/button";
 import SparePartFormDialog from "./SparePartFormDialog";
 
 export default function EquipmentSparePartsPanel({ equipmentId, equipmentName }) {
-  const { t } = useTranslation();
+  const { t } = useLanguage();
   const { hasPermission } = usePermissions();
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);

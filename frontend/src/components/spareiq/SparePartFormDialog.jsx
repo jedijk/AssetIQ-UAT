@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { useLanguage } from "../../contexts/LanguageContext";
 
 import { equipmentAPI } from "../../lib/apis/equipment";
 import { Button } from "../ui/button";
@@ -31,7 +31,7 @@ export default function SparePartFormDialog({
   onSubmit,
   isSubmitting = false,
 }) {
-  const { t } = useTranslation();
+  const { t } = useLanguage();
   const [description, setDescription] = useState("");
   const [typeModel, setTypeModel] = useState("");
   const [manufacturer, setManufacturer] = useState("");

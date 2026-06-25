@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ExternalLink, Package, Pencil, Trash2, Upload } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 
 import { sparePartsAPI } from "../lib/apis/spareParts";
@@ -13,7 +13,7 @@ import SparePartFormDialog from "../components/spareiq/SparePartFormDialog";
 export default function SparePartDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { t } = useTranslation();
+  const { t } = useLanguage();
   const { hasPermission } = usePermissions();
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);

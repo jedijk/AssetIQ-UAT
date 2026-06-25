@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Package, Plus, Search, Upload } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 
 import { sparePartsAPI } from "../lib/apis/spareParts";
@@ -13,7 +13,7 @@ import SparePartFormDialog from "../components/spareiq/SparePartFormDialog";
 import SparePartsImportDialog from "../components/spareiq/SparePartsImportDialog";
 
 export default function SpareIQPage() {
-  const { t } = useTranslation();
+  const { t } = useLanguage();
   const { hasPermission } = usePermissions();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
