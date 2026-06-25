@@ -17,6 +17,7 @@ import {
   ScrollText,
   BarChart3,
   Monitor,
+  Package,
 } from "lucide-react";
 
 export function buildNavItems(t) {
@@ -30,6 +31,7 @@ export function buildNavItems(t) {
     { path: "/tasks", label: t("nav.taskScheduler"), icon: Calendar, desktopOnly: true, feature: "tasks", navTestId: "task-scheduler" },
     { path: "/form-submissions", label: t("nav.formSubmissions"), icon: FileText, feature: "forms", navTestId: "form-submissions" },
     { path: "/library", label: t("nav.library"), icon: BookOpen, desktopOnly: true, feature: "library", navTestId: "library" },
+    { path: "/spareiq", label: t("nav.spareiq"), icon: Package, feature: "spareiq", navTestId: "spareiq" },
   ];
 }
 

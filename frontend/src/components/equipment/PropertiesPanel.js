@@ -8,7 +8,7 @@ import { failureModesAPI, qrCodeAPI, equipmentHierarchyAPI, definitionsAPI } fro
 import { queryKeys } from "../../lib/queryKeys";
 import {
   Settings, Cog, Check, Edit, GripVertical, Trash2, ChevronDown, Sparkles, Eye, Search, AlertTriangle, QrCode, Info,
-  Paperclip, Upload, Download, FileText, Image, File as FileIcon, X, ClipboardList,
+  Paperclip, Upload, Download, FileText, Image, File as FileIcon, X, ClipboardList, Package,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -27,6 +27,7 @@ import { getEquipmentLevelLabel } from "../../lib/equipmentLevelLabels";
 import { computeCriticalityScore } from "../../lib/criticalityScore";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
 import MaintenanceProgramPanel from "./MaintenanceProgramPanel";
+import EquipmentSparePartsPanel from "../spareiq/EquipmentSparePartsPanel";
 
 const LEVEL_CONFIG = {
   installation: { icon: Settings },
@@ -412,6 +413,7 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
   const [typeSearchQuery, setTypeSearchQuery] = useState("");
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [showMaintenanceProgramDialog, setShowMaintenanceProgramDialog] = useState(false);
+  const [showSparePartsDialog, setShowSparePartsDialog] = useState(false);
   
   // Find the installation ID for this equipment (traverse up the hierarchy)
   const installationId = useMemo(() => {
@@ -961,6 +963,22 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
             </Button>
           </div>
           
+          {["equipment_unit", "equipment", "subunit", "maintainable_item", "unit"].includes(node.level) && (
+            <div className="pt-4 border-t border-slate-200">
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-sm font-medium">{t("equipment.spareParts")}</Label>
+              </div>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setShowSparePartsDialog(true)}
+              >
+                <Package className="w-4 h-4 mr-2" />
+                {t("equipment.viewSpareParts")}
+              </Button>
+            </div>
+          )}
+
           {/* Maintenance Program Section - Only show for equipment levels that can have maintenance programs */}
           {["equipment_unit", "equipment", "subunit", "maintainable_item", "unit"].includes(node.level) && (
             <div className="pt-4 border-t border-slate-200">
@@ -1021,6 +1039,21 @@ export function PropertiesPanel({ node, equipmentTypes, onUpdate, onAssignCritic
               equipmentId={node?.id} 
               equipmentName={translatedName || node?.name}
             />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showSparePartsDialog} onOpenChange={setShowSparePartsDialog}>
+        <DialogContent className="max-w-lg max-h-[min(92dvh,100%)] overflow-hidden flex flex-col gap-2 p-4 sm:p-6">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Package className="h-5 w-5 text-amber-600" />
+              {t("equipment.spareParts")}
+            </DialogTitle>
+            <DialogDescription>{translatedName || node?.name}</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <EquipmentSparePartsPanel equipmentId={node?.id} equipmentName={translatedName || node?.name} />
           </div>
         </DialogContent>
       </Dialog>

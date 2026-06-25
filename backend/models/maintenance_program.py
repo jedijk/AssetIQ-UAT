@@ -18,6 +18,8 @@ from enum import Enum
 from datetime import datetime
 import uuid
 
+from models.spare_parts import SparePartRequirement
+
 
 # ============= Enums =============
 
@@ -122,6 +124,7 @@ class TaskTraceability(BaseModel):
     overridden_by: Optional[str] = None
 
 
+
 # ============= Maintenance Program Task =============
 
 class MaintenanceProgramTask(BaseModel):
@@ -149,6 +152,7 @@ class MaintenanceProgramTask(BaseModel):
     skills_required: List[str] = []
     tools_required: List[str] = []
     spare_parts: List[str] = []
+    spare_part_requirements: List[SparePartRequirement] = Field(default_factory=list)
     
     # Procedure/Instructions
     procedure_steps: List[str] = []
@@ -303,6 +307,7 @@ class UpdateTaskRequest(BaseModel):
     is_active: Optional[bool] = None
     is_mandatory: Optional[bool] = None
     override_reason: Optional[str] = None
+    spare_part_requirements: Optional[List[SparePartRequirement]] = None
 
 
 class RegenerateProgramRequest(BaseModel):

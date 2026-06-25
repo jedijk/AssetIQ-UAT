@@ -485,6 +485,17 @@ async def update_action(
     await assert_action_installation_scope(current_user, action)
 
     update_data = {k: v for k, v in update_fields.items() if v is not None}
+    spare_requirements = update_data.pop("spare_part_requirements", None)
+    if spare_requirements is not None:
+        from models.spare_parts import SparePartRequirement
+
+        normalized = []
+        for req in spare_requirements:
+            if isinstance(req, dict):
+                normalized.append(SparePartRequirement(**req).model_dump())
+            else:
+                normalized.append(req.model_dump())
+        update_data["spare_part_requirements"] = normalized
     update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     status_changed_to_completed = (
@@ -493,6 +504,18 @@ async def update_action(
 
     await _action_repo.update_mongo_doc(action["_id"], {"$set": update_data})
     updated = await _action_repo.find_by_mongo_id(action["_id"], projection={"_id": 0})
+
+    if spare_requirements is not None:
+        from services.spare_part_requirements_service import apply_action_requirements
+
+        serialized = await apply_action_requirements(
+            user=current_user,
+            action_id=action_id,
+            action=updated or action,
+            requirements=update_data.get("spare_part_requirements") or [],
+        )
+        if updated is not None:
+            updated["spare_part_requirements"] = serialized
 
     completion_notification = None
     if status_changed_to_completed:

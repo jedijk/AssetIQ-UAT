@@ -84,6 +84,7 @@ NODE_TYPES: List[Dict[str, Any]] = [
     {"id": "action", "label": "Action", "domain": "reactive", "color": "#2563EB"},
     {"id": "outcome", "label": "Outcome", "domain": "reactive", "color": "#059669"},
     {"id": "reliability_impact", "label": "Reliability Impact", "domain": "reactive", "color": "#10B981"},
+    {"id": "spare_part", "label": "Spare Part", "domain": "maintenance", "color": "#F59E0B"},
 ]
 
 RELATIONS: List[Dict[str, Any]] = [
@@ -114,6 +115,9 @@ RELATIONS: List[Dict[str, Any]] = [
     {"id": "resulted_in", "label": "resulted in", "source": "action", "target": "outcome", "domain": "reactive"},
     {"id": "impacted_reliability", "label": "impacted reliability", "source": "outcome", "target": "reliability_impact", "domain": "reactive"},
     {"id": "affects_equipment", "label": "affects equipment", "source": "reliability_impact", "target": "equipment", "domain": "reactive"},
+    {"id": "used_on", "label": "used on", "source": "spare_part", "target": "equipment", "domain": "maintenance"},
+    {"id": "program_task_requires", "label": "requires", "source": "program_task", "target": "spare_part", "domain": "maintenance"},
+    {"id": "action_requires", "label": "requires", "source": "action", "target": "spare_part", "domain": "maintenance"},
 ]
 
 RELATION_LABELS: Dict[str, str] = {rel["id"]: rel["label"] for rel in RELATIONS}

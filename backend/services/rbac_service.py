@@ -50,6 +50,7 @@ ROLES = {
             "settings:read", "settings:write",
             "installations:all",  # Special permission to see all installations
             "vmb:read", "vmb:write", "vmb:publish", "vmb:admin",
+            "spareiq:read", "spareiq:write", "spareiq:delete",
         ]
     },
     "admin": {
@@ -70,6 +71,7 @@ ROLES = {
             "analytics:read", "analytics:export",
             "settings:read", "settings:write",
             "vmb:read", "vmb:write", "vmb:publish", "vmb:admin",
+            "spareiq:read", "spareiq:write", "spareiq:delete",
         ]
     },
     "reliability_engineer": {
@@ -89,6 +91,7 @@ ROLES = {
             "analytics:read", "analytics:export",
             "settings:read",
             "vmb:read", "vmb:write",
+            "spareiq:read", "spareiq:write",
         ]
     },
     "maintenance": {
@@ -107,6 +110,7 @@ ROLES = {
             "decision_engine:read",
             "analytics:read",
             "vmb:read",
+            "spareiq:read",
         ]
     },
     "operations": {
@@ -124,6 +128,7 @@ ROLES = {
             "observations:read", "observations:write",
             "analytics:read",
             "vmb:read",
+            "spareiq:read",
         ]
     },
     "viewer": {
@@ -141,6 +146,7 @@ ROLES = {
             "observations:read",
             "analytics:read",
             "vmb:read",
+            "spareiq:read",
         ]
     }
 }

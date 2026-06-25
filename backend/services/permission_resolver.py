@@ -23,6 +23,7 @@ API_TO_UI_FEATURE: Dict[str, str] = {
     "forms": "forms",
     "equipment": "equipment",
     "library": "library",
+    "spareiq": "spareiq",
     "investigations": "investigations",
     "users": "users",
     "settings": "settings",

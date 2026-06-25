@@ -20,6 +20,7 @@ DEFAULT_PERMISSIONS = {
         "dashboard_executive": {"read": True, "write": True, "delete": True},
         "dashboard_builder": {"read": True, "write": True, "delete": True},
         "visual_boards": {"read": True, "write": True, "delete": True},
+        "spareiq": {"read": True, "write": True, "delete": True},
         "chat": {"read": True, "write": True, "delete": True},
         "statistics": {"read": True, "write": True, "delete": True},
         "feedback": {"read": True, "write": True, "delete": True},
@@ -43,6 +44,7 @@ DEFAULT_PERMISSIONS = {
         "dashboard_executive": {"read": False, "write": False, "delete": False},
         "dashboard_builder": {"read": False, "write": False, "delete": False},
         "visual_boards": {"read": True, "write": True, "delete": True},
+        "spareiq": {"read": True, "write": True, "delete": True},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": True, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": True},
@@ -66,6 +68,7 @@ DEFAULT_PERMISSIONS = {
         "dashboard_executive": {"read": False, "write": False, "delete": False},
         "dashboard_builder": {"read": False, "write": False, "delete": False},
         "visual_boards": {"read": True, "write": True, "delete": False},
+        "spareiq": {"read": True, "write": True, "delete": False},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": True, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": False},
@@ -89,6 +92,7 @@ DEFAULT_PERMISSIONS = {
         "dashboard_executive": {"read": False, "write": False, "delete": False},
         "dashboard_builder": {"read": False, "write": False, "delete": False},
         "visual_boards": {"read": True, "write": False, "delete": False},
+        "spareiq": {"read": True, "write": False, "delete": False},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": False, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": False},
@@ -112,6 +116,7 @@ DEFAULT_PERMISSIONS = {
         "dashboard_executive": {"read": False, "write": False, "delete": False},
         "dashboard_builder": {"read": False, "write": False, "delete": False},
         "visual_boards": {"read": True, "write": False, "delete": False},
+        "spareiq": {"read": True, "write": False, "delete": False},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": False, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": False},
@@ -135,6 +140,7 @@ DEFAULT_PERMISSIONS = {
         "dashboard_executive": {"read": False, "write": False, "delete": False},
         "dashboard_builder": {"read": False, "write": False, "delete": False},
         "visual_boards": {"read": True, "write": False, "delete": False},
+        "spareiq": {"read": True, "write": False, "delete": False},
         "chat": {"read": True, "write": True, "delete": False},
         "statistics": {"read": False, "write": False, "delete": False},
         "feedback": {"read": True, "write": True, "delete": False},
@@ -204,6 +210,10 @@ FEATURES = {
     "library": {
         "name": "Strategy",
         "description": "Strategy library for failure modes and maintenance programs"
+    },
+    "spareiq": {
+        "name": "SpareIQ",
+        "description": "Spare parts knowledge register linked to equipment"
     },
     "library_ai_tools": {
         "name": "Strategy — AI Tools",

@@ -20,7 +20,8 @@
     "taskScheduler": "Uitvoering",
     "formSubmissions": "Rapporten",
     "reliabilityIntelligence": "Betrouwbaarheidsintelligentie",
-    "visualManagement": "Visueel Management"
+    "visualManagement": "Visueel Management",
+    "spareiq": "SpareIQ"
   },
   "settings": {
     "userManagement": "Gebruikersbeheer",

@@ -14,6 +14,7 @@ import { usePermissions } from "../../contexts/PermissionsContext";
 import { formatDate as formatDateUtil } from "../../lib/dateUtils";
 import { useTranslatedActions } from "../../hooks/useTranslatedEntities";
 import { queryKeys } from "../../lib/queryKeys";
+import { actionConsumesSpareParts } from "../../components/spareiq/sparePartUtils";
 
 const EMPTY_EDIT_FORM = {
   title: "",
@@ -27,6 +28,7 @@ const EMPTY_EDIT_FORM = {
   comments: "",
   completion_notes: "",
   attachments: [],
+  spare_part_requirements: [],
 };
 
 export function useActionsPage() {
@@ -182,6 +184,7 @@ export function useActionsPage() {
       comments: action.comments || "",
       completion_notes: action.completion_notes || "",
       attachments: action.attachments || [],
+      spare_part_requirements: action.spare_part_requirements || [],
     });
     setUploadingActionAttachment(false);
     setIsEditDialogOpen(true);
@@ -192,9 +195,18 @@ export function useActionsPage() {
       toast.error("Title is required");
       return;
     }
+    const payload = { ...editForm, due_date: editForm.due_date || null };
+    if (actionConsumesSpareParts({ ...editingAction, ...editForm })) {
+      payload.spare_part_requirements = (editForm.spare_part_requirements || []).map((req) => ({
+        spare_part_id: req.spare_part_id,
+        quantity: req.quantity || 1,
+      }));
+    } else {
+      delete payload.spare_part_requirements;
+    }
     updateMutation.mutate({
       actionId: editingAction.id,
-      data: { ...editForm, due_date: editForm.due_date || null },
+      data: payload,
       oldData: editingAction,
     });
   };

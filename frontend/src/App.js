@@ -52,6 +52,8 @@ const ObservationWorkspacePage = lazy(() => import("./pages/ObservationWorkspace
 const ActionDetailPage = lazy(() => import("./pages/ActionDetailPage"));
 const EquipmentManagerPage = lazy(() => import("./pages/EquipmentManagerPage"));
 const EquipmentReliabilityTracePage = lazy(() => import("./pages/EquipmentReliabilityTracePage"));
+const SpareIQPage = lazy(() => import("./pages/SpareIQPage"));
+const SparePartDetailPage = lazy(() => import("./pages/SparePartDetailPage"));
 const SupervisorCommandCenterPage = lazy(() => import("./pages/SupervisorCommandCenterPage"));
 const EquipmentReliabilityProfilePage = lazy(() => import("./pages/EquipmentReliabilityProfilePage"));
 const CausalEnginePage = lazy(() => import("./pages/CausalEnginePage"));
@@ -535,6 +537,8 @@ function App() {
                 <Route path="actions" element={<Suspense fallback={<RouteFallback />}><ActionsPage /></Suspense>} />
                 <Route path="actions/:actionId" element={<Suspense fallback={<RouteFallback />}><ActionDetailPage /></Suspense>} />
                 <Route path="library" element={<Suspense fallback={<RouteFallback />}><FailureModesPage /></Suspense>} />
+                <Route path="spareiq" element={<Suspense fallback={<RouteFallback />}><SpareIQPage /></Suspense>} />
+                <Route path="spareiq/:id" element={<Suspense fallback={<RouteFallback />}><SparePartDetailPage /></Suspense>} />
                 <Route path="equipment-manager" element={<Suspense fallback={<RouteFallback />}><EquipmentManagerPage /></Suspense>} />
                 <Route path="equipment/:id/trace" element={<Suspense fallback={<RouteFallback />}><EquipmentReliabilityTracePage /></Suspense>} />
                 <Route path="supervisor" element={<Suspense fallback={<RouteFallback />}><SupervisorCommandCenterPage /></Suspense>} />

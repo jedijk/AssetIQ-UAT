@@ -15,6 +15,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "../../../components/ui/select";
 import { Sheet, SheetContent } from "../../../components/ui/sheet";
+import SparePartRequirementsEditor from "../../../components/spareiq/SparePartRequirementsEditor";
+import { actionConsumesSpareParts } from "../../../components/spareiq/sparePartUtils";
 
 export function ActionsEditSheet({
   open,
@@ -196,6 +198,16 @@ export function ActionsEditSheet({
                               </div>
                             )}
                           </div>
+                        )}
+
+                        {actionConsumesSpareParts({ ...ea, ...editForm }) && (
+                          <SparePartRequirementsEditor
+                            equipmentId={ea.linked_equipment_id}
+                            requirements={editForm.spare_part_requirements || []}
+                            onChange={(spare_part_requirements) =>
+                              setEditForm({ ...editForm, spare_part_requirements })
+                            }
+                          />
                         )}
 
                         {/* Attachments - at bottom */}

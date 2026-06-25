@@ -1,12 +1,13 @@
 """
 Actions routes — orchestration only (Wave 4 convergence).
 """
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, BackgroundTasks
 from pydantic import BaseModel
 
 from auth import require_permission
+from models.spare_parts import SparePartRequirement
 from services.background_jobs import schedule_tracked_job
 from services import action_service
 from services.action_outcome_service import get_action_outcome
@@ -48,6 +49,7 @@ class CentralActionUpdate(BaseModel):
     status: Optional[str] = None
     completion_notes: Optional[str] = None
     comments: Optional[str] = None
+    spare_part_requirements: Optional[List[SparePartRequirement]] = None
 
 
 class ActionValidateRequest(BaseModel):

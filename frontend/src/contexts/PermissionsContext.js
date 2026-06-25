@@ -28,6 +28,7 @@ const FEATURE_PATHS = {
   forms: ["/forms", "/form-submissions", "/granulometry"],
   equipment: ["/equipment", "/definitions", "/equipment-manager"],
   library: ["/library"],
+  spareiq: ["/spareiq"],
   visual_boards: [
     "/visual-management",
     "/visual-management/boards",

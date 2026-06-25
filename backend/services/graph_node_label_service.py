@@ -256,6 +256,19 @@ async def _load_labels_for_type(
     if node_type == "failure_mode":
         return await _load_failure_mode_labels(node_ids)
 
+    if node_type == "spare_part":
+        cursor = db.spare_parts.find(
+            merge_tenant_filter({"id": {"$in": id_list}}, user),
+            {"_id": 0, "id": 1, "description": 1, "type_model": 1},
+        )
+        for doc in await cursor.to_list(len(id_list)):
+            desc = doc.get("description") or ""
+            model = doc.get("type_model") or ""
+            label = f"{desc} ({model})".strip(" ()") if model else desc
+            if label:
+                labels[doc["id"]] = label[:80]
+        return labels
+
     if node_type == "finding":
         cursor = db.findings.find(
             merge_tenant_filter({"id": {"$in": id_list}}, user),

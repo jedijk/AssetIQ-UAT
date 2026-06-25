@@ -37,6 +37,8 @@ import { CRITICALITY_CONFIG } from '../maintenance/constants';
 import { computeCriticalityScore } from '../../lib/criticalityScore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { cn } from '../../lib/utils';
+import SparePartRequirementsEditor from '../spareiq/SparePartRequirementsEditor';
+import { taskConsumesSpareParts } from '../spareiq/sparePartUtils';
 
 const PANEL_ROOT_CLASS = 'min-w-0 max-w-full overflow-x-hidden space-y-3 sm:space-y-4';
 
@@ -682,6 +684,7 @@ const EditTaskDialog = ({ open, onClose, task, equipmentId, onSuccess }) => {
         task_category: task.task_category,
         priority: task.priority,
         is_active: task.is_active !== false,
+        spare_part_requirements: task.spare_part_requirements || [],
       });
       setOverrideReason('');
     }
@@ -704,12 +707,21 @@ const EditTaskDialog = ({ open, onClose, task, equipmentId, onSuccess }) => {
     if (task.task_source === 'strategy_generated' && overrideReason) {
       updates.override_reason = overrideReason;
     }
+    if (showSpareParts && updates.spare_part_requirements) {
+      updates.spare_part_requirements = updates.spare_part_requirements.map((req) => ({
+        spare_part_id: req.spare_part_id,
+        quantity: req.quantity || 1,
+      }));
+    } else {
+      delete updates.spare_part_requirements;
+    }
     updateTaskMutation.mutate(updates);
   };
   
   if (!formData) return null;
   
   const isStrategyTask = task?.task_source === 'strategy_generated';
+  const showSpareParts = taskConsumesSpareParts({ ...task, ...formData });
   
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -832,6 +844,16 @@ const EditTaskDialog = ({ open, onClose, task, equipmentId, onSuccess }) => {
                 rows={2}
               />
             </div>
+          )}
+
+          {showSpareParts && (
+            <SparePartRequirementsEditor
+              equipmentId={equipmentId}
+              requirements={formData.spare_part_requirements || []}
+              onChange={(spare_part_requirements) =>
+                setFormData((prev) => ({ ...prev, spare_part_requirements }))
+              }
+            />
           )}
         </div>
         

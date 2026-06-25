@@ -18,6 +18,8 @@ import {
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from "../../../components/ui/dialog";
+import SparePartRequirementsEditor from "../../../components/spareiq/SparePartRequirementsEditor";
+import { actionConsumesSpareParts } from "../../../components/spareiq/sparePartUtils";
 
 export function ActionsEditDialog({
   open,
@@ -187,6 +189,16 @@ export function ActionsEditDialog({
                               rows={2}
                             />
                           </div>
+                        )}
+
+                        {actionConsumesSpareParts({ ...ea, ...editForm }) && (
+                          <SparePartRequirementsEditor
+                            equipmentId={ea.linked_equipment_id}
+                            requirements={editForm.spare_part_requirements || []}
+                            onChange={(spare_part_requirements) =>
+                              setEditForm({ ...editForm, spare_part_requirements })
+                            }
+                          />
                         )}
                         
                         {/* Attachments Section */}

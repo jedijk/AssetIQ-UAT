@@ -514,7 +514,7 @@ class MaintenanceProgramService:
                     elif key in ["task_title", "task_description", "estimated_duration_hours",
                                 "task_category", "priority", "skill_requirement", "discipline",
                                 "procedure_steps", "acceptance_criteria", "is_active", "is_mandatory",
-                                "tools_required", "spare_parts", "skills_required"]:
+                                "tools_required", "spare_parts", "skills_required", "spare_part_requirements"]:
                         if isinstance(value, Enum):
                             tasks[i][key] = value.value
                         else:

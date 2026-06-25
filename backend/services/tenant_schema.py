@@ -110,6 +110,12 @@ WAVE10_COLLECTIONS = frozenset({
     "visual_display_events",
 })
 
+WAVE11_COLLECTIONS = frozenset({
+    "spare_parts",
+    "spare_part_files",
+    "spare_categories",
+})
+
 WAVE_COLLECTIONS = (
     PILOT_COLLECTIONS
     | WAVE1_COLLECTIONS
@@ -122,6 +128,7 @@ WAVE_COLLECTIONS = (
     | WAVE8_COLLECTIONS
     | WAVE9_COLLECTIONS
     | WAVE10_COLLECTIONS
+    | WAVE11_COLLECTIONS
 )
 
 DEFAULT_TENANT_FIELD = "tenant_id"

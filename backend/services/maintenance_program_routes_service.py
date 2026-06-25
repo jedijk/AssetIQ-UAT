@@ -461,6 +461,11 @@ async def update_task(
         updates["is_active"] = request.is_active
     if request.is_mandatory is not None:
         updates["is_mandatory"] = request.is_mandatory
+    if request.spare_part_requirements is not None:
+        updates["spare_part_requirements"] = [
+            req.model_dump() if hasattr(req, "model_dump") else req
+            for req in request.spare_part_requirements
+        ]
     
     if not updates:
         raise HTTPException(status_code=400, detail="No updates provided")
@@ -475,6 +480,16 @@ async def update_task(
             override_reason=request.override_reason,
             user_id=_current_user_id(current_user)
         )
+
+        if request.spare_part_requirements is not None:
+            from services.spare_part_requirements_service import apply_program_task_requirements
+
+            await apply_program_task_requirements(
+                user=current_user,
+                equipment_id=equipment_id,
+                task_id=task_id,
+                requirements=request.spare_part_requirements,
+            )
 
         schedule_refresh = None
         pm_ref_parts = parse_pm_import_ref(task=updated_task, task_id=task_id)
@@ -523,6 +538,15 @@ async def delete_task(
             equipment_id=equipment_id,
             task_id=task_id,
             user_id=_current_user_id(current_user)
+        )
+
+        from services.spare_parts_graph_sync import retire_requires_edges
+        from services.tenant_schema import tenant_id_from_user
+
+        await retire_requires_edges(
+            source_type="program_task",
+            source_id=task_id,
+            tenant_id=tenant_id_from_user(current_user),
         )
         
         schedule_refresh = await _refresh_equipment_schedule_after_change(

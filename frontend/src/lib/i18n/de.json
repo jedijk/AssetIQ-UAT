@@ -20,7 +20,8 @@
     "taskScheduler": "Planer",
     "formSubmissions": "Berichte",
     "reliabilityIntelligence": "Zuverlässigkeitsintelligenz",
-    "visualManagement": "Visuelles Management"
+    "visualManagement": "Visuelles Management",
+    "spareiq": "SpareIQ"
   },
   "settings": {
     "userManagement": "Benutzerverwaltung",

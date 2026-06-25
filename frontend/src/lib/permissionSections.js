@@ -28,7 +28,7 @@ export const PERMISSION_SECTIONS = [
     id: "reliability",
     label: "Reliability & Equipment",
     labelKey: "permissions.sections.reliability",
-    features: ["investigations", "library", "library_ai_tools", "equipment"],
+    features: ["investigations", "library", "library_ai_tools", "equipment", "spareiq"],
   },
   {
     id: "collaboration",
