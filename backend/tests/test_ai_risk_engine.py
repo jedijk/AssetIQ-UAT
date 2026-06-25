@@ -34,10 +34,11 @@ def _wait_for_causal_analysis(client, threat_id: str, timeout_s: int = 90):
 
 
 @pytest.fixture(autouse=True)
-def _require_test_threat(request, authenticated_client, test_threat_id):
+def _require_test_threat(request, test_threat_id):
     """Skip AI integration tests when the configured threat is absent (empty CI DB)."""
     if request.node.name in ("test_login_success", "test_unauthorized_access"):
         return
+    authenticated_client = request.getfixturevalue("authenticated_client")
     response = authenticated_client.get(f"{BASE_URL}/api/threats/{test_threat_id}")
     if response.status_code == 404:
         pytest.skip(f"Test threat {test_threat_id} not found in database")
