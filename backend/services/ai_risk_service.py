@@ -182,7 +182,6 @@ async def dashboard_intent(
 
 
 async def log_ai_usage(
-    actor: dict,
     user_id: str,
     feature: str,
     model: str = "gpt-4o",

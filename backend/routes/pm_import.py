@@ -6,6 +6,7 @@ failure mode intelligence for the AssetIQ Failure Mode Library.
 """
 
 import asyncio
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -133,16 +134,15 @@ async def download_pm_template():
     - Example rows (in gray italic)
     - Instructions sheet with valid discipline values
     """
-    import os
     from fastapi.responses import FileResponse
     
-    template_path = "/app/backend/static/templates/pm_import_template.xlsx"
+    template_path = Path(__file__).resolve().parent.parent / "static/templates/pm_import_template.xlsx"
     
-    if not os.path.exists(template_path):
+    if not template_path.is_file():
         raise HTTPException(status_code=404, detail="Template file not found")
     
     return FileResponse(
-        path=template_path,
+        path=str(template_path),
         filename="pm_import_template.xlsx",
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
