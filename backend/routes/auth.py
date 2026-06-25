@@ -15,6 +15,7 @@ from middleware.rate_limit import RATE_LIMIT_ENABLED
 from typing import Optional
 
 from database import db, JWT_EXPIRATION_HOURS
+from services.tenant_schema import stamp_user_tenant_fields
 from auth import (
     hash_password,
     verify_password,
@@ -283,7 +284,7 @@ async def register(request: Request, user_data: RegisterWithProtection):
         "is_active": True,
         "has_seen_intro": False,  # Show intro tour on first login
     }
-    await db.users.insert_one(user_doc)
+    await db.users.insert_one(stamp_user_tenant_fields(user_doc))
     
     # Notify admins about new user (could send email notification)
     await notify_admins_new_user(user_data.email, user_data.name)

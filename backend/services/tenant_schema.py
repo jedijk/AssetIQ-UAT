@@ -137,6 +137,9 @@ DEFAULT_TENANT_FIELD = "tenant_id"
 # Staging / UAT: set TENANT_STRICT_MODE=true after Wave 2 backfill (see scripts/strict_mode_cutover_check.py).
 TENANT_STRICT_MODE = os.environ.get("TENANT_STRICT_MODE", "false").lower() == "true"
 
+# Single-tenant deployments: default org id for new users when no creator context exists.
+BACKFILL_TENANT_ID = os.environ.get("BACKFILL_TENANT_ID") or None
+
 
 def tenant_id_from_user(user: Optional[dict]) -> Optional[str]:
     if not user:
@@ -149,6 +152,15 @@ def with_tenant_id(doc: Dict[str, Any], user: Optional[dict]) -> Dict[str, Any]:
     tid = tenant_id_from_user(user)
     if tid:
         doc[DEFAULT_TENANT_FIELD] = tid
+    return doc
+
+
+def stamp_user_tenant_fields(doc: Dict[str, Any], source_user: Optional[dict] = None) -> Dict[str, Any]:
+    """Set company_id and tenant_id on a user record from creator/approver or BACKFILL_TENANT_ID."""
+    tid = tenant_id_from_user(source_user) or BACKFILL_TENANT_ID
+    if tid:
+        doc.setdefault("company_id", tid)
+        doc.setdefault(DEFAULT_TENANT_FIELD, tid)
     return doc
 
 

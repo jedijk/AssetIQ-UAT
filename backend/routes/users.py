@@ -15,7 +15,7 @@ from auth import get_current_user, hash_password, verify_password, require_permi
 from routes.auth import validate_password_complexity
 from services.storage_service import upload_avatar_async, get_object_async, get_mime_type, is_storage_available
 from services.cache_service import CacheService as cache
-from services.tenant_schema import merge_tenant_filter, with_tenant_id
+from services.tenant_schema import merge_tenant_filter, stamp_user_tenant_fields, with_tenant_id
 
 # Try to import resend for email
 try:
@@ -260,7 +260,7 @@ async def admin_create_user(
         "assigned_installations": user_data.installations,  # Assign to installations
         "has_seen_intro": True,  # Don't show intro until after password change
     }
-    await db.users.insert_one(with_tenant_id(user_doc, current_user))
+    await db.users.insert_one(stamp_user_tenant_fields(with_tenant_id(user_doc, current_user), current_user))
     
     logger.info(f"User created by admin {current_user['email']}: {user_data.email} with role {user_data.role}, installations: {user_data.installations}")
     
@@ -691,6 +691,9 @@ async def approve_user(
     # Handle assigned installations
     if action == "approve" and "assigned_installations" in approval_data:
         update_data["assigned_installations"] = approval_data["assigned_installations"]
+
+    if action == "approve":
+        stamp_user_tenant_fields(update_data, current_user)
     
     await db.users.update_one(
         {"id": user_id},
