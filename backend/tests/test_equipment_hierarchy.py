@@ -36,9 +36,9 @@ class TestEquipmentHierarchyLibrary:
         assert "discipline" in first_type
         assert "icon" in first_type
         
-    def test_get_disciplines(self, api_client):
+    def test_get_disciplines(self, owner_authenticated_client):
         """Get all disciplines"""
-        response = api_client.get(f"{BASE_URL}/api/equipment-hierarchy/disciplines")
+        response = owner_authenticated_client.get(f"{BASE_URL}/api/equipment-hierarchy/disciplines")
         assert response.status_code == 200
         data = response.json()
         assert "disciplines" in data
@@ -49,9 +49,9 @@ class TestEquipmentHierarchyLibrary:
         expected = {"rotating", "electrical", "instrumentation", "static", "piping"}
         assert expected.issubset(normalized), f"Missing ISO disciplines in {disciplines}"
         
-    def test_get_criticality_profiles(self, api_client):
+    def test_get_criticality_profiles(self, owner_authenticated_client):
         """Get all criticality profiles"""
-        response = api_client.get(f"{BASE_URL}/api/equipment-hierarchy/criticality-profiles")
+        response = owner_authenticated_client.get(f"{BASE_URL}/api/equipment-hierarchy/criticality-profiles")
         assert response.status_code == 200
         data = response.json()
         assert "profiles" in data
@@ -72,9 +72,9 @@ class TestEquipmentHierarchyLibrary:
             assert "fatality_risk" in profile["defaults"]
             assert "production_loss_per_day" in profile["defaults"]
             
-    def test_get_iso_levels(self, api_client):
+    def test_get_iso_levels(self, owner_authenticated_client):
         """Get ISO 14224 hierarchy levels"""
-        response = api_client.get(f"{BASE_URL}/api/equipment-hierarchy/iso-levels")
+        response = owner_authenticated_client.get(f"{BASE_URL}/api/equipment-hierarchy/iso-levels")
         assert response.status_code == 200
         data = response.json()
         assert "levels" in data
