@@ -185,24 +185,28 @@ class MaintenanceStrategyGenerator:
         self.api_key = api_key
     
     def _call_openai(self, user_message: str, user_id: str = "system") -> str:
-        """Make a chat completion call to OpenAI with cost guard and usage tracking."""
-        from ai_helpers import chat_completions_create, get_openai_client
+        """Make a chat completion call via the shared AI gateway."""
+        import asyncio
 
-        try:
-            client = get_openai_client()
-            response = chat_completions_create(
-                client,
-                "maintenance_strategy_generator.generate",
-                user_id=user_id,
-                model="gpt-4o",
-                messages=[
+        from services.ai_gateway import chat_completion_response
+
+        async def _run():
+            response = await chat_completion_response(
+                [
                     {"role": "system", "content": STRATEGY_GENERATION_PROMPT},
                     {"role": "user", "content": user_message},
                 ],
+                user_id=user_id,
+                company_id="default",
+                endpoint="maintenance_strategy_generator.generate",
+                model="gpt-4o",
                 max_tokens=4000,
                 temperature=0.5,
             )
             return response.choices[0].message.content
+
+        try:
+            return asyncio.run(_run())
         except Exception as e:
             logger.error(f"OpenAI API error: {str(e)}")
             raise

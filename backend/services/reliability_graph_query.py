@@ -26,11 +26,11 @@ async def get_equipment_reliability_context(
     tid = tenant_id_from_user(user)
     edges = await get_edges_for_equipment(equipment_id, limit=edge_limit, tenant_id=tid)
     equipment = await db.equipment_nodes.find_one(
-        {"id": equipment_id},
+        merge_tenant_filter({"id": equipment_id}, user),
         {"_id": 0, "id": 1, "name": 1, "tag": 1, "equipment_type_id": 1, "criticality": 1},
     )
     program = await db.maintenance_programs_v2.find_one(
-        {"equipment_id": equipment_id},
+        merge_tenant_filter({"equipment_id": equipment_id}, user),
         {"_id": 0, "id": 1, "source_strategy_version": 1, "tasks": 1},
     )
     task_count = len((program or {}).get("tasks") or [])

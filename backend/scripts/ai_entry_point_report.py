@@ -16,10 +16,7 @@ OPENAI_IMPORT_ALLOWLIST = {
 }
 
 # Grandfathered legacy bypass paths (tracked, not blocking CI growth).
-OPENAI_IMPORT_BASELINE = {
-    "ai_helpers.py",
-    "routes/feedback.py",
-}
+OPENAI_IMPORT_BASELINE: set[str] = set()
 
 OPENAI_IMPORT_RE = re.compile(r"^\s*from\s+openai\s+import\b", re.MULTILINE)
 AI_GATEWAY_RE = re.compile(r"\b(?:from\s+services\.ai_gateway\s+import|services\.ai_gateway\.)")

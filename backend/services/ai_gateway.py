@@ -186,3 +186,31 @@ async def chat_completion_response(
         model=resolved_model,
     )
     return response
+
+
+async def transcribe_audio(
+    audio_data: bytes,
+    *,
+    filename: str = "audio.webm",
+    language: Optional[str] = None,
+    user_id: Optional[str] = None,
+    company_id: Optional[str] = None,
+    endpoint: str = "ai_gateway.transcribe_audio",
+    installation_id: Optional[str] = None,
+    installation_name: Optional[str] = None,
+) -> str:
+    """Guarded Whisper transcription via openai_service transport."""
+    from services.openai_service import transcribe_audio as _transcribe
+
+    uid = user_id or "anonymous"
+    cid = company_id or "default"
+    guard_ai_request(user_id=uid, company_id=cid, endpoint=endpoint)
+    return await _transcribe(
+        audio_data,
+        filename=filename,
+        language=language,
+        user_id=uid,
+        company_id=cid,
+        installation_id=installation_id,
+        installation_name=installation_name,
+    )

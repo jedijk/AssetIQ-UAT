@@ -120,67 +120,34 @@ async def transcribe_audio(
     Supports mp3, mp4, mpeg, mpga, m4a, wav, webm formats.
     Max file size: 25 MB.
     """
-    import os
     import logging
-    import tempfile
-    from openai import OpenAI
-    
+
+    from services.ai_gateway import transcribe_audio as gateway_transcribe
+
     logger = logging.getLogger(__name__)
-    
-    # Validate file type
+
     ext = file.filename.split(".")[-1].lower() if file.filename else "webm"
     allowed_formats = ["mp3", "mp4", "mpeg", "mpga", "m4a", "wav", "webm"]
     if ext not in allowed_formats:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail=f"Invalid audio format. Allowed: {', '.join(allowed_formats)}"
         )
-    
-    # Read file content
+
     file_content = await file.read()
-    
-    # Check file size (25 MB limit)
     if len(file_content) > 25 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large. Maximum size is 25 MB.")
-    
-    # Get API key
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="Transcription service not configured")
-    
+
+    user_id, company_id = user_context(current_user)
     try:
-        # Create temp file for the audio
-        with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=False) as temp_file:
-            temp_file.write(file_content)
-            temp_path = temp_file.name
-        
-        try:
-            # Initialize OpenAI client
-            client = OpenAI(api_key=api_key)
-            
-            # Transcribe audio
-            with open(temp_path, "rb") as audio_file:
-                response = client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=audio_file,
-                    response_format="json"
-                )
-            
-            # Clean up temp file
-            os.unlink(temp_path)
-            
-            transcribed_text = response.text if hasattr(response, 'text') else str(response)
-            
-            return {
-                "text": transcribed_text,
-                "success": True
-            }
-        except Exception as e:
-            # Clean up temp file on error
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
-            raise e
-            
+        transcribed_text = await gateway_transcribe(
+            file_content,
+            filename=f"audio.{ext}",
+            user_id=user_id,
+            company_id=company_id,
+            endpoint="feedback.transcribe_audio",
+        )
+        return {"text": transcribed_text, "success": True}
     except HTTPException:
         raise
     except Exception as e:

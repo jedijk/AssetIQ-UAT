@@ -9,10 +9,9 @@ import base64
 import logging
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 from dotenv import load_dotenv
 from fastapi import HTTPException
-from openai import OpenAI
 
 from database import db
 from services.ai_cost_guard import guard_ai_request, record_ai_tokens
@@ -21,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def chat_completions_create(
-    client: OpenAI,
+    client: Any,
     endpoint: str,
     *,
     user_id: str = "system",
@@ -55,12 +54,11 @@ def chat_completions_create(
     return response
 
 
-def get_openai_client() -> OpenAI:
+def get_openai_client():
     """Get OpenAI client with API key from environment."""
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY not configured in environment")
-    return OpenAI(api_key=api_key)
+    from services.openai_service import get_openai_client as _get_client
+
+    return _get_client()
 
 
 async def _gateway_completion(
@@ -766,65 +764,32 @@ async def transcribe_audio_with_ai(
     Supports mixed languages (e.g. Dutch + English technical terms) by NOT forcing translation.
     If `language` is provided (e.g. 'en', 'nl'), Whisper uses it as a hint; otherwise it auto-detects.
     """
-    temp_path = None
     try:
-        guard_ai_request(
+        if "," in audio_base64:
+            audio_base64 = audio_base64.split(",", 1)[1]
+
+        audio_data = base64.b64decode(audio_base64)
+        suffix = detect_audio_format(audio_data)
+        logger.info(
+            "Detected audio format: %s, data size: %s bytes, language hint: %s",
+            suffix,
+            len(audio_data),
+            language,
+        )
+
+        from services.ai_gateway import transcribe_audio as gateway_transcribe
+
+        return await gateway_transcribe(
+            audio_data,
+            filename=f"audio{suffix}",
+            language=language if language in ("en", "nl") else None,
             user_id=user_id,
             company_id=company_id,
             endpoint="ai_helpers.transcribe_audio",
-            estimated_tokens=500,
-        )
-        client = get_openai_client()
-
-        # Strip data URL prefix if present (e.g., "data:audio/webm;base64,...")
-        if ',' in audio_base64:
-            audio_base64 = audio_base64.split(',')[1]
-        
-        # Decode the base64 audio data
-        audio_data = base64.b64decode(audio_base64)
-        
-        # Determine file extension based on magic bytes
-        suffix = detect_audio_format(audio_data)
-        
-        logger.info(f"Detected audio format: {suffix}, data size: {len(audio_data)} bytes, language hint: {language}")
-
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
-            f.write(audio_data)
-            temp_path = f.name
-
-        with open(temp_path, "rb") as audio_file:
-            # Use transcriptions endpoint to preserve the original spoken language(s).
-            # This handles mixed-language input (e.g. Dutch sentences with English technical terms)
-            # far better than the translations endpoint, which forces output to English.
-            kwargs = {
-                "model": "whisper-1",
-                "file": audio_file,
-                "response_format": "json",
-                # A short domain prompt helps Whisper bias toward technical reliability vocabulary
-                "prompt": "Reliability and maintenance observation. Equipment, failure mode, sensor, valve, pump, bearing, vibration, leak.",
-            }
-            if language in ("en", "nl"):
-                kwargs["language"] = language
-            response = client.audio.transcriptions.create(**kwargs)
-
-        transcript = response.text
-        completion_tokens = max(1, len(transcript or "") // 4)
-        record_ai_tokens(
-            user_id=user_id or "system",
-            company_id=company_id or "default",
-            endpoint="voice_transcription",
-            prompt_tokens=0,
-            completion_tokens=completion_tokens,
-            model="whisper-1",
-            feature="voice_transcription",
             installation_id=installation_id,
             installation_name=installation_name,
         )
-        return transcript
 
     except Exception as e:
         logger.error(f"Transcription error: {e}")
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
-    finally:
-        if temp_path and os.path.exists(temp_path):
-            os.unlink(temp_path)

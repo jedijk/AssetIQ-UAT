@@ -28,6 +28,24 @@ EDGE_STATUS_ACTIVE = "active"
 EDGE_STATUS_RETIRED = "retired"
 
 
+def _edge_tenant_clause(tenant_id: Optional[str]) -> Dict[str, Any]:
+    """Tenant read filter for reliability_edges (strict or migration-safe)."""
+    if not tenant_id:
+        return {}
+    from services.tenant_schema import tenant_read_filter
+
+    return tenant_read_filter({"company_id": tenant_id})
+
+
+def _merge_edge_query(base: Dict[str, Any], tenant_id: Optional[str]) -> Dict[str, Any]:
+    tenant_part = _edge_tenant_clause(tenant_id)
+    if not tenant_part:
+        return base or {}
+    if not base:
+        return tenant_part
+    return {"$and": [base, tenant_part]}
+
+
 async def _run_graph_sync(coro, label: str) -> None:
     """Execute graph sync inline; log-and-continue unless strict/audit mode is enabled."""
     from services.reliability_graph_strict import graph_sync_strict
@@ -1004,11 +1022,7 @@ async def get_edges_for_equipment(
     query: Dict[str, Any] = {"equipment_id": equipment_id}
     if not include_retired:
         query["status"] = {"$ne": EDGE_STATUS_RETIRED}
-    if tenant_id:
-        query["$or"] = [
-            {"tenant_id": tenant_id},
-            {"tenant_id": {"$exists": False}},
-        ]
+    query = _merge_edge_query(query, tenant_id)
     return await db[COLLECTION].find(
         query,
         {"_id": 0},
@@ -1033,13 +1047,7 @@ async def get_edges_for_node(
     query: Dict[str, Any] = {"$or": clauses}
     if not include_retired:
         query["status"] = {"$ne": EDGE_STATUS_RETIRED}
-    if tenant_id:
-        query = {
-            "$and": [
-                query,
-                {"$or": [{"tenant_id": tenant_id}, {"tenant_id": {"$exists": False}}]},
-            ]
-        }
+    query = _merge_edge_query(query, tenant_id)
     return await db[COLLECTION].find(query, {"_id": 0}).sort("updated_at", -1).to_list(limit)
 
 
