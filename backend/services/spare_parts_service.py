@@ -58,14 +58,52 @@ async def _find_by_duplicate_key(user: dict, description: str, type_model: str, 
     return await db.spare_parts.find_one(query, {"_id": 0})
 
 
-async def _enrich_list_item(user: dict, doc: dict) -> dict:
+def _serialize_spare_part_doc(doc: dict) -> dict:
+    """Return a JSON-safe spare-part dict for API responses."""
+    out = dict(doc)
+    for key in ("created_at", "updated_at"):
+        value = out.get(key)
+        if hasattr(value, "isoformat"):
+            out[key] = value.isoformat()
+    return out
+
+
+def _build_list_query(
+    user: dict,
+    *,
+    category_id: Optional[str] = None,
+    equipment_id: Optional[str] = None,
+    search: Optional[str] = None,
+) -> Dict[str, Any]:
+    clauses: List[Dict[str, Any]] = []
+    if category_id:
+        clauses.append({"category_id": category_id})
+    if equipment_id:
+        clauses.append({"equipment_links.equipment_id": equipment_id})
+    if search:
+        search_clause = or_search_fields(search, "description", "type_model", "manufacturer", "notes")
+        if search_clause:
+            clauses.append(search_clause)
+    if not clauses:
+        base_query: Dict[str, Any] = {}
+    elif len(clauses) == 1:
+        base_query = clauses[0]
+    else:
+        base_query = {"$and": clauses}
+    return merge_tenant_filter(base_query, user)
+
+
+async def _enrich_list_item(user: dict, doc: dict) -> Optional[dict]:
+    spare_part_id = doc.get("id")
+    if not spare_part_id:
+        return None
     equipment_links = doc.get("equipment_links") or []
     file_count = await db.spare_part_files.count_documents(
-        merge_tenant_filter({"spare_part_id": doc["id"]}, user),
+        merge_tenant_filter({"spare_part_id": spare_part_id}, user),
     )
     has_url = bool(doc.get("document_url"))
     return {
-        **doc,
+        **_serialize_spare_part_doc(doc),
         "linked_equipment_count": len(equipment_links),
         "document_count": file_count + (1 if has_url else 0),
     }
@@ -80,13 +118,12 @@ async def list_spare_parts(
     sort_by: str = "updated_at",
     sort_dir: int = -1,
 ) -> dict:
-    query: Dict[str, Any] = merge_tenant_filter({}, user)
-    if category_id:
-        query["category_id"] = category_id
-    if equipment_id:
-        query["equipment_links.equipment_id"] = equipment_id
-    if search:
-        query.update(or_search_fields(search, "description", "type_model", "manufacturer", "notes"))
+    query = _build_list_query(
+        user,
+        category_id=category_id,
+        equipment_id=equipment_id,
+        search=search,
+    )
     allowed_sort = {"description", "type_model", "manufacturer", "updated_at", "created_at"}
     sort_field = sort_by if sort_by in allowed_sort else "updated_at"
     direction = -1 if sort_dir < 0 else 1
@@ -94,7 +131,9 @@ async def list_spare_parts(
     items = await cursor.to_list(500)
     enriched = []
     for doc in items:
-        enriched.append(await _enrich_list_item(user, doc))
+        item = await _enrich_list_item(user, doc)
+        if item:
+            enriched.append(item)
     return {"spare_parts": enriched, "total": len(enriched)}
 
 
@@ -160,12 +199,16 @@ async def create_spare_part(user: dict, payload: SparePartCreate) -> dict:
         "updated_at": now,
     }, user)
     await db.spare_parts.insert_one(doc)
-    await sync_spare_part_equipment_links(
-        spare_part_id=doc["id"],
-        equipment_links=links,
-        tenant_id=tenant_id_from_user(user),
-    )
-    return await _enrich_list_item(user, doc)
+    try:
+        await sync_spare_part_equipment_links(
+            spare_part_id=doc["id"],
+            equipment_links=links,
+            tenant_id=tenant_id_from_user(user),
+        )
+    except Exception:
+        pass
+    item = await _enrich_list_item(user, doc)
+    return item or _serialize_spare_part_doc(doc)
 
 
 async def _merge_into_existing(
@@ -194,14 +237,21 @@ async def _merge_into_existing(
         merge_tenant_filter({"id": existing["id"]}, user),
         {"$set": updates},
     )
-    await retire_spare_part_graph(existing["id"], user)
-    await sync_spare_part_equipment_links(
-        spare_part_id=existing["id"],
-        equipment_links=merged_links,
-        tenant_id=tenant_id_from_user(user),
-    )
+    try:
+        await retire_spare_part_graph(existing["id"], user)
+    except Exception:
+        pass
+    try:
+        await sync_spare_part_equipment_links(
+            spare_part_id=existing["id"],
+            equipment_links=merged_links,
+            tenant_id=tenant_id_from_user(user),
+        )
+    except Exception:
+        pass
     updated = {**existing, **updates, "merged": True}
-    return await _enrich_list_item(user, updated)
+    item = await _enrich_list_item(user, updated)
+    return item or _serialize_spare_part_doc(updated)
 
 
 async def update_spare_part(user: dict, spare_part_id: str, payload: SparePartUpdate) -> dict:
@@ -250,12 +300,18 @@ async def update_spare_part(user: dict, spare_part_id: str, payload: SparePartUp
     )
 
     if payload.equipment_links is not None:
-        await retire_spare_part_graph(spare_part_id, user)
-        await sync_spare_part_equipment_links(
-            spare_part_id=spare_part_id,
-            equipment_links=updates["equipment_links"],
-            tenant_id=tenant_id_from_user(user),
-        )
+        try:
+            await retire_spare_part_graph(spare_part_id, user)
+        except Exception:
+            pass
+        try:
+            await sync_spare_part_equipment_links(
+                spare_part_id=spare_part_id,
+                equipment_links=updates["equipment_links"],
+                tenant_id=tenant_id_from_user(user),
+            )
+        except Exception:
+            pass
 
     return await get_spare_part(user, spare_part_id)
 
@@ -302,11 +358,14 @@ async def link_equipment(
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }},
     )
-    await sync_spare_part_equipment_links(
-        spare_part_id=spare_part_id,
-        equipment_links=links,
-        tenant_id=tenant_id_from_user(user),
-    )
+    try:
+        await sync_spare_part_equipment_links(
+            spare_part_id=spare_part_id,
+            equipment_links=links,
+            tenant_id=tenant_id_from_user(user),
+        )
+    except Exception:
+        pass
     return await get_spare_part(user, spare_part_id)
 
 
@@ -329,10 +388,16 @@ async def unlink_equipment(user: dict, spare_part_id: str, equipment_id: str) ->
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }},
     )
-    await retire_spare_part_graph(spare_part_id, user)
-    await sync_spare_part_equipment_links(
-        spare_part_id=spare_part_id,
-        equipment_links=links,
-        tenant_id=tenant_id_from_user(user),
-    )
+    try:
+        await retire_spare_part_graph(spare_part_id, user)
+    except Exception:
+        pass
+    try:
+        await sync_spare_part_equipment_links(
+            spare_part_id=spare_part_id,
+            equipment_links=links,
+            tenant_id=tenant_id_from_user(user),
+        )
+    except Exception:
+        pass
     return await get_spare_part(user, spare_part_id)

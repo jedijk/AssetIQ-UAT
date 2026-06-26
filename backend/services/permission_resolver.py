@@ -120,6 +120,8 @@ async def check_api_permission(role: str, permission: str) -> bool:
         return _roles_fallback(role, permission)
 
     feature_perms = role_perms.get(ui_feature, {})
+    if not isinstance(feature_perms, dict):
+        feature_perms = {}
     if feature_perms.get(action, False):
         return True
 

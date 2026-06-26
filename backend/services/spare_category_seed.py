@@ -34,6 +34,7 @@ async def seed_spare_categories_for_user(user: Optional[dict]) -> int:
     if existing > 0:
         return 0
     now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
     docs = []
     for value, label, sort_order in SEED_SPARE_CATEGORIES:
         doc = {
@@ -42,12 +43,16 @@ async def seed_spare_categories_for_user(user: Optional[dict]) -> int:
             "label": label,
             "sort_order": sort_order,
             "is_active": True,
-            "created_at": now,
-            "updated_at": now,
+            "created_at": now_iso,
+            "updated_at": now_iso,
         }
         if tid:
             doc = with_tenant_id(doc, pseudo_user)
         docs.append(doc)
     if docs:
-        await db.spare_categories.insert_many(docs)
+        try:
+            await db.spare_categories.insert_many(docs, ordered=False)
+        except Exception:
+            # Another request may have seeded concurrently.
+            pass
     return len(docs)

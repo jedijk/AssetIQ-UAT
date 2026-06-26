@@ -1,5 +1,5 @@
 """Default UI permission matrix and backfill helpers (shared by routes and services)."""
-from typing import Dict
+from typing import Dict, Optional
 
 # Default permissions for each role
 DEFAULT_PERMISSIONS = {
@@ -246,6 +246,20 @@ FEATURES = {
 }
 
 
+def _normalize_feature_perms(value, fallback: Optional[dict] = None) -> dict:
+    """Coerce stored permission values to {read, write, delete} dicts."""
+    base = fallback or {"read": False, "write": False, "delete": False}
+    if isinstance(value, dict):
+        return {
+            "read": bool(value.get("read", base.get("read", False))),
+            "write": bool(value.get("write", base.get("write", False))),
+            "delete": bool(value.get("delete", base.get("delete", False))),
+        }
+    if isinstance(value, bool):
+        return {"read": value, "write": False, "delete": False}
+    return dict(base)
+
+
 def backfill_permissions(stored_perms: Dict) -> Dict:
     """Ensure stored role permissions include every feature key in FEATURES."""
     if not isinstance(stored_perms, dict):
@@ -267,8 +281,14 @@ def backfill_permissions(stored_perms: Dict) -> Dict:
             merged["supervisor_command_center"] = dict(merged["dashboard_operational"])
         defaults_for_role = DEFAULT_PERMISSIONS.get(role_name) or DEFAULT_PERMISSIONS["viewer"]
         for feature_key in FEATURES.keys():
+            default_feature = defaults_for_role.get(
+                feature_key,
+                {"read": False, "write": False, "delete": False},
+            )
             if feature_key not in merged:
-                merged[feature_key] = dict(defaults_for_role.get(feature_key, {"read": False, "write": False, "delete": False}))
+                merged[feature_key] = dict(default_feature)
+            else:
+                merged[feature_key] = _normalize_feature_perms(merged.get(feature_key), default_feature)
         result[role_name] = merged
     return result
 

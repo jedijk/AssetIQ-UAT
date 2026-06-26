@@ -1,6 +1,11 @@
 """SpareIQ unit tests."""
+import os
+
+os.environ.setdefault("MONGO_URL", "mongodb://localhost:27017")
+
+from services.permissions_defaults import backfill_permissions
 from services.spare_parts_import_service import _map_headers, build_import_template_bytes
-from services.spare_parts_service import _normalize_key
+from services.spare_parts_service import _build_list_query, _normalize_key
 
 
 def test_duplicate_key_normalizes_description_and_type_model():
@@ -22,7 +27,7 @@ def test_import_template_generates_xlsx():
     assert content[:2] == b"PK"
 
 
-def test_task_consumes_spare_parts_for_replacement_title():
+def test_action_consumes_spare_parts_for_replacement_title():
     from services.spare_part_requirements_service import (
         action_consumes_spare_parts,
         task_consumes_spare_parts,
@@ -33,4 +38,30 @@ def test_task_consumes_spare_parts_for_replacement_title():
     assert task_consumes_spare_parts({"task_title": "Inspect", "spare_part_requirements": [{"spare_part_id": "p1", "quantity": 2}]})
     assert action_consumes_spare_parts({"action_type": "CM", "title": "Replace seal"})
     assert not action_consumes_spare_parts({"action_type": "PM", "title": "Monthly inspection"})
+
+
+def test_backfill_permissions_normalizes_spareiq_feature_dict():
+    stored = {
+        "admin": {
+            "spareiq": "read",
+            "equipment": {"read": True, "write": True, "delete": False},
+        }
+    }
+    result = backfill_permissions(stored)
+    assert result["admin"]["spareiq"]["read"] is True
+    assert result["admin"]["spareiq"]["write"] is True
+
+
+def test_build_list_query_combines_search_with_tenant_filter(monkeypatch):
+    import services.tenant_schema as tenant_schema
+
+    monkeypatch.setattr(tenant_schema, "TENANT_STRICT_MODE", False)
+    user = {"company_id": "Tyromer"}
+    query = _build_list_query(user, equipment_id="eq-1", search="bearing")
+    assert "$and" in query
+    filter_parts = query["$and"][0].get("$and", [query["$and"][0]])
+    assert any("equipment_links.equipment_id" in part for part in filter_parts)
+    assert any("$or" in part for part in filter_parts)
+    tenant_part = query["$and"][1]
+    assert "$or" in tenant_part
 
