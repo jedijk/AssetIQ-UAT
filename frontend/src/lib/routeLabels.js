@@ -11,6 +11,7 @@ import {
   FileText,
   GitBranch,
   LayoutDashboard,
+  Package,
   ScrollText,
   Server,
   Settings,
@@ -48,6 +49,7 @@ const staticRouteLabels = {
   '/supervisor': 'Supervisor Command Center',
   '/reliability/cases': 'Reliability Cases',
   '/definitions': 'Definitions',
+  '/spareiq': 'SpareIQ',
   '/settings': 'Settings',
   '/settings/preferences': 'Preferences',
   '/settings/general': 'General',
@@ -80,6 +82,7 @@ const dynamicRoutePatterns = [
   { pattern: /^\/threats\/([^/]+)\/workspace$/, label: 'Observation Workspace', icon: AlertTriangle },
   { pattern: /^\/threats\/([^/]+)$/, label: 'Observation Detail', icon: AlertTriangle },
   { pattern: /^\/actions\/([^/]+)$/, label: 'Action Detail', icon: ClipboardList },
+  { pattern: /^\/spareiq\/([^/]+)$/, label: 'Spare Part', icon: Package },
   { pattern: /^\/equipment\/([^/]+)\/trace$/, label: 'Reliability Trace', icon: GitBranch },
   { pattern: /^\/equipment\/([^/]+)\/reliability$/, label: 'Reliability Profile', icon: Sparkles },
   { pattern: /^\/reliability\/cases\/([^/]+)$/, label: 'Case Detail', icon: Sparkles },
@@ -104,6 +107,7 @@ const staticRouteIcons = {
   '/supervisor': ClipboardCheck,
   '/reliability/cases': Sparkles,
   '/definitions': Sliders,
+  '/spareiq': Package,
   '/settings': Settings,
   '/settings/preferences': Settings,
   '/settings/general': Settings,
@@ -231,6 +235,9 @@ export function getParentBreadcrumbPath(path) {
   }
   if (/^\/actions\/[^/]+$/.test(normalized)) {
     return '/actions';
+  }
+  if (/^\/spareiq\/[^/]+$/.test(normalized)) {
+    return '/spareiq';
   }
   if (/^\/reliability\/cases\/[^/]+$/.test(normalized)) {
     return '/reliability/cases';

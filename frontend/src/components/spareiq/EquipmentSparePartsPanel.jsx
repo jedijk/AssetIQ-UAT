@@ -30,6 +30,17 @@ function sparePartHoverComment(part, link, t) {
   return lines.length ? lines.join("\n\n") : null;
 }
 
+function findEquipmentLink(part, equipmentId) {
+  const target = String(equipmentId || "");
+  if (!target) return null;
+  for (const source of [part?.equipment_links, part?.linked_equipment]) {
+    if (!Array.isArray(source)) continue;
+    const match = source.find((link) => link && String(link.equipment_id) === target);
+    if (match) return match;
+  }
+  return null;
+}
+
 export default function EquipmentSparePartsPanel({ equipmentId, equipmentName }) {
   const { t } = useLanguage();
   const { hasPermission } = usePermissions();
@@ -148,9 +159,7 @@ export default function EquipmentSparePartsPanel({ equipmentId, equipmentName })
       )}
       <ul className="divide-y divide-slate-100 rounded border border-slate-200">
         {parts.map((part) => {
-          const link = (part.equipment_links || part.linked_equipment || []).find(
-            (l) => l.equipment_id === equipmentId
-          );
+          const link = findEquipmentLink(part, equipmentId);
           const hoverComment = sparePartHoverComment(part, link, t);
           const partSummary = (
             <div className="min-w-0 flex items-center gap-2">
@@ -167,13 +176,17 @@ export default function EquipmentSparePartsPanel({ equipmentId, equipmentName })
             </div>
           );
           return (
-            <li key={part.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+            <li
+              key={part.id}
+              className="flex items-center justify-between gap-2 px-3 py-2 text-sm"
+              title={hoverComment || undefined}
+            >
               {hoverComment ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="min-w-0 flex-1 cursor-default">{partSummary}</div>
+                    <div className="min-w-0 flex-1 cursor-help">{partSummary}</div>
                   </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs whitespace-pre-wrap text-xs">
+                  <TooltipContent side="top" className="max-w-xs whitespace-pre-wrap text-xs z-[110]">
                     {hoverComment}
                   </TooltipContent>
                 </Tooltip>

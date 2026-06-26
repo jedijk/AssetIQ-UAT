@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ExternalLink, Package, Pencil, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, ExternalLink, Package, Pencil, Search, Trash2, Upload } from "lucide-react";
 import { useLanguage } from "../contexts/LanguageContext";
 import { toast } from "sonner";
 
 import { sparePartsAPI } from "../lib/apis/spareParts";
 import { usePermissions } from "../contexts/PermissionsContext";
+import { useBreadcrumbTab } from "../contexts/BreadcrumbContext";
 import { Button } from "../components/ui/button";
 import SparePartFormDialog from "../components/spareiq/SparePartFormDialog";
 
@@ -40,6 +41,8 @@ export default function SparePartDetailPage() {
     queryFn: () => sparePartsAPI.getById(id),
     enabled: Boolean(id),
   });
+
+  useBreadcrumbTab(part?.description || null);
 
   const { data: categoriesData } = useQuery({
     queryKey: ["spare-categories"],
@@ -126,9 +129,10 @@ export default function SparePartDetailPage() {
                       key={link.equipment_id}
                       type="button"
                       onClick={() => openHierarchySearch(hierarchySearchQuery(link))}
-                      className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-mono text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-mono text-slate-700 hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-pointer"
                       title={t("observationWorkspace.clickToFindInHierarchy") || "Click to find in hierarchy"}
                     >
+                      <Search className="w-3 h-3 shrink-0" />
                       {equipmentLinkLabel(link)}
                     </button>
                   ))}
@@ -222,9 +226,10 @@ export default function SparePartDetailPage() {
                       <button
                         type="button"
                         onClick={() => openHierarchySearch(link.equipment_tag)}
-                        className="font-mono text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded text-xs hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1 font-mono text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded text-xs hover:bg-blue-100 hover:text-blue-700 transition-colors cursor-pointer"
                         title={t("observationWorkspace.clickToFindInHierarchy") || "Click to find in hierarchy"}
                       >
+                        <Search className="w-3 h-3 shrink-0" />
                         {link.equipment_tag}
                       </button>
                     ) : null}
